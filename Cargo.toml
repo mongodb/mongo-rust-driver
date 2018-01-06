@@ -1,0 +1,6 @@
+[package]
+authors = ["Saghm Rossi <saghmrossi@gmail.com>"]
+license = "Apache-2.0"
+name = "mrd"
+edition = "2018"
+version = "0.1.0"
