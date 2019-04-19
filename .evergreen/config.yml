@@ -1,0 +1,289 @@
+########################################
+# Evergreen Template for MongoDB Drivers
+########################################
+
+# When a task that used to pass starts to fail
+# Go through all versions that may have been skipped to detect
+# when the task started failing
+stepback: true
+
+# Mark a failure as a system/bootstrap failure (purple box) rather then a task
+# failure by default.
+# Actual testing tasks are marked with `type: test`
+command_type: system
+
+# Protect ourself against rogue test case, or curl gone wild, that runs forever
+# 12 minutes is the longest we'll ever run
+exec_timeout_secs: 3600 # 12 minutes is the longest we'll ever run
+
+# What to do when evergreen hits the timeout (`post:` tasks are run automatically)
+timeout:
+  - command: shell.exec
+    params:
+      script: |
+        ls -la
+
+functions:
+  "fetch source":
+    # Executes git clone and applies the submitted patch, if any
+    - command: git.get_project
+      params:
+        directory: "src"
+    # Applies the subitted patch, if any
+    # Deprecated. Should be removed. But still needed for certain agents (ZAP)
+    - command: git.apply_patch
+    # Make an evergreen exapanstion file with dynamic values
+    - command: shell.exec
+      params:
+        working_dir: "src"
+        script: |
+           # Get the current unique version of this checkout
+           if [ "${is_patch}" = "true" ]; then
+              CURRENT_VERSION=$(git describe)-patch-${version_id}
+           else
+              CURRENT_VERSION=latest
+           fi
+
+           export DRIVERS_TOOLS="$(pwd)/../drivers-tools"
+
+           # Python has cygwin path problems on Windows. Detect prospective mongo-orchestration home directory
+           if [ "Windows_NT" = "$OS" ]; then # Magic variable in cygwin
+              export DRIVERS_TOOLS=$(cygpath -m $DRIVERS_TOOLS)
+           fi
+
+           export MONGO_ORCHESTRATION_HOME="$DRIVERS_TOOLS/.evergreen/orchestration"
+           export MONGODB_BINARIES="$DRIVERS_TOOLS/mongodb/bin"
+           export UPLOAD_BUCKET="${project}"
+           export PROJECT_DIRECTORY="$(pwd)"
+
+           cat <<EOT > expansion.yml
+           CURRENT_VERSION: "$CURRENT_VERSION"
+           DRIVERS_TOOLS: "$DRIVERS_TOOLS"
+           MONGO_ORCHESTRATION_HOME: "$MONGO_ORCHESTRATION_HOME"
+           MONGODB_BINARIES: "$MONGODB_BINARIES"
+           UPLOAD_BUCKET: "$UPLOAD_BUCKET"
+           PROJECT_DIRECTORY: "$PROJECT_DIRECTORY"
+           PREPARE_SHELL: |
+              set -o errexit
+              set -o xtrace
+              export DRIVERS_TOOLS="$DRIVERS_TOOLS"
+              export MONGO_ORCHESTRATION_HOME="$MONGO_ORCHESTRATION_HOME"
+              export MONGODB_BINARIES="$MONGODB_BINARIES"
+              export UPLOAD_BUCKET="$UPLOAD_BUCKET"
+              export PROJECT_DIRECTORY="$PROJECT_DIRECTORY"
+
+              export TMPDIR="$MONGO_ORCHESTRATION_HOME/db"
+              export PATH="$MONGODB_BINARIES:$PATH"
+              export PROJECT="${project}"
+              
+              export AUTH=${AUTH}
+              export SSL=${SSL}
+              export TOPOLOGY=${TOPOLOGY}
+              export RVM_RUBY="${RVM_RUBY}"
+              export MONGODB_VERSION=${VERSION}
+              export FCV=${FCV}
+              export MONGO_RUBY_DRIVER_LINT=${LINT}
+              export RETRY_WRITES=${RETRY_WRITES}
+              export WITH_ACTIVE_SUPPORT="${WITH_ACTIVE_SUPPORT}"
+           EOT
+           # See what we've done
+           cat expansion.yml
+
+    # Load the expansion file to make an evergreen variable with the current unique version
+    - command: expansions.update
+      params:
+        file: src/expansion.yml
+
+  "prepare resources":
+    - command: shell.exec
+      params:
+        script: |
+          ${PREPARE_SHELL}
+          rm -rf $DRIVERS_TOOLS
+          git clone git://github.com/mongodb-labs/drivers-evergreen-tools.git $DRIVERS_TOOLS
+          echo "{ \"releases\": { \"default\": \"$MONGODB_BINARIES\" }}" > $MONGO_ORCHESTRATION_HOME/orchestration.config
+
+  "install dependencies":
+    command: shell.exec
+    params:
+      working_dir: "src"
+      script: |
+        ${PREPARE_SHELL}
+        .evergreen/install-dependencies.sh
+
+  "bootstrap mongo-orchestration":
+    - command: shell.exec
+      params:
+        script: |
+          ${PREPARE_SHELL}
+          MONGODB_VERSION=${VERSION} TOPOLOGY=${TOPOLOGY} AUTH=${AUTH} SSL=${SSL} sh ${DRIVERS_TOOLS}/.evergreen/run-orchestration.sh
+    # run-orchestration generates expansion file with the MONGODB_URI for the cluster
+    - command: expansions.update
+      params:
+        file: mo-expansion.yml
+
+  "run tests":
+    - command: shell.exec
+      type: test
+      params:
+        shell: bash
+        working_dir: "src"
+        script: |
+          ${PREPARE_SHELL}
+          MONGODB_URI="${MONGODB_URI}" .evergreen/run-tests.sh
+
+  "check format":
+    - command: shell.exec
+      type: test
+      params:
+        shell: bash
+        working_dir: "src"
+        script: |
+          ${PREPARE_SHELL}
+          .evergreen/check-format.sh
+
+  "cleanup":
+    - command: shell.exec
+      params:
+        script: |
+          ${PREPARE_SHELL}
+          cd "$MONGO_ORCHESTRATION_HOME"
+          # source the mongo-orchestration virtualenv if it exists
+          if [ -f venv/bin/activate ]; then
+            . venv/bin/activate
+          elif [ -f venv/Scripts/activate ]; then
+            . venv/Scripts/activate
+          fi
+          mongo-orchestration stop
+          cd -
+          rm -rf $DRIVERS_TOOLS || true
+
+  "fix absolute paths":
+    - command: shell.exec
+      params:
+        script: |
+          ${PREPARE_SHELL}
+          for filename in $(find ${DRIVERS_TOOLS} -name \*.json); do
+            perl -p -i -e "s|ABSOLUTE_PATH_REPLACEMENT_TOKEN|${DRIVERS_TOOLS}|g" $filename
+          done
+
+  "windows fix":
+    - command: shell.exec
+      params:
+        script: |
+          ${PREPARE_SHELL}
+          for i in $(find ${DRIVERS_TOOLS}/.evergreen ${PROJECT_DIRECTORY}/.evergreen -name \*.sh); do
+            cat $i | tr -d '\r' > $i.new
+            mv $i.new $i
+          done
+
+  "make files executable":
+    - command: shell.exec
+      params:
+        script: |
+          ${PREPARE_SHELL}
+          for i in $(find ${DRIVERS_TOOLS}/.evergreen ${PROJECT_DIRECTORY}/.evergreen -name \*.sh); do
+            chmod +x $i
+          done
+
+  "init test-results":
+    - command: shell.exec
+      params:
+        script: |
+          ${PREPARE_SHELL}
+          echo '{"results": [{ "status": "FAIL", "test_file": "Build", "log_raw": "No test-results.json found was created"  } ]}' > ${PROJECT_DIRECTORY}/test-results.json
+
+pre:
+  - func: "fetch source"
+  - func: "prepare resources"
+  - func: "windows fix"
+  - func: "fix absolute paths"
+  - func: "init test-results"
+  - func: "make files executable"
+  - func: "install dependencies"
+
+post:
+  - func: "cleanup"
+
+tasks:
+    - name: "check-format"
+      commands:
+        - func: "check format"
+    - name: "test"
+      commands:
+        - func: "bootstrap mongo-orchestration"
+        - func: "run tests"
+
+axes:
+  - id: "mongodb-version"
+    display_name: MongoDB Version
+    values:
+      - id: "latest"
+        display_name: "latest"
+        variables:
+           VERSION: "latest"
+      - id: "4.0"
+        display_name: "4.0"
+        variables:
+          VERSION: "4.0"
+      - id: "3.6"
+        display_name: "3.6"
+        variables:
+           VERSION: "3.6"
+      - id: "3.4"
+        display_name: "3.4"
+        variables:
+           VERSION: "3.4"
+      - id: "3.2"
+        display_name: "3.2"
+        variables:
+           VERSION: "3.2"
+
+  - id: "topology"
+    display_name: Topology
+    values:
+      - id: "standalone"
+        display_name: Standalone
+        variables:
+           TOPOLOGY: "server"
+      - id: "replica-set"
+        display_name: Replica Set
+        variables:
+           TOPOLOGY: "replica_set"
+      - id: "sharded-cluster"
+        display_name: Sharded
+        variables:
+           TOPOLOGY: "sharded_cluster"
+  - id: "auth-and-ssl"
+    display_name: Authentication and SSL
+    values:
+      - id: "auth-and-ssl"
+        display_name: Auth SSL
+        variables:
+           AUTH: "auth"
+           SSL: "ssl"
+      - id: "noauth-and-nossl"
+        display_name: NoAuth NoSSL
+        variables:
+           AUTH: "noauth"
+           SSL: "nossl"
+
+buildvariants:
+-
+  matrix_name: "tests"
+  matrix_spec:
+    auth-and-ssl: "noauth-and-nossl"
+    mongodb-version: "*"
+    topology: "*"
+  display_name: "${mongodb-version} ${topology} ${auth-and-ssl}"
+  run_on:
+    - ubuntu1804-test
+  tasks:
+     - name: "test"
+-
+  name: "format"
+  display_name: "Check Format"
+  run_on:
+    - ubuntu1804-test
+  tasks:
+    - name: "check-format"
