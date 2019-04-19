@@ -132,7 +132,7 @@ functions:
           ${PREPARE_SHELL}
           MONGODB_URI="${MONGODB_URI}" .evergreen/run-tests.sh
 
-  "check format":
+  "check rustfmt":
     - command: shell.exec
       type: test
       params:
@@ -140,13 +140,25 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          .evergreen/check-format.sh
+          .evergreen/check-rustfmt.sh
+
+  "check clippy":
+    - command: shell.exec
+      type: test
+      params:
+        shell: bash
+        working_dir: "src"
+        script: |
+          ${PREPARE_SHELL}
+          .evergreen/check-clippy.sh
 
   "cleanup":
     - command: shell.exec
       params:
         script: |
           ${PREPARE_SHELL}
+          rm -rf ~/.rustup
+
           cd "$MONGO_ORCHESTRATION_HOME"
           # source the mongo-orchestration virtualenv if it exists
           if [ -f venv/bin/activate ]; then
@@ -206,13 +218,95 @@ post:
   - func: "cleanup"
 
 tasks:
-    - name: "check-format"
-      commands:
-        - func: "check format"
-    - name: "test"
-      commands:
-        - func: "bootstrap mongo-orchestration"
-        - func: "run tests"
+  - name: "test-3.6-standalone"
+    tags: ["3.6", "standalone"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: "3.6"
+          TOPOLOGY: "server"
+      - func: "run tests"
+
+  - name: "test-3.6-replica_set"
+    tags: ["3.6", "replica_set"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: "3.6"
+          TOPOLOGY: "replica_set"
+      - func: "run tests"
+
+  - name: "test-3.6-sharded_cluster"
+    tags: ["3.6", "sharded_cluster"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: "3.6"
+          TOPOLOGY: "sharded_cluster"
+      - func: "run tests"
+
+  - name: "test-4.0-standalone"
+    tags: ["4.0", "standalone"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: "4.0"
+          TOPOLOGY: "server"
+      - func: "run tests"
+
+  - name: "test-4.0-replica_set"
+    tags: ["4.0", "replica_set"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: "4.0"
+          TOPOLOGY: "replica_set"
+      - func: "run tests"
+
+  - name: "test-4.0-sharded_cluster"
+    tags: ["4.0", "sharded_cluster"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: "4.0"
+          TOPOLOGY: "sharded_cluster"
+      - func: "run tests"
+
+  - name: "test-latest-standalone"
+    tags: ["latest", "standalone"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: "latest"
+          TOPOLOGY: "server"
+      - func: "run tests"
+
+  - name: "test-latest-replica_set"
+    tags: ["latest", "replica_set"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: "latest"
+          TOPOLOGY: "replica_set"
+      - func: "run tests"
+
+  - name: "test-latest-sharded_cluster"
+    tags: ["latest", "sharded_cluster"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: "latest"
+          TOPOLOGY: "sharded_cluster"
+      - func: "run tests"
+
+  - name: "check-rustfmt"
+    commands:
+      - func: "check rustfmt"
+  - name: "check-clippy"
+    commands:
+      - func: "check clippy"
+
+
 
 axes:
   - id: "mongodb-version"
@@ -221,23 +315,15 @@ axes:
       - id: "latest"
         display_name: "latest"
         variables:
-           VERSION: "latest"
+           MONGODB_VERSION: "latest"
       - id: "4.0"
         display_name: "4.0"
         variables:
-          VERSION: "4.0"
+          MONGODB_VERSION: "4.0"
       - id: "3.6"
         display_name: "3.6"
         variables:
-           VERSION: "3.6"
-      - id: "3.4"
-        display_name: "3.4"
-        variables:
-           VERSION: "3.4"
-      - id: "3.2"
-        display_name: "3.2"
-        variables:
-           VERSION: "3.2"
+           MONGODB_VERSION: "3.6"
 
   - id: "topology"
     display_name: Topology
@@ -254,6 +340,7 @@ axes:
         display_name: Sharded
         variables:
            TOPOLOGY: "sharded_cluster"
+
   - id: "auth-and-ssl"
     display_name: Authentication and SSL
     values:
@@ -268,22 +355,31 @@ axes:
            AUTH: "noauth"
            SSL: "nossl"
 
+  - id: "os"
+    display_name: OS
+    values:
+      - id: ubuntu-18.04
+        display_name: "Ubuntu 18.04"
+        run_on: ubuntu1804-test
+      - id: macos-10.14
+        display_name: "MacOS 10.14"
+        run_on: macos-1014
+
 buildvariants:
 -
   matrix_name: "tests"
   matrix_spec:
-    auth-and-ssl: "noauth-and-nossl"
-    mongodb-version: "*"
-    topology: "*"
-  display_name: "${mongodb-version} ${topology} ${auth-and-ssl}"
-  run_on:
-    - ubuntu1804-test
+    os: "*"
+  display_name: "${os}"
   tasks:
-     - name: "test"
+     - ".latest"
+     - ".4.0"
+     - ".3.6"
 -
-  name: "format"
-  display_name: "Check Format"
+  name: "lint"
+  display_name: "Lint"
   run_on:
     - ubuntu1804-test
   tasks:
-    - name: "check-format"
+    - name: "check-clippy"
+    - name: "check-rustfmt"

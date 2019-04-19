@@ -1,4 +1,3 @@
-binop_separator = "Back"
 combine_control_expr = false
 comment_width = 100
 condense_wildcard_suffixes = true
