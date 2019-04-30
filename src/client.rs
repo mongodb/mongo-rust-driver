@@ -15,19 +15,28 @@ use crate::{
 /// `Client` uses [`std::sync::Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html) internally,
 /// so it can safely be shared across threads. For example:
 ///
-/// ```
+/// ```rust
 /// 
-/// let client = Client::connect("mongodb://example.com");
+/// # use mongodb::{Client, error::Result};
 ///
-/// for i in range 0..5 {
+/// # fn start_workers() -> Result<()> {
+/// let client = Client::with_uri("mongodb://example.com")?;
+///
+/// for i in 0..5 {
 ///     let client_ref = client.clone();
 ///
 ///     std::thread::spawn(move || {
-///         let collection = client_ref.database("items").collection(format!("coll{}", i));
+///         let collection = client_ref.database("items").collection(&format!("coll{}", i));
 ///
 ///         // Do something with the collection
 ///     });
 /// }
+/// #
+/// # // Technically we should join the threads here, but for the purpose of the example, we'll just
+/// # // sleep for a bit.
+/// # std::thread::sleep(std::time::Duration::from_secs(3));
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Clone, Debug)]
 pub struct Client {
