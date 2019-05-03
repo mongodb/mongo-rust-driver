@@ -51,7 +51,7 @@ pub struct Database {
 }
 
 #[derive(Debug)]
-pub struct DatabaseInner {
+struct DatabaseInner {
     client: Client,
     name: String,
     read_preference: Option<ReadPreference>,
