@@ -8,7 +8,7 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::Result,
-    options::CollectionOptions,
+    options::{CollectionOptions, CreateCollectionOptions},
     read_preference::ReadPreference,
     Client, Collection,
 };
@@ -127,7 +127,11 @@ impl Database {
     ///
     /// Note that MongoDB creates collections implicitly when data is inserted, so this method is
     /// not needed if no special options are required.
-    pub fn create_collection(&self, name: &str, options: Option<Document>) -> Result<()> {
+    pub fn create_collection(
+        &self,
+        name: &str,
+        options: Option<CreateCollectionOptions>,
+    ) -> Result<()> {
         unimplemented!()
     }
 
