@@ -22,8 +22,8 @@ use crate::{
 /// so it can safely be shared across threads. For example:
 ///
 /// ```rust
-/// 
 /// # #[macro_use]
+/// # extern crate bson;
 /// #
 /// # use bson::{bson, doc};
 /// # use mongodb::{Client, error::Result};
