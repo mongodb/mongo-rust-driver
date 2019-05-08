@@ -90,22 +90,10 @@ pub enum ValidationLevel {
     Moderate,
 }
 
-impl Default for ValidationLevel {
-    fn default() -> Self {
-        ValidationLevel::Strict
-    }
-}
-
 // Specifies whether the database should return an error or simply raise a warning if inserted
 // documents do not pass the validation.
 #[derive(Debug)]
 pub enum ValidationAction {
     Error,
     Warn,
-}
-
-impl Default for ValidationAction {
-    fn default() -> Self {
-        ValidationAction::Error
-    }
 }
