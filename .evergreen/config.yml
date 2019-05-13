@@ -53,7 +53,6 @@ functions:
 
            export MONGO_ORCHESTRATION_HOME="$DRIVERS_TOOLS/.evergreen/orchestration"
            export MONGODB_BINARIES="$DRIVERS_TOOLS/mongodb/bin"
-           export UPLOAD_BUCKET="${project}"
            export PROJECT_DIRECTORY="$(pwd)"
 
            cat <<EOT > expansion.yml
@@ -61,7 +60,6 @@ functions:
            DRIVERS_TOOLS: "$DRIVERS_TOOLS"
            MONGO_ORCHESTRATION_HOME: "$MONGO_ORCHESTRATION_HOME"
            MONGODB_BINARIES: "$MONGODB_BINARIES"
-           UPLOAD_BUCKET: "$UPLOAD_BUCKET"
            PROJECT_DIRECTORY: "$PROJECT_DIRECTORY"
            PREPARE_SHELL: |
               set -o errexit
@@ -69,7 +67,6 @@ functions:
               export DRIVERS_TOOLS="$DRIVERS_TOOLS"
               export MONGO_ORCHESTRATION_HOME="$MONGO_ORCHESTRATION_HOME"
               export MONGODB_BINARIES="$MONGODB_BINARIES"
-              export UPLOAD_BUCKET="$UPLOAD_BUCKET"
               export PROJECT_DIRECTORY="$PROJECT_DIRECTORY"
 
               export TMPDIR="$MONGO_ORCHESTRATION_HOME/db"
@@ -79,12 +76,7 @@ functions:
               export AUTH=${AUTH}
               export SSL=${SSL}
               export TOPOLOGY=${TOPOLOGY}
-              export RVM_RUBY="${RVM_RUBY}"
               export MONGODB_VERSION=${VERSION}
-              export FCV=${FCV}
-              export MONGO_RUBY_DRIVER_LINT=${LINT}
-              export RETRY_WRITES=${RETRY_WRITES}
-              export WITH_ACTIVE_SUPPORT="${WITH_ACTIVE_SUPPORT}"
            EOT
            # See what we've done
            cat expansion.yml
