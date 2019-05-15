@@ -7,7 +7,9 @@ use crate::{error::Result, Collection};
 /// A `Cursor` streams the result of a query. When a query is made, a `Cursor` will be returned with
 /// the first batch of results from the server; the documents will be returned as the `Cursor` is
 /// iterated. When the batch is exhausted and if there are more results, the `Cursor` will fetch the
-/// next batch of documents, and so forth until the results are exhausted.
+/// next batch of documents, and so forth until the results are exhausted. Note that because of this
+/// batching, additional network I/O may occur on any given call to `Cursor::next`. Because of this,
+/// a `Cursor` iterates over `Result<Document>` items rather than simply `Document` items.
 ///
 /// The batch size of the `Cursor` can be configured using the options to the method that returns
 /// it. For example, setting the `batch_size` field of `FindOptions` will set the batch size of the
