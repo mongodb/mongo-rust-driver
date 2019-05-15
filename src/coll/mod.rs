@@ -138,11 +138,6 @@ impl Collection {
     }
 
     /// Deletes up to one document found matching `query`.
-    ///
-    /// If the `array_filters` option is not provided, then the first document found that matches
-    /// the query will be deleted. However, if the `array_filters` options is provided, the database
-    /// will still only check the first document it finds matching the query and will delete it only
-    /// if it matches the `array_filters` as well.
     pub fn delete_one(
         &self,
         query: Document,
