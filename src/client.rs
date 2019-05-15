@@ -73,6 +73,8 @@ impl Client {
     }
 
     /// Gets a handle to a database specified by `name` in the cluster the `Client` is connected to.
+    /// The `Database` options (e.g. read preference and write concern) will default to those of the
+    /// `Client`.
     ///
     /// This method does not send or receive anything across the wire to the database, so it can be
     /// used repeatedly without incurring any costs from I/O.
@@ -81,7 +83,8 @@ impl Client {
     }
 
     /// Gets a handle to a database specified by `name` in the cluster the `Client` is connected to.
-    /// Operations done with this `Database` will use the options specified by `options` by default.
+    /// Operations done with this `Database` will use the options specified by `options` by default
+    /// and will otherwise default to those of the `Client`.
     ///
     /// This method does not send or receive anything across the wire to the database, so it can be
     /// used repeatedly without incurring any costs from I/O.

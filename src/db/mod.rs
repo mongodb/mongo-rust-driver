@@ -60,15 +60,6 @@ struct DatabaseInner {
 }
 
 impl Database {
-    /// Gets a reference to the `Client` the `Database` was created from.
-    ///
-    /// `Client` uses a `std::sync::Arc` internally, so while the `Client` returned is a different
-    /// struct, it shares the same state as the one the `Database` was originally created from.
-    /// See the type-level documentation for `Client` for more information.
-    pub fn client(&self) -> Client {
-        unimplemented!()
-    }
-
     /// Gets the name of the `Database`.
     pub fn name(&self) -> &str {
         unimplemented!()
@@ -89,7 +80,8 @@ impl Database {
         unimplemented!()
     }
 
-    /// Gets a handle to a collection specified by `name` of the database.
+    /// Gets a handle to a collection specified by `name` of the database. The `Collection` options
+    /// (e.g. read preference and write concern) will default to those of the `Database`.
     ///
     /// This method does not send or receive anything across the wire to the database, so it can be
     /// used repeatedly without incurring any costs from I/O.
@@ -99,7 +91,7 @@ impl Database {
 
     /// Gets a handle to a collection specified by `name` in the cluster the `Client` is connected
     /// to. Operations done with this `Collection` will use the options specified by `options` by
-    /// default.
+    /// default and will otherwise default to those of the `Database`.
     ///
     /// This method does not send or receive anything across the wire to the database, so it can be
     /// used repeatedly without incurring any costs from I/O.
