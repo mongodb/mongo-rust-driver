@@ -1,6 +1,10 @@
 [package]
 authors = ["Saghm Rossi <saghmrossi@gmail.com>"]
 license = "Apache-2.0"
-name = "mrd"
+name = "mongodb"
 edition = "2018"
 version = "0.1.0"
+
+[dependencies]
+typed-builder = "0.3.0"
+bson = "0.13.0"

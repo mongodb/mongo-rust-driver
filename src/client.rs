@@ -15,19 +15,28 @@ use crate::{
 /// `Client` uses [`std::sync::Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html) internally,
 /// so it can safely be shared across threads. For example:
 ///
-/// ```
+/// ```rust
 /// 
-/// let client = Client::connect("mongodb://example.com");
+/// # use mongodb::{Client, error::Result};
 ///
-/// for i in range 0..5 {
+/// # fn start_workers() -> Result<()> {
+/// let client = Client::with_uri("mongodb://example.com")?;
+///
+/// for i in 0..5 {
 ///     let client_ref = client.clone();
 ///
 ///     std::thread::spawn(move || {
-///         let collection = client_ref.database("items").collection(format!("coll{}", i));
+///         let collection = client_ref.database("items").collection(&format!("coll{}", i));
 ///
 ///         // Do something with the collection
 ///     });
 /// }
+/// #
+/// # // Technically we should join the threads here, but for the purpose of the example, we'll just
+/// # // sleep for a bit.
+/// # std::thread::sleep(std::time::Duration::from_secs(3));
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Clone, Debug)]
 pub struct Client {
@@ -64,6 +73,8 @@ impl Client {
     }
 
     /// Gets a handle to a database specified by `name` in the cluster the `Client` is connected to.
+    /// The `Database` options (e.g. read preference and write concern) will default to those of the
+    /// `Client`.
     ///
     /// This method does not send or receive anything across the wire to the database, so it can be
     /// used repeatedly without incurring any costs from I/O.
@@ -72,7 +83,8 @@ impl Client {
     }
 
     /// Gets a handle to a database specified by `name` in the cluster the `Client` is connected to.
-    /// Operations done with this `Database` will use the options specified by `options` by default.
+    /// Operations done with this `Database` will use the options specified by `options` by default
+    /// and will otherwise default to those of the `Client`.
     ///
     /// This method does not send or receive anything across the wire to the database, so it can be
     /// used repeatedly without incurring any costs from I/O.

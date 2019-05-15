@@ -1,1 +1,2 @@
-pub use crate::db::options::Options as DatabaseOptions;
+pub use crate::coll::options::*;
+pub use crate::db::options::*;
