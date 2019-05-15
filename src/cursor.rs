@@ -5,7 +5,7 @@ use bson::Document;
 use crate::{error::Result, Collection};
 
 /// A `Cursor` streams the result of a query. When a query is made, a `Cursor` will be returned with
-/// the first batch of results from the server; the documents be returned as the `Cursor` is
+/// the first batch of results from the server; the documents will be returned as the `Cursor` is
 /// iterated. When the batch is exhausted and if there are more results, the `Cursor` will fetch the
 /// next batch of documents, and so forth until the results are exhausted.
 ///
