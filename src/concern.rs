@@ -84,18 +84,20 @@ impl WriteConcern {
         unimplemented!()
     }
 
-    /// Sets the `j` field of the write concern.
-    pub fn journal(self, j: bool) -> Self {
+    /// Sets the `j` field of the write concern. If `j` is `None`, this will clear any previously
+    /// set value.
+    pub fn journal(self, j: impl Into<Option<bool>>) -> Self {
         unimplemented!()
     }
 
-    /// Sets the `w` field of the write concern.
+    /// Sets the `w` field of the write concern. If `w` is `None`, this will clear any previously
+    /// set value.
     ///
     /// `w` must be one the following types:
     ///   * `i32`
     ///   * `&str`
     ///   * `String`
-    pub fn w(self, w: impl Into<WType>) -> Self {
+    pub fn w(self, w: impl Into<Option<WType>>) -> Self {
         unimplemented!()
     }
 
@@ -104,8 +106,9 @@ impl WriteConcern {
         unimplemented!()
     }
 
-    /// Sets the `wtimeoutMS` field of the write concern.
-    pub fn w_timeout(self, timeout: StdDuration) -> Self {
+    /// Sets the `wtimeoutMS` field of the write concern. If `timeout` is `None`, this will clear
+    /// any previously set value.
+    pub fn w_timeout(self, timeout: impl Into<Option<StdDuration>>) -> Self {
         unimplemented!()
     }
 
