@@ -35,7 +35,7 @@ impl ReadConcern {
 }
 
 // We need `WType` to be a public type in order to use it as part of the `WriteConcern::w` method
-// signature, but using it directly is verbose and unnecessary when we can allow uses to just pass
+// signature, but using it directly is verbose and unnecessary when we can allow users to just pass
 // anything that coerces to it in that method. The workaround for this is to make `WType` a public
 // type in a private module, so the compiler views the type as public even though its inaccessible
 // to users.
