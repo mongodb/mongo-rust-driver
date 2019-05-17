@@ -37,7 +37,7 @@ impl ReadConcern {
 ///
 /// See the documentation [here](https://docs.mongodb.com/manual/reference/write-concern/) for more
 /// information about write concerns.
-#[derive(Clone, Debug, PartialEq, TypedBuilder)]
+#[derive(Clone, Debug, Default, PartialEq, TypedBuilder)]
 pub struct WriteConcern {
     #[builder(default)]
     pub w: Option<Acknowledgement>,
