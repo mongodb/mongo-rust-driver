@@ -40,7 +40,7 @@ extern crate typed_builder;
 
 mod client;
 mod coll;
-mod concern;
+pub mod concern;
 mod cursor;
 mod db;
 pub mod error;
