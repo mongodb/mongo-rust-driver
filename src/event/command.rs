@@ -88,13 +88,16 @@ pub struct CommandFailedEvent {
 pub trait CommandEventHandler: Send + Sync {
     /// A `Client` will call this method on each registered handler whenever a database command is
     /// initiated.
+    #[allow(unused_variables)]
     fn handle_command_started_event(&self, event: CommandStartedEvent) {}
 
     /// A `Client` will call this method on each registered handler whenever a database command
     /// successfully completes.
+    #[allow(unused_variables)]
     fn handle_command_succeeded_event(&self, event: CommandSucceededEvent) {}
 
     /// A `Client` will call this method on each registered handler whenever a database command
     /// fails to complete successfully.
+    #[allow(unused_variables)]
     fn handle_command_failed_event(&self, event: CommandFailedEvent) {}
 }

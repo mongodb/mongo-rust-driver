@@ -2,7 +2,11 @@ use std::collections::VecDeque;
 
 use bson::Document;
 
-use crate::{error::Result, Client};
+use crate::{
+    command_responses::{FindCommandResponse, FindCommandResponseInner},
+    error::Result,
+    Collection,
+};
 
 /// A `Cursor` streams the result of a query. When a query is made, a `Cursor` will be returned with
 /// the first batch of results from the server; the documents will be returned as the `Cursor` is
@@ -58,17 +62,65 @@ use crate::{error::Result, Client};
 /// ```
 #[allow(dead_code)]
 pub struct Cursor {
-    client: Client,
+    coll: Collection,
     address: String,
     cursor_id: i64,
     batch_size: Option<i32>,
     buffer: VecDeque<Document>,
 }
 
+impl Cursor {
+    pub(crate) fn new(
+        address: String,
+        coll: Collection,
+        reply: FindCommandResponse,
+        batch_size: Option<i32>,
+    ) -> Self {
+        Self {
+            address,
+            coll,
+            cursor_id: reply.cursor.id,
+            batch_size,
+            buffer: reply.cursor.first_batch.into_iter().collect(),
+        }
+    }
+
+    pub(crate) fn empty(address: String, coll: Collection) -> Self {
+        Self::new(
+            address,
+            coll,
+            FindCommandResponse {
+                cursor: FindCommandResponseInner {
+                    first_batch: Vec::new(),
+                    id: 0,
+                },
+            },
+            None,
+        )
+    }
+
+    fn next_batch(&mut self) -> Result<()> {
+        let result = self
+            .coll
+            .get_more_command(&self.address, self.cursor_id, self.batch_size)?;
+        self.cursor_id = result.cursor.id;
+        self.buffer.extend(result.cursor.next_batch.into_iter());
+
+        Ok(())
+    }
+}
+
 impl Iterator for Cursor {
     type Item = Result<Document>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        unimplemented!()
+        match self.buffer.pop_front() {
+            Some(doc) => Some(Ok(doc)),
+            None if self.cursor_id == 0 => None,
+            None => match self.next_batch() {
+                Ok(()) => self.next(),
+                Err(e) => Some(Err(e)),
+            },
+        }
     }
 }
