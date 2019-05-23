@@ -39,14 +39,14 @@ pub struct CreateCollectionOptions {
     #[builder(default)]
     max: Option<i64>,
 
-    /// The storage engine that the collection should use. The value should take the following
+    /// The storage engine that the collection should use. The value should take thefollowing
     /// form:
     ///
     /// `{ <storage-engine-name>: <options> }`
     #[builder(default)]
     storage_engine: Option<Document>,
 
-    /// Specifies a validator to restrict the schema of documents which can exist in the
+    /// Specifies a validator to restrict the schema of documents which can exist inthe
     /// collection. Expressions can be specified using any query operators except `$near`,
     /// `$nearSphere`, `$text`, and `$where`.
     #[builder(default)]
@@ -72,7 +72,7 @@ pub struct CreateCollectionOptions {
     #[builder(default)]
     pipeline: Option<Vec<Document>>,
 
-    /// The default collation for the collection or view.   
+    /// The default collation for the collection or view.
     #[builder(default)]
     collation: Option<Document>,
 }

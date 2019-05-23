@@ -1,2 +1,1 @@
-pub use crate::coll::options::*;
-pub use crate::db::options::*;
+pub use crate::{coll::options::*, db::options::*};

@@ -34,19 +34,47 @@
 //! # }
 //! ```
 
-#![allow(unused_variables)]
+#![recursion_limit = "128"]
+#![cfg_attr(
+    feature = "cargo-clippy",
+    allow(
+        clippy::unreadable_literal,
+        clippy::cognitive_complexity,
+        clippy::float_cmp
+    )
+)]
 
+#[macro_use]
+extern crate bitflags;
+#[macro_use]
+extern crate bson;
+#[macro_use]
+extern crate error_chain;
+#[macro_use]
+extern crate lazy_static;
+#[macro_use]
+extern crate serde_derive;
 #[macro_use]
 extern crate typed_builder;
 
+#[macro_use]
+pub mod read_preference;
+
+mod bson_util;
 mod client;
 mod coll;
+mod command_responses;
 pub mod concern;
+mod connstring;
 mod cursor;
 mod db;
 pub mod error;
 pub mod options;
-mod read_preference;
+mod pool;
 pub mod results;
+#[cfg(test)]
+mod test;
+mod topology;
+mod wire;
 
 pub use crate::{client::Client, coll::Collection, cursor::Cursor, db::Database};
