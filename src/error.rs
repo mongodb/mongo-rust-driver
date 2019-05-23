@@ -2,11 +2,15 @@ use std::fmt;
 
 error_chain! {
     foreign_links {
+        BsonOid(bson::oid::Error);
+        BsonDecode(bson::DecoderError);
+        BsonEncode(bson::EncoderError);
         Io(std::io::Error);
+        R2D2(r2d2::Error);
     }
 
     errors {
-        /// A malformed or invalid argument was passed to the driver.
+       /// A malformed or invalid argument was passed to the driver.
         ArgumentError(msg: String) {
             description("An invalid argument was provided to a database operation")
             display("An invalid arugment was provided to a database operation: {}", msg)
@@ -19,18 +23,33 @@ error_chain! {
         }
 
         /// The driver was unable to send or receive a message to the server.
+        InvalidHostname(hostname: String) {
+            description("Unable to parse hostname")
+            display("Unable to parse hostname: '{}'", hostname)
+        }
+
         OperationError(msg: String) {
             description("A database operation failed to send or receive a reply")
             display("A database operation failed to send or receive a reply: {}", msg)
         }
 
        /// The response the driver received from the server was not in the form expected.
+        ParseError(data_type: String, file_path: String) {
+            description("Unable to parse data from file")
+            display("Unable to parse {} data from {}", data_type, file_path)
+        }
+
         ResponseError(msg: String) {
             description("A database operation returned an invalid reply")
             display("A database operation returned an invalid reply: {}", msg)
         }
 
         /// An error occurred during server selection.
+        ServerError(operation: String, msg: String) {
+            description("An attempted database operation failed")
+            display("{} operation failed: {}", operation, msg)
+        }
+
         ServerSelectionError(msg: String) {
             description("An error occurred during server selection")
             display("An error occured during server selection: {}", msg)
@@ -82,7 +101,7 @@ pub enum WriteFailure {
 }
 
 impl fmt::Display for WriteFailure {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, _fmt: &mut fmt::Formatter) -> fmt::Result {
         unimplemented!()
     }
 }
