@@ -5,6 +5,8 @@ use std::{collections::HashMap, time::Duration};
 /// If applicable, `tag_sets` can be used to target specific nodes in a replica set, and
 /// `max_staleness` specifies the maximum lag behind the primary that a secondary can be to remain
 /// eligible for the operation.
+/// 
+/// See the [MongoDB docs](https://docs.mongodb.com/manual/core/read-preference) for more details.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ReadPreference {
     /// Only route this operation to the primary.
