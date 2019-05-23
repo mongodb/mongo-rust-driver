@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::Document;
+use bson::{Bson, Document};
 
 use crate::{
     concern::{ReadConcern, WriteConcern},
@@ -34,6 +34,15 @@ pub enum ReturnDocument {
     Before,
 }
 
+impl ReturnDocument {
+    pub(crate) fn is_after(&self) -> bool {
+        match *self {
+            ReturnDocument::After => true,
+            ReturnDocument::Before => false,
+        }
+    }
+}
+
 /// Specifies the index to use for an operation.
 #[derive(Debug)]
 pub enum Hint {
@@ -41,6 +50,15 @@ pub enum Hint {
     Keys(Document),
     /// Specifies the name of the index to use.
     Name(String),
+}
+
+impl Hint {
+    pub(crate) fn into_bson(self) -> Bson {
+        match self {
+            Hint::Keys(doc) => Bson::Document(doc),
+            Hint::Name(s) => Bson::String(s),
+        }
+    }
 }
 
 /// Specifies the type of cursor to return from a find operation.
