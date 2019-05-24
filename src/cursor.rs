@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use bson::Document;
 
-use crate::{error::Result, Collection};
+use crate::error::Result;
 
 /// A `Cursor` streams the result of a query. When a query is made, a `Cursor` will be returned with
 /// the first batch of results from the server; the documents will be returned as the `Cursor` is
@@ -59,7 +59,6 @@ use crate::{error::Result, Collection};
 #[allow(dead_code)]
 pub struct Cursor {
     address: String,
-    coll: Collection,
     cursor_id: i64,
     batch_size: Option<i32>,
     buffer: VecDeque<Document>,
