@@ -53,7 +53,7 @@ pub struct WriteConcern {
 pub enum Acknowledgement {
     Nodes(i32),
     Majority,
-    TagSet(String),
+    Tags(String),
 }
 
 impl From<i32> for Acknowledgement {
@@ -67,7 +67,7 @@ impl From<String> for Acknowledgement {
         if s == "majority" {
             Acknowledgement::Majority
         } else {
-            Acknowledgement::TagSet(s)
+            Acknowledgement::Tags(s)
         }
     }
 }
