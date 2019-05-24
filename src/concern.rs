@@ -13,10 +13,20 @@ use crate::error::Result;
 /// information about read concerns.
 #[derive(Clone, Debug)]
 pub enum ReadConcern {
+    /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-local/).
     Local,
+
+    /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-majority/).
     Majority,
+
+    /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-linearizable/).
     Linearizable,
+
+    /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-available/).
     Available,
+
+    /// Specify a custom read concern level. This is present to provide forwards compatibility with
+    /// any future read concerns which may be added to new versions of MongoDB.
     Custom(String),
 }
 
@@ -39,20 +49,34 @@ impl ReadConcern {
 /// information about write concerns.
 #[derive(Clone, Debug, Default, PartialEq, TypedBuilder)]
 pub struct WriteConcern {
+    /// Requests acknowledgement that the operation has propagated to a specific number or variet
+    /// of servers.
     #[builder(default)]
     pub w: Option<Acknowledgement>,
 
+    /// Requests acknowledgement that the operation has propagated to the on-disk journal.
     #[builder(default)]
     pub journal: Option<bool>,
 
+    /// Specifies a time limit for the write concern. If an operation has not propagated to the
+    /// requested level within the time limit, an error will return.
+    ///
+    /// Note that an error being returned due to a write concern error does not imply that the
+    /// write would not have finished propagating if allowed more time to finish, and the
+    /// server will not roll back the writes that occurred before the timeout was reached.
     #[builder(default)]
     pub w_timeout: Option<Duration>,
 }
 
+/// The type of the `w` field in a write concern.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Acknowledgement {
+    /// Requires acknowledgement that the write has reached the specified number of nodes.
     Nodes(i32),
+    /// Requires acknowledgement that the write has reached the majority of nodes.
     Majority,
+    /// Requires acknowledgement that the write has reached a node with the specified replica set
+    /// tags.
     Tags(String),
 }
 
