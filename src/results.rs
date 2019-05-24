@@ -1,5 +1,7 @@
 //! Contains the types of results returned by CRUD operations.
 
+use std::collections::HashMap;
+
 use bson::Bson;
 
 /// The result of a `Collection::insert_one` operation.
@@ -13,7 +15,7 @@ pub struct InsertOneResult {
 #[derive(Debug)]
 pub struct InsertManyResult {
     /// The `_id` field of the documents inserted.
-    pub inserted_ids: Vec<Bson>,
+    pub inserted_ids: HashMap<usize, Bson>,
 }
 
 /// The result of a `Collection::update_one` or `Collection::update_many` operation.
