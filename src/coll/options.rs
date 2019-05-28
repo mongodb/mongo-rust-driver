@@ -93,13 +93,6 @@ pub struct UpdateOptions {
     #[builder(default)]
     pub bypass_document_validation: Option<bool>,
 
-    /// The collation to apply to the operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/collation/) for more
-    /// information on collations.
-    #[builder(default)]
-    pub collation: Option<Document>,
-
     /// If true, insert a document if no matching document is found.
     #[builder(default)]
     pub upsert: Option<bool>,
@@ -112,13 +105,6 @@ pub struct ReplaceOptions {
     #[builder(default)]
     pub bypass_document_validation: Option<bool>,
 
-    /// The collation to apply to the operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/collation/) for more
-    /// information on collations.
-    #[builder(default)]
-    pub collation: Option<Document>,
-
     /// If true, insert a document if no matching document is found.
     #[builder(default)]
     pub upsert: Option<bool>,
@@ -126,25 +112,11 @@ pub struct ReplaceOptions {
 
 /// Specifies the options to a `Collection::delete_one` or `Collection::delete_many` operation.
 #[derive(Debug, Default, TypedBuilder)]
-pub struct DeleteOptions {
-    /// The collation to apply to the operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/collation/) for more
-    /// information on collations.
-    #[builder(default)]
-    pub collation: Option<Document>,
-}
+pub struct DeleteOptions {}
 
 /// Specifies the options to a `Collection::find_one_and_delete` operation.
 #[derive(Debug, Default, TypedBuilder)]
 pub struct FindOneAndDeleteOptions {
-    /// The collation to apply to the operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/collation/) for more
-    /// information on collations.
-    #[builder(default)]
-    pub collation: Option<Document>,
-
     /// The maximum amount of time to allow the query to run.
     #[builder(default)]
     pub max_time: Option<Duration>,
@@ -164,13 +136,6 @@ pub struct FindOneAndReplaceOptions {
     /// Opt out of document-level validation.
     #[builder(default)]
     pub bypass_document_validation: Option<bool>,
-
-    /// The collation to apply to the operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/collation/) for more
-    /// information on collations.
-    #[builder(default)]
-    pub collation: Option<Document>,
 
     /// The maximum amount of time to allow the query to run.
     #[builder(default)]
@@ -205,13 +170,6 @@ pub struct FindOneAndUpdateOptions {
     /// Opt out of document-level validation.
     #[builder(default)]
     pub bypass_document_validation: Option<bool>,
-
-    /// The collation to apply to the operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/collation/) for more
-    /// information on collations.
-    #[builder(default)]
-    pub collation: Option<Document>,
 
     /// The maximum amount of time to allow the query to run.
     #[builder(default)]
@@ -255,13 +213,6 @@ pub struct AggregateOptions {
     #[builder(default)]
     pub bypass_document_validation: Option<bool>,
 
-    /// The collation to apply to the operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/collation/) for more
-    /// information on collations.
-    #[builder(default)]
-    pub collation: Option<Document>,
-
     /// The maximum amount of time to allow the query to run.
     #[builder(default)]
     pub max_time: Option<Duration>,
@@ -279,13 +230,6 @@ pub struct AggregateOptions {
 /// Specifies the options to a `Collection::count_documents` operation.
 #[derive(Debug, Default, TypedBuilder)]
 pub struct CountOptions {
-    /// The collation to apply to the operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/collation/) for more
-    /// information on collations.
-    #[builder(default)]
-    pub collation: Option<Document>,
-
     /// The index to use for the operation.
     #[builder(default)]
     pub hint: Option<Hint>,
@@ -314,13 +258,6 @@ pub struct EstimatedDocumentCountOptions {
 /// Specifies the options to a `Collection::distinct` operation.
 #[derive(Debug, Default, TypedBuilder)]
 pub struct DistinctOptions {
-    /// The collation to apply to the operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/collation/) for more
-    /// information on collations.
-    #[builder(default)]
-    pub collation: Option<Document>,
-
     /// The maximum amount of time to allow the query to run.
     #[builder(default)]
     pub max_time: Option<Duration>,
@@ -342,13 +279,6 @@ pub struct FindOptions {
     /// query.
     #[builder(default)]
     pub batch_size: Option<i32>,
-
-    /// The collation to apply to the operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/collation/) for more
-    /// information on collations.
-    #[builder(default)]
-    pub collation: Option<Document>,
 
     /// Tags the query with an arbitrary string to help trace the operation through the database
     /// profiler, currentOp and logs.
