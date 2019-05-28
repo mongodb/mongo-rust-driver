@@ -49,7 +49,7 @@ impl ReadConcern {
 /// information about write concerns.
 #[derive(Clone, Debug, Default, PartialEq, TypedBuilder)]
 pub struct WriteConcern {
-    /// Requests acknowledgement that the operation has propagated to a specific number or variet
+    /// Requests acknowledgement that the operation has propagated to a specific number or variety
     /// of servers.
     #[builder(default)]
     pub w: Option<Acknowledgement>,
