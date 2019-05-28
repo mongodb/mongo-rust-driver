@@ -75,8 +75,8 @@ pub enum Acknowledgement {
     Nodes(i32),
     /// Requires acknowledgement that the write has reached the majority of nodes.
     Majority,
-    /// Requires acknowledgement that the write has reached a node with the specified replica set
-    /// tag.
+    /// Requires acknowledgement according to the given write tag. See [here](https://docs.mongodb.com/manual/tutorial/configure-replica-set-tag-sets/#tag-sets-and-custom-write-concern-behavior)
+    /// for more information.
     Tag(String),
 }
 
