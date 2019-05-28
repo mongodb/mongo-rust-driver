@@ -76,8 +76,8 @@ pub enum Acknowledgement {
     /// Requires acknowledgement that the write has reached the majority of nodes.
     Majority,
     /// Requires acknowledgement that the write has reached a node with the specified replica set
-    /// tags.
-    Tags(String),
+    /// tag.
+    Tag(String),
 }
 
 impl From<i32> for Acknowledgement {
@@ -91,7 +91,7 @@ impl From<String> for Acknowledgement {
         if s == "majority" {
             Acknowledgement::Majority
         } else {
-            Acknowledgement::Tags(s)
+            Acknowledgement::Tag(s)
         }
     }
 }
