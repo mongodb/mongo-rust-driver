@@ -15,6 +15,7 @@
 //! Operations can be performed by obtaining a `Database` or `Collection` from the `Client`:
 //!
 //! ```rust
+//! # use bson::{bson, doc};
 //! # use mongodb::{Client, error::Result};
 //! #
 //! # fn do_stuff() -> Result<()> {
@@ -26,9 +27,9 @@
 //! }
 //!
 //! let coll = db.collection("some-coll");
-//! if let Some(doc) = coll.find_one(None, None)? {
-//!     println!("document: {}", doc);
-//! }
+//! let result = coll.insert_one(doc! { "x": 1 }, None)?;
+//! println!("{:#?}", result);
+//!
 //! # Ok(())
 //! # }
 //! ```

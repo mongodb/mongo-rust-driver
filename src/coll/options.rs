@@ -93,13 +93,6 @@ pub struct UpdateOptions {
     #[builder(default)]
     pub bypass_document_validation: Option<bool>,
 
-    /// The collation to apply to the operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/collation/) for more
-    /// information on collations.
-    #[builder(default)]
-    pub collation: Option<Document>,
-
     /// If true, insert a document if no matching document is found.
     #[builder(default)]
     pub upsert: Option<bool>,
@@ -112,13 +105,6 @@ pub struct ReplaceOptions {
     #[builder(default)]
     pub bypass_document_validation: Option<bool>,
 
-    /// The collation to apply to the operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/collation/) for more
-    /// information on collations.
-    #[builder(default)]
-    pub collation: Option<Document>,
-
     /// If true, insert a document if no matching document is found.
     #[builder(default)]
     pub upsert: Option<bool>,
@@ -126,26 +112,15 @@ pub struct ReplaceOptions {
 
 /// Specifies the options to a `Collection::delete_one` or `Collection::delete_many` operation.
 #[derive(Debug, Default, TypedBuilder)]
-pub struct DeleteOptions {
-    /// The collation to apply to the operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/collation/) for more
-    /// information on collations.
-    #[builder(default)]
-    pub collation: Option<Document>,
-}
+pub struct DeleteOptions {}
 
 /// Specifies the options to a `Collection::find_one_and_delete` operation.
 #[derive(Debug, Default, TypedBuilder)]
 pub struct FindOneAndDeleteOptions {
-    /// The collation to apply to the operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/collation/) for more
-    /// information on collations.
-    #[builder(default)]
-    pub collation: Option<Document>,
-
     /// The maximum amount of time to allow the query to run.
+    ///
+    /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     pub max_time: Option<Duration>,
 
@@ -165,14 +140,10 @@ pub struct FindOneAndReplaceOptions {
     #[builder(default)]
     pub bypass_document_validation: Option<bool>,
 
-    /// The collation to apply to the operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/collation/) for more
-    /// information on collations.
-    #[builder(default)]
-    pub collation: Option<Document>,
-
     /// The maximum amount of time to allow the query to run.
+    ///
+    /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     pub max_time: Option<Duration>,
 
@@ -206,14 +177,10 @@ pub struct FindOneAndUpdateOptions {
     #[builder(default)]
     pub bypass_document_validation: Option<bool>,
 
-    /// The collation to apply to the operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/collation/) for more
-    /// information on collations.
-    #[builder(default)]
-    pub collation: Option<Document>,
-
     /// The maximum amount of time to allow the query to run.
+    ///
+    /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     pub max_time: Option<Duration>,
 
@@ -255,14 +222,10 @@ pub struct AggregateOptions {
     #[builder(default)]
     pub bypass_document_validation: Option<bool>,
 
-    /// The collation to apply to the operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/collation/) for more
-    /// information on collations.
-    #[builder(default)]
-    pub collation: Option<Document>,
-
     /// The maximum amount of time to allow the query to run.
+    ///
+    /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     pub max_time: Option<Duration>,
 
@@ -279,13 +242,6 @@ pub struct AggregateOptions {
 /// Specifies the options to a `Collection::count_documents` operation.
 #[derive(Debug, Default, TypedBuilder)]
 pub struct CountOptions {
-    /// The collation to apply to the operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/collation/) for more
-    /// information on collations.
-    #[builder(default)]
-    pub collation: Option<Document>,
-
     /// The index to use for the operation.
     #[builder(default)]
     pub hint: Option<Hint>,
@@ -295,6 +251,9 @@ pub struct CountOptions {
     pub limit: Option<i64>,
 
     /// The maximum amount of time to allow the query to run.
+    ///
+    /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     pub max_time: Option<Duration>,
 
@@ -307,6 +266,9 @@ pub struct CountOptions {
 #[derive(Debug, Default, TypedBuilder)]
 pub struct EstimatedDocumentCountOptions {
     /// The maximum amount of time to allow the query to run.
+    ///
+    /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     pub max_time: Option<Duration>,
 }
@@ -314,110 +276,12 @@ pub struct EstimatedDocumentCountOptions {
 /// Specifies the options to a `Collection::distinct` operation.
 #[derive(Debug, Default, TypedBuilder)]
 pub struct DistinctOptions {
-    /// The collation to apply to the operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/collation/) for more
-    /// information on collations.
-    #[builder(default)]
-    pub collation: Option<Document>,
-
     /// The maximum amount of time to allow the query to run.
+    ///
+    /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     pub max_time: Option<Duration>,
-}
-
-/// Specifies the options to a `Collection::find_one` operation.
-#[derive(Debug, Default, TypedBuilder)]
-pub struct FindOneOptions {
-    /// If true, partial results will be returned from a mongos rather than an error being
-    /// returned if one or more shards is down.
-    #[builder(default)]
-    pub allow_partial_results: Option<bool>,
-
-    /// The number of documents the server should return per cursor batch.
-    ///
-    /// Note that this does not have any affect on the documents that are returned by a cursor,
-    /// only the number of documents kept in memory at a given time (and by extension, the
-    /// number of round trips needed to return the entire set of documents returned by the
-    /// query.
-    #[builder(default)]
-    pub batch_size: Option<i32>,
-
-    /// The collation to apply to the operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/collation/) for more
-    /// information on collations.
-    #[builder(default)]
-    pub collation: Option<Document>,
-
-    /// Tags the query with an arbitrary string to help trace the operation through the database
-    /// profiler, currentOp and logs.
-    #[builder(default)]
-    pub comment: Option<String>,
-
-    /// The type of cursor to return.
-    #[builder(default)]
-    pub cursor_type: Option<CursorType>,
-
-    /// The index to use for the operation.
-    #[builder(default)]
-    pub hint: Option<Hint>,
-
-    /// The exclusive upper bound for a specific index.
-    #[builder(default)]
-    pub max: Option<Document>,
-
-    /// The maximum amount of time for the server to wait on new documents to satisfy a tailable
-    /// cursor query. If the cursor is not tailable, this option is ignored.
-    #[builder(default)]
-    pub max_await_time: Option<Duration>,
-
-    /// Maximum number of documents or index keys to scan when executing the query.
-    #[builder(default)]
-    pub max_scan: Option<i64>,
-
-    /// The maximum amount of time to allow the query to run.
-    #[builder(default)]
-    pub max_time: Option<Duration>,
-
-    /// The inclusive lower bound for a specific index.
-    #[builder(default)]
-    pub min: Option<Document>,
-
-    /// Whether the server should close the cursor after a period of inactivity.
-    #[builder(default)]
-    pub no_cursor_timeout: Option<bool>,
-
-    /// Limits the fields of the document being returned.
-    #[builder(default)]
-    pub projection: Option<Document>,
-
-    /// Whether to return only the index keys in the documents.
-    #[builder(default)]
-    pub return_key: Option<bool>,
-
-    /// Whether to return the record identifier for each document.
-    #[builder(default)]
-    pub show_record_id: Option<bool>,
-
-    /// The number of documents to skip before returning.
-    #[builder(default)]
-    pub skip: Option<i64>,
-
-    /// Prevents the cursor from returning a document more than once because of an intervening
-    /// write operation.
-    #[builder(default)]
-    pub snapshot: Option<bool>,
-
-    /// The order of the documents for the purposes of the operation.
-    #[builder(default)]
-    pub sort: Option<Document>,
-}
-
-impl FindOneOptions {
-    pub fn into_find_options(self) -> FindOptions {
-        unimplemented!()
-    }
 }
 
 /// Specifies the options to a `Collection::find` operation.
@@ -436,13 +300,6 @@ pub struct FindOptions {
     /// query.
     #[builder(default)]
     pub batch_size: Option<i32>,
-
-    /// The collation to apply to the operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/collation/) for more
-    /// information on collations.
-    #[builder(default)]
-    pub collation: Option<Document>,
 
     /// Tags the query with an arbitrary string to help trace the operation through the database
     /// profiler, currentOp and logs.
@@ -475,6 +332,9 @@ pub struct FindOptions {
     pub max_scan: Option<i64>,
 
     /// The maximum amount of time to allow the query to run.
+    ///
+    /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     pub max_time: Option<Duration>,
 

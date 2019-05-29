@@ -22,9 +22,6 @@ use crate::{
 /// so it can safely be shared across threads. For example:
 ///
 /// ```rust
-/// 
-/// # #[macro_use]
-/// #
 /// # use bson::{bson, doc};
 /// # use mongodb::{Client, error::Result};
 /// #
@@ -111,19 +108,22 @@ impl Collection {
         unimplemented!()
     }
 
-    /// Gets the number of documents matching `filter`.
-    pub fn count_documents(
-        &self,
-        filter: Option<Document>,
-        options: Option<CountOptions>,
-    ) -> Result<i64> {
-        unimplemented!()
-    }
-
     /// Estimates the number of documents in the collection using collection metadata.
     pub fn estimated_document_count(
         &self,
         options: Option<EstimatedDocumentCountOptions>,
+    ) -> Result<i64> {
+        unimplemented!()
+    }
+
+    /// Gets the number of documents matching `filter`.
+    ///
+    /// Note that using `Collection::estimated_document_count` is recommended instead of this method
+    /// is most cases.
+    pub fn count_documents(
+        &self,
+        filter: Option<Document>,
+        options: Option<CountOptions>,
     ) -> Result<i64> {
         unimplemented!()
     }
@@ -187,16 +187,6 @@ impl Collection {
         filter: Document,
         update: Document,
         options: Option<FindOneAndUpdateOptions>,
-    ) -> Result<Option<Document>> {
-        unimplemented!()
-    }
-
-    /// Finds up to one in the collection matching `filter`. This is semantically equivalent to
-    /// calling `Collection::find` with the `limit` option set to `1`.
-    pub fn find_one(
-        &self,
-        filter: Option<Document>,
-        options: Option<FindOneOptions>,
     ) -> Result<Option<Document>> {
         unimplemented!()
     }
