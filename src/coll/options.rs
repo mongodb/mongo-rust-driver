@@ -118,6 +118,9 @@ pub struct DeleteOptions {}
 #[derive(Debug, Default, TypedBuilder)]
 pub struct FindOneAndDeleteOptions {
     /// The maximum amount of time to allow the query to run.
+    ///
+    /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     pub max_time: Option<Duration>,
 
@@ -138,6 +141,9 @@ pub struct FindOneAndReplaceOptions {
     pub bypass_document_validation: Option<bool>,
 
     /// The maximum amount of time to allow the query to run.
+    ///
+    /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     pub max_time: Option<Duration>,
 
@@ -172,6 +178,9 @@ pub struct FindOneAndUpdateOptions {
     pub bypass_document_validation: Option<bool>,
 
     /// The maximum amount of time to allow the query to run.
+    ///
+    /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     pub max_time: Option<Duration>,
 
@@ -214,6 +223,9 @@ pub struct AggregateOptions {
     pub bypass_document_validation: Option<bool>,
 
     /// The maximum amount of time to allow the query to run.
+    ///
+    /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     pub max_time: Option<Duration>,
 
@@ -239,6 +251,9 @@ pub struct CountOptions {
     pub limit: Option<i64>,
 
     /// The maximum amount of time to allow the query to run.
+    ///
+    /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     pub max_time: Option<Duration>,
 
@@ -251,6 +266,9 @@ pub struct CountOptions {
 #[derive(Debug, Default, TypedBuilder)]
 pub struct EstimatedDocumentCountOptions {
     /// The maximum amount of time to allow the query to run.
+    ///
+    /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     pub max_time: Option<Duration>,
 }
@@ -259,6 +277,9 @@ pub struct EstimatedDocumentCountOptions {
 #[derive(Debug, Default, TypedBuilder)]
 pub struct DistinctOptions {
     /// The maximum amount of time to allow the query to run.
+    ///
+    /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     pub max_time: Option<Duration>,
 }
@@ -311,6 +332,9 @@ pub struct FindOptions {
     pub max_scan: Option<i64>,
 
     /// The maximum amount of time to allow the query to run.
+    ///
+    /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     pub max_time: Option<Duration>,
 
