@@ -46,5 +46,6 @@ mod db;
 pub mod error;
 pub mod options;
 mod read_preference;
+pub mod results;
 
-pub use crate::{client::Client, coll::Collection, db::Database};
+pub use crate::{client::Client, coll::Collection, cursor::Cursor, db::Database};
