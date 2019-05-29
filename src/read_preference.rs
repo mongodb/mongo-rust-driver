@@ -4,7 +4,8 @@ use std::{collections::HashMap, time::Duration};
 ///
 /// If applicable, `tag_sets` can be used to target specific nodes in a replica set, and
 /// `max_staleness` specifies the maximum lag behind the primary that a secondary can be to remain
-/// eligible for the operation.
+/// eligible for the operation. The max staleness value maps to the `maxStalenessSeconds` MongoDB
+/// option and will be sent to the server as an integer number of seconds.
 ///
 /// See the [MongoDB docs](https://docs.mongodb.com/manual/core/read-preference) for more details.
 #[derive(Clone, Debug, PartialEq)]
