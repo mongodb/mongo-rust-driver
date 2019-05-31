@@ -345,10 +345,6 @@ pub struct FindOptions {
     #[builder(default)]
     pub max_await_time: Option<Duration>,
 
-    /// Maximum number of documents or index keys to scan when executing the query.
-    #[builder(default)]
-    pub max_scan: Option<i64>,
-
     /// The maximum amount of time to allow the query to run.
     ///
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
