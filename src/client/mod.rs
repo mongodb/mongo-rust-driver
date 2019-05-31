@@ -7,11 +7,13 @@ use std::{
     time::Duration,
 };
 
+use bson::{Bson, Document};
 use derivative::Derivative;
 use rand::{seq::SliceRandom, thread_rng};
 use time::{Duration as TimeDuration, PreciseTime};
 
 use crate::{
+    command_responses::ListDatabasesResponse,
     concern::{ReadConcern, WriteConcern},
     connstring::ConnectionString,
     db::Database,
@@ -138,6 +140,52 @@ impl Client {
             .read()
             .unwrap()
             .slave_ok(address, read_preference.or_else(|| self.read_preference()))
+    }
+
+    /// Gets information about each of the databases in the connected server in the form of an
+    /// an array of documents.
+    pub fn list_databases(&self, filter: Option<Document>) -> Result<Vec<Document>> {
+        let mut cmd = doc! { "listDatabases" : 1 };
+        if let Some(filter) = filter {
+            cmd.insert("filter", filter);
+        }
+
+        let result = self.list_databases_command(cmd)?;
+        Ok(result.databases)
+    }
+
+    /// Gets the names of the databases in the connected server.
+    pub fn list_database_names(&self, filter: Option<Document>) -> Result<Vec<String>> {
+        let mut cmd = doc! {
+            "listDatabases" : 1,
+            "nameOnly" : true
+        };
+        if let Some(filter) = filter {
+            cmd.insert("filter", filter);
+        }
+
+        let result = self.list_databases_command(cmd)?;
+        result
+            .databases
+            .into_iter()
+            .map(|database| match database.get("name") {
+                Some(Bson::String(name)) => Ok(name.to_string()),
+                _ => bail!(ErrorKind::ResponseError(
+                    "invalid document returned by listDatabases command".to_string(),
+                )),
+            })
+            .collect()
+    }
+
+    fn list_databases_command(&self, cmd: Document) -> Result<ListDatabasesResponse> {
+        let (_, result) = self.database("admin").run_driver_command(cmd, None, None)?;
+
+        match bson::from_bson(Bson::Document(result)) {
+            Ok(response) => Ok(response),
+            Err(_) => bail!(ErrorKind::ResponseError(
+                "invalid server response to listDatabases command".to_string()
+            )),
+        }
     }
 
     fn server_selection_timeout(&self) -> Duration {
