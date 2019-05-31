@@ -755,10 +755,6 @@ impl Collection {
                 command_doc.insert("max", max);
             }
 
-            if let Some(max_scan) = opts.max_scan {
-                command_doc.insert("maxScan", max_scan);
-            }
-
             if let Some(max_time) = opts.max_time {
                 command_doc.insert("maxTimeMS", max_time.subsec_millis());
             }
