@@ -1,7 +1,5 @@
 use std::fmt;
 
-use bson::Document;
-
 error_chain! {
     foreign_links {
         Io(std::io::Error);
@@ -51,8 +49,10 @@ error_chain! {
 pub struct WriteConcernError {
     /// Identifies the type of write concern error.
     pub code: i32,
+
     /// The name associated with the error code.
     pub code_name: String,
+
     /// A description of the error that occurred.
     pub message: String,
 }
@@ -63,11 +63,13 @@ pub struct WriteConcernError {
 pub struct WriteError {
     /// Identifies the type of write concern error.
     pub code: i32,
+
     /// The name associated with the error code.
     ///
     /// Note that the server will not return this in some cases, hence `code_name` being an
     /// `Option`.
     pub code_name: Option<String>,
+
     /// A description of the error that occurred.
     pub message: String,
 }
