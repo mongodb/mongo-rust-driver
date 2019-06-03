@@ -64,6 +64,12 @@ pub struct CreateIndexesResponse {
     pub num_indexes_after: i32,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListDatabasesResponse {
+    pub databases: Vec<Document>,
+}
+
 #[derive(Debug, Default, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct IsMasterCommandResponse {
