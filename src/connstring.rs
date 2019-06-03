@@ -433,17 +433,20 @@ mod tests {
     };
 
     macro_rules! tag_set {
-        ( $($k:expr => $v:expr),* ) => {{
-            use std::collections::HashMap;
+        ( $($k:expr => $v:expr),* ) => {
+            #[allow(clippy::let_and_return)]
+            {
+                use std::collections::HashMap;
 
-            #[allow(unused_mut)]
-            let mut ts = HashMap::new();
-            $(
-                ts.insert($k.to_string(), $v.to_string());
-            )*
+                #[allow(unused_mut)]
+                let mut ts = HashMap::new();
+                $(
+                    ts.insert($k.to_string(), $v.to_string());
+                )*
 
-            ts
-        }}
+                ts
+            }
+        }
     }
 
     fn host_without_port(hostname: &str) -> Host {
