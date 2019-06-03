@@ -142,8 +142,7 @@ impl Client {
             .slave_ok(address, read_preference.or_else(|| self.read_preference()))
     }
 
-    /// Gets information about each of the databases in the connected server in the form of an
-    /// an array of documents.
+    /// Gets information about each of the databases in the connected server.
     pub fn list_databases(&self, filter: Option<Document>) -> Result<Vec<Document>> {
         let mut cmd = doc! { "listDatabases" : 1 };
         if let Some(filter) = filter {
