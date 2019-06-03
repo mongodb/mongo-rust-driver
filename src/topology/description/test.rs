@@ -4,7 +4,7 @@ use bson::oid::ObjectId;
 
 use super::{ServerDescription, ServerType, TopologyDescription, TopologyType};
 use crate::{
-    command_responses::IsMasterCommandResponse, connstring::ClientOptions, error::ErrorKind,
+    command_responses::IsMasterCommandResponse, error::ErrorKind, options::ClientOptions,
     pool::IsMasterReply,
 };
 

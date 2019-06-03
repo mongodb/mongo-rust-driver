@@ -76,8 +76,37 @@ impl fmt::Display for Host {
     }
 }
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, TypedBuilder)]
 pub struct ClientOptions {
+    pub hosts: Vec<Host>,
+
+    #[builder(default)]
+    pub tls_options: Option<TlsOptions>,
+
+    #[builder(default)]
+    pub heartbeat_freq: Option<Duration>,
+
+    #[builder(default)]
+    pub local_threshold: Option<i64>,
+
+    #[builder(default)]
+    pub read_concern: Option<ReadConcern>,
+
+    #[builder(default)]
+    pub read_preference: Option<ReadPreference>,
+
+    #[builder(default)]
+    pub repl_set_name: Option<String>,
+
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
+
+    #[builder(default)]
+    pub server_selection_timeout: Option<Duration>,
+}
+
+#[derive(Debug, Default, PartialEq)]
+struct ClientOptionsParser {
     pub hosts: Vec<Host>,
     pub tls_options: Option<TlsOptions>,
     pub heartbeat_freq: Option<Duration>,
@@ -161,7 +190,29 @@ impl TlsOptions {
     }
 }
 
+impl From<ClientOptionsParser> for ClientOptions {
+    fn from(parser: ClientOptionsParser) -> Self {
+        Self {
+            hosts: parser.hosts,
+            tls_options: parser.tls_options,
+            heartbeat_freq: parser.heartbeat_freq,
+            local_threshold: parser.local_threshold,
+            read_concern: parser.read_concern,
+            read_preference: parser.read_preference,
+            repl_set_name: parser.repl_set_name,
+            write_concern: parser.write_concern,
+            server_selection_timeout: parser.server_selection_timeout,
+        }
+    }
+}
+
 impl ClientOptions {
+    pub fn parse(s: &str) -> Result<Self> {
+        ClientOptionsParser::parse(s).map(Into::into)
+    }
+}
+
+impl ClientOptionsParser {
     pub fn parse(s: &str) -> Result<Self> {
         let end_of_scheme = match s.find("://") {
             Some(index) => index,
@@ -221,18 +272,18 @@ impl ClientOptions {
 
         let hosts = hosts?;
 
-        let mut connstring = ClientOptions {
+        let mut options = ClientOptionsParser {
             hosts,
             ..Default::default()
         };
 
-        connstring.parse_options(options_section)?;
+        options.parse_options(options_section)?;
 
-        if let Some(ref write_concern) = connstring.write_concern {
+        if let Some(ref write_concern) = options.write_concern {
             write_concern.validate()?;
         }
 
-        Ok(connstring)
+        Ok(options)
     }
 
     fn parse_options(&mut self, options: &str) -> Result<()> {

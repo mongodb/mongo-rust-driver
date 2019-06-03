@@ -10,7 +10,7 @@ use derivative::Derivative;
 
 use self::server::{monitor::start_monitor, Server};
 use crate::{
-    connstring::{ClientOptions, Host},
+    options::{ClientOptions, Host},
     read_preference::ReadPreference,
 };
 

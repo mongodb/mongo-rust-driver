@@ -1,3 +1,4 @@
+pub mod options;
 #[cfg(test)]
 mod test;
 
@@ -15,10 +16,9 @@ use time::{Duration as TimeDuration, PreciseTime};
 use crate::{
     command_responses::ListDatabasesResponse,
     concern::{ReadConcern, WriteConcern},
-    connstring::ClientOptions,
     db::Database,
     error::{ErrorKind, Result},
-    options::DatabaseOptions,
+    options::{ClientOptions, DatabaseOptions},
     pool::Connection,
     read_preference::ReadPreference,
     topology::{ServerDescription, ServerType, Topology, TopologyType},

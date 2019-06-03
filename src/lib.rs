@@ -65,7 +65,6 @@ mod client;
 mod coll;
 mod command_responses;
 pub mod concern;
-pub mod connstring;
 mod cursor;
 mod db;
 pub mod error;

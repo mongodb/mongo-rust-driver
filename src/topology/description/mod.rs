@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use bson::oid::ObjectId;
 
 use crate::{
-    connstring::ClientOptions,
+    options::ClientOptions,
     read_preference::ReadPreference,
     topology::server::{ServerDescription, ServerType},
 };
