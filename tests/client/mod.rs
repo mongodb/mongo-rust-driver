@@ -64,6 +64,8 @@ fn list_databases() {
 
     let prev_dbs = client.list_databases(None).unwrap();
 
+    println!("{:#?}", prev_dbs);
+
     for name in expected_dbs {
         assert!(!prev_dbs
             .iter()
