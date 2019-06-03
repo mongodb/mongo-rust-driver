@@ -34,7 +34,7 @@ fn normalize_write_concern_doc(mut write_concern_doc: Document) -> Document {
 
 fn run_connection_string_test(test_file: TestFile) {
     for test_case in test_file.tests {
-        match Client::with_uri(&test_case.uri) {
+        match Client::with_uri_str(&test_case.uri) {
             Ok(client) => {
                 assert!(test_case.valid);
 

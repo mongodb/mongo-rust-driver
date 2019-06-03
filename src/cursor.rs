@@ -27,7 +27,7 @@ use crate::{command_responses::FindCommandResponse, error::Result, Collection};
 /// # use mongodb::{Client, error::Result};
 /// #
 /// # fn do_stuff() -> Result<()> {
-/// # let client = Client::with_uri("mongodb://example.com")?;
+/// # let client = Client::with_uri_str("mongodb://example.com")?;
 /// # let coll = client.database("foo").collection("bar");
 /// # let cursor = coll.find(None, None)?;
 /// #
@@ -48,7 +48,7 @@ use crate::{command_responses::FindCommandResponse, error::Result, Collection};
 /// # use mongodb::{Client, error::Result};
 /// #
 /// # fn do_stuff() -> Result<()> {
-/// # let client = Client::with_uri("mongodb://example.com")?;
+/// # let client = Client::with_uri_str("mongodb://example.com")?;
 /// # let coll = client.database("foo").collection("bar");
 /// # let cursor = coll.find(Some(doc! { "x": 1 }), None)?;
 /// #

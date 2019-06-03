@@ -10,7 +10,7 @@ use derivative::Derivative;
 
 use self::server::{monitor::start_monitor, Server};
 use crate::{
-    connstring::{ConnectionString, Host},
+    connstring::{ClientOptions, Host},
     read_preference::ReadPreference,
 };
 
@@ -31,7 +31,7 @@ pub(crate) struct Topology {
 impl Topology {
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::new_ret_no_self))]
     pub(crate) fn new(
-        conn_string: ConnectionString,
+        conn_string: ClientOptions,
         tls_config: Option<Arc<rustls::ClientConfig>>,
     ) -> Arc<RwLock<Self>> {
         let servers = conn_string

@@ -77,7 +77,7 @@ impl fmt::Display for Host {
 }
 
 #[derive(Debug, Default, PartialEq)]
-pub struct ConnectionString {
+pub struct ClientOptions {
     pub hosts: Vec<Host>,
     pub tls_options: Option<TlsOptions>,
     pub heartbeat_freq: Option<Duration>,
@@ -161,7 +161,7 @@ impl TlsOptions {
     }
 }
 
-impl ConnectionString {
+impl ClientOptions {
     pub fn parse(s: &str) -> Result<Self> {
         let end_of_scheme = match s.find("://") {
             Some(index) => index,
@@ -221,7 +221,7 @@ impl ConnectionString {
 
         let hosts = hosts?;
 
-        let mut connstring = ConnectionString {
+        let mut connstring = ClientOptions {
             hosts,
             ..Default::default()
         };
@@ -426,7 +426,7 @@ impl ConnectionString {
 mod tests {
     use std::time::Duration;
 
-    use super::{ConnectionString, Host};
+    use super::{ClientOptions, Host};
     use crate::{
         concern::{Acknowledgment, ReadConcern, WriteConcern},
         read_preference::ReadPreference,
@@ -455,34 +455,34 @@ mod tests {
 
     #[test]
     fn fails_without_scheme() {
-        assert!(ConnectionString::parse("localhost:27017").is_err());
+        assert!(ClientOptions::parse("localhost:27017").is_err());
     }
 
     #[test]
     fn fails_with_invalid_scheme() {
-        assert!(ConnectionString::parse("mangodb://localhost:27017").is_err());
+        assert!(ClientOptions::parse("mangodb://localhost:27017").is_err());
     }
 
     #[test]
     fn fails_with_nothing_after_scheme() {
-        assert!(ConnectionString::parse("mongodb://").is_err());
+        assert!(ClientOptions::parse("mongodb://").is_err());
     }
 
     #[test]
     fn fails_with_only_slash_after_scheme() {
-        assert!(ConnectionString::parse("mongodb:///").is_err());
+        assert!(ClientOptions::parse("mongodb:///").is_err());
     }
 
     #[test]
     fn fails_with_no_host() {
-        assert!(ConnectionString::parse("mongodb://:27017").is_err());
+        assert!(ClientOptions::parse("mongodb://:27017").is_err());
     }
 
     #[test]
     fn no_port() {
         assert_eq!(
-            ConnectionString::parse("mongodb://localhost").unwrap(),
-            ConnectionString {
+            ClientOptions::parse("mongodb://localhost").unwrap(),
+            ClientOptions {
                 hosts: vec![host_without_port("localhost")],
                 ..Default::default()
             }
@@ -492,8 +492,8 @@ mod tests {
     #[test]
     fn no_port_trailing_slash() {
         assert_eq!(
-            ConnectionString::parse("mongodb://localhost/").unwrap(),
-            ConnectionString {
+            ClientOptions::parse("mongodb://localhost/").unwrap(),
+            ClientOptions {
                 hosts: vec![host_without_port("localhost")],
                 ..Default::default()
             }
@@ -503,8 +503,8 @@ mod tests {
     #[test]
     fn with_port() {
         assert_eq!(
-            ConnectionString::parse("mongodb://localhost:27017").unwrap(),
-            ConnectionString {
+            ClientOptions::parse("mongodb://localhost:27017").unwrap(),
+            ClientOptions {
                 hosts: vec![Host {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
@@ -517,8 +517,8 @@ mod tests {
     #[test]
     fn with_port_and_trailing_slash() {
         assert_eq!(
-            ConnectionString::parse("mongodb://localhost:27017/").unwrap(),
-            ConnectionString {
+            ClientOptions::parse("mongodb://localhost:27017/").unwrap(),
+            ClientOptions {
                 hosts: vec![Host {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
@@ -531,8 +531,8 @@ mod tests {
     #[test]
     fn with_read_concern() {
         assert_eq!(
-            ConnectionString::parse("mongodb://localhost:27017/?readConcernLevel=foo").unwrap(),
-            ConnectionString {
+            ClientOptions::parse("mongodb://localhost:27017/?readConcernLevel=foo").unwrap(),
+            ClientOptions {
                 hosts: vec![Host {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
@@ -545,7 +545,7 @@ mod tests {
 
     #[test]
     fn with_w_negative_int() {
-        assert!(ConnectionString::parse("mongodb://localhost:27017/?w=-1").is_err());
+        assert!(ClientOptions::parse("mongodb://localhost:27017/?w=-1").is_err());
     }
 
     #[test]
@@ -553,8 +553,8 @@ mod tests {
         let write_concern = WriteConcern::builder().w(Acknowledgment::from(1)).build();
 
         assert_eq!(
-            ConnectionString::parse("mongodb://localhost:27017/?w=1").unwrap(),
-            ConnectionString {
+            ClientOptions::parse("mongodb://localhost:27017/?w=1").unwrap(),
+            ClientOptions {
                 hosts: vec![Host {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
@@ -572,8 +572,8 @@ mod tests {
             .build();
 
         assert_eq!(
-            ConnectionString::parse("mongodb://localhost:27017/?w=foo").unwrap(),
-            ConnectionString {
+            ClientOptions::parse("mongodb://localhost:27017/?w=foo").unwrap(),
+            ClientOptions {
                 hosts: vec![Host {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
@@ -586,7 +586,7 @@ mod tests {
 
     #[test]
     fn with_invalid_j() {
-        assert!(ConnectionString::parse("mongodb://localhost:27017/?journal=foo").is_err());
+        assert!(ClientOptions::parse("mongodb://localhost:27017/?journal=foo").is_err());
     }
 
     #[test]
@@ -594,8 +594,8 @@ mod tests {
         let write_concern = WriteConcern::builder().journal(true).build();
 
         assert_eq!(
-            ConnectionString::parse("mongodb://localhost:27017/?journal=true").unwrap(),
-            ConnectionString {
+            ClientOptions::parse("mongodb://localhost:27017/?journal=true").unwrap(),
+            ClientOptions {
                 hosts: vec![Host {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
@@ -608,12 +608,12 @@ mod tests {
 
     #[test]
     fn with_wtimeout_non_int() {
-        assert!(ConnectionString::parse("mongodb://localhost:27017/?wtimeoutMS=foo").is_err());
+        assert!(ClientOptions::parse("mongodb://localhost:27017/?wtimeoutMS=foo").is_err());
     }
 
     #[test]
     fn with_wtimeout_negative_int() {
-        assert!(ConnectionString::parse("mongodb://localhost:27017/?wtimeoutMS=-1").is_err());
+        assert!(ClientOptions::parse("mongodb://localhost:27017/?wtimeoutMS=-1").is_err());
     }
 
     #[test]
@@ -623,8 +623,8 @@ mod tests {
             .build();
 
         assert_eq!(
-            ConnectionString::parse("mongodb://localhost:27017/?wtimeoutMS=27").unwrap(),
-            ConnectionString {
+            ClientOptions::parse("mongodb://localhost:27017/?wtimeoutMS=27").unwrap(),
+            ClientOptions {
                 hosts: vec![Host {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
@@ -644,11 +644,11 @@ mod tests {
             .build();
 
         assert_eq!(
-            ConnectionString::parse(
+            ClientOptions::parse(
                 "mongodb://localhost:27017/?w=majority&journal=false&wtimeoutMS=27"
             )
             .unwrap(),
-            ConnectionString {
+            ClientOptions {
                 hosts: vec![Host {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
@@ -671,14 +671,14 @@ mod tests {
             .build();
 
         assert_eq!(
-            ConnectionString::parse(
+            ClientOptions::parse(
                 "mongodb://localhost,localhost:27018/?w=majority&readConcernLevel=majority&\
                  journal=false&wtimeoutMS=27&replicaSet=foo&heartbeatFrequencyMS=1000&\
                  localThresholdMS=4000&readPreference=secondaryPreferred&readpreferencetags=dc:ny,\
                  rack:1&serverselectiontimeoutms=2000&readpreferencetags=dc:ny&readpreferencetags="
             )
             .unwrap(),
-            ConnectionString {
+            ClientOptions {
                 hosts: vec![
                     Host {
                         hostname: "localhost".to_string(),

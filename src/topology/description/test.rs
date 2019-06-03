@@ -4,7 +4,7 @@ use bson::oid::ObjectId;
 
 use super::{ServerDescription, ServerType, TopologyDescription, TopologyType};
 use crate::{
-    command_responses::IsMasterCommandResponse, connstring::ConnectionString, error::ErrorKind,
+    command_responses::IsMasterCommandResponse, connstring::ClientOptions, error::ErrorKind,
     pool::IsMasterReply,
 };
 
@@ -64,7 +64,7 @@ fn server_type_from_str(s: &str) -> Option<ServerType> {
 }
 
 fn run_test(test_file: TestFile) {
-    let conn_string = ConnectionString::parse(&test_file.uri).expect(&test_file.description);
+    let conn_string = ClientOptions::parse(&test_file.uri).expect(&test_file.description);
 
     let mut topology_description = TopologyDescription::new(conn_string);
 

@@ -14,7 +14,7 @@ struct ListIndexesEntry {
 
 #[test]
 fn list_indexes_contains_id() {
-    let client = Client::with_uri(MONGODB_URI.as_str()).unwrap();
+    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
     let db = client.database("list_indexes_contains_id");
     let coll = db.collection("list_indexes_contains_id");
 
@@ -43,7 +43,7 @@ fn list_indexes_contains_id() {
 
 #[test]
 fn index_management() {
-    let client = Client::with_uri(MONGODB_URI.as_str()).unwrap();
+    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
     let db = client.database("index_management");
     let coll = db.collection("index_management");
 

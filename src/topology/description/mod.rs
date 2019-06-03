@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use bson::oid::ObjectId;
 
 use crate::{
-    connstring::ConnectionString,
+    connstring::ClientOptions,
     read_preference::ReadPreference,
     topology::server::{ServerDescription, ServerType},
 };
@@ -58,7 +58,7 @@ pub struct TopologyDescription {
 }
 
 impl TopologyDescription {
-    pub fn new(conn_string: ConnectionString) -> Self {
+    pub fn new(conn_string: ClientOptions) -> Self {
         let topology_type = if conn_string.repl_set_name.is_some() {
             TopologyType::ReplicaSetNoPrimary
         } else if conn_string.hosts.len() == 1 {
