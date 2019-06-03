@@ -52,19 +52,13 @@ fn metadata_sent_in_handshake() {
 fn list_databases() {
     let client = Client::with_uri(MONGODB_URI.as_str()).unwrap();
 
-    let expected_dbs = &[
-        "list_database_names1",
-        "list_database_names2",
-        "list_database_names3",
-    ];
+    let expected_dbs = &["list_databases1", "list_databases2", "list_databases3"];
 
     for name in expected_dbs {
         client.database(name).drop().unwrap();
     }
 
     let prev_dbs = client.list_databases(None).unwrap();
-
-    println!("{:#?}", prev_dbs);
 
     for name in expected_dbs {
         assert!(!prev_dbs
