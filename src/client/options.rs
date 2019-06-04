@@ -217,7 +217,7 @@ impl ClientOptions {
 }
 
 impl ClientOptionsParser {
-    pub fn parse(s: &str) -> Result<Self> {
+    fn parse(s: &str) -> Result<Self> {
         let end_of_scheme = match s.find("://") {
             Some(index) => index,
             None => bail!(ErrorKind::ArgumentError(

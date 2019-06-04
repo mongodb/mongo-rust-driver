@@ -64,9 +64,9 @@ fn server_type_from_str(s: &str) -> Option<ServerType> {
 }
 
 fn run_test(test_file: TestFile) {
-    let conn_string = ClientOptions::parse(&test_file.uri).expect(&test_file.description);
+    let options = ClientOptions::parse(&test_file.uri).expect(&test_file.description);
 
-    let mut topology_description = TopologyDescription::new(conn_string);
+    let mut topology_description = TopologyDescription::new(options);
 
     for (i, phase) in test_file.phases.into_iter().enumerate() {
         for Response(address, command_response) in phase.responses {
