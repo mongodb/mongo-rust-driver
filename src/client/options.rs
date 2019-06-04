@@ -78,6 +78,10 @@ impl fmt::Display for Host {
 
 #[derive(Debug, Default, PartialEq, TypedBuilder)]
 pub struct ClientOptions {
+    #[builder(default_code = "vec![ Host {
+        hostname: \"localhost\".to_string(),
+        port: Some(27017),
+    }]")]
     pub hosts: Vec<Host>,
 
     #[builder(default)]
