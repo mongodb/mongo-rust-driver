@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use bson::{Bson, Document};
 
-use self::options::{CreateCollectionOptions, DatabaseOptions};
+use self::options::{CreateCollectionOptions, DatabaseOptions, ValidationAction, ValidationLevel};
 use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
@@ -208,10 +208,66 @@ impl Database {
         name: &str,
         options: Option<CreateCollectionOptions>,
     ) -> Result<()> {
-        let base = doc! { "create": name };
+        let mut base = doc! { "create": name };
 
         let cmd = if let Some(opts) = options {
-            base.into_iter().chain(opts).collect()
+            if let Some(capped) = opts.capped {
+                base.insert("capped", capped);
+            }
+
+            if let Some(size) = opts.size {
+                base.insert("size", size);
+            }
+
+            if let Some(max) = opts.max {
+                base.insert("max", max);
+            }
+
+            if let Some(storage_engine) = opts.storage_engine {
+                base.insert("storageEngine", storage_engine);
+            }
+
+            if let Some(validation) = opts.validation {
+                base.insert("validator", validation);
+            }
+
+            if let Some(validation_level) = opts.validation_level {
+                base.insert(
+                    "validationLevel",
+                    match validation_level {
+                        ValidationLevel::Off => "off",
+                        ValidationLevel::Strict => "strict",
+                        ValidationLevel::Moderate => "moderate",
+                    },
+                );
+            }
+
+            if let Some(validation_action) = opts.validation_action {
+                base.insert(
+                    "validationAction",
+                    match validation_action {
+                        ValidationAction::Error => "error",
+                        ValidationAction::Warn => "warn",
+                    },
+                );
+            }
+
+            if let Some(view_on) = opts.view_on {
+                base.insert("viewOn", view_on);
+            }
+
+            if let Some(pipeline) = opts.pipeline {
+                base.insert(
+                    "pipeline",
+                    Bson::Array(pipeline.into_iter().map(Bson::Document).collect()),
+                );
+            }
+
+            if let Some(collation) = opts.collation {
+                base.insert("collation", collation);
+            }
+
+            base
         } else {
             base
         };
