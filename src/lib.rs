@@ -7,7 +7,7 @@
 //! # use mongodb::{Client, error::Result};
 //! #
 //! # fn make_client() -> Result<Client> {
-//! let client = Client::with_uri("mongodb://localhost:27017/")?;
+//! let client = Client::with_uri_str("mongodb://localhost:27017/")?;
 //! # Ok(client)
 //! # }
 //! ```
@@ -19,7 +19,7 @@
 //! # use mongodb::{Client, error::Result};
 //! #
 //! # fn do_stuff() -> Result<()> {
-//! # let client = Client::with_uri("mongodb://localhost:27017")?;
+//! # let client = Client::with_uri_str("mongodb://localhost:27017")?;
 //!
 //! let db = client.database("some_db");
 //! for coll_name in db.list_collection_names(None)? {
@@ -64,7 +64,6 @@ mod client;
 mod coll;
 mod command_responses;
 pub mod concern;
-mod connstring;
 mod cursor;
 mod db;
 pub mod error;

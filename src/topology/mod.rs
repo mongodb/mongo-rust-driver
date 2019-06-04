@@ -10,7 +10,7 @@ use derivative::Derivative;
 
 use self::server::{monitor::start_monitor, Server};
 use crate::{
-    connstring::{ConnectionString, Host},
+    options::{ClientOptions, Host},
     read_preference::ReadPreference,
 };
 
@@ -31,10 +31,10 @@ pub(crate) struct Topology {
 impl Topology {
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::new_ret_no_self))]
     pub(crate) fn new(
-        conn_string: ConnectionString,
+        options: ClientOptions,
         tls_config: Option<Arc<rustls::ClientConfig>>,
     ) -> Arc<RwLock<Self>> {
-        let servers = conn_string
+        let servers = options
             .hosts
             .iter()
             .map(|host| {
@@ -43,11 +43,11 @@ impl Topology {
             })
             .collect();
 
-        let heartbeat_freq = conn_string.heartbeat_freq;
+        let heartbeat_freq = options.heartbeat_freq;
 
         let topology = Arc::new(RwLock::new(Self {
             tls_config,
-            description: TopologyDescription::new(conn_string),
+            description: TopologyDescription::new(options),
             servers,
         }));
 

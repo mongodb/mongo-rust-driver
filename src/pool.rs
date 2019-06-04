@@ -15,8 +15,8 @@ use webpki::DNSNameRef;
 
 use crate::{
     command_responses::IsMasterCommandResponse,
-    connstring::Host,
     error::{Error, ErrorKind, Result},
+    options::Host,
     wire::{new_request_id, Header, OpCode, Query, QueryFlags, Reply},
 };
 

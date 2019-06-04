@@ -26,7 +26,7 @@ lazy_static! {
 
             uri
         };
-    static ref CLIENT: Client = Client::with_uri(MONGODB_URI.as_str()).unwrap();
+    static ref CLIENT: Client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
 }
 
 fn get_coll(db_name: &str, coll_name: &str) -> Collection {

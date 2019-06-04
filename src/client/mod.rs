@@ -1,3 +1,4 @@
+pub mod options;
 #[cfg(test)]
 mod test;
 
@@ -14,11 +15,10 @@ use time::{Duration as TimeDuration, PreciseTime};
 use crate::{
     command_responses::ListDatabasesResponse,
     concern::{ReadConcern, WriteConcern},
-    connstring::ConnectionString,
     db::Database,
     error::{ErrorKind, Result},
     event::{CommandEventHandler, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
-    options::DatabaseOptions,
+    options::{ClientOptions, DatabaseOptions},
     pool::Connection,
     read_preference::ReadPreference,
     topology::{ServerDescription, ServerType, Topology, TopologyType},
@@ -40,7 +40,7 @@ lazy_static! {
 /// # use mongodb::{Client, error::Result};
 ///
 /// # fn start_workers() -> Result<()> {
-/// let client = Client::with_uri("mongodb://example.com")?;
+/// let client = Client::with_uri_str("mongodb://example.com")?;
 ///
 /// for i in 0..5 {
 ///     let client_ref = client.clone();
@@ -81,9 +81,15 @@ struct ClientInner {
 impl Client {
     /// Creates a new `Client` connected to the cluster specified by `uri`. `uri` must be a valid
     /// MongoDB connection string.
-    pub fn with_uri(uri: &str) -> Result<Self> {
-        let mut connstring = ConnectionString::parse(uri)?;
-        let tls_config = match connstring.tls_options.take() {
+    pub fn with_uri_str(uri: &str) -> Result<Self> {
+        let options = ClientOptions::parse(uri)?;
+
+        Client::with_options(options)
+    }
+
+    /// Creates a new `Client` connected to the cluster specified by ClientOptions `options`.
+    pub fn with_options(mut options: ClientOptions) -> Result<Self> {
+        let tls_config = match options.tls_options.take() {
             Some(opts) => Some(Arc::new(opts.into_rustls_config()?)),
             None => None,
         };
@@ -91,12 +97,12 @@ impl Client {
         Ok(Self {
             inner: Arc::new(ClientInner {
                 tls_config: tls_config.clone(),
-                local_threshold: connstring.local_threshold,
-                server_selection_timeout: connstring.server_selection_timeout,
-                read_preference: connstring.read_preference.take(),
-                read_concern: connstring.read_concern.take(),
-                write_concern: connstring.write_concern.take(),
-                topology: Topology::new(connstring, tls_config),
+                local_threshold: options.local_threshold,
+                server_selection_timeout: options.server_selection_timeout,
+                read_preference: options.read_preference.take(),
+                read_concern: options.read_concern.take(),
+                write_concern: options.write_concern.take(),
+                topology: Topology::new(options, tls_config),
                 command_event_handler: None,
             }),
         })
