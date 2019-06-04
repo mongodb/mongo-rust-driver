@@ -63,7 +63,7 @@ fn count(client: &Client) -> mongodb::error::Result<i64> {
 
 fn run() -> mongodb::error::Result<()> {
     let client =
-        Client::with_uri(option_env!("MONGODB_URI").unwrap_or("mongodb://localhost:27017"))?;
+        Client::with_uri_str(option_env!("MONGODB_URI").unwrap_or("mongodb://localhost:27017"))?;
     client.database(DB_NAME).drop()?;
     populate(&client)?;
 

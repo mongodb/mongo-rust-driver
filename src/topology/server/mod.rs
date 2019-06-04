@@ -8,8 +8,8 @@ use derivative::Derivative;
 pub use self::description::{OpTime, ServerDescription, ServerType};
 
 use crate::{
-    connstring::Host,
     error::Result,
+    options::Host,
     pool::{is_master, Connection, Pool},
 };
 

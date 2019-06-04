@@ -112,7 +112,7 @@ mod test {
 
     #[test]
     fn is_master_command_response() {
-        let client = crate::Client::with_uri(
+        let client = crate::Client::with_uri_str(
             option_env!("MONGODB_URI").unwrap_or("mongodb://localhost:27017"),
         )
         .unwrap();
