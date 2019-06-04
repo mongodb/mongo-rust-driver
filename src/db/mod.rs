@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use bson::{Bson, Document};
 
-use self::options::DatabaseOptions;
+use self::options::{CreateCollectionOptions, DatabaseOptions};
 use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
@@ -203,7 +203,11 @@ impl Database {
     ///
     /// Note that MongoDB creates collections implicitly when data is inserted, so the method is not
     /// needed if no special options are required.
-    pub fn create_collection(&self, name: &str, options: Option<Document>) -> Result<()> {
+    pub fn create_collection(
+        &self,
+        name: &str,
+        options: Option<CreateCollectionOptions>,
+    ) -> Result<()> {
         let base = doc! { "create": name };
 
         let cmd = if let Some(opts) = options {
