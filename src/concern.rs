@@ -2,9 +2,9 @@
 
 use std::time::Duration;
 
-use bson::Document;
+use bson::{Bson, Document};
 
-use crate::error::Result;
+use crate::error::{ErrorKind, Result};
 
 /// Specifies the consistency and isolation properties of read operations from replica sets and
 /// replica set shards.
@@ -32,14 +32,20 @@ pub enum ReadConcern {
 
 impl PartialEq for ReadConcern {
     fn eq(&self, other: &Self) -> bool {
-        unimplemented!()
+        self.as_str() == other.as_str()
     }
 }
 
 impl ReadConcern {
     /// Gets the string representation of the `ReadConcern`.
     pub fn as_str(&self) -> &str {
-        unimplemented!()
+        match *self {
+            ReadConcern::Local => "local",
+            ReadConcern::Majority => "majority",
+            ReadConcern::Linearizable => "linearizable",
+            ReadConcern::Available => "available",
+            ReadConcern::Custom(ref s) => s,
+        }
     }
 }
 
@@ -52,7 +58,7 @@ pub struct WriteConcern {
     /// Requests acknowledgement that the operation has propagated to a specific number or variety
     /// of servers.
     #[builder(default)]
-    pub w: Option<Acknowledgement>,
+    pub w: Option<Acknowledgment>,
 
     /// Requests acknowledgement that the operation has propagated to the on-disk journal.
     #[builder(default)]
@@ -70,7 +76,7 @@ pub struct WriteConcern {
 
 /// The type of the `w` field in a write concern.
 #[derive(Clone, Debug, PartialEq)]
-pub enum Acknowledgement {
+pub enum Acknowledgment {
     /// Requires acknowledgement that the write has reached the specified number of nodes.
     Nodes(i32),
     /// Requires acknowledgement that the write has reached the majority of nodes.
@@ -80,37 +86,80 @@ pub enum Acknowledgement {
     Tag(String),
 }
 
-impl From<i32> for Acknowledgement {
+impl From<i32> for Acknowledgment {
     fn from(i: i32) -> Self {
-        Acknowledgement::Nodes(i)
+        Acknowledgment::Nodes(i)
     }
 }
 
-impl From<String> for Acknowledgement {
+impl From<String> for Acknowledgment {
     fn from(s: String) -> Self {
         if s == "majority" {
-            Acknowledgement::Majority
+            Acknowledgment::Majority
         } else {
-            Acknowledgement::Tag(s)
+            Acknowledgment::Tag(s)
+        }
+    }
+}
+
+impl Acknowledgment {
+    fn to_bson(&self) -> Bson {
+        match self {
+            Acknowledgment::Nodes(i) => Bson::I32(*i),
+            Acknowledgment::Majority => Bson::String("majority".to_string()),
+            Acknowledgment::Tag(s) => Bson::String(s.to_string()),
         }
     }
 }
 
 impl WriteConcern {
-    /// Creates a new write concern with the default configuration.
-    pub fn new() -> Self {
-        unimplemented!()
-    }
-
     /// Validates that the write concern. A write concern is invalid if the `w` field is 0
     /// and the `j` field is `true`.
     pub fn validate(&self) -> Result<()> {
-        unimplemented!()
+        if let Some(Acknowledgment::Nodes(i)) = self.w {
+            if i < 0 {
+                bail!(ErrorKind::ArgumentError(
+                    "write concern `w` field cannot be negative integer".to_string()
+                ));
+            }
+        }
+
+        if self.w == Some(Acknowledgment::Nodes(0)) && self.journal == Some(true) {
+            bail!(ErrorKind::ArgumentError(
+                "write concern cannot have w=0 and j=true".to_string()
+            ));
+        }
+
+        if let Some(w_timeout) = self.w_timeout {
+            if w_timeout < Duration::from_millis(0) {
+                bail!(ErrorKind::ArgumentError(
+                    "write concern `w_timeout` field cannot be negative".to_string()
+                ));
+            }
+        }
+
+        Ok(())
     }
 
     /// Converts the write concern into a `Document`. This method will return an error if the write
     /// concern is invalid.
     pub fn into_document(self) -> Result<Document> {
-        unimplemented!()
+        self.validate()?;
+
+        let mut doc = Document::new();
+
+        if let Some(acknowledgment) = self.w {
+            doc.insert("w", acknowledgment.to_bson());
+        }
+
+        if let Some(w_timeout) = self.w_timeout {
+            doc.insert("wtimeout", w_timeout.as_millis() as i64);
+        }
+
+        if let Some(j) = self.journal {
+            doc.insert("j", j);
+        }
+
+        Ok(doc)
     }
 }

@@ -19,12 +19,24 @@ error_chain! {
         }
 
         /// The driver was unable to send or receive a message to the server.
+        InvalidHostname(hostname: String) {
+            description("Unable to parse hostname")
+            display("Unable to parse hostname: '{}'", hostname)
+        }
+
+        /// The driver was unable to send or receive a message to the server.
         OperationError(msg: String) {
             description("A database operation failed to send or receive a reply")
             display("A database operation failed to send or receive a reply: {}", msg)
         }
 
-       /// The response the driver received from the server was not in the form expected.
+        /// The response the driver received from the server was not in the form expected.
+        ParseError(data_type: String, file_path: String) {
+            description("Unable to parse data from file")
+            display("Unable to parse {} data from {}", data_type, file_path)
+        }
+
+        /// The response the driver received from the server was not in the form expected.
         ResponseError(msg: String) {
             description("A database operation returned an invalid reply")
             display("A database operation returned an invalid reply: {}", msg)

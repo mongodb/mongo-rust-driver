@@ -1,3 +1,5 @@
+pub mod options;
+
 use std::sync::Arc;
 
 use crate::{
@@ -5,7 +7,7 @@ use crate::{
     db::Database,
     error::Result,
     event::{CommandEventHandler, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
-    options::DatabaseOptions,
+    options::{ClientOptions, DatabaseOptions},
     read_preference::ReadPreference,
 };
 
@@ -21,7 +23,7 @@ use crate::{
 /// # use mongodb::{Client, error::Result};
 ///
 /// # fn start_workers() -> Result<()> {
-/// let client = Client::with_uri("mongodb://example.com")?;
+/// let client = Client::with_uri_str("mongodb://example.com")?;
 ///
 /// for i in 0..5 {
 ///     let client_ref = client.clone();
@@ -57,7 +59,14 @@ struct ClientInner {
 impl Client {
     /// Creates a new `Client` connected to the cluster specified by `uri`. `uri` must be a valid
     /// MongoDB connection string.
-    pub fn with_uri(uri: &str) -> Result<Self> {
+    pub fn with_uri_str(uri: &str) -> Result<Self> {
+        let options = ClientOptions::parse(uri)?;
+
+        Client::with_options(options)
+    }
+
+    /// Creates a new `Client` connected to the cluster specified by ClientOptions `options`.
+    pub fn with_options(options: ClientOptions) -> Result<Self> {
         unimplemented!()
     }
 

@@ -26,7 +26,7 @@ use crate::{
 /// # use mongodb::{Client, error::Result};
 /// #
 /// # fn start_workers() -> Result<()> {
-/// # let client = Client::with_uri("mongodb://example.com")?;
+/// # let client = Client::with_uri_str("mongodb://example.com")?;
 /// let coll = client.database("items").collection("in_stock");
 ///
 /// for i in 0..5 {

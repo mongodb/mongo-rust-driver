@@ -1,5 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 
+use crate::error::{ErrorKind, Result};
+
 /// Specifies how the driver should route a read operation to members of a replica set.
 ///
 /// If applicable, `tag_sets` can be used to target specific nodes in a replica set, and
@@ -35,6 +37,41 @@ pub enum ReadPreference {
         tag_sets: Option<Vec<TagSet>>,
         max_staleness: Option<Duration>,
     },
+}
+
+impl ReadPreference {
+    pub(crate) fn with_tags(self, tag_sets: Vec<TagSet>) -> Result<Self> {
+        let tag_sets = Some(tag_sets);
+
+        let read_pref = match self {
+            ReadPreference::Primary => bail!(ErrorKind::ArgumentError(
+                "read preference tags can only be specified when a non-primary mode is specified"
+                    .to_string()
+            )),
+            ReadPreference::Secondary { max_staleness, .. } => ReadPreference::Secondary {
+                tag_sets,
+                max_staleness,
+            },
+            ReadPreference::PrimaryPreferred { max_staleness, .. } => {
+                ReadPreference::PrimaryPreferred {
+                    tag_sets,
+                    max_staleness,
+                }
+            }
+            ReadPreference::SecondaryPreferred { max_staleness, .. } => {
+                ReadPreference::SecondaryPreferred {
+                    tag_sets,
+                    max_staleness,
+                }
+            }
+            ReadPreference::Nearest { max_staleness, .. } => ReadPreference::Nearest {
+                tag_sets,
+                max_staleness,
+            },
+        };
+
+        Ok(read_pref)
+    }
 }
 
 pub type TagSet = HashMap<String, String>;
