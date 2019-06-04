@@ -7,7 +7,7 @@ use crate::MONGODB_URI;
 
 #[test]
 fn count() {
-    let client = Client::with_uri(MONGODB_URI.as_str()).unwrap();
+    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
     let db = client.database("count");
     let coll = db.collection("count");
 
@@ -26,7 +26,7 @@ fn count() {
 
 #[test]
 fn find() {
-    let client = Client::with_uri(MONGODB_URI.as_str()).unwrap();
+    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
     let db = client.database("find");
     let coll = db.collection("find");
 
@@ -51,7 +51,7 @@ fn find() {
 
 #[test]
 fn update() {
-    let client = Client::with_uri(MONGODB_URI.as_str()).unwrap();
+    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
     let db = client.database("update");
     let coll = db.collection("update");
 
@@ -88,7 +88,7 @@ fn update() {
 
 #[test]
 fn delete() {
-    let client = Client::with_uri(MONGODB_URI.as_str()).unwrap();
+    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
     let db = client.database("delete");
     let coll = db.collection("delete");
 

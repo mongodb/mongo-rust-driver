@@ -35,7 +35,7 @@ struct OsMetadata {
 // #[test]
 #[allow(unused)]
 fn metadata_sent_in_handshake() {
-    let client = Client::with_uri(MONGODB_URI.as_str()).unwrap();
+    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
     let db = client.database("admin");
     let result = db.run_command(doc! { "currentOp": 1 }, None).unwrap();
 
@@ -50,7 +50,7 @@ fn metadata_sent_in_handshake() {
 
 #[test]
 fn list_databases() {
-    let client = Client::with_uri(MONGODB_URI.as_str()).unwrap();
+    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
 
     let expected_dbs = &["list_databases1", "list_databases2", "list_databases3"];
 
@@ -94,7 +94,7 @@ fn list_databases() {
 
 #[test]
 fn list_database_names() {
-    let client = Client::with_uri(MONGODB_URI.as_str()).unwrap();
+    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
 
     let expected_dbs = &[
         "list_database_names1",
