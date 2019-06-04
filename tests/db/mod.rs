@@ -1,10 +1,9 @@
 use std::cmp::Ord;
 
 use bson::{Bson, Document};
-use mongodb::{options, Client, Database};
+use mongodb::{options::CreateCollectionOptions, Client, Database};
 
 use crate::MONGODB_URI;
-use options::CreateCollectionOptions;
 
 #[derive(Debug, Deserialize)]
 struct CollectionInfo {
@@ -158,11 +157,10 @@ fn collection_management() {
     db.create_collection("collection_management1", None)
         .unwrap();
 
-    let options = CreateCollectionOptions {
-        capped: Some(true),
-        size: Some(512),
-        ..Default::default()
-    };
+    let options = CreateCollectionOptions::builder()
+        .capped(true)
+        .size(512)
+        .build();
     db.create_collection("collection_management2", Some(options))
         .unwrap();
 

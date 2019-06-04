@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use bson::{Bson, Document};
 
-use self::options::{CreateCollectionOptions, DatabaseOptions, ValidationAction, ValidationLevel};
+use self::options::{CreateCollectionOptions, DatabaseOptions};
 use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
@@ -232,24 +232,11 @@ impl Database {
             }
 
             if let Some(validation_level) = opts.validation_level {
-                base.insert(
-                    "validationLevel",
-                    match validation_level {
-                        ValidationLevel::Off => "off",
-                        ValidationLevel::Strict => "strict",
-                        ValidationLevel::Moderate => "moderate",
-                    },
-                );
+                base.insert("validationLevel", validation_level.as_str());
             }
 
             if let Some(validation_action) = opts.validation_action {
-                base.insert(
-                    "validationAction",
-                    match validation_action {
-                        ValidationAction::Error => "error",
-                        ValidationAction::Warn => "warn",
-                    },
-                );
+                base.insert("validationAction", validation_action.as_str());
             }
 
             if let Some(view_on) = opts.view_on {

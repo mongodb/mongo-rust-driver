@@ -90,10 +90,29 @@ pub enum ValidationLevel {
     Moderate,
 }
 
+impl ValidationLevel {
+    pub(crate) fn as_str(&self) -> String {
+        match *self {
+            ValidationLevel::Off => "off".to_string(),
+            ValidationLevel::Strict => "strict".to_string(),
+            ValidationLevel::Moderate => "moderate".to_string(),
+        }
+    }
+}
+
 // Specifies whether the database should return an error or simply raise a warning if inserted
 // documents do not pass the validation.
 #[derive(Debug)]
 pub enum ValidationAction {
     Error,
     Warn,
+}
+
+impl ValidationAction {
+    pub(crate) fn as_str(&self) -> String {
+        match *self {
+            ValidationAction::Error => "error".to_string(),
+            ValidationAction::Warn => "warn".to_string(),
+        }
+    }
 }
