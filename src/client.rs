@@ -1,9 +1,10 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use crate::{
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::Result,
+    event::CommandEventHandler,
     options::DatabaseOptions,
     read_preference::ReadPreference,
 };
@@ -43,11 +44,14 @@ pub struct Client {
     inner: Arc<ClientInner>,
 }
 
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 struct ClientInner {
     read_preference: Option<ReadPreference>,
     read_concern: Option<ReadConcern>,
     write_concern: Option<WriteConcern>,
+    #[derivative(Debug = "ignore")]
+    command_event_handlers: RwLock<Vec<Box<CommandEventHandler>>>,
 }
 
 impl Client {
@@ -90,5 +94,14 @@ impl Client {
     /// used repeatedly without incurring any costs from I/O.
     pub fn database_with_options(&self, name: &str, options: DatabaseOptions) -> Database {
         unimplemented!()
+    }
+
+    /// Registers an event handler to receive notifications whenever a command-related event occurs.
+    pub fn add_command_event_handler(&self, handler: Box<dyn CommandEventHandler>) {
+        self.inner
+            .command_event_handlers
+            .write()
+            .unwrap()
+            .push(handler)
     }
 }
