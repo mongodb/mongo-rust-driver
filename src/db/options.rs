@@ -91,11 +91,11 @@ pub enum ValidationLevel {
 }
 
 impl ValidationLevel {
-    pub(crate) fn as_str(&self) -> String {
+    pub(crate) fn as_str(&self) -> &'static str {
         match *self {
-            ValidationLevel::Off => "off".to_string(),
-            ValidationLevel::Strict => "strict".to_string(),
-            ValidationLevel::Moderate => "moderate".to_string(),
+            ValidationLevel::Off => "off",
+            ValidationLevel::Strict => "strict",
+            ValidationLevel::Moderate => "moderate",
         }
     }
 }
@@ -109,10 +109,10 @@ pub enum ValidationAction {
 }
 
 impl ValidationAction {
-    pub(crate) fn as_str(&self) -> String {
+    pub(crate) fn as_str(&self) -> &'static str {
         match *self {
-            ValidationAction::Error => "error".to_string(),
-            ValidationAction::Warn => "warn".to_string(),
+            ValidationAction::Error => "error",
+            ValidationAction::Warn => "warn",
         }
     }
 }
