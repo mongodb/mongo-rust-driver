@@ -37,6 +37,8 @@
 #![allow(unused_variables)]
 
 #[macro_use]
+extern crate error_chain;
+#[macro_use]
 extern crate typed_builder;
 
 mod client;
