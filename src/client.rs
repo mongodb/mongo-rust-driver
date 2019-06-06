@@ -1,10 +1,13 @@
-use std::sync::{Arc, RwLock};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 use crate::{
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::Result,
-    event::CommandEventHandler,
+    event::{CommandEventHandler, HandlerId},
     options::DatabaseOptions,
     read_preference::ReadPreference,
 };
@@ -51,7 +54,7 @@ struct ClientInner {
     read_concern: Option<ReadConcern>,
     write_concern: Option<WriteConcern>,
     #[derivative(Debug = "ignore")]
-    command_event_handlers: RwLock<Vec<Box<CommandEventHandler>>>,
+    command_event_handlers: RwLock<HashMap<HandlerId, Box<CommandEventHandler>>>,
 }
 
 impl Client {
@@ -97,11 +100,13 @@ impl Client {
     }
 
     /// Registers an event handler to receive notifications whenever a command-related event occurs.
-    pub fn add_command_event_handler(&self, handler: Box<dyn CommandEventHandler>) {
-        self.inner
-            .command_event_handlers
-            .write()
-            .unwrap()
-            .push(handler)
+    pub fn add_command_event_handler(&self, handler: Box<dyn CommandEventHandler>) -> HandlerId {
+        unimplemented!()
+    }
+
+    /// Unregisters an event handler so that it no longer receives notifications when an event
+    /// occurs.
+    pub fn remove_event_handler(&self, id: HandlerId) {
+        unimplemented!()
     }
 }
