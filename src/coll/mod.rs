@@ -144,68 +144,9 @@ impl Collection {
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<AggregateOptions>,
     ) -> Result<Cursor> {
-        let batch_size = options.as_ref().and_then(|opts| opts.batch_size);
-        let pipeline: Vec<_> = pipeline.into_iter().collect();
-
-        let has_out = pipeline.iter().any(|d| d.contains_key("$out"));
-
-        let mut command_doc = doc! {
-            "aggregate": &self.inner.name,
-            "pipeline": Bson::Array(pipeline.into_iter().map(Bson::Document).collect()),
-        };
-
-        let mut cursor_option = Document::new();
-
-        if let Some(opts) = options {
-            if let Some(allow_disk_use) = opts.allow_disk_use {
-                command_doc.insert("allowDiskUse", allow_disk_use);
-            }
-
-            if let Some(batch_size) = opts.batch_size {
-                if !has_out {
-                    cursor_option.insert("batchSize", batch_size);
-                }
-            }
-
-            if let Some(bypass_document_validation) = opts.bypass_document_validation {
-                command_doc.insert("bypassDocumentValidation", bypass_document_validation);
-            }
-
-            if let Some(max_time) = opts.max_time {
-                command_doc.insert("maxTimeMS", max_time.subsec_millis());
-            }
-
-            if let Some(comment) = opts.comment {
-                command_doc.insert("comment", comment);
-            }
-
-            if let Some(hint) = opts.hint {
-                command_doc.insert("hint", hint.into_bson());
-            }
-        }
-
-        command_doc.insert("cursor", cursor_option);
-
-        if has_out {
-            if let Some(ref write_concern) = self.inner.write_concern {
-                command_doc.insert("writeConcern", write_concern.clone().into_document()?);
-            }
-        } else if let Some(ref read_concern) = self.inner.read_concern {
-            command_doc.insert("readConcern", doc! { "level": read_concern.as_str() });
-        }
-
-        let (address, result) = if has_out {
-            self.run_write_command(command_doc)?
-        } else {
-            self.run_command(command_doc, self.inner.read_preference.as_ref())?
-        };
-
-        match bson::from_bson(Bson::Document(result)) {
-            Ok(result) => Ok(Cursor::new(address, self.clone(), result, batch_size)),
-            Err(_) => bail!(ErrorKind::ResponseError(
-                "invalid server response to find command".to_string()
-            )),
-        }
+        self.inner
+            .db
+            .aggregate_helper(self.inner.name, pipeline, options)
     }
 
     /// Estimates the number of documents in the collection using collection metadata.
