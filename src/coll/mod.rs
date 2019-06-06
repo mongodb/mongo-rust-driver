@@ -207,6 +207,15 @@ impl Collection {
     }
 
     /// Estimates the number of documents in the collection using collection metadata.
+    ///
+    /// Note that there are restrictions on certain operators for this method. Those operators
+    /// (listed below) should be replaced accordingly:
+    ///
+    /// | Operator | Replacement |
+    /// | -------- | ----------- |
+    /// | `$where`   | [`$expr`](https://docs.mongodb.com/manual/reference/operator/query/expr/) |
+    /// | `$near`    | [`$geoWithin`](https://docs.mongodb.com/manual/reference/operator/query/geoWithin/) with [`$center`](https://docs.mongodb.com/manual/reference/operator/query/center/#op._S_center) |
+    /// | `$nearSphere` | [`$geoWithin`](https://docs.mongodb.com/manual/reference/operator/query/geoWithin/) with [`$centerSphere`](https://docs.mongodb.com/manual/reference/operator/query/centerSphere/#op._S_centerSphere) |
     pub fn estimated_document_count(
         &self,
         options: Option<EstimatedDocumentCountOptions>,
@@ -242,6 +251,15 @@ impl Collection {
     ///
     /// Note that using `Collection::estimated_document_count` is recommended instead of this method
     /// is most cases.
+    ///
+    /// Also note that there are restrictions on certain operators for this method. Those operators
+    /// (listed below) should be replaced accordingly:
+    ///
+    /// | Operator | Replacement |
+    /// | -------- | ----------- |
+    /// | `$where`   | [`$expr`](https://docs.mongodb.com/manual/reference/operator/query/expr/) |
+    /// | `$near`    | [`$geoWithin`](https://docs.mongodb.com/manual/reference/operator/query/geoWithin/) with [`$center`](https://docs.mongodb.com/manual/reference/operator/query/center/#op._S_center) |
+    /// | `$nearSphere` | [`$geoWithin`](https://docs.mongodb.com/manual/reference/operator/query/geoWithin/) with [`$centerSphere`](https://docs.mongodb.com/manual/reference/operator/query/centerSphere/#op._S_centerSphere) |
     pub fn count_documents(
         &self,
         filter: Option<Document>,
