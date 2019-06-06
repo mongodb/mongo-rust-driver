@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bson::Document;
 
-use crate::error::Error;
+use crate::{error::Error, pool::ConnectionInfo};
 
 /// An event that triggers when a database command is initiated.
 #[derive(Debug)]
@@ -21,8 +21,8 @@ pub struct CommandStartedEvent {
     /// `CommandSucceededEvent` or `CommandFailedEvent`).
     pub request_id: i32,
 
-    /// The driver-generated identifier of the connection which the command will run on.
-    pub connection_id: u32,
+    /// Information about the connect the command will be run on.
+    pub connection: ConnectionInfo,
 }
 
 /// An event that triggers when a database command completes without an error.
@@ -41,8 +41,8 @@ pub struct CommandSucceededEvent {
     /// corresponding `ComamndStartedEvent` that triggered earlier.
     pub request_id: i32,
 
-    /// The driver-generated identifier of the connection which the command was run on.
-    pub connection_id: u32,
+    /// Information about the connect the command will be run on.
+    pub connection_id: ConnectionInfo,
 }
 
 /// An event that triggers when a command failed to complete successfully.
@@ -61,8 +61,8 @@ pub struct CommandFailedEvent {
     /// corresponding `ComamndStartedEvent` that triggered earlier.
     pub request_id: i32,
 
-    /// The driver-generated identifier of the connection which the command was run on.
-    pub connection_id: u32,
+    /// Information about the connect the command will be run on.
+    pub connection_id: ConnectionInfo,
 }
 
 /// Applications can implement this trait to specify custom logic to run on each command event sent

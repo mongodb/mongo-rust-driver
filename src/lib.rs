@@ -51,6 +51,7 @@ mod db;
 pub mod error;
 pub mod event;
 pub mod options;
+mod pool;
 mod read_preference;
 pub mod results;
 
