@@ -1,7 +1,5 @@
 use bson::{Bson, Document};
-use mongodb::{options::IndexModel, Client};
-
-use crate::MONGODB_URI;
+use mongodb::options::IndexModel;
 
 #[derive(Debug, Deserialize)]
 struct ListIndexesEntry {
@@ -14,10 +12,7 @@ struct ListIndexesEntry {
 
 #[test]
 fn list_indexes_contains_id() {
-    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
-    let db = client.database("list_indexes_contains_id");
-    let coll = db.collection("list_indexes_contains_id");
-
+    let coll = crate::get_coll("list_indexes_contains_id", "list_indexes_contains_id");
     coll.drop().unwrap();
 
     let indexes: Vec<_> = coll.list_indexes().unwrap().collect();
@@ -43,13 +38,11 @@ fn list_indexes_contains_id() {
 
 #[test]
 fn index_management() {
-    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
-    let db = client.database("index_management");
+    let db = crate::get_db("index_management");
     let coll = db.collection("index_management");
 
     coll.drop().unwrap();
-    db.run_command(doc! { "createCollection": "index_management" }, None)
-        .unwrap();
+    db.create_collection("index_management", None).unwrap();
 
     let keys = vec![
         doc! { "w": 1 },

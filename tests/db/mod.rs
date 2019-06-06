@@ -1,9 +1,7 @@
 use std::cmp::Ord;
 
 use bson::{Bson, Document};
-use mongodb::{options::CreateCollectionOptions, Client, Database};
-
-use crate::MONGODB_URI;
+use mongodb::{options::CreateCollectionOptions, Database};
 
 #[derive(Debug, Deserialize)]
 struct CollectionInfo {
@@ -41,8 +39,7 @@ fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<CollectionInfo>
 
 #[test]
 fn is_master() {
-    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
-    let db = client.database("test");
+    let db = crate::get_db("test");
     let doc = db.run_command(doc! { "ismaster": 1 }, None).unwrap();
     let is_master_reply: IsMasterReply = bson::from_bson(Bson::Document(doc)).unwrap();
 
@@ -52,8 +49,7 @@ fn is_master() {
 
 #[test]
 fn list_collections() {
-    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
-    let db = client.database("list_collections");
+    let db = crate::get_db("list_collections");
     db.drop().unwrap();
 
     assert_eq!(db.list_collections(None).unwrap().count(), 0);
@@ -86,8 +82,7 @@ fn list_collections() {
 
 #[test]
 fn list_collections_filter() {
-    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
-    let db = client.database("list_collections_filter");
+    let db = crate::get_db("list_collections_filter");
     db.drop().unwrap();
 
     assert_eq!(db.list_collections(None).unwrap().count(), 0);
@@ -123,8 +118,7 @@ fn list_collections_filter() {
 
 #[test]
 fn list_collection_names() {
-    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
-    let db = client.database("list_collection_names");
+    let db = crate::get_db("list_collection_names");
     db.drop().unwrap();
 
     assert!(db.list_collection_names(None).unwrap().is_empty());
@@ -148,8 +142,7 @@ fn list_collection_names() {
 
 #[test]
 fn collection_management() {
-    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
-    let db = client.database("collection_management");
+    let db = crate::get_db("collection_management");
     db.drop().unwrap();
 
     assert!(db.list_collection_names(None).unwrap().is_empty());

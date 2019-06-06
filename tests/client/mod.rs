@@ -1,7 +1,6 @@
 use bson::Bson;
-use mongodb::Client;
 
-use crate::MONGODB_URI;
+use crate::CLIENT;
 
 #[derive(Debug, Deserialize)]
 struct Metadata {
@@ -35,8 +34,7 @@ struct OsMetadata {
 // #[test]
 #[allow(unused)]
 fn metadata_sent_in_handshake() {
-    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
-    let db = client.database("admin");
+    let db = crate::get_db("admin");
     let result = db.run_command(doc! { "currentOp": 1 }, None).unwrap();
 
     let in_prog = match result.get("inprog") {
@@ -50,29 +48,27 @@ fn metadata_sent_in_handshake() {
 
 #[test]
 fn list_databases() {
-    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
-
     let expected_dbs = &["list_databases1", "list_databases2", "list_databases3"];
 
     for name in expected_dbs {
-        client.database(name).drop().unwrap();
+        CLIENT.database(name).drop().unwrap();
     }
 
-    let prev_dbs = client.list_databases(None).unwrap();
+    let prev_dbs = CLIENT.list_databases(None).unwrap();
 
     for name in expected_dbs {
         assert!(!prev_dbs
             .iter()
             .any(|doc| doc.get("name") == Some(&Bson::String(name.to_string()))));
 
-        let db = client.database(name);
+        let db = CLIENT.database(name);
 
         db.collection("foo")
             .insert_one(doc! { "x": 1 }, None)
             .unwrap();
     }
 
-    let new_dbs = client.list_databases(None).unwrap();
+    let new_dbs = CLIENT.list_databases(None).unwrap();
     let new_dbs: Vec<_> = new_dbs
         .into_iter()
         .filter(|doc| match doc.get("name") {
@@ -94,8 +90,6 @@ fn list_databases() {
 
 #[test]
 fn list_database_names() {
-    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
-
     let expected_dbs = &[
         "list_database_names1",
         "list_database_names2",
@@ -103,22 +97,22 @@ fn list_database_names() {
     ];
 
     for name in expected_dbs {
-        client.database(name).drop().unwrap();
+        CLIENT.database(name).drop().unwrap();
     }
 
-    let prev_dbs = client.list_database_names(None).unwrap();
+    let prev_dbs = CLIENT.list_database_names(None).unwrap();
 
     for name in expected_dbs {
         assert!(!prev_dbs.iter().any(|db_name| db_name == name));
 
-        let db = client.database(name);
+        let db = CLIENT.database(name);
 
         db.collection("foo")
             .insert_one(doc! { "x": 1 }, None)
             .unwrap();
     }
 
-    let new_dbs = client.list_database_names(None).unwrap();
+    let new_dbs = CLIENT.list_database_names(None).unwrap();
 
     for name in expected_dbs {
         assert_eq!(new_dbs.iter().filter(|db_name| db_name == name).count(), 1);
