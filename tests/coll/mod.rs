@@ -1,15 +1,11 @@
 mod indexes;
 
 use bson::Bson;
-use mongodb::{options::UpdateOptions, Client};
-
-use crate::MONGODB_URI;
+use mongodb::options::UpdateOptions;
 
 #[test]
 fn count() {
-    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
-    let db = client.database("count");
-    let coll = db.collection("count");
+    let coll = crate::get_coll("count", "count");
 
     coll.drop().unwrap();
     assert_eq!(coll.estimated_document_count(None).unwrap(), 0);
@@ -26,9 +22,7 @@ fn count() {
 
 #[test]
 fn find() {
-    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
-    let db = client.database("find");
-    let coll = db.collection("find");
+    let coll = crate::get_coll("find", "find");
 
     coll.drop().unwrap();
 
@@ -51,9 +45,7 @@ fn find() {
 
 #[test]
 fn update() {
-    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
-    let db = client.database("update");
-    let coll = db.collection("update");
+    let coll = crate::get_coll("update", "update");
 
     coll.drop().unwrap();
 
@@ -88,9 +80,7 @@ fn update() {
 
 #[test]
 fn delete() {
-    let client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
-    let db = client.database("delete");
-    let coll = db.collection("delete");
+    let coll = crate::get_coll("delete", "delete");
 
     coll.drop().unwrap();
 

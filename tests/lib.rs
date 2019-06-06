@@ -12,7 +12,7 @@ mod coll;
 mod db;
 mod spec;
 
-use mongodb::{Client, Collection};
+use mongodb::{Client, Collection, Database};
 
 lazy_static! {
     static ref MONGODB_URI: String =
@@ -29,8 +29,12 @@ lazy_static! {
     static ref CLIENT: Client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
 }
 
+fn get_db(db_name: &str) -> Database {
+    CLIENT.database(db_name)
+}
+
 fn get_coll(db_name: &str, coll_name: &str) -> Collection {
-    CLIENT.database(db_name).collection(coll_name)
+    get_db(db_name).collection(coll_name)
 }
 
 fn init_db_and_coll(db_name: &str, coll_name: &str) -> Collection {
