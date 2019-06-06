@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use bson::{Bson, Document};
 
-use self::options::DatabaseOptions;
+use self::options::{CreateCollectionOptions, DatabaseOptions};
 use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
@@ -203,11 +203,58 @@ impl Database {
     ///
     /// Note that MongoDB creates collections implicitly when data is inserted, so the method is not
     /// needed if no special options are required.
-    pub fn create_collection(&self, name: &str, options: Option<Document>) -> Result<()> {
-        let base = doc! { "create": name };
+    pub fn create_collection(
+        &self,
+        name: &str,
+        options: Option<CreateCollectionOptions>,
+    ) -> Result<()> {
+        let mut base = doc! { "create": name };
 
         let cmd = if let Some(opts) = options {
-            base.into_iter().chain(opts).collect()
+            if let Some(capped) = opts.capped {
+                base.insert("capped", capped);
+            }
+
+            if let Some(size) = opts.size {
+                base.insert("size", size);
+            }
+
+            if let Some(max) = opts.max {
+                base.insert("max", max);
+            }
+
+            if let Some(storage_engine) = opts.storage_engine {
+                base.insert("storageEngine", storage_engine);
+            }
+
+            if let Some(validation) = opts.validation {
+                base.insert("validator", validation);
+            }
+
+            if let Some(validation_level) = opts.validation_level {
+                base.insert("validationLevel", validation_level.as_str());
+            }
+
+            if let Some(validation_action) = opts.validation_action {
+                base.insert("validationAction", validation_action.as_str());
+            }
+
+            if let Some(view_on) = opts.view_on {
+                base.insert("viewOn", view_on);
+            }
+
+            if let Some(pipeline) = opts.pipeline {
+                base.insert(
+                    "pipeline",
+                    Bson::Array(pipeline.into_iter().map(Bson::Document).collect()),
+                );
+            }
+
+            if let Some(collation) = opts.collation {
+                base.insert("collation", collation);
+            }
+
+            base
         } else {
             base
         };
