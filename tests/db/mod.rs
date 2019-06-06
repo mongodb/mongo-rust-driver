@@ -1,7 +1,7 @@
 use std::cmp::Ord;
 
 use bson::{Bson, Document};
-use mongodb::{Client, Database};
+use mongodb::{options::CreateCollectionOptions, Client, Database};
 
 use crate::MONGODB_URI;
 
@@ -157,11 +157,11 @@ fn collection_management() {
     db.create_collection("collection_management1", None)
         .unwrap();
 
-    let options = doc! {
-        "capped": true,
-        "size": 512
-    };
-    db.create_collection("collection_management2", Some(options.clone()))
+    let options = CreateCollectionOptions::builder()
+        .capped(true)
+        .size(512)
+        .build();
+    db.create_collection("collection_management2", Some(options))
         .unwrap();
 
     let colls = get_coll_info(&db, None);
@@ -174,6 +174,7 @@ fn collection_management() {
 
     assert_eq!(colls[1].name, "collection_management2");
     assert_eq!(colls[1].coll_type, "collection");
-    assert_eq!(colls[1].options, options);
+    assert_eq!(colls[1].options.get("capped"), Some(&Bson::Boolean(true)));
+    assert_eq!(colls[1].options.get("size"), Some(&Bson::I32(512)));
     assert!(!colls[1].info.read_only);
 }
