@@ -67,7 +67,27 @@ pub struct CommandFailedEvent {
 
 /// Applications can implement this trait to specify custom logic to run on each command event sent
 /// by the driver.
-pub trait CommandEventHandler {
+///
+/// ```rust
+/// # use mongodb::{Client, event::{CommandEventHandler, CommandFailedEvent}};
+///
+/// struct FailedCommandLogger {}
+///
+/// impl CommandEventHandler for FailedCommandLogger {
+///     fn handle_command_failed_event(&mut self, event: CommandFailedEvent) {
+///         eprintln!("Failed command: {:?}", event);
+///     }
+/// }
+///
+/// # fn do_stuff(client: &Client) -> mongodb::error::Result<()> {
+/// let logger = FailedCommandLogger {};
+/// client.add_command_event_handler(Box::new(logger));
+///
+/// // Do things with the client, and failed command events will be logged to stderr.
+/// # Ok(())
+/// # }
+/// ```
+pub trait CommandEventHandler: Send + Sync {
     /// A `Client` will call this method on each registered handler whenever a database command is
     /// initiated.
     fn handle_command_started_event(&mut self, event: CommandStartedEvent) {}
