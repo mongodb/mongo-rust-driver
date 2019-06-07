@@ -271,21 +271,22 @@ impl Database {
         Ok(())
     }
 
+    /// Runs a database level aggregation operation.
+    ///
+    /// See the documentation [here](https://docs.mongodb.com/manual/aggregation/) for more
+    /// information on aggregations on the db level.
     pub fn aggregate(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<AggregateOptions>,
     ) -> Result<Cursor> {
-        self.aggregate_helper(1, pipeline, options)
+        self.aggregate_helper("$cmd.aggregate", self.read_preference(), pipeline, options)
     }
 
-    /// Runs an aggregation operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/aggregation/) for more
-    /// information on aggregations.
     pub(crate) fn aggregate_helper(
         &self,
-        coll_name: impl Into<Bson>,
+        coll_name: &str,
+        read_pref: Option<&ReadPreference>,
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<AggregateOptions>,
     ) -> Result<Cursor> {
@@ -295,7 +296,7 @@ impl Database {
         let has_out = pipeline.iter().any(|d| d.contains_key("$out"));
 
         let mut command_doc = doc! {
-            "aggregate": coll_name.into(),
+            "aggregate": coll_name,
             "pipeline": Bson::Array(pipeline.into_iter().map(Bson::Document).collect()),
         };
 
@@ -342,25 +343,9 @@ impl Database {
         let (address, result) = if has_out {
             self.run_driver_command(command_doc, Some(ReadPreference::Primary).as_ref(), None)
                 .expect("invalid server response to find command")
-        // self.run_write_command(command_doc)?
         } else {
-            self.run_driver_command(
-                command_doc,
-                if let Some(preference) = self
-                    .collection(
-                        if let Some(name) = coll_name.into().as_str() {
-                            name
-                        },
-                    )
-                    .read_preference()
-                {
-                    preference
-                },
-                None,
-            )
-            .expect("invalid server response to find command")
-            // self.run_command(command_doc, self.inner.read_preference.as_ref())?
-            // self.run_driver_command(command_doc, collection's read pref, None,)
+            self.run_driver_command(command_doc, read_pref, None)
+                .expect("invalid server response to find command")
         };
 
         match bson::from_bson(Bson::Document(result)) {

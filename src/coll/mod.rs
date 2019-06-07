@@ -144,9 +144,8 @@ impl Collection {
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<AggregateOptions>,
     ) -> Result<Cursor> {
-        self.inner
-            .db
-            .aggregate_helper(self.inner.name, pipeline, options)
+        self.database()
+            .aggregate_helper(self.name(), self.read_preference(), pipeline, options)
     }
 
     /// Estimates the number of documents in the collection using collection metadata.
