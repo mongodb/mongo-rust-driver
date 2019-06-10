@@ -55,5 +55,5 @@ fn db_aggregate_test(test_file: TestFile) {
 
 #[test]
 fn run() {
-    crate::spec::test(&["crud", "read"], db_aggregate_test);
+    crate::spec::test(&["crud", "v1", "read"], db_aggregate_test);
 }
