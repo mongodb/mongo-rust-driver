@@ -24,9 +24,13 @@ pub(crate) struct Server {
 }
 
 impl Server {
-    pub(crate) fn new(host: Host, tls_config: Option<Arc<rustls::ClientConfig>>) -> Self {
+    pub(crate) fn new(
+        host: Host,
+        max_pool_size: Option<u32>,
+        tls_config: Option<Arc<rustls::ClientConfig>>,
+    ) -> Self {
         Self {
-            pool: Pool::new(host.clone(), None, tls_config.clone()).unwrap(),
+            pool: Pool::new(host.clone(), max_pool_size, tls_config.clone()).unwrap(),
             monitor_pool: Pool::new(host.clone(), Some(1), tls_config.clone()).unwrap(),
             host,
             tls_config,

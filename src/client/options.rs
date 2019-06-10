@@ -94,6 +94,9 @@ pub struct ClientOptions {
     pub local_threshold: Option<i64>,
 
     #[builder(default)]
+    pub max_pool_size: Option<u32>,
+
+    #[builder(default)]
     pub read_concern: Option<ReadConcern>,
 
     #[builder(default)]
@@ -115,6 +118,7 @@ struct ClientOptionsParser {
     pub tls_options: Option<TlsOptions>,
     pub heartbeat_freq: Option<Duration>,
     pub local_threshold: Option<i64>,
+    pub max_pool_size: Option<u32>,
     pub read_concern: Option<ReadConcern>,
     pub read_preference: Option<ReadPreference>,
     pub repl_set_name: Option<String>,
@@ -201,6 +205,7 @@ impl From<ClientOptionsParser> for ClientOptions {
             tls_options: parser.tls_options,
             heartbeat_freq: parser.heartbeat_freq,
             local_threshold: parser.local_threshold,
+            max_pool_size: parser.max_pool_size,
             read_concern: parser.read_concern,
             read_preference: parser.read_preference,
             repl_set_name: parser.repl_set_name,
@@ -366,6 +371,14 @@ impl ClientOptionsParser {
                 write_concern.journal = Some(get_bool!(value, k));
             }
             k @ "localthresholdms" => self.local_threshold = Some(get_ms!(value, k) as i64),
+            "maxpoolsize" => {
+                self.max_pool_size = match u32::from_str_radix(value, 10) {
+                    Ok(u) if u > 0 => Some(u),
+                    _ => bail!(ErrorKind::ArgumentError(format!(
+                        "connection string `maxPoolSize` option must be a positive integer"
+                    ))),
+                }
+            }
             "readconcernlevel" => {
                 self.read_concern = Some(ReadConcern::Custom(value.to_string()));
             }
