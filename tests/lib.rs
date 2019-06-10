@@ -12,6 +12,9 @@ mod coll;
 mod db;
 mod spec;
 
+use std::collections::HashMap;
+
+use bson::{oid::ObjectId, Bson};
 use mongodb::{
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     options::ClientOptions,
@@ -33,6 +36,22 @@ lazy_static! {
 
         Client::with_options(options).unwrap()
     };
+    static ref SERVER_INFO: IsMasterCommandResponse = {
+        bson::from_bson(Bson::Document(
+            CLIENT
+                .database("admin")
+                .run_command(doc! { "isMaster":  1 }, None)
+                .unwrap(),
+        ))
+        .unwrap()
+    };
+}
+
+fn version_at_least_40() -> bool {
+    SERVER_INFO
+        .max_wire_version
+        .map(|v| v >= 7)
+        .unwrap_or(false)
 }
 
 fn get_db(db_name: &str) -> Database {
@@ -47,4 +66,31 @@ fn init_db_and_coll(db_name: &str, coll_name: &str) -> Collection {
     let coll = get_coll(db_name, coll_name);
     coll.drop().unwrap();
     coll
+}
+
+// Copy of the internal isMaster struct; fix this later.
+#[derive(Debug, Default, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct IsMasterCommandResponse {
+    #[serde(rename = "ismaster")]
+    pub is_master: Option<bool>,
+    pub ok: Option<f32>,
+    pub hosts: Option<Vec<String>>,
+    pub passives: Option<Vec<String>>,
+    pub arbiters: Option<Vec<String>>,
+    pub msg: Option<String>,
+    pub me: Option<String>,
+    pub set_version: Option<i32>,
+    pub set_name: Option<String>,
+    pub hidden: Option<bool>,
+    pub secondary: Option<bool>,
+    pub arbiter_only: Option<bool>,
+    #[serde(rename = "isreplicaset")]
+    pub is_replica_set: Option<bool>,
+    pub logical_session_timeout_minutes: Option<i64>,
+    pub min_wire_version: Option<i32>,
+    pub max_wire_version: Option<i32>,
+    pub tags: Option<HashMap<String, String>>,
+    pub election_id: Option<ObjectId>,
+    pub primary: Option<String>,
 }
