@@ -1,0 +1,140 @@
+{
+  "database_name": "admin",
+  "minServerVersion": "4.0",
+  "tests": [
+    {
+      "description": "Aggregate with $currentOp",
+      "operations": [
+        {
+          "name": "aggregate",
+          "object": "database",
+          "arguments": {
+            "pipeline": [
+              {
+                "$currentOp": {
+                  "allUsers": false,
+                  "idleConnections": false,
+                  "localOps": true
+                }
+              },
+              {
+                "$match": {
+                  "command.aggregate": {
+                    "$eq": 1
+                  }
+                }
+              },
+              {
+                "$project": {
+                  "command.aggregate": 1,
+                  "command.cursor": 1,
+                  "command.pipeline": 1
+                }
+              }
+            ]
+          },
+          "result": [
+            {
+              "command": {
+                "aggregate": 1,
+                "pipeline": [
+                  {
+                    "$currentOp": {
+                      "allUsers": false,
+                      "idleConnections": false,
+                      "localOps": true
+                    }
+                  },
+                  {
+                    "$match": {
+                      "command.aggregate": {
+                        "$eq": 1
+                      }
+                    }
+                  },
+                  {
+                    "$project": {
+                      "command.aggregate": 1,
+                      "command.cursor": 1,
+                      "command.pipeline": 1
+                    }
+                  }
+                ],
+                "cursor": {}
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Aggregate with $currentOp and allowDiskUse",
+      "operations": [
+        {
+          "name": "aggregate",
+          "object": "database",
+          "arguments": {
+            "pipeline": [
+              {
+                "$currentOp": {
+                  "allUsers": true,
+                  "idleConnections": true,
+                  "localOps": true
+                }
+              },
+              {
+                "$match": {
+                  "command.aggregate": {
+                    "$eq": 1
+                  }
+                }
+              },
+              {
+                "$project": {
+                  "command.aggregate": 1,
+                  "command.cursor": 1,
+                  "command.pipeline": 1,
+                  "command.allowDiskUse": 1
+                }
+              }
+            ],
+            "allowDiskUse": true
+          },
+          "result": [
+            {
+              "command": {
+                "aggregate": 1,
+                "pipeline": [
+                  {
+                    "$currentOp": {
+                      "allUsers": true,
+                      "idleConnections": true,
+                      "localOps": true
+                    }
+                  },
+                  {
+                    "$match": {
+                      "command.aggregate": {
+                        "$eq": 1
+                      }
+                    }
+                  },
+                  {
+                    "$project": {
+                      "command.aggregate": 1,
+                      "command.cursor": 1,
+                      "command.pipeline": 1,
+                      "command.allowDiskUse": 1
+                    }
+                  }
+                ],
+                "allowDiskUse": true,
+                "cursor": {}
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 mod aggregate;
+mod db_aggregate;
 mod delete_many;
 mod delete_one;
 mod distinct;
@@ -32,6 +33,7 @@ pub struct TestCase {
 pub struct Operation {
     name: String,
     arguments: Document,
+    object: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

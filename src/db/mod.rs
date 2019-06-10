@@ -280,23 +280,30 @@ impl Database {
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<AggregateOptions>,
     ) -> Result<Cursor> {
-        self.aggregate_helper("$cmd.aggregate", self.read_preference(), pipeline, options)
+        self.aggregate_helper(1, self.read_preference(), pipeline, options)
     }
 
     pub(crate) fn aggregate_helper(
         &self,
-        coll_name: &str,
+        coll_name: impl Into<Bson>,
         read_pref: Option<&ReadPreference>,
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<AggregateOptions>,
     ) -> Result<Cursor> {
+        let coll_name_bson = coll_name.into();
+        let cursor_coll_name = if coll_name_bson == Bson::I32(1) {
+            "$cmd.aggregate".to_string()
+        } else {
+            format!("{}", coll_name_bson)
+        };
+
         let batch_size = options.as_ref().and_then(|opts| opts.batch_size);
         let pipeline: Vec<_> = pipeline.into_iter().collect();
 
         let has_out = pipeline.iter().any(|d| d.contains_key("$out"));
 
         let mut command_doc = doc! {
-            "aggregate": coll_name,
+            "aggregate": coll_name_bson,
             "pipeline": Bson::Array(pipeline.into_iter().map(Bson::Document).collect()),
         };
 
@@ -341,17 +348,26 @@ impl Database {
         }
 
         let (address, result) = if has_out {
-            self.run_driver_command(command_doc, Some(ReadPreference::Primary).as_ref(), None)
-                .expect("invalid server response to find command")
+            match self.run_driver_command(command_doc, Some(ReadPreference::Primary).as_ref(), None)
+            {
+                Ok((address, result)) => (address, result),
+                Err(_) => bail!(ErrorKind::ResponseError(
+                    "invalid server response to find command".to_string()
+                )),
+            }
         } else {
-            self.run_driver_command(command_doc, read_pref, None)
-                .expect("invalid server response to find command")
+            match self.run_driver_command(command_doc, read_pref, None) {
+                Ok((address, result)) => (address, result),
+                Err(_) => bail!(ErrorKind::ResponseError(
+                    "invalid server response to find command".to_string()
+                )),
+            }
         };
 
         match bson::from_bson(Bson::Document(result)) {
             Ok(result) => Ok(Cursor::new(
                 address,
-                self.collection(coll_name).clone(),
+                self.collection(&cursor_coll_name).clone(),
                 result,
                 batch_size,
             )),
