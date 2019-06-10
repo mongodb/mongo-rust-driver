@@ -60,8 +60,7 @@ pub struct FindAndModifyCommandResponse {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateIndexesResponse {
-    pub num_indexes_before: i32,
-    pub num_indexes_after: i32,
+    pub ok: Bson,
 }
 
 #[derive(Debug, Deserialize)]

@@ -634,8 +634,8 @@ impl Collection {
         let (_, result) = self.run_command(doc, None)?;
 
         match bson::from_bson(Bson::Document(result)) {
-            Ok(CreateIndexesResponse { .. }) => Ok(names),
-            Err(_) => bail!(ErrorKind::ResponseError(
+            Ok(CreateIndexesResponse { ref ok }) if bson_util::get_int(ok) == Some(1) => Ok(names),
+            _ => bail!(ErrorKind::ResponseError(
                 "invalid server response to find createIndexes command".to_string()
             )),
         }
