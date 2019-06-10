@@ -162,7 +162,9 @@ impl Collection {
             }
 
             if let Some(batch_size) = opts.batch_size {
-                cursor_option.insert("batchSize", batch_size);
+                if !has_out {
+                    cursor_option.insert("batchSize", batch_size);
+                }
             }
 
             if let Some(bypass_document_validation) = opts.bypass_document_validation {

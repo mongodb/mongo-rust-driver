@@ -1,7 +1,7 @@
 mod indexes;
 
 use bson::Bson;
-use mongodb::options::UpdateOptions;
+use mongodb::options::{AggregateOptions, UpdateOptions};
 
 #[test]
 fn count() {
@@ -96,4 +96,48 @@ fn delete() {
     let delete_many_result = coll.delete_many(doc! {"x": 3}, None).unwrap();
     assert_eq!(delete_many_result.deleted_count, 4);
     assert_eq!(coll.count_documents(Some(doc! {"x": 3 }), None).unwrap(), 0);
+}
+
+#[test]
+fn aggregate_out() {
+    let db = crate::get_db("aggregate_out");
+    let coll = db.collection("aggregate_out");
+
+    coll.drop().unwrap();
+
+    let result = coll
+        .insert_many((0i32..5).map(|n| doc! { "x": n }).collect::<Vec<_>>(), None)
+        .unwrap();
+    assert_eq!(result.inserted_ids.len(), 5);
+
+    let out_coll = db.collection("aggregate_out_1");
+    let pipeline = vec![
+        doc! {
+            "$match": {
+                "x": { "$gt": 1 },
+            }
+        },
+        doc! {"$out": out_coll.name()},
+    ];
+    out_coll.drop().unwrap();
+
+    coll.aggregate(pipeline.clone(), None).unwrap();
+    assert!(db
+        .list_collection_names(None)
+        .unwrap()
+        .into_iter()
+        .any(|name| name.as_str() == out_coll.name()));
+    out_coll.drop().unwrap();
+
+    // check that even with a batch size of 0, a new collection is created.
+    coll.aggregate(
+        pipeline,
+        Some(AggregateOptions::builder().batch_size(0).build()),
+    )
+    .unwrap();
+    assert!(db
+        .list_collection_names(None)
+        .unwrap()
+        .into_iter()
+        .any(|name| name.as_str() == out_coll.name()));
 }
