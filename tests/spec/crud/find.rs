@@ -60,5 +60,5 @@ fn run_find_test(test_file: TestFile) {
 
 #[test]
 fn run() {
-    crate::spec::test(&["crud", "read"], run_find_test);
+    crate::spec::test(&["crud", "v1", "read"], run_find_test);
 }

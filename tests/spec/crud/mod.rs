@@ -1,4 +1,5 @@
 mod aggregate;
+mod count;
 mod delete_many;
 mod delete_one;
 mod distinct;

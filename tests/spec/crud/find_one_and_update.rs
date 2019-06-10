@@ -91,5 +91,5 @@ fn run_find_one_and_update_test(test_file: TestFile) {
 
 #[test]
 fn run() {
-    crate::spec::test(&["crud", "write"], run_find_one_and_update_test);
+    crate::spec::test(&["crud", "v1", "write"], run_find_one_and_update_test);
 }
