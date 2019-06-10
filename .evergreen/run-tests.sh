@@ -3,4 +3,4 @@
 set -o errexit
 
 . ~/.cargo/env
-cargo test
+cargo test -- --test-threads=4
