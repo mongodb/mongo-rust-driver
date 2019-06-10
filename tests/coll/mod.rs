@@ -112,19 +112,21 @@ fn aggregate_out() {
 
     let out_coll = db.collection("aggregate_out_1");
     let pipeline = vec![
-        doc! {"$match": {"x" : {"$gt": 1}}},
+        doc! {
+            "$match": {
+                "x": { "$gt": 1 },
+            }
+        },
         doc! {"$out": out_coll.name()},
     ];
     out_coll.drop().unwrap();
 
     coll.aggregate(pipeline.clone(), None).unwrap();
-    assert_eq!(
-        db.list_collection_names(None)
-            .unwrap()
-            .into_iter()
-            .any(|name| name.as_str() == out_coll.name()),
-        true
-    );
+    assert!(db
+        .list_collection_names(None)
+        .unwrap()
+        .into_iter()
+        .any(|name| name.as_str() == out_coll.name()));
     out_coll.drop().unwrap();
 
     // check that even with a batch size of 0, a new collection is created.
@@ -133,11 +135,9 @@ fn aggregate_out() {
         Some(AggregateOptions::builder().batch_size(0).build()),
     )
     .unwrap();
-    assert_eq!(
-        db.list_collection_names(None)
-            .unwrap()
-            .into_iter()
-            .any(|name| name.as_str() == out_coll.name()),
-        true
-    );
+    assert!(db
+        .list_collection_names(None)
+        .unwrap()
+        .into_iter()
+        .any(|name| name.as_str() == out_coll.name()));
 }
