@@ -12,21 +12,27 @@ mod coll;
 mod db;
 mod spec;
 
-use mongodb::{Client, Collection, Database};
+use mongodb::{
+    concern::{Acknowledgment, ReadConcern, WriteConcern},
+    options::ClientOptions,
+    read_preference::ReadPreference,
+    Client, Collection, Database,
+};
 
 lazy_static! {
-    static ref MONGODB_URI: String =
-        {
-            let mut uri = option_env!("MONGODB_URI").unwrap_or("mongodb://localhost:27017").to_string();
+    static ref CLIENT: Client = {
+        let uri = option_env!("MONGODB_URI").unwrap_or("mongodb://localhost:27017");
+        let mut options = ClientOptions::parse(uri).unwrap();
 
-            // Kind of a hack; we should probably fix this at some point.
-            if uri.contains("replicaSet=") {
-                uri.push_str("&readPreference=primaryPreferred&w=majority&readConcernLevel=linearizable");
-            }
+        if options.repl_set_name.is_some() || options.hosts.len() > 1 {
+            options.read_preference = Some(ReadPreference::Primary);
+            options.read_concern = Some(ReadConcern::Linearizable);
+            options.write_concern =
+                Some(WriteConcern::builder().w(Acknowledgment::Majority).build());
+        }
 
-            uri
-        };
-    static ref CLIENT: Client = Client::with_uri_str(MONGODB_URI.as_str()).unwrap();
+        Client::with_options(options).unwrap()
+    };
 }
 
 fn get_db(db_name: &str) -> Database {
