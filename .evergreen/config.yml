@@ -122,7 +122,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          MONGODB_URI="${MONGODB_URI}" .evergreen/run-tests.sh
+          MONGODB_URI="${MONGODB_URI}" MONGODB_VERSION="${VERSION}" .evergreen/run-tests.sh
 
   "check rustfmt":
     - command: shell.exec
@@ -218,7 +218,9 @@ tasks:
           MONGODB_VERSION: "3.6"
           TOPOLOGY: "server"
       - func: "run tests"
-
+        vars:
+          MONGODB_VERSION: "3.6"
+ 
   - name: "test-3.6-replica_set"
     tags: ["3.6", "replica_set"]
     commands:
@@ -227,7 +229,9 @@ tasks:
           MONGODB_VERSION: "3.6"
           TOPOLOGY: "replica_set"
       - func: "run tests"
-
+        vars:
+          MONGODB_VERSION: "3.6"
+ 
   - name: "test-3.6-sharded_cluster"
     tags: ["3.6", "sharded_cluster"]
     commands:
@@ -236,7 +240,9 @@ tasks:
           MONGODB_VERSION: "3.6"
           TOPOLOGY: "sharded_cluster"
       - func: "run tests"
-
+        vars:
+          MONGODB_VERSION: "3.6"
+ 
   - name: "test-4.0-standalone"
     tags: ["4.0", "standalone"]
     commands:
@@ -245,7 +251,9 @@ tasks:
           MONGODB_VERSION: "4.0"
           TOPOLOGY: "server"
       - func: "run tests"
-
+        vars:
+          MONGODB_VERSION: "4.0"
+ 
   - name: "test-4.0-replica_set"
     tags: ["4.0", "replica_set"]
     commands:
@@ -254,7 +262,9 @@ tasks:
           MONGODB_VERSION: "4.0"
           TOPOLOGY: "replica_set"
       - func: "run tests"
-
+        vars:
+          MONGODB_VERSION: "4.0"
+ 
   - name: "test-4.0-sharded_cluster"
     tags: ["4.0", "sharded_cluster"]
     commands:
@@ -263,7 +273,9 @@ tasks:
           MONGODB_VERSION: "4.0"
           TOPOLOGY: "sharded_cluster"
       - func: "run tests"
-
+        vars:
+          MONGODB_VERSION: "4.0"
+ 
   - name: "test-latest-standalone"
     tags: ["latest", "standalone"]
     commands:
@@ -272,7 +284,9 @@ tasks:
           MONGODB_VERSION: "latest"
           TOPOLOGY: "server"
       - func: "run tests"
-
+        vars:
+          MONGODB_VERSION: "latest"
+ 
   - name: "test-latest-replica_set"
     tags: ["latest", "replica_set"]
     commands:
@@ -281,7 +295,9 @@ tasks:
           MONGODB_VERSION: "latest"
           TOPOLOGY: "replica_set"
       - func: "run tests"
-
+        vars:
+          MONGODB_VERSION: "latest"
+ 
   - name: "test-latest-sharded_cluster"
     tags: ["latest", "sharded_cluster"]
     commands:
@@ -290,6 +306,8 @@ tasks:
           MONGODB_VERSION: "latest"
           TOPOLOGY: "sharded_cluster"
       - func: "run tests"
+        vars:
+          MONGODB_VERSION: "latest"
 
   - name: "check-rustfmt"
     commands:
