@@ -14,10 +14,7 @@ fn run_aggregate_test(test_file: TestFile) {
     let data = test_file.data;
 
     for mut test_case in test_file.tests {
-        if test_case.operation.name != "aggregate"
-            || test_case.description.contains("collation")
-            || test_case.operation.object != Some("database".to_string())
-        {
+        if test_case.operation.name != "aggregate" || test_case.description.contains("collation") {
             continue;
         }
 
@@ -81,5 +78,5 @@ fn run_aggregate_test(test_file: TestFile) {
 
 #[test]
 fn run() {
-    crate::spec::test(&["crud", "v1", "read"], run_aggregate_test);
+    crate::spec::test(&["crud", "read"], run_aggregate_test);
 }

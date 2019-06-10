@@ -98,5 +98,5 @@ fn run_update_many_test(test_file: TestFile) {
 
 #[test]
 fn run() {
-    crate::spec::test(&["crud", "v1", "write"], run_update_many_test);
+    crate::spec::test(&["crud", "write"], run_update_many_test);
 }
