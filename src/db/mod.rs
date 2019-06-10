@@ -291,10 +291,10 @@ impl Database {
         options: Option<AggregateOptions>,
     ) -> Result<Cursor> {
         let coll_name_bson = coll_name.into();
-        let cursor_coll_name = if coll_name_bson == Bson::I32(1) {
-            "$cmd.aggregate".to_string()
-        } else {
-            format!("{}", coll_name_bson)
+        let cursor_coll_name = match coll_name_bson {
+            Bson::I32(1) => "$cmd.aggregate".to_string(),
+            Bson::String(ref s) => s.clone(),
+            _ => unreachable!(),
         };
 
         let batch_size = options.as_ref().and_then(|opts| opts.batch_size);
