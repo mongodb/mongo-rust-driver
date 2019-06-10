@@ -344,7 +344,9 @@ impl Database {
                 command_doc.insert("writeConcern", write_concern.clone().into_document()?);
             }
         } else if let Some(ref read_concern) = self.inner.read_concern {
-            command_doc.insert("readConcern", doc! { "level": read_concern.as_str() });
+            if cursor_coll_name != "$cmd.aggregate" {
+                command_doc.insert("readConcern", doc! { "level": read_concern.as_str() });
+            }
         }
 
         let (address, result) = if has_out {
