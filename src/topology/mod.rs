@@ -24,6 +24,7 @@ pub(crate) use self::{
 pub(crate) struct Topology {
     #[derivative(Debug = "ignore")]
     tls_config: Option<Arc<rustls::ClientConfig>>,
+    max_pool_size: Option<u32>,
     description: TopologyDescription,
     servers: HashMap<String, Arc<RwLock<Server>>>,
 }
@@ -38,7 +39,11 @@ impl Topology {
             .hosts
             .iter()
             .map(|host| {
-                let server = Arc::new(RwLock::new(Server::new(host.clone(), tls_config.clone())));
+                let server = Arc::new(RwLock::new(Server::new(
+                    host.clone(),
+                    options.max_pool_size,
+                    tls_config.clone(),
+                )));
                 (host.display(), server)
             })
             .collect();
@@ -47,6 +52,7 @@ impl Topology {
 
         let topology = Arc::new(RwLock::new(Self {
             tls_config,
+            max_pool_size: options.max_pool_size,
             description: TopologyDescription::new(options),
             servers,
         }));
@@ -115,6 +121,7 @@ impl Topology {
                     address.clone(),
                     Arc::new(RwLock::new(Server::new(
                         Host::parse(address).unwrap(),
+                        self.max_pool_size,
                         self.tls_config.clone(),
                     ))),
                 )

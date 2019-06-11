@@ -26,6 +26,7 @@ lazy_static! {
     static ref CLIENT: Client = {
         let uri = option_env!("MONGODB_URI").unwrap_or("mongodb://localhost:27017");
         let mut options = ClientOptions::parse(uri).unwrap();
+        options.max_pool_size = Some(100);
 
         if options.repl_set_name.is_some() || options.hosts.len() > 1 {
             options.read_preference = Some(ReadPreference::Primary);
@@ -47,6 +48,7 @@ lazy_static! {
     };
 }
 
+#[allow(dead_code)]
 fn version_at_least_40() -> bool {
     SERVER_INFO
         .max_wire_version
