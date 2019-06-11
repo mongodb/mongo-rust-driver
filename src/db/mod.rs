@@ -9,7 +9,7 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{ErrorKind, Result},
-    options::CollectionOptions,
+    options::{AggregateOptions, CollectionOptions},
     pool::run_command,
     read_preference::ReadPreference,
     Client, Collection,
@@ -269,6 +269,111 @@ impl Database {
         }
 
         Ok(())
+    }
+
+    /// Runs a database level aggregation operation.
+    pub fn aggregate(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: Option<AggregateOptions>,
+    ) -> Result<Cursor> {
+        self.aggregate_helper(1, pipeline, self.read_preference(), options)
+    }
+
+    pub(crate) fn aggregate_helper(
+        &self,
+        coll_name: impl Into<Bson>,
+        pipeline: impl IntoIterator<Item = Document>,
+        read_pref: Option<&ReadPreference>,
+        options: Option<AggregateOptions>,
+    ) -> Result<Cursor> {
+        let coll_name_bson = coll_name.into();
+        let cursor_coll_name = match coll_name_bson {
+            Bson::I32(1) => "$cmd.aggregate".to_string(),
+            Bson::String(ref s) => s.clone(),
+            _ => unreachable!(),
+        };
+
+        let batch_size = options.as_ref().and_then(|opts| opts.batch_size);
+        let pipeline: Vec<_> = pipeline.into_iter().collect();
+
+        let has_out = pipeline.iter().any(|d| d.contains_key("$out"));
+
+        let mut command_doc = doc! {
+            "aggregate": coll_name_bson,
+            "pipeline": Bson::Array(pipeline.into_iter().map(Bson::Document).collect()),
+        };
+
+        let mut cursor_option = Document::new();
+
+        if let Some(opts) = options {
+            if let Some(allow_disk_use) = opts.allow_disk_use {
+                command_doc.insert("allowDiskUse", allow_disk_use);
+            }
+
+            if let Some(batch_size) = opts.batch_size {
+                if !has_out {
+                    cursor_option.insert("batchSize", batch_size);
+                }
+            }
+
+            if let Some(bypass_document_validation) = opts.bypass_document_validation {
+                command_doc.insert("bypassDocumentValidation", bypass_document_validation);
+            }
+
+            if let Some(max_time) = opts.max_time {
+                command_doc.insert("maxTimeMS", max_time.subsec_millis());
+            }
+
+            if let Some(comment) = opts.comment {
+                command_doc.insert("comment", comment);
+            }
+
+            if let Some(hint) = opts.hint {
+                command_doc.insert("hint", hint.into_bson());
+            }
+        }
+
+        command_doc.insert("cursor", cursor_option);
+
+        if has_out {
+            if let Some(ref write_concern) = self.inner.write_concern {
+                command_doc.insert("writeConcern", write_concern.clone().into_document()?);
+            }
+        } else if let Some(ref read_concern) = self.inner.read_concern {
+            if cursor_coll_name != "$cmd.aggregate" {
+                command_doc.insert("readConcern", doc! { "level": read_concern.as_str() });
+            }
+        }
+
+        let (address, result) = if has_out {
+            match self.run_driver_command(command_doc, Some(ReadPreference::Primary).as_ref(), None)
+            {
+                Ok((address, result)) => (address, result),
+                Err(_) => bail!(ErrorKind::ResponseError(
+                    "invalid server response to aggregate command".to_string()
+                )),
+            }
+        } else {
+            match self.run_driver_command(command_doc, read_pref, None) {
+                Ok((address, result)) => (address, result),
+                Err(_) => bail!(ErrorKind::ResponseError(
+                    "invalid server response to aggregate command".to_string()
+                )),
+            }
+        };
+
+        match bson::from_bson(Bson::Document(result)) {
+            Ok(result) => Ok(Cursor::new(
+                address,
+                self.collection(&cursor_coll_name),
+                result,
+                batch_size,
+            )),
+            Err(_) => bail!(ErrorKind::ResponseError(
+                "invalid server response to aggregate command".to_string()
+            )),
+        }
     }
 
     /// Runs a database-level command.

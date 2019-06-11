@@ -1,7 +1,10 @@
 use std::cmp::Ord;
 
 use bson::{Bson, Document};
-use mongodb::{options::CreateCollectionOptions, Database};
+use mongodb::{
+    options::{AggregateOptions, CreateCollectionOptions},
+    Database,
+};
 
 #[derive(Debug, Deserialize)]
 struct CollectionInfo {
@@ -170,4 +173,82 @@ fn collection_management() {
     assert_eq!(colls[1].options.get("capped"), Some(&Bson::Boolean(true)));
     assert_eq!(colls[1].options.get("size"), Some(&Bson::I32(512)));
     assert!(!colls[1].info.read_only);
+}
+
+#[test]
+fn db_aggregate() {
+    if !crate::version_at_least_40() {
+        return;
+    }
+
+    let db = crate::get_db("admin");
+
+    let pipeline = vec![
+        doc! {
+          "$currentOp": {
+            "allUsers": false,
+            "idleConnections": false
+          }
+        },
+        doc! {
+          "$match": {
+            "command.aggregate": {
+              "$eq": 1
+            }
+          }
+        },
+        doc! {
+          "$project": {
+            "command": 1
+          }
+        },
+        doc! {
+          "$project": {
+            "command.lsid": 0
+          }
+        },
+    ];
+
+    let result = db.aggregate(pipeline, None);
+    result.unwrap();
+}
+
+#[test]
+fn db_aggregate_disk_use() {
+    if !crate::version_at_least_40() {
+        return;
+    }
+
+    let db = crate::get_db("admin");
+
+    let pipeline = vec![
+        doc! {
+          "$currentOp": {
+            "allUsers": true,
+            "idleConnections": true
+          }
+        },
+        doc! {
+          "$match": {
+            "command.aggregate": {
+              "$eq": 1
+            }
+          }
+        },
+        doc! {
+          "$project": {
+            "command": 1
+          }
+        },
+        doc! {
+          "$project": {
+            "command.lsid": 0
+          }
+        },
+    ];
+
+    let options = AggregateOptions::builder().allow_disk_use(true).build();
+
+    let result = db.aggregate(pipeline, Some(options));
+    result.unwrap();
 }
