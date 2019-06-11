@@ -182,7 +182,6 @@ fn db_aggregate() {
     }
 
     let db = crate::get_db("admin");
-    db.drop().unwrap();
 
     let pipeline = vec![
         doc! {
@@ -221,7 +220,6 @@ fn db_aggregate_disk_use() {
     }
 
     let db = crate::get_db("admin");
-    db.drop().unwrap();
 
     let pipeline = vec![
         doc! {

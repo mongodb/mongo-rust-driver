@@ -366,7 +366,7 @@ impl Database {
         match bson::from_bson(Bson::Document(result)) {
             Ok(result) => Ok(Cursor::new(
                 address,
-                self.collection(&cursor_coll_name).clone(),
+                self.collection(&cursor_coll_name),
                 result,
                 batch_size,
             )),
