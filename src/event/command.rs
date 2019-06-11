@@ -2,10 +2,10 @@ use std::time::Duration;
 
 use bson::Document;
 
-use crate::{error::Error, pool::ConnectionInfo};
+use crate::{event::Failure, pool::ConnectionInfo};
 
 /// An event that triggers when a database command is initiated.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct CommandStartedEvent {
     /// The command being run.
     pub command: Document,
@@ -26,7 +26,7 @@ pub struct CommandStartedEvent {
 }
 
 /// An event that triggers when a database command completes without an error.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct CommandSucceededEvent {
     /// The total execution time of the command (including the network round-trip).
     pub duration: Duration,
@@ -46,7 +46,7 @@ pub struct CommandSucceededEvent {
 }
 
 /// An event that triggers when a command failed to complete successfully.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct CommandFailedEvent {
     /// The total execution time of the command (including the network round-trip).
     pub duration: Duration,
@@ -55,7 +55,7 @@ pub struct CommandFailedEvent {
     pub command_name: String,
 
     /// The error that the driver returned due to the event failing.
-    pub failure: Error,
+    pub failure: Failure,
 
     /// The driver-generated identifier for the request. Applications can use this to identify the
     /// corresponding `ComamndStartedEvent` that triggered earlier.

@@ -13,9 +13,9 @@ error_chain! {
         }
 
         /// The server encountered an error when executing the operation.
-        CommandError(code: u32, code_name: String, msg: String, labels: Vec<String>) {
+        CommandError(err: CommandError) {
             description("An error occurred when executing a command")
-            display("Command failed ({}): {}", code_name, msg)
+            display("Command failed ({}): {}", err.code_name, err.message)
         }
 
         /// The driver was unable to send or receive a message to the server.
@@ -44,8 +44,17 @@ error_chain! {
     }
 }
 
+/// An error that occurred due to a database command failing.
+#[derive(Clone, Debug)]
+pub struct CommandError {
+    code: u32,
+    code_name: String,
+    message: String,
+    labels: Vec<String>,
+}
+
 /// An error that occurred due to not being able to satisfy a write concern.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct WriteConcernError {
     /// Identifies the type of write concern error.
     pub code: i32,
@@ -59,7 +68,7 @@ pub struct WriteConcernError {
 
 /// An error that occurred duringn a write operation that wasn't due to being unable to satisfy a
 /// write concern.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct WriteError {
     /// Identifies the type of write concern error.
     pub code: i32,
@@ -75,7 +84,7 @@ pub struct WriteError {
 }
 
 /// An error that occurred when trying to execute a write operation.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum WriteFailure {
     WriteConcernError(WriteConcernError),
     WriteError(WriteError),

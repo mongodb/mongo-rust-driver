@@ -1,5 +1,5 @@
 /// User-facing information about a connection to the database.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ConnectionInfo {
     /// A driver-generated identifier that uniquely identifies the connection.
     pub id: u32,
