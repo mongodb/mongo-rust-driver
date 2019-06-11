@@ -374,9 +374,10 @@ impl ClientOptionsParser {
             "maxpoolsize" => {
                 self.max_pool_size = match u32::from_str_radix(value, 10) {
                     Ok(u) if u > 0 => Some(u),
-                    _ => bail!(ErrorKind::ArgumentError(format!(
+                    _ => bail!(ErrorKind::ArgumentError(
                         "connection string `maxPoolSize` option must be a positive integer"
-                    ))),
+                            .to_string(),
+                    )),
                 }
             }
             "readconcernlevel" => {
