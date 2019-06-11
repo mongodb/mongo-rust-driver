@@ -47,7 +47,7 @@ fn run_aggregate_test(test_file: TestFile) {
                 .aggregate(arguments.pipeline, Some(options))
                 .expect(&test_case.description);
             assert_eq!(
-                outcome.result.unwrap_or(Vec::new()),
+                outcome.result.unwrap_or_else(|| { Vec::new() }),
                 cursor.map(Result::unwrap).collect::<Vec<_>>(),
                 "{}",
                 test_case.description,
