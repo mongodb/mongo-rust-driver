@@ -128,6 +128,7 @@ impl Client {
             .remove(&id)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn send_command_started_event(&self, event: CommandStartedEvent) {
         for handler in self
             .inner
@@ -140,6 +141,7 @@ impl Client {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn send_command_succeeded_event(&self, event: CommandSucceededEvent) {
         for handler in self
             .inner
@@ -152,6 +154,7 @@ impl Client {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn send_command_failed_event(&self, event: CommandFailedEvent) {
         for handler in self
             .inner
