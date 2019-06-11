@@ -72,7 +72,7 @@ functions:
               export TMPDIR="$MONGO_ORCHESTRATION_HOME/db"
               export PATH="$MONGODB_BINARIES:$PATH"
               export PROJECT="${project}"
-              
+
               export AUTH=${AUTH}
               export SSL=${SSL}
               export TOPOLOGY=${TOPOLOGY}
@@ -108,7 +108,7 @@ functions:
       params:
         script: |
           ${PREPARE_SHELL}
-          MONGODB_VERSION=${VERSION} TOPOLOGY=${TOPOLOGY} AUTH=${AUTH} SSL=${SSL} sh ${DRIVERS_TOOLS}/.evergreen/run-orchestration.sh
+          MONGODB_VERSION=${MONGODB_VERSION} TOPOLOGY=${TOPOLOGY} AUTH=${AUTH} SSL=${SSL} sh ${DRIVERS_TOOLS}/.evergreen/run-orchestration.sh
     # run-orchestration generates expansion file with the MONGODB_URI for the cluster
     - command: expansions.update
       params:
@@ -122,7 +122,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          MONGODB_URI="${MONGODB_URI}" MONGODB_VERSION="${VERSION}" .evergreen/run-tests.sh
+          MONGODB_URI="${MONGODB_URI}" .evergreen/run-tests.sh
 
   "check rustfmt":
     - command: shell.exec
@@ -220,7 +220,7 @@ tasks:
       - func: "run tests"
         vars:
           MONGODB_VERSION: "3.6"
- 
+
   - name: "test-3.6-replica_set"
     tags: ["3.6", "replica_set"]
     commands:
@@ -231,7 +231,7 @@ tasks:
       - func: "run tests"
         vars:
           MONGODB_VERSION: "3.6"
- 
+
   - name: "test-3.6-sharded_cluster"
     tags: ["3.6", "sharded_cluster"]
     commands:
@@ -242,7 +242,7 @@ tasks:
       - func: "run tests"
         vars:
           MONGODB_VERSION: "3.6"
- 
+
   - name: "test-4.0-standalone"
     tags: ["4.0", "standalone"]
     commands:
@@ -253,7 +253,7 @@ tasks:
       - func: "run tests"
         vars:
           MONGODB_VERSION: "4.0"
- 
+
   - name: "test-4.0-replica_set"
     tags: ["4.0", "replica_set"]
     commands:
@@ -264,7 +264,7 @@ tasks:
       - func: "run tests"
         vars:
           MONGODB_VERSION: "4.0"
- 
+
   - name: "test-4.0-sharded_cluster"
     tags: ["4.0", "sharded_cluster"]
     commands:
@@ -275,7 +275,7 @@ tasks:
       - func: "run tests"
         vars:
           MONGODB_VERSION: "4.0"
- 
+
   - name: "test-latest-standalone"
     tags: ["latest", "standalone"]
     commands:
@@ -286,7 +286,7 @@ tasks:
       - func: "run tests"
         vars:
           MONGODB_VERSION: "latest"
- 
+
   - name: "test-latest-replica_set"
     tags: ["latest", "replica_set"]
     commands:
@@ -297,7 +297,7 @@ tasks:
       - func: "run tests"
         vars:
           MONGODB_VERSION: "latest"
- 
+
   - name: "test-latest-sharded_cluster"
     tags: ["latest", "sharded_cluster"]
     commands:
