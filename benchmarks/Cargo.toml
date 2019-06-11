@@ -1,0 +1,9 @@
+[package]
+name = "rust-driver-bench"
+version = "0.1.0"
+authors = ["benjirewis <ben.rewis98@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+mongodb = { path = "../mongo-rust-driver" }
+bson = "0.13.0"
