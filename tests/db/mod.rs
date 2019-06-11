@@ -177,7 +177,9 @@ fn collection_management() {
 
 #[test]
 fn db_aggregate() {
-    assert!(crate::version_at_least_40());
+    if !crate::version_at_least_40() {
+        return;
+    }
 
     let db = crate::get_db("admin");
     db.drop().unwrap();
@@ -214,7 +216,9 @@ fn db_aggregate() {
 
 #[test]
 fn db_aggregate_disk_use() {
-    assert!(crate::version_at_least_40());
+    if !crate::version_at_least_40() {
+        return;
+    }
 
     let db = crate::get_db("admin");
     db.drop().unwrap();

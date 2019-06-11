@@ -145,7 +145,7 @@ impl Collection {
         options: Option<AggregateOptions>,
     ) -> Result<Cursor> {
         self.database()
-            .aggregate_helper(self.name(), self.read_preference(), pipeline, options)
+            .aggregate_helper(self.name(), pipeline, self.read_preference(), options)
     }
 
     /// Estimates the number of documents in the collection using collection metadata.

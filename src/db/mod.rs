@@ -273,21 +273,21 @@ impl Database {
 
     /// Runs a database level aggregation operation.
     ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/aggregation/) for more
+    /// See the documentation [here](https://docs.mongodb.com/manual/reference/method/db.aggregate/) for more
     /// information on aggregations on the db level.
     pub fn aggregate(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<AggregateOptions>,
     ) -> Result<Cursor> {
-        self.aggregate_helper(1, self.read_preference(), pipeline, options)
+        self.aggregate_helper(1, pipeline, self.read_preference(), options)
     }
 
     pub(crate) fn aggregate_helper(
         &self,
         coll_name: impl Into<Bson>,
-        read_pref: Option<&ReadPreference>,
         pipeline: impl IntoIterator<Item = Document>,
+        read_pref: Option<&ReadPreference>,
         options: Option<AggregateOptions>,
     ) -> Result<Cursor> {
         let coll_name_bson = coll_name.into();
@@ -354,14 +354,14 @@ impl Database {
             {
                 Ok((address, result)) => (address, result),
                 Err(_) => bail!(ErrorKind::ResponseError(
-                    "invalid server response to find command".to_string()
+                    "invalid server response to aggregate command".to_string()
                 )),
             }
         } else {
             match self.run_driver_command(command_doc, read_pref, None) {
                 Ok((address, result)) => (address, result),
                 Err(_) => bail!(ErrorKind::ResponseError(
-                    "invalid server response to find command".to_string()
+                    "invalid server response to aggregate command".to_string()
                 )),
             }
         };
@@ -374,7 +374,7 @@ impl Database {
                 batch_size,
             )),
             Err(_) => bail!(ErrorKind::ResponseError(
-                "invalid server response to find command".to_string()
+                "invalid server response to aggregate command".to_string()
             )),
         }
     }
