@@ -272,9 +272,6 @@ impl Database {
     }
 
     /// Runs a database level aggregation operation.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/reference/method/db.aggregate/) for more
-    /// information on aggregations on the db level.
     pub fn aggregate(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
