@@ -120,8 +120,12 @@ impl Client {
 
     /// Unregisters an event handler so that it no longer receives notifications when an event
     /// occurs.
-    pub fn remove_event_handler(&self, id: HandlerId) {
-        unimplemented!()
+    pub fn remove_event_handler(&self, id: HandlerId) -> Option<Box<dyn CommandEventHandler>> {
+        self.inner
+            .command_event_handlers
+            .write()
+            .unwrap()
+            .remove(&id)
     }
 
     pub(crate) fn send_command_started_event(&self, event: CommandStartedEvent) {
