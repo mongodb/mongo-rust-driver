@@ -1,16 +1,23 @@
 use bson::{Bson, Document};
+use mongodb::options::InsertManyOptions;
 
 use super::{Outcome, TestFile};
 
 #[derive(Debug, Deserialize)]
 struct Arguments {
     pub documents: Vec<Document>,
+    pub options: Options,
+}
+
+#[derive(Debug, Deserialize)]
+struct Options {
+    pub ordered: bool,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ResultDoc {
-    inserted_ids: Document,
+    inserted_ids: Option<Document>,
 }
 
 fn run_insert_many_test(test_file: TestFile) {
@@ -30,25 +37,32 @@ fn run_insert_many_test(test_file: TestFile) {
         let outcome: Outcome<ResultDoc> =
             bson::from_bson(Bson::Document(test_case.outcome)).expect(&test_case.description);
 
+        let options = InsertManyOptions::builder()
+            .ordered(arguments.options.ordered)
+            .build();
+
         let result = coll
-            .insert_many(arguments.documents, None)
+            .insert_many(arguments.documents, Some(options))
             .expect(&test_case.description);
-        let mut result_inserted_ids: Vec<_> = result
-            .inserted_ids
-            .into_iter()
-            .map(|(index, val)| (index.to_string(), val))
-            .collect();
-        result_inserted_ids.sort_by(|pair1, pair2| pair1.0.cmp(&pair2.0));
 
-        let mut outcome_result_inserted_ids: Vec<_> =
-            outcome.result.inserted_ids.into_iter().collect();
-        outcome_result_inserted_ids.sort_by(|pair1, pair2| pair1.0.cmp(&pair2.0));
+        if let Some(outcome_result_inserted_ids) = outcome.result.inserted_ids {
+            let mut result_inserted_ids: Vec<_> = result
+                .inserted_ids
+                .into_iter()
+                .map(|(index, val)| (index.to_string(), val))
+                .collect();
+            result_inserted_ids.sort_by(|pair1, pair2| pair1.0.cmp(&pair2.0));
 
-        assert_eq!(
-            outcome_result_inserted_ids, result_inserted_ids,
-            "{}",
-            test_case.description
-        );
+            let mut outcome_result_inserted_ids: Vec<_> =
+                outcome_result_inserted_ids.into_iter().collect();
+            outcome_result_inserted_ids.sort_by(|pair1, pair2| pair1.0.cmp(&pair2.0));
+
+            assert_eq!(
+                outcome_result_inserted_ids, result_inserted_ids,
+                "{}",
+                test_case.description
+            );
+        }
 
         if let Some(c) = outcome.collection {
             let outcome_coll = match c.name {
@@ -68,5 +82,5 @@ fn run_insert_many_test(test_file: TestFile) {
 
 #[test]
 fn run() {
-    crate::spec::test(&["crud", "write"], run_insert_many_test);
+    crate::spec::test(&["crud", "v1", "write"], run_insert_many_test);
 }
