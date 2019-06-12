@@ -1,9 +1,13 @@
 use std::fs::File;
 
-use bson::Document;
+use bson::{Bson, Document};
 use mongodb::{Client, Collection, Database};
+use serde_json::Value;
 
-use crate::{bench::Benchmark, error::Result};
+use crate::{
+    bench::Benchmark,
+    error::{Error, Result},
+};
 
 pub struct InsertOneBenchmark {
     db: Database,
@@ -23,9 +27,14 @@ impl Benchmark for InsertOneBenchmark {
              single_and_multi_document/small_doc.json",
         )?;
 
+        let json: Value = serde_json::from_reader(&mut file)?;
+
         Ok(InsertOneBenchmark {
             db,
-            doc: bson::decode_document(&mut file)?,
+            doc: match json.into() {
+                Bson::Document(doc) => doc,
+                _ => return Err(Error::UnexpectedJson("invalid json test file".to_string())),
+            },
         })
     }
 
