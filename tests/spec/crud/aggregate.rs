@@ -26,7 +26,7 @@ fn run_aggregate_test(test_file: TestFile) {
 
         let arguments: Arguments = bson::from_bson(Bson::Document(test_case.operation.arguments))
             .expect(&test_case.description);
-        let outcome: Outcome<Vec<Document>> =
+        let outcome: Outcome<Option<Vec<Document>>> =
             bson::from_bson(Bson::Document(test_case.outcome)).expect(&test_case.description);
 
         if let Some(ref c) = outcome.collection {
@@ -42,18 +42,12 @@ fn run_aggregate_test(test_file: TestFile) {
             ..Default::default()
         };
 
-        let out = arguments
-            .pipeline
-            .get(arguments.pipeline.len() - 1)
-            .map(|doc| doc.contains_key("$out"))
-            .unwrap_or(false);
-
         {
             let cursor = coll
                 .aggregate(arguments.pipeline, Some(options))
                 .expect(&test_case.description);
             assert_eq!(
-                if out { Vec::new() } else { outcome.result },
+                outcome.result.unwrap_or_default(),
                 cursor.map(Result::unwrap).collect::<Vec<_>>(),
                 "{}",
                 test_case.description,
@@ -78,5 +72,5 @@ fn run_aggregate_test(test_file: TestFile) {
 
 #[test]
 fn run() {
-    crate::spec::test(&["crud", "read"], run_aggregate_test);
+    crate::spec::test(&["crud", "v1", "read"], run_aggregate_test);
 }
