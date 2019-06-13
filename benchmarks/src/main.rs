@@ -13,8 +13,6 @@ use std::{
 
 use crate::bench::Benchmark;
 
-const NUM_ITERATIONS: u32 = 1;
-
 lazy_static! {
     static ref DATA_PATH: PathBuf = Path::new(env!("CARGO_MANIFEST_DIR")).join("data");
 }
@@ -44,15 +42,17 @@ fn run_tests(more_info: bool) {
     println!("----------------------------");
 
     // Run command
-    let run_command =
-        bench::run_benchmark(bench::run_command::RunCommandBenchmark::setup(None, None).unwrap())
-            .unwrap();
+    let run_command = bench::run_benchmark(
+        bench::run_command::RunCommandBenchmark::setup(10000, None, None).unwrap(),
+    )
+    .unwrap();
 
     comp_score += score_test(run_command, "Run command", 0.16, more_info);
 
     // Find one by ID
     let find_one = bench::run_benchmark(
         bench::find_one::FindOneBenchmark::setup(
+            10000,
             Some(DATA_PATH.join("single_and_multi_document/tweet.json")),
             None,
         )
@@ -65,6 +65,7 @@ fn run_tests(more_info: bool) {
     // Small doc insertOne
     let small_insert_one = bench::run_benchmark(
         bench::insert_one::InsertOneBenchmark::setup(
+            10000,
             Some(DATA_PATH.join("single_and_multi_document/small_doc.json")),
             None,
         )
@@ -77,6 +78,7 @@ fn run_tests(more_info: bool) {
     // Large doc insertOne
     let large_insert_one = bench::run_benchmark(
         bench::insert_one::InsertOneBenchmark::setup(
+            10,
             Some(DATA_PATH.join("single_and_multi_document/large_doc.json")),
             None,
         )
@@ -85,6 +87,27 @@ fn run_tests(more_info: bool) {
     .unwrap();
 
     comp_score += score_test(large_insert_one, "Large doc insertOne", 27.31, more_info);
+
+    println!("Multi-Doc Benchmarks:");
+    println!("----------------------------");
+
+    // Find many and empty the cursor
+    let find_many = bench::run_benchmark(
+        bench::find_many::FindManyBenchmark::setup(
+            10000,
+            Some(DATA_PATH.join("single_and_multi_document/tweet.json")),
+            None,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
+    comp_score += score_test(
+        find_many,
+        "Find many and empty the cursor",
+        16.22,
+        more_info,
+    );
 
     println!("----------------------------");
     println!("COMPOSITE SCORE = {}", comp_score);

@@ -11,13 +11,12 @@ use crate::{
 
 pub struct FindOneBenchmark {
     db: Database,
+    num_iter: i32,
     coll: Collection,
 }
 
 impl Benchmark for FindOneBenchmark {
-    type Context = ();
-
-    fn setup(path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
+    fn setup(num_iter: i32, path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
         let client = Client::with_uri_str(uri.unwrap_or("mongodb://localhost:27017"))?;
         let db = client.database("perftest");
         db.drop()?;
@@ -43,15 +42,11 @@ impl Benchmark for FindOneBenchmark {
             coll.insert_one(doc.clone(), None)?;
         }
 
-        Ok(FindOneBenchmark { db, coll })
+        Ok(FindOneBenchmark { db, num_iter, coll })
     }
 
-    fn before_task(&self) -> Result<()> {
-        Ok(())
-    }
-
-    fn do_task(&self, _context: Self::Context) -> Result<()> {
-        for x in 0..crate::NUM_ITERATIONS {
+    fn do_task(&self) -> Result<()> {
+        for x in 0..self.num_iter {
             let mut cursor = self.coll.find(Some(doc! { "_id": x }), None)?;
             let _doc = cursor.next();
         }

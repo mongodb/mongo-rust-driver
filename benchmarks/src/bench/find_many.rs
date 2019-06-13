@@ -1,6 +1,6 @@
 use std::{fs::File, path::PathBuf};
 
-use bson::{Bson, Document};
+use bson::Bson;
 use mongodb::{Client, Collection, Database};
 use serde_json::Value;
 
@@ -9,15 +9,13 @@ use crate::{
     error::{Error, Result},
 };
 
-pub struct InsertOneBenchmark {
+pub struct FindManyBenchmark {
     db: Database,
-    num_iter: i32,
     coll: Collection,
-    doc: Document,
 }
 
-impl Benchmark for InsertOneBenchmark {
-    fn setup(num_iter: i32, path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
+impl Benchmark for FindManyBenchmark {
+    fn setup(_num_iter: i32, path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
         let client = Client::with_uri_str(uri.unwrap_or("mongodb://localhost:27017"))?;
         let db = client.database("perftest");
         db.drop()?;
@@ -32,32 +30,22 @@ impl Benchmark for InsertOneBenchmark {
         })?;
 
         let json: Value = serde_json::from_reader(&mut file)?;
+        let doc = match json.into() {
+            Bson::Document(doc) => doc,
+            _ => return Err(Error::UnexpectedJson("invalid json test file".to_string())),
+        };
 
-        // TODO: creation of collection not specified until before_task
         let coll = db.collection("corpus");
+        for _ in 0..10000 {
+            coll.insert_one(doc.clone(), None)?;
+        }
 
-        Ok(InsertOneBenchmark {
-            db,
-            num_iter,
-            coll,
-            doc: match json.into() {
-                Bson::Document(doc) => doc,
-                _ => return Err(Error::UnexpectedJson("invalid json test file".to_string())),
-            },
-        })
-    }
-
-    fn before_task(&mut self) -> Result<()> {
-        self.coll = self.db.collection("corpus");
-        self.coll.drop()?;
-
-        Ok(())
+        Ok(FindManyBenchmark { db, coll })
     }
 
     fn do_task(&self) -> Result<()> {
-        for _ in 0..self.num_iter {
-            self.coll.insert_one(self.doc.clone(), None)?;
-        }
+        let mut cursor = self.coll.find(None, None)?;
+        while let Some(_doc) = cursor.next() {}
 
         Ok(())
     }
