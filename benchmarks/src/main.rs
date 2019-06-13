@@ -1,5 +1,5 @@
-// #[macro_use]
-// extern crate bson;
+#[macro_use]
+extern crate bson;
 
 mod bench;
 mod error;
@@ -26,19 +26,69 @@ fn score_test(durations: Vec<Duration>, name: &str, task_size: f64, more_info: b
     score
 }
 
-fn run_tests() {
+fn run_tests(more_info: bool) {
     let mut comp_score: f64 = 0.0;
 
-    let small_insert_one_test =
-        bench::run_benchmark(bench::small_insert_one::InsertOneBenchmark::setup().unwrap())
+    println!("Single-Doc Benchmarks:");
+    println!("----------------------------");
+
+    // Run command
+    let run_command =
+        bench::run_benchmark(bench::run_command::RunCommandBenchmark::setup(None, None).unwrap())
             .unwrap();
 
-    comp_score += score_test(small_insert_one_test, "Small doc insertOne", 2.75, false);
+    comp_score += score_test(run_command, "Run command", 0.16, more_info);
+
+    // Find one by ID
+    let find_one = bench::run_benchmark(
+        bench::find_one::FindOneBenchmark::setup(
+            Some(
+                "/Users/benji.rewis/Desktop/mongo-rust-driver/benchmarks/data/\
+                 single_and_multi_document/tweet.json",
+            ),
+            None,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
+    comp_score += score_test(find_one, "Find one by ID", 16.22, more_info);
+
+    // Small doc insertOne
+    let small_insert_one = bench::run_benchmark(
+        bench::insert_one::InsertOneBenchmark::setup(
+            Some(
+                "/Users/benji.rewis/Desktop/mongo-rust-driver/benchmarks/data/\
+                 single_and_multi_document/small_doc.json",
+            ),
+            None,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
+    comp_score += score_test(small_insert_one, "Small doc insertOne", 2.75, more_info);
+
+    // Large doc insertOne
+    let large_insert_one = bench::run_benchmark(
+        bench::insert_one::InsertOneBenchmark::setup(
+            Some(
+                "/Users/benji.rewis/Desktop/mongo-rust-driver/benchmarks/data/\
+                 single_and_multi_document/large_doc.json",
+            ),
+            None,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
+    comp_score += score_test(large_insert_one, "Large doc insertOne", 27.31, more_info);
 
     println!("----------------------------");
     println!("COMPOSITE SCORE = {}", comp_score);
 }
 
 fn main() {
-    run_tests();
+    println!("Running tests...");
+    run_tests(false);
 }

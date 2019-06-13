@@ -17,15 +17,19 @@ pub struct InsertOneBenchmark {
 impl Benchmark for InsertOneBenchmark {
     type Context = Collection;
 
-    fn setup() -> Result<Self> {
-        let client = Client::with_uri_str("mongodb://localhost:27017")?;
+    fn setup(path: Option<&str>, uri: Option<&str>) -> Result<Self> {
+        let client = Client::with_uri_str(uri.unwrap_or("mongodb://localhost:27017"))?;
         let db = client.database("perftest");
         db.drop()?;
 
-        let mut file = File::open(
-            "/Users/benji.rewis/Desktop/mongo-rust-driver/benchmarks/data/\
-             single_and_multi_document/small_doc.json",
-        )?;
+        let mut file = File::open(match path {
+            Some(path) => path,
+            None => {
+                return Err(Error::UnexpectedJson(
+                    "invalid json test file path".to_string(),
+                ))
+            }
+        })?;
 
         let json: Value = serde_json::from_reader(&mut file)?;
 
@@ -46,7 +50,7 @@ impl Benchmark for InsertOneBenchmark {
     }
 
     fn do_task(&self, coll: Self::Context) -> Result<()> {
-        for _x in 0..10000 {
+        for _ in 0..10000 {
             coll.insert_one(self.doc.clone(), None)?;
         }
 

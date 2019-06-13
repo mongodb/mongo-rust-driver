@@ -1,4 +1,6 @@
-pub mod small_insert_one;
+pub mod find_one;
+pub mod insert_one;
+pub mod run_command;
 
 use std::time::{Duration, Instant};
 
@@ -8,12 +10,10 @@ pub trait Benchmark: Sized {
     type Context;
 
     // execute once before benchmarking
-    fn setup() -> Result<Self>;
+    fn setup(path: Option<&str>, uri: Option<&str>) -> Result<Self>;
 
     // execute at the beginning of every iteration
-    fn before_task(&self) -> Result<Self::Context> {
-        unimplemented!()
-    }
+    fn before_task(&self) -> Result<Self::Context>;
 
     fn do_task(&self, context: Self::Context) -> Result<()>;
 
