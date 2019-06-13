@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use bson::Document;
 use mongodb::{Client, Database};
 
@@ -11,7 +13,7 @@ pub struct RunCommandBenchmark {
 impl Benchmark for RunCommandBenchmark {
     type Context = ();
 
-    fn setup(_path: Option<&str>, uri: Option<&str>) -> Result<Self> {
+    fn setup(_path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
         let client = Client::with_uri_str(uri.unwrap_or("mongodb://localhost:27017"))?;
         let db = client.database("perftest");
         db.drop()?;
@@ -27,7 +29,7 @@ impl Benchmark for RunCommandBenchmark {
     }
 
     fn do_task(&self, _context: Self::Context) -> Result<()> {
-        for _ in 0..10000 {
+        for _ in 0..crate::NUM_ITERATIONS {
             let _doc = self.db.run_command(self.cmd.clone(), None)?;
         }
 

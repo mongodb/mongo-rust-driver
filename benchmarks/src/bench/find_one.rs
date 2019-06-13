@@ -1,4 +1,4 @@
-use std::fs::File;
+use std::{fs::File, path::PathBuf};
 
 use bson::Bson;
 use mongodb::{Client, Collection, Database};
@@ -17,7 +17,7 @@ pub struct FindOneBenchmark {
 impl Benchmark for FindOneBenchmark {
     type Context = ();
 
-    fn setup(path: Option<&str>, uri: Option<&str>) -> Result<Self> {
+    fn setup(path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
         let client = Client::with_uri_str(uri.unwrap_or("mongodb://localhost:27017"))?;
         let db = client.database("perftest");
         db.drop()?;
@@ -51,7 +51,7 @@ impl Benchmark for FindOneBenchmark {
     }
 
     fn do_task(&self, _context: Self::Context) -> Result<()> {
-        for x in 0..10000 {
+        for x in 0..crate::NUM_ITERATIONS {
             let mut cursor = self.coll.find(Some(doc! { "_id": x }), None)?;
             let _doc = cursor.next();
         }

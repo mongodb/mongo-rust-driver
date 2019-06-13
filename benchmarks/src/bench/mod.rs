@@ -2,7 +2,10 @@ pub mod find_one;
 pub mod insert_one;
 pub mod run_command;
 
-use std::time::{Duration, Instant};
+use std::{
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
 use crate::error::Result;
 
@@ -10,7 +13,7 @@ pub trait Benchmark: Sized {
     type Context;
 
     // execute once before benchmarking
-    fn setup(path: Option<&str>, uri: Option<&str>) -> Result<Self>;
+    fn setup(path: Option<PathBuf>, uri: Option<&str>) -> Result<Self>;
 
     // execute at the beginning of every iteration
     fn before_task(&self) -> Result<Self::Context>;

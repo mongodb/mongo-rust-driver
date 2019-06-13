@@ -1,4 +1,4 @@
-use std::fs::File;
+use std::{fs::File, path::PathBuf};
 
 use bson::{Bson, Document};
 use mongodb::{Client, Collection, Database};
@@ -17,7 +17,7 @@ pub struct InsertOneBenchmark {
 impl Benchmark for InsertOneBenchmark {
     type Context = Collection;
 
-    fn setup(path: Option<&str>, uri: Option<&str>) -> Result<Self> {
+    fn setup(path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
         let client = Client::with_uri_str(uri.unwrap_or("mongodb://localhost:27017"))?;
         let db = client.database("perftest");
         db.drop()?;
@@ -50,7 +50,7 @@ impl Benchmark for InsertOneBenchmark {
     }
 
     fn do_task(&self, coll: Self::Context) -> Result<()> {
-        for _ in 0..10000 {
+        for _ in 0..crate::NUM_ITERATIONS {
             coll.insert_one(self.doc.clone(), None)?;
         }
 

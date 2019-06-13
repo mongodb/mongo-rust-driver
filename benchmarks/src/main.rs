@@ -1,12 +1,23 @@
 #[macro_use]
 extern crate bson;
+#[macro_use]
+extern crate lazy_static;
 
 mod bench;
 mod error;
 
-use std::time::Duration;
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use crate::bench::Benchmark;
+
+const NUM_ITERATIONS: u32 = 1;
+
+lazy_static! {
+    static ref DATA_PATH: PathBuf = Path::new(env!("CARGO_MANIFEST_DIR")).join("data");
+}
 
 fn score_test(durations: Vec<Duration>, name: &str, task_size: f64, more_info: bool) -> f64 {
     let score: f64 = durations[49].as_millis() as f64 / task_size;
@@ -42,10 +53,7 @@ fn run_tests(more_info: bool) {
     // Find one by ID
     let find_one = bench::run_benchmark(
         bench::find_one::FindOneBenchmark::setup(
-            Some(
-                "/Users/benji.rewis/Desktop/mongo-rust-driver/benchmarks/data/\
-                 single_and_multi_document/tweet.json",
-            ),
+            Some(DATA_PATH.join("single_and_multi_document/tweet.json")),
             None,
         )
         .unwrap(),
@@ -57,10 +65,7 @@ fn run_tests(more_info: bool) {
     // Small doc insertOne
     let small_insert_one = bench::run_benchmark(
         bench::insert_one::InsertOneBenchmark::setup(
-            Some(
-                "/Users/benji.rewis/Desktop/mongo-rust-driver/benchmarks/data/\
-                 single_and_multi_document/small_doc.json",
-            ),
+            Some(DATA_PATH.join("single_and_multi_document/small_doc.json")),
             None,
         )
         .unwrap(),
@@ -72,10 +77,7 @@ fn run_tests(more_info: bool) {
     // Large doc insertOne
     let large_insert_one = bench::run_benchmark(
         bench::insert_one::InsertOneBenchmark::setup(
-            Some(
-                "/Users/benji.rewis/Desktop/mongo-rust-driver/benchmarks/data/\
-                 single_and_multi_document/large_doc.json",
-            ),
+            Some(DATA_PATH.join("single_and_multi_document/large_doc.json")),
             None,
         )
         .unwrap(),
