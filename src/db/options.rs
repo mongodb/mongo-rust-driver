@@ -6,7 +6,7 @@ use crate::{
 };
 
 /// These are the valid options for creating a `Database` with `Client::database_with_options`.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct DatabaseOptions {
     /// The default read preference for operations.
     #[builder(default)]
@@ -22,7 +22,7 @@ pub struct DatabaseOptions {
 }
 
 /// These are the valid options for creating a collection with `Database::create_collection`.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct CreateCollectionOptions {
     /// Whether the collection should be capped. If true, `size` must also be set.
     #[builder(default)]
@@ -79,7 +79,7 @@ pub struct CreateCollectionOptions {
 
 /// Specifies how strictly the database should apply validation rules to existing documents during
 /// an update.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum ValidationLevel {
     /// Perform no validation for inserts and updates.
     Off,
@@ -102,7 +102,7 @@ impl ValidationLevel {
 
 // Specifies whether the database should return an error or simply raise a warning if inserted
 // documents do not pass the validation.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum ValidationAction {
     Error,
     Warn,
