@@ -76,7 +76,7 @@ impl fmt::Display for Host {
     }
 }
 
-#[derive(Debug, Default, PartialEq, TypedBuilder)]
+#[derive(Clone, Debug, Default, PartialEq, TypedBuilder)]
 pub struct ClientOptions {
     #[builder(default_code = "vec![ Host {
         hostname: \"localhost\".to_string(),
@@ -127,7 +127,7 @@ struct ClientOptionsParser {
     read_preference_tags: Option<Vec<TagSet>>,
 }
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct TlsOptions {
     pub allow_invalid_certificates: Option<bool>,
     pub ca_file_path: Option<String>,
