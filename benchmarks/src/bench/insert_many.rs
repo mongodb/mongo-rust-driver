@@ -1,6 +1,6 @@
 use std::{fs::File, path::PathBuf};
 
-use bson::Bson;
+use bson::{Bson, Document};
 use mongodb::{Client, Collection, Database};
 use serde_json::Value;
 
@@ -9,12 +9,13 @@ use crate::{
     error::{Error, Result},
 };
 
-pub struct FindManyBenchmark {
+pub struct InsertManyBenchmark {
     db: Database,
     coll: Collection,
+    doc: Document,
 }
 
-impl Benchmark for FindManyBenchmark {
+impl Benchmark for InsertManyBenchmark {
     fn setup(_num_iter: i32, path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
         let client = Client::with_uri_str(uri.unwrap_or("mongodb://localhost:27017"))?;
         let db = client.database("perftest");
@@ -30,24 +31,30 @@ impl Benchmark for FindManyBenchmark {
         })?;
 
         let json: Value = serde_json::from_reader(&mut file)?;
-        let doc = match json.into() {
-            Bson::Document(doc) => doc,
-            _ => return Err(Error::UnexpectedJson("invalid json test file".to_string())),
-        };
 
+        // TODO: creation of collection not specified until before_task
         let coll = db.collection("corpus");
-        for _ in 0..10000 {
-            coll.insert_one(doc.clone(), None)?;
-        }
 
-        Ok(FindManyBenchmark { db, coll })
+        Ok(InsertManyBenchmark {
+            db,
+            coll,
+            doc: match json.into() {
+                Bson::Document(doc) => doc,
+                _ => return Err(Error::UnexpectedJson("invalid json test file".to_string())),
+            },
+        })
+    }
+
+    fn before_task(&mut self) -> Result<()> {
+        self.coll = self.db.collection("corpus");
+        self.coll.drop()?;
+
+        Ok(())
     }
 
     fn do_task(&self) -> Result<()> {
-        let cursor = self.coll.find(None, None)?;
-        for doc in cursor {
-            doc?;
-        }
+        let insertions = vec![self.doc.clone(); 10000];
+        self.coll.insert_many(insertions, None)?;
 
         Ok(())
     }
