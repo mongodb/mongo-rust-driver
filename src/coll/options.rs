@@ -9,7 +9,7 @@ use crate::{
 
 /// These are the valid options for creating a `Collection` with
 /// `Database::collection_with_options`.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct CollectionOptions {
     /// The default read preference for operations.
     #[builder(default)]
@@ -26,7 +26,7 @@ pub struct CollectionOptions {
 
 /// Specifies whether a `Collection::find_one_and_replace` and `Collection::find_one_and_update`
 /// operation should return the document before or after modification.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum ReturnDocument {
     /// Return the document after modification.
     After,
@@ -44,7 +44,7 @@ impl ReturnDocument {
 }
 
 /// Specifies the index to use for an operation.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Hint {
     /// Specifies the keys of the index to use.
     Keys(Document),
@@ -62,7 +62,7 @@ impl Hint {
 }
 
 /// Specifies the type of cursor to return from a find operation.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum CursorType {
     /// Default; close the cursor after the last document is received from the server.
     NonTailable,
@@ -77,7 +77,7 @@ pub enum CursorType {
 }
 
 /// Specifies the options to a `Collection::insert_one` operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct InsertOneOptions {
     /// Opt out of document-level validation.
     #[builder(default)]
@@ -85,7 +85,7 @@ pub struct InsertOneOptions {
 }
 
 /// Specifies the options to a `Collection::insert_many` operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct InsertManyOptions {
     /// Opt out of document-level validation.
     #[builder(default)]
@@ -98,7 +98,7 @@ pub struct InsertManyOptions {
 }
 
 /// Specifies the options to a `Collection::update_one` or `Collection::update_many` operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct UpdateOptions {
     /// A set of filters specifying to which array elements an update should apply.
     ///
@@ -117,7 +117,7 @@ pub struct UpdateOptions {
 }
 
 /// Specifies the options to a `Collection::replace_one` operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct ReplaceOptions {
     /// Opt out of document-level validation.
     #[builder(default)]
@@ -129,11 +129,11 @@ pub struct ReplaceOptions {
 }
 
 /// Specifies the options to a `Collection::delete_one` or `Collection::delete_many` operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct DeleteOptions {}
 
 /// Specifies the options to a `Collection::find_one_and_delete` operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct FindOneAndDeleteOptions {
     /// The maximum amount of time to allow the query to run.
     ///
@@ -152,7 +152,7 @@ pub struct FindOneAndDeleteOptions {
 }
 
 /// Specifies the options to a `Collection::find_one_and_replace` operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct FindOneAndReplaceOptions {
     /// Opt out of document-level validation.
     #[builder(default)]
@@ -183,7 +183,7 @@ pub struct FindOneAndReplaceOptions {
 }
 
 /// Specifies the options to a `Collection::find_one_and_update` operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct FindOneAndUpdateOptions {
     /// A set of filters specifying to which array elements an update should apply.
     ///
@@ -220,7 +220,7 @@ pub struct FindOneAndUpdateOptions {
 }
 
 /// Specifies the options to a `Collection::aggregate` operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct AggregateOptions {
     /// Enables writing to temporary files. When set to true, aggregation stages can write data to
     /// the _tmp subdirectory in the dbPath directory.
@@ -258,7 +258,7 @@ pub struct AggregateOptions {
 }
 
 /// Specifies the options to a `Collection::count_documents` operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct CountOptions {
     /// The index to use for the operation.
     #[builder(default)]
@@ -281,7 +281,7 @@ pub struct CountOptions {
 }
 
 /// Specifies the options to a `Collection::estimated_document_count` operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct EstimatedDocumentCountOptions {
     /// The maximum amount of time to allow the query to run.
     ///
@@ -292,7 +292,7 @@ pub struct EstimatedDocumentCountOptions {
 }
 
 /// Specifies the options to a `Collection::distinct` operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct DistinctOptions {
     /// The maximum amount of time to allow the query to run.
     ///
@@ -303,7 +303,7 @@ pub struct DistinctOptions {
 }
 
 /// Specifies the options to a `Collection::find` operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct FindOptions {
     /// If true, partial results will be returned from a mongos rather than an error being
     /// returned if one or more shards is down.
@@ -387,7 +387,7 @@ pub struct FindOptions {
 }
 
 /// Specifies an index to create.
-#[derive(Debug, TypedBuilder)]
+#[derive(Clone, Debug, TypedBuilder)]
 pub struct IndexModel {
     /// The fields to index, along with their sort order.
     pub keys: Document,
