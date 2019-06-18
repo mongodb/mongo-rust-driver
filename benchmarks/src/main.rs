@@ -168,6 +168,21 @@ fn parallel_benchmarks(more_info: bool) -> Result<f64> {
         more_info,
     );
 
+    // LDJSON multi-file export
+    let json_multi_export =
+        bench::run_benchmark(bench::json_multi_export::JsonMultiExportBenchmark::setup(
+            num_cpus::get() as i32,
+            Some(DATA_PATH.join("parallel/ldjson_multi")),
+            None,
+        )?)?;
+
+    comp_score += score_test(
+        json_multi_export,
+        "LDJSON multi-file export",
+        565.0,
+        more_info,
+    );
+
     Ok(comp_score)
 }
 

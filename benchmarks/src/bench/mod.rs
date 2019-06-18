@@ -2,6 +2,7 @@ pub mod find_many;
 pub mod find_one;
 pub mod insert_many;
 pub mod insert_one;
+pub mod json_multi_export;
 pub mod json_multi_import;
 pub mod run_command;
 

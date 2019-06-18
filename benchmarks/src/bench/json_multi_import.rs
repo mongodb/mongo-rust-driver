@@ -88,9 +88,15 @@ impl Benchmark for JsonMultiImportBenchmark {
                 }
                 doc_chunks.push(docs);
 
-                while !doc_chunks.is_empty() {
+                loop {
                     coll_ref
-                        .insert_many(doc_chunks.pop(), Some(opts.clone()))
+                        .insert_many(
+                            match doc_chunks.pop() {
+                                Some(chunk) => chunk,
+                                None => break,
+                            },
+                            Some(opts.clone()),
+                        )
                         .unwrap();
                 }
             });
