@@ -18,6 +18,7 @@ struct Arguments {
     pub upsert: Option<bool>,
 }
 
+#[function_name]
 fn run_find_one_and_update_test(test_file: TestFile) {
     let data = test_file.data;
 
@@ -30,7 +31,7 @@ fn run_find_one_and_update_test(test_file: TestFile) {
 
         test_case.description = test_case.description.replace('$', "%");
         let sub = cmp::min(test_case.description.len(), 50);
-        let coll = crate::init_db_and_coll("findOneAndUpdate", &test_case.description[..sub]);
+        let coll = crate::init_db_and_coll(function_name!(), &test_case.description[..sub]);
         coll.insert_many(data.clone(), None)
             .expect(&test_case.description);
 
@@ -41,7 +42,7 @@ fn run_find_one_and_update_test(test_file: TestFile) {
 
         if let Some(ref c) = outcome.collection {
             if let Some(ref name) = c.name {
-                crate::get_coll("findOneAndUpdate", name)
+                crate::get_coll(function_name!(), name)
                     .drop()
                     .expect(&test_case.description);
             }
@@ -75,7 +76,7 @@ fn run_find_one_and_update_test(test_file: TestFile) {
 
         if let Some(c) = outcome.collection {
             let outcome_coll = match c.name {
-                Some(ref name) => crate::get_coll("findOneAndUpdate", name),
+                Some(ref name) => crate::get_coll(function_name!(), name),
                 None => coll,
             };
 

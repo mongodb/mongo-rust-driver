@@ -47,8 +47,13 @@ fn metadata_sent_in_handshake() {
 }
 
 #[test]
+#[function_name]
 fn list_databases() {
-    let expected_dbs = &["list_databases1", "list_databases2", "list_databases3"];
+    let expected_dbs = &[
+        format!("{}1", function_name!()),
+        format!("{}2", function_name!()),
+        format!("{}3", function_name!()),
+    ];
 
     for name in expected_dbs {
         CLIENT.database(name).drop().unwrap();
@@ -72,7 +77,7 @@ fn list_databases() {
     let new_dbs: Vec<_> = new_dbs
         .into_iter()
         .filter(|doc| match doc.get("name") {
-            Some(&Bson::String(ref name)) => expected_dbs.contains(&name.as_str()),
+            Some(&Bson::String(ref name)) => expected_dbs.contains(name),
             _ => false,
         })
         .collect();
@@ -89,11 +94,12 @@ fn list_databases() {
 }
 
 #[test]
+#[function_name]
 fn list_database_names() {
     let expected_dbs = &[
-        "list_database_names1",
-        "list_database_names2",
-        "list_database_names3",
+        format!("{}1", function_name!()),
+        format!("{}2", function_name!()),
+        format!("{}3", function_name!()),
     ];
 
     for name in expected_dbs {
@@ -115,6 +121,6 @@ fn list_database_names() {
     let new_dbs = CLIENT.list_database_names(None).unwrap();
 
     for name in expected_dbs {
-        assert_eq!(new_dbs.iter().filter(|db_name| db_name == name).count(), 1);
+        assert_eq!(new_dbs.iter().filter(|db_name| db_name == &name).count(), 1);
     }
 }

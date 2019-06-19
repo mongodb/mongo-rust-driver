@@ -11,8 +11,9 @@ struct ListIndexesEntry {
 }
 
 #[test]
+#[function_name]
 fn list_indexes_contains_id() {
-    let coll = crate::get_coll("list_indexes_contains_id", "list_indexes_contains_id");
+    let coll = crate::get_coll(function_name!(), function_name!());
     coll.drop().unwrap();
 
     let indexes: Vec<_> = coll.list_indexes().unwrap().collect();
@@ -32,17 +33,18 @@ fn list_indexes_contains_id() {
     assert_eq!(entry.name, "_id_");
     assert_eq!(
         entry.ns,
-        "list_indexes_contains_id.list_indexes_contains_id"
+        format!("{}.{}", function_name!(), function_name!())
     );
 }
 
 #[test]
+#[function_name]
 fn index_management() {
-    let db = crate::get_db("index_management");
-    let coll = db.collection("index_management");
+    let db = crate::get_db(function_name!());
+    let coll = db.collection(function_name!());
 
     coll.drop().unwrap();
-    db.create_collection("index_management", None).unwrap();
+    db.create_collection(function_name!(), None).unwrap();
 
     let keys = vec![
         doc! { "w": 1 },
@@ -87,21 +89,33 @@ fn index_management() {
 
     assert_eq!(listed_indexes[0].key, doc! { "_id": 1 });
     assert_eq!(listed_indexes[0].name, "_id_");
-    assert_eq!(listed_indexes[0].ns, "index_management.index_management");
+    assert_eq!(
+        listed_indexes[0].ns,
+        format!("{}.{}", function_name!(), function_name!())
+    );
     assert!(listed_indexes[0].unique.is_none());
 
     assert_eq!(listed_indexes[1].key, keys[0]);
     assert_eq!(listed_indexes[1].name, created_names[0]);
-    assert_eq!(listed_indexes[1].ns, "index_management.index_management");
+    assert_eq!(
+        listed_indexes[1].ns,
+        format!("{}.{}", function_name!(), function_name!())
+    );
     assert!(listed_indexes[1].unique.is_none());
 
     assert_eq!(listed_indexes[2].key, keys[1]);
     assert_eq!(listed_indexes[2].name, created_names[1]);
-    assert_eq!(listed_indexes[2].ns, "index_management.index_management");
+    assert_eq!(
+        listed_indexes[2].ns,
+        format!("{}.{}", function_name!(), function_name!())
+    );
     assert!(listed_indexes[2].unique.is_none());
 
     assert_eq!(listed_indexes[3].key, keys[2]);
     assert_eq!(listed_indexes[3].name, created_names[2]);
-    assert_eq!(listed_indexes[3].ns, "index_management.index_management");
+    assert_eq!(
+        listed_indexes[3].ns,
+        format!("{}.{}", function_name!(), function_name!())
+    );
     assert_eq!(listed_indexes[3].unique, Some(true));
 }

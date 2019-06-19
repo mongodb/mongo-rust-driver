@@ -51,17 +51,19 @@ fn is_master() {
 }
 
 #[test]
+#[function_name]
 fn list_collections() {
-    let db = crate::get_db("list_collections");
+    let db = crate::get_db(function_name!());
     db.drop().unwrap();
 
     assert_eq!(db.list_collections(None).unwrap().count(), 0);
 
     let coll_names = &[
-        "list_collections1",
-        "list_collections2",
-        "list_collections3",
+        format!("{}1", function_name!()),
+        format!("{}2", function_name!()),
+        format!("{}3", function_name!()),
     ];
+
     for coll_name in coll_names {
         db.collection(coll_name)
             .insert_one(doc! { "x": 1 }, None)
@@ -84,8 +86,9 @@ fn list_collections() {
 }
 
 #[test]
+#[function_name]
 fn list_collections_filter() {
-    let db = crate::get_db("list_collections_filter");
+    let db = crate::get_db(function_name!());
     db.drop().unwrap();
 
     assert_eq!(db.list_collections(None).unwrap().count(), 0);
@@ -120,17 +123,19 @@ fn list_collections_filter() {
 }
 
 #[test]
+#[function_name]
 fn list_collection_names() {
-    let db = crate::get_db("list_collection_names");
+    let db = crate::get_db(function_name!());
     db.drop().unwrap();
 
     assert!(db.list_collection_names(None).unwrap().is_empty());
 
     let expected_colls = &[
-        "list_collection_names1",
-        "list_collection_names2",
-        "list_collection_names3",
+        format!("{}1", function_name!()),
+        format!("{}2", function_name!()),
+        format!("{}3", function_name!()),
     ];
+
     for coll in expected_colls {
         db.collection(coll)
             .insert_one(doc! { "x": 1 }, None)
@@ -144,31 +149,32 @@ fn list_collection_names() {
 }
 
 #[test]
+#[function_name]
 fn collection_management() {
-    let db = crate::get_db("collection_management");
+    let db = crate::get_db(function_name!());
     db.drop().unwrap();
 
     assert!(db.list_collection_names(None).unwrap().is_empty());
 
-    db.create_collection("collection_management1", None)
+    db.create_collection(&format!("{}{}", function_name!(), 1), None)
         .unwrap();
 
     let options = CreateCollectionOptions::builder()
         .capped(true)
         .size(512)
         .build();
-    db.create_collection("collection_management2", Some(options))
+    db.create_collection(&format!("{}{}", function_name!(), 2), Some(options))
         .unwrap();
 
     let colls = get_coll_info(&db, None);
     assert_eq!(colls.len(), 2);
 
-    assert_eq!(colls[0].name, "collection_management1");
+    assert_eq!(colls[0].name, format!("{}1", function_name!()));
     assert_eq!(colls[0].coll_type, "collection");
     assert!(colls[0].options.is_empty());
     assert!(!colls[0].info.read_only);
 
-    assert_eq!(colls[1].name, "collection_management2");
+    assert_eq!(colls[1].name, format!("{}2", function_name!()));
     assert_eq!(colls[1].coll_type, "collection");
     assert_eq!(colls[1].options.get("capped"), Some(&Bson::Boolean(true)));
     assert_eq!(colls[1].options.get("size"), Some(&Bson::I32(512)));

@@ -4,8 +4,9 @@ use bson::Bson;
 use mongodb::options::{AggregateOptions, UpdateOptions};
 
 #[test]
+#[function_name]
 fn count() {
-    let coll = crate::get_coll("count", "count");
+    let coll = crate::get_coll(function_name!(), function_name!());
 
     coll.drop().unwrap();
     assert_eq!(coll.estimated_document_count(None).unwrap(), 0);
@@ -21,8 +22,9 @@ fn count() {
 }
 
 #[test]
+#[function_name]
 fn find() {
-    let coll = crate::get_coll("find", "find");
+    let coll = crate::get_coll(function_name!(), function_name!());
 
     coll.drop().unwrap();
 
@@ -44,8 +46,9 @@ fn find() {
 }
 
 #[test]
+#[function_name]
 fn update() {
-    let coll = crate::get_coll("update", "update");
+    let coll = crate::get_coll(function_name!(), function_name!());
 
     coll.drop().unwrap();
 
@@ -79,8 +82,9 @@ fn update() {
 }
 
 #[test]
+#[function_name]
 fn delete() {
-    let coll = crate::get_coll("delete", "delete");
+    let coll = crate::get_coll(function_name!(), function_name!());
 
     coll.drop().unwrap();
 
@@ -99,9 +103,10 @@ fn delete() {
 }
 
 #[test]
+#[function_name]
 fn aggregate_out() {
-    let db = crate::get_db("aggregate_out");
-    let coll = db.collection("aggregate_out");
+    let db = crate::get_db(function_name!());
+    let coll = db.collection(function_name!());
 
     coll.drop().unwrap();
 
@@ -110,7 +115,7 @@ fn aggregate_out() {
         .unwrap();
     assert_eq!(result.inserted_ids.len(), 5);
 
-    let out_coll = db.collection("aggregate_out_1");
+    let out_coll = db.collection(&format!("{}_1", function_name!()));
     let pipeline = vec![
         doc! {
             "$match": {
