@@ -191,8 +191,8 @@ fn main() {
 
     let mut comp_score: f64 = 0.0;
 
-    let single_doc_score = 0.0; // single_doc_benchmarks(false).unwrap();
-    let multi_doc_score = 0.0; // multi_doc_benchmarks(false).unwrap();
+    let single_doc_score = single_doc_benchmarks(false).unwrap();
+    let multi_doc_score = multi_doc_benchmarks(false).unwrap();
     let parallel_score = parallel_benchmarks(false).unwrap();
 
     comp_score += single_doc_score + multi_doc_score + parallel_score;

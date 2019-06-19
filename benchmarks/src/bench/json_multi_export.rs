@@ -94,8 +94,8 @@ impl Benchmark for JsonMultiExportBenchmark {
                 for x in downloaded_files..downloaded_files + num_files {
                     let file_name = path_ref.join(format!("ldjson{:03}.txt", x));
                     let mut file = OpenOptions::new()
+                        .create(true)
                         .write(true)
-                        .append(true)
                         .open(&file_name)
                         .unwrap();
 
