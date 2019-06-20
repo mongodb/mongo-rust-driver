@@ -10,6 +10,7 @@ struct Arguments {
     pub batch_size: Option<i32>,
 }
 
+#[function_name]
 fn run_aggregate_test(test_file: TestFile) {
     let data = test_file.data;
 
@@ -20,7 +21,7 @@ fn run_aggregate_test(test_file: TestFile) {
 
         test_case.description = test_case.description.replace('$', "%");
 
-        let coll = crate::init_db_and_coll("aggregate", &test_case.description);
+        let coll = crate::init_db_and_coll(function_name!(), &test_case.description);
         coll.insert_many(data.clone(), None)
             .expect(&test_case.description);
 
@@ -31,7 +32,7 @@ fn run_aggregate_test(test_file: TestFile) {
 
         if let Some(ref c) = outcome.collection {
             if let Some(ref name) = c.name {
-                crate::get_coll("aggregate", name)
+                crate::get_coll(function_name!(), name)
                     .drop()
                     .expect(&test_case.description);
             }
@@ -56,7 +57,7 @@ fn run_aggregate_test(test_file: TestFile) {
 
         if let Some(c) = outcome.collection {
             let outcome_coll = match c.name {
-                Some(ref name) => crate::get_coll("aggregate", name),
+                Some(ref name) => crate::get_coll(function_name!(), name),
                 None => coll,
             };
 
