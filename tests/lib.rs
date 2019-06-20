@@ -3,6 +3,8 @@ extern crate approx;
 #[macro_use]
 extern crate bson;
 #[macro_use]
+extern crate function_name;
+#[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate serde_derive;

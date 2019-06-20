@@ -20,6 +20,7 @@ struct ResultDoc {
     inserted_ids: Option<Document>,
 }
 
+#[function_name]
 fn run_insert_many_test(test_file: TestFile) {
     let data = test_file.data;
 
@@ -28,7 +29,7 @@ fn run_insert_many_test(test_file: TestFile) {
             continue;
         }
 
-        let coll = crate::init_db_and_coll("insertMany", &test_case.description);
+        let coll = crate::init_db_and_coll(function_name!(), &test_case.description);
         coll.insert_many(data.clone(), None)
             .expect(&test_case.description);
 
@@ -66,7 +67,7 @@ fn run_insert_many_test(test_file: TestFile) {
 
         if let Some(c) = outcome.collection {
             let outcome_coll = match c.name {
-                Some(ref name) => crate::get_coll("insertMany", name),
+                Some(ref name) => crate::get_coll(function_name!(), name),
                 None => coll,
             };
 

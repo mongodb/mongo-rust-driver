@@ -28,3 +28,4 @@ features = ["dangerous_configuration"]
 [dev-dependencies]
 approx = "0.3.2"
 serde_json = "1.0.39"
+function_name = "0.1.1"
