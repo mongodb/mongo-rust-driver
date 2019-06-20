@@ -9,7 +9,6 @@ use crate::{
 };
 
 const TOTAL_FILES: i32 = 100;
-const CHUNK_SIZE: usize = 40000;
 
 pub struct JsonMultiImportBenchmark {
     db: Database,
