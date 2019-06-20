@@ -8,17 +8,17 @@ use crate::{
     error::{Error, Result},
 };
 
-const TOTAL_FILES: i32 = 100;
+const TOTAL_FILES: usize = 100;
 
 pub struct JsonMultiImportBenchmark {
     db: Database,
     coll: Collection,
-    num_threads: i32,
+    num_threads: usize,
     path: PathBuf,
 }
 
 impl Benchmark for JsonMultiImportBenchmark {
-    fn setup(num_threads: i32, path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
+    fn setup(num_threads: usize, path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
         let client = Client::with_uri_str(uri.unwrap_or("mongodb://localhost:27017"))?;
         let db = client.database("perftest");
         db.drop()?;

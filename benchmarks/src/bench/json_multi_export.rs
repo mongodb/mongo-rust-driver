@@ -1,5 +1,5 @@
 use std::{
-    fs::{remove_file, File, OpenOptions},
+    fs::{self, File, OpenOptions},
     io::Write,
     path::PathBuf,
 };
@@ -11,17 +11,17 @@ use crate::{
     error::{Error, Result},
 };
 
-const TOTAL_FILES: i32 = 100;
+const TOTAL_FILES: usize = 100;
 
 pub struct JsonMultiExportBenchmark {
     db: Database,
     coll: Collection,
-    num_threads: i32,
+    num_threads: usize,
     path: PathBuf,
 }
 
 impl Benchmark for JsonMultiExportBenchmark {
-    fn setup(num_threads: i32, path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
+    fn setup(num_threads: usize, path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
         let client = Client::with_uri_str(uri.unwrap_or("mongodb://localhost:27017"))?;
         let db = client.database("perftest");
         db.drop()?;
@@ -38,8 +38,8 @@ impl Benchmark for JsonMultiExportBenchmark {
             }
         };
 
-        for x in 0..TOTAL_FILES {
-            let json_file_name = path.join(format!("ldjson{:03}.txt", x));
+        for i in 0..TOTAL_FILES {
+            let json_file_name = path.join(format!("ldjson{:03}.txt", i));
             let file = File::open(&json_file_name)?;
 
             let mut docs = parse_json_file_to_documents(file)?;
@@ -49,7 +49,7 @@ impl Benchmark for JsonMultiExportBenchmark {
                     Some(doc) => doc,
                     None => break,
                 };
-                doc.insert("file", x);
+                doc.insert("file", i as i32);
                 coll.insert_one(doc, None)?;
             }
         }
@@ -66,8 +66,8 @@ impl Benchmark for JsonMultiExportBenchmark {
         self.coll = self.db.collection("corpus");
         self.coll.drop()?;
 
-        for x in 0..TOTAL_FILES {
-            remove_file(self.path.join(format!("ldjson{:03}.txt", x)))?;
+        for i in 0..TOTAL_FILES {
+            fs::remove_file(self.path.join(format!("ldjson{:03}.txt", i)))?;
         }
 
         Ok(())
@@ -88,18 +88,20 @@ impl Benchmark for JsonMultiExportBenchmark {
             let path_ref = self.path.clone();
 
             let thread = std::thread::spawn(move || {
-                // Note that errors are unwrapped within threads instead of propagated with `?`
+                // Note that errors are unwrapped within threads instead of propagated with `?`.
                 // While we could set up a channel to send errors back to main thread, this is a lot
-                // of work for little gain since we `unwrap()` in main.rs anyway
-                for x in downloaded_files..downloaded_files + num_files {
-                    let file_name = path_ref.join(format!("ldjson{:03}.txt", x));
+                // of work for little gain since we `unwrap()` in main.rs anyway.
+                for i in downloaded_files..downloaded_files + num_files {
+                    let file_name = path_ref.join(format!("ldjson{:03}.txt", i));
                     let mut file = OpenOptions::new()
                         .create(true)
                         .write(true)
                         .open(&file_name)
                         .unwrap();
 
-                    let cursor = coll_ref.find(Some(doc! { "file": x }), None).unwrap();
+                    let cursor = coll_ref
+                        .find(Some(doc! { "file": i as i32 }), None)
+                        .unwrap();
 
                     for doc in cursor {
                         writeln!(file, "{}", doc.unwrap().to_string()).unwrap();

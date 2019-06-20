@@ -15,7 +15,7 @@ pub struct FindManyBenchmark {
 }
 
 impl Benchmark for FindManyBenchmark {
-    fn setup(_num_iter: i32, path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
+    fn setup(num_iter: usize, path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
         let client = Client::with_uri_str(uri.unwrap_or("mongodb://localhost:27017"))?;
         let db = client.database("perftest");
         db.drop()?;
@@ -36,7 +36,7 @@ impl Benchmark for FindManyBenchmark {
         };
 
         let coll = db.collection("corpus");
-        for _ in 0..10000 {
+        for _ in 0..num_iter {
             coll.insert_one(doc.clone(), None)?;
         }
 

@@ -7,12 +7,12 @@ use crate::{bench::Benchmark, error::Result};
 
 pub struct RunCommandBenchmark {
     db: Database,
-    num_iter: i32,
+    num_iter: usize,
     cmd: Document,
 }
 
 impl Benchmark for RunCommandBenchmark {
-    fn setup(num_iter: i32, _path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
+    fn setup(num_iter: usize, _path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
         let client = Client::with_uri_str(uri.unwrap_or("mongodb://localhost:27017"))?;
         let db = client.database("perftest");
         db.drop()?;

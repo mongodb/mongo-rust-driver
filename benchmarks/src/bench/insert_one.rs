@@ -11,13 +11,13 @@ use crate::{
 
 pub struct InsertOneBenchmark {
     db: Database,
-    num_iter: i32,
+    num_iter: usize,
     coll: Collection,
     doc: Document,
 }
 
 impl Benchmark for InsertOneBenchmark {
-    fn setup(num_iter: i32, path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
+    fn setup(num_iter: usize, path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
         let client = Client::with_uri_str(uri.unwrap_or("mongodb://localhost:27017"))?;
         let db = client.database("perftest");
         db.drop()?;

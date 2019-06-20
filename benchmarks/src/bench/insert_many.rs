@@ -16,7 +16,7 @@ pub struct InsertManyBenchmark {
 }
 
 impl Benchmark for InsertManyBenchmark {
-    fn setup(_num_iter: i32, path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
+    fn setup(_num_iter: usize, path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
         let client = Client::with_uri_str(uri.unwrap_or("mongodb://localhost:27017"))?;
         let db = client.database("perftest");
         db.drop()?;
@@ -32,7 +32,7 @@ impl Benchmark for InsertManyBenchmark {
 
         let json: Value = serde_json::from_reader(&mut file)?;
 
-        // TODO: creation of collection not specified until before_task
+        // creation of collection not specified until before_task
         let coll = db.collection("corpus");
 
         Ok(InsertManyBenchmark {

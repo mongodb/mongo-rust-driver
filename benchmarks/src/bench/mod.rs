@@ -18,9 +18,13 @@ use serde_json::Value;
 
 use crate::error::{Error, Result};
 
+const MAX_EXECUTION_TIME: u64 = 300;
+const MIN_EXECUTION_TIME: u64 = 300;
+const MAX_ITERATIONS: usize = 99;
+
 pub trait Benchmark: Sized {
     // execute once before benchmarking
-    fn setup(num_iter_or_threads: i32, path: Option<PathBuf>, uri: Option<&str>) -> Result<Self>;
+    fn setup(num_iter_or_threads: usize, path: Option<PathBuf>, uri: Option<&str>) -> Result<Self>;
 
     // execute at the beginning of every iteration
     fn before_task(&mut self) -> Result<()> {
@@ -53,8 +57,9 @@ pub fn parse_json_file_to_documents(file: File) -> Result<Vec<Document>> {
     Ok(docs)
 }
 
-fn finished(elapsed: u64, iter: usize) -> bool {
-    elapsed >= 300 || (iter >= 99 && elapsed > 60)
+fn finished(duration: Duration, iter: usize) -> bool {
+    let elapsed = duration.as_secs();
+    elapsed >= MAX_EXECUTION_TIME || (iter >= MAX_ITERATIONS && elapsed > MIN_EXECUTION_TIME)
 }
 
 pub fn run_benchmark(mut test: impl Benchmark) -> Result<Vec<Duration>> {
@@ -62,7 +67,7 @@ pub fn run_benchmark(mut test: impl Benchmark) -> Result<Vec<Duration>> {
 
     let benchmark_timer = Instant::now();
     let mut iter = 0;
-    while !finished(benchmark_timer.elapsed().as_secs(), iter) {
+    while !finished(benchmark_timer.elapsed(), iter) {
         let timer = Instant::now();
         test.before_task()?;
         test.do_task()?;

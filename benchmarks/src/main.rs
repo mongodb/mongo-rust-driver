@@ -156,7 +156,7 @@ fn parallel_benchmarks(more_info: bool) -> Result<f64> {
     // LDJSON multi-file import
     let json_multi_import =
         bench::run_benchmark(bench::json_multi_import::JsonMultiImportBenchmark::setup(
-            num_cpus::get() as i32,
+            num_cpus::get(),
             Some(DATA_PATH.join("parallel/ldjson_multi")),
             None,
         )?)?;
@@ -171,7 +171,7 @@ fn parallel_benchmarks(more_info: bool) -> Result<f64> {
     // LDJSON multi-file export
     let json_multi_export =
         bench::run_benchmark(bench::json_multi_export::JsonMultiExportBenchmark::setup(
-            num_cpus::get() as i32,
+            num_cpus::get(),
             Some(DATA_PATH.join("parallel/ldjson_multi")),
             None,
         )?)?;
