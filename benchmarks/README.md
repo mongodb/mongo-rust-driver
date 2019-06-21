@@ -4,15 +4,6 @@ This suite implements the benchmarks described in this (spec)[https://github.com
 
 In order to run the microbenchmarks, first run `etc/microbenchmark-test-data.sh` to download the data.
 
-In order to run specific tests, just specify their names as arguments. If run with no arguments,
-all benchmarks will be run. Also, remember to run in release
-e.g. `cargo run --release BSONBench MultiBench
-
-Full list of options:
-SingleBench
-MultiBench
-ParallelBench
-
 Note: make sure you run both the download script and the microbenchmarks binary from the project root.
 
 See the spec for details on these benchmarks.

@@ -19,7 +19,7 @@ use serde_json::Value;
 use crate::error::{Error, Result};
 
 const MAX_EXECUTION_TIME: u64 = 300;
-const MIN_EXECUTION_TIME: u64 = 300;
+const MIN_EXECUTION_TIME: u64 = 60;
 const MAX_ITERATIONS: usize = 99;
 
 pub trait Benchmark: Sized {

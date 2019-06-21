@@ -9,6 +9,7 @@ use crate::{
 };
 
 const TOTAL_FILES: usize = 100;
+const CHUNK_SIZE: usize = 40000;
 
 pub struct JsonMultiImportBenchmark {
     db: Database,
@@ -23,8 +24,9 @@ impl Benchmark for JsonMultiImportBenchmark {
         let db = client.database("perftest");
         db.drop()?;
 
-        // TODO: creation of collection not specified until before_task
-        let coll = db.collection("corpus");
+        // We need to create a collection in order to populate the field of the InsertManyBenchmark
+        // being returned, so we create a placeholder that gets overwritten in before_task().
+        let coll = db.collection("placeholder");
 
         Ok(JsonMultiImportBenchmark {
             db,
@@ -63,9 +65,9 @@ impl Benchmark for JsonMultiImportBenchmark {
             let path_ref = self.path.clone();
 
             let thread = std::thread::spawn(move || {
-                // Note that errors are unwrapped within threads instead of propagated with `?`
+                // Note that errors are unwrapped within threads instead of propagated with `?`.
                 // While we could set up a channel to send errors back to main thread, this is a lot
-                // of work for little gain since we `unwrap()` in main.rs anyway
+                // of work for little gain since we `unwrap()` in main.rs anyway.
                 let mut docs: Vec<Document> = Vec::new();
 
                 for x in uploaded_files..uploaded_files + num_files {
@@ -78,7 +80,7 @@ impl Benchmark for JsonMultiImportBenchmark {
                 }
 
                 // We can change this to a single `Collection::insert_many` once batching is
-                // implemented in the driver
+                // implemented in the driver TODO RUST-187.
                 let opts = InsertManyOptions::builder().ordered(Some(false)).build();
 
                 let mut doc_chunks: Vec<Vec<Document>> = Vec::new();

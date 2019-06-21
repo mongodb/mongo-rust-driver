@@ -26,8 +26,9 @@ impl Benchmark for JsonMultiExportBenchmark {
         let db = client.database("perftest");
         db.drop()?;
 
-        // TODO: creation of collection not specified until before_task
-        let coll = db.collection("corpus");
+        // We need to create a collection in order to populate the field of the InsertManyBenchmark
+        // being returned, so we create a placeholder that gets overwritten in before_task().
+        let coll = db.collection("placeholder");
 
         let path = match path {
             Some(path) => path,
