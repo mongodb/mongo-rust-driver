@@ -14,7 +14,7 @@ pub struct FindManyBenchmark {
     coll: Collection,
 }
 
-// Specifies the options to a `bench::find_many::setup` operation.
+// Specifies the options to `FindManyBenchmark::setup` operation.
 pub struct Options {
     pub num_iter: usize,
     pub path: PathBuf,
@@ -37,6 +37,8 @@ impl Benchmark for FindManyBenchmark {
             _ => return Err(Error::UnexpectedJson("invalid json test file".to_string())),
         };
 
+        // TODO RUST-187: We can change this to a single `Collection::insert_many` once batching is
+        // implemented in the driver.
         let coll = db.collection("corpus");
         for _ in 0..options.num_iter {
             coll.insert_one(doc.clone(), None)?;

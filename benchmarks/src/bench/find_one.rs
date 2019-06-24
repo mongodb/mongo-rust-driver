@@ -15,7 +15,7 @@ pub struct FindOneBenchmark {
     coll: Collection,
 }
 
-// Specifies the options to a `bench::find_one::setup` operation.
+// Specifies the options to a `FindOneBenchmark::setup` operation.
 pub struct Options {
     pub num_iter: usize,
     pub path: PathBuf,
@@ -53,7 +53,9 @@ impl Benchmark for FindOneBenchmark {
 
     fn do_task(&self) -> Result<()> {
         for i in 0..self.num_iter {
-            let mut cursor = self.coll.find(Some(doc! { "_id": i as i32 }), None)?;
+            let mut cursor = self
+                .coll
+                .find(Some(doc! { "_id": i as i32, "limit" : 1 }), None)?;
             let _doc = cursor.next();
         }
 

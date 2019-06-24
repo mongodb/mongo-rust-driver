@@ -33,7 +33,7 @@ impl Benchmark for JsonMultiImportBenchmark {
         let db = client.database("perftest");
         db.drop()?;
 
-        // We need to create a collection in order to populate the field of the InsertManyBenchmark
+        // We need to create a Collection in order to populate the field of the InsertManyBenchmark
         // being returned, so we create a placeholder that gets overwritten in before_task().
         let coll = db.collection("placeholder");
 
@@ -64,7 +64,7 @@ impl Benchmark for JsonMultiImportBenchmark {
         while uploaded_files < TOTAL_FILES {
             let num_files = std::cmp::min(TOTAL_FILES - uploaded_files, num_each);
             let coll_ref = self.coll.clone();
-            let path_ref = self.path.clone();
+            let path = self.path.clone();
 
             let thread = std::thread::spawn(move || {
                 // Note that errors are unwrapped within threads instead of propagated with `?`.
@@ -73,7 +73,7 @@ impl Benchmark for JsonMultiImportBenchmark {
                 let mut docs: Vec<Document> = Vec::new();
 
                 for x in uploaded_files..uploaded_files + num_files {
-                    let json_file_name = path_ref.join(format!("ldjson{:03}.txt", x));
+                    let json_file_name = path.join(format!("ldjson{:03}.txt", x));
                     let file = File::open(&json_file_name).unwrap();
 
                     let mut new_docs = parse_json_file_to_documents(file).unwrap();
@@ -81,26 +81,18 @@ impl Benchmark for JsonMultiImportBenchmark {
                     docs.append(&mut new_docs);
                 }
 
-                // We can change this to a single `Collection::insert_many` once batching is
-                // implemented in the driver TODO RUST-187.
+                // TODO RUST-187: We can change this to a single `Collection::insert_many` once
+                // batching is implemented in the driver.
                 let opts = InsertManyOptions::builder().ordered(Some(false)).build();
 
-                let mut doc_chunks: Vec<Vec<Document>> = Vec::new();
+                let mut doc_chunks = Vec::new();
                 while docs.len() > CHUNK_SIZE {
                     doc_chunks.push(docs.split_off(CHUNK_SIZE));
                 }
                 doc_chunks.push(docs);
 
-                loop {
-                    coll_ref
-                        .insert_many(
-                            match doc_chunks.pop() {
-                                Some(chunk) => chunk,
-                                None => break,
-                            },
-                            Some(opts.clone()),
-                        )
-                        .unwrap();
+                for chunk in doc_chunks {
+                    coll_ref.insert_many(chunk, Some(opts.clone())).unwrap();
                 }
             });
             threads.push(thread);

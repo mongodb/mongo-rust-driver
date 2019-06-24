@@ -2,17 +2,14 @@
 
 This suite implements the benchmarks described in this (spec)[https://github.com/mongodb/specifications/blob/master/source/benchmarking/benchmarking.rst].
 
-In order to run the microbenchmarks, first run `../etc/microbenchmark-test-data.sh` to download the data. Then run `cargo build --release` to
-build benchmarks in release mode.
+In order to run the microbenchmarks, first run `../etc/microbenchmark-test-data.sh` to download the data. 
 
 Note: make sure you run the download script and the microbenchmarks binary from the benchmark root (the directory containing this README).
 
-See the spec for details on these benchmarks.
-
-To execute all benchmarks, run `./target/release/rust-driver-bench` with a mongod instance running on port 27017 (or, you can specify a custom 
+To execute all benchmarks, run `cargo run --release` with a mongod instance running on port 27017 (or, you can specify a custom 
 connection string by setting the `MONGODB_URI` environment variable).
 
-Run `./target/release/rust-driver-bench --help` to see a full list of testing options.
+Run `cargo run --release -- --help` to see a full list of testing options.
 
 Note that in order to compare against the other drivers, an inMemory mongod instance should be used.
 

@@ -15,7 +15,7 @@ pub struct InsertManyBenchmark {
     doc: Document,
 }
 
-// Specifies the options to a `bench::insert_many::setup` operation.
+// Specifies the options to a `InsertManyBenchmark::setup` operation.
 pub struct Options {
     pub path: PathBuf,
     pub uri: String,
@@ -33,7 +33,7 @@ impl Benchmark for InsertManyBenchmark {
 
         let json: Value = serde_json::from_reader(&mut file)?;
 
-        // We need to create a collection in order to populate the field of the InsertManyBenchmark
+        // We need to create a Collection in order to populate the field of the InsertManyBenchmark
         // being returned, so we create a placeholder that gets overwritten in before_task().
         let coll = db.collection("placeholder");
 

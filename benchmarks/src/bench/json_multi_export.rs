@@ -20,7 +20,7 @@ pub struct JsonMultiExportBenchmark {
     path: PathBuf,
 }
 
-// Specifies the options to a `bench::json_multi_export::setup` operation.
+// Specifies the options to a `JsonMultiExportBenchmark::setup` operation.
 pub struct Options {
     pub num_threads: usize,
     pub path: PathBuf,
@@ -35,7 +35,7 @@ impl Benchmark for JsonMultiExportBenchmark {
         let db = client.database("perftest");
         db.drop()?;
 
-        // We need to create a collection in order to populate the field of the InsertManyBenchmark
+        // We need to create a Collection in order to populate the field of the InsertManyBenchmark
         // being returned, so we create a placeholder that gets overwritten in before_task().
         let coll = db.collection("placeholder");
 
@@ -43,13 +43,9 @@ impl Benchmark for JsonMultiExportBenchmark {
             let json_file_name = options.path.join(format!("ldjson{:03}.txt", i));
             let file = File::open(&json_file_name)?;
 
-            let mut docs = parse_json_file_to_documents(file)?;
+            let docs = parse_json_file_to_documents(file)?;
 
-            loop {
-                let mut doc = match docs.pop() {
-                    Some(doc) => doc,
-                    None => break,
-                };
+            for mut doc in docs {
                 doc.insert("file", i as i32);
                 coll.insert_one(doc, None)?;
             }
@@ -86,14 +82,14 @@ impl Benchmark for JsonMultiExportBenchmark {
         while downloaded_files < TOTAL_FILES {
             let num_files = std::cmp::min(TOTAL_FILES - downloaded_files, num_each);
             let coll_ref = self.coll.clone();
-            let path_ref = self.path.clone();
+            let path = self.path.clone();
 
             let thread = std::thread::spawn(move || {
                 // Note that errors are unwrapped within threads instead of propagated with `?`.
                 // While we could set up a channel to send errors back to main thread, this is a lot
                 // of work for little gain since we `unwrap()` in main.rs anyway.
                 for i in downloaded_files..downloaded_files + num_files {
-                    let file_name = path_ref.join(format!("ldjson{:03}.txt", i));
+                    let file_name = path.join(format!("ldjson{:03}.txt", i));
                     let mut file = OpenOptions::new()
                         .create(true)
                         .write(true)
