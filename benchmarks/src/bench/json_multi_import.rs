@@ -87,7 +87,8 @@ impl Benchmark for JsonMultiImportBenchmark {
 
                 let mut doc_chunks = Vec::new();
                 while docs.len() > CHUNK_SIZE {
-                    doc_chunks.push(docs.split_off(CHUNK_SIZE));
+                    let rest = docs.split_off(CHUNK_SIZE);
+                    doc_chunks.push(std::mem::replace(&mut docs, rest));
                 }
                 doc_chunks.push(docs);
 
