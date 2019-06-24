@@ -5,7 +5,7 @@ use mongodb::{options::InsertManyOptions, Client, Collection, Database};
 
 use crate::{
     bench::{parse_json_file_to_documents, Benchmark},
-    error::{Error, Result},
+    error::Result,
 };
 
 const TOTAL_FILES: usize = 100;
@@ -18,9 +18,18 @@ pub struct JsonMultiImportBenchmark {
     path: PathBuf,
 }
 
+// Specifies the options to a `bench::json_multi_import::setup` operation.
+pub struct Options {
+    pub num_threads: usize,
+    pub path: PathBuf,
+    pub uri: String,
+}
+
 impl Benchmark for JsonMultiImportBenchmark {
-    fn setup(num_threads: usize, path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
-        let client = Client::with_uri_str(uri.unwrap_or("mongodb://localhost:27017"))?;
+    type Options = Options;
+
+    fn setup(options: Self::Options) -> Result<Self> {
+        let client = Client::with_uri_str(&options.uri)?;
         let db = client.database("perftest");
         db.drop()?;
 
@@ -31,15 +40,8 @@ impl Benchmark for JsonMultiImportBenchmark {
         Ok(JsonMultiImportBenchmark {
             db,
             coll,
-            num_threads,
-            path: match path {
-                Some(path) => path,
-                None => {
-                    return Err(Error::UnexpectedJson(
-                        "no test file path provided".to_string(),
-                    ))
-                }
-            },
+            num_threads: options.num_threads,
+            path: options.path,
         })
     }
 

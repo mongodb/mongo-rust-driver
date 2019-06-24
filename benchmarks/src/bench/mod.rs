@@ -9,7 +9,6 @@ pub mod run_command;
 use std::{
     fs::File,
     io::{BufRead, BufReader},
-    path::PathBuf,
     time::{Duration, Instant},
 };
 
@@ -23,8 +22,10 @@ const MIN_EXECUTION_TIME: u64 = 60;
 const MAX_ITERATIONS: usize = 99;
 
 pub trait Benchmark: Sized {
+    type Options;
+
     // execute once before benchmarking
-    fn setup(num_iter_or_threads: usize, path: Option<PathBuf>, uri: Option<&str>) -> Result<Self>;
+    fn setup(options: Self::Options) -> Result<Self>;
 
     // execute at the beginning of every iteration
     fn before_task(&mut self) -> Result<()> {

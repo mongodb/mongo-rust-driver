@@ -8,7 +8,7 @@ use mongodb::{Client, Collection, Database};
 
 use crate::{
     bench::{parse_json_file_to_documents, Benchmark},
-    error::{Error, Result},
+    error::Result,
 };
 
 const TOTAL_FILES: usize = 100;
@@ -20,9 +20,18 @@ pub struct JsonMultiExportBenchmark {
     path: PathBuf,
 }
 
+// Specifies the options to a `bench::json_multi_export::setup` operation.
+pub struct Options {
+    pub num_threads: usize,
+    pub path: PathBuf,
+    pub uri: String,
+}
+
 impl Benchmark for JsonMultiExportBenchmark {
-    fn setup(num_threads: usize, path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
-        let client = Client::with_uri_str(uri.unwrap_or("mongodb://localhost:27017"))?;
+    type Options = Options;
+
+    fn setup(options: Self::Options) -> Result<Self> {
+        let client = Client::with_uri_str(&options.uri)?;
         let db = client.database("perftest");
         db.drop()?;
 
@@ -30,17 +39,8 @@ impl Benchmark for JsonMultiExportBenchmark {
         // being returned, so we create a placeholder that gets overwritten in before_task().
         let coll = db.collection("placeholder");
 
-        let path = match path {
-            Some(path) => path,
-            None => {
-                return Err(Error::UnexpectedJson(
-                    "no test file path provided".to_string(),
-                ))
-            }
-        };
-
         for i in 0..TOTAL_FILES {
-            let json_file_name = path.join(format!("ldjson{:03}.txt", i));
+            let json_file_name = options.path.join(format!("ldjson{:03}.txt", i));
             let file = File::open(&json_file_name)?;
 
             let mut docs = parse_json_file_to_documents(file)?;
@@ -58,8 +58,8 @@ impl Benchmark for JsonMultiExportBenchmark {
         Ok(JsonMultiExportBenchmark {
             db,
             coll,
-            num_threads,
-            path,
+            num_threads: options.num_threads,
+            path: options.path,
         })
     }
 

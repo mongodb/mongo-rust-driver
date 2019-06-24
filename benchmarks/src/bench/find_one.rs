@@ -15,20 +15,22 @@ pub struct FindOneBenchmark {
     coll: Collection,
 }
 
+// Specifies the options to a `bench::find_one::setup` operation.
+pub struct Options {
+    pub num_iter: usize,
+    pub path: PathBuf,
+    pub uri: String,
+}
+
 impl Benchmark for FindOneBenchmark {
-    fn setup(num_iter: usize, path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
-        let client = Client::with_uri_str(uri.unwrap_or("mongodb://localhost:27017"))?;
+    type Options = Options;
+
+    fn setup(options: Self::Options) -> Result<Self> {
+        let client = Client::with_uri_str(&options.uri)?;
         let db = client.database("perftest");
         db.drop()?;
 
-        let mut file = File::open(match path {
-            Some(path) => path,
-            None => {
-                return Err(Error::UnexpectedJson(
-                    "invalid json test file path".to_string(),
-                ))
-            }
-        })?;
+        let mut file = File::open(options.path)?;
 
         let json: Value = serde_json::from_reader(&mut file)?;
         let mut doc = match json.into() {
@@ -37,12 +39,16 @@ impl Benchmark for FindOneBenchmark {
         };
 
         let coll = db.collection("corpus");
-        for i in 0..num_iter {
+        for i in 0..options.num_iter {
             doc.insert("_id", i as i32);
             coll.insert_one(doc.clone(), None)?;
         }
 
-        Ok(FindOneBenchmark { db, num_iter, coll })
+        Ok(FindOneBenchmark {
+            db,
+            num_iter: options.num_iter,
+            coll,
+        })
     }
 
     fn do_task(&self) -> Result<()> {

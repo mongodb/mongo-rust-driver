@@ -16,20 +16,22 @@ pub struct InsertOneBenchmark {
     doc: Document,
 }
 
+// Specifies the options to a `bench::insert_one::setup` operation.
+pub struct Options {
+    pub num_iter: usize,
+    pub path: PathBuf,
+    pub uri: String,
+}
+
 impl Benchmark for InsertOneBenchmark {
-    fn setup(num_iter: usize, path: Option<PathBuf>, uri: Option<&str>) -> Result<Self> {
-        let client = Client::with_uri_str(uri.unwrap_or("mongodb://localhost:27017"))?;
+    type Options = Options;
+
+    fn setup(options: Self::Options) -> Result<Self> {
+        let client = Client::with_uri_str(&options.uri)?;
         let db = client.database("perftest");
         db.drop()?;
 
-        let mut file = File::open(match path {
-            Some(path) => path,
-            None => {
-                return Err(Error::UnexpectedJson(
-                    "invalid json test file path".to_string(),
-                ))
-            }
-        })?;
+        let mut file = File::open(options.path)?;
 
         let json: Value = serde_json::from_reader(&mut file)?;
 
@@ -39,7 +41,7 @@ impl Benchmark for InsertOneBenchmark {
 
         Ok(InsertOneBenchmark {
             db,
-            num_iter,
+            num_iter: options.num_iter,
             coll,
             doc: match json.into() {
                 Bson::Document(doc) => doc,
