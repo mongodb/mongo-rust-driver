@@ -1,6 +1,5 @@
 use std::{fs::File, path::PathBuf};
 
-use bson::Document;
 use mongodb::{options::InsertManyOptions, Client, Collection, Database};
 
 use crate::{
@@ -9,7 +8,7 @@ use crate::{
 };
 
 const TOTAL_FILES: usize = 100;
-const CHUNK_SIZE: usize = 20000;
+const CHUNK_SIZE: usize = 10000;
 
 pub struct JsonMultiImportBenchmark {
     db: Database,
