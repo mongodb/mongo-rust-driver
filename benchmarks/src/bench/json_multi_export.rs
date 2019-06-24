@@ -35,8 +35,9 @@ impl Benchmark for JsonMultiExportBenchmark {
         let db = client.database("perftest");
         db.drop()?;
 
-        // We need to create a Collection in order to populate the field of the InsertManyBenchmark
-        // being returned, so we create a placeholder that gets overwritten in before_task().
+        // We need to create a `Collection` in order to populate the field of the
+        // InsertManyBenchmark being returned, so we create a placeholder that gets
+        // overwritten in before_task().
         let coll = db.collection("placeholder");
 
         for i in 0..TOTAL_FILES {

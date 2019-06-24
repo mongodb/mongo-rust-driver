@@ -9,7 +9,7 @@ use crate::{
 };
 
 const TOTAL_FILES: usize = 100;
-const CHUNK_SIZE: usize = 40000;
+const CHUNK_SIZE: usize = 20000;
 
 pub struct JsonMultiImportBenchmark {
     db: Database,
@@ -18,7 +18,7 @@ pub struct JsonMultiImportBenchmark {
     path: PathBuf,
 }
 
-// Specifies the options to a `bench::json_multi_import::setup` operation.
+// Specifies the options to a `JsonMultiImportBenchmark::setup` operation.
 pub struct Options {
     pub num_threads: usize,
     pub path: PathBuf,
@@ -33,8 +33,9 @@ impl Benchmark for JsonMultiImportBenchmark {
         let db = client.database("perftest");
         db.drop()?;
 
-        // We need to create a Collection in order to populate the field of the InsertManyBenchmark
-        // being returned, so we create a placeholder that gets overwritten in before_task().
+        // We need to create a `Collection` in order to populate the field of the
+        // InsertManyBenchmark being returned, so we create a placeholder that gets
+        // overwritten in before_task().
         let coll = db.collection("placeholder");
 
         Ok(JsonMultiImportBenchmark {
@@ -70,7 +71,7 @@ impl Benchmark for JsonMultiImportBenchmark {
                 // Note that errors are unwrapped within threads instead of propagated with `?`.
                 // While we could set up a channel to send errors back to main thread, this is a lot
                 // of work for little gain since we `unwrap()` in main.rs anyway.
-                let mut docs: Vec<Document> = Vec::new();
+                let mut docs = Vec::new();
 
                 for x in uploaded_files..uploaded_files + num_files {
                     let json_file_name = path.join(format!("ldjson{:03}.txt", x));

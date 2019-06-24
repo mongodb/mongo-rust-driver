@@ -33,8 +33,9 @@ impl Benchmark for InsertManyBenchmark {
 
         let json: Value = serde_json::from_reader(&mut file)?;
 
-        // We need to create a Collection in order to populate the field of the InsertManyBenchmark
-        // being returned, so we create a placeholder that gets overwritten in before_task().
+        // We need to create a `Collection` in order to populate the field of the
+        // InsertManyBenchmark being returned, so we create a placeholder that gets
+        // overwritten in before_task().
         let coll = db.collection("placeholder");
 
         Ok(InsertManyBenchmark {
