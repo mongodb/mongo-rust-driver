@@ -11,12 +11,14 @@ use crate::{
 
 pub struct InsertManyBenchmark {
     db: Database,
+    num_copies: usize,
     coll: Collection,
     doc: Document,
 }
 
 // Specifies the options to a `InsertManyBenchmark::setup` operation.
 pub struct Options {
+    pub num_copies: usize,
     pub path: PathBuf,
     pub uri: String,
 }
@@ -40,6 +42,7 @@ impl Benchmark for InsertManyBenchmark {
 
         Ok(InsertManyBenchmark {
             db,
+            num_copies: options.num_copies,
             coll,
             doc: match json.into() {
                 Bson::Document(doc) => doc,
@@ -56,7 +59,7 @@ impl Benchmark for InsertManyBenchmark {
     }
 
     fn do_task(&self) -> Result<()> {
-        let insertions = vec![self.doc.clone(); 10000];
+        let insertions = vec![self.doc.clone(); self.num_copies];
         self.coll.insert_many(insertions, None)?;
 
         Ok(())

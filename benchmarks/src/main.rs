@@ -66,6 +66,7 @@ fn score_test(durations: Vec<Duration>, name: &str, task_size: f64, more_info: b
 }
 
 fn single_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
+    println!("----------------------------");
     println!("Single-Doc Benchmarks:");
     println!("----------------------------");
 
@@ -121,6 +122,7 @@ fn single_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
 }
 
 fn multi_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
+    println!("----------------------------");
     println!("Multi-Doc Benchmarks:");
     println!("----------------------------");
 
@@ -145,6 +147,7 @@ fn multi_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
 
     // Small doc bulk insert
     let small_insert_many_options = bench::insert_many::Options {
+        num_copies: 10000,
         path: DATA_PATH.join("single_and_multi_document/small_doc.json"),
         uri: uri.to_string(),
     };
@@ -156,6 +159,7 @@ fn multi_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
 
     // Large doc bulk insert
     let large_insert_many_options = bench::insert_many::Options {
+        num_copies: 10,
         path: DATA_PATH.join("single_and_multi_document/large_doc.json"),
         uri: uri.to_string(),
     };
@@ -169,6 +173,7 @@ fn multi_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
 }
 
 fn parallel_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
+    println!("----------------------------");
     println!("Parallel Benchmarks:");
     println!("----------------------------");
 
