@@ -72,8 +72,8 @@ impl Benchmark for JsonMultiImportBenchmark {
                 // of work for little gain since we `unwrap()` in main.rs anyway.
                 let mut docs = Vec::new();
 
-                for x in uploaded_files..uploaded_files + num_files {
-                    let json_file_name = path.join(format!("ldjson{:03}.txt", x));
+                for i in uploaded_files..uploaded_files + num_files {
+                    let json_file_name = path.join(format!("ldjson{:03}.txt", i));
                     let file = File::open(&json_file_name).unwrap();
 
                     let mut new_docs = parse_json_file_to_documents(file).unwrap();
