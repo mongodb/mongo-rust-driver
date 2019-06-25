@@ -1,5 +1,5 @@
 use bson::{Bson, Document};
-use mongodb::options::IndexModel;
+use mongodb::{collation::Collation, options::IndexModel};
 
 #[derive(Debug, Deserialize)]
 struct ListIndexesEntry {
@@ -118,4 +118,66 @@ fn index_management() {
         format!("{}.{}", function_name!(), function_name!())
     );
     assert_eq!(listed_indexes[3].unique, Some(true));
+}
+
+/// This tests that creating two indexes with the same keys but different collations succeeds, and
+/// that the indexes can be deleted separately.
+#[test]
+#[function_name]
+fn test_create_index_collation() {
+    let db = crate::get_db(function_name!());
+    let coll = db.collection(function_name!());
+
+    coll.drop().unwrap();
+    db.create_collection(function_name!(), None).unwrap();
+
+    let keys = doc! { "x": 1 };
+    let collation1 = bson::to_bson(&Collation {
+        locale: "af".to_string(),
+        ..Default::default()
+    })
+    .unwrap();
+
+    let name = "named";
+    let collation2 = bson::to_bson(&Collation {
+        locale: "sq".to_string(),
+        ..Default::default()
+    })
+    .unwrap();
+
+    coll.create_index(IndexModel {
+        keys: keys.clone(),
+        options: Some(doc! { "collation": collation1}),
+    })
+    .unwrap();
+
+    coll.create_index(IndexModel {
+        keys: keys.clone(),
+        options: Some(doc! {"name": name, "collation": collation2}),
+    })
+    .unwrap();
+
+    assert!(coll.drop_index(name).is_ok());
+
+    let listed_indexes: Vec<ListIndexesEntry> = coll
+        .list_indexes()
+        .unwrap()
+        .map(|doc| bson::from_bson(Bson::Document(doc.unwrap())).unwrap())
+        .collect();
+
+    assert_eq!(
+        listed_indexes
+            .iter()
+            .filter(|index| index.name == name)
+            .count(),
+        0
+    );
+
+    assert_eq!(
+        listed_indexes
+            .iter()
+            .filter(|index| index.key == keys)
+            .count(),
+        1
+    );
 }

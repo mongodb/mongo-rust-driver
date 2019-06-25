@@ -1,5 +1,5 @@
 use bson::{Bson, Document};
-use mongodb::options::UpdateOptions;
+use mongodb::{collation::Collation, options::UpdateOptions};
 
 use super::{Outcome, TestFile};
 
@@ -10,6 +10,7 @@ struct Arguments {
     pub update: Document,
     pub upsert: Option<bool>,
     pub array_filters: Option<Vec<Document>>,
+    pub collation: Option<Collation>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -26,7 +27,7 @@ fn run_update_one_test(test_file: TestFile) {
     let data = test_file.data;
 
     for mut test_case in test_file.tests {
-        if test_case.operation.name != "updateOne" || test_case.description.contains("collation") {
+        if test_case.operation.name != "updateOne" {
             continue;
         }
 
@@ -52,6 +53,7 @@ fn run_update_one_test(test_file: TestFile) {
         let options = UpdateOptions {
             upsert: arguments.upsert,
             array_filters: arguments.array_filters,
+            collation: arguments.collation,
             ..Default::default()
         };
 

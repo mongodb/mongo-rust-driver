@@ -1,5 +1,5 @@
 use bson::{Bson, Document};
-use mongodb::options::CountOptions;
+use mongodb::{collation::Collation, options::CountOptions};
 
 use super::{Outcome, TestFile};
 
@@ -8,6 +8,7 @@ struct Arguments {
     pub filter: Option<Document>,
     pub skip: Option<i64>,
     pub limit: Option<i64>,
+    pub collation: Option<Collation>,
 }
 
 #[function_name]
@@ -18,10 +19,7 @@ fn run_count_test(test_file: TestFile) {
         let lower_description = test_case.description.to_lowercase();
 
         // old `count` not implemented, collation not implemented
-        if !lower_description.contains("count")
-            || lower_description.contains("collation")
-            || lower_description.contains("deprecated")
-        {
+        if !lower_description.contains("count") || lower_description.contains("deprecated") {
             continue;
         }
 
@@ -49,6 +47,7 @@ fn run_count_test(test_file: TestFile) {
                 let options = CountOptions::builder()
                     .skip(arguments.skip)
                     .limit(arguments.limit)
+                    .collation(arguments.collation)
                     .build();
                 coll.count_documents(arguments.filter, Some(options))
             }

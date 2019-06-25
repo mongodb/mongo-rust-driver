@@ -1,12 +1,14 @@
 use bson::{Bson, Document};
 
 use super::{Outcome, TestFile};
+use mongodb::{collation::Collation, options::DistinctOptions};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Arguments {
     pub filter: Option<Document>,
     pub field_name: String,
+    pub collation: Option<Collation>,
 }
 
 #[function_name]
@@ -14,7 +16,7 @@ fn run_distinct_test(test_file: TestFile) {
     let data = test_file.data;
 
     for mut test_case in test_file.tests {
-        if test_case.operation.name != "distinct" || test_case.description.contains("collation") {
+        if test_case.operation.name != "distinct" {
             continue;
         }
 
@@ -37,8 +39,13 @@ fn run_distinct_test(test_file: TestFile) {
             }
         }
 
+        let opts = DistinctOptions {
+            collation: arguments.collation,
+            ..Default::default()
+        };
+
         let result = coll
-            .distinct(&arguments.field_name, arguments.filter, None)
+            .distinct(&arguments.field_name, arguments.filter, Some(opts))
             .expect(&test_case.description);
         assert_eq!(result, outcome.result, "{}", test_case.description);
     }

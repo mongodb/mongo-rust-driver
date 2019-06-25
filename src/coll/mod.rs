@@ -231,6 +231,12 @@ impl Collection {
                     .get_or_insert_with(Default::default)
                     .max_time = Some(max_time);
             }
+
+            if let Some(collation) = options.collation {
+                aggregate_options
+                    .get_or_insert_with(Default::default)
+                    .collation = Some(collation);
+            }
         }
 
         pipeline.push(doc! {
@@ -298,6 +304,10 @@ impl Collection {
             if let Some(max_time) = opts.max_time {
                 command_doc.insert("maxTimeMS", max_time.subsec_millis());
             }
+
+            if let Some(collation) = opts.collation {
+                command_doc.insert("collation", bson::to_bson(&collation)?);
+            }
         }
 
         if let Some(ref read_concern) = self.inner.read_concern {
@@ -346,6 +356,10 @@ impl Collection {
             if let Some(sort) = opts.sort {
                 command_doc.insert("sort", sort);
             }
+
+            if let Some(collation) = opts.collation {
+                command_doc.insert("collation", bson::to_bson(&collation)?);
+            }
         }
         self.find_and_modify_command(command_doc, "delete")
     }
@@ -389,6 +403,10 @@ impl Collection {
 
             if let Some(upsert) = opts.upsert {
                 command_doc.insert("upsert", upsert);
+            }
+
+            if let Some(collation) = opts.collation {
+                command_doc.insert("collation", bson::to_bson(&collation)?);
             }
         }
 
@@ -438,6 +456,10 @@ impl Collection {
 
             if let Some(upsert) = opts.upsert {
                 command_doc.insert("upsert", upsert);
+            }
+
+            if let Some(collation) = opts.collation {
+                command_doc.insert("collation", bson::to_bson(&collation)?);
             }
         }
 
@@ -641,10 +663,10 @@ impl Collection {
     fn delete_command(
         &self,
         query: Document,
-        _options: Option<DeleteOptions>,
+        options: Option<DeleteOptions>,
         multi: bool,
     ) -> Result<DeleteResult> {
-        let delete_doc = doc! {
+        let mut delete_doc = doc! {
             "q": query,
             "limit": if multi { 0 } else { 1 },
         };
@@ -653,7 +675,11 @@ impl Collection {
             "delete": &self.inner.name,
         };
 
-        // TODO: When we implement the collation spec, we need to process the options here.
+        if let Some(opts) = options {
+            if let Some(collation) = opts.collation {
+                delete_doc.insert("collation", bson::to_bson(&collation)?);
+            }
+        }
 
         command_doc.insert(
             "deletes",
@@ -779,6 +805,10 @@ impl Collection {
                     command_doc.insert("singleBatch", true);
                 }
             }
+
+            if let Some(collation) = opts.collation {
+                command_doc.insert("collation", bson::to_bson(&collation)?);
+            }
         }
 
         if let Some(ref read_concern) = self.inner.read_concern {
@@ -853,6 +883,10 @@ impl Collection {
             if let Some(bypass_document_validation) = option.bypass_document_validation {
                 command_doc.insert("bypassDocumentValidation", bypass_document_validation);
             }
+
+            if let Some(collation) = option.collation {
+                update_doc.insert("collation", bson::to_bson(&collation)?);
+            }
         }
 
         command_doc.insert(
@@ -897,6 +931,10 @@ impl Collection {
 
             if let Some(bypass_document_validation) = option.bypass_document_validation {
                 command_doc.insert("bypassDocumentValidation", bypass_document_validation);
+            }
+
+            if let Some(collation) = option.collation {
+                update_doc.insert("collation", bson::to_bson(&collation)?);
             }
         }
 

@@ -1,7 +1,10 @@
 use std::cmp;
 
 use bson::{Bson, Document};
-use mongodb::options::{FindOneAndReplaceOptions, ReturnDocument};
+use mongodb::{
+    collation::Collation,
+    options::{FindOneAndReplaceOptions, ReturnDocument},
+};
 
 use super::{Outcome, TestFile};
 
@@ -15,6 +18,7 @@ struct Arguments {
     pub return_document: Option<String>,
     pub sort: Option<Document>,
     pub upsert: Option<bool>,
+    pub collation: Option<Collation>,
 }
 
 #[function_name]
@@ -22,9 +26,7 @@ fn run_find_one_and_replace_test(test_file: TestFile) {
     let data = test_file.data;
 
     for mut test_case in test_file.tests {
-        if test_case.operation.name != "findOneAndReplace"
-            || test_case.description.contains("collation")
-        {
+        if test_case.operation.name != "findOneAndReplace" {
             continue;
         }
 
@@ -58,6 +60,7 @@ fn run_find_one_and_replace_test(test_file: TestFile) {
             return_document: new,
             sort: arguments.sort,
             upsert: arguments.upsert,
+            collation: arguments.collation,
             ..Default::default()
         };
 

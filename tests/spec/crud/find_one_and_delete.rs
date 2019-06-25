@@ -1,5 +1,5 @@
 use bson::{Bson, Document};
-use mongodb::options::FindOneAndDeleteOptions;
+use mongodb::{collation::Collation, options::FindOneAndDeleteOptions};
 
 use super::{Outcome, TestFile};
 
@@ -9,6 +9,7 @@ struct Arguments {
     pub filter: Document,
     pub projection: Option<Document>,
     pub sort: Option<Document>,
+    pub collation: Option<Collation>,
 }
 
 #[function_name]
@@ -16,9 +17,7 @@ fn run_find_one_and_delete_test(test_file: TestFile) {
     let data = test_file.data;
 
     for mut test_case in test_file.tests {
-        if test_case.operation.name != "findOneAndDelete"
-            || test_case.description.contains("collation")
-        {
+        if test_case.operation.name != "findOneAndDelete" {
             continue;
         }
 
@@ -44,6 +43,7 @@ fn run_find_one_and_delete_test(test_file: TestFile) {
         let options = FindOneAndDeleteOptions {
             projection: arguments.projection,
             sort: arguments.sort,
+            collation: arguments.collation,
             ..Default::default()
         };
 

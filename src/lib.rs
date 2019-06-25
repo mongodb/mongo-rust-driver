@@ -63,6 +63,7 @@ pub mod read_preference;
 mod bson_util;
 mod client;
 mod coll;
+pub mod collation;
 mod command_responses;
 pub mod concern;
 mod cursor;

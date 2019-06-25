@@ -25,7 +25,7 @@ fn run_insert_many_test(test_file: TestFile) {
     let data = test_file.data;
 
     for test_case in test_file.tests {
-        if test_case.operation.name != "insertMany" || test_case.description.contains("collation") {
+        if test_case.operation.name != "insertMany" {
             continue;
         }
 

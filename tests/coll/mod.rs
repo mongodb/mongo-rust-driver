@@ -73,6 +73,7 @@ fn update() {
         array_filters: None,
         bypass_document_validation: None,
         upsert: Some(true),
+        collation: None,
     };
     let upsert_results = coll
         .update_one(doc! {"b": 7}, doc! {"$set": { "b": 7 }}, Some(options))

@@ -1,5 +1,5 @@
 use bson::{Bson, Document};
-use mongodb::options::AggregateOptions;
+use mongodb::{collation::Collation, options::AggregateOptions};
 
 use super::{Outcome, TestFile};
 
@@ -8,6 +8,7 @@ use super::{Outcome, TestFile};
 struct Arguments {
     pub pipeline: Vec<Document>,
     pub batch_size: Option<i32>,
+    pub collation: Option<Collation>,
 }
 
 #[function_name]
@@ -15,7 +16,7 @@ fn run_aggregate_test(test_file: TestFile) {
     let data = test_file.data;
 
     for mut test_case in test_file.tests {
-        if test_case.operation.name != "aggregate" || test_case.description.contains("collation") {
+        if test_case.operation.name != "aggregate" {
             continue;
         }
 
@@ -40,6 +41,7 @@ fn run_aggregate_test(test_file: TestFile) {
 
         let options = AggregateOptions {
             batch_size: arguments.batch_size,
+            collation: arguments.collation,
             ..Default::default()
         };
 
