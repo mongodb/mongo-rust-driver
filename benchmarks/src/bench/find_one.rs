@@ -1,7 +1,7 @@
 use std::{fs::File, path::PathBuf};
 
 use bson::Bson;
-use mongodb::{Client, Collection, Database};
+use mongodb::{options::FindOptions, Client, Collection, Database};
 use serde_json::Value;
 
 use crate::{
@@ -53,9 +53,10 @@ impl Benchmark for FindOneBenchmark {
 
     fn do_task(&self) -> Result<()> {
         for i in 0..self.num_iter {
+            let find_options = FindOptions::builder().limit(Some(1)).build();
             let mut cursor = self
                 .coll
-                .find(Some(doc! { "_id": i as i32, "limit" : 1 }), None)?;
+                .find(Some(doc! { "_id": i as i32 }), Some(find_options))?;
             let _doc = cursor.next();
         }
 
