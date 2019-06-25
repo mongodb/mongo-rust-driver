@@ -146,3 +146,63 @@ fn aggregate_out() {
         .into_iter()
         .any(|name| name.as_str() == out_coll.name()));
 }
+
+#[test]
+#[function_name]
+fn large_insert() {
+    #[allow(clippy::unreadable_literal)]
+    let doc = doc! {
+        "text": "@wildfits you're not getting one.....",
+        "in_reply_to_status_id": 22773233453i64,
+        "retweet_count": Bson::Null,
+        "contributors": Bson::Null,
+        "created_at": "Thu Sep 02 19:38:18 +0000 2010",
+        "geo": Bson::Null,
+        "source": "web",
+        "coordinates": Bson::Null,
+        "in_reply_to_screen_name": "wildfits",
+        "truncated": false,
+        "entities": {
+            "user_mentions": [
+                {
+                    "indices": [
+                        0,
+                        9
+                    ],
+                    "screen_name": "wildfits",
+                    "name": "Mairin Goetzinger",
+                    "id": 41832464
+                }
+            ],
+            "urls": [],
+            "hashtags": []
+        },
+        "retweeted": false,
+        "place": Bson::Null,
+        "user": {
+            "friends_count": 179,
+            "profile_sidebar_fill_color": "7a7a7a",
+            "location": "Minneapols, MN/Brookings SD",
+            "verified": false,
+            "follow_request_sent": Bson::Null,
+            "favourites_count": 0,
+            "profile_sidebar_border_color": "a3a3a3",
+            "profile_image_url": "http://a1.twimg.com/profile_images/1110614677/Screen_shot_2010-08-25_at_10.12.40_AM_normal.png",
+            "geo_enabled": false,
+            "created_at": "Sun Aug 17 00:23:13 +0000 2008",
+            "description": "graphic designer + foodie, with a love of music, movies, running, design, + the outdoors!",
+            "time_zone": "Mountain Time (US & Canada)",
+            "url": "http://jessiefarris.com/",
+            "screen_name": "jessiekf",
+            "notifications": Bson::Null,
+            "profile_background_color": "303030",
+            "listed_count": 1,
+            "lang": "en"
+        }
+    };
+
+    let docs = vec![doc; 35000];
+
+    let coll = crate::init_db_and_coll(function_name!(), function_name!());
+    coll.insert_many(docs, None).unwrap();
+}

@@ -13,7 +13,7 @@ use crate::{
         UpdateCommandResponse,
     },
     concern::{ReadConcern, WriteConcern},
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     read_preference::ReadPreference,
     results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
     Client, Cursor, Database,
@@ -64,6 +64,8 @@ struct CollectionInner {
     read_concern: Option<ReadConcern>,
     write_concern: Option<WriteConcern>,
 }
+
+const MAX_INSERT_DOCS_BYTES: usize = 16 * 1000 * 1000;
 
 impl Collection {
     pub(crate) fn new(db: Database, name: &str, options: Option<CollectionOptions>) -> Self {
@@ -458,7 +460,7 @@ impl Collection {
             .collect();
         let options = options.unwrap_or_default();
 
-        let _ = self.insert_command(docs, options.bypass_document_validation, options.ordered);
+        self.insert_command(docs, options.bypass_document_validation, options.ordered)?;
         Ok(InsertManyResult { inserted_ids })
     }
 
@@ -819,7 +821,60 @@ impl Collection {
             command_doc.insert("writeConcern", write_concern.clone().into_document()?);
         }
 
-        let _ = self.run_write_command(command_doc)?;
+        if bson_util::doc_size_bytes(&command_doc) > MAX_INSERT_DOCS_BYTES {
+            return self.insert_in_batches(command_doc);
+        }
+
+        self.run_write_command_with_error_check(command_doc)?;
+        Ok(())
+    }
+
+    fn insert_in_batches(&self, command_doc: Document) -> Result<()> {
+        let mut command_docs = vec![command_doc];
+
+        while bson_util::size_bytes(command_docs[0].get("documents").unwrap())
+            > MAX_INSERT_DOCS_BYTES
+        {
+            command_docs = command_docs
+                .into_iter()
+                .fold(Vec::new(), |mut all, mut doc| {
+                    let mut docs = match doc.remove("documents").unwrap() {
+                        Bson::Array(arr) => arr,
+                        _ => unreachable!(),
+                    };
+
+                    let middle = if docs.len() % 2 == 1 {
+                        docs.len() / 2 + 1
+                    } else {
+                        docs.len() / 2
+                    };
+
+                    let rest = docs.split_off(middle);
+                    let mut second_doc = doc.clone();
+
+                    doc.insert("documents", docs);
+                    second_doc.insert("documents", rest);
+
+                    all.push(doc);
+                    all.push(second_doc);
+                    all
+                });
+        }
+
+        for command_doc in command_docs {
+            self.run_write_command_with_error_check(command_doc)?;
+        }
+
+        Ok(())
+    }
+
+    fn run_write_command_with_error_check(&self, command_doc: Document) -> Result<()> {
+        if let Ok((_, document)) = self.run_write_command(command_doc) {
+            if let Some(error) = Error::from_command_response(document) {
+                return Err(error);
+            }
+        }
+
         Ok(())
     }
 

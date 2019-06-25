@@ -378,7 +378,7 @@ impl Database {
 
     /// Runs a database-level command.
     ///
-    /// Note that no inspectio is done on `doc`, so the command will not use the database's default
+    /// Note that no inspection is done on `doc`, so the command will not use the database's default
     /// read concern or write concern. If a specific read concern or write concern is desired, it
     /// must be specified manually.
     pub fn run_command(
