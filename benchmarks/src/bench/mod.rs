@@ -76,11 +76,11 @@ pub fn run_benchmark(mut test: impl Benchmark) -> Result<Vec<Duration>> {
     let benchmark_timer = Instant::now();
     let mut iter = 0;
     while !finished(benchmark_timer.elapsed(), iter) {
-        let timer = Instant::now();
         test.before_task()?;
+        let timer = Instant::now();
         test.do_task()?;
-        test.after_task()?;
         test_durations.push(timer.elapsed());
+        test.after_task()?;
 
         iter += 1;
     }
