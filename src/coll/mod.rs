@@ -804,9 +804,15 @@ impl Collection {
         bypass_document_validation: Option<bool>,
         ordered: Option<bool>,
     ) -> Result<()> {
+        let docs: Vec<_> = docs.into_iter().map(Bson::Document).collect();
+
+        if docs.is_empty() {
+            return Ok(());
+        }
+
         let mut command_doc = doc! {
             "insert": &self.inner.name,
-            "documents": Bson::Array(docs.into_iter().map(Bson::Document).collect()),
+            "documents": Bson::Array(docs),
         };
 
         if let Some(val) = bypass_document_validation {
