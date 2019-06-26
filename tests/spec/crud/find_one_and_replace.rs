@@ -1,7 +1,7 @@
 use std::cmp;
 
 use bson::{Bson, Document};
-use mongodb::options::{FindOneAndReplaceOptions, ReturnDocument, collation::Collation};
+use mongodb::options::{collation::Collation, FindOneAndReplaceOptions, ReturnDocument};
 
 use super::{Outcome, TestFile};
 

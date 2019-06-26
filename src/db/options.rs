@@ -1,8 +1,8 @@
 use bson::Document;
 
 use crate::{
-    options::collation::Collation,
     concern::{ReadConcern, WriteConcern},
+    options::collation::Collation,
     read_preference::ReadPreference,
 };
 
