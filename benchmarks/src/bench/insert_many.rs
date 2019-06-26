@@ -5,7 +5,7 @@ use mongodb::{Client, Collection, Database};
 use serde_json::Value;
 
 use crate::{
-    bench::Benchmark,
+    bench::{Benchmark, COLL_NAME, DATABASE_NAME},
     error::{Error, Result},
 };
 
@@ -28,7 +28,7 @@ impl Benchmark for InsertManyBenchmark {
 
     fn setup(options: Self::Options) -> Result<Self> {
         let client = Client::with_uri_str(&options.uri)?;
-        let db = client.database("perftest");
+        let db = client.database(&DATABASE_NAME);
         db.drop()?;
 
         let mut file = File::open(options.path)?;
@@ -52,7 +52,8 @@ impl Benchmark for InsertManyBenchmark {
     }
 
     fn before_task(&mut self) -> Result<()> {
-        self.coll = self.db.collection("corpus");
+        self.db.create_collection(&COLL_NAME, None)?;
+        self.coll = self.db.collection(&COLL_NAME);
         self.coll.drop()?;
 
         Ok(())

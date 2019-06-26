@@ -1,7 +1,10 @@
 use bson::Document;
 use mongodb::{Client, Database};
 
-use crate::{bench::Benchmark, error::Result};
+use crate::{
+    bench::{Benchmark, DATABASE_NAME},
+    error::Result,
+};
 
 pub struct RunCommandBenchmark {
     db: Database,
@@ -19,7 +22,7 @@ impl Benchmark for RunCommandBenchmark {
 
     fn setup(options: Self::Options) -> Result<Self> {
         let client = Client::with_uri_str(&options.uri)?;
-        let db = client.database("perftest");
+        let db = client.database(&DATABASE_NAME);
         db.drop()?;
 
         Ok(RunCommandBenchmark {

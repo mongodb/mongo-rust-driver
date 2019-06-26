@@ -20,45 +20,46 @@ lazy_static! {
     static ref DATA_PATH: PathBuf = Path::new(env!("CARGO_MANIFEST_DIR")).join("data");
 }
 
-fn score_test(durations: Vec<Duration>, name: &str, task_size: f64, more_info: bool) -> f64 {
-    let dur_len: f64 = durations.len() as f64;
+fn get_nth_percentile(durations: Vec<Duration>, n: f64) -> Duration {
+    durations[(durations.len() as f64 * n / 100.0) as usize - 1]
+}
 
-    let score: f64 =
-        durations[(dur_len * 50.0 / 100.0) as usize - 1].as_millis() as f64 / task_size;
+fn score_test(durations: Vec<Duration>, name: &str, task_size: f64, more_info: bool) -> f64 {
+    let score: f64 = get_nth_percentile(durations.clone(), 50.0).as_millis() as f64 / task_size;
 
     println!("TEST: {} -- Score: {}", name, score);
     if more_info {
         println!(
             "10th percentile: {:#?}",
-            durations[(dur_len * 10.0 / 100.0) as usize - 1]
+            get_nth_percentile(durations.clone(), 10.0),
         );
         println!(
             "25th percentile: {:#?}",
-            durations[(dur_len * 25.0 / 100.0) as usize - 1]
+            get_nth_percentile(durations.clone(), 25.0),
         );
         println!(
             "50th percentile: {:#?}",
-            durations[(dur_len * 50.0 / 100.0) as usize - 1]
+            get_nth_percentile(durations.clone(), 50.0),
         );
         println!(
             "75th percentile: {:#?}",
-            durations[(dur_len * 75.0 / 100.0) as usize - 1]
+            get_nth_percentile(durations.clone(), 75.0),
         );
         println!(
             "90th percentile: {:#?}",
-            durations[(dur_len * 90.0 / 100.0) as usize - 1]
+            get_nth_percentile(durations.clone(), 90.0),
         );
         println!(
             "95th percentile: {:#?}",
-            durations[(dur_len * 95.0 / 100.0) as usize - 1]
+            get_nth_percentile(durations.clone(), 95.0),
         );
         println!(
             "98th percentile: {:#?}",
-            durations[(dur_len * 98.0 / 100.0) as usize - 1]
+            get_nth_percentile(durations.clone(), 98.0),
         );
         println!(
             "99th percentile: {:#?}",
-            durations[(dur_len * 99.0 / 100.0) as usize - 1]
+            get_nth_percentile(durations.clone(), 99.0),
         );
     }
 

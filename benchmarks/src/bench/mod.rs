@@ -17,6 +17,13 @@ use serde_json::Value;
 
 use crate::error::{Error, Result};
 
+lazy_static! {
+    static ref DATABASE_NAME: String = option_env!("DATABASE_NAME")
+        .unwrap_or("perftest")
+        .to_string();
+    static ref COLL_NAME: String = option_env!("COLL_NAME").unwrap_or("corpus").to_string();
+}
+
 const MAX_EXECUTION_TIME: u64 = 300;
 const MIN_EXECUTION_TIME: u64 = 60;
 const MAX_ITERATIONS: usize = 99;

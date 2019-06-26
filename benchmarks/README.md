@@ -7,7 +7,8 @@ In order to run the microbenchmarks, first run `../etc/microbenchmark-test-data.
 Note: make sure you run the download script and the microbenchmarks binary from the benchmark root (the directory containing this README).
 
 To execute all benchmarks, run `cargo run --release` with a mongod instance running on port 27017 (or, you can specify a custom 
-connection string by setting the `MONGODB_URI` environment variable).
+connection string by setting the `MONGODB_URI` environment variable). You can specify a custom name for the used database or 
+collection by setting the `DATABASE_NAME` or `COLL_NAME` environment variables respectively.
 
 Run `cargo run --release -- --help` to see a full list of testing options.
 

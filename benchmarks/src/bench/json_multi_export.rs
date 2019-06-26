@@ -1,5 +1,6 @@
 use std::{
-    fs::{self, File, OpenOptions},
+    env,
+    fs::{File, OpenOptions},
     io::Write,
     path::PathBuf,
 };
@@ -7,7 +8,7 @@ use std::{
 use mongodb::{Client, Collection, Database};
 
 use crate::{
-    bench::{parse_json_file_to_documents, Benchmark},
+    bench::{parse_json_file_to_documents, Benchmark, COLL_NAME, DATABASE_NAME},
     error::Result,
 };
 
@@ -17,7 +18,6 @@ pub struct JsonMultiExportBenchmark {
     db: Database,
     coll: Collection,
     num_threads: usize,
-    path: PathBuf,
 }
 
 // Specifies the options to a `JsonMultiExportBenchmark::setup` operation.
@@ -32,13 +32,10 @@ impl Benchmark for JsonMultiExportBenchmark {
 
     fn setup(options: Self::Options) -> Result<Self> {
         let client = Client::with_uri_str(&options.uri)?;
-        let db = client.database("perftest");
+        let db = client.database(&DATABASE_NAME);
         db.drop()?;
 
-        // We need to create a `Collection` in order to populate the field of the
-        // InsertManyBenchmark being returned, so we create a placeholder that gets
-        // overwritten in before_task().
-        let coll = db.collection("placeholder");
+        let coll = db.collection(&COLL_NAME);
 
         for i in 0..TOTAL_FILES {
             let json_file_name = options.path.join(format!("ldjson{:03}.txt", i));
@@ -56,17 +53,12 @@ impl Benchmark for JsonMultiExportBenchmark {
             db,
             coll,
             num_threads: options.num_threads,
-            path: options.path,
         })
     }
 
     fn before_task(&mut self) -> Result<()> {
-        self.coll = self.db.collection("corpus");
+        self.coll = self.db.collection(&COLL_NAME);
         self.coll.drop()?;
-
-        for i in 0..TOTAL_FILES {
-            fs::remove_file(self.path.join(format!("ldjson{:03}.txt", i)))?;
-        }
 
         Ok(())
     }
@@ -83,7 +75,7 @@ impl Benchmark for JsonMultiExportBenchmark {
         while downloaded_files < TOTAL_FILES {
             let num_files = std::cmp::min(TOTAL_FILES - downloaded_files, num_each);
             let coll_ref = self.coll.clone();
-            let path = self.path.clone();
+            let path = env::temp_dir();
 
             let thread = std::thread::spawn(move || {
                 // Note that errors are unwrapped within threads instead of propagated with `?`.

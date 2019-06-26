@@ -5,7 +5,7 @@ use mongodb::{Client, Collection, Database};
 use serde_json::Value;
 
 use crate::{
-    bench::Benchmark,
+    bench::{Benchmark, COLL_NAME, DATABASE_NAME},
     error::{Error, Result},
 };
 
@@ -26,7 +26,7 @@ impl Benchmark for FindManyBenchmark {
 
     fn setup(options: Self::Options) -> Result<Self> {
         let client = Client::with_uri_str(&options.uri)?;
-        let db = client.database("perftest");
+        let db = client.database(&DATABASE_NAME);
         db.drop()?;
 
         let mut file = File::open(options.path)?;
@@ -39,7 +39,7 @@ impl Benchmark for FindManyBenchmark {
 
         // TODO RUST-187: We can change this to a single `Collection::insert_many` once batching is
         // implemented in the driver.
-        let coll = db.collection("corpus");
+        let coll = db.collection(&COLL_NAME);
         for _ in 0..options.num_iter {
             coll.insert_one(doc.clone(), None)?;
         }

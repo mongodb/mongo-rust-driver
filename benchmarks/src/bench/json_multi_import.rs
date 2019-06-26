@@ -3,7 +3,7 @@ use std::{fs::File, path::PathBuf};
 use mongodb::{options::InsertManyOptions, Client, Collection, Database};
 
 use crate::{
-    bench::{parse_json_file_to_documents, Benchmark},
+    bench::{parse_json_file_to_documents, Benchmark, COLL_NAME, DATABASE_NAME},
     error::Result,
 };
 
@@ -29,7 +29,7 @@ impl Benchmark for JsonMultiImportBenchmark {
 
     fn setup(options: Self::Options) -> Result<Self> {
         let client = Client::with_uri_str(&options.uri)?;
-        let db = client.database("perftest");
+        let db = client.database(&DATABASE_NAME);
         db.drop()?;
 
         // We need to create a `Collection` in order to populate the field of the
@@ -46,7 +46,8 @@ impl Benchmark for JsonMultiImportBenchmark {
     }
 
     fn before_task(&mut self) -> Result<()> {
-        self.coll = self.db.collection("corpus");
+        self.db.create_collection(&COLL_NAME, None)?;
+        self.coll = self.db.collection(&COLL_NAME);
         self.coll.drop()?;
 
         Ok(())
