@@ -1,19 +1,10 @@
-use std::{
-    collections::HashMap,
-    sync::{
-        atomic::{AtomicU32, Ordering},
-        Arc, RwLock,
-    },
-};
+use std::sync::Arc;
 
 use crate::{
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::Result,
-    event::{
-        CommandEventHandler, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent,
-        HandlerId,
-    },
+    event::{CommandEventHandler, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
     options::DatabaseOptions,
     read_preference::ReadPreference,
 };
@@ -59,9 +50,8 @@ struct ClientInner {
     read_preference: Option<ReadPreference>,
     read_concern: Option<ReadConcern>,
     write_concern: Option<WriteConcern>,
-    next_handler_id: AtomicU32,
     #[derivative(Debug = "ignore")]
-    command_event_handlers: RwLock<HashMap<HandlerId, Box<CommandEventHandler>>>,
+    command_event_handler: Option<Box<CommandEventHandler>>,
 }
 
 impl Client {
@@ -106,63 +96,23 @@ impl Client {
         unimplemented!()
     }
 
-    /// Registers an event handler to receive notifications whenever a command-related event occurs.
-    pub fn add_command_event_handler(&self, handler: Box<dyn CommandEventHandler>) -> HandlerId {
-        let id = HandlerId::new(self.inner.next_handler_id.fetch_add(1, Ordering::SeqCst));
-        self.inner
-            .command_event_handlers
-            .write()
-            .unwrap()
-            .insert(id, handler);
-
-        id
-    }
-
-    /// Unregisters an event handler so that it no longer receives notifications when an event
-    /// occurs.
-    pub fn remove_event_handler(&self, id: HandlerId) -> Option<Box<dyn CommandEventHandler>> {
-        self.inner
-            .command_event_handlers
-            .write()
-            .unwrap()
-            .remove(&id)
-    }
-
     #[allow(dead_code)]
     pub(crate) fn send_command_started_event(&self, event: CommandStartedEvent) {
-        for handler in self
-            .inner
-            .command_event_handlers
-            .write()
-            .unwrap()
-            .values_mut()
-        {
+        if let Some(ref handler) = self.inner.command_event_handler {
             handler.handle_command_started_event(event.clone());
         }
     }
 
     #[allow(dead_code)]
     pub(crate) fn send_command_succeeded_event(&self, event: CommandSucceededEvent) {
-        for handler in self
-            .inner
-            .command_event_handlers
-            .write()
-            .unwrap()
-            .values_mut()
-        {
+        if let Some(ref handler) = self.inner.command_event_handler {
             handler.handle_command_succeeded_event(event.clone());
         }
     }
 
     #[allow(dead_code)]
     pub(crate) fn send_command_failed_event(&self, event: CommandFailedEvent) {
-        for handler in self
-            .inner
-            .command_event_handlers
-            .write()
-            .unwrap()
-            .values_mut()
-        {
+        if let Some(ref handler) = self.inner.command_event_handler {
             handler.handle_command_failed_event(event.clone());
         }
     }

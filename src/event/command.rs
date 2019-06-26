@@ -38,7 +38,7 @@ pub struct CommandSucceededEvent {
     pub command_name: String,
 
     /// The driver-generated identifier for the request. Applications can use this to identify the
-    /// corresponding `ComamndStartedEvent` that triggered earlier.
+    /// corresponding `CommandStartedEvent` that triggered earlier.
     pub request_id: i32,
 
     /// Information about the connect the command will be run on.
@@ -58,7 +58,7 @@ pub struct CommandFailedEvent {
     pub failure: Failure,
 
     /// The driver-generated identifier for the request. Applications can use this to identify the
-    /// corresponding `ComamndStartedEvent` that triggered earlier.
+    /// corresponding `CommandStartedEvent` that triggered earlier.
     pub request_id: i32,
 
     /// Information about the connect the command will be run on.
@@ -74,29 +74,27 @@ pub struct CommandFailedEvent {
 /// struct FailedCommandLogger {}
 ///
 /// impl CommandEventHandler for FailedCommandLogger {
-///     fn handle_command_failed_event(&mut self, event: CommandFailedEvent) {
+///     fn handle_command_failed_event(&self, event: CommandFailedEvent) {
 ///         eprintln!("Failed command: {:?}", event);
 ///     }
 /// }
 ///
-/// # fn do_stuff(client: &Client) -> mongodb::error::Result<()> {
-/// let logger = FailedCommandLogger {};
-/// client.add_command_event_handler(Box::new(logger));
+/// # fn main() {
+/// // TODO: Construct client with event handler by using `ClientOptions`.
 ///
 /// // Do things with the client, and failed command events will be logged to stderr.
-/// # Ok(())
 /// # }
 /// ```
 pub trait CommandEventHandler: Send + Sync {
     /// A `Client` will call this method on each registered handler whenever a database command is
     /// initiated.
-    fn handle_command_started_event(&mut self, event: CommandStartedEvent) {}
+    fn handle_command_started_event(&self, event: CommandStartedEvent) {}
 
     /// A `Client` will call this method on each registered handler whenever a database command
     /// successfully completes.
-    fn handle_command_succeeded_event(&mut self, event: CommandSucceededEvent) {}
+    fn handle_command_succeeded_event(&self, event: CommandSucceededEvent) {}
 
     /// A `Client` will call this method on each registered handler whenever a database command
     /// fails to complete successfully.
-    fn handle_command_failed_event(&mut self, event: CommandFailedEvent) {}
+    fn handle_command_failed_event(&self, event: CommandFailedEvent) {}
 }

@@ -4,15 +4,6 @@ pub use command::*;
 
 use crate::error::{CommandError, WriteFailure};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct HandlerId(u32);
-
-impl HandlerId {
-    pub(crate) fn new(u: u32) -> Self {
-        HandlerId(u)
-    }
-}
-
 /// In order to easily send events to multiple handlers, we need to be able to copy the events.
 /// Certain events (e.g. `CommandFailedEvent`) need to contain information about an error that a
 /// driver returned, but due to some external errors not implementing Clone (e.g. `std::io::Error`),
