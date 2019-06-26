@@ -1,7 +1,7 @@
 use bson::Document;
 
 use crate::{
-    collation::Collation,
+    options::collation::Collation,
     concern::{ReadConcern, WriteConcern},
     read_preference::ReadPreference,
 };

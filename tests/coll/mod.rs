@@ -69,12 +69,7 @@ fn update() {
     assert_eq!(update_many_results.modified_count, 4);
     assert!(update_many_results.upserted_id.is_none());
 
-    let options = UpdateOptions {
-        array_filters: None,
-        bypass_document_validation: None,
-        upsert: Some(true),
-        collation: None,
-    };
+    let options = UpdateOptions::builder().upsert(true).build();
     let upsert_results = coll
         .update_one(doc! {"b": 7}, doc! {"$set": { "b": 7 }}, Some(options))
         .unwrap();

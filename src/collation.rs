@@ -5,6 +5,7 @@
 #[serde(rename_all = "camelCase")]
 pub struct Collation {
     /// The ICU locale.
+    ///
     /// See the list of supported languages and locales [here](https://docs.mongodb.com/manual/reference/collation-locales-defaults/#collation-languages-locales).
     pub locale: String,
 

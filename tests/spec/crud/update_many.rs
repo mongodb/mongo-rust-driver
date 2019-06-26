@@ -1,5 +1,5 @@
 use bson::{Bson, Document};
-use mongodb::{collation::Collation, options::UpdateOptions};
+use mongodb::options::{collation::Collation, UpdateOptions};
 
 use super::{Outcome, TestFile};
 

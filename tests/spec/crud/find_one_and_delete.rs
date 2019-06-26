@@ -1,5 +1,5 @@
 use bson::{Bson, Document};
-use mongodb::{collation::Collation, options::FindOneAndDeleteOptions};
+use mongodb::options::{collation::Collation, FindOneAndDeleteOptions};
 
 use super::{Outcome, TestFile};
 

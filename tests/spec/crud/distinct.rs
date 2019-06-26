@@ -1,7 +1,7 @@
 use bson::{Bson, Document};
 
 use super::{Outcome, TestFile};
-use mongodb::{collation::Collation, options::DistinctOptions};
+use mongodb::options::{collation::Collation, DistinctOptions};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]

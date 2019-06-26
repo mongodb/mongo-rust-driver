@@ -3,7 +3,7 @@ use std::time::Duration;
 use bson::{Bson, Document};
 
 use crate::{
-    collation::Collation,
+    options::collation::Collation,
     concern::{ReadConcern, WriteConcern},
     read_preference::ReadPreference,
 };
@@ -117,6 +117,7 @@ pub struct UpdateOptions {
     pub upsert: Option<bool>,
 
     /// The collation to use for the operation.
+    ///
     /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
     /// information on how to use this option.
     #[builder(default)]
@@ -135,6 +136,7 @@ pub struct ReplaceOptions {
     pub upsert: Option<bool>,
 
     /// The collation to use for the operation.
+    ///
     /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
     /// information on how to use this option.
     #[builder(default)]
@@ -145,6 +147,7 @@ pub struct ReplaceOptions {
 #[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct DeleteOptions {
     /// The collation to use for the operation.
+    ///
     /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
     /// information on how to use this option.
     #[builder(default)]
@@ -170,6 +173,7 @@ pub struct FindOneAndDeleteOptions {
     pub sort: Option<Document>,
 
     /// The collation to use for the operation.
+    ///
     /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
     /// information on how to use this option.
     #[builder(default)]
@@ -207,6 +211,7 @@ pub struct FindOneAndReplaceOptions {
     pub upsert: Option<bool>,
 
     /// The collation to use for the operation.
+    ///
     /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
     /// information on how to use this option.
     #[builder(default)]
@@ -250,6 +255,7 @@ pub struct FindOneAndUpdateOptions {
     pub upsert: Option<bool>,
 
     /// The collation to use for the operation.
+    ///
     /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
     /// information on how to use this option.
     #[builder(default)]
@@ -294,6 +300,7 @@ pub struct AggregateOptions {
     pub hint: Option<Hint>,
 
     /// The collation to use for the operation.
+    ///
     /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
     /// information on how to use this option.
     #[builder(default)]
@@ -323,6 +330,7 @@ pub struct CountOptions {
     pub skip: Option<i64>,
 
     /// The collation to use for the operation.
+    ///
     /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
     /// information on how to use this option.
     #[builder(default)]
@@ -351,6 +359,7 @@ pub struct DistinctOptions {
     pub max_time: Option<Duration>,
 
     /// The collation to use for the operation.
+    ///
     /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
     /// information on how to use this option.
     #[builder(default)]
@@ -441,6 +450,7 @@ pub struct FindOptions {
     pub sort: Option<Document>,
 
     /// The collation to use for the operation.
+    ///
     /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
     /// information on how to use this option.
     #[builder(default)]

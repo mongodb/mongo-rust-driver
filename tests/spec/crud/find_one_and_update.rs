@@ -1,8 +1,5 @@
 use bson::{Bson, Document};
-use mongodb::{
-    collation::Collation,
-    options::{FindOneAndUpdateOptions, ReturnDocument},
-};
+use mongodb::options::{FindOneAndUpdateOptions, ReturnDocument, collation::Collation};
 
 use super::{Outcome, TestFile};
 

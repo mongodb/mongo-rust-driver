@@ -1,5 +1,5 @@
 use bson::{Bson, Document};
-use mongodb::{collation::Collation, options::IndexModel};
+use mongodb::options::{collation::Collation, IndexModel};
 
 #[derive(Debug, Deserialize)]
 struct ListIndexesEntry {
