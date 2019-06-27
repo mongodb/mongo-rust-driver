@@ -4,6 +4,7 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::Result,
+    event::{CommandEventHandler, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
     options::DatabaseOptions,
     read_preference::ReadPreference,
 };
@@ -43,11 +44,14 @@ pub struct Client {
     inner: Arc<ClientInner>,
 }
 
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 struct ClientInner {
     read_preference: Option<ReadPreference>,
     read_concern: Option<ReadConcern>,
     write_concern: Option<WriteConcern>,
+    #[derivative(Debug = "ignore")]
+    command_event_handler: Option<Box<CommandEventHandler>>,
 }
 
 impl Client {
@@ -90,5 +94,26 @@ impl Client {
     /// used repeatedly without incurring any costs from I/O.
     pub fn database_with_options(&self, name: &str, options: DatabaseOptions) -> Database {
         unimplemented!()
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn send_command_started_event(&self, event: CommandStartedEvent) {
+        if let Some(ref handler) = self.inner.command_event_handler {
+            handler.handle_command_started_event(event.clone());
+        }
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn send_command_succeeded_event(&self, event: CommandSucceededEvent) {
+        if let Some(ref handler) = self.inner.command_event_handler {
+            handler.handle_command_succeeded_event(event.clone());
+        }
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn send_command_failed_event(&self, event: CommandFailedEvent) {
+        if let Some(ref handler) = self.inner.command_event_handler {
+            handler.handle_command_failed_event(event.clone());
+        }
     }
 }

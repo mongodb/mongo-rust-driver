@@ -37,6 +37,8 @@
 #![allow(unused_variables)]
 
 #[macro_use]
+extern crate derivative;
+#[macro_use]
 extern crate error_chain;
 #[macro_use]
 extern crate typed_builder;
@@ -47,7 +49,9 @@ pub mod concern;
 mod cursor;
 mod db;
 pub mod error;
+pub mod event;
 pub mod options;
+mod pool;
 mod read_preference;
 pub mod results;
 
