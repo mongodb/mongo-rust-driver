@@ -69,6 +69,10 @@ pub struct Cursor {
     buffer: VecDeque<Document>,
 }
 
+pub struct Tail<'a> {
+    cursor: &'a mut Cursor,
+}
+
 impl Cursor {
     pub(crate) fn new(
         address: String,
@@ -108,6 +112,10 @@ impl Cursor {
 
         Ok(())
     }
+
+    pub fn tail(&mut self) -> Tail {
+        Tail { cursor: self }
+    }
 }
 
 impl Iterator for Cursor {
@@ -122,5 +130,13 @@ impl Iterator for Cursor {
                 Err(e) => Some(Err(e)),
             },
         }
+    }
+}
+
+impl<'a> Iterator for Tail<'a> {
+    type Item = Result<Document>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.cursor.next()
     }
 }
