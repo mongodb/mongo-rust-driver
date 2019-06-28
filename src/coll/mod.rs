@@ -306,7 +306,7 @@ impl Collection {
             }
 
             if let Some(collation) = opts.collation {
-                command_doc.insert("collation", bson::to_bson(&collation)?);
+                command_doc.insert("collation", collation.to_bson()?);
             }
         }
 
@@ -358,7 +358,7 @@ impl Collection {
             }
 
             if let Some(collation) = opts.collation {
-                command_doc.insert("collation", bson::to_bson(&collation)?);
+                command_doc.insert("collation", collation.to_bson()?);
             }
         }
         self.find_and_modify_command(command_doc, "delete")
@@ -406,7 +406,7 @@ impl Collection {
             }
 
             if let Some(collation) = opts.collation {
-                command_doc.insert("collation", bson::to_bson(&collation)?);
+                command_doc.insert("collation", collation.to_bson()?);
             }
         }
 
@@ -459,7 +459,7 @@ impl Collection {
             }
 
             if let Some(collation) = opts.collation {
-                command_doc.insert("collation", bson::to_bson(&collation)?);
+                command_doc.insert("collation", collation.to_bson()?);
             }
         }
 
@@ -677,7 +677,7 @@ impl Collection {
 
         if let Some(opts) = options {
             if let Some(collation) = opts.collation {
-                delete_doc.insert("collation", bson::to_bson(&collation)?);
+                delete_doc.insert("collation", collation.to_bson()?);
             }
         }
 
@@ -807,7 +807,7 @@ impl Collection {
             }
 
             if let Some(collation) = opts.collation {
-                command_doc.insert("collation", bson::to_bson(&collation)?);
+                command_doc.insert("collation", collation.to_bson()?);
             }
         }
 
@@ -885,7 +885,7 @@ impl Collection {
             }
 
             if let Some(collation) = option.collation {
-                update_doc.insert("collation", bson::to_bson(&collation)?);
+                update_doc.insert("collation", collation.to_bson()?);
             }
         }
 
@@ -934,7 +934,7 @@ impl Collection {
             }
 
             if let Some(collation) = option.collation {
-                update_doc.insert("collation", bson::to_bson(&collation)?);
+                update_doc.insert("collation", collation.to_bson()?);
             }
         }
 

@@ -1,3 +1,7 @@
+use bson::Bson;
+
+use crate::error::Result;
+
 /// A collation configuration. See the official MongoDB
 /// [documentation](https://docs.mongodb.com/manual/reference/collation/) for more information on
 /// each of the fields.
@@ -50,4 +54,11 @@ pub struct Collation {
     #[builder(default)]
     #[serde(skip_serializing_if = "std::option::Option::is_none")]
     pub backwards: Option<bool>,
+}
+
+impl Collation {
+    pub(crate) fn to_bson(&self) -> Result<Bson> {
+        let collation = bson::to_bson(self)?;
+        Ok(collation)
+    }
 }
