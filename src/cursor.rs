@@ -122,14 +122,23 @@ impl Iterator for Cursor {
     type Item = Result<Document>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        // Return the next document from the current batch if one is available.
+        //
+        // Otherwise, if the cursor ID is 0, then the server has closed the cursor, so there are no
+        // more results.
         match self.buffer.pop_front() {
-            Some(doc) => Some(Ok(doc)),
-            None if self.cursor_id == 0 => None,
-            None => match self.next_batch() {
-                Ok(()) => self.next(),
-                Err(e) => Some(Err(e)),
-            },
+            Some(doc) => return Some(Ok(doc)),
+            None if self.cursor_id == 0 => return None,
+            None => {}
+        };
+
+        // Fetch the next batch, returning and error if one returns.
+        if let Err(err) = self.next_batch() {
+            return Some(Err(err));
         }
+
+        // Return the first document from the next batch if it's available.
+        self.buffer.pop_front().map(Ok)
     }
 }
 
