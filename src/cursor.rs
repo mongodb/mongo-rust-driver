@@ -66,11 +66,11 @@ use crate::{
 /// `self`, meaning that the `Cursor` will be unusable afterwards. Normally, this isn't an issue, as
 /// by default, since the server will close a cursor once all the results have been sent to the
 /// client. However, a [tailable cursor](https://docs.mongodb.com/manual/core/tailable-cursors/)
-/// will remain open open even after the results have been exhausted and may return additional
-/// results later. In order to facilitate using the full `Iterator` API with tailable cursors,
-/// `Cursor` implements a method called `tail`. `Cursor::tail` returns a `Tail` struct that also
-/// implements `Iterator`, which can then be freely used in ways that require ownership of `self`
-/// without rendering the original `Cursor` unusable:
+/// will remain open even after the results have been exhausted and may return additional results
+/// later. In order to facilitate using the full `Iterator` API with tailable cursors, `Cursor`
+/// implements a method called `tail`. `Cursor::tail` returns a `Tail` struct that also implements
+/// `Iterator`, which can then be freely used in ways that require ownership of `self` without
+/// rendering the original `Cursor` unusable:
 ///
 /// ```rust
 /// # use mongodb::{Client, error::Result, options::{CursorType, FindOptions}};
@@ -197,7 +197,7 @@ impl Iterator for Cursor {
             None => {}
         };
 
-        // Fetch the next batch, returning and error if one returns.
+        // Fetch the next batch, returning an error if one occurs.
         if let Err(err) = self.next_batch() {
             return Some(Err(err));
         }
