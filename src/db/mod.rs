@@ -251,7 +251,7 @@ impl Database {
             }
 
             if let Some(collation) = opts.collation {
-                base.insert("collation", collation);
+                base.insert("collation", collation.to_bson()?);
             }
 
             base
@@ -331,6 +331,10 @@ impl Database {
 
             if let Some(hint) = opts.hint {
                 command_doc.insert("hint", hint.into_bson());
+            }
+
+            if let Some(collation) = opts.collation {
+                command_doc.insert("collation", collation.to_bson()?);
             }
         }
 

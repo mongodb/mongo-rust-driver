@@ -4,6 +4,7 @@ use bson::{Bson, Document};
 
 use crate::{
     concern::{ReadConcern, WriteConcern},
+    options::collation::Collation,
     read_preference::ReadPreference,
 };
 
@@ -114,6 +115,13 @@ pub struct UpdateOptions {
     /// If true, insert a document if no matching document is found.
     #[builder(default)]
     pub upsert: Option<bool>,
+
+    /// The collation to use for the operation.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub collation: Option<Collation>,
 }
 
 /// Specifies the options to a `Collection::replace_one` operation.
@@ -126,11 +134,25 @@ pub struct ReplaceOptions {
     /// If true, insert a document if no matching document is found.
     #[builder(default)]
     pub upsert: Option<bool>,
+
+    /// The collation to use for the operation.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub collation: Option<Collation>,
 }
 
 /// Specifies the options to a `Collection::delete_one` or `Collection::delete_many` operation.
 #[derive(Clone, Debug, Default, TypedBuilder)]
-pub struct DeleteOptions {}
+pub struct DeleteOptions {
+    /// The collation to use for the operation.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub collation: Option<Collation>,
+}
 
 /// Specifies the options to a `Collection::find_one_and_delete` operation.
 #[derive(Clone, Debug, Default, TypedBuilder)]
@@ -149,6 +171,13 @@ pub struct FindOneAndDeleteOptions {
     /// The order of the documents for the purposes of the operation.
     #[builder(default)]
     pub sort: Option<Document>,
+
+    /// The collation to use for the operation.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub collation: Option<Collation>,
 }
 
 /// Specifies the options to a `Collection::find_one_and_replace` operation.
@@ -180,6 +209,13 @@ pub struct FindOneAndReplaceOptions {
     /// If true, insert a document if no matching document is found.
     #[builder(default)]
     pub upsert: Option<bool>,
+
+    /// The collation to use for the operation.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub collation: Option<Collation>,
 }
 
 /// Specifies the options to a `Collection::find_one_and_update` operation.
@@ -217,6 +253,13 @@ pub struct FindOneAndUpdateOptions {
     /// If true, insert a document if no matching document is found.
     #[builder(default)]
     pub upsert: Option<bool>,
+
+    /// The collation to use for the operation.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub collation: Option<Collation>,
 }
 
 /// Specifies the options to a `Collection::aggregate` operation.
@@ -255,6 +298,13 @@ pub struct AggregateOptions {
     /// The index to use for the operation.
     #[builder(default)]
     pub hint: Option<Hint>,
+
+    /// The collation to use for the operation.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub collation: Option<Collation>,
 }
 
 /// Specifies the options to a `Collection::count_documents` operation.
@@ -278,6 +328,13 @@ pub struct CountOptions {
     /// The number of documents to skip before counting.
     #[builder(default)]
     pub skip: Option<i64>,
+
+    /// The collation to use for the operation.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub collation: Option<Collation>,
 }
 
 /// Specifies the options to a `Collection::estimated_document_count` operation.
@@ -300,6 +357,13 @@ pub struct DistinctOptions {
     /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     pub max_time: Option<Duration>,
+
+    /// The collation to use for the operation.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub collation: Option<Collation>,
 }
 
 /// Specifies the options to a `Collection::find` operation.
@@ -384,6 +448,13 @@ pub struct FindOptions {
     /// The order of the documents for the purposes of the operation.
     #[builder(default)]
     pub sort: Option<Document>,
+
+    /// The collation to use for the operation.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub collation: Option<Collation>,
 }
 
 /// Specifies an index to create.

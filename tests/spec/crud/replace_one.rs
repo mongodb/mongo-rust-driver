@@ -1,5 +1,5 @@
 use bson::{Bson, Document};
-use mongodb::options::ReplaceOptions;
+use mongodb::options::{collation::Collation, ReplaceOptions};
 
 use super::{Outcome, TestFile};
 
@@ -9,6 +9,7 @@ struct Arguments {
     pub filter: Document,
     pub replacement: Document,
     pub upsert: Option<bool>,
+    pub collation: Option<Collation>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -25,7 +26,7 @@ fn run_replace_one_test(test_file: TestFile) {
     let data = test_file.data;
 
     for mut test_case in test_file.tests {
-        if test_case.operation.name != "replaceOne" || test_case.description.contains("collation") {
+        if test_case.operation.name != "replaceOne" {
             continue;
         }
 
@@ -50,6 +51,7 @@ fn run_replace_one_test(test_file: TestFile) {
 
         let options = ReplaceOptions {
             upsert: arguments.upsert,
+            collation: arguments.collation,
             ..Default::default()
         };
 

@@ -1,5 +1,5 @@
 use bson::{Bson, Document};
-use mongodb::options::{FindOneAndUpdateOptions, ReturnDocument};
+use mongodb::options::{collation::Collation, FindOneAndUpdateOptions, ReturnDocument};
 
 use super::{Outcome, TestFile};
 
@@ -16,6 +16,7 @@ struct Arguments {
     pub return_document: Option<String>,
     pub sort: Option<Document>,
     pub upsert: Option<bool>,
+    pub collation: Option<Collation>,
 }
 
 #[function_name]
@@ -23,9 +24,7 @@ fn run_find_one_and_update_test(test_file: TestFile) {
     let data = test_file.data;
 
     for mut test_case in test_file.tests {
-        if test_case.operation.name != "findOneAndUpdate"
-            || test_case.description.contains("collation")
-        {
+        if test_case.operation.name != "findOneAndUpdate" {
             continue;
         }
 
@@ -61,6 +60,7 @@ fn run_find_one_and_update_test(test_file: TestFile) {
             return_document: new,
             sort: arguments.sort,
             upsert: arguments.upsert,
+            collation: arguments.collation,
             ..Default::default()
         };
 

@@ -2,6 +2,7 @@ use bson::Document;
 
 use crate::{
     concern::{ReadConcern, WriteConcern},
+    options::collation::Collation,
     read_preference::ReadPreference,
 };
 
@@ -74,7 +75,7 @@ pub struct CreateCollectionOptions {
 
     /// The default collation for the collection or view.
     #[builder(default)]
-    pub collation: Option<Document>,
+    pub collation: Option<Collation>,
 }
 
 /// Specifies how strictly the database should apply validation rules to existing documents during
