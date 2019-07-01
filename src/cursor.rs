@@ -63,8 +63,8 @@ use crate::{
 ///
 /// One subtlety of `Cursor` implementing `Iterator` is that many of the common ways to use a
 /// `Cursor`, including using a `for` loop and methods such as `map` and `fold` take ownership of
-/// `self`, meaning that the `Cursor` will be unusable afterwards. Normally, this isn't an issue, as
-/// by default, since the server will close a cursor once all the results have been sent to the
+/// `self`, meaning that the `Cursor` will be unusable afterwards. Normally, this isn't an issue,
+/// since by default, the server will close a cursor once all the results have been sent to the
 /// client. However, a [tailable cursor](https://docs.mongodb.com/manual/core/tailable-cursors/)
 /// will remain open even after the results have been exhausted and may return additional results
 /// later. In order to facilitate using the full `Iterator` API with tailable cursors, `Cursor`
