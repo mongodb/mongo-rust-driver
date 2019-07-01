@@ -835,39 +835,26 @@ impl Collection {
         Ok(())
     }
 
-    fn insert_in_batches(&self, command_doc: Document) -> Result<()> {
-        let mut command_docs = vec![command_doc];
+    fn insert_in_batches(&self, mut command_doc: Document) -> Result<()> {
+        let mut remaining_docs = match command_doc.remove("documents") {
+            Some(Bson::Array(docs)) => docs,
+            _ => unreachable!(),
+        };
 
-        while bson_util::size_bytes(command_docs[0].get("documents").unwrap())
-            > MAX_INSERT_DOCS_BYTES
-        {
-            command_docs = command_docs
-                .into_iter()
-                .fold(Vec::new(), |mut all, mut doc| {
-                    let mut docs = match doc.remove("documents").unwrap() {
-                        Bson::Array(arr) => arr,
-                        _ => unreachable!(),
-                    };
+        while let Some(mut current_batch) = split_off_batch(
+            &mut remaining_docs,
+            MAX_INSERT_DOCS_BYTES,
+            bson_util::size_bytes,
+        ) {
+            std::mem::swap(&mut remaining_docs, &mut current_batch);
 
-                    let middle = if docs.len() % 2 == 1 {
-                        docs.len() / 2 + 1
-                    } else {
-                        docs.len() / 2
-                    };
-
-                    let rest = docs.split_off(middle);
-                    let mut second_doc = doc.clone();
-
-                    doc.insert("documents", docs);
-                    second_doc.insert("documents", rest);
-
-                    all.push(doc);
-                    all.push(second_doc);
-                    all
-                });
+            let mut current_batch_doc = command_doc.clone();
+            current_batch_doc.insert("documents", current_batch);
+            self.run_write_command_with_error_check(current_batch_doc)?;
         }
 
-        for command_doc in command_docs {
+        if !remaining_docs.is_empty() {
+            command_doc.insert("documents", remaining_docs);
             self.run_write_command_with_error_check(command_doc)?;
         }
 
@@ -1023,4 +1010,30 @@ impl Collection {
             )),
         }
     }
+}
+
+// Splits off elements from `all` so that the sum of sizes in `all` is not greater than
+// `max_batch_size`. Any remaining elements will be returned in a separate vector.
+fn split_off_batch<T>(
+    all: &mut Vec<T>,
+    max_batch_size: usize,
+    get_size: impl Fn(&T) -> usize,
+) -> Option<Vec<T>> {
+    if all.is_empty() {
+        return None;
+    }
+
+    let mut batch_size = get_size(&all[0]);
+
+    for i in 1..all.len() {
+        let elem_size = get_size(&all[i]);
+
+        if batch_size + elem_size > max_batch_size {
+            return Some(all.split_off(i));
+        }
+
+        batch_size += elem_size;
+    }
+
+    None
 }
