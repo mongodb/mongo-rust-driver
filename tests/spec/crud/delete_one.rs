@@ -1,11 +1,13 @@
 use bson::{Bson, Document};
 
 use super::{Outcome, TestFile};
+use mongodb::options::{collation::Collation, DeleteOptions};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Arguments {
     pub filter: Document,
+    pub collation: Option<Collation>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -19,7 +21,7 @@ fn run_delete_one_test(test_file: TestFile) {
     let data = test_file.data;
 
     for mut test_case in test_file.tests {
-        if test_case.operation.name != "deleteOne" || test_case.description.contains("collation") {
+        if test_case.operation.name != "deleteOne" {
             continue;
         }
 
@@ -42,8 +44,12 @@ fn run_delete_one_test(test_file: TestFile) {
             }
         }
 
+        let opts = DeleteOptions {
+            collation: arguments.collation,
+        };
+
         let result = coll
-            .delete_one(arguments.filter, None)
+            .delete_one(arguments.filter, Some(opts))
             .expect(&test_case.description);
 
         assert_eq!(

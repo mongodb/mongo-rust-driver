@@ -1,5 +1,5 @@
 use bson::{Bson, Document};
-use mongodb::options::FindOptions;
+use mongodb::options::{collation::Collation, FindOptions};
 
 use super::{Outcome, TestFile};
 
@@ -10,6 +10,7 @@ struct Arguments {
     pub skip: Option<i64>,
     pub limit: Option<i64>,
     pub batch_size: Option<i32>,
+    pub collation: Option<Collation>,
 }
 
 #[function_name]
@@ -17,7 +18,7 @@ fn run_find_test(test_file: TestFile) {
     let data = test_file.data;
 
     for mut test_case in test_file.tests {
-        if test_case.operation.name != "find" || test_case.description.contains("collation") {
+        if test_case.operation.name != "find" {
             continue;
         }
 
@@ -44,6 +45,7 @@ fn run_find_test(test_file: TestFile) {
             skip: arguments.skip,
             limit: arguments.limit,
             batch_size: arguments.batch_size,
+            collation: arguments.collation,
             ..Default::default()
         };
 
