@@ -1,3 +1,4 @@
+mod batch;
 pub mod options;
 
 use std::sync::Arc;
@@ -841,7 +842,7 @@ impl Collection {
             _ => unreachable!(),
         };
 
-        while let Some(mut current_batch) = split_off_batch(
+        while let Some(mut current_batch) = batch::split_off_batch(
             &mut remaining_docs,
             MAX_INSERT_DOCS_BYTES,
             bson_util::size_bytes,
@@ -1010,30 +1011,4 @@ impl Collection {
             )),
         }
     }
-}
-
-// Splits off elements from `all` so that the sum of sizes in `all` is not greater than
-// `max_batch_size`. Any remaining elements will be returned in a separate vector.
-fn split_off_batch<T>(
-    all: &mut Vec<T>,
-    max_batch_size: usize,
-    get_size: impl Fn(&T) -> usize,
-) -> Option<Vec<T>> {
-    if all.is_empty() {
-        return None;
-    }
-
-    let mut batch_size = get_size(&all[0]);
-
-    for i in 1..all.len() {
-        let elem_size = get_size(&all[i]);
-
-        if batch_size + elem_size > max_batch_size {
-            return Some(all.split_off(i));
-        }
-
-        batch_size += elem_size;
-    }
-
-    None
 }
