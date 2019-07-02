@@ -32,10 +32,9 @@ impl Benchmark for JsonMultiImportBenchmark {
         let db = client.database(&DATABASE_NAME);
         db.drop()?;
 
-        // We need to create a `Collection` in order to populate the field of the
-        // InsertManyBenchmark being returned, so we create a placeholder that gets
-        // overwritten in before_task().
-        let coll = db.collection("placeholder");
+        // We need to get a handle to the `Collection` in order to populate the field of the
+        // JsonMultiImportBenchmark being returned
+        let coll = db.collection("corpus");
 
         Ok(JsonMultiImportBenchmark {
             db,
