@@ -2,6 +2,7 @@ use bson::{Bson, Document};
 use mongodb::options::InsertManyOptions;
 
 use super::{Outcome, TestFile};
+use crate::CLIENT;
 
 #[derive(Debug, Deserialize)]
 struct Arguments {
@@ -29,7 +30,7 @@ fn run_insert_many_test(test_file: TestFile) {
             continue;
         }
 
-        let coll = crate::init_db_and_coll(function_name!(), &test_case.description);
+        let coll = CLIENT.init_db_and_coll(function_name!(), &test_case.description);
         coll.insert_many(data.clone(), None)
             .expect(&test_case.description);
 
@@ -67,7 +68,7 @@ fn run_insert_many_test(test_file: TestFile) {
 
         if let Some(c) = outcome.collection {
             let outcome_coll = match c.name {
-                Some(ref name) => crate::get_coll(function_name!(), name),
+                Some(ref name) => CLIENT.get_coll(function_name!(), name),
                 None => coll,
             };
 

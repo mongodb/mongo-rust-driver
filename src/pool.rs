@@ -1,7 +1,7 @@
 use std::{
     env,
     io::{self, Read, Write},
-    net::TcpStream,
+    net::{IpAddr, SocketAddr, TcpStream},
     ops::{Deref, DerefMut},
     sync::Arc,
 };
@@ -16,8 +16,10 @@ use webpki::DNSNameRef;
 use crate::{
     command_responses::IsMasterCommandResponse,
     error::{Error, ErrorKind, Result},
+    event::CommandStartedEvent,
     options::Host,
     wire::{new_request_id, Header, OpCode, Query, QueryFlags, Reply},
+    Client,
 };
 
 const DEFAULT_POOL_SIZE: u32 = 5;
@@ -30,10 +32,10 @@ pub struct ConnectionInfo {
     pub id: u32,
 
     /// The hostname of the address of the server that the connection is connected to.
-    pub hostname: String,
+    pub hostname: IpAddr,
 
     /// The port of the address of the server that the connection is connected to.
-    pub port: Option<u16>,
+    pub port: u16,
 }
 
 pub type Connection = PooledConnection<Connector>;
@@ -77,6 +79,30 @@ pub struct Connector {
 pub enum Stream {
     Basic(TcpStream),
     Tls(rustls::StreamOwned<rustls::ClientSession, TcpStream>),
+}
+
+impl Stream {
+    fn info(&self) -> Result<ConnectionInfo> {
+        let addr = self.addr()?;
+
+        let info = ConnectionInfo {
+            // TODO: Replace with unique IDs once CMAP is implemented.
+            id: 0,
+            hostname: addr.ip(),
+            port: addr.port(),
+        };
+
+        Ok(info)
+    }
+
+    fn addr(&self) -> Result<SocketAddr> {
+        let address = match self {
+            Stream::Basic(s) => s.peer_addr()?,
+            Stream::Tls(s) => s.sock.peer_addr()?,
+        };
+
+        Ok(address)
+    }
 }
 
 impl Read for Stream {
@@ -136,14 +162,17 @@ impl ManageConnection for Connector {
 }
 
 pub fn run_command(
+    client: Option<Client>,
     conn: &mut Connection,
     db: &str,
     doc: Document,
     slave_ok: bool,
 ) -> Result<Document> {
+    let request_id = new_request_id();
+
     let header = Header {
         length: 0,
-        request_id: new_request_id(),
+        request_id,
         response_to: 0,
         opcode: OpCode::Query,
     };
@@ -160,7 +189,7 @@ pub fn run_command(
         full_collection_name: format!("{}.$cmd", db),
         num_to_skip: 0,
         num_to_return: 1,
-        query: doc,
+        query: doc.clone(),
         return_field_selector: None,
     };
 
@@ -169,6 +198,22 @@ pub fn run_command(
 
     let num_bytes = bytes.len();
     (&mut bytes[0..4]).write_i32::<LittleEndian>(num_bytes as i32)?;
+
+    if let Some(client) = client {
+        let name = doc.iter().next().unwrap().0;
+
+        if !crate::event::REDACTED_COMMAND_NAMES.contains(&name.as_str()) {
+            let event = CommandStartedEvent {
+                command_name: name.clone(),
+                command: doc,
+                db: db.into(),
+                request_id,
+                connection: conn.info()?,
+            };
+
+            client.send_command_started_event(event);
+        }
+    }
 
     let _ = conn.write(&bytes[..])?;
     let reply = Reply::read(conn.deref_mut())?;
@@ -186,7 +231,11 @@ pub struct IsMasterReply {
     pub round_trip_time: i64,
 }
 
-pub fn is_master(conn: &mut Connection, handshake: bool) -> Result<IsMasterReply> {
+pub fn is_master(
+    client: Option<Client>,
+    conn: &mut Connection,
+    handshake: bool,
+) -> Result<IsMasterReply> {
     let doc = if handshake {
         doc! {
             "isMaster": 1,
@@ -206,7 +255,7 @@ pub fn is_master(conn: &mut Connection, handshake: bool) -> Result<IsMasterReply
     };
 
     let start = PreciseTime::now();
-    let doc = run_command(conn, "admin", doc, false)?;
+    let doc = run_command(client, conn, "admin", doc, false)?;
     let round_trip_time = start.to(PreciseTime::now());
     let command_response = bson::from_bson(Bson::Document(doc))?;
 

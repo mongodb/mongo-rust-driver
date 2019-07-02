@@ -1,6 +1,7 @@
 use bson::{Bson, Document};
 
 use super::{Outcome, TestFile};
+use crate::CLIENT;
 
 #[derive(Debug, Deserialize)]
 struct Arguments {
@@ -24,7 +25,7 @@ fn run_insert_one_test(test_file: TestFile) {
 
         test_case.description = test_case.description.replace('$', "%");
 
-        let coll = crate::init_db_and_coll(function_name!(), &test_case.description);
+        let coll = CLIENT.init_db_and_coll(function_name!(), &test_case.description);
         coll.insert_many(data.clone(), None)
             .expect(&test_case.description);
 
@@ -35,7 +36,8 @@ fn run_insert_one_test(test_file: TestFile) {
 
         if let Some(ref c) = outcome.collection {
             if let Some(ref name) = c.name {
-                crate::get_coll(function_name!(), name)
+                CLIENT
+                    .get_coll(function_name!(), name)
                     .drop()
                     .expect(&test_case.description);
             }
@@ -52,7 +54,7 @@ fn run_insert_one_test(test_file: TestFile) {
 
         if let Some(c) = outcome.collection {
             let outcome_coll = match c.name {
-                Some(ref name) => crate::get_coll(function_name!(), name),
+                Some(ref name) => CLIENT.get_coll(function_name!(), name),
                 None => coll,
             };
 

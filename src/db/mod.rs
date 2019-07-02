@@ -417,7 +417,13 @@ impl Database {
         let slave_ok = self.client().slave_ok(&address, read_pref);
         Ok((
             address,
-            run_command(&mut stream, &self.inner.name, doc, slave_ok)?,
+            run_command(
+                Some(self.client()),
+                &mut stream,
+                &self.inner.name,
+                doc,
+                slave_ok,
+            )?,
         ))
     }
 }

@@ -45,23 +45,27 @@ impl Server {
         let mut conn = self.pool.get()?;
 
         // Connection handshake
-        is_master(&mut conn, true)?;
+        is_master(None, &mut conn, true)?;
 
         Ok(conn)
     }
 
     pub(crate) fn check(&mut self, server_type: ServerType) -> ServerDescription {
         let mut conn = self.monitor_pool.get().unwrap();
-        let mut description =
-            ServerDescription::new(&self.host.display(), Some(is_master(&mut conn, false)));
+        let mut description = ServerDescription::new(
+            &self.host.display(),
+            Some(is_master(None, &mut conn, false)),
+        );
 
         if description.error.is_some() {
             self.reset_pools();
 
             if server_type != ServerType::Unknown {
                 conn = self.monitor_pool.get().unwrap();
-                description =
-                    ServerDescription::new(&self.host.display(), Some(is_master(&mut conn, false)));
+                description = ServerDescription::new(
+                    &self.host.display(),
+                    Some(is_master(None, &mut conn, false)),
+                );
             }
         }
 

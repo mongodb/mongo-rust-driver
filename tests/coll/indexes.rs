@@ -1,6 +1,8 @@
 use bson::{Bson, Document};
 use mongodb::options::{collation::Collation, IndexModel};
 
+use crate::CLIENT;
+
 #[derive(Debug, Deserialize)]
 struct ListIndexesEntry {
     v: i64,
@@ -13,7 +15,7 @@ struct ListIndexesEntry {
 #[test]
 #[function_name]
 fn list_indexes_contains_id() {
-    let coll = crate::get_coll(function_name!(), function_name!());
+    let coll = CLIENT.get_coll(function_name!(), function_name!());
     coll.drop().unwrap();
 
     let indexes: Vec<_> = coll.list_indexes().unwrap().collect();
@@ -40,7 +42,7 @@ fn list_indexes_contains_id() {
 #[test]
 #[function_name]
 fn index_management() {
-    let db = crate::get_db(function_name!());
+    let db = CLIENT.database(function_name!());
     let coll = db.collection(function_name!());
 
     coll.drop().unwrap();
@@ -125,7 +127,7 @@ fn index_management() {
 #[test]
 #[function_name]
 fn test_create_index_collation() {
-    let db = crate::get_db(function_name!());
+    let db = CLIENT.database(function_name!());
     let coll = db.collection(function_name!());
 
     coll.drop().unwrap();
