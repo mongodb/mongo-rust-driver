@@ -33,8 +33,6 @@ impl Benchmark for JsonMultiImportBenchmark {
         db.drop()?;
 
         let coll = db.collection(&COLL_NAME);
-        coll.drop()?;
-        db.create_collection(&COLL_NAME, None)?;
 
         Ok(JsonMultiImportBenchmark {
             db,

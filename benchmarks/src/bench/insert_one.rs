@@ -36,8 +36,6 @@ impl Benchmark for InsertOneBenchmark {
         let json: Value = serde_json::from_reader(&mut file)?;
 
         let coll = db.collection(&COLL_NAME);
-        coll.drop()?;
-        db.create_collection(&COLL_NAME, None)?;
 
         Ok(InsertOneBenchmark {
             db,
