@@ -35,9 +35,9 @@ impl Benchmark for InsertManyBenchmark {
 
         let json: Value = serde_json::from_reader(&mut file)?;
 
-        // We need to get a handle to the `Collection` in order to populate the field of the
-        // InsertManyBenchmark being returned
-        let coll = db.collection("corpus");
+        let coll = db.collection(&COLL_NAME);
+        coll.drop()?;
+        db.create_collection(&COLL_NAME, None)?;
 
         Ok(InsertManyBenchmark {
             db,
@@ -51,8 +51,6 @@ impl Benchmark for InsertManyBenchmark {
     }
 
     fn before_task(&mut self) -> Result<()> {
-        self.db.create_collection(&COLL_NAME, None)?;
-        self.coll = self.db.collection(&COLL_NAME);
         self.coll.drop()?;
 
         Ok(())

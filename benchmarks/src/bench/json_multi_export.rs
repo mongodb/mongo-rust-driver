@@ -36,6 +36,8 @@ impl Benchmark for JsonMultiExportBenchmark {
         db.drop()?;
 
         let coll = db.collection(&COLL_NAME);
+        coll.drop()?;
+        db.create_collection(&COLL_NAME, None)?;
 
         for i in 0..TOTAL_FILES {
             let json_file_name = options.path.join(format!("ldjson{:03}.txt", i));
@@ -57,7 +59,6 @@ impl Benchmark for JsonMultiExportBenchmark {
     }
 
     fn before_task(&mut self) -> Result<()> {
-        self.coll = self.db.collection(&COLL_NAME);
         self.coll.drop()?;
 
         Ok(())

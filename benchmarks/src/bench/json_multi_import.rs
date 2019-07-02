@@ -32,9 +32,9 @@ impl Benchmark for JsonMultiImportBenchmark {
         let db = client.database(&DATABASE_NAME);
         db.drop()?;
 
-        // We need to get a handle to the `Collection` in order to populate the field of the
-        // JsonMultiImportBenchmark being returned
-        let coll = db.collection("corpus");
+        let coll = db.collection(&COLL_NAME);
+        coll.drop()?;
+        db.create_collection(&COLL_NAME, None)?;
 
         Ok(JsonMultiImportBenchmark {
             db,
@@ -45,8 +45,6 @@ impl Benchmark for JsonMultiImportBenchmark {
     }
 
     fn before_task(&mut self) -> Result<()> {
-        self.db.create_collection(&COLL_NAME, None)?;
-        self.coll = self.db.collection(&COLL_NAME);
         self.coll.drop()?;
 
         Ok(())
