@@ -1,5 +1,4 @@
 use std::{
-    env,
     fs::{File, OpenOptions},
     io::Write,
     path::PathBuf,
@@ -75,7 +74,7 @@ impl Benchmark for JsonMultiExportBenchmark {
         while downloaded_files < TOTAL_FILES {
             let num_files = std::cmp::min(TOTAL_FILES - downloaded_files, num_each);
             let coll_ref = self.coll.clone();
-            let path = env::temp_dir();
+            let path = std::env::temp_dir();
 
             let thread = std::thread::spawn(move || {
                 // Note that errors are unwrapped within threads instead of propagated with `?`.

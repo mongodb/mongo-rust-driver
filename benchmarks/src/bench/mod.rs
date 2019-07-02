@@ -70,7 +70,9 @@ fn finished(duration: Duration, iter: usize) -> bool {
     elapsed >= MAX_EXECUTION_TIME || (iter >= MAX_ITERATIONS && elapsed > MIN_EXECUTION_TIME)
 }
 
-pub fn run_benchmark(mut test: impl Benchmark) -> Result<Vec<Duration>> {
+pub fn run_benchmark<B: Benchmark>(options: B::Options) -> Result<Vec<Duration>> {
+    let mut test = B::setup(options)?;
+
     let mut test_durations = Vec::new();
 
     let benchmark_timer = Instant::now();

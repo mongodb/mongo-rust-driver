@@ -14,52 +14,59 @@ use std::{
     time::Duration,
 };
 
-use crate::{bench::Benchmark, error::Result};
+use crate::{
+    bench::{
+        find_many::FindManyBenchmark, find_one::FindOneBenchmark, insert_many::InsertManyBenchmark,
+        insert_one::InsertOneBenchmark, json_multi_export::JsonMultiExportBenchmark,
+        json_multi_import::JsonMultiImportBenchmark, run_command::RunCommandBenchmark,
+    },
+    error::Result,
+};
 
 lazy_static! {
     static ref DATA_PATH: PathBuf = Path::new(env!("CARGO_MANIFEST_DIR")).join("data");
 }
 
-fn get_nth_percentile(durations: Vec<Duration>, n: f64) -> Duration {
+fn get_nth_percentile(durations: &[Duration], n: f64) -> Duration {
     durations[(durations.len() as f64 * n / 100.0) as usize - 1]
 }
 
 fn score_test(durations: Vec<Duration>, name: &str, task_size: f64, more_info: bool) -> f64 {
-    let score: f64 = get_nth_percentile(durations.clone(), 50.0).as_millis() as f64 / task_size;
+    let score: f64 = get_nth_percentile(&durations, 50.0).as_millis() as f64 / task_size;
 
     println!("TEST: {} -- Score: {}", name, score);
     if more_info {
         println!(
             "10th percentile: {:#?}",
-            get_nth_percentile(durations.clone(), 10.0),
+            get_nth_percentile(&durations, 10.0),
         );
         println!(
             "25th percentile: {:#?}",
-            get_nth_percentile(durations.clone(), 25.0),
+            get_nth_percentile(&durations, 25.0),
         );
         println!(
             "50th percentile: {:#?}",
-            get_nth_percentile(durations.clone(), 50.0),
+            get_nth_percentile(&durations, 50.0),
         );
         println!(
             "75th percentile: {:#?}",
-            get_nth_percentile(durations.clone(), 75.0),
+            get_nth_percentile(&durations, 75.0),
         );
         println!(
             "90th percentile: {:#?}",
-            get_nth_percentile(durations.clone(), 90.0),
+            get_nth_percentile(&durations, 90.0),
         );
         println!(
             "95th percentile: {:#?}",
-            get_nth_percentile(durations.clone(), 95.0),
+            get_nth_percentile(&durations, 95.0),
         );
         println!(
             "98th percentile: {:#?}",
-            get_nth_percentile(durations.clone(), 98.0),
+            get_nth_percentile(&durations, 98.0),
         );
         println!(
             "99th percentile: {:#?}",
-            get_nth_percentile(durations.clone(), 99.0),
+            get_nth_percentile(&durations, 99.0),
         );
     }
 
@@ -78,44 +85,43 @@ fn single_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
         num_iter: 10000,
         uri: uri.to_string(),
     };
-    let run_command = bench::run_benchmark(bench::run_command::RunCommandBenchmark::setup(
-        run_command_options,
-    )?)?;
+    let run_command = bench::run_benchmark::<RunCommandBenchmark>(run_command_options)?;
 
     comp_score += score_test(run_command, "Run command", 0.16, more_info);
 
     // Find one by ID
     let find_one_options = bench::find_one::Options {
         num_iter: 10000,
-        path: DATA_PATH.join("single_and_multi_document/tweet.json"),
+        path: DATA_PATH
+            .join("single_and_multi_document")
+            .join("tweet.json"),
         uri: uri.to_string(),
     };
-    let find_one =
-        bench::run_benchmark(bench::find_one::FindOneBenchmark::setup(find_one_options)?)?;
+    let find_one = bench::run_benchmark::<FindOneBenchmark>(find_one_options)?;
 
     comp_score += score_test(find_one, "Find one by ID", 16.22, more_info);
 
     // Small doc insertOne
     let small_insert_one_options = bench::insert_one::Options {
         num_iter: 10000,
-        path: DATA_PATH.join("single_and_multi_document/small_doc.json"),
+        path: DATA_PATH
+            .join("single_and_multi_document")
+            .join("small_doc.json"),
         uri: uri.to_string(),
     };
-    let small_insert_one = bench::run_benchmark(bench::insert_one::InsertOneBenchmark::setup(
-        small_insert_one_options,
-    )?)?;
+    let small_insert_one = bench::run_benchmark::<InsertOneBenchmark>(small_insert_one_options)?;
 
     comp_score += score_test(small_insert_one, "Small doc insertOne", 2.75, more_info);
 
     // Large doc insertOne
     let large_insert_one_options = bench::insert_one::Options {
         num_iter: 10,
-        path: DATA_PATH.join("single_and_multi_document/large_doc.json"),
+        path: DATA_PATH
+            .join("single_and_multi_document")
+            .join("large_doc.json"),
         uri: uri.to_string(),
     };
-    let large_insert_one = bench::run_benchmark(bench::insert_one::InsertOneBenchmark::setup(
-        large_insert_one_options,
-    )?)?;
+    let large_insert_one = bench::run_benchmark::<InsertOneBenchmark>(large_insert_one_options)?;
 
     comp_score += score_test(large_insert_one, "Large doc insertOne", 27.31, more_info);
 
@@ -132,12 +138,12 @@ fn multi_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
     // Find many and empty the cursor
     let find_many_options = bench::find_many::Options {
         num_iter: 10000,
-        path: DATA_PATH.join("single_and_multi_document/tweet.json"),
+        path: DATA_PATH
+            .join("single_and_multi_document")
+            .join("tweet.json"),
         uri: uri.to_string(),
     };
-    let find_many = bench::run_benchmark(bench::find_many::FindManyBenchmark::setup(
-        find_many_options,
-    )?)?;
+    let find_many = bench::run_benchmark::<FindManyBenchmark>(find_many_options)?;
 
     comp_score += score_test(
         find_many,
@@ -149,24 +155,24 @@ fn multi_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
     // Small doc bulk insert
     let small_insert_many_options = bench::insert_many::Options {
         num_copies: 10000,
-        path: DATA_PATH.join("single_and_multi_document/small_doc.json"),
+        path: DATA_PATH
+            .join("single_and_multi_document")
+            .join("small_doc.json"),
         uri: uri.to_string(),
     };
-    let small_insert_many = bench::run_benchmark(bench::insert_many::InsertManyBenchmark::setup(
-        small_insert_many_options,
-    )?)?;
+    let small_insert_many = bench::run_benchmark::<InsertManyBenchmark>(small_insert_many_options)?;
 
     comp_score += score_test(small_insert_many, "Small doc bulk insert", 2.75, more_info);
 
     // Large doc bulk insert
     let large_insert_many_options = bench::insert_many::Options {
         num_copies: 10,
-        path: DATA_PATH.join("single_and_multi_document/large_doc.json"),
+        path: DATA_PATH
+            .join("single_and_multi_document")
+            .join("large_doc.json"),
         uri: uri.to_string(),
     };
-    let large_insert_many = bench::run_benchmark(bench::insert_many::InsertManyBenchmark::setup(
-        large_insert_many_options,
-    )?)?;
+    let large_insert_many = bench::run_benchmark::<InsertManyBenchmark>(large_insert_many_options)?;
 
     comp_score += score_test(large_insert_many, "Large doc bulk insert", 27.31, more_info);
 
@@ -183,12 +189,11 @@ fn parallel_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
     // LDJSON multi-file import
     let json_multi_import_options = bench::json_multi_import::Options {
         num_threads: num_cpus::get(),
-        path: DATA_PATH.join("parallel/ldjson_multi"),
+        path: DATA_PATH.join("parallel").join("ldjson_multi"),
         uri: uri.to_string(),
     };
-    let json_multi_import = bench::run_benchmark(
-        bench::json_multi_import::JsonMultiImportBenchmark::setup(json_multi_import_options)?,
-    )?;
+    let json_multi_import =
+        bench::run_benchmark::<JsonMultiImportBenchmark>(json_multi_import_options)?;
 
     comp_score += score_test(
         json_multi_import,
@@ -200,12 +205,11 @@ fn parallel_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
     // LDJSON multi-file export
     let json_multi_export_options = bench::json_multi_export::Options {
         num_threads: num_cpus::get(),
-        path: DATA_PATH.join("parallel/ldjson_multi"),
+        path: DATA_PATH.join("parallel").join("ldjson_multi"),
         uri: uri.to_string(),
     };
-    let json_multi_export = bench::run_benchmark(
-        bench::json_multi_export::JsonMultiExportBenchmark::setup(json_multi_export_options)?,
-    )?;
+    let json_multi_export =
+        bench::run_benchmark::<JsonMultiExportBenchmark>(json_multi_export_options)?;
 
     comp_score += score_test(
         json_multi_export,
@@ -219,7 +223,7 @@ fn parallel_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
 
 fn main() {
     let matches = clap_app!(RustDriverBenchmark =>
-        (version: "1.0")
+        (version: env!("CARGO_PKG_VERSION"))
         (about: "Runs performance micro-benchmarks on Rust driver")
         (author: "benjirewis")
         (@arg single: -s --single ... "Run single document benchmarks")
