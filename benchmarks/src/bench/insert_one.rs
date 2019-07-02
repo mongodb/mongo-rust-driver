@@ -52,6 +52,7 @@ impl Benchmark for InsertOneBenchmark {
 
     fn before_task(&mut self) -> Result<()> {
         self.coll.drop()?;
+        self.db.create_collection(&COLL_NAME, None)?;
 
         Ok(())
     }
