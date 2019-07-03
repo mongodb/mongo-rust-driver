@@ -66,6 +66,11 @@ error_chain! {
             description("An error occurred when trying to execute a write operation:")
             display("{}", inner)
         }
+
+        AuthenticationError(msg: String) {
+            description("An error occurred when trying to authenticate a connection.")
+            display("{}", msg)
+        }
     }
 }
 

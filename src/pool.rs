@@ -14,6 +14,7 @@ use time::PreciseTime;
 use webpki::DNSNameRef;
 
 use crate::{
+    client::{auth, auth::MongoCredential},
     command_responses::IsMasterCommandResponse,
     error::{Error, ErrorKind, Result},
     event::CommandStartedEvent,
@@ -53,11 +54,15 @@ impl Pool {
         host: Host,
         max_size: Option<u32>,
         tls_config: Option<Arc<rustls::ClientConfig>>,
+        credential: Option<MongoCredential>,
     ) -> Result<Self> {
         let pool = ::r2d2::Pool::builder()
             .max_size(max_size.unwrap_or(DEFAULT_POOL_SIZE))
-            .build_unchecked(Connector { host, tls_config });
-
+            .build_unchecked(Connector {
+                host,
+                tls_config,
+                credential,
+            });
         Ok(Self { pool })
     }
 }
@@ -73,6 +78,7 @@ impl Deref for Pool {
 pub struct Connector {
     pub host: Host,
     pub tls_config: Option<Arc<rustls::ClientConfig>>,
+    pub credential: Option<MongoCredential>,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -138,15 +144,23 @@ impl ManageConnection for Connector {
         let socket = TcpStream::connect(&self.host.display())?;
         socket.set_nodelay(true)?;
 
-        match self.tls_config {
+        let mut stream = match self.tls_config {
             Some(ref cfg) => {
                 let name = DNSNameRef::try_from_ascii_str(self.host.hostname()).expect("TODO: fix");
                 let session = rustls::ClientSession::new(cfg, name);
 
-                Ok(Stream::Tls(rustls::StreamOwned::new(session, socket)))
+                Stream::Tls(rustls::StreamOwned::new(session, socket))
             }
-            None => Ok(Stream::Basic(socket)),
+            None => Stream::Basic(socket),
+        };
+
+        if let Some(credential) = &self.credential {
+            auth::authenticate_stream(&mut stream, credential)?;
+        } else {
+            is_master_stream(&mut stream, true, None)?;
         }
+
+        Ok(stream)
     }
 
     // We purposely do nothing here since `is_valid` is called before a connection is returned from
@@ -158,6 +172,52 @@ impl ManageConnection for Connector {
 
     fn has_broken(&self, _: &mut Self::Connection) -> bool {
         false
+    }
+}
+
+pub fn run_command_stream<T: Read + Write>(
+    stream: &mut T,
+    db: &str,
+    doc: Document,
+    slave_ok: bool,
+) -> Result<Document> {
+    let header = Header {
+        length: 0,
+        request_id: new_request_id(),
+        response_to: 0,
+        opcode: OpCode::Query,
+    };
+
+    let mut flags = QueryFlags::empty();
+
+    if slave_ok {
+        flags.insert(QueryFlags::SLAVE_OK);
+    }
+
+    let query = Query {
+        header,
+        flags,
+        full_collection_name: format!("{}.$cmd", db),
+        num_to_skip: 0,
+        num_to_return: 1,
+        query: doc,
+        return_field_selector: None,
+    };
+
+    let mut bytes: Vec<u8> = Vec::new();
+    query.write(&mut bytes)?;
+
+    let num_bytes = bytes.len();
+    (&mut bytes[0..4]).write_i32::<LittleEndian>(num_bytes as i32)?;
+
+    let _ = stream.write(&bytes[..])?;
+    let reply = Reply::read(stream)?;
+
+    match reply.docs.into_iter().next() {
+        Some(doc) => Ok(doc),
+        None => bail!(ErrorKind::OperationError(
+            "The reply from the server did not contain a document".to_string()
+        )),
     }
 }
 
@@ -231,10 +291,49 @@ pub struct IsMasterReply {
     pub round_trip_time: i64,
 }
 
+pub fn is_master_stream<T: Read + Write>(
+    stream: &mut T,
+    handshake: bool,
+    credential: Option<&MongoCredential>,
+) -> Result<IsMasterReply> {
+    let mut doc = if handshake {
+        doc! {
+            "isMaster": 1,
+            "client": {
+                "driver": {
+                    "name": DRIVER_NAME,
+                    "version": env!("CARGO_PKG_VERSION")
+                },
+                "os": {
+                    "type": env::consts::OS,
+                    "architecture": env::consts::ARCH
+                }
+            }
+        }
+    } else {
+        doc! { "isMaster": 1 }
+    };
+
+    if let Some(credential) = credential {
+        credential.append_needed_mechanism_negotiation(&mut doc);
+    }
+
+    let start = PreciseTime::now();
+    let response_doc = run_command_stream(stream, "admin", doc, false)?;
+    let round_trip_time = start.to(PreciseTime::now());
+    let command_response = bson::from_bson(Bson::Document(response_doc))?;
+
+    Ok(IsMasterReply {
+        command_response,
+        round_trip_time: round_trip_time.num_milliseconds(),
+    })
+}
+
 pub fn is_master(
     client: Option<Client>,
     conn: &mut Connection,
     handshake: bool,
+    credential: Option<MongoCredential>,
 ) -> Result<IsMasterReply> {
     let doc = if handshake {
         doc! {

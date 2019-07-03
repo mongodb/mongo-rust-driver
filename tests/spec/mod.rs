@@ -1,3 +1,4 @@
+mod auth;
 mod crud;
 mod read_write_concern;
 

@@ -43,6 +43,7 @@ impl Topology {
                     host.clone(),
                     options.max_pool_size,
                     tls_config.clone(),
+                    options.credential.clone(),
                 )));
                 (host.display(), server)
             })
@@ -123,6 +124,7 @@ impl Topology {
                         Host::parse(address).unwrap(),
                         self.max_pool_size,
                         self.tls_config.clone(),
+                        None,
                     ))),
                 )
             })

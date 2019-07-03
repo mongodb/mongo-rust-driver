@@ -8,6 +8,7 @@ use derivative::Derivative;
 pub use self::description::{OpTime, ServerDescription, ServerType};
 
 use crate::{
+    client::auth::MongoCredential,
     error::Result,
     options::Host,
     pool::{is_master, Connection, Pool},
@@ -28,10 +29,11 @@ impl Server {
         host: Host,
         max_pool_size: Option<u32>,
         tls_config: Option<Arc<rustls::ClientConfig>>,
+        credential: Option<MongoCredential>,
     ) -> Self {
         Self {
-            pool: Pool::new(host.clone(), max_pool_size, tls_config.clone()).unwrap(),
-            monitor_pool: Pool::new(host.clone(), Some(1), tls_config.clone()).unwrap(),
+            pool: Pool::new(host.clone(), max_pool_size, tls_config.clone(), credential).unwrap(),
+            monitor_pool: Pool::new(host.clone(), Some(1), tls_config.clone(), None).unwrap(),
             host,
             tls_config,
         }
@@ -42,11 +44,7 @@ impl Server {
     }
 
     pub(crate) fn acquire_stream(&self) -> Result<Connection> {
-        let mut conn = self.pool.get()?;
-
-        // Connection handshake
-        is_master(None, &mut conn, true)?;
-
+        let conn = self.pool.get()?;
         Ok(conn)
     }
 
@@ -54,7 +52,7 @@ impl Server {
         let mut conn = self.monitor_pool.get().unwrap();
         let mut description = ServerDescription::new(
             &self.host.display(),
-            Some(is_master(None, &mut conn, false)),
+            Some(is_master(None, &mut conn, false, None)),
         );
 
         if description.error.is_some() {
@@ -64,7 +62,7 @@ impl Server {
                 conn = self.monitor_pool.get().unwrap();
                 description = ServerDescription::new(
                     &self.host.display(),
-                    Some(is_master(None, &mut conn, false)),
+                    Some(is_master(None, &mut conn, false, None)),
                 );
             }
         }
@@ -73,7 +71,8 @@ impl Server {
     }
 
     pub(crate) fn reset_pools(&mut self) {
-        self.pool = Pool::new(self.host.clone(), None, self.tls_config.clone()).unwrap();
-        self.monitor_pool = Pool::new(self.host.clone(), Some(1), self.tls_config.clone()).unwrap();
+        self.pool = Pool::new(self.host.clone(), None, self.tls_config.clone(), None).unwrap();
+        self.monitor_pool =
+            Pool::new(self.host.clone(), Some(1), self.tls_config.clone(), None).unwrap();
     }
 }
