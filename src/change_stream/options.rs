@@ -1,8 +1,10 @@
 use std::time::Duration;
 
-use bson::Document;
+use bson::{Bson, Document};
 
-#[derive(Debug, TypedBuilder)]
+use crate::error::Result;
+
+#[derive(Debug, Serialize, Deserialize, TypedBuilder)]
 pub struct ChangeStreamOptions {
     /// When set to "updateLookup", the `full_document` field of the
     /// `ChangeStreamDocument` will be populated with a copy of the
@@ -43,7 +45,7 @@ pub struct ChangeStreamOptions {
     start_after: Option<Document>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum FullDocumentType {
     /// The `full_document` field of the `ChangeStreamDocument`
     /// will be populated with a copy of the entire document that was updated
@@ -51,4 +53,11 @@ pub enum FullDocumentType {
 
     /// User-defined other types for forward compatibility
     Other(String),
+}
+
+impl ChangeStreamOptions {
+    pub(crate) fn to_bson(&self) -> Result<Bson> {
+        let options = bson::to_bson(self)?;
+        Ok(options)
+    }
 }

@@ -1062,6 +1062,23 @@ impl Collection {
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<ChangeStreamOptions>,
     ) -> Result<ChangeStream> {
-        unimplemented!();
+        let pipeline = pipeline.into_iter();
+        let mut watch_pipeline = Vec::new();
+
+        if let Some(options) = options {
+            watch_pipeline.push(doc! { "$changeStream": options.to_bson()? });
+        } else {
+            watch_pipeline.push(doc! { "$changeStream": {} });
+        }
+        watch_pipeline.extend(pipeline);
+
+        let aggregate_options = AggregateOptions::builder()
+            .collation(match options {
+                Some(options) => Some(options.collation),
+                None => None,
+            })
+            .build();
+
+        self.aggregate(watch_pipeline, aggregate_options)?;
     }
 }

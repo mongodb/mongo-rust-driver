@@ -1,4 +1,6 @@
-use bson::Document;
+use bson::{Bson, Document};
+
+use crate::error::Result;
 
 /// An opaque token for use when resuming an interrupted `ChangeStream`
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -60,4 +62,11 @@ pub enum OperationType {
     Drop,
     DropDatabase,
     Rename,
+}
+
+impl ChangeStreamDocument {
+    pub(crate) fn to_bson(&self) -> Result<Bson> {
+        let doc = bson::to_bson(self)?;
+        Ok(doc)
+    }
 }
