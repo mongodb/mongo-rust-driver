@@ -60,6 +60,7 @@ extern crate serde_derive;
 extern crate typed_builder;
 
 mod bson_util;
+pub mod change_stream;
 mod client;
 mod coll;
 pub mod collation;
@@ -74,7 +75,7 @@ mod pool;
 pub mod read_preference;
 pub mod results;
 #[cfg(test)]
-mod test;
+pub(crate) mod test;
 mod topology;
 mod wire;
 

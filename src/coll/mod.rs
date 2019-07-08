@@ -4,10 +4,12 @@ pub mod options;
 use std::sync::Arc;
 
 use bson::{Bson, Document};
+use serde::Deserialize;
 
 use self::options::*;
 use crate::{
     bson_util,
+    change_stream::{ChangeStream, ChangeStreamTarget},
     command_responses::{
         CreateIndexesResponse, DeleteCommandResponse, DistinctCommandResponse,
         FindAndModifyCommandResponse, FindCommandResponse, GetMoreCommandResponse,
@@ -15,6 +17,7 @@ use crate::{
     },
     concern::{ReadConcern, WriteConcern},
     error::{Error, ErrorKind, Result},
+    options::ChangeStreamOptions,
     read_preference::ReadPreference,
     results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
     Client, Cursor, Database,
@@ -1048,5 +1051,26 @@ impl Collection {
                 "invalid server response to getmore".to_string()
             )),
         }
+    }
+
+    /// Starts a new `ChangeStream` that receives events for all changes in this collection.
+    /// A `ChangeStream` cannot be started on system collections.
+    ///
+    /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
+    /// streams.
+    ///
+    /// Change streams require either a "majority" read concern or no read concern. Anything else
+    /// will cause a server error.
+    ///
+    /// Also note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
+    /// fields will cause an error. The driver requires these fields to support resumability.
+    pub fn watch<'a, 'b, T: Deserialize<'a>>(
+        &'b self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: Option<ChangeStreamOptions>,
+    ) -> Result<ChangeStream<'a, T>> {
+        let db = self.database();
+        let target = ChangeStreamTarget::Collection(self.clone());
+        db.watch_helper(pipeline, target, options)
     }
 }
