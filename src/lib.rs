@@ -60,6 +60,7 @@ extern crate serde_derive;
 extern crate typed_builder;
 
 mod bson_util;
+pub mod change_stream;
 mod client;
 mod coll;
 pub mod collation;

@@ -6,10 +6,11 @@ use bson::{Bson, Document};
 
 use self::options::{CreateCollectionOptions, DatabaseOptions};
 use crate::{
+    change_stream::ChangeStream,
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{ErrorKind, Result},
-    options::{AggregateOptions, CollectionOptions},
+    options::{AggregateOptions, ChangeStreamOptions, CollectionOptions},
     pool::run_command,
     read_preference::ReadPreference,
     Client, Collection,
@@ -425,5 +426,19 @@ impl Database {
                 slave_ok,
             )?,
         ))
+    }
+
+    /// Allows a client to observe all changes in a database.
+    /// Excludes system collections.
+    ///
+    /// Note that using a `$project` stage to remove any of the `_id`
+    /// `operationType` or `ns` fields will cause an error. The driver
+    /// requires these fields to support resumability.
+    pub(crate) fn watch(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: Option<ChangeStreamOptions>,
+    ) -> Result<ChangeStream> {
+        unimplemented!();
     }
 }

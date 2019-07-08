@@ -182,6 +182,24 @@ impl Cursor {
     pub fn tail(&mut self) -> Tail {
         Tail { cursor: self }
     }
+
+    pub(crate) fn cursor_id(&self) -> i64 {
+        self.cursor_id
+    }
+}
+
+impl Drop for Cursor {
+    fn drop(&mut self) {
+        if self.cursor_id() != 0 {
+            let kill_command =
+                doc! { "killCursors": self.coll.name(), "cursors": [self.cursor_id()] };
+
+            match self.coll.database().run_command(kill_command, None) {
+                Ok(_) => return,
+                Err(_) => return,
+            }
+        }
+    }
 }
 
 impl Iterator for Cursor {

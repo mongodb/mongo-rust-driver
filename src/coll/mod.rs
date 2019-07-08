@@ -8,6 +8,7 @@ use bson::{Bson, Document};
 use self::options::*;
 use crate::{
     bson_util,
+    change_stream::ChangeStream,
     command_responses::{
         CreateIndexesResponse, DeleteCommandResponse, DistinctCommandResponse,
         FindAndModifyCommandResponse, FindCommandResponse, GetMoreCommandResponse,
@@ -15,6 +16,7 @@ use crate::{
     },
     concern::{ReadConcern, WriteConcern},
     error::{Error, ErrorKind, Result},
+    options::ChangeStreamOptions,
     read_preference::ReadPreference,
     results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
     Client, Cursor, Database,
@@ -1048,5 +1050,18 @@ impl Collection {
                 "invalid server response to getmore".to_string()
             )),
         }
+    }
+
+    /// Returns a change stream on a specific collection.
+    ///
+    /// Note that using a `$project` stage to remove any of the `_id`
+    /// `operationType` or `ns` fields will cause an error. The driver
+    /// requires these fields to support resumability.
+    pub(crate) fn watch(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: Option<ChangeStreamOptions>,
+    ) -> Result<ChangeStream> {
+        unimplemented!();
     }
 }

@@ -14,12 +14,13 @@ use rand::{seq::SliceRandom, thread_rng};
 use time::{Duration as TimeDuration, PreciseTime};
 
 use crate::{
+    change_stream::ChangeStream,
     command_responses::ListDatabasesResponse,
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::{ErrorKind, Result},
     event::{CommandEventHandler, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
-    options::{ClientOptions, DatabaseOptions},
+    options::{ChangeStreamOptions, ClientOptions, DatabaseOptions},
     pool::Connection,
     read_preference::ReadPreference,
     topology::{ServerDescription, ServerType, Topology, TopologyType},
@@ -335,6 +336,21 @@ impl Client {
         if let Some(ref handler) = self.inner.command_event_handler {
             handler.handle_command_failed_event(event.clone());
         }
+    }
+
+    /// Allows a client to observe all changes in a cluster.
+    /// Excludes system collections. Excludes the "config",
+    /// "local", and "admin" databases.
+    ///
+    /// Note that using a `$project` stage to remove any of the `_id`
+    /// `operationType` or `ns` fields will cause an error. The driver
+    /// requires these fields to support resumability.
+    pub(crate) fn watch(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: Option<ChangeStreamOptions>,
+    ) -> Result<ChangeStream> {
+        unimplemented!();
     }
 }
 

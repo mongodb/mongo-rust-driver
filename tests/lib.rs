@@ -11,6 +11,7 @@ extern crate lazy_static;
 #[macro_use]
 extern crate serde_derive;
 
+mod change_stream;
 mod client;
 mod coll;
 mod db;
