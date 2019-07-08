@@ -3,13 +3,15 @@ pub mod options;
 use std::sync::Arc;
 
 use bson::{Bson, Document};
+use serde::Deserialize;
 
 use self::options::{CreateCollectionOptions, DatabaseOptions};
 use crate::{
+    change_stream::{document::ResumeToken, ChangeStream, ChangeStreamTarget},
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{ErrorKind, Result},
-    options::{AggregateOptions, CollectionOptions},
+    options::{AggregateOptions, ChangeStreamOptions, CollectionOptions},
     pool::run_command,
     read_preference::ReadPreference,
     Client, Collection,
@@ -24,7 +26,6 @@ use crate::{
 /// so it can safely be shared across threads. For example:
 ///
 /// ```rust
-/// 
 /// # use mongodb::{Client, error::Result};
 ///
 /// # fn start_workers() -> Result<()> {
@@ -424,6 +425,111 @@ impl Database {
                 doc,
                 slave_ok,
             )?,
+        ))
+    }
+
+    /// Starts a new `ChangeStream` that receives events for all changes in this database. The
+    /// stream does not observe changes from system collections and cannot be started on "config",
+    /// "local" or "admin" databases.
+    ///
+    /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
+    /// streams.
+    ///
+    /// Change streams require either a "majority" read concern or no read
+    /// concern. Anything else will cause a server error.
+    ///
+    /// Note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
+    /// fields will cause an error. The driver requires these fields to support resumability.
+    pub fn watch<'a, T: Deserialize<'a>>(
+        &'a self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: Option<ChangeStreamOptions>,
+    ) -> Result<ChangeStream<T>> {
+        self.watch_helper(
+            pipeline,
+            ChangeStreamTarget::Database(self.clone()),
+            options,
+        )
+    }
+
+    pub(crate) fn watch_helper<'a, 'b, T: Deserialize<'a>>(
+        &'b self,
+        pipeline: impl IntoIterator<Item = Document>,
+        target: ChangeStreamTarget,
+        options: Option<ChangeStreamOptions>,
+    ) -> Result<ChangeStream<'a, T>> {
+        let pipeline: Vec<Document> = pipeline.into_iter().collect();
+
+        let mut watch_pipeline = Vec::new();
+        let mut aggregate_options: Option<AggregateOptions>;
+        let mut resume_token: Option<ResumeToken>;
+        let stream_options = options.clone();
+
+        if let Some(options) = options {
+            match target {
+                ChangeStreamTarget::Collection(_) | ChangeStreamTarget::Database(_) => {
+                    watch_pipeline.push(doc! { "$changeStream": bson::to_bson(&options)? })
+                }
+                ChangeStreamTarget::Cluster(_) => {
+                    let options_bson = bson::to_bson(&options)?;
+                    if let bson::Bson::Document(mut options_doc) = options_bson {
+                        options_doc.insert("allChangesForCluster", true);
+                        watch_pipeline.push(doc! { "$changeStream": options_doc });
+                    } else {
+                        // TODO: Throw the correct error here (options cannot be parsed as Document)
+                        unreachable!();
+                    }
+                }
+            }
+
+            aggregate_options = Some(
+                AggregateOptions::builder()
+                    .collation(options.collation)
+                    .build(),
+            );
+
+            resume_token = options.start_after.or(options.resume_after);
+        } else {
+            match target {
+                ChangeStreamTarget::Collection(_) | ChangeStreamTarget::Database(_) => {
+                    watch_pipeline.push(doc! { "$changeStream": {} });
+                }
+                ChangeStreamTarget::Cluster(_) => {
+                    watch_pipeline.push(doc! { "$changeStream": { "allChangesForCluster": true } });
+                }
+            }
+
+            aggregate_options = None;
+            resume_token = None;
+        }
+        watch_pipeline.extend(pipeline.clone());
+
+        let (cursor, client, read_preference) = match target {
+            ChangeStreamTarget::Collection(ref coll) => (
+                coll.aggregate(watch_pipeline, aggregate_options)?,
+                coll.client(),
+                coll.read_preference()
+                    .cloned()
+                    .or_else(|| coll.database().read_preference().cloned())
+                    .or_else(|| coll.client().read_preference().cloned()),
+            ),
+            ChangeStreamTarget::Database(ref db) | ChangeStreamTarget::Cluster(ref db) => (
+                db.aggregate(watch_pipeline, aggregate_options)?,
+                db.client(),
+                db.read_preference()
+                    .cloned()
+                    .or_else(|| db.client().read_preference().cloned()),
+            ),
+        };
+
+        Ok(ChangeStream::new(
+            cursor,
+            pipeline,
+            client,
+            target,
+            resume_token,
+            stream_options,
+            read_preference,
         ))
     }
 }

@@ -14,7 +14,7 @@ extern crate serde_derive;
 mod client;
 mod coll;
 mod db;
-mod spec;
+pub(crate) mod spec;
 mod util;
 
 use util::TestClient;

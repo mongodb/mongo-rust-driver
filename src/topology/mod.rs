@@ -1,4 +1,4 @@
-mod description;
+pub(crate) mod description;
 mod server;
 
 use std::{
@@ -101,6 +101,13 @@ impl Topology {
 
     pub(crate) fn get_server(&self, address: &str) -> Option<Arc<RwLock<Server>>> {
         self.servers.get(address).map(Clone::clone)
+    }
+
+    pub(crate) fn get_max_wire_version(&self, address: &str) -> Option<i32> {
+        self.description
+            .server_descriptions()
+            .get(address)
+            .map(|s| s.max_wire_version)
     }
 
     pub(crate) fn update_description<'a>(

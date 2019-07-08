@@ -11,15 +11,17 @@ use std::{
 
 use bson::{Bson, Document};
 use rand::{seq::SliceRandom, thread_rng};
+use serde::Deserialize;
 use time::{Duration as TimeDuration, PreciseTime};
 
 use crate::{
+    change_stream::{ChangeStream, ChangeStreamTarget},
     command_responses::ListDatabasesResponse,
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::{ErrorKind, Result},
     event::{CommandEventHandler, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
-    options::{ClientOptions, DatabaseOptions},
+    options::{ChangeStreamOptions, ClientOptions, DatabaseOptions},
     pool::Connection,
     read_preference::ReadPreference,
     topology::{ServerDescription, ServerType, Topology, TopologyType},
@@ -222,6 +224,20 @@ impl Client {
             .unwrap_or(*DEFAULT_SERVER_SELECTION_TIMEOUT)
     }
 
+    pub(crate) fn get_max_wire_version(&self, address: &str) -> Option<i32> {
+        self.inner
+            .topology
+            .read()
+            .unwrap()
+            .get_max_wire_version(address)
+    }
+
+    // This method is only called for testing
+    #[allow(dead_code)]
+    pub(crate) fn get_topology_type(&self) -> TopologyType {
+        self.inner.topology.read().unwrap().topology_type()
+    }
+
     fn get_connection_from_server(&self, address: &str) -> Result<Option<Connection>> {
         self.inner
             .topology
@@ -336,6 +352,29 @@ impl Client {
         if let Some(ref handler) = self.inner.command_event_handler {
             handler.handle_command_failed_event(event.clone());
         }
+    }
+
+    /// Starts a new `ChangeStream` that receives events for all changes in the cluster. The stream
+    /// does not observe changes from system collections or the "config", "local" or "admin"
+    /// databases. Note that this method (`watch` on a cluster) is only supported in MongoDB 4.0 or
+    /// greater.
+    ///
+    /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
+    /// streams.
+    ///
+    /// Change streams require either a "majority" read concern or no read
+    /// concern. Anything else will cause a server error.
+    ///
+    /// Note that using a `$project` stage to remove any of the `_id` `operationType` or `ns` fields
+    /// will cause an error. The driver requires these fields to support resumability.
+    pub fn watch<'a, T: Deserialize<'a>>(
+        &'a self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: Option<ChangeStreamOptions>,
+    ) -> Result<ChangeStream<T>> {
+        let db = self.database("admin");
+        let target = ChangeStreamTarget::Cluster(db.clone());
+        db.watch_helper(pipeline, target, options)
     }
 }
 

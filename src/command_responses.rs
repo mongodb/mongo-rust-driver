@@ -10,6 +10,7 @@ pub struct DistinctCommandResponse {
 #[derive(Debug, Deserialize)]
 pub struct FindCommandResponse {
     pub cursor: FindCommandResponseInner,
+    pub operation_time: Option<Bson>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -22,6 +23,7 @@ pub struct FindCommandResponseInner {
 #[derive(Debug, Deserialize)]
 pub struct GetMoreCommandResponse {
     pub cursor: GetMoreCommandResponseInner,
+    pub operation_time: Option<Bson>,
 }
 
 #[derive(Debug, Deserialize)]
