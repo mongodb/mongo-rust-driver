@@ -32,7 +32,7 @@ fn get_nth_percentile(durations: &[Duration], n: f64) -> Duration {
 }
 
 fn score_test(durations: Vec<Duration>, name: &str, task_size: f64, more_info: bool) -> f64 {
-    let score: f64 = get_nth_percentile(&durations, 50.0).as_millis() as f64 / task_size;
+    let score: f64 = task_size / (get_nth_percentile(&durations, 50.0).as_millis() as f64 / 1000.0);
 
     println!("TEST: {} -- Score: {}", name, score);
     if more_info {
