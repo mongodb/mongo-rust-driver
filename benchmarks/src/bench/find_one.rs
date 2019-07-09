@@ -52,11 +52,11 @@ impl Benchmark for FindOneBenchmark {
     }
 
     fn do_task(&self) -> Result<()> {
+        let find_options = FindOptions::builder().limit(Some(1)).build();
         for i in 0..self.num_iter {
-            let find_options = FindOptions::builder().limit(Some(1)).build();
             let mut cursor = self
                 .coll
-                .find(Some(doc! { "_id": i as i32 }), Some(find_options))?;
+                .find(Some(doc! { "_id": i as i32 }), Some(find_options.clone()))?;
             let _doc = cursor.next();
         }
 
