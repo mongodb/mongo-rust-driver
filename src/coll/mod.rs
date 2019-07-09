@@ -8,7 +8,7 @@ use bson::{Bson, Document};
 use self::options::*;
 use crate::{
     bson_util,
-    change_stream::{ChangeStream, ChangeStreamToken},
+    change_stream::{document::ChangeStreamToken, ChangeStream},
     command_responses::{
         CreateIndexesResponse, DeleteCommandResponse, DistinctCommandResponse,
         FindAndModifyCommandResponse, FindCommandResponse, GetMoreCommandResponse,
@@ -1062,40 +1062,41 @@ impl Collection {
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<ChangeStreamOptions>,
     ) -> Result<ChangeStream> {
-        let pipeline = pipeline.into_iter();
+        let pipeline: Vec<Document> = pipeline.into_iter().collect();
+
         let mut watch_pipeline = Vec::new();
+        let mut aggregate_options: Option<AggregateOptions>;
+        let mut resume_token: ChangeStreamToken;
+        let stream_options = options.clone();
 
         if let Some(options) = options {
             watch_pipeline.push(doc! { "$changeStream": options.to_bson()? });
+            aggregate_options = Some(
+                AggregateOptions::builder()
+                    .collation(options.collation)
+                    .build(),
+            );
+            resume_token = ChangeStreamToken::new(options.start_after.or(options.resume_after));
         } else {
             watch_pipeline.push(doc! { "$changeStream": {} });
+            aggregate_options = None;
+            resume_token = ChangeStreamToken::new(None);
         }
-        watch_pipeline.extend(pipeline);
+        watch_pipeline.extend(pipeline.clone());
 
-        let aggregate_options = AggregateOptions::builder()
-            .collation(match options {
-                Some(options) => options.collation,
-                None => None,
-            })
-            .build();
-
-        let cursor = self.aggregate(watch_pipeline, Some(aggregate_options))?;
+        let cursor = self.aggregate(watch_pipeline, aggregate_options)?;
 
         let read_preference = self
             .read_preference()
             .or(self.database().read_preference())
-            .or(self.client().read_preference());
-
-        let resume_token = match options {
-            Some(options) => ChangeStreamToken::new(options.start_after.or(options.resume_after)),
-            None => None,
-        };
+            .or(self.client().read_preference())
+            .map(|pref: &ReadPreference| pref.clone());
 
         Ok(ChangeStream {
             cursor,
             resume_token,
             pipeline,
-            options,
+            options: stream_options,
             read_preference,
         })
     }

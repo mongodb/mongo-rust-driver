@@ -4,13 +4,14 @@ use crate::error::Result;
 
 /// An opaque token for use when resuming an interrupted `ChangeStream`
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ChangeStreamToken(Document);
+pub struct ChangeStreamToken(Option<Document>);
 
 impl ChangeStreamToken {
-    pub fn new(doc: Document) -> ChangeStreamToken {
+    pub fn new(doc: Option<Document>) -> ChangeStreamToken {
         ChangeStreamToken(doc)
     }
 }
+
 /// A `ChangeStreamDocument` represents a [change event]
 /// (https://docs.mongodb.com/manual/reference/change-events/) in the
 /// associated change stream. Instances of `ChangeStreamDocument` are returned

@@ -38,26 +38,26 @@ use crate::{error::Result, read_preference::ReadPreference, Cursor};
 /// details. Also see the documentation on [usage recommendations](https://docs.mongodb.com/manual/administration/change-streams-production-recommendations/).
 pub struct ChangeStream {
     /// The cursor to iterate over `ChangeStreamDocument` instances
-    cursor: Cursor,
+    pub cursor: Cursor,
 
     /// The cached resume token
-    resume_token: Option<ChangeStreamToken>,
+    pub resume_token: ChangeStreamToken,
 
     /// The pipeline of stages to append to an initial `$changeStream` stage
-    pipeline: Vec<Document>,
+    pub pipeline: Vec<Document>,
 
     /// The options provided to the initial `$changeStream` stage
-    options: Option<ChangeStreamOptions>,
+    pub options: Option<ChangeStreamOptions>,
 
     /// The read preference for the initial `$changeStream` aggregation, used
     /// for server selection during an automatic resume.
-    read_preference: Option<ReadPreference>,
+    pub read_preference: Option<ReadPreference>,
 }
 
 impl ChangeStream {
     /// Returns the cached resume token that will be used to resume after the
     /// most recently returned change.
-    pub(crate) fn resume_token(&self) -> Option<ChangeStreamToken> {
+    pub fn resume_token(&self) -> ChangeStreamToken {
         self.resume_token.clone()
     }
 
