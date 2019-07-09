@@ -6,6 +6,11 @@ use crate::error::Result;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChangeStreamToken(Document);
 
+impl ChangeStreamToken {
+    pub fn new(doc: Document) -> ChangeStreamToken {
+        ChangeStreamToken(doc)
+    }
+}
 /// A `ChangeStreamDocument` represents a [change event]
 /// (https://docs.mongodb.com/manual/reference/change-events/) in the
 /// associated change stream. Instances of `ChangeStreamDocument` are returned
@@ -15,23 +20,23 @@ pub struct ChangeStreamToken(Document);
 pub struct ChangeStreamDocument {
     /// An opaque token for use when resuming an interrupted `ChangeStream`
     #[serde(rename = "_id")]
-    id: ChangeStreamToken,
+    pub id: ChangeStreamToken,
 
     /// Describes the type of operation represented in this change notification
-    operation_type: OperationType,
+    pub operation_type: OperationType,
 
     /// The namespace in which the change happened, which will be in the format
     /// <database>.<collection>.
-    ns: Document,
+    pub ns: Document,
 
     /// For unsharded collections this contains a single field, id, with the
     /// value of the id of the document updated.  For sharded collections,
     /// this will contain all the components of the shard key in order,
     /// followed by the id if the id isn’t part of the shard key.
-    document_key: Option<Document>,
+    pub document_key: Option<Document>,
 
     /// Contains a description of updated and removed fields in this operation
-    update_description: Option<UpdateDescription>,
+    pub update_description: Option<UpdateDescription>,
 
     /// For operations of type "insert" and "replace", this key will contain the
     /// `Document` being inserted, or the new version of the `Document` that is
@@ -40,17 +45,24 @@ pub struct ChangeStreamDocument {
     /// For operations of type "update", this key will contain a copy of the full
     /// version of the `Document` from some point after the update occurred. If the
     /// `Document` was deleted since the updated happened, it will be None.
-    full_document: Option<Document>,
+    pub full_document: Option<Document>,
+}
+
+impl ChangeStreamDocument {
+    pub(crate) fn to_bson(&self) -> Result<Bson> {
+        let doc = bson::to_bson(self)?;
+        Ok(doc)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateDescription {
     /// A `Document` containing key:value pairs of names of the fields that were
     /// changed, and the new value for those fields.
-    updated_fields: Document,
+    pub updated_fields: Document,
 
     /// An array of field names that were removed from the `Document`
-    removed_fields: Vec<String>,
+    pub removed_fields: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -62,11 +74,4 @@ pub enum OperationType {
     Drop,
     DropDatabase,
     Rename,
-}
-
-impl ChangeStreamDocument {
-    pub(crate) fn to_bson(&self) -> Result<Bson> {
-        let doc = bson::to_bson(self)?;
-        Ok(doc)
-    }
 }

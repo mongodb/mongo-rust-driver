@@ -1,4 +1,4 @@
-mod document;
+pub mod document;
 pub mod options;
 
 use bson::Document;
@@ -41,24 +41,24 @@ pub struct ChangeStream {
     cursor: Cursor,
 
     /// The cached resume token
-    resume_token: ChangeStreamToken,
+    resume_token: Option<ChangeStreamToken>,
 
     /// The pipeline of stages to append to an initial `$changeStream` stage
     pipeline: Vec<Document>,
 
     /// The options provided to the initial `$changeStream` stage
-    options: ChangeStreamOptions,
+    options: Option<ChangeStreamOptions>,
 
     /// The read preference for the initial `$changeStream` aggregation, used
     /// for server selection during an automatic resume.
-    read_preference: ReadPreference,
+    read_preference: Option<ReadPreference>,
 }
 
 impl ChangeStream {
     /// Returns the cached resume token that will be used to resume after the
     /// most recently returned change.
     pub(crate) fn resume_token(&self) -> Option<ChangeStreamToken> {
-        Some(self.resume_token.clone())
+        self.resume_token.clone()
     }
 
     /// Tail the change stream.

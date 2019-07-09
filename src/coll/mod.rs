@@ -8,7 +8,7 @@ use bson::{Bson, Document};
 use self::options::*;
 use crate::{
     bson_util,
-    change_stream::ChangeStream,
+    change_stream::{ChangeStream, ChangeStreamToken},
     command_responses::{
         CreateIndexesResponse, DeleteCommandResponse, DistinctCommandResponse,
         FindAndModifyCommandResponse, FindCommandResponse, GetMoreCommandResponse,
@@ -1074,11 +1074,29 @@ impl Collection {
 
         let aggregate_options = AggregateOptions::builder()
             .collation(match options {
-                Some(options) => Some(options.collation),
+                Some(options) => options.collation,
                 None => None,
             })
             .build();
 
-        self.aggregate(watch_pipeline, aggregate_options)?;
+        let cursor = self.aggregate(watch_pipeline, Some(aggregate_options))?;
+
+        let read_preference = self
+            .read_preference()
+            .or(self.database().read_preference())
+            .or(self.client().read_preference());
+
+        let resume_token = match options {
+            Some(options) => ChangeStreamToken::new(options.start_after.or(options.resume_after)),
+            None => None,
+        };
+
+        Ok(ChangeStream {
+            cursor,
+            resume_token,
+            pipeline,
+            options,
+            read_preference,
+        })
     }
 }
