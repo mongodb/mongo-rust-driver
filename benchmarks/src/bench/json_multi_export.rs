@@ -30,6 +30,8 @@ impl Benchmark for JsonMultiExportBenchmark {
     type Options = Options;
 
     fn setup(options: Self::Options) -> Result<Self> {
+        println!("Running JsonMultiExportBenchmark...");
+
         let client = Client::with_uri_str(&options.uri)?;
         let db = client.database(&DATABASE_NAME);
         db.drop()?;
@@ -53,13 +55,6 @@ impl Benchmark for JsonMultiExportBenchmark {
             coll,
             num_threads: options.num_threads,
         })
-    }
-
-    fn before_task(&mut self) -> Result<()> {
-        self.coll.drop()?;
-        self.db.create_collection(&COLL_NAME, None)?;
-
-        Ok(())
     }
 
     fn do_task(&self) -> Result<()> {

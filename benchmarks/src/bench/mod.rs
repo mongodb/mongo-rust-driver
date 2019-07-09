@@ -13,6 +13,7 @@ use std::{
 };
 
 use bson::{Bson, Document};
+use indicatif::{ProgressBar, ProgressStyle};
 use serde_json::Value;
 
 use crate::error::{Error, Result};
@@ -22,11 +23,22 @@ lazy_static! {
         .unwrap_or("perftest")
         .to_string();
     static ref COLL_NAME: String = option_env!("COLL_NAME").unwrap_or("corpus").to_string();
+    static ref MAX_EXECUTION_TIME: u64 = option_env!("MAX_EXECUTION_TIME")
+        .unwrap_or("300")
+        .to_string()
+        .parse::<u64>()
+        .expect("invalid MAX_EXECUTION_TIME");
+    static ref MIN_EXECUTION_TIME: u64 = option_env!("MIN_EXECUTION_TIME")
+        .unwrap_or("60")
+        .to_string()
+        .parse::<u64>()
+        .expect("invalid MIN_EXECUTION_TIME");
+    static ref MAX_ITERATIONS: usize = option_env!("MAX_ITERATIONS")
+        .unwrap_or("100")
+        .to_string()
+        .parse::<usize>()
+        .expect("invalid MAX_ITERATIONS");
 }
-
-const MAX_EXECUTION_TIME: u64 = 300;
-const MIN_EXECUTION_TIME: u64 = 60;
-const MAX_ITERATIONS: usize = 99;
 
 pub trait Benchmark: Sized {
     type Options;
@@ -67,10 +79,20 @@ pub fn parse_json_file_to_documents(file: File) -> Result<Vec<Document>> {
 
 fn finished(duration: Duration, iter: usize) -> bool {
     let elapsed = duration.as_secs();
-    elapsed >= MAX_EXECUTION_TIME || (iter >= MAX_ITERATIONS && elapsed > MIN_EXECUTION_TIME)
+    elapsed >= *MAX_EXECUTION_TIME || (iter >= *MAX_ITERATIONS && elapsed > *MIN_EXECUTION_TIME)
 }
 
 pub fn run_benchmark<B: Benchmark>(options: B::Options) -> Result<Vec<Duration>> {
+    let bar = ProgressBar::new(*MAX_ITERATIONS as u64);
+    bar.set_style(
+        ProgressStyle::default_bar()
+            .template(
+                "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos:>2}/{len:2} \
+                 ({eta})",
+            )
+            .progress_chars("#>-"),
+    );
+
     let mut test = B::setup(options)?;
 
     let mut test_durations = Vec::new();
@@ -78,6 +100,8 @@ pub fn run_benchmark<B: Benchmark>(options: B::Options) -> Result<Vec<Duration>>
     let benchmark_timer = Instant::now();
     let mut iter = 0;
     while !finished(benchmark_timer.elapsed(), iter) {
+        bar.inc(1);
+
         test.before_task()?;
         let timer = Instant::now();
         test.do_task()?;
@@ -87,6 +111,7 @@ pub fn run_benchmark<B: Benchmark>(options: B::Options) -> Result<Vec<Duration>>
         iter += 1;
     }
     test.teardown()?;
+    bar.finish();
 
     test_durations.sort();
     Ok(test_durations)

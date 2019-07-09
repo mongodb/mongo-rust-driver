@@ -4,6 +4,7 @@ extern crate bson;
 extern crate lazy_static;
 #[macro_use]
 extern crate clap;
+extern crate indicatif;
 extern crate num_cpus;
 
 mod bench;
@@ -125,6 +126,7 @@ fn single_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
 
     comp_score += score_test(large_insert_one, "Large doc insertOne", 27.31, more_info);
 
+    println!("SingleBench Score: {}", comp_score);
     Ok(comp_score)
 }
 
@@ -176,6 +178,7 @@ fn multi_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
 
     comp_score += score_test(large_insert_many, "Large doc bulk insert", 27.31, more_info);
 
+    println!("MultiBench Score: {}", comp_score);
     Ok(comp_score)
 }
 
@@ -218,6 +221,7 @@ fn parallel_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
         more_info,
     );
 
+    println!("ParallelBench Score: {}", comp_score);
     Ok(comp_score)
 }
 
@@ -263,5 +267,5 @@ fn main() {
     }
 
     println!("----------------------------");
-    println!("COMPOSITE SCORE = {}", comp_score);
+    println!("DriverBench Score = {}", comp_score);
 }
