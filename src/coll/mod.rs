@@ -1,3 +1,4 @@
+mod batch;
 pub mod options;
 
 use std::sync::Arc;
@@ -13,7 +14,7 @@ use crate::{
         UpdateCommandResponse,
     },
     concern::{ReadConcern, WriteConcern},
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     read_preference::ReadPreference,
     results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
     Client, Cursor, Database,
@@ -64,6 +65,8 @@ struct CollectionInner {
     read_concern: Option<ReadConcern>,
     write_concern: Option<WriteConcern>,
 }
+
+const MAX_INSERT_DOCS_BYTES: usize = 16 * 1000 * 1000;
 
 impl Collection {
     pub(crate) fn new(db: Database, name: &str, options: Option<CollectionOptions>) -> Self {
@@ -480,7 +483,7 @@ impl Collection {
             .collect();
         let options = options.unwrap_or_default();
 
-        let _ = self.insert_command(docs, options.bypass_document_validation, options.ordered);
+        self.insert_command(docs, options.bypass_document_validation, options.ordered)?;
         Ok(InsertManyResult { inserted_ids })
     }
 
@@ -832,9 +835,15 @@ impl Collection {
         bypass_document_validation: Option<bool>,
         ordered: Option<bool>,
     ) -> Result<()> {
+        let docs: Vec<_> = docs.into_iter().map(Bson::Document).collect();
+
+        if docs.is_empty() {
+            return Ok(());
+        }
+
         let mut command_doc = doc! {
             "insert": &self.inner.name,
-            "documents": Bson::Array(docs.into_iter().map(Bson::Document).collect()),
+            "documents": Bson::Array(docs),
         };
 
         if let Some(val) = bypass_document_validation {
@@ -849,7 +858,47 @@ impl Collection {
             command_doc.insert("writeConcern", write_concern.clone().into_document()?);
         }
 
-        let _ = self.run_write_command(command_doc)?;
+        if bson_util::doc_size_bytes(&command_doc) > MAX_INSERT_DOCS_BYTES {
+            return self.insert_in_batches(command_doc);
+        }
+
+        self.run_write_command_with_error_check(command_doc)?;
+        Ok(())
+    }
+
+    fn insert_in_batches(&self, mut command_doc: Document) -> Result<()> {
+        let mut remaining_docs = match command_doc.remove("documents") {
+            Some(Bson::Array(docs)) => docs,
+            _ => unreachable!(),
+        };
+
+        while let Some(mut current_batch) = batch::split_off_batch(
+            &mut remaining_docs,
+            MAX_INSERT_DOCS_BYTES,
+            bson_util::size_bytes,
+        ) {
+            std::mem::swap(&mut remaining_docs, &mut current_batch);
+
+            let mut current_batch_doc = command_doc.clone();
+            current_batch_doc.insert("documents", current_batch);
+            self.run_write_command_with_error_check(current_batch_doc)?;
+        }
+
+        if !remaining_docs.is_empty() {
+            command_doc.insert("documents", remaining_docs);
+            self.run_write_command_with_error_check(command_doc)?;
+        }
+
+        Ok(())
+    }
+
+    fn run_write_command_with_error_check(&self, command_doc: Document) -> Result<()> {
+        if let Ok((_, document)) = self.run_write_command(command_doc) {
+            if let Some(error) = Error::from_command_response(document) {
+                return Err(error);
+            }
+        }
+
         Ok(())
     }
 
