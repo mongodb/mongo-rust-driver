@@ -28,8 +28,6 @@ impl Benchmark for JsonMultiImportBenchmark {
     type Options = Options;
 
     fn setup(options: Self::Options) -> Result<Self> {
-        println!("Running JsonMultiImportBenchmark...");
-
         let client = Client::with_uri_str(&options.uri)?;
         let db = client.database(&DATABASE_NAME);
         db.drop()?;

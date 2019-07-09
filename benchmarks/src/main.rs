@@ -35,7 +35,7 @@ fn get_nth_percentile(durations: &[Duration], n: f64) -> Duration {
 fn score_test(durations: Vec<Duration>, name: &str, task_size: f64, more_info: bool) -> f64 {
     let score: f64 = task_size / (get_nth_percentile(&durations, 50.0).as_millis() as f64 / 1000.0);
 
-    println!("TEST: {} -- Score: {}", name, score);
+    println!("TEST: {} -- Score: {}\n", name, score);
     if more_info {
         println!(
             "10th percentile: {:#?}",
@@ -66,7 +66,7 @@ fn score_test(durations: Vec<Duration>, name: &str, task_size: f64, more_info: b
             get_nth_percentile(&durations, 98.0),
         );
         println!(
-            "99th percentile: {:#?}",
+            "99th percentile: {:#?}\n",
             get_nth_percentile(&durations, 99.0),
         );
     }
@@ -77,7 +77,7 @@ fn score_test(durations: Vec<Duration>, name: &str, task_size: f64, more_info: b
 fn single_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
     println!("----------------------------");
     println!("Single-Doc Benchmarks:");
-    println!("----------------------------");
+    println!("----------------------------\n");
 
     let mut comp_score: f64 = 0.0;
 
@@ -86,6 +86,7 @@ fn single_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
         num_iter: 10000,
         uri: uri.to_string(),
     };
+    println!("Running Run command...");
     let run_command = bench::run_benchmark::<RunCommandBenchmark>(run_command_options)?;
 
     comp_score += score_test(run_command, "Run command", 0.16, more_info);
@@ -98,6 +99,7 @@ fn single_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
             .join("tweet.json"),
         uri: uri.to_string(),
     };
+    println!("Running Find one by ID...");
     let find_one = bench::run_benchmark::<FindOneBenchmark>(find_one_options)?;
 
     comp_score += score_test(find_one, "Find one by ID", 16.22, more_info);
@@ -110,6 +112,7 @@ fn single_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
             .join("small_doc.json"),
         uri: uri.to_string(),
     };
+    println!("Running Small doc insertOne...");
     let small_insert_one = bench::run_benchmark::<InsertOneBenchmark>(small_insert_one_options)?;
 
     comp_score += score_test(small_insert_one, "Small doc insertOne", 2.75, more_info);
@@ -122,18 +125,19 @@ fn single_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
             .join("large_doc.json"),
         uri: uri.to_string(),
     };
+    println!("Running Large doc insertOne...");
     let large_insert_one = bench::run_benchmark::<InsertOneBenchmark>(large_insert_one_options)?;
 
     comp_score += score_test(large_insert_one, "Large doc insertOne", 27.31, more_info);
 
-    println!("SingleBench Score: {}", comp_score);
+    println!("\nSingle-doc benchmark composite score: {}\n", comp_score);
     Ok(comp_score)
 }
 
 fn multi_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
     println!("----------------------------");
     println!("Multi-Doc Benchmarks:");
-    println!("----------------------------");
+    println!("----------------------------\n");
 
     let mut comp_score: f64 = 0.0;
 
@@ -145,6 +149,7 @@ fn multi_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
             .join("tweet.json"),
         uri: uri.to_string(),
     };
+    println!("Running Find many and empty the cursor...");
     let find_many = bench::run_benchmark::<FindManyBenchmark>(find_many_options)?;
 
     comp_score += score_test(
@@ -162,6 +167,7 @@ fn multi_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
             .join("small_doc.json"),
         uri: uri.to_string(),
     };
+    println!("Running Small doc bulk insert...");
     let small_insert_many = bench::run_benchmark::<InsertManyBenchmark>(small_insert_many_options)?;
 
     comp_score += score_test(small_insert_many, "Small doc bulk insert", 2.75, more_info);
@@ -174,18 +180,19 @@ fn multi_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
             .join("large_doc.json"),
         uri: uri.to_string(),
     };
+    println!("Running Large doc bulk insert...");
     let large_insert_many = bench::run_benchmark::<InsertManyBenchmark>(large_insert_many_options)?;
 
     comp_score += score_test(large_insert_many, "Large doc bulk insert", 27.31, more_info);
 
-    println!("MultiBench Score: {}", comp_score);
+    println!("\nMulti-doc benchmark composite score: {}\n", comp_score);
     Ok(comp_score)
 }
 
 fn parallel_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
     println!("----------------------------");
     println!("Parallel Benchmarks:");
-    println!("----------------------------");
+    println!("----------------------------\n");
 
     let mut comp_score: f64 = 0.0;
 
@@ -195,6 +202,7 @@ fn parallel_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
         path: DATA_PATH.join("parallel").join("ldjson_multi"),
         uri: uri.to_string(),
     };
+    println!("Running LDJSON multi-file import...");
     let json_multi_import =
         bench::run_benchmark::<JsonMultiImportBenchmark>(json_multi_import_options)?;
 
@@ -211,6 +219,7 @@ fn parallel_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
         path: DATA_PATH.join("parallel").join("ldjson_multi"),
         uri: uri.to_string(),
     };
+    println!("Running LDJSON multi-file export...");
     let json_multi_export =
         bench::run_benchmark::<JsonMultiExportBenchmark>(json_multi_export_options)?;
 
@@ -221,7 +230,7 @@ fn parallel_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
         more_info,
     );
 
-    println!("ParallelBench Score: {}", comp_score);
+    println!("\nParallel benchmark composite score: {}\n", comp_score);
     Ok(comp_score)
 }
 
@@ -250,8 +259,12 @@ fn main() {
     }
 
     println!(
-        "Running tests{}...",
-        if verbose { " in verbose mode" } else { "" }
+        "Running tests{}...\n",
+        if verbose {
+            " in verbose mode"
+        } else {
+            " nonverbosely"
+        }
     );
 
     let mut comp_score: f64 = 0.0;
@@ -267,5 +280,5 @@ fn main() {
     }
 
     println!("----------------------------");
-    println!("DriverBench Score = {}", comp_score);
+    println!("Driver benchmark composite score = {}", comp_score);
 }

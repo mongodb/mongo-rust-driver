@@ -83,6 +83,10 @@ fn finished(duration: Duration, iter: usize) -> bool {
 }
 
 pub fn run_benchmark<B: Benchmark>(options: B::Options) -> Result<Vec<Duration>> {
+    let mut test = B::setup(options)?;
+
+    let mut test_durations = Vec::new();
+
     let bar = ProgressBar::new(*MAX_ITERATIONS as u64);
     bar.set_style(
         ProgressStyle::default_bar()
@@ -92,10 +96,6 @@ pub fn run_benchmark<B: Benchmark>(options: B::Options) -> Result<Vec<Duration>>
             )
             .progress_chars("#>-"),
     );
-
-    let mut test = B::setup(options)?;
-
-    let mut test_durations = Vec::new();
 
     let benchmark_timer = Instant::now();
     let mut iter = 0;

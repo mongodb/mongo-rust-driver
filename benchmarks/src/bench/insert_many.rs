@@ -27,8 +27,6 @@ impl Benchmark for InsertManyBenchmark {
     type Options = Options;
 
     fn setup(options: Self::Options) -> Result<Self> {
-        println!("Running InsertManyBenchmark...");
-
         let client = Client::with_uri_str(&options.uri)?;
         let db = client.database(&DATABASE_NAME);
         db.drop()?;
