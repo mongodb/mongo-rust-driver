@@ -8,7 +8,6 @@ use crate::{
 };
 
 const TOTAL_FILES: usize = 100;
-const CHUNK_SIZE: usize = 10000;
 
 pub struct JsonMultiImportBenchmark {
     db: Database,
@@ -78,20 +77,8 @@ impl Benchmark for JsonMultiImportBenchmark {
                     docs.append(&mut new_docs);
                 }
 
-                // TODO RUST-187: We can change this to a single `Collection::insert_many` once
-                // batching is implemented in the driver.
-                let opts = InsertManyOptions::builder().ordered(Some(false)).build();
-
-                let mut doc_chunks = Vec::new();
-                while docs.len() > CHUNK_SIZE {
-                    let rest = docs.split_off(CHUNK_SIZE);
-                    doc_chunks.push(std::mem::replace(&mut docs, rest));
-                }
-                doc_chunks.push(docs);
-
-                for chunk in doc_chunks {
-                    coll_ref.insert_many(chunk, Some(opts.clone())).unwrap();
-                }
+                let opts = Some(InsertManyOptions::builder().ordered(Some(false)).build());
+                coll_ref.insert_many(docs, opts).unwrap();
             });
             threads.push(thread);
 
