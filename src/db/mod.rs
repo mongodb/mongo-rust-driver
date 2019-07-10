@@ -446,7 +446,7 @@ impl Database {
 
         let mut watch_pipeline = Vec::new();
         let mut aggregate_options: Option<AggregateOptions>;
-        let mut resume_token: ChangeStreamToken;
+        let mut resume_token: Option<ChangeStreamToken>;
         let stream_options = options.clone();
 
         if let Some(options) = options {
@@ -456,11 +456,12 @@ impl Database {
                     .collation(options.collation)
                     .build(),
             );
-            resume_token = ChangeStreamToken::new(options.start_after.or(options.resume_after));
+
+            resume_token = options.start_after.or(options.resume_after);
         } else {
             watch_pipeline.push(doc! { "$changeStream": {} });
             aggregate_options = None;
-            resume_token = ChangeStreamToken::new(None);
+            resume_token = None;
         }
         watch_pipeline.extend(pipeline.clone());
 

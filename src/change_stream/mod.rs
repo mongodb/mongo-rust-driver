@@ -41,7 +41,7 @@ pub struct ChangeStream {
     pub cursor: Cursor,
 
     /// The cached resume token
-    pub resume_token: ChangeStreamToken,
+    pub resume_token: Option<ChangeStreamToken>,
 
     /// The pipeline of stages to append to an initial `$changeStream` stage
     pub pipeline: Vec<Document>,
@@ -57,8 +57,8 @@ pub struct ChangeStream {
 impl ChangeStream {
     /// Returns the cached resume token that will be used to resume after the
     /// most recently returned change.
-    pub fn resume_token(&self) -> ChangeStreamToken {
-        self.resume_token.clone()
+    pub fn resume_token(&self) -> Option<ChangeStreamToken> {
+        self.resume_token
     }
 
     /// Tail the change stream.
@@ -69,8 +69,23 @@ impl ChangeStream {
     }
 
     /// Attempt to resume the change stream.
-    fn resume(&mut self) -> Result<()> {
-        unimplemented!();
+    fn resume(&mut self) -> Result<ChangeStream> {
+        // perform server selection
+        // connect to selected server
+
+        if self.resume_token().is_some() {
+            let new_options = self.options.clone();
+
+            if let Some(new_options) = new_options {
+                new_options.resume_after = self.resume_token();
+                new_options.start_after = None;
+                new_options.start_at_operation_time = None;
+            }
+        } else {
+
+        }
+
+        Ok(ChangeStream { Default::default() })
     }
 }
 
@@ -98,6 +113,6 @@ impl<'a> Iterator for ChangeStreamTail<'a> {
     type Item = Result<ChangeStreamDocument>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        unimplemented!();
+        self.change_stream.next()
     }
 }

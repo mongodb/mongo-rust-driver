@@ -1,13 +1,11 @@
-use bson::{Bson, Document};
-
-use crate::error::Result;
+use bson::Document;
 
 /// An opaque token for use when resuming an interrupted `ChangeStream`
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ChangeStreamToken(Option<Document>);
+pub struct ChangeStreamToken(Document);
 
 impl ChangeStreamToken {
-    pub fn new(doc: Option<Document>) -> ChangeStreamToken {
+    pub fn new(doc: Document) -> ChangeStreamToken {
         ChangeStreamToken(doc)
     }
 }
@@ -47,13 +45,6 @@ pub struct ChangeStreamDocument {
     /// version of the `Document` from some point after the update occurred. If the
     /// `Document` was deleted since the updated happened, it will be None.
     pub full_document: Option<Document>,
-}
-
-impl ChangeStreamDocument {
-    pub(crate) fn to_bson(&self) -> Result<Bson> {
-        let doc = bson::to_bson(self)?;
-        Ok(doc)
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
