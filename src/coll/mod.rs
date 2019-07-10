@@ -1054,7 +1054,11 @@ impl Collection {
 
     /// Returns a change stream on a specific collection.
     ///
-    /// Note that using a `$project` stage to remove any of the `_id`
+    /// At the time of writing, change streams require either a "majority"
+    /// read concern or no read concern. Anything else will cause a server
+    /// error.
+    ///
+    /// Also note that using a `$project` stage to remove any of the `_id`
     /// `operationType` or `ns` fields will cause an error. The driver
     /// requires these fields to support resumability.
     pub(crate) fn watch(
@@ -1070,7 +1074,7 @@ impl Collection {
         let stream_options = options.clone();
 
         if let Some(options) = options {
-            watch_pipeline.push(doc! { "$changeStream": options.to_bson()? });
+            watch_pipeline.push(doc! { "$changeStream": bson::to_bson(&options)? });
             aggregate_options = Some(
                 AggregateOptions::builder()
                     .collation(options.collation)

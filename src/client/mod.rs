@@ -14,13 +14,13 @@ use rand::{seq::SliceRandom, thread_rng};
 use time::{Duration as TimeDuration, PreciseTime};
 
 use crate::{
-    change_stream::ChangeStream,
+    change_stream::{document::ChangeStreamToken, ChangeStream},
     command_responses::ListDatabasesResponse,
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::{ErrorKind, Result},
     event::{CommandEventHandler, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
-    options::{ChangeStreamOptions, ClientOptions, DatabaseOptions},
+    options::{AggregateOptions, ChangeStreamOptions, ClientOptions, DatabaseOptions},
     pool::Connection,
     read_preference::ReadPreference,
     topology::{ServerDescription, ServerType, Topology, TopologyType},
@@ -342,6 +342,10 @@ impl Client {
     /// Excludes system collections. Excludes the "config",
     /// "local", and "admin" databases.
     ///
+    /// At the time of writing, change streams require either a "majority"
+    /// read concern or no read concern. Anything else will cause a server
+    /// error.
+    ///
     /// Note that using a `$project` stage to remove any of the `_id`
     /// `operationType` or `ns` fields will cause an error. The driver
     /// requires these fields to support resumability.
@@ -350,7 +354,50 @@ impl Client {
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<ChangeStreamOptions>,
     ) -> Result<ChangeStream> {
-        unimplemented!();
+        let pipeline: Vec<Document> = pipeline.into_iter().collect();
+
+        let mut watch_pipeline = Vec::new();
+        let mut aggregate_options: Option<AggregateOptions>;
+        let mut resume_token: ChangeStreamToken;
+        let stream_options = options.clone();
+
+        if let Some(options) = options {
+            let options_bson = bson::to_bson(&options)?;
+            if let bson::Bson::Document(mut options_doc) = options_bson {
+                options_doc.insert("allChangesForCluster", true);
+                watch_pipeline.push(doc! { "$changeStream": options_doc });
+            } else {
+                // TODO: Throw the correct error here (options cannot be parsed as Document)
+                unreachable!();
+            }
+
+            aggregate_options = Some(
+                AggregateOptions::builder()
+                    .collation(options.collation)
+                    .build(),
+            );
+            resume_token = ChangeStreamToken::new(options.start_after.or(options.resume_after));
+        } else {
+            watch_pipeline.push(doc! { "$changeStream": { "allChangesForCluster": true } });
+            aggregate_options = None;
+            resume_token = ChangeStreamToken::new(None);
+        }
+        watch_pipeline.extend(pipeline.clone());
+
+        let db = self.database("admin");
+        let cursor = db.aggregate(watch_pipeline, aggregate_options)?;
+
+        let read_preference = self
+            .read_preference()
+            .map(|pref: &ReadPreference| pref.clone());
+
+        Ok(ChangeStream {
+            cursor,
+            resume_token,
+            pipeline,
+            options: stream_options,
+            read_preference,
+        })
     }
 }
 

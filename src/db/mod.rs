@@ -6,7 +6,7 @@ use bson::{Bson, Document};
 
 use self::options::{CreateCollectionOptions, DatabaseOptions};
 use crate::{
-    change_stream::ChangeStream,
+    change_stream::{document::ChangeStreamToken, ChangeStream},
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{ErrorKind, Result},
@@ -25,7 +25,6 @@ use crate::{
 /// so it can safely be shared across threads. For example:
 ///
 /// ```rust
-/// 
 /// # use mongodb::{Client, error::Result};
 ///
 /// # fn start_workers() -> Result<()> {
@@ -431,6 +430,10 @@ impl Database {
     /// Allows a client to observe all changes in a database.
     /// Excludes system collections.
     ///
+    /// At the time of writing, change streams require either a "majority"
+    /// read concern or no read concern. Anything else will cause a server
+    /// error.
+    ///
     /// Note that using a `$project` stage to remove any of the `_id`
     /// `operationType` or `ns` fields will cause an error. The driver
     /// requires these fields to support resumability.
@@ -439,6 +442,41 @@ impl Database {
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<ChangeStreamOptions>,
     ) -> Result<ChangeStream> {
-        unimplemented!();
+        let pipeline: Vec<Document> = pipeline.into_iter().collect();
+
+        let mut watch_pipeline = Vec::new();
+        let mut aggregate_options: Option<AggregateOptions>;
+        let mut resume_token: ChangeStreamToken;
+        let stream_options = options.clone();
+
+        if let Some(options) = options {
+            watch_pipeline.push(doc! { "$changeStream": bson::to_bson(&options)? });
+            aggregate_options = Some(
+                AggregateOptions::builder()
+                    .collation(options.collation)
+                    .build(),
+            );
+            resume_token = ChangeStreamToken::new(options.start_after.or(options.resume_after));
+        } else {
+            watch_pipeline.push(doc! { "$changeStream": {} });
+            aggregate_options = None;
+            resume_token = ChangeStreamToken::new(None);
+        }
+        watch_pipeline.extend(pipeline.clone());
+
+        let cursor = self.aggregate(watch_pipeline, aggregate_options)?;
+
+        let read_preference = self
+            .read_preference()
+            .or(self.client().read_preference())
+            .map(|pref: &ReadPreference| pref.clone());
+
+        Ok(ChangeStream {
+            cursor,
+            resume_token,
+            pipeline,
+            options: stream_options,
+            read_preference,
+        })
     }
 }

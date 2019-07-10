@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use bson::{Bson, Document};
+use bson::Document;
 
-use crate::{error::Result, options::collation::Collation};
+use crate::options::collation::Collation;
 
 #[derive(Clone, Debug, Serialize, Deserialize, TypedBuilder)]
 pub struct ChangeStreamOptions {
@@ -53,11 +53,4 @@ pub enum FullDocumentType {
 
     /// User-defined other types for forward compatibility
     Other(String),
-}
-
-impl ChangeStreamOptions {
-    pub(crate) fn to_bson(&self) -> Result<Bson> {
-        let options = bson::to_bson(self)?;
-        Ok(options)
-    }
 }
