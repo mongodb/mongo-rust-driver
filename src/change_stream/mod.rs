@@ -58,7 +58,7 @@ impl ChangeStream {
     /// Returns the cached resume token that will be used to resume after the
     /// most recently returned change.
     pub fn resume_token(&self) -> Option<ChangeStreamToken> {
-        self.resume_token
+        self.resume_token.clone()
     }
 
     /// Tail the change stream.
@@ -73,19 +73,20 @@ impl ChangeStream {
         // perform server selection
         // connect to selected server
 
-        if self.resume_token().is_some() {
-            let new_options = self.options.clone();
+        // if self.resume_token().is_some() {
+        // let new_options = self.options.clone();
 
-            if let Some(new_options) = new_options {
-                new_options.resume_after = self.resume_token();
-                new_options.start_after = None;
-                new_options.start_at_operation_time = None;
-            }
-        } else {
+        // if let Some(new_options) = new_options {
+        // new_options.resume_after = self.resume_token();
+        // new_options.start_after = None;
+        // new_options.start_at_operation_time = None;
+        // }
+        // } else {
 
-        }
+        // }
 
-        Ok(ChangeStream { Default::default() })
+        // Ok(ChangeStream { Default::default() })
+        unimplemented!();
     }
 }
 
