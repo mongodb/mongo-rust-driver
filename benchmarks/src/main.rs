@@ -15,6 +15,8 @@ use std::{
     time::Duration,
 };
 
+use clap::ArgMatches;
+
 use crate::{
     bench::{
         find_many::FindManyBenchmark, find_one::FindOneBenchmark, insert_many::InsertManyBenchmark,
@@ -74,7 +76,7 @@ fn score_test(durations: Vec<Duration>, name: &str, task_size: f64, more_info: b
     score
 }
 
-fn single_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
+fn single_doc_benchmarks(uri: &str, more_info: bool, id_vec: &[bool]) -> Result<f64> {
     println!("----------------------------");
     println!("Single-Doc Benchmarks:");
     println!("----------------------------\n");
@@ -82,59 +84,69 @@ fn single_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
     let mut comp_score: f64 = 0.0;
 
     // Run command
-    let run_command_options = bench::run_command::Options {
-        num_iter: 10000,
-        uri: uri.to_string(),
-    };
-    println!("Running Run command...");
-    let run_command = bench::run_benchmark::<RunCommandBenchmark>(run_command_options)?;
+    if id_vec[0] {
+        let run_command_options = bench::run_command::Options {
+            num_iter: 10000,
+            uri: uri.to_string(),
+        };
+        println!("Running Run command...");
+        let run_command = bench::run_benchmark::<RunCommandBenchmark>(run_command_options)?;
 
-    comp_score += score_test(run_command, "Run command", 0.16, more_info);
+        comp_score += score_test(run_command, "Run command", 0.16, more_info);
+    }
 
     // Find one by ID
-    let find_one_options = bench::find_one::Options {
-        num_iter: 10000,
-        path: DATA_PATH
-            .join("single_and_multi_document")
-            .join("tweet.json"),
-        uri: uri.to_string(),
-    };
-    println!("Running Find one by ID...");
-    let find_one = bench::run_benchmark::<FindOneBenchmark>(find_one_options)?;
+    if id_vec[1] {
+        let find_one_options = bench::find_one::Options {
+            num_iter: 10000,
+            path: DATA_PATH
+                .join("single_and_multi_document")
+                .join("tweet.json"),
+            uri: uri.to_string(),
+        };
+        println!("Running Find one by ID...");
+        let find_one = bench::run_benchmark::<FindOneBenchmark>(find_one_options)?;
 
-    comp_score += score_test(find_one, "Find one by ID", 16.22, more_info);
+        comp_score += score_test(find_one, "Find one by ID", 16.22, more_info);
+    }
 
     // Small doc insertOne
-    let small_insert_one_options = bench::insert_one::Options {
-        num_iter: 10000,
-        path: DATA_PATH
-            .join("single_and_multi_document")
-            .join("small_doc.json"),
-        uri: uri.to_string(),
-    };
-    println!("Running Small doc insertOne...");
-    let small_insert_one = bench::run_benchmark::<InsertOneBenchmark>(small_insert_one_options)?;
+    if id_vec[2] {
+        let small_insert_one_options = bench::insert_one::Options {
+            num_iter: 10000,
+            path: DATA_PATH
+                .join("single_and_multi_document")
+                .join("small_doc.json"),
+            uri: uri.to_string(),
+        };
+        println!("Running Small doc insertOne...");
+        let small_insert_one =
+            bench::run_benchmark::<InsertOneBenchmark>(small_insert_one_options)?;
 
-    comp_score += score_test(small_insert_one, "Small doc insertOne", 2.75, more_info);
+        comp_score += score_test(small_insert_one, "Small doc insertOne", 2.75, more_info);
+    }
 
     // Large doc insertOne
-    let large_insert_one_options = bench::insert_one::Options {
-        num_iter: 10,
-        path: DATA_PATH
-            .join("single_and_multi_document")
-            .join("large_doc.json"),
-        uri: uri.to_string(),
-    };
-    println!("Running Large doc insertOne...");
-    let large_insert_one = bench::run_benchmark::<InsertOneBenchmark>(large_insert_one_options)?;
+    if id_vec[3] {
+        let large_insert_one_options = bench::insert_one::Options {
+            num_iter: 10,
+            path: DATA_PATH
+                .join("single_and_multi_document")
+                .join("large_doc.json"),
+            uri: uri.to_string(),
+        };
+        println!("Running Large doc insertOne...");
+        let large_insert_one =
+            bench::run_benchmark::<InsertOneBenchmark>(large_insert_one_options)?;
 
-    comp_score += score_test(large_insert_one, "Large doc insertOne", 27.31, more_info);
+        comp_score += score_test(large_insert_one, "Large doc insertOne", 27.31, more_info);
+    }
 
     println!("\nSingle-doc benchmark composite score: {}\n", comp_score);
     Ok(comp_score)
 }
 
-fn multi_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
+fn multi_doc_benchmarks(uri: &str, more_info: bool, id_vec: &[bool]) -> Result<f64> {
     println!("----------------------------");
     println!("Multi-Doc Benchmarks:");
     println!("----------------------------\n");
@@ -142,54 +154,62 @@ fn multi_doc_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
     let mut comp_score: f64 = 0.0;
 
     // Find many and empty the cursor
-    let find_many_options = bench::find_many::Options {
-        num_iter: 10000,
-        path: DATA_PATH
-            .join("single_and_multi_document")
-            .join("tweet.json"),
-        uri: uri.to_string(),
-    };
-    println!("Running Find many and empty the cursor...");
-    let find_many = bench::run_benchmark::<FindManyBenchmark>(find_many_options)?;
+    if id_vec[4] {
+        let find_many_options = bench::find_many::Options {
+            num_iter: 10000,
+            path: DATA_PATH
+                .join("single_and_multi_document")
+                .join("tweet.json"),
+            uri: uri.to_string(),
+        };
+        println!("Running Find many and empty the cursor...");
+        let find_many = bench::run_benchmark::<FindManyBenchmark>(find_many_options)?;
 
-    comp_score += score_test(
-        find_many,
-        "Find many and empty the cursor",
-        16.22,
-        more_info,
-    );
+        comp_score += score_test(
+            find_many,
+            "Find many and empty the cursor",
+            16.22,
+            more_info,
+        );
+    }
 
     // Small doc bulk insert
-    let small_insert_many_options = bench::insert_many::Options {
-        num_copies: 10000,
-        path: DATA_PATH
-            .join("single_and_multi_document")
-            .join("small_doc.json"),
-        uri: uri.to_string(),
-    };
-    println!("Running Small doc bulk insert...");
-    let small_insert_many = bench::run_benchmark::<InsertManyBenchmark>(small_insert_many_options)?;
+    if id_vec[5] {
+        let small_insert_many_options = bench::insert_many::Options {
+            num_copies: 10000,
+            path: DATA_PATH
+                .join("single_and_multi_document")
+                .join("small_doc.json"),
+            uri: uri.to_string(),
+        };
+        println!("Running Small doc bulk insert...");
+        let small_insert_many =
+            bench::run_benchmark::<InsertManyBenchmark>(small_insert_many_options)?;
 
-    comp_score += score_test(small_insert_many, "Small doc bulk insert", 2.75, more_info);
+        comp_score += score_test(small_insert_many, "Small doc bulk insert", 2.75, more_info);
+    }
 
     // Large doc bulk insert
-    let large_insert_many_options = bench::insert_many::Options {
-        num_copies: 10,
-        path: DATA_PATH
-            .join("single_and_multi_document")
-            .join("large_doc.json"),
-        uri: uri.to_string(),
-    };
-    println!("Running Large doc bulk insert...");
-    let large_insert_many = bench::run_benchmark::<InsertManyBenchmark>(large_insert_many_options)?;
+    if id_vec[6] {
+        let large_insert_many_options = bench::insert_many::Options {
+            num_copies: 10,
+            path: DATA_PATH
+                .join("single_and_multi_document")
+                .join("large_doc.json"),
+            uri: uri.to_string(),
+        };
+        println!("Running Large doc bulk insert...");
+        let large_insert_many =
+            bench::run_benchmark::<InsertManyBenchmark>(large_insert_many_options)?;
 
-    comp_score += score_test(large_insert_many, "Large doc bulk insert", 27.31, more_info);
+        comp_score += score_test(large_insert_many, "Large doc bulk insert", 27.31, more_info);
+    }
 
     println!("\nMulti-doc benchmark composite score: {}\n", comp_score);
     Ok(comp_score)
 }
 
-fn parallel_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
+fn parallel_benchmarks(uri: &str, more_info: bool, id_vec: &[bool]) -> Result<f64> {
     println!("----------------------------");
     println!("Parallel Benchmarks:");
     println!("----------------------------\n");
@@ -197,41 +217,84 @@ fn parallel_benchmarks(uri: &str, more_info: bool) -> Result<f64> {
     let mut comp_score: f64 = 0.0;
 
     // LDJSON multi-file import
-    let json_multi_import_options = bench::json_multi_import::Options {
-        num_threads: num_cpus::get(),
-        path: DATA_PATH.join("parallel").join("ldjson_multi"),
-        uri: uri.to_string(),
-    };
-    println!("Running LDJSON multi-file import...");
-    let json_multi_import =
-        bench::run_benchmark::<JsonMultiImportBenchmark>(json_multi_import_options)?;
+    if id_vec[7] {
+        let json_multi_import_options = bench::json_multi_import::Options {
+            num_threads: num_cpus::get(),
+            path: DATA_PATH.join("parallel").join("ldjson_multi"),
+            uri: uri.to_string(),
+        };
+        println!("Running LDJSON multi-file import...");
+        let json_multi_import =
+            bench::run_benchmark::<JsonMultiImportBenchmark>(json_multi_import_options)?;
 
-    comp_score += score_test(
-        json_multi_import,
-        "LDJSON multi-file import",
-        565.0,
-        more_info,
-    );
+        comp_score += score_test(
+            json_multi_import,
+            "LDJSON multi-file import",
+            565.0,
+            more_info,
+        );
+    }
 
     // LDJSON multi-file export
-    let json_multi_export_options = bench::json_multi_export::Options {
-        num_threads: num_cpus::get(),
-        path: DATA_PATH.join("parallel").join("ldjson_multi"),
-        uri: uri.to_string(),
-    };
-    println!("Running LDJSON multi-file export...");
-    let json_multi_export =
-        bench::run_benchmark::<JsonMultiExportBenchmark>(json_multi_export_options)?;
+    if id_vec[8] {
+        let json_multi_export_options = bench::json_multi_export::Options {
+            num_threads: num_cpus::get(),
+            path: DATA_PATH.join("parallel").join("ldjson_multi"),
+            uri: uri.to_string(),
+        };
+        println!("Running LDJSON multi-file export...");
+        let json_multi_export =
+            bench::run_benchmark::<JsonMultiExportBenchmark>(json_multi_export_options)?;
 
-    comp_score += score_test(
-        json_multi_export,
-        "LDJSON multi-file export",
-        565.0,
-        more_info,
-    );
+        comp_score += score_test(
+            json_multi_export,
+            "LDJSON multi-file export",
+            565.0,
+            more_info,
+        );
+    }
 
     println!("\nParallel benchmark composite score: {}\n", comp_score);
     Ok(comp_score)
+}
+
+fn parse_ids(matches: ArgMatches) -> Vec<bool> {
+    let ids: Vec<usize> = matches
+        .value_of("ids")
+        .unwrap_or("1,2,3,4,5,6,7,8,9")
+        .split(',')
+        .map(|str| {
+            str.to_string()
+                .parse::<usize>()
+                .expect("invalid test IDs provided, see README")
+        })
+        .collect();
+
+    let mut id_vec = vec![false; 9];
+    for id in ids {
+        if id < 1 || id > 9 {
+            panic!("invalid test IDs provided, see README");
+        }
+        id_vec[id - 1] = true;
+    }
+
+    if matches.is_present("single") {
+        id_vec[0] = true;
+        id_vec[1] = true;
+        id_vec[2] = true;
+        id_vec[3] = true;
+    }
+    if matches.is_present("multi") {
+        id_vec[4] = true;
+        id_vec[5] = true;
+        id_vec[6] = true;
+    }
+    if matches.is_present("parallel") {
+        id_vec[7] = true;
+        id_vec[8] = true;
+    }
+
+    id_vec
 }
 
 fn main() {
@@ -242,21 +305,13 @@ fn main() {
         (@arg single: -s --single ... "Run single document benchmarks")
         (@arg multi: -m --multi ... "Run multi document benchmarks")
         (@arg parallel: -p --parallel ... "Run parallel document benchmarks")
-        (@arg verbose: -v --verbose ... "Print test information verbosely"))
+        (@arg verbose: -v --verbose ... "Print test information verbosely")
+        (@arg ids: --ids +takes_value "Run benchmarks by id number"))
     .get_matches();
 
     let uri = option_env!("MONGODB_URI").unwrap_or("mongodb://localhost:27017");
 
     let verbose = matches.is_present("verbose");
-    let mut single = matches.is_present("single");
-    let mut multi = matches.is_present("multi");
-    let mut parallel = matches.is_present("parallel");
-
-    if !single && !multi && !parallel {
-        single = true;
-        multi = true;
-        parallel = true;
-    }
 
     println!(
         "Running tests{}...\n",
@@ -267,16 +322,21 @@ fn main() {
         }
     );
 
+    let id_vec = parse_ids(matches);
+
     let mut comp_score: f64 = 0.0;
 
-    if single {
-        comp_score += single_doc_benchmarks(uri, verbose).unwrap();
+    // Single
+    if id_vec[0] || id_vec[1] || id_vec[2] || id_vec[3] {
+        comp_score += single_doc_benchmarks(uri, verbose, &id_vec).unwrap();
     }
-    if multi {
-        comp_score += multi_doc_benchmarks(uri, verbose).unwrap();
+    // Multi
+    if id_vec[4] || id_vec[5] || id_vec[6] {
+        comp_score += multi_doc_benchmarks(uri, verbose, &id_vec).unwrap();
     }
-    if parallel {
-        comp_score += parallel_benchmarks(uri, verbose).unwrap();
+    // Parallel
+    if id_vec[7] || id_vec[8] {
+        comp_score += parallel_benchmarks(uri, verbose, &id_vec).unwrap();
     }
 
     println!("----------------------------");

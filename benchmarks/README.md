@@ -15,6 +15,22 @@ and `MAX_ITERATIONS` environment variables.
 
 Run `cargo run --release -- --help` to see a full list of testing options.
 
+When running the benchmarks with the `--ids` flag, you can refer to each benchmark by their unique id. You can refer to multiple 
+benchmarks by separating each benchmark's id with a comma. For example `cargo run --release -- --ids 1,2,3,4` would run all 
+the single-doc benchmarks. By default, all benchmarks are executed. The table below lists each benchmark's id.
+
+| Benchmark                      | ID |
+|--------------------------------|----|
+| Run command                    | 1  |
+| Find one by ID                 | 2  |
+| Small doc insertOne            | 3  |
+| Large doc insertOne            | 4  |
+| Find many and empty the cursor | 5  |
+| Small doc bulk insert          | 6  |
+| Large doc bulk insert          | 7  |
+| LDJSON multi-file import       | 8  |
+| LDJSON multi-file export       | 9  |
+
 Note that in order to compare against the other drivers, an inMemory mongod instance should be used.
 
 At this point, BSON and GridFS benchmarks are not implemented because we do not own the Rust BSON library, and GridFS has not been implemented
