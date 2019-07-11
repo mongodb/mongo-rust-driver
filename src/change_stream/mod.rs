@@ -1,6 +1,8 @@
 pub mod document;
 pub mod options;
 
+use std::marker::PhantomData;
+
 use bson::Document;
 
 use self::document::*;
@@ -36,25 +38,45 @@ use crate::{error::Result, read_preference::ReadPreference, Cursor};
 ///
 /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/index.html) for more
 /// details. Also see the documentation on [usage recommendations](https://docs.mongodb.com/manual/administration/change-streams-production-recommendations/).
-pub struct ChangeStream {
+struct ChangeStream<T> {
     /// The cursor to iterate over `ChangeStreamDocument` instances
-    pub cursor: Cursor,
-
-    /// The cached resume token
-    pub resume_token: Option<ChangeStreamToken>,
+    cursor: Cursor,
 
     /// The pipeline of stages to append to an initial `$changeStream` stage
-    pub pipeline: Vec<Document>,
+    pipeline: Vec<Document>,
+
+    /// The cached resume token
+    resume_token: Option<ChangeStreamToken>,
 
     /// The options provided to the initial `$changeStream` stage
-    pub options: Option<ChangeStreamOptions>,
+    options: Option<ChangeStreamOptions>,
 
     /// The read preference for the initial `$changeStream` aggregation, used
     /// for server selection during an automatic resume.
-    pub read_preference: Option<ReadPreference>,
+    read_preference: Option<ReadPreference>,
+
+    phantom: PhantomData<T>,
 }
 
-impl ChangeStream {
+impl<T> ChangeStream<T> {
+    /// Creates a new ChangeStream instance
+    pub fn new(
+        cursor: Cursor,
+        pipeline: Vec<Document>,
+        resume_token: Option<ChangeStreamToken>,
+        options: Option<ChangeStreamOptions>,
+        read_preference: Option<ReadPreference>,
+    ) -> Self {
+        Self {
+            cursor,
+            pipeline,
+            resume_token,
+            options,
+            read_preference,
+            phantom: PhantomData,
+        }
+    }
+
     /// Returns the cached resume token that will be used to resume after the
     /// most recently returned change.
     pub fn resume_token(&self) -> Option<ChangeStreamToken> {
@@ -62,14 +84,14 @@ impl ChangeStream {
     }
 
     /// Tail the change stream.
-    pub fn tail(&mut self) -> ChangeStreamTail {
+    pub fn tail(&mut self) -> ChangeStreamTail<T> {
         ChangeStreamTail {
             change_stream: self,
         }
     }
 
     /// Attempt to resume the change stream.
-    fn resume(&mut self) -> Result<ChangeStream> {
+    fn resume(&mut self) -> Result<ChangeStream<T>> {
         // perform server selection
         // connect to selected server
 
@@ -90,8 +112,8 @@ impl ChangeStream {
     }
 }
 
-impl Iterator for ChangeStream {
-    type Item = Result<ChangeStreamDocument>;
+impl<T> Iterator for ChangeStream<T> {
+    type Item = Result<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         unimplemented!();
@@ -106,12 +128,12 @@ impl Iterator for ChangeStream {
 /// Similar to a `Tail` for a `Cursor`, the only way to create a `ChangeStreamTail` is
 /// with `ChangeStream::tail`. See the `Cursor` type documentation for more details on
 /// how to use a tail.
-pub struct ChangeStreamTail<'a> {
-    change_stream: &'a mut ChangeStream,
+struct ChangeStreamTail<'a, T> {
+    change_stream: &'a mut ChangeStream<T>,
 }
 
-impl<'a> Iterator for ChangeStreamTail<'a> {
-    type Item = Result<ChangeStreamDocument>;
+impl<'a, T> Iterator for ChangeStreamTail<'a, T> {
+    type Item = Result<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.change_stream.next()

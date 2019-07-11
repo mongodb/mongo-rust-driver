@@ -5,8 +5,8 @@ use bson::Document;
 pub struct ChangeStreamToken(Document);
 
 impl ChangeStreamToken {
-    pub fn new(doc: Document) -> ChangeStreamToken {
-        ChangeStreamToken(doc)
+    pub fn new(doc: Document) -> Self {
+        Self(doc)
     }
 }
 
