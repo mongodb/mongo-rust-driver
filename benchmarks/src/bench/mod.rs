@@ -25,17 +25,14 @@ lazy_static! {
     static ref COLL_NAME: String = option_env!("COLL_NAME").unwrap_or("corpus").to_string();
     static ref MAX_EXECUTION_TIME: u64 = option_env!("MAX_EXECUTION_TIME")
         .unwrap_or("300")
-        .to_string()
         .parse::<u64>()
         .expect("invalid MAX_EXECUTION_TIME");
     static ref MIN_EXECUTION_TIME: u64 = option_env!("MIN_EXECUTION_TIME")
         .unwrap_or("60")
-        .to_string()
         .parse::<u64>()
         .expect("invalid MIN_EXECUTION_TIME");
-    static ref MAX_ITERATIONS: usize = option_env!("MAX_ITERATIONS")
+    pub static ref MAX_ITERATIONS: usize = option_env!("MAX_ITERATIONS")
         .unwrap_or("100")
-        .to_string()
         .parse::<usize>()
         .expect("invalid MAX_ITERATIONS");
 }

@@ -2,7 +2,6 @@
 extern crate bson;
 #[macro_use]
 extern crate lazy_static;
-#[macro_use]
 extern crate clap;
 extern crate indicatif;
 extern crate num_cpus;
@@ -15,13 +14,14 @@ use std::{
     time::Duration,
 };
 
-use clap::ArgMatches;
+use clap::{App, Arg, ArgMatches};
 
 use crate::{
     bench::{
         find_many::FindManyBenchmark, find_one::FindOneBenchmark, insert_many::InsertManyBenchmark,
         insert_one::InsertOneBenchmark, json_multi_export::JsonMultiExportBenchmark,
         json_multi_import::JsonMultiImportBenchmark, run_command::RunCommandBenchmark,
+        MAX_ITERATIONS,
     },
     error::Result,
 };
@@ -31,14 +31,16 @@ lazy_static! {
 }
 
 fn get_nth_percentile(durations: &[Duration], n: f64) -> Duration {
-    durations[(durations.len() as f64 * n / 100.0) as usize - 1]
+    let index = (durations.len() as f64 * n / *MAX_ITERATIONS as f64) as usize;
+    durations[std::cmp::max(index, 1) - 1]
 }
 
 fn score_test(durations: Vec<Duration>, name: &str, task_size: f64, more_info: bool) -> f64 {
-    let score: f64 = task_size / (get_nth_percentile(&durations, 50.0).as_millis() as f64 / 1000.0);
-
+    let median = get_nth_percentile(&durations, *MAX_ITERATIONS as f64 / 2.0);
+    let score = task_size / (median.as_millis() as f64 / 1000.0);
     println!("TEST: {} -- Score: {}\n", name, score);
-    if more_info {
+
+    if more_info && *MAX_ITERATIONS == 100 {
         println!(
             "10th percentile: {:#?}",
             get_nth_percentile(&durations, 10.0),
@@ -259,16 +261,16 @@ fn parallel_benchmarks(uri: &str, more_info: bool, id_vec: &[bool]) -> Result<f6
 }
 
 fn parse_ids(matches: ArgMatches) -> Vec<bool> {
-    let ids: Vec<usize> = matches
-        .value_of("ids")
-        .unwrap_or("1,2,3,4,5,6,7,8,9")
-        .split(',')
-        .map(|str| {
-            str.to_string()
-                .parse::<usize>()
-                .expect("invalid test IDs provided, see README")
-        })
-        .collect();
+    let ids: Vec<usize> = match matches.value_of("ids") {
+        Some("all") | None => vec![1, 2, 3, 4, 5, 6, 7, 8, 9],
+        Some(ids) => ids
+            .split(',')
+            .map(|str| {
+                str.parse::<usize>()
+                    .expect("invalid test IDs provided, see README")
+            })
+            .collect(),
+    };
 
     let mut id_vec = vec![false; 9];
     for id in ids {
@@ -298,16 +300,56 @@ fn parse_ids(matches: ArgMatches) -> Vec<bool> {
 }
 
 fn main() {
-    let matches = clap_app!(RustDriverBenchmark =>
-        (version: env!("CARGO_PKG_VERSION"))
-        (about: "Runs performance micro-benchmarks on Rust driver")
-        (author: "benjirewis")
-        (@arg single: -s --single ... "Run single document benchmarks")
-        (@arg multi: -m --multi ... "Run multi document benchmarks")
-        (@arg parallel: -p --parallel ... "Run parallel document benchmarks")
-        (@arg verbose: -v --verbose ... "Print test information verbosely")
-        (@arg ids: --ids +takes_value "Run benchmarks by id number"))
-    .get_matches();
+    let matches = App::new("RustDriverBenchmark")
+        .version(env!("CARGO_PKG_VERSION"))
+        .about("Runs performance micro-bench")
+        .author("benjirewis")
+        .arg(
+            Arg::with_name("single")
+                .short("s")
+                .long("single")
+                .help("Run single document benchmarks"),
+        )
+        .arg(
+            Arg::with_name("multi")
+                .short("m")
+                .long("multi")
+                .help("Run multi document benchmarks"),
+        )
+        .arg(
+            Arg::with_name("parallel")
+                .short("p")
+                .long("parallel")
+                .help("Run parallel document benchmarks"),
+        )
+        .arg(
+            Arg::with_name("verbose")
+                .short("v")
+                .long("verbose")
+                .help("Print test information verbosely"),
+        )
+        .arg(
+            Arg::with_name("ids")
+                .short("i")
+                .long("ids")
+                .takes_value(true)
+                .help("Run benchmarks by id number (comma-separated)")
+                .long_help(
+                    "Run benchmarks by id number (comma-separated):
+    1: Run command
+    2: Find one by ID
+    3: Small doc insertOne
+    4: Large doc insertOne
+    5: Find many and empty the cursor
+    6: Small doc bulk insert
+    7: Large doc bulk insert
+    8: LDJSON multi-file import
+    9: LDJSON multi-file export
+    all: All benchmarks
+                    ",
+                ),
+        )
+        .get_matches();
 
     let uri = option_env!("MONGODB_URI").unwrap_or("mongodb://localhost:27017");
 
