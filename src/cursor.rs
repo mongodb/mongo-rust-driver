@@ -116,6 +116,7 @@ use crate::{
 /// cursor.next();
 /// tail.next();
 /// # Ok(())
+/// # }
 /// ```
 #[allow(dead_code)]
 pub struct Cursor {
