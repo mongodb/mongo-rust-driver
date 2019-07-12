@@ -4,10 +4,15 @@ pub mod options;
 use std::marker::PhantomData;
 
 use bson::Document;
+use serde::Deserialize;
 
 use self::document::*;
 use self::options::*;
-use crate::{error::Result, read_preference::ReadPreference, Cursor};
+use crate::{
+    error::{Error, Result},
+    read_preference::ReadPreference,
+    Cursor,
+};
 
 /// A `ChangeStream` streams the ongoing changes of its associated collection,
 /// database or deployment. `ChangeStream` instances should be created with
@@ -38,7 +43,7 @@ use crate::{error::Result, read_preference::ReadPreference, Cursor};
 ///
 /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/index.html) for more
 /// details. Also see the documentation on [usage recommendations](https://docs.mongodb.com/manual/administration/change-streams-production-recommendations/).
-pub(crate) struct ChangeStream<T> {
+pub struct ChangeStream<T: Deserialize> {
     /// The cursor to iterate over `ChangeStreamDocument` instances
     cursor: Cursor,
 
@@ -58,7 +63,10 @@ pub(crate) struct ChangeStream<T> {
     phantom: PhantomData<T>,
 }
 
-impl<T> ChangeStream<T> {
+impl<T> ChangeStream<T>
+where
+    T: Deserialize,
+{
     /// Creates a new ChangeStream instance
     pub(crate) fn new(
         cursor: Cursor,
@@ -90,8 +98,12 @@ impl<T> ChangeStream<T> {
         }
     }
 
+    fn try_resume(&mut self, error: Error) -> Result<()> {
+        Ok(())
+    }
+
     /// Attempt to resume the change stream.
-    fn resume(&mut self) -> Result<ChangeStream<T>> {
+    fn resume(&mut self) -> Result<()> {
         // TODO: perform server selection and connect to selected server
 
         // let mut new_options = self.options.clone();
@@ -125,20 +137,22 @@ impl<T> ChangeStream<T> {
 
         // run aggregate command against original target
 
-        unimplemented!();
+        Ok(())
     }
 }
 
-impl<T> Iterator for ChangeStream<T> {
+impl<T> Iterator for ChangeStream<T>
+where
+    T: Deserialize,
+{
     type Item = Result<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // if let Some(batch) = self.cursor.next() {
-        // match batch {
-        // Some(doc) =>
-        // }
-        // }
-        unimplemented!();
+        match self.cursor.next() {
+            Some(Ok(doc)) => Some(bson::from_bson(Bson::Document(doc))),
+            Some(Err(e)) => self.try_resume(e); None,
+            None => None,
+        }
     }
 }
 
@@ -150,11 +164,11 @@ impl<T> Iterator for ChangeStream<T> {
 /// Similar to a `Tail` for a `Cursor`, the only way to create a `ChangeStreamTail` is
 /// with `ChangeStream::tail`. See the `Cursor` type documentation for more details on
 /// how to use a tail.
-pub struct ChangeStreamTail<'a, T> {
+pub struct ChangeStreamTail<'a, T: Deserialize> {
     change_stream: &'a mut ChangeStream<T>,
 }
 
-impl<'a, T> Iterator for ChangeStreamTail<'a, T> {
+impl<'a, T> Iterator for ChangeStreamTail<'a, T> where T: Deserialize {
     type Item = Result<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
