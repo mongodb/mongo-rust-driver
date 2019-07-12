@@ -36,7 +36,7 @@ fn get_nth_percentile(durations: &[Duration], n: f64) -> Duration {
 }
 
 fn score_test(durations: Vec<Duration>, name: &str, task_size: f64, more_info: bool) -> f64 {
-    let median = get_nth_percentile(&durations, *MAX_ITERATIONS as f64 / 2.0);
+    let median = get_nth_percentile(&durations, (*MAX_ITERATIONS / 2) as f64);
     let score = task_size / (median.as_millis() as f64 / 1000.0);
     println!("TEST: {} -- Score: {}\n", name, score);
 
@@ -335,7 +335,8 @@ fn main() {
                 .takes_value(true)
                 .help("Run benchmarks by id number (comma-separated)")
                 .long_help(
-                    "Run benchmarks by id number (comma-separated):
+                    "
+Run benchmarks by id number (comma-separated):
     1: Run command
     2: Find one by ID
     3: Small doc insertOne
