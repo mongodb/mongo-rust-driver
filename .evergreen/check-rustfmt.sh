@@ -7,5 +7,3 @@ cargo +nightly fmt -- --check
 
 cd benchmarks
 cargo +nightly fmt -- --check
-
-
