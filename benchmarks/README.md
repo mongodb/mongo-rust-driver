@@ -30,6 +30,7 @@ the single-doc benchmarks. By default, all benchmarks are executed. The table be
 | Large doc bulk insert          | 7  |
 | LDJSON multi-file import       | 8  |
 | LDJSON multi-file export       | 9  |
+| All benchmarks                 | all|
 
 Note that in order to compare against the other drivers, an inMemory mongod instance should be used.
 
