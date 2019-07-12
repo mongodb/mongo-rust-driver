@@ -63,7 +63,7 @@ pub fn parse_json_file_to_documents(file: File) -> Result<Vec<Document>> {
     let mut docs: Vec<Document> = Vec::new();
 
     for line in BufReader::new(file).lines() {
-        let json: Value = serde_json::from_str(&mut line?)?;
+        let json: Value = serde_json::from_str(&line?)?;
 
         docs.push(match json.into() {
             Bson::Document(doc) => doc,
@@ -84,8 +84,8 @@ pub fn run_benchmark<B: Benchmark>(options: B::Options) -> Result<Vec<Duration>>
 
     let mut test_durations = Vec::new();
 
-    let bar = ProgressBar::new(*MAX_ITERATIONS as u64);
-    bar.set_style(
+    let progress_bar = ProgressBar::new(*MAX_ITERATIONS as u64);
+    progress_bar.set_style(
         ProgressStyle::default_bar()
             .template(
                 "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos:>2}/{len:2} \
@@ -97,7 +97,7 @@ pub fn run_benchmark<B: Benchmark>(options: B::Options) -> Result<Vec<Duration>>
     let benchmark_timer = Instant::now();
     let mut iter = 0;
     while !finished(benchmark_timer.elapsed(), iter) {
-        bar.inc(1);
+        progress_bar.inc(1);
 
         test.before_task()?;
         let timer = Instant::now();
@@ -108,7 +108,7 @@ pub fn run_benchmark<B: Benchmark>(options: B::Options) -> Result<Vec<Duration>>
         iter += 1;
     }
     test.teardown()?;
-    bar.finish();
+    progress_bar.finish();
 
     test_durations.sort();
     Ok(test_durations)

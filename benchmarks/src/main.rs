@@ -78,7 +78,7 @@ fn score_test(durations: Vec<Duration>, name: &str, task_size: f64, more_info: b
     score
 }
 
-fn single_doc_benchmarks(uri: &str, more_info: bool, id_vec: &[bool]) -> Result<f64> {
+fn single_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<f64> {
     println!("----------------------------");
     println!("Single-Doc Benchmarks:");
     println!("----------------------------\n");
@@ -86,7 +86,7 @@ fn single_doc_benchmarks(uri: &str, more_info: bool, id_vec: &[bool]) -> Result<
     let mut comp_score: f64 = 0.0;
 
     // Run command
-    if id_vec[0] {
+    if ids[0] {
         let run_command_options = bench::run_command::Options {
             num_iter: 10000,
             uri: uri.to_string(),
@@ -98,7 +98,7 @@ fn single_doc_benchmarks(uri: &str, more_info: bool, id_vec: &[bool]) -> Result<
     }
 
     // Find one by ID
-    if id_vec[1] {
+    if ids[1] {
         let find_one_options = bench::find_one::Options {
             num_iter: 10000,
             path: DATA_PATH
@@ -113,7 +113,7 @@ fn single_doc_benchmarks(uri: &str, more_info: bool, id_vec: &[bool]) -> Result<
     }
 
     // Small doc insertOne
-    if id_vec[2] {
+    if ids[2] {
         let small_insert_one_options = bench::insert_one::Options {
             num_iter: 10000,
             path: DATA_PATH
@@ -129,7 +129,7 @@ fn single_doc_benchmarks(uri: &str, more_info: bool, id_vec: &[bool]) -> Result<
     }
 
     // Large doc insertOne
-    if id_vec[3] {
+    if ids[3] {
         let large_insert_one_options = bench::insert_one::Options {
             num_iter: 10,
             path: DATA_PATH
@@ -148,7 +148,7 @@ fn single_doc_benchmarks(uri: &str, more_info: bool, id_vec: &[bool]) -> Result<
     Ok(comp_score)
 }
 
-fn multi_doc_benchmarks(uri: &str, more_info: bool, id_vec: &[bool]) -> Result<f64> {
+fn multi_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<f64> {
     println!("----------------------------");
     println!("Multi-Doc Benchmarks:");
     println!("----------------------------\n");
@@ -156,7 +156,7 @@ fn multi_doc_benchmarks(uri: &str, more_info: bool, id_vec: &[bool]) -> Result<f
     let mut comp_score: f64 = 0.0;
 
     // Find many and empty the cursor
-    if id_vec[4] {
+    if ids[4] {
         let find_many_options = bench::find_many::Options {
             num_iter: 10000,
             path: DATA_PATH
@@ -176,7 +176,7 @@ fn multi_doc_benchmarks(uri: &str, more_info: bool, id_vec: &[bool]) -> Result<f
     }
 
     // Small doc bulk insert
-    if id_vec[5] {
+    if ids[5] {
         let small_insert_many_options = bench::insert_many::Options {
             num_copies: 10000,
             path: DATA_PATH
@@ -192,7 +192,7 @@ fn multi_doc_benchmarks(uri: &str, more_info: bool, id_vec: &[bool]) -> Result<f
     }
 
     // Large doc bulk insert
-    if id_vec[6] {
+    if ids[6] {
         let large_insert_many_options = bench::insert_many::Options {
             num_copies: 10,
             path: DATA_PATH
@@ -211,7 +211,7 @@ fn multi_doc_benchmarks(uri: &str, more_info: bool, id_vec: &[bool]) -> Result<f
     Ok(comp_score)
 }
 
-fn parallel_benchmarks(uri: &str, more_info: bool, id_vec: &[bool]) -> Result<f64> {
+fn parallel_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<f64> {
     println!("----------------------------");
     println!("Parallel Benchmarks:");
     println!("----------------------------\n");
@@ -219,7 +219,7 @@ fn parallel_benchmarks(uri: &str, more_info: bool, id_vec: &[bool]) -> Result<f6
     let mut comp_score: f64 = 0.0;
 
     // LDJSON multi-file import
-    if id_vec[7] {
+    if ids[7] {
         let json_multi_import_options = bench::json_multi_import::Options {
             num_threads: num_cpus::get(),
             path: DATA_PATH.join("parallel").join("ldjson_multi"),
@@ -238,7 +238,7 @@ fn parallel_benchmarks(uri: &str, more_info: bool, id_vec: &[bool]) -> Result<f6
     }
 
     // LDJSON multi-file export
-    if id_vec[8] {
+    if ids[8] {
         let json_multi_export_options = bench::json_multi_export::Options {
             num_threads: num_cpus::get(),
             path: DATA_PATH.join("parallel").join("ldjson_multi"),
@@ -261,9 +261,9 @@ fn parallel_benchmarks(uri: &str, more_info: bool, id_vec: &[bool]) -> Result<f6
 }
 
 fn parse_ids(matches: ArgMatches) -> Vec<bool> {
-    let ids: Vec<usize> = match matches.value_of("ids") {
+    let id_list: Vec<usize> = match matches.value_of("ids") {
         Some("all") | None => vec![1, 2, 3, 4, 5, 6, 7, 8, 9],
-        Some(ids) => ids
+        Some(id_list) => id_list
             .split(',')
             .map(|str| {
                 str.parse::<usize>()
@@ -272,31 +272,31 @@ fn parse_ids(matches: ArgMatches) -> Vec<bool> {
             .collect(),
     };
 
-    let mut id_vec = vec![false; 9];
-    for id in ids {
+    let mut ids = vec![false; 9];
+    for id in id_list {
         if id < 1 || id > 9 {
             panic!("invalid test IDs provided, see README");
         }
-        id_vec[id - 1] = true;
+        ids[id - 1] = true;
     }
 
     if matches.is_present("single") {
-        id_vec[0] = true;
-        id_vec[1] = true;
-        id_vec[2] = true;
-        id_vec[3] = true;
+        ids[0] = true;
+        ids[1] = true;
+        ids[2] = true;
+        ids[3] = true;
     }
     if matches.is_present("multi") {
-        id_vec[4] = true;
-        id_vec[5] = true;
-        id_vec[6] = true;
+        ids[4] = true;
+        ids[5] = true;
+        ids[6] = true;
     }
     if matches.is_present("parallel") {
-        id_vec[7] = true;
-        id_vec[8] = true;
+        ids[7] = true;
+        ids[8] = true;
     }
 
-    id_vec
+    ids
 }
 
 fn main() {
@@ -365,21 +365,21 @@ Run benchmarks by id number (comma-separated):
         }
     );
 
-    let id_vec = parse_ids(matches);
+    let ids = parse_ids(matches);
 
     let mut comp_score: f64 = 0.0;
 
     // Single
-    if id_vec[0] || id_vec[1] || id_vec[2] || id_vec[3] {
-        comp_score += single_doc_benchmarks(uri, verbose, &id_vec).unwrap();
+    if ids[0] || ids[1] || ids[2] || ids[3] {
+        comp_score += single_doc_benchmarks(uri, verbose, &ids).unwrap();
     }
     // Multi
-    if id_vec[4] || id_vec[5] || id_vec[6] {
-        comp_score += multi_doc_benchmarks(uri, verbose, &id_vec).unwrap();
+    if ids[4] || ids[5] || ids[6] {
+        comp_score += multi_doc_benchmarks(uri, verbose, &ids).unwrap();
     }
     // Parallel
-    if id_vec[7] || id_vec[8] {
-        comp_score += parallel_benchmarks(uri, verbose, &id_vec).unwrap();
+    if ids[7] || ids[8] {
+        comp_score += parallel_benchmarks(uri, verbose, &ids).unwrap();
     }
 
     println!("----------------------------");
