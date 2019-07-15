@@ -9,7 +9,7 @@ use std::{
 };
 
 use self::options::ConnectionPoolOptions;
-use crate::error::Result;
+use crate::{error::Result, event::cmap::CmapEventHandler};
 
 #[derive(Debug)]
 pub(crate) struct Connection {
@@ -38,6 +38,7 @@ pub(crate) struct WaitQueue {
 
 #[derive(Debug)]
 pub(crate) struct ConnectionPool {
+    address: String,
     pub(crate) wait_queue: WaitQueue,
     pub(crate) generation: AtomicU32,
     pub(crate) total_connection_count: AtomicU32,
@@ -45,7 +46,11 @@ pub(crate) struct ConnectionPool {
 }
 
 impl ConnectionPool {
-    pub(crate) fn new(options: ConnectionPoolOptions) -> Self {
+    pub(crate) fn new(
+        address: &str,
+        options: Option<ConnectionPoolOptions>,
+        event_handler: Option<Box<CmapEventHandler>>,
+    ) -> Self {
         unimplemented!()
     }
 

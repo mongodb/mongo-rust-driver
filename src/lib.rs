@@ -56,4 +56,7 @@ pub mod options;
 mod read_preference;
 pub mod results;
 
+#[cfg(test)]
+mod test;
+
 pub use crate::{client::Client, coll::Collection, cursor::Cursor, db::Database};

@@ -1,14 +1,8 @@
 use std::sync::{Arc, RwLock};
 
-use bson::Document;
 use serde::Deserialize;
 
 use crate::event::cmap::*;
-
-struct Test {
-    file: TestFile,
-    event_handler: EventHandler,
-}
 
 struct EventHandler {
     pool_created_events: Arc<RwLock<Vec<PoolCreatedEvent>>>,
@@ -78,26 +72,43 @@ impl CmapEventHandler for EventHandler {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct TestFile {
     version: u8,
     description: String,
-    pool_options: Option<Document>,
+    pool_options: Option<ConnectionPoolOptions>,
     operations: Vec<Operation>,
-    error: Error,
+    error: Option<Error>,
     events: Vec<Event>,
+    #[serde(default)]
     ignore: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "name")]
 enum Operation {
+    #[serde(rename = "start")]
     Start { target: String },
+
+    #[serde(rename = "wait")]
     Wait { ms: u64 },
+
+    #[serde(rename = "waitForThread")]
     WaitForThread { target: String },
+
+    #[serde(rename = "waitForEvent")]
     WaitForEvent { event: String, count: u8 },
+
+    #[serde(rename = "checkOut")]
     CheckOut { label: Option<String> },
+
+    #[serde(rename = "checkIn")]
     CheckIn { connection: String },
+
+    #[serde(rename = "clear")]
     Clear,
+
+    #[serde(rename = "close")]
     Close,
 }
 
@@ -106,19 +117,27 @@ struct Error {
     #[serde(rename = "type")]
     type_: String,
     message: String,
-    address: String,
+    address: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-struct Event {
-    #[serde(rename = "type")]
-    type_: String,
-    address: String,
-    connection_id: u32,
-    options: Option<Document>,
-    reason: String,
+#[serde(tag = "type")]
+enum Event {
+    ConnectionPoolCreated(PoolCreatedEvent),
+    ConnectionPoolCleared(PoolClearedEvent),
+    ConnectionPoolClosed(PoolClosedEvent),
+    ConnectionCreated(ConnectionCreatedEvent),
+    ConnectionReady(ConnectionReadyEvent),
+    ConnectionClosed(ConnectionClosedEvent),
+    ConnectionCheckOutStarted(ConnectionCheckoutStartedEvent),
+    ConnectionCheckOutFailed(ConnectionCheckoutFailedEvent),
+    ConnectionCheckedOut(ConnectionCheckedOutEvent),
+    ConnectionCheckedIn(ConnectionCheckedInEvent),
 }
 
-impl Test {
-    fn run(&self) {}
+fn run_cmap_test(test_file: TestFile) {}
+
+#[test]
+fn cmap_spec_tests() {
+    crate::test::run(&["connection-monitoring-and-pooling"], run_cmap_test);
 }

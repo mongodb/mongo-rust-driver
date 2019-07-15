@@ -1,75 +1,115 @@
+use serde::Deserialize;
+
 pub use crate::cmap::options::ConnectionPoolOptions;
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct PoolCreatedEvent {
+    #[serde(default)]
     pub address: String,
 
     pub options: Option<ConnectionPoolOptions>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct PoolClearedEvent {
+    #[serde(default)]
     pub address: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct PoolClosedEvent {
+    #[serde(default)]
     pub address: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConnectionCreatedEvent {
+    #[serde(default)]
     pub address: String,
+
+    #[serde(default)]
     pub connection_id: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConnectionReadyEvent {
+    #[serde(default)]
     pub address: String,
+
+    #[serde(default)]
     pub connection_id: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConnectionClosedEvent {
+    #[serde(default)]
     pub address: String,
+
+    #[serde(default)]
     pub connection_id: u32,
+
     pub reason: ConnectionClosedReason,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub enum ConnectionClosedReason {
+    #[serde(rename = "stale")]
     Stale,
+
+    #[serde(rename = "idle")]
     Idle,
+
+    #[serde(rename = "error")]
     Error,
+
+    #[serde(rename = "poolClosed")]
     PoolClosed,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct ConnectionCheckoutStartedEvent {
+    #[serde(default)]
     pub address: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct ConnectionCheckoutFailedEvent {
+    #[serde(default)]
     address: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub enum ConnectionCheckoutFailedReason {
+    #[serde(rename = "poolClosed")]
     PoolClosed,
+
+    #[serde(rename = "timeout")]
     Timeout,
+
+    #[serde(rename = "connectionError")]
     ConnectionError,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConnectionCheckedOutEvent {
+    #[serde(default)]
     pub address: String,
+
+    #[serde(default)]
     pub connection_id: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConnectionCheckedInEvent {
+    #[serde(default)]
     pub address: String,
+
+    #[serde(default)]
     pub connection_id: u32,
 }
 
