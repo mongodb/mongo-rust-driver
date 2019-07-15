@@ -44,6 +44,8 @@ extern crate error_chain;
 extern crate typed_builder;
 
 mod client;
+#[allow(dead_code)]
+mod cmap;
 mod coll;
 pub mod concern;
 mod cursor;
@@ -51,7 +53,6 @@ mod db;
 pub mod error;
 pub mod event;
 pub mod options;
-mod pool;
 mod read_preference;
 pub mod results;
 

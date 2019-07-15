@@ -1,6 +1,6 @@
-mod command;
-
-pub use command::*;
+#[allow(dead_code)]
+pub mod cmap;
+pub mod command;
 
 use crate::error::{CommandError, WriteFailure};
 
