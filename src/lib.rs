@@ -57,6 +57,9 @@ mod read_preference;
 pub mod results;
 
 #[cfg(test)]
+#[macro_use]
+extern crate derive_more;
+#[cfg(test)]
 mod test;
 
 pub use crate::{client::Client, coll::Collection, cursor::Cursor, db::Database};
