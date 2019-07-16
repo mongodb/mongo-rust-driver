@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 pub use crate::cmap::options::ConnectionPoolOptions;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 pub struct PoolCreatedEvent {
     #[serde(default)]
     pub address: String,
@@ -10,19 +10,19 @@ pub struct PoolCreatedEvent {
     pub options: Option<ConnectionPoolOptions>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 pub struct PoolClearedEvent {
     #[serde(default)]
     pub address: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 pub struct PoolClosedEvent {
     #[serde(default)]
     pub address: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionCreatedEvent {
     #[serde(default)]
@@ -32,7 +32,7 @@ pub struct ConnectionCreatedEvent {
     pub connection_id: u32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionReadyEvent {
     #[serde(default)]
@@ -42,7 +42,7 @@ pub struct ConnectionReadyEvent {
     pub connection_id: u32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionClosedEvent {
     #[serde(default)]
@@ -54,7 +54,7 @@ pub struct ConnectionClosedEvent {
     pub reason: ConnectionClosedReason,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 pub enum ConnectionClosedReason {
     #[serde(rename = "stale")]
     Stale,
@@ -69,19 +69,19 @@ pub enum ConnectionClosedReason {
     PoolClosed,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 pub struct ConnectionCheckoutStartedEvent {
     #[serde(default)]
     pub address: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 pub struct ConnectionCheckoutFailedEvent {
     #[serde(default)]
     address: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 pub enum ConnectionCheckoutFailedReason {
     #[serde(rename = "poolClosed")]
     PoolClosed,
@@ -93,7 +93,7 @@ pub enum ConnectionCheckoutFailedReason {
     ConnectionError,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionCheckedOutEvent {
     #[serde(default)]
@@ -103,7 +103,7 @@ pub struct ConnectionCheckedOutEvent {
     pub connection_id: u32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionCheckedInEvent {
     #[serde(default)]

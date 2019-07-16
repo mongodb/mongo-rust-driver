@@ -15,7 +15,7 @@ pub struct TestFile {
     pub error: Option<Error>,
     pub events: Vec<Event>,
     #[serde(default)]
-    ignore: Vec<String>,
+    pub ignore: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -39,7 +39,7 @@ pub enum Operation {
     WaitForThread { target: String },
 
     #[serde(rename = "waitForEvent")]
-    WaitForEvent { event: String, count: u8 },
+    WaitForEvent { event: String, count: usize },
 
     #[serde(rename = "checkOut")]
     CheckOut { label: Option<String> },
