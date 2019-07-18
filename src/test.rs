@@ -30,9 +30,11 @@ where
             continue;
         }
 
-        println!("file: {}", test_file_path.display());
+        if test_file_path.display().to_string() == "pool-create-min-size.json" {
+            continue;
+        }
 
-        let test_file_full_path = dbg!(base_path.join(&test_file_path));
+        let test_file_full_path = base_path.join(&test_file_path);
         let json: Value =
             serde_json::from_reader(File::open(test_file_full_path.as_path()).unwrap()).unwrap();
 

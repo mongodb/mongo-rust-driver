@@ -14,13 +14,13 @@ pub struct ConnectionPoolOptions {
     #[builder(default)]
     #[serde(rename = "maxIdleTimeMS")]
     #[serde(default)]
-    #[serde(deserialize_with = "self::deserialize_duration_from_millis")]
+    #[serde(deserialize_with = "self::deserialize_duration_from_u64_millis")]
     pub max_idle_time: Option<Duration>,
 
     #[builder(default)]
     #[serde(rename = "waitQueueTimeoutMS")]
     #[serde(default)]
-    #[serde(deserialize_with = "self::deserialize_duration_from_millis")]
+    #[serde(deserialize_with = "self::deserialize_duration_from_u64_millis")]
     pub wait_queue_timeout: Option<Duration>,
 }
 
@@ -33,7 +33,9 @@ impl ConnectionPoolOptions {
     }
 }
 
-fn deserialize_duration_from_millis<'de, D>(deserializer: D) -> Result<Option<Duration>, D::Error>
+fn deserialize_duration_from_u64_millis<'de, D>(
+    deserializer: D,
+) -> Result<Option<Duration>, D::Error>
 where
     D: Deserializer<'de>,
 {

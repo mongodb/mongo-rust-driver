@@ -55,17 +55,11 @@ pub struct ConnectionClosedEvent {
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub enum ConnectionClosedReason {
-    #[serde(rename = "stale")]
     Stale,
-
-    #[serde(rename = "idle")]
     Idle,
-
-    #[serde(rename = "error")]
     Error,
-
-    #[serde(rename = "poolClosed")]
     PoolClosed,
 }
 
@@ -78,18 +72,15 @@ pub struct ConnectionCheckoutStartedEvent {
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct ConnectionCheckoutFailedEvent {
     #[serde(default)]
-    address: String,
+    pub address: String,
+
+    pub reason: ConnectionCheckoutFailedReason,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub enum ConnectionCheckoutFailedReason {
-    #[serde(rename = "poolClosed")]
-    PoolClosed,
-
-    #[serde(rename = "timeout")]
     Timeout,
-
-    #[serde(rename = "connectionError")]
     ConnectionError,
 }
 

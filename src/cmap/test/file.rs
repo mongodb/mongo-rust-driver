@@ -28,29 +28,28 @@ struct ThreadedOperation {
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "name")]
+#[serde(rename_all = "camelCase")]
 pub enum Operation {
-    #[serde(rename = "start")]
-    Start { target: String },
-
-    #[serde(rename = "wait")]
-    Wait { ms: u64 },
-
-    #[serde(rename = "waitForThread")]
-    WaitForThread { target: String },
-
-    #[serde(rename = "waitForEvent")]
-    WaitForEvent { event: String, count: usize },
-
-    #[serde(rename = "checkOut")]
-    CheckOut { label: Option<String> },
-
-    #[serde(rename = "checkIn")]
-    CheckIn { connection: String },
-
-    #[serde(rename = "clear")]
+    Start {
+        target: String,
+    },
+    Wait {
+        ms: u64,
+    },
+    WaitForThread {
+        target: String,
+    },
+    WaitForEvent {
+        event: String,
+        count: usize,
+    },
+    CheckOut {
+        label: Option<String>,
+    },
+    CheckIn {
+        connection: String,
+    },
     Clear,
-
-    #[serde(rename = "close")]
     Close,
 
     StartHelper {
@@ -70,9 +69,6 @@ pub struct Error {
 impl Error {
     pub fn assert_matches(&self, error: &crate::error::Error) {
         match error.kind() {
-            ErrorKind::PoolClosedError(_) => {
-                assert_eq!(self.type_, "PoolClosedError");
-            }
             ErrorKind::WaitQueueTimeoutError(_) => {
                 assert_eq!(self.type_, "WaitQueueTimeoutError");
             }

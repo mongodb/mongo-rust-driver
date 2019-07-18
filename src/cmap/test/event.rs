@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 
-use serde::Deserialize;
+use serde::{de::Unexpected, Deserialize, Deserializer};
 
 use crate::event::cmap::*;
 
@@ -22,7 +22,7 @@ impl EventHandler {
         let event = event.into();
 
         if !self.ignore.iter().any(|e| e == event.name()) {
-            self.events.write().unwrap().push(event.into());
+            self.events.write().unwrap().push(event);
         }
     }
 }
@@ -72,12 +72,15 @@ impl CmapEventHandler for EventHandler {
 #[derive(Debug, Deserialize, From, PartialEq)]
 #[serde(tag = "type")]
 pub enum Event {
+    #[serde(deserialize_with = "self::deserialize_pool_created")]
     ConnectionPoolCreated(PoolCreatedEvent),
     ConnectionPoolClosed(PoolClosedEvent),
     ConnectionCreated(ConnectionCreatedEvent),
     ConnectionReady(ConnectionReadyEvent),
     ConnectionClosed(ConnectionClosedEvent),
     ConnectionCheckOutStarted(ConnectionCheckoutStartedEvent),
+
+    #[serde(deserialize_with = "self::deserialize_checkout_failed")]
     ConnectionCheckOutFailed(ConnectionCheckoutFailedEvent),
     ConnectionCheckedOut(ConnectionCheckedOutEvent),
     ConnectionPoolCleared(PoolClearedEvent),
@@ -99,4 +102,85 @@ impl Event {
             Event::ConnectionCheckedIn(_) => "ConnectionCheckedIn",
         }
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct PoolCreatedEventHelper {
+    #[serde(default)]
+    pub address: String,
+
+    #[serde(default)]
+    pub options: Option<PoolOptionsHelper>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum PoolOptionsHelper {
+    Number(u64),
+    Options(ConnectionPoolOptions),
+}
+
+fn deserialize_pool_created<'de, D>(deserializer: D) -> Result<PoolCreatedEvent, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let helper = PoolCreatedEventHelper::deserialize(deserializer)?;
+
+    let options = match helper.options {
+        Some(PoolOptionsHelper::Options(opts)) => Some(opts),
+        Some(PoolOptionsHelper::Number(42)) | None => None,
+        Some(PoolOptionsHelper::Number(other)) => {
+            return Err(serde::de::Error::invalid_value(
+                Unexpected::Unsigned(other),
+                &"42",
+            ));
+        }
+    };
+
+    Ok(PoolCreatedEvent {
+        address: helper.address,
+        options,
+    })
+}
+
+#[derive(Debug, Deserialize)]
+struct ConnectionCheckoutFailedHelper {
+    #[serde(default)]
+    pub address: String,
+
+    pub reason: CheckoutFailedReasonHelper,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum CheckoutFailedReasonHelper {
+    Timeout,
+    ConnectionError,
+    PoolClosed,
+}
+
+fn deserialize_checkout_failed<'de, D>(
+    deserializer: D,
+) -> Result<ConnectionCheckoutFailedEvent, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let helper = ConnectionCheckoutFailedHelper::deserialize(deserializer)?;
+
+    // The driver doesn't have a concept of a "closed pool", instead having the pool closed when the
+    // pool is dropped. Because of this, the driver doesn't implement the "poolClosed" reason for a
+    // connection checkout failure. While we skip over the corresponding tests in our spec test
+    // runner, we still need to be able to deserialize the "poolClosed" reason to avoid the test
+    // harness panicking, so we arbitrarily map the "poolClosed" to "connectionError".
+    let reason = match helper.reason {
+        CheckoutFailedReasonHelper::PoolClosed | CheckoutFailedReasonHelper::ConnectionError => {
+            ConnectionCheckoutFailedReason::ConnectionError
+        }
+        CheckoutFailedReasonHelper::Timeout => ConnectionCheckoutFailedReason::Timeout,
+    };
+
+    Ok(ConnectionCheckoutFailedEvent {
+        address: helper.address,
+        reason,
+    })
 }
