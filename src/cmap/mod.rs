@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod test;
 
+mod background;
 mod conn;
 pub(crate) mod options;
 mod wait_queue;
@@ -33,11 +34,12 @@ pub(crate) struct ConnectionPool {
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-struct ConnectionPoolInner {
+pub(crate) struct ConnectionPoolInner {
     address: String,
     wait_queue_timeout: Option<Duration>,
     max_idle_time: Option<Duration>,
     max_pool_size: u32,
+    min_pool_size: Option<u32>,
     generation: AtomicU32,
     total_connection_count: AtomicU32,
     next_connection_id: AtomicU32,
@@ -59,14 +61,16 @@ impl ConnectionPool {
             .as_ref()
             .and_then(|opts| opts.max_pool_size)
             .unwrap_or(100);
+        let min_pool_size = options.as_ref().and_then(|opts| opts.min_pool_size);
 
         let event_handler = event_handler.map(Arc::from);
 
         let inner = ConnectionPoolInner {
             address: address.into(),
             wait_queue_timeout,
-            max_pool_size,
             max_idle_time,
+            max_pool_size,
+            min_pool_size,
             generation: AtomicU32::new(0),
             total_connection_count: AtomicU32::new(0),
             next_connection_id: AtomicU32::new(1),
@@ -87,6 +91,8 @@ impl ConnectionPool {
 
             handler.handle_pool_created_event(event);
         });
+
+        background::start_background_thread(Arc::downgrade(&pool.inner));
 
         pool
     }
@@ -144,7 +150,7 @@ impl ConnectionPool {
 
             // Create a new connection if the pool is under max size.
             if self.inner.total_connection_count.load(Ordering::SeqCst) < self.inner.max_pool_size {
-                return Ok(self.create_connection());
+                return Ok(self.inner.create_connection());
             }
 
             // Check if the pool has a max timeout.
@@ -205,25 +211,25 @@ impl ConnectionPool {
         });
     }
 
-    fn create_connection(&self) -> Connection {
-        self.inner
-            .total_connection_count
-            .fetch_add(1, Ordering::SeqCst);
-
-        Connection::new(
-            self.inner.next_connection_id.fetch_add(1, Ordering::SeqCst),
-            &self.inner.address,
-            self.inner.generation.load(Ordering::SeqCst),
-            self.inner.event_handler.clone(),
-        )
-    }
-
     fn close_connection(&self, conn: Connection, reason: ConnectionClosedReason, available: bool) {
         conn.close(reason);
 
         self.inner
             .total_connection_count
             .fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+impl ConnectionPoolInner {
+    fn create_connection(&self) -> Connection {
+        self.total_connection_count.fetch_add(1, Ordering::SeqCst);
+
+        Connection::new(
+            self.next_connection_id.fetch_add(1, Ordering::SeqCst),
+            &self.address,
+            self.generation.load(Ordering::SeqCst),
+            self.event_handler.clone(),
+        )
     }
 }
 
