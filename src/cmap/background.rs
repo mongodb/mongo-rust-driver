@@ -7,18 +7,16 @@ use super::ConnectionPoolInner;
 
 pub(crate) fn start_background_thread(pool: Weak<ConnectionPoolInner>) {
     std::thread::spawn(move || loop {
-        perform_checks(&pool);
+        match pool.upgrade() {
+            Some(pool) => perform_checks(pool),
+            None => return,
+        };
 
         std::thread::sleep(Duration::from_millis(100));
     });
 }
 
-fn perform_checks(pool: &Weak<ConnectionPoolInner>) {
-    let pool = match pool.upgrade() {
-        Some(pool) => pool,
-        None => return,
-    };
-
+fn perform_checks(pool: Arc<ConnectionPoolInner>) {
     remove_perished_connections_from_pool(&pool);
     ensure_min_connections_in_pool(&pool);
 }
