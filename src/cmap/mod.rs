@@ -131,7 +131,7 @@ impl ConnectionPool {
 
         loop {
             // Try to get the most recent available connection.
-            if let Some(conn) = self.inner.connections.write().unwrap().pop() {
+            while let Some(conn) = self.inner.connections.write().unwrap().pop() {
                 // Close the connection if it's stale.
                 if conn.is_stale(self.inner.generation.load(Ordering::SeqCst)) {
                     self.close_connection(conn, ConnectionClosedReason::Stale, true);

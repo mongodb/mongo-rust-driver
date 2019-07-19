@@ -24,15 +24,6 @@ pub struct ConnectionPoolOptions {
     pub wait_queue_timeout: Option<Duration>,
 }
 
-impl ConnectionPoolOptions {
-    pub(crate) fn is_empty(&self) -> bool {
-        self.max_pool_size.is_none()
-            && self.min_pool_size.is_none()
-            && self.max_idle_time.is_none()
-            && self.wait_queue_timeout.is_none()
-    }
-}
-
 fn deserialize_duration_from_u64_millis<'de, D>(
     deserializer: D,
 ) -> Result<Option<Duration>, D::Error>
