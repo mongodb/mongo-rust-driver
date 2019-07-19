@@ -79,7 +79,6 @@ pub enum Event {
     ConnectionReady(ConnectionReadyEvent),
     ConnectionClosed(ConnectionClosedEvent),
     ConnectionCheckOutStarted(ConnectionCheckoutStartedEvent),
-
     #[serde(deserialize_with = "self::deserialize_checkout_failed")]
     ConnectionCheckOutFailed(ConnectionCheckoutFailedEvent),
     ConnectionCheckedOut(ConnectionCheckedOutEvent),
@@ -126,6 +125,13 @@ where
 {
     let helper = PoolCreatedEventHelper::deserialize(deserializer)?;
 
+    // The CMAP spec tests use "42" as a placeholder in the expected events to indicate that the
+    // driver should assert that a value is present without any constraints on the value itself.
+    // This idiom is used for the connection pool creation options even when no options are
+    // specified, meaning that there isn't any useful assertion we can do based on this value.
+    // Because of this, we deserialize the value `42` into `None` for the options, which prevents
+    // deserialization failure due to an unexpected type. For other integer values, we raise an
+    // error indicating that we expect `42` instead.
     let options = match helper.options {
         Some(PoolOptionsHelper::Options(opts)) => Some(opts),
         Some(PoolOptionsHelper::Number(42)) | None => None,

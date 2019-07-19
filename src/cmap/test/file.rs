@@ -52,6 +52,11 @@ pub enum Operation {
     Clear,
     Close,
 
+    // In order to execute a `Start` operation, we need to know all of the operations that should
+    // execute in the context of that thread. To achieve this, we preprocess the operations
+    // specified by the test file to replace each instance of `Start` operation with a
+    // `StartHelper` with the corresponding operations. `StartHelper` won't ever actually occur in
+    // the original set of operations specified.
     StartHelper {
         target: String,
         operations: Vec<Operation>,
@@ -85,6 +90,10 @@ impl TestFile {
 
         while let Some(operation) = self.operations.pop_front() {
             match operation.type_ {
+                // When a `Start` operation is encountered, search the rest of the operations for
+                // any that occur in the context of the corresponding thread, remove them from the
+                // original set of operations, and add them to the newly created `StartHelper`
+                // operation.
                 Operation::Start { target } => {
                     let start_helper = Operation::StartHelper {
                         operations: remove_by(&mut self.operations, |op| {
@@ -106,6 +115,8 @@ impl TestFile {
     }
 }
 
+// Removes all items in the `VecDeque` that fulfill the predicate and return them in order as a new
+// `Vec`.
 fn remove_by<T, F>(vec: &mut VecDeque<T>, pred: F) -> Vec<T>
 where
     F: Fn(&T) -> bool,

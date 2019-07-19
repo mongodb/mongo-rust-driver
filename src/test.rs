@@ -30,7 +30,7 @@ where
             continue;
         }
 
-        let test_file_full_path = base_path.join(dbg!(&test_file_path));
+        let test_file_full_path = base_path.join(&test_file_path);
         let json: Value =
             serde_json::from_reader(File::open(test_file_full_path.as_path()).unwrap()).unwrap();
 
