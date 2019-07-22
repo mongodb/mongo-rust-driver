@@ -27,18 +27,38 @@ use crate::{
     },
 };
 
+const DEFAULT_MAX_POOL_SIZE: usize = 100;
+
+// A pool of connections implementing the CMAP spec. All state is kept internally in an `Arc`, and
+// internal state that is mutable is additionally wrapped by a lock.
 #[derive(Clone, Debug)]
 pub(crate) struct ConnectionPool {
     inner: Arc<ConnectionPoolInner>,
 }
 
+// The internal state of a connection pool.
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub(crate) struct ConnectionPoolInner {
+    // The address of the server the pool's connections will connect to.
     address: String,
+
+    // If a checkout operation takes longer than `wait_queue_timeout`, the pool will return an
+    // error. If `wait_queue_timeout` is `None`, then the checkout operation will not time out.
     wait_queue_timeout: Option<Duration>,
+
+    // Connections that have been ready for usage in the pool for longer than `max_idle_time` will
+    // be closed either by the background thread or when popped off of the set of available
+    // connections. If `max_idle_time` is `None`, then connections will not be closed due to being
+    // idle.
     max_idle_time: Option<Duration>,
+
+    // The maximum number of connections that the pool can have at a given time. This includes
+    // connections which are currently checked out of the pool.
     max_pool_size: u32,
+
+    // The minimum number of connections that the pool can have at a given time. This includes
+    // connections which are currently checked out of the pool.
     min_pool_size: Option<u32>,
     generation: AtomicU32,
     total_connection_count: AtomicU32,
@@ -60,7 +80,7 @@ impl ConnectionPool {
         let max_pool_size = options
             .as_ref()
             .and_then(|opts| opts.max_pool_size)
-            .unwrap_or(100);
+            .unwrap_or(DEFAULT_MAX_POOL_SIZE);
         let min_pool_size = options.as_ref().and_then(|opts| opts.min_pool_size);
 
         let event_handler = event_handler.map(Arc::from);
