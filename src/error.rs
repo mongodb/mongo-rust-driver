@@ -9,7 +9,7 @@ error_chain! {
         /// A malformed or invalid argument was passed to the driver.
         ArgumentError(msg: String) {
             description("An invalid argument was provided to a database operation")
-            display("An invalid arugment was provided to a database operation: {}", msg)
+            display("An invalid argument was provided to a database operation: {}", msg)
         }
 
         /// The server encountered an error when executing the operation.
@@ -33,7 +33,7 @@ error_chain! {
         /// An error occurred during server selection.
         ServerSelectionError(msg: String) {
             description("An error occurred during server selection")
-            display("An error occured during server selection: {}", msg)
+            display("An error occurred during server selection: {}", msg)
         }
 
         /// An error occurred when trying to execute a write operation.
@@ -66,7 +66,7 @@ pub struct WriteConcernError {
     pub message: String,
 }
 
-/// An error that occurred duringn a write operation that wasn't due to being unable to satisfy a
+/// An error that occurred during a write operation that wasn't due to being unable to satisfy a
 /// write concern.
 #[derive(Clone, Debug)]
 pub struct WriteError {
