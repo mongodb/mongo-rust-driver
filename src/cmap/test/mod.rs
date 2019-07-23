@@ -75,7 +75,7 @@ impl Executor {
         let pool = ConnectionPool::new(
             "42",
             test_file.pool_options,
-            Some(Box::new(handler.clone())),
+            Some(Arc::new(handler.clone())),
         );
 
         let state = State {
