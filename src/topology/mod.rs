@@ -99,6 +99,13 @@ impl Topology {
         self.servers.get(address).map(Clone::clone)
     }
 
+    pub(crate) fn get_max_wire_version(&self, address: &str) -> Option<i32> {
+        self.description
+            .server_descriptions()
+            .get(address)
+            .map(|s| s.max_wire_version)
+    }
+
     pub(crate) fn update_description<'a>(
         &'a mut self,
         description: TopologyDescription,

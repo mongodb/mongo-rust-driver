@@ -2,9 +2,9 @@ use bson::Document;
 
 /// An opaque token for use when resuming an interrupted `ChangeStream`
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ChangeStreamToken(Document);
+pub struct ResumeToken(Document);
 
-impl ChangeStreamToken {
+impl ResumeToken {
     pub fn new(doc: Document) -> Self {
         Self(doc)
     }
@@ -19,7 +19,7 @@ impl ChangeStreamToken {
 pub struct ChangeStreamDocument {
     /// An opaque token for use when resuming an interrupted `ChangeStream`
     #[serde(rename = "_id")]
-    pub id: ChangeStreamToken,
+    pub id: ResumeToken,
 
     /// Describes the type of operation represented in this change notification
     pub operation_type: OperationType,

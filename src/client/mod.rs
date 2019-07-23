@@ -15,8 +15,8 @@ use time::{Duration as TimeDuration, PreciseTime};
 
 use crate::{
     change_stream::{
-        document::{ChangeStreamDocument, ChangeStreamToken},
-        ChangeStream,
+        document::{ChangeStreamDocument, ResumeToken},
+        ChangeStream, ChangeStreamTarget,
     },
     command_responses::ListDatabasesResponse,
     concern::{ReadConcern, WriteConcern},
@@ -225,6 +225,14 @@ impl Client {
             .unwrap_or(*DEFAULT_SERVER_SELECTION_TIMEOUT)
     }
 
+    pub(crate) fn get_max_wire_version(&self, address: &str) -> Option<i32> {
+        self.inner
+            .topology
+            .read()
+            .unwrap()
+            .get_max_wire_version(address)
+    }
+
     fn get_connection_from_server(&self, address: &str) -> Result<Option<Connection>> {
         self.inner
             .topology
@@ -361,7 +369,7 @@ impl Client {
 
         let mut watch_pipeline = Vec::new();
         let mut aggregate_options: Option<AggregateOptions>;
-        let mut resume_token: Option<ChangeStreamToken>;
+        let mut resume_token: Option<ResumeToken>;
         let stream_options = options.clone();
 
         if let Some(options) = options {
@@ -389,7 +397,7 @@ impl Client {
         watch_pipeline.extend(pipeline.clone());
 
         let db = self.database("admin");
-        let cursor = db.aggregate(watch_pipeline, aggregate_options)?;
+        let cursor = db.aggregate(watch_pipeline.clone(), aggregate_options)?;
 
         let read_preference = self
             .read_preference()
@@ -397,7 +405,9 @@ impl Client {
 
         Ok(ChangeStream::new(
             cursor,
-            pipeline,
+            watch_pipeline,
+            self.clone(),
+            ChangeStreamTarget::Deployment(self.database("admin")),
             resume_token,
             stream_options,
             read_preference,
@@ -410,7 +420,7 @@ impl Client {
     ///
     /// Returns a change stream that yields instances of
     /// `ChangeStreamDocument`
-    pub(crate) fn watch_serialized(
+    pub(crate) fn watch_deserialized(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<ChangeStreamOptions>,
@@ -419,7 +429,7 @@ impl Client {
 
         let mut watch_pipeline = Vec::new();
         let mut aggregate_options: Option<AggregateOptions>;
-        let mut resume_token: Option<ChangeStreamToken>;
+        let mut resume_token: Option<ResumeToken>;
         let stream_options = options.clone();
 
         if let Some(options) = options {
@@ -447,7 +457,7 @@ impl Client {
         watch_pipeline.extend(pipeline.clone());
 
         let db = self.database("admin");
-        let cursor = db.aggregate(watch_pipeline, aggregate_options)?;
+        let cursor = db.aggregate(watch_pipeline.clone(), aggregate_options)?;
 
         let read_preference = self
             .read_preference()
@@ -455,7 +465,9 @@ impl Client {
 
         Ok(ChangeStream::new(
             cursor,
-            pipeline,
+            watch_pipeline,
+            self.clone(),
+            ChangeStreamTarget::Deployment(self.database("admin")),
             resume_token,
             stream_options,
             read_preference,

@@ -7,8 +7,8 @@ use bson::{Bson, Document};
 use self::options::{CreateCollectionOptions, DatabaseOptions};
 use crate::{
     change_stream::{
-        document::{ChangeStreamDocument, ChangeStreamToken},
-        ChangeStream,
+        document::{ChangeStreamDocument, ResumeToken},
+        ChangeStream, ChangeStreamTarget,
     },
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
@@ -449,7 +449,7 @@ impl Database {
 
         let mut watch_pipeline = Vec::new();
         let mut aggregate_options: Option<AggregateOptions>;
-        let mut resume_token: Option<ChangeStreamToken>;
+        let mut resume_token: Option<ResumeToken>;
         let stream_options = options.clone();
 
         if let Some(options) = options {
@@ -468,7 +468,7 @@ impl Database {
         }
         watch_pipeline.extend(pipeline.clone());
 
-        let cursor = self.aggregate(watch_pipeline, aggregate_options)?;
+        let cursor = self.aggregate(watch_pipeline.clone(), aggregate_options)?;
 
         let read_preference = self
             .read_preference()
@@ -477,7 +477,9 @@ impl Database {
 
         Ok(ChangeStream::new(
             cursor,
-            pipeline,
+            watch_pipeline,
+            self.client(),
+            ChangeStreamTarget::Database(self.clone()),
             resume_token,
             stream_options,
             read_preference,
@@ -489,7 +491,7 @@ impl Database {
     ///
     /// Returns a change stream that yields instances of
     /// `ChangeStreamDocument`.
-    pub(crate) fn watch_serialized(
+    pub(crate) fn watch_deserialized(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<ChangeStreamOptions>,
@@ -498,7 +500,7 @@ impl Database {
 
         let mut watch_pipeline = Vec::new();
         let mut aggregate_options: Option<AggregateOptions>;
-        let mut resume_token: Option<ChangeStreamToken>;
+        let mut resume_token: Option<ResumeToken>;
         let stream_options = options.clone();
 
         if let Some(options) = options {
@@ -517,7 +519,7 @@ impl Database {
         }
         watch_pipeline.extend(pipeline.clone());
 
-        let cursor = self.aggregate(watch_pipeline, aggregate_options)?;
+        let cursor = self.aggregate(watch_pipeline.clone(), aggregate_options)?;
 
         let read_preference = self
             .read_preference()
@@ -526,7 +528,9 @@ impl Database {
 
         Ok(ChangeStream::new(
             cursor,
-            pipeline,
+            watch_pipeline,
+            self.client(),
+            ChangeStreamTarget::Database(self.clone()),
             resume_token,
             stream_options,
             read_preference,

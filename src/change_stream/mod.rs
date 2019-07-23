@@ -10,8 +10,9 @@ use self::document::*;
 use self::options::*;
 use crate::{
     error::{Error, ErrorKind, Result},
+    options::AggregateOptions,
     read_preference::ReadPreference,
-    Cursor,
+    Client, Collection, Cursor, Database,
 };
 
 /// A `ChangeStream` streams the ongoing changes of its associated collection,
@@ -50,8 +51,16 @@ pub struct ChangeStream<'a, T: Deserialize<'a>> {
     /// The pipeline of stages to append to an initial `$changeStream` stage
     pipeline: Vec<Document>,
 
+    /// The client that was used for the initial `$changeStream` aggregation, used
+    /// for server selection during an automatic resume.
+    client: Client,
+
+    /// The original target of the change stream, used for re-issuing the aggregation during
+    /// an automatic resume.
+    target: ChangeStreamTarget,
+
     /// The cached resume token
-    resume_token: Option<ChangeStreamToken>,
+    resume_token: Option<ResumeToken>,
 
     /// The options provided to the initial `$changeStream` stage
     options: Option<ChangeStreamOptions>,
@@ -60,6 +69,8 @@ pub struct ChangeStream<'a, T: Deserialize<'a>> {
     /// for server selection during an automatic resume.
     read_preference: Option<ReadPreference>,
 
+    resume_attempted: bool,
+
     phantom: PhantomData<&'a T>,
 }
 
@@ -67,27 +78,31 @@ impl<'a, T> ChangeStream<'a, T>
 where
     T: Deserialize<'a>,
 {
-    /// Creates a new ChangeStream instance
     pub(crate) fn new(
         cursor: Cursor,
         pipeline: Vec<Document>,
-        resume_token: Option<ChangeStreamToken>,
+        client: Client,
+        target: ChangeStreamTarget,
+        resume_token: Option<ResumeToken>,
         options: Option<ChangeStreamOptions>,
         read_preference: Option<ReadPreference>,
     ) -> Self {
         Self {
             cursor,
             pipeline,
+            client,
+            target,
             resume_token,
             options,
             read_preference,
+            resume_attempted: false,
             phantom: PhantomData,
         }
     }
 
     /// Returns the cached resume token that will be used to resume after the
     /// most recently returned change.
-    pub fn resume_token(&self) -> Option<ChangeStreamToken> {
+    pub fn resume_token(&self) -> Option<ResumeToken> {
         self.resume_token.clone()
     }
 
@@ -98,43 +113,78 @@ where
         }
     }
 
-    fn try_resume(&mut self, error: Error) -> Option<Result<T>> {
-        unimplemented!();
+    fn try_resume(&mut self, error: Error) -> Result<()> {
+        self.resume_attempted = true;
+
+        match error.kind() {
+            ErrorKind::ServerError(ref operation, ref msg) => {
+                if operation == "getMore"
+                    && (msg.contains("Interrupted")
+                        || msg.contains("CappedPositionLost")
+                        || msg.contains("CursorKilled")
+                        || msg.contains("NonResumableChangeStreamError"))
+                {
+                    Err(error)
+                } else {
+                    self.resume()
+                }
+            }
+            _ => self.resume(),
+        }
     }
 
     fn resume(&mut self) -> Result<()> {
-        // TODO: perform server selection and connect to selected server
+        let (address, _) = self
+            .client
+            .acquire_stream(self.read_preference.as_ref(), None)?;
 
-        // let mut new_options = self.options.clone();
-        // let start_at_operation_time = match new_options {
-        // Some(new_options) => new_options.start_at_operation_time,
-        // None => None,
-        // };
-        // // TODO: find actual max_wire_version
-        // let max_wire_version = 7;
+        let max_wire_version = match self.client.get_max_wire_version(&address) {
+            Some(v) => v,
+            None => bail!(ErrorKind::ServerSelectionError(
+                "selected server removed from cluster before change stream resume could occur"
+                    .into(),
+            )),
+        };
 
-        // if self.resume_token().is_some() {
-        // if let Some(new_options) = new_options {
-        // new_options.resume_after = self.resume_token();
-        // new_options.start_after = None;
-        // new_options.start_at_operation_time = None;
-        // } else {
-        // new_options = Some(
-        // ChangeStreamOptions::builder()
-        // .resume_after(self.resume_token())
-        // .build(),
-        // );
-        // }
-        // } else if self.resume_token().is_none()
-        // && start_at_operation_time.is_some()
-        // && max_wire_version >= 7
-        // {
-        // if let Some(new_options) = new_options {
-        // new_options.start_at_operation_time = start_at_operation_time;
-        // }
-        // }
+        let mut new_options: ChangeStreamOptions;
+        let mut aggregate_options = AggregateOptions::builder().build();
 
-        // run aggregate command against original target
+        if let Some(options) = self.options.clone() {
+            new_options = options.clone();
+            aggregate_options.collation = options.collation;
+
+            if self.resume_token().is_some() {
+                if options.start_after.is_some() {
+                    new_options.start_after = self.resume_token();
+                    new_options.start_at_operation_time = None;
+                } else {
+                    new_options.resume_after = self.resume_token();
+                    new_options.start_after = None;
+                    new_options.start_at_operation_time = None;
+                }
+            } else if options.start_at_operation_time.is_some() && max_wire_version >= 7 {
+                new_options.start_at_operation_time = options.start_at_operation_time;
+            }
+        } else {
+            new_options = ChangeStreamOptions::builder().build();
+
+            if self.resume_token().is_some() {
+                new_options.start_after = self.resume_token();
+            }
+        }
+        self.options = Some(new_options);
+
+        self.cursor = match &self.target {
+            ChangeStreamTarget::Collection(coll) => {
+                coll.aggregate(self.pipeline.clone(), Some(aggregate_options))?
+            }
+            ChangeStreamTarget::Database(db) => {
+                db.aggregate(self.pipeline.clone(), Some(aggregate_options))?
+            }
+            ChangeStreamTarget::Deployment(db) => {
+                db.aggregate(self.pipeline.clone(), Some(aggregate_options))?
+            }
+        };
 
         Ok(())
     }
@@ -154,10 +204,30 @@ where
                     "invalid server response to change stream getMore".to_string(),
                 ))),
             }),
-            Some(Err(e)) => self.try_resume(e),
+            Some(Err(e)) => {
+                if !self.resume_attempted {
+                    match self.try_resume(e) {
+                        Ok(_) => {
+                            self.resume_attempted = false;
+                            self.next()
+                        }
+                        Err(e) => Some(Err(e)),
+                    }
+                } else {
+                    Some(Err(Error::from_kind(ErrorKind::ChangeStreamResumeError(
+                        "failed to resume".to_string(),
+                    ))))
+                }
+            }
             None => None,
         }
     }
+}
+
+pub(crate) enum ChangeStreamTarget {
+    Collection(Collection),
+    Database(Database),
+    Deployment(Database),
 }
 
 /// A `ChangeStreamTail` is a temporary `Iterator` created from

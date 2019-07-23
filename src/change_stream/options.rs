@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::{change_stream::document::ChangeStreamToken, options::collation::Collation};
+use crate::{change_stream::document::ResumeToken, options::collation::Collation};
 
 #[derive(Clone, Debug, Serialize, Deserialize, TypedBuilder)]
 pub struct ChangeStreamOptions {
@@ -14,7 +14,7 @@ pub struct ChangeStreamOptions {
 
     /// Specifies the logical starting point for the new change stream.
     #[builder(default)]
-    pub resume_after: Option<ChangeStreamToken>,
+    pub resume_after: Option<ResumeToken>,
 
     /// The maximum amount of time for the server to wait on new documents to
     /// satisfy a change stream query.
@@ -40,7 +40,7 @@ pub struct ChangeStreamOptions {
     /// that have been dropped and recreated or newly renamed collections without
     /// missing any notifications.
     #[builder(default)]
-    pub start_after: Option<ChangeStreamToken>,
+    pub start_after: Option<ResumeToken>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
