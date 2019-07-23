@@ -122,7 +122,7 @@ impl WaitQueue {
     ) -> Self {
         let inner = WaitQueueInner {
             queue: Default::default(),
-            address: address.into(),
+            address: address.to_string(),
             event_handler,
             timeout,
         };

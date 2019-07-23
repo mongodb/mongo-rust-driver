@@ -114,7 +114,7 @@ impl ConnectionPool {
             generation: AtomicU32::new(0),
             total_connection_count: AtomicU32::new(0),
             next_connection_id: AtomicU32::new(1),
-            wait_queue: WaitQueue::new(address.into(), wait_queue_timeout, event_handler.clone()),
+            wait_queue: WaitQueue::new(address, wait_queue_timeout, event_handler.clone()),
             connections: Default::default(),
             event_handler,
         };
