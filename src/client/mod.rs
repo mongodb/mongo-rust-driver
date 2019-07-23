@@ -360,7 +360,7 @@ impl Client {
     /// Note that using a `$project` stage to remove any of the `_id`
     /// `operationType` or `ns` fields will cause an error. The driver
     /// requires these fields to support resumability.
-    pub(crate) fn watch(
+    pub fn watch(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<ChangeStreamOptions>,
@@ -420,7 +420,7 @@ impl Client {
     ///
     /// Returns a change stream that yields instances of
     /// `ChangeStreamDocument`
-    pub(crate) fn watch_deserialized(
+    pub fn watch_deserialized(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<ChangeStreamOptions>,
