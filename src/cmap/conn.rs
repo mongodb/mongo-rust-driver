@@ -26,15 +26,16 @@ pub(crate) struct Connection {
     pool: Option<Weak<RwLock<ConnectionPool>>>,
 
     #[derivative(Debug = "ignore")]
-    handler: Option<Arc<CmapEventHandler>>,
+    handler: Option<Arc<dyn CmapEventHandler>>,
 }
 
 impl Connection {
+    // Constructs a new connection. This should only be called by the connection pool.
     pub(crate) fn new(
         id: u32,
         address: &str,
         generation: u32,
-        handler: Option<Arc<CmapEventHandler>>,
+        handler: Option<Arc<dyn CmapEventHandler>>,
     ) -> Self {
         if let Some(ref handler) = handler {
             let event = ConnectionCreatedEvent {
@@ -76,6 +77,7 @@ impl Connection {
         }
     }
 
+    // Internal helper to emit a `ConnectionClosedEvent`.
     fn emit_closed_event(&self, reason: ConnectionClosedReason) {
         if let Some(ref handler) = self.handler {
             let event = ConnectionClosedEvent {
@@ -88,10 +90,13 @@ impl Connection {
         }
     }
 
+    // Helper to mark the time that the connection was checked into the pool for the purpose of
+    // detecting when it becomes idle. This should only be called by the connection pool.
     pub(crate) fn mark_as_ready_and_available(&mut self) {
         self.ready_and_available_time = Some(Instant::now());
     }
 
+    // Checks if the connection is idle.
     pub(crate) fn is_idle(&self, max_idle_time: Option<Duration>) -> bool {
         self.ready_and_available_time
             .and_then(|ready_and_available_time| {
@@ -102,11 +107,12 @@ impl Connection {
             .unwrap_or(false)
     }
 
+    // Checks if the connection is stale.
     pub(crate) fn is_stale(&self, current_generation: u32) -> bool {
         self.generation != current_generation
     }
 
-    // Helper to close the connection and emit the corresponding CMAP event. This will only be
+    // Helper to close the connection and emit the corresponding CMAP event. This should only be
     // called by ConnectionPool.
     pub(crate) fn close(mut self, reason: ConnectionClosedReason) {
         self.pool.take();
@@ -133,6 +139,8 @@ impl Connection {
         self.established = true;
     }
 
+    // Helper to create a `ConnectionCheckedOutEvent` for the connection. This should only be called
+    // by the connection pool
     pub(crate) fn checked_out_event(&self) -> ConnectionCheckedOutEvent {
         ConnectionCheckedOutEvent {
             address: self.address.clone(),
@@ -140,6 +148,8 @@ impl Connection {
         }
     }
 
+    // Helper to create a `ConnectionCheckedInEvent` for the connection. This should only be called
+    // by the connection pool
     pub(crate) fn checked_in_event(&self) -> ConnectionCheckedInEvent {
         ConnectionCheckedInEvent {
             address: self.address.clone(),
