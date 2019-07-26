@@ -3,10 +3,12 @@ mod indexes;
 use bson::Bson;
 use mongodb::options::{AggregateOptions, UpdateOptions};
 
+use crate::CLIENT;
+
 #[test]
 #[function_name]
 fn count() {
-    let coll = crate::get_coll(function_name!(), function_name!());
+    let coll = CLIENT.get_coll(function_name!(), function_name!());
 
     coll.drop().unwrap();
     assert_eq!(coll.estimated_document_count(None).unwrap(), 0);
@@ -24,7 +26,7 @@ fn count() {
 #[test]
 #[function_name]
 fn find() {
-    let coll = crate::get_coll(function_name!(), function_name!());
+    let coll = CLIENT.get_coll(function_name!(), function_name!());
 
     coll.drop().unwrap();
 
@@ -48,7 +50,7 @@ fn find() {
 #[test]
 #[function_name]
 fn update() {
-    let coll = crate::get_coll(function_name!(), function_name!());
+    let coll = CLIENT.get_coll(function_name!(), function_name!());
 
     coll.drop().unwrap();
 
@@ -80,7 +82,7 @@ fn update() {
 #[test]
 #[function_name]
 fn delete() {
-    let coll = crate::get_coll(function_name!(), function_name!());
+    let coll = CLIENT.get_coll(function_name!(), function_name!());
 
     coll.drop().unwrap();
 
@@ -101,7 +103,7 @@ fn delete() {
 #[test]
 #[function_name]
 fn aggregate_out() {
-    let db = crate::get_db(function_name!());
+    let db = CLIENT.database(function_name!());
     let coll = db.collection(function_name!());
 
     coll.drop().unwrap();
@@ -199,6 +201,6 @@ fn large_insert() {
 
     let docs = vec![doc; 35000];
 
-    let coll = crate::init_db_and_coll(function_name!(), function_name!());
+    let coll = CLIENT.init_db_and_coll(function_name!(), function_name!());
     coll.insert_many(docs, None).unwrap();
 }

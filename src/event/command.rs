@@ -4,6 +4,18 @@ use bson::Document;
 
 use crate::{event::Failure, pool::ConnectionInfo};
 
+pub const REDACTED_COMMAND_NAMES: &[&str] = &[
+    "authenticate",
+    "saslStart",
+    "saslContinue",
+    "getnonce",
+    "createUser",
+    "updateUser",
+    "copydbgetnonce",
+    "copydbsaslstart",
+    "copydb",
+];
+
 /// An event that triggers when a database command is initiated.
 #[derive(Clone, Debug)]
 pub struct CommandStartedEvent {
@@ -69,9 +81,13 @@ pub struct CommandFailedEvent {
 /// by the driver.
 ///
 /// ```rust
-/// # use mongodb::{Client, event::{CommandEventHandler, CommandFailedEvent}};
+/// # use mongodb::{
+/// #     Client,
+/// #     event::{CommandEventHandler, CommandFailedEvent},
+/// #     options::ClientOptions,
+/// # };
 ///
-/// struct FailedCommandLogger {}
+/// struct FailedCommandLogger;
 ///
 /// impl CommandEventHandler for FailedCommandLogger {
 ///     fn handle_command_failed_event(&self, event: CommandFailedEvent) {
@@ -79,10 +95,12 @@ pub struct CommandFailedEvent {
 ///     }
 /// }
 ///
-/// # fn main() {
-/// // TODO: Construct client with event handler by using `ClientOptions`.
+/// # fn main() -> mongodb::error::Result<()> {
+/// # let options = ClientOptions::default();
+/// let client = Client::with_event_handler(options, Box::new(FailedCommandLogger))?;
 ///
 /// // Do things with the client, and failed command events will be logged to stderr.
+/// # Ok(())
 /// # }
 /// ```
 pub trait CommandEventHandler: Send + Sync {

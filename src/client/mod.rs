@@ -73,7 +73,7 @@ struct ClientInner {
     read_concern: Option<ReadConcern>,
     write_concern: Option<WriteConcern>,
     #[derivative(Debug = "ignore")]
-    command_event_handler: Option<Box<CommandEventHandler>>,
+    command_event_handler: Option<Box<dyn CommandEventHandler>>,
     local_threshold: Option<i64>,
     server_selection_timeout: Option<Duration>,
 }
@@ -87,8 +87,26 @@ impl Client {
         Client::with_options(options)
     }
 
-    /// Creates a new `Client` connected to the cluster specified by ClientOptions `options`.
-    pub fn with_options(mut options: ClientOptions) -> Result<Self> {
+    /// Creates a new `Client` connected to the cluster specified by `options`.
+    pub fn with_options(options: ClientOptions) -> Result<Self> {
+        Client::new(options, None)
+    }
+
+    /// Creates a new `Client` connected to the cluster specified by `options` with the custom event
+    /// handler.
+    ///
+    /// See the type-level documentation for `CommandEventHandler` for more details.
+    pub fn with_event_handler(
+        options: ClientOptions,
+        event_handler: Box<dyn CommandEventHandler>,
+    ) -> Result<Self> {
+        Self::new(options, Some(event_handler))
+    }
+
+    fn new(
+        mut options: ClientOptions,
+        event_handler: Option<Box<dyn CommandEventHandler>>,
+    ) -> Result<Self> {
         let tls_config = match options.tls_options.take() {
             Some(opts) => Some(Arc::new(opts.into_rustls_config()?)),
             None => None,
@@ -103,7 +121,7 @@ impl Client {
                 read_concern: options.read_concern.take(),
                 write_concern: options.write_concern.take(),
                 topology: Topology::new(options, tls_config),
-                command_event_handler: None,
+                command_event_handler: event_handler,
             }),
         })
     }

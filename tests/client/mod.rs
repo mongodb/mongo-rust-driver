@@ -34,7 +34,7 @@ struct OsMetadata {
 // #[test]
 #[allow(unused)]
 fn metadata_sent_in_handshake() {
-    let db = crate::get_db("admin");
+    let db = CLIENT.database("admin");
     let result = db.run_command(doc! { "currentOp": 1 }, None).unwrap();
 
     let in_prog = match result.get("inprog") {

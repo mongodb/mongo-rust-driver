@@ -6,6 +6,8 @@ use mongodb::{
     Database,
 };
 
+use crate::CLIENT;
+
 #[derive(Debug, Deserialize)]
 struct CollectionInfo {
     pub name: String,
@@ -42,7 +44,7 @@ fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<CollectionInfo>
 
 #[test]
 fn is_master() {
-    let db = crate::get_db("test");
+    let db = CLIENT.database("test");
     let doc = db.run_command(doc! { "ismaster": 1 }, None).unwrap();
     let is_master_reply: IsMasterReply = bson::from_bson(Bson::Document(doc)).unwrap();
 
@@ -53,7 +55,7 @@ fn is_master() {
 #[test]
 #[function_name]
 fn list_collections() {
-    let db = crate::get_db(function_name!());
+    let db = CLIENT.database(function_name!());
     db.drop().unwrap();
 
     assert_eq!(db.list_collections(None).unwrap().count(), 0);
@@ -88,7 +90,7 @@ fn list_collections() {
 #[test]
 #[function_name]
 fn list_collections_filter() {
-    let db = crate::get_db(function_name!());
+    let db = CLIENT.database(function_name!());
     db.drop().unwrap();
 
     assert_eq!(db.list_collections(None).unwrap().count(), 0);
@@ -125,7 +127,7 @@ fn list_collections_filter() {
 #[test]
 #[function_name]
 fn list_collection_names() {
-    let db = crate::get_db(function_name!());
+    let db = CLIENT.database(function_name!());
     db.drop().unwrap();
 
     assert!(db.list_collection_names(None).unwrap().is_empty());
@@ -151,7 +153,7 @@ fn list_collection_names() {
 #[test]
 #[function_name]
 fn collection_management() {
-    let db = crate::get_db(function_name!());
+    let db = CLIENT.database(function_name!());
     db.drop().unwrap();
 
     assert!(db.list_collection_names(None).unwrap().is_empty());
@@ -183,11 +185,11 @@ fn collection_management() {
 
 #[test]
 fn db_aggregate() {
-    if !crate::version_at_least_40() {
+    if !CLIENT.version_at_least_40() {
         return;
     }
 
-    let db = crate::get_db("admin");
+    let db = CLIENT.database("admin");
 
     let pipeline = vec![
         doc! {
@@ -221,11 +223,11 @@ fn db_aggregate() {
 
 #[test]
 fn db_aggregate_disk_use() {
-    if !crate::version_at_least_40() {
+    if !CLIENT.version_at_least_40() {
         return;
     }
 
-    let db = crate::get_db("admin");
+    let db = CLIENT.database("admin");
 
     let pipeline = vec![
         doc! {
