@@ -3,7 +3,7 @@ use std::str::FromStr;
 use bson::Document;
 
 use mongodb::options::{
-    auth::{AuthMechanism, MongoCredential},
+    auth::{AuthMechanism, Credential},
     ClientOptions,
 };
 
@@ -21,9 +21,9 @@ struct TestCredential {
     pub mechanism_properties: Option<Document>,
 }
 
-impl Into<MongoCredential> for TestCredential {
-    fn into(self) -> MongoCredential {
-        MongoCredential {
+impl Into<Credential> for TestCredential {
+    fn into(self) -> Credential {
+        Credential {
             username: self.username,
             password: self.password,
             source: self.source,

@@ -8,7 +8,7 @@ use derivative::Derivative;
 pub use self::description::{OpTime, ServerDescription, ServerType};
 
 use crate::{
-    client::auth::MongoCredential,
+    client::auth::Credential,
     error::Result,
     options::Host,
     pool::{is_master, Connection, Pool},
@@ -29,7 +29,7 @@ impl Server {
         host: Host,
         max_pool_size: Option<u32>,
         tls_config: Option<Arc<rustls::ClientConfig>>,
-        credential: Option<MongoCredential>,
+        credential: Option<Credential>,
     ) -> Self {
         Self {
             pool: Pool::new(host.clone(), max_pool_size, tls_config.clone(), credential).unwrap(),

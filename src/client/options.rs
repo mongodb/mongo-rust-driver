@@ -8,15 +8,13 @@ use std::{
     time::Duration,
 };
 
-use percent_encoding;
+use bson::Document;
 use rustls::{
     internal::pemfile, Certificate, RootCertStore, ServerCertVerified, ServerCertVerifier, TLSError,
 };
 
-use bson::Document;
-
 use crate::{
-    client::auth::{AuthMechanism, MongoCredential},
+    client::auth::{AuthMechanism, Credential},
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::{Error, ErrorKind, Result},
     read_preference::{ReadPreference, TagSet},
@@ -28,12 +26,12 @@ lazy_static! {
     /// Reserved characters as defined by [Section 2.2 of RFC-3986](https://tools.ietf.org/html/rfc3986#section-2.2).
     /// Usernames / passwords that contain these characters must instead include the URL encoded version of them when included
     /// as part of the connection string.
-    static ref USERINFO_RESERVED_CHARACTERS: HashSet<char> = {
-        [':', '/', '?', '#', '[', ']', '@', '!'].iter().cloned().collect()
+    static ref USERINFO_RESERVED_CHARACTERS: HashSet<&'static char> = {
+        [':', '/', '?', '#', '[', ']', '@', '!'].iter().collect()
     };
 
-    static ref ILLEGAL_DATABASE_CHARACTERS: HashSet<char> = {
-        ['/', '\\', ' ', '"', '$', '.'].iter().cloned().collect()
+    static ref ILLEGAL_DATABASE_CHARACTERS: HashSet<&'static char> = {
+        ['/', '\\', ' ', '"', '$', '.'].iter().collect()
     };
 }
 
@@ -130,7 +128,7 @@ pub struct ClientOptions {
 
     /// The credential to use for authenticating connections made by this client.
     #[builder(default)]
-    pub credential: Option<MongoCredential>,
+    pub credential: Option<Credential>,
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -145,7 +143,7 @@ struct ClientOptionsParser {
     pub repl_set_name: Option<String>,
     pub write_concern: Option<WriteConcern>,
     pub server_selection_timeout: Option<Duration>,
-    pub credentials: Option<MongoCredential>,
+    pub credential: Option<Credential>,
     auth_mechanism: Option<AuthMechanism>,
     auth_source: Option<String>,
     auth_mechanism_properties: Option<Document>,
@@ -236,7 +234,7 @@ impl From<ClientOptionsParser> for ClientOptions {
             repl_set_name: parser.repl_set_name,
             write_concern: parser.write_concern,
             server_selection_timeout: parser.server_selection_timeout,
-            credential: parser.credentials,
+            credential: parser.credential,
         }
     }
 }
@@ -259,7 +257,7 @@ fn exclusive_split_at(s: &str, i: usize) -> (Option<&str>, Option<&str>) {
 }
 
 fn percent_decode(s: &str, err_message: &str) -> Result<String> {
-    match percent_encoding::percent_decode(s.as_bytes()).decode_utf8() {
+    match percent_encoding::percent_decode_str(s).decode_utf8() {
         Ok(result) => Ok(result.to_string()),
         Err(_) => Err(ErrorKind::ArgumentError(err_message.to_string()).into()),
     }
@@ -308,7 +306,7 @@ impl ClientOptionsParser {
             None => (None, None),
         };
 
-        let decoded_db = match database {
+        let db = match database {
             Some(db) => {
                 let decoded = percent_decode(db, "database name must be URL encoded")?;
                 if decoded
@@ -395,9 +393,9 @@ impl ClientOptionsParser {
             write_concern.validate()?;
         }
 
-        // set username and password
+        // Set username and password.
         if let Some(u) = username {
-            let mut credential = options.credentials.get_or_insert_with(Default::default);
+            let mut credential = options.credential.get_or_insert_with(Default::default);
             validate_userinfo(u, "username")?;
             let decoded_u = percent_decode(u, "username must be URL encoded")?;
             credential.username = Some(decoded_u);
@@ -409,28 +407,23 @@ impl ClientOptionsParser {
             }
         }
 
-        let db = match &decoded_db {
-            Some(s) => Some(s.as_str()),
-            None => None,
-        };
+        let db_str = db.as_ref().map(|s| s.as_str());
 
-        match options.auth_mechanism.clone() {
-            Some(mechanism) => {
-                let mut credential = options.credentials.get_or_insert_with(Default::default);
-
-                credential.source = match &options.auth_source {
-                    // if a source is provided, use that
-                    Some(source) => Some(source.clone()),
-                    // otherwise, allow the mechanism to decided between a set default or the
-                    // connection string database
-                    None => Some(mechanism.default_source(db).to_string()),
-                };
-                credential.mechanism_properties = options.auth_mechanism_properties.clone();
+        match options.auth_mechanism {
+            Some(ref mechanism) => {
+                let mut credential = options.credential.get_or_insert_with(Default::default);
+                // If a source is provided, use that. Otherwise, choose a default based on the
+                // mechanism.
+                credential.source = options
+                    .auth_source
+                    .take()
+                    .or_else(|| Some(mechanism.default_source(db_str)));
+                credential.mechanism_properties = options.auth_mechanism_properties.take();
                 mechanism.validate_credential(&credential)?;
-                credential.mechanism = Some(mechanism);
+                credential.mechanism = options.auth_mechanism.take();
             }
             None => {
-                if let Some(credential) = &mut options.credentials {
+                if let Some(credential) = &mut options.credential {
                     // If credentials exist (i.e. username is specified) but no mechanism, the
                     // default source is chosen from the following list in
                     // order (skipping null ones): authSource option, connection string db,
@@ -438,8 +431,8 @@ impl ClientOptionsParser {
                     credential.source = Some(
                         options
                             .auth_source
-                            .clone()
-                            .unwrap_or_else(|| AuthMechanism::SCRAMSHA1.default_source(db)),
+                            .take()
+                            .unwrap_or_else(|| AuthMechanism::ScramSha1.default_source(db_str)),
                     )
                 } else if authentication_requested {
                     bail!(ErrorKind::ArgumentError(

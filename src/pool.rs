@@ -14,7 +14,7 @@ use time::PreciseTime;
 use webpki::DNSNameRef;
 
 use crate::{
-    client::{auth, auth::MongoCredential},
+    client::auth::Credential,
     command_responses::IsMasterCommandResponse,
     error::{Error, ErrorKind, Result},
     event::CommandStartedEvent,
@@ -54,7 +54,7 @@ impl Pool {
         host: Host,
         max_size: Option<u32>,
         tls_config: Option<Arc<rustls::ClientConfig>>,
-        credential: Option<MongoCredential>,
+        credential: Option<Credential>,
     ) -> Result<Self> {
         let pool = ::r2d2::Pool::builder()
             .max_size(max_size.unwrap_or(DEFAULT_POOL_SIZE))
@@ -78,7 +78,7 @@ impl Deref for Pool {
 pub struct Connector {
     pub host: Host,
     pub tls_config: Option<Arc<rustls::ClientConfig>>,
-    pub credential: Option<MongoCredential>,
+    pub credential: Option<Credential>,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -155,7 +155,7 @@ impl ManageConnection for Connector {
         };
 
         if let Some(credential) = &self.credential {
-            auth::authenticate_stream(&mut stream, credential)?;
+            credential.authenticate_stream(&mut stream)?;
         } else {
             is_master_stream(&mut stream, true, None)?;
         }
@@ -294,7 +294,7 @@ pub struct IsMasterReply {
 pub fn is_master_stream<T: Read + Write>(
     stream: &mut T,
     handshake: bool,
-    credential: Option<&MongoCredential>,
+    credential: Option<&Credential>,
 ) -> Result<IsMasterReply> {
     let mut doc = if handshake {
         doc! {
@@ -333,7 +333,7 @@ pub fn is_master(
     client: Option<Client>,
     conn: &mut Connection,
     handshake: bool,
-    credential: Option<MongoCredential>,
+    _credential: Option<Credential>,
 ) -> Result<IsMasterReply> {
     let doc = if handshake {
         doc! {

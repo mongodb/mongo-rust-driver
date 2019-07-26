@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
-    fmt,
-    fmt::{Display, Formatter},
+    fmt::{self, Display, Formatter},
     io::{Read, Write},
     ops::{BitXor, Deref, Range},
     str,
@@ -10,16 +9,14 @@ use std::{
 
 use hmac::{Hmac, Mac};
 use md5::Md5;
-use pbkdf2;
 use sha1::{Digest, Sha1};
-use stringprep;
 
 use bson::{spec::BinarySubtype, Bson, Document};
 
 use crate::{
     bson_util,
-    client::{auth, auth::MongoCredential},
-    error::Result,
+    client::auth::{self, Credential},
+    error::{Error, Result},
     pool,
 };
 
@@ -57,16 +54,16 @@ struct CacheEntry {
 /// The versions of SCRAM supported by the driver (classified according to hash function used).
 #[derive(Hash, Eq, PartialEq, Clone)]
 pub(crate) enum ScramVersion {
-    SHA1,
+    Sha1,
 }
 
 impl ScramVersion {
     /// HMAC function used as part of SCRAM authentication.
     fn hmac(&self, key: &[u8], str: &[u8]) -> Result<Vec<u8>> {
         match self {
-            ScramVersion::SHA1 => {
-                let mut mac =
-                    Hmac::<Sha1>::new_varkey(key).or_else(|_| Err(auth::unknown_error("SCRAM")))?;
+            ScramVersion::Sha1 => {
+                let mut mac = Hmac::<Sha1>::new_varkey(key)
+                    .or_else(|_| Err(Error::unknown_authentication_error("SCRAM")))?;
                 mac.input(str);
                 Ok(mac.result().code().to_vec())
             }
@@ -76,7 +73,7 @@ impl ScramVersion {
     /// The "h" function defined in the SCRAM RFC.
     fn h(&self, str: &[u8]) -> Vec<u8> {
         match self {
-            ScramVersion::SHA1 => {
+            ScramVersion::Sha1 => {
                 let mut sha1 = Sha1::new();
                 sha1.input(str);
                 sha1.result().to_vec()
@@ -87,7 +84,7 @@ impl ScramVersion {
     /// The "h_i" function as defined in the SCRAM RFC.
     fn h_i(&self, str: &str, salt: &[u8], iterations: usize) -> Vec<u8> {
         match self {
-            ScramVersion::SHA1 => {
+            ScramVersion::Sha1 => {
                 let mut buf = vec![0u8; 20];
                 pbkdf2::pbkdf2::<Hmac<Sha1>>(str.as_bytes(), salt, iterations, &mut buf);
                 buf
@@ -108,7 +105,7 @@ impl ScramVersion {
         md5.input(format!("{}:mongo:{}", username, password));
         let hashed_password = hex::encode(md5.result());
         let normalized_password = stringprep::saslprep(hashed_password.as_str())
-            .or_else(|_| Err(auth::error("SCRAM", "saslprep failure")))?;
+            .or_else(|_| Err(Error::authentication_error("SCRAM", "saslprep failure")))?;
         Ok(self.h_i(normalized_password.deref(), salt, i))
     }
 }
@@ -116,7 +113,7 @@ impl ScramVersion {
 impl Display for ScramVersion {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            ScramVersion::SHA1 => write!(f, "SCRAM-SHA-1"),
+            ScramVersion::Sha1 => write!(f, "SCRAM-SHA-1"),
         }
     }
 }
@@ -133,7 +130,7 @@ pub fn xor(lhs: &[u8], rhs: &[u8]) -> Vec<u8> {
 /// Parses a string slice of the form "<expected_key>=<body>" into "<body>", if possible.
 fn parse_kvp(str: &str, expected_key: char) -> Result<String> {
     if str.chars().nth(0) != Some(expected_key) || str.chars().nth(1) != Some('=') {
-        Err(auth::invalid_response("SCRAM"))
+        Err(Error::invalid_authentication_response("SCRAM"))
     } else {
         Ok(str.chars().skip(2).collect())
     }
@@ -142,16 +139,16 @@ fn parse_kvp(str: &str, expected_key: char) -> Result<String> {
 fn validate_command_success(response: &Document) -> Result<()> {
     let ok = response
         .get("ok")
-        .ok_or_else(|| auth::invalid_response("SCRAM"))?;
+        .ok_or_else(|| Error::invalid_authentication_response("SCRAM"))?;
     match bson_util::get_int(ok) {
         Some(1) => Ok(()),
-        Some(_) => Err(auth::error(
+        Some(_) => Err(Error::authentication_error(
             "SCRAM",
             response
                 .get_str("errmsg")
                 .unwrap_or("Authentication failure"),
         )),
-        _ => Err(auth::invalid_response("SCRAM")),
+        _ => Err(Error::invalid_authentication_response("SCRAM")),
     }
 }
 
@@ -222,30 +219,36 @@ impl ServerFirst {
 
         let conversation_id = response
             .get("conversationId")
-            .ok_or_else(|| auth::error("SCRAM", "mismatched conversationId's"))?;
+            .ok_or_else(|| Error::authentication_error("SCRAM", "mismatched conversationId's"))?;
         let payload = match response.get_binary_generic("payload") {
             Ok(p) => p,
-            Err(_) => return Err(auth::invalid_response("SCRAM")),
+            Err(_) => return Err(Error::invalid_authentication_response("SCRAM")),
         };
         let done = response
             .get_bool("done")
-            .or_else(|_| Err(auth::invalid_response("SCRAM")))?;
-        let message = str::from_utf8(payload).or_else(|_| Err(auth::invalid_response("SCRAM")))?;
+            .or_else(|_| Err(Error::invalid_authentication_response("SCRAM")))?;
+        let message = str::from_utf8(payload)
+            .or_else(|_| Err(Error::invalid_authentication_response("SCRAM")))?;
 
         let parts: Vec<&str> = message.split(',').collect();
 
         if parts.len() < 3 {
-            return Err(auth::invalid_response("SCRAM"));
+            return Err(Error::invalid_authentication_response("SCRAM"));
         };
 
         let full_nonce = parse_kvp(parts[0], NONCE_KEY)?;
 
         let salt = base64::decode(parse_kvp(parts[1], SALT_KEY)?.as_str())
-            .or_else(|_| Err(auth::invalid_response("SCRAM")))?;
+            .or_else(|_| Err(Error::invalid_authentication_response("SCRAM")))?;
 
         let i: usize = match parse_kvp(parts[2], ITERATION_COUNT_KEY)?.parse() {
             Ok(num) => num,
-            Err(_) => return Err(auth::error("SCRAM", "iteration count invalid")),
+            Err(_) => {
+                return Err(Error::authentication_error(
+                    "SCRAM",
+                    "iteration count invalid",
+                ))
+            }
         };
 
         Ok(ServerFirst {
@@ -280,11 +283,17 @@ impl ServerFirst {
 
     fn validate(&self, nonce: &str) -> Result<()> {
         if self.done {
-            Err(auth::error("SCRAM", "handshake terminated early"))
+            Err(Error::authentication_error(
+                "SCRAM",
+                "handshake terminated early",
+            ))
         } else if &self.nonce[0..nonce.len()] != nonce {
-            Err(auth::error("SCRAM", "mismatched nonce"))
+            Err(Error::authentication_error("SCRAM", "mismatched nonce"))
         } else if self.i < MIN_ITERATION_COUNT {
-            Err(auth::error("SCRAM", "iteration count too low"))
+            Err(Error::authentication_error(
+                "SCRAM",
+                "iteration count too low",
+            ))
         } else {
             Ok(())
         }
@@ -378,19 +387,20 @@ impl ServerFinal {
 
         let conversation_id = response
             .get("conversationId")
-            .ok_or_else(|| auth::invalid_response("SCRAM"))?;
+            .ok_or_else(|| Error::invalid_authentication_response("SCRAM"))?;
         let done = response
             .get_bool("done")
-            .or_else(|_| Err(auth::invalid_response("SCRAM")))?;
+            .or_else(|_| Err(Error::invalid_authentication_response("SCRAM")))?;
         let payload = response
             .get_binary_generic("payload")
-            .or_else(|_| Err(auth::invalid_response("SCRAM")))?;
-        let message = str::from_utf8(payload).or_else(|_| Err(auth::invalid_response("SCRAM")))?;
+            .or_else(|_| Err(Error::invalid_authentication_response("SCRAM")))?;
+        let message = str::from_utf8(payload)
+            .or_else(|_| Err(Error::invalid_authentication_response("SCRAM")))?;
 
         let first = message
             .chars()
             .nth(0)
-            .ok_or_else(|| auth::invalid_response("SCRAM"))?;
+            .ok_or_else(|| Error::invalid_authentication_response("SCRAM"))?;
         let body = if first == ERROR_KEY {
             let error = parse_kvp(message, ERROR_KEY)?;
             ServerFinalBody::Error(error)
@@ -398,7 +408,7 @@ impl ServerFinal {
             let verifier = parse_kvp(message, VERIFIER_KEY)?;
             ServerFinalBody::Verifier(verifier)
         } else {
-            return Err(auth::invalid_response("SCRAM"));
+            return Err(Error::invalid_authentication_response("SCRAM"));
         };
 
         Ok(ServerFinal {
@@ -415,11 +425,17 @@ impl ServerFinal {
         scram: &ScramVersion,
     ) -> Result<()> {
         if self.done {
-            return Err(auth::error("SCRAM", "handshake terminated early"));
+            return Err(Error::authentication_error(
+                "SCRAM",
+                "handshake terminated early",
+            ));
         };
 
         if self.conversation_id != client_final.conversation_id {
-            return Err(auth::error("SCRAM", "mismatched conversationId's"));
+            return Err(Error::authentication_error(
+                "SCRAM",
+                "mismatched conversationId's",
+            ));
         };
 
         match &self.body {
@@ -432,10 +448,13 @@ impl ServerFinal {
                 if base64::encode(server_signature.as_slice()).as_str() == body {
                     Ok(())
                 } else {
-                    Err(auth::error("SCRAM", "mismatched server signatures"))
+                    Err(Error::authentication_error(
+                        "SCRAM",
+                        "mismatched server signatures",
+                    ))
                 }
             }
-            ServerFinalBody::Error(err) => Err(auth::error("SCRAM", err.as_str())),
+            ServerFinalBody::Error(err) => Err(Error::authentication_error("SCRAM", err.as_str())),
         }
     }
 
@@ -447,21 +466,26 @@ impl ServerFinal {
 /// Perform SCRAM authentication for a given stream.
 pub(crate) fn authenticate_stream<T: Read + Write>(
     stream: &mut T,
-    credential: &MongoCredential,
+    credential: &Credential,
     scram: ScramVersion,
 ) -> Result<()> {
     let username = credential
-        .username()
-        .ok_or_else(|| auth::error("SCRAM", "no username supplied"))?;
+        .username
+        .as_ref()
+        .ok_or_else(|| Error::authentication_error("SCRAM", "no username supplied"))?;
 
     let password = credential
-        .password()
-        .ok_or_else(|| auth::error("SCRAM", "no password supplied"))?;
+        .password
+        .as_ref()
+        .ok_or_else(|| Error::authentication_error("SCRAM", "no password supplied"))?;
 
-    let source = credential.source().unwrap_or("admin");
+    let source = match credential.source.as_ref() {
+        Some(s) => s.as_str(),
+        None => "admin",
+    };
 
-    if credential.mechanism_properties().is_some() {
-        return Err(auth::error(
+    if credential.mechanism_properties.is_some() {
+        return Err(Error::authentication_error(
             "SCRAM",
             "mechanism properties MUST NOT be specified",
         ));
@@ -482,15 +506,19 @@ pub(crate) fn authenticate_stream<T: Read + Write>(
         i: server_first.i(),
         mechanism: scram.clone(),
     };
-    let salted_password = match CREDENTIAL_CACHE.read().unwrap().get(&cache_entry_key) {
-        Some(pwd) => pwd.clone(),
-        None => scram.compute_salted_password(
-            username,
-            password,
-            server_first.i(),
-            server_first.salt(),
-        )?,
-    };
+    let (should_update_cache, salted_password) =
+        match CREDENTIAL_CACHE.read().unwrap().get(&cache_entry_key) {
+            Some(pwd) => (false, pwd.clone()),
+            None => (
+                true,
+                scram.compute_salted_password(
+                    username,
+                    password,
+                    server_first.i(),
+                    server_first.salt(),
+                )?,
+            ),
+        };
 
     let client_final = ClientFinal::new(
         salted_password.as_slice(),
@@ -519,26 +547,25 @@ pub(crate) fn authenticate_stream<T: Read + Write>(
         .and_then(|id| Some(id == server_final.conversation_id()))
         != Some(true)
     {
-        return Err(auth::error("SCRAM", "mismatched conversationId's"));
+        return Err(Error::authentication_error(
+            "SCRAM",
+            "mismatched conversationId's",
+        ));
     };
 
     if !server_noop_response.get_bool("done").unwrap_or(false) {
-        return Err(auth::error(
+        return Err(Error::authentication_error(
             "SCRAM",
             "authentication did not complete successfully",
         ));
     }
 
-    if CREDENTIAL_CACHE
-        .read()
-        .unwrap()
-        .get(&cache_entry_key)
-        .is_none()
-    {
-        CREDENTIAL_CACHE
-            .write()
-            .unwrap()
-            .insert(cache_entry_key, salted_password.clone());
+    if should_update_cache {
+        if let Ok(ref mut cache) = CREDENTIAL_CACHE.write() {
+            if cache.get(&cache_entry_key).is_none() {
+                cache.insert(cache_entry_key, salted_password);
+            }
+        }
     }
 
     Ok(())
