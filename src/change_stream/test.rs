@@ -1,7 +1,8 @@
 use bson::{Bson, Document};
-use mongodb::{
+
+use crate::{
     change_stream::document::ChangeStreamDocument, error::Result, options::ChangeStreamOptions,
-    Client,
+    topology::description::TopologyType, Client,
 };
 
 #[derive(Debug, Deserialize)]
@@ -21,7 +22,7 @@ struct TestCase {
     max_server_version: Option<String>,
     fail_point: Option<Document>,
     target: Target,
-    topology: Topology,
+    topology: Vec<Topology>,
     change_stream_pipeline: Vec<Document>,
     change_stream_options: ChangeStreamOptions,
     operations: Vec<Document>,
@@ -70,8 +71,14 @@ fn run_test(
 ) -> Result<Vec<Document>> {
     test_case.description = test_case.description.replace('$', "%");
 
-    // TODO: Change to check actual topology
-    if test_case.topology != Topology::Single {
+    let topology = match global_client.get_topology_type() {
+        TopologyType::Single => Topology::Single,
+        TopologyType::ReplicaSetNoPrimary | TopologyType::ReplicaSetWithPrimary => {
+            Topology::ReplicaSet
+        }
+        TopologyType::Sharded => Topology::Sharded,
+    };
+    if !test_case.topology.contains(&topology) {
         return Ok(Vec::new());
     }
 
@@ -137,14 +144,14 @@ fn run_change_stream_test(test_file: TestFile) {
     for mut test_case in test_file.tests {
         match run_test(test_case, test_file, global_client) {
             Err(e) => match test_case.result {
-                Outcome::Error(code) => assert!(matches(code, e.code)),
+                Outcome::Error(code) => assert!(matches(code, e.0)),
                 Outcome::Success(_) => panic!(&test_case.description),
             },
             Ok(changes) => match test_case.result {
                 Outcome::Error(_) => panic!(&test_case.description),
                 Outcome::Success(docs) => {
                     for pair in docs.iter().zip(changes.iter()) {
-                        assert!(matches(bson::to_bson(pair.0).unwrap(), pair.1));
+                        assert!(matches(pair.0, pair.1));
                     }
                 }
             },
@@ -159,5 +166,5 @@ fn run_change_stream_test(test_file: TestFile) {
 
 #[test]
 fn run() {
-    crate::spec::test(&["change-streams"], run_change_stream_test);
+    crate::tests::spec::test(&["change-streams"], run_change_stream_test);
 }

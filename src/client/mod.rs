@@ -233,6 +233,10 @@ impl Client {
             .get_max_wire_version(address)
     }
 
+    pub(crate) fn get_topology_type(&self) -> TopologyType {
+        self.inner.topology.read().unwrap().topology_type()
+    }
+
     fn get_connection_from_server(&self, address: &str) -> Result<Option<Connection>> {
         self.inner
             .topology

@@ -1,4 +1,4 @@
-mod description;
+pub(crate) mod description;
 mod server;
 
 use std::{

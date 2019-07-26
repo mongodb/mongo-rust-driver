@@ -1,5 +1,7 @@
 pub mod document;
 pub mod options;
+#[cfg(test)]
+mod test;
 
 use std::marker::PhantomData;
 
