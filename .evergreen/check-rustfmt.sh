@@ -3,4 +3,4 @@
 set -o errexit
 
 . ~/.cargo/env
-cargo +nightly fmt -- --check
+cargo +nightly-2019-07-22 fmt -- --check
