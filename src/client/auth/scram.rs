@@ -438,8 +438,8 @@ impl ServerFinal {
             ));
         };
 
-        match &self.body {
-            ServerFinalBody::Verifier(body) => {
+        match self.body {
+            ServerFinalBody::Verifier(ref body) => {
                 let server_key = scram.hmac(salted_password, b"Server Key")?;
                 let server_signature = scram.hmac(
                     server_key.as_slice(),
@@ -454,7 +454,9 @@ impl ServerFinal {
                     ))
                 }
             }
-            ServerFinalBody::Error(err) => Err(Error::authentication_error("SCRAM", err.as_str())),
+            ServerFinalBody::Error(ref err) => {
+                Err(Error::authentication_error("SCRAM", err.as_str()))
+            }
         }
     }
 

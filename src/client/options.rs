@@ -407,7 +407,7 @@ impl ClientOptionsParser {
             }
         }
 
-        let db_str = db.as_ref().map(|s| s.as_str());
+        let db_str = db.as_ref().map(String::as_str);
 
         match options.auth_mechanism {
             Some(ref mechanism) => {
@@ -423,7 +423,7 @@ impl ClientOptionsParser {
                 credential.mechanism = options.auth_mechanism.take();
             }
             None => {
-                if let Some(credential) = &mut options.credential {
+                if let Some(ref mut credential) = options.credential {
                     // If credentials exist (i.e. username is specified) but no mechanism, the
                     // default source is chosen from the following list in
                     // order (skipping null ones): authSource option, connection string db,
