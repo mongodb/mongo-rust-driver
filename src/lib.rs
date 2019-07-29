@@ -75,7 +75,7 @@ mod pool;
 pub mod read_preference;
 pub mod results;
 #[cfg(test)]
-mod test;
+pub(crate) mod test;
 mod topology;
 mod wire;
 

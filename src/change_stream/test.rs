@@ -1,8 +1,10 @@
 use bson::{Bson, Document};
 
 use crate::{
-    change_stream::document::ChangeStreamDocument, error::Result, options::ChangeStreamOptions,
-    topology::description::TopologyType, Client,
+    error::{ErrorKind, Result},
+    options::ChangeStreamOptions,
+    topology::description::TopologyType,
+    Client,
 };
 
 #[derive(Debug, Deserialize)]
@@ -14,7 +16,7 @@ struct TestFile {
     tests: Vec<TestCase>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct TestCase {
     description: String,
@@ -25,36 +27,45 @@ struct TestCase {
     topology: Vec<Topology>,
     change_stream_pipeline: Vec<Document>,
     change_stream_options: ChangeStreamOptions,
-    operations: Vec<Document>,
-    expectations: Vec<Document>,
+    operations: Vec<Operation>,
+    expectations: Option<Vec<Document>>,
     result: Outcome,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
 enum Target {
     Collection,
     Database,
     Client,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
 enum Topology {
     Single,
     ReplicaSet,
     Sharded,
+    Unknown,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Deserialize)]
+struct Operation {
+    database: String,
+    collection: String,
+    name: String,
+    arguments: Option<Document>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
 enum Outcome {
-    Error(i32),
-    Success(Vec<ChangeStreamDocument>),
+    Error { code: i32 },
+    Success(Vec<Document>),
 }
 
 fn matches(expected: impl Into<Bson>, actual: impl Into<Bson>) -> bool {
-    let mut expected_bson = expected.into();
+    let expected_bson = expected.into();
     let actual_bson = actual.into();
 
     if expected_bson == bson::to_bson("42").unwrap() {
@@ -66,8 +77,8 @@ fn matches(expected: impl Into<Bson>, actual: impl Into<Bson>) -> bool {
 
 fn run_test(
     mut test_case: TestCase,
-    test_file: TestFile,
-    global_client: Client,
+    test_file: &TestFile,
+    global_client: &Client,
 ) -> Result<Vec<Document>> {
     test_case.description = test_case.description.replace('$', "%");
 
@@ -77,6 +88,7 @@ fn run_test(
             Topology::ReplicaSet
         }
         TopologyType::Sharded => Topology::Sharded,
+        TopologyType::Unknown => Topology::Unknown,
     };
     if !test_case.topology.contains(&topology) {
         return Ok(Vec::new());
@@ -90,28 +102,27 @@ fn run_test(
     db.create_collection(&test_file.collection_name, None)?;
     db2.create_collection(&test_file.collection2_name, None)?;
     let coll = db.collection(&test_file.collection_name);
-    let coll2 = db.collection(&test_file.collection2_name);
 
     if let Some(fail_point) = test_case.fail_point {
         let admin_db = global_client.database("admin");
         admin_db.run_command(fail_point, None)?;
     }
 
-    let client = Client::with_uri_str("mongodb://localhost:27017")?;
+    let client =
+        Client::with_uri_str(option_env!("MONGODB_URI").unwrap_or("mongodb://localhost:27017"))?;
 
     // TODO: Begin monitoring all APM events for client
 
-    // TODO: Change to correct collection and database targets
-    let change_stream = match test_case.target {
-        Collection => coll.watch(
+    let mut change_stream = match test_case.target {
+        Target::Collection => coll.watch(
             test_case.change_stream_pipeline,
             Some(test_case.change_stream_options),
         )?,
-        Database => db.watch(
+        Target::Database => db.watch(
             test_case.change_stream_pipeline,
             Some(test_case.change_stream_options),
         )?,
-        Client => client.watch(
+        Target::Client => client.watch(
             test_case.change_stream_pipeline,
             Some(test_case.change_stream_options),
         )?,
@@ -119,13 +130,14 @@ fn run_test(
 
     for operation in test_case.operations {
         global_client
-            .database("admin")
-            .run_command(operation, None)?;
+            .database(&operation.database)
+            .collection(&operation.collection)
+            .run_command(operation.arguments, None)?;
     }
 
-    let changes = Vec::new();
+    let mut changes = Vec::new();
     match test_case.result {
-        Outcome::Error(_) => {
+        Outcome::Error { code: _ } => {
             change_stream.next().transpose()?;
         }
         Outcome::Success(_) => {
@@ -139,32 +151,52 @@ fn run_test(
 }
 
 fn run_change_stream_test(test_file: TestFile) {
-    let global_client = Client::with_uri_str("mongodb://localhost:27017").unwrap();
+    let global_client =
+        Client::with_uri_str(option_env!("MONGODB_URI").unwrap_or("mongodb://localhost:27017"))
+            .unwrap();
 
-    for mut test_case in test_file.tests {
-        match run_test(test_case, test_file, global_client) {
-            Err(e) => match test_case.result {
-                Outcome::Error(code) => assert!(matches(code, e.0)),
-                Outcome::Success(_) => panic!(&test_case.description),
+    for test_case in test_file.tests.clone() {
+        let description = test_case.description.clone();
+        let result = test_case.result.clone();
+        match run_test(test_case, &test_file, &global_client) {
+            Err(e) => match result {
+                Outcome::Error { code } => match e.kind() {
+                    ErrorKind::CommandError(ref inner) => {
+                        assert!(matches(code, inner.code));
+                    }
+                    _ => panic!("{}: wrong type of error ({}) returned", &description, e),
+                },
+                Outcome::Success(_) => {
+                    panic!("{}: unexpected error ({}) was returned", &description, e)
+                }
             },
-            Ok(changes) => match test_case.result {
-                Outcome::Error(_) => panic!(&test_case.description),
+            Ok(changes) => match result {
+                Outcome::Error { code } => panic!(
+                    "{}: expected error (code: {}) was not returned",
+                    &description, code
+                ),
                 Outcome::Success(docs) => {
                     for pair in docs.iter().zip(changes.iter()) {
-                        assert!(matches(pair.0, pair.1));
+                        assert!(matches(pair.0.clone(), pair.1.clone()));
                     }
                 }
             },
         }
 
-        // TODO: Assert expectations
+        // TODO: Assert expectations == command monitoring results
     }
 
-    global_client.database(&test_file.database_name).drop();
-    global_client.database(&test_file.database2_name).drop();
+    global_client
+        .database(&test_file.database_name)
+        .drop()
+        .unwrap();
+    global_client
+        .database(&test_file.database2_name)
+        .drop()
+        .unwrap();
 }
 
 #[test]
 fn run() {
-    crate::tests::spec::test(&["change-streams"], run_change_stream_test);
+    crate::test::run(&["change-streams"], run_change_stream_test);
 }
