@@ -52,7 +52,7 @@ impl Server {
         let mut conn = self.monitor_pool.get().unwrap();
         let mut description = ServerDescription::new(
             &self.host.display(),
-            Some(is_master(None, &mut conn, false, None)),
+            Some(is_master(None, &mut conn, false)),
         );
 
         if description.error.is_some() {
@@ -62,7 +62,7 @@ impl Server {
                 conn = self.monitor_pool.get().unwrap();
                 description = ServerDescription::new(
                     &self.host.display(),
-                    Some(is_master(None, &mut conn, false, None)),
+                    Some(is_master(None, &mut conn, false)),
                 );
             }
         }

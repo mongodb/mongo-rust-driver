@@ -154,7 +154,7 @@ impl ManageConnection for Connector {
             None => Stream::Basic(socket),
         };
 
-        if let Some(credential) = &self.credential {
+        if let Some(ref credential) = self.credential {
             credential.authenticate_stream(&mut stream)?;
         } else {
             is_master_stream(&mut stream, true, None)?;
@@ -333,7 +333,6 @@ pub fn is_master(
     client: Option<Client>,
     conn: &mut Connection,
     handshake: bool,
-    _credential: Option<Credential>,
 ) -> Result<IsMasterReply> {
     let doc = if handshake {
         doc! {
