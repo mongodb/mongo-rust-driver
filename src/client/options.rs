@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     fmt,
     fs::File,
     io::{BufReader, Seek, SeekFrom},
@@ -7,18 +8,32 @@ use std::{
     time::Duration,
 };
 
-use percent_encoding::percent_decode;
+use bson::Document;
 use rustls::{
     internal::pemfile, Certificate, RootCertStore, ServerCertVerified, ServerCertVerifier, TLSError,
 };
 
 use crate::{
+    client::auth::{AuthMechanism, Credential},
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::{Error, ErrorKind, Result},
     read_preference::{ReadPreference, TagSet},
 };
 
 const DEFAULT_PORT: u16 = 27017;
+
+lazy_static! {
+    /// Reserved characters as defined by [Section 2.2 of RFC-3986](https://tools.ietf.org/html/rfc3986#section-2.2).
+    /// Usernames / passwords that contain these characters must instead include the URL encoded version of them when included
+    /// as part of the connection string.
+    static ref USERINFO_RESERVED_CHARACTERS: HashSet<&'static char> = {
+        [':', '/', '?', '#', '[', ']', '@', '!'].iter().collect()
+    };
+
+    static ref ILLEGAL_DATABASE_CHARACTERS: HashSet<&'static char> = {
+        ['/', '\\', ' ', '"', '$', '.'].iter().collect()
+    };
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Host {
@@ -110,6 +125,10 @@ pub struct ClientOptions {
 
     #[builder(default)]
     pub server_selection_timeout: Option<Duration>,
+
+    /// The credential to use for authenticating connections made by this client.
+    #[builder(default)]
+    pub credential: Option<Credential>,
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -124,6 +143,10 @@ struct ClientOptionsParser {
     pub repl_set_name: Option<String>,
     pub write_concern: Option<WriteConcern>,
     pub server_selection_timeout: Option<Duration>,
+    pub credential: Option<Credential>,
+    auth_mechanism: Option<AuthMechanism>,
+    auth_source: Option<String>,
+    auth_mechanism_properties: Option<Document>,
     read_preference_tags: Option<Vec<TagSet>>,
 }
 
@@ -211,6 +234,7 @@ impl From<ClientOptionsParser> for ClientOptions {
             repl_set_name: parser.repl_set_name,
             write_concern: parser.write_concern,
             server_selection_timeout: parser.server_selection_timeout,
+            credential: parser.credential,
         }
     }
 }
@@ -219,6 +243,33 @@ impl ClientOptions {
     pub fn parse(s: &str) -> Result<Self> {
         ClientOptionsParser::parse(s).map(Into::into)
     }
+}
+
+/// Splits a string into a section before a given index and a section exclusively after the index.
+/// Empty portions are returned as `None`.
+fn exclusive_split_at(s: &str, i: usize) -> (Option<&str>, Option<&str>) {
+    let (l, r) = s.split_at(i);
+
+    let lout = if !l.is_empty() { Some(l) } else { None };
+    let rout = if r.len() > 1 { Some(&r[1..]) } else { None };
+
+    (lout, rout)
+}
+
+fn percent_decode(s: &str, err_message: &str) -> Result<String> {
+    match percent_encoding::percent_decode_str(s).decode_utf8() {
+        Ok(result) => Ok(result.to_string()),
+        Err(_) => Err(ErrorKind::ArgumentError(err_message.to_string()).into()),
+    }
+}
+
+fn validate_userinfo(s: &str, userinfo_type: &str) -> Result<()> {
+    if s.chars().any(|c| USERINFO_RESERVED_CHARACTERS.contains(&c)) {
+        bail!(ErrorKind::ArgumentError(
+            format!("{} must be URL encoded", userinfo_type).to_string()
+        ))
+    }
+    Ok(())
 }
 
 impl ClientOptionsParser {
@@ -239,12 +290,60 @@ impl ClientOptionsParser {
 
         let after_scheme = &s[end_of_scheme + 3..];
 
-        let (host_section, options_section) = match after_scheme.find('/') {
-            Some(index) => after_scheme.split_at(index),
-            None => (after_scheme, ""),
+        let (pre_slash, post_slash) = match after_scheme.find('/') {
+            Some(slash_index) => match exclusive_split_at(after_scheme, slash_index) {
+                (Some(section), o) => (section, o),
+                (None, _) => bail!(ErrorKind::ArgumentError("missing hosts".to_string())),
+            },
+            None => (after_scheme, None),
         };
 
-        let hosts: Result<Vec<_>> = host_section
+        let (database, options_section) = match post_slash {
+            Some(section) => match section.find('?') {
+                Some(index) => exclusive_split_at(section, index),
+                None => (post_slash, None),
+            },
+            None => (None, None),
+        };
+
+        let db = match database {
+            Some(db) => {
+                let decoded = percent_decode(db, "database name must be URL encoded")?;
+                if decoded
+                    .chars()
+                    .any(|c| ILLEGAL_DATABASE_CHARACTERS.contains(&c))
+                {
+                    bail!(ErrorKind::ArgumentError(
+                        "illegal character in database name".to_string()
+                    ))
+                }
+                Some(decoded)
+            }
+            None => None,
+        };
+
+        let (authentication_requested, cred_section, hosts_section) = match pre_slash.rfind('@') {
+            Some(index) => {
+                // if '@' is in the host section, it MUST be interpreted as a request for
+                // authentication, even if the credentials are empty.
+                let (creds, hosts) = exclusive_split_at(pre_slash, index);
+                match hosts {
+                    Some(hs) => (true, creds, hs),
+                    None => bail!(ErrorKind::ArgumentError("missing hosts".to_string())),
+                }
+            }
+            None => (false, None, pre_slash),
+        };
+
+        let (username, password) = match cred_section {
+            Some(creds) => match creds.find(':') {
+                Some(index) => exclusive_split_at(creds, index),
+                None => (Some(creds), None), // Lack of ":" implies whole string is username
+            },
+            None => (None, None),
+        };
+
+        let hosts: Result<Vec<_>> = hosts_section
             .split(',')
             .map(|host| {
                 let (hostname, port) = match host.find(':') {
@@ -286,11 +385,69 @@ impl ClientOptionsParser {
             ..Default::default()
         };
 
-        options.parse_options(options_section)?;
+        if let Some(opts) = options_section {
+            options.parse_options(opts)?;
+        }
 
         if let Some(ref write_concern) = options.write_concern {
             write_concern.validate()?;
         }
+
+        // Set username and password.
+        if let Some(u) = username {
+            let mut credential = options.credential.get_or_insert_with(Default::default);
+            validate_userinfo(u, "username")?;
+            let decoded_u = percent_decode(u, "username must be URL encoded")?;
+            credential.username = Some(decoded_u);
+
+            if let Some(pass) = password {
+                validate_userinfo(pass, "password")?;
+                let decoded_p = percent_decode(pass, "password must be URL encoded")?;
+                credential.password = Some(decoded_p)
+            }
+        }
+
+        let db_str = db.as_ref().map(String::as_str);
+
+        match options.auth_mechanism {
+            Some(ref mechanism) => {
+                let mut credential = options.credential.get_or_insert_with(Default::default);
+                // If a source is provided, use that. Otherwise, choose a default based on the
+                // mechanism.
+                credential.source = options
+                    .auth_source
+                    .take()
+                    .or_else(|| Some(mechanism.default_source(db_str)));
+                credential.mechanism_properties = options.auth_mechanism_properties.take();
+                mechanism.validate_credential(&credential)?;
+                credential.mechanism = options.auth_mechanism.take();
+            }
+            None => {
+                if let Some(ref mut credential) = options.credential {
+                    // If credentials exist (i.e. username is specified) but no mechanism, the
+                    // default source is chosen from the following list in
+                    // order (skipping null ones): authSource option, connection string db,
+                    // SCRAM default (i.e. "admin").
+                    credential.source = Some(
+                        options
+                            .auth_source
+                            .take()
+                            .unwrap_or_else(|| AuthMechanism::ScramSha1.default_source(db_str)),
+                    )
+                } else if authentication_requested {
+                    bail!(ErrorKind::ArgumentError(
+                        "username and mechanism both not provided, but authentication was \
+                         requested"
+                            .to_string()
+                    ))
+                } else if options.auth_source.is_some() {
+                    bail!(ErrorKind::ArgumentError(
+                        "username and mechanism both not provided, but authSource was specified"
+                            .to_string()
+                    ))
+                }
+            }
+        };
 
         Ok(options)
     }
@@ -300,12 +457,7 @@ impl ClientOptionsParser {
             return Ok(());
         }
 
-        let options_section = match options.find('?') {
-            Some(index) if index < options.len() - 1 => &options[index + 1..],
-            _ => return Ok(()),
-        };
-
-        for option_pair in options_section.split('&') {
+        for option_pair in options.split('&') {
             let (key, value) = match option_pair.find('=') {
                 Some(index) => option_pair.split_at(index),
                 None => bail!(ErrorKind::ArgumentError(format!(
@@ -317,7 +469,7 @@ impl ClientOptionsParser {
             // Skip leading '=' in value.
             self.parse_option_pair(
                 &key.to_lowercase(),
-                percent_decode(&value.as_bytes()[1..])
+                percent_encoding::percent_decode(&value.as_bytes()[1..])
                     .decode_utf8_lossy()
                     .as_ref(),
             )?;
@@ -483,6 +635,32 @@ impl ClientOptionsParser {
             k @ "wtimeoutms" => {
                 let write_concern = self.write_concern.get_or_insert_with(Default::default);
                 write_concern.w_timeout = Some(Duration::from_millis(get_ms!(value, k)));
+            }
+            "authmechanism" => {
+                self.auth_mechanism = Some(AuthMechanism::from_str(value)?);
+            }
+            "authsource" => self.auth_source = Some(value.to_string()),
+            "authmechanismproperties" => {
+                let mut doc = Document::new();
+                let err_func = || {
+                    ErrorKind::ArgumentError(
+                        "improperly formatted authMechanismProperties".to_string(),
+                    )
+                    .into()
+                };
+
+                for kvp in value.split(',') {
+                    match kvp.find(':') {
+                        Some(index) => {
+                            let (k, v) = exclusive_split_at(kvp, index);
+                            let key = k.ok_or_else(err_func)?;
+                            let value = v.ok_or_else(err_func)?;
+                            doc.insert(key, value);
+                        }
+                        None => return Err(err_func()),
+                    };
+                }
+                self.auth_mechanism_properties = Some(doc);
             }
             _ => {}
         }

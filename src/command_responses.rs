@@ -94,6 +94,7 @@ pub struct IsMasterCommandResponse {
     pub tags: Option<TagSet>,
     pub election_id: Option<ObjectId>,
     pub primary: Option<String>,
+    pub sasl_supported_mechs: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]

@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use bson::{oid::ObjectId, TimeStamp, UtcDateTime};
 
 use crate::{
+    command_responses::IsMasterCommandResponse,
     error::Result,
     pool::IsMasterReply,
     read_preference::{ReadPreference, TagSet},
@@ -24,6 +25,45 @@ pub enum ServerType {
     RSOther,
     RSGhost,
     Unknown,
+}
+
+impl ServerType {
+    pub(crate) fn from_ismaster_response(is_master: &IsMasterCommandResponse) -> ServerType {
+        #[cfg_attr(feature = "cargo-clippy", allow(clippy::if_same_then_else))]
+        {
+            if is_master.ok != Some(1.0) {
+                ServerType::Unknown
+            } else if is_master.msg.as_ref().map(|s| &s[..]) == Some("isdbgrid") {
+                ServerType::Mongos
+            } else if is_master.set_name.is_some() {
+                if is_master.is_master.unwrap_or(false) {
+                    ServerType::RSPrimary
+                } else if is_master.hidden.unwrap_or(false) {
+                    ServerType::RSOther
+                } else if is_master.secondary.unwrap_or(false) {
+                    ServerType::RSSecondary
+                } else if is_master.arbiter_only.unwrap_or(false) {
+                    ServerType::RSArbiter
+                } else {
+                    ServerType::RSOther
+                }
+            } else if is_master.is_replica_set.unwrap_or(false) {
+                ServerType::RSGhost
+            } else {
+                ServerType::Standalone
+            }
+        }
+    }
+
+    pub(crate) fn can_auth(self) -> bool {
+        match self {
+            ServerType::Standalone
+            | ServerType::RSPrimary
+            | ServerType::RSSecondary
+            | ServerType::Mongos => true,
+            _ => false,
+        }
+    }
 }
 
 impl Default for ServerType {
@@ -86,31 +126,7 @@ impl ServerDescription {
 
         description.round_trip_time = Some(round_trip_time as f64);
 
-        #[cfg_attr(feature = "cargo-clippy", allow(clippy::if_same_then_else))]
-        {
-            description.server_type = if is_master.ok != Some(1.0) {
-                description.round_trip_time = None;
-                ServerType::Unknown
-            } else if is_master.msg.as_ref().map(|s| &s[..]) == Some("isdbgrid") {
-                ServerType::Mongos
-            } else if is_master.set_name.is_some() {
-                if is_master.is_master.unwrap_or(false) {
-                    ServerType::RSPrimary
-                } else if is_master.hidden.unwrap_or(false) {
-                    ServerType::RSOther
-                } else if is_master.secondary.unwrap_or(false) {
-                    ServerType::RSSecondary
-                } else if is_master.arbiter_only.unwrap_or(false) {
-                    ServerType::RSArbiter
-                } else {
-                    ServerType::RSOther
-                }
-            } else if is_master.is_replica_set.unwrap_or(false) {
-                ServerType::RSGhost
-            } else {
-                ServerType::Standalone
-            };
-        }
+        description.server_type = ServerType::from_ismaster_response(&is_master);
 
         description.logical_session_timeout_minutes = is_master.logical_session_timeout_minutes;
 

@@ -1,3 +1,4 @@
+pub mod auth;
 pub mod options;
 #[cfg(test)]
 mod test;

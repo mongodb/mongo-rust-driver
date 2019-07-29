@@ -66,6 +66,11 @@ error_chain! {
             description("An error occurred when trying to execute a write operation:")
             display("{}", inner)
         }
+
+        AuthenticationError(msg: String) {
+            description("An error occurred when trying to authenticate a connection.")
+            display("{}", msg)
+        }
     }
 }
 
@@ -97,6 +102,22 @@ impl Error {
         }
 
         None
+    }
+
+    /// Creates an `AuthenticationError` for the given mechanism with the provided reason.
+    pub(crate) fn authentication_error(mechanism_name: &str, reason: &str) -> Self {
+        ErrorKind::AuthenticationError(format!("{} failure: {}", mechanism_name, reason)).into()
+    }
+
+    /// Creates an `AuthenticationError` for the given mechanism with a generic "unknown" message.
+    pub(crate) fn unknown_authentication_error(mechanism_name: &str) -> Error {
+        Error::authentication_error(mechanism_name, "internal error")
+    }
+
+    /// Creates an `AuthenticationError` for the given mechanism when the server response is
+    /// invalid.
+    pub(crate) fn invalid_authentication_response(mechanism_name: &str) -> Error {
+        Error::authentication_error(mechanism_name, "invalid server response")
     }
 }
 
