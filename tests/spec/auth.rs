@@ -49,13 +49,7 @@ fn run_auth_test(test_file: TestFile) {
     for mut test_case in test_file.tests {
         test_case.description = test_case.description.replace('$', "%");
 
-        let skipped_mechanisms = [
-            "SCRAM-SHA-256",
-            "GSSAPI",
-            "MONGODB-X509",
-            "PLAIN",
-            "MONGODB-CR",
-        ];
+        let skipped_mechanisms = ["GSSAPI", "MONGODB-X509", "PLAIN", "MONGODB-CR"];
 
         // TODO: start testing other mechanisms as they're added
         if skipped_mechanisms

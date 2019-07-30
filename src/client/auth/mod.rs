@@ -13,6 +13,7 @@ use rand::Rng;
 use crate::{
     command_responses::IsMasterCommandResponse,
     error::{Error, ErrorKind, Result},
+    options::auth::scram::ScramVersion,
     pool,
     topology::ServerType,
 };
@@ -41,8 +42,6 @@ pub enum AuthMechanism {
     /// The SCRAM-SHA-256 mechanism which extends [RFC 5802](http://tools.ietf.org/html/rfc5802) and is formally defined in [RFC 7677](https://tools.ietf.org/html/rfc7677).
     ///
     /// See the [MongoDB documentation](https://docs.mongodb.com/manual/core/security-scram/) for more information.
-    ///
-    /// Note: This mechanism is not currently supported by this driver but will be in the future.
     ScramSha256,
 
     /// The MONGODB-X509 mechanism based on the usage of X.509 certificates to validate a client
@@ -72,21 +71,55 @@ pub enum AuthMechanism {
 }
 
 impl AuthMechanism {
-    pub(crate) fn from_is_master(_reply: &IsMasterCommandResponse) -> AuthMechanism {
-        // TODO: RUST-87 check for SCRAM-SHA-256 first
-        AuthMechanism::ScramSha1
+    /// Get an `AuthenticationMechanism` from the response to an isMaster.
+    /// If no mechanisms are present in the response, SCRAM-SHA-1 will be chosen by default.
+    pub(crate) fn from_is_master(reply: &IsMasterCommandResponse) -> AuthMechanism {
+        match reply.sasl_supported_mechs {
+            Some(ref ms) => {
+                match ms
+                    .iter()
+                    .find(|s| s.as_str() == AuthMechanism::ScramSha256.as_str())
+                {
+                    Some(_) => AuthMechanism::ScramSha256,
+                    None => AuthMechanism::ScramSha1,
+                }
+            }
+            None => AuthMechanism::ScramSha1,
+        }
     }
 
     /// Determines if the provided credentials have the required information to perform
     /// authentication.
     pub fn validate_credential(&self, credential: &Credential) -> Result<()> {
+        // TODO: fill in others as they're implemented.
         match self {
-            AuthMechanism::ScramSha1 => {
-                if credential.username.is_none() {
+            AuthMechanism::ScramSha1 | AuthMechanism::ScramSha256 => {
+                match credential.username {
+                    Some(ref user) => {
+                        if user.is_empty() {
+                            bail!(ErrorKind::ArgumentError(
+                                "Username must be non-zero length in SCRAM authentication"
+                                    .to_string()
+                            ))
+                        }
+                    }
+                    None => bail!(ErrorKind::ArgumentError(
+                        "Username must be provided for SCRAM authentication".to_string()
+                    )),
+                };
+
+                if credential.password.is_none() {
                     bail!(ErrorKind::ArgumentError(
-                        "No username provided for SCRAM authentication".to_string()
+                        "Password must be provided for SCRAM authentication".to_string()
                     ))
                 };
+
+                if credential.mechanism_properties.is_some() {
+                    bail!(ErrorKind::ArgumentError(
+                        "Mechanism properties must not be provided for SCRAM authentication"
+                            .to_string()
+                    ))
+                }
                 Ok(())
             }
             _ => Ok(()),
@@ -102,6 +135,17 @@ impl AuthMechanism {
                 uri_db.unwrap_or("admin").to_string()
             }
             _ => "".to_string(),
+        }
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        match self {
+            AuthMechanism::ScramSha1 => SCRAM_SHA_1_STR,
+            AuthMechanism::ScramSha256 => SCRAM_SHA_256_STR,
+            AuthMechanism::Gssapi => GSSAPI_STR,
+            AuthMechanism::MongoDbCr => MONGODB_CR_STR,
+            AuthMechanism::MongoDbX509 => MONGODB_X509_STR,
+            AuthMechanism::Plain => PLAIN_STR,
         }
     }
 }
@@ -200,9 +244,8 @@ impl Credential {
 
         // Authenticate according to the chosen mechanism.
         match mechanism.as_ref() {
-            AuthMechanism::ScramSha1 => {
-                scram::authenticate_stream(stream, self, scram::ScramVersion::Sha1)
-            }
+            AuthMechanism::ScramSha1 => ScramVersion::Sha1.authenticate_stream(stream, self),
+            AuthMechanism::ScramSha256 => ScramVersion::Sha256.authenticate_stream(stream, self),
             AuthMechanism::MongoDbCr => bail!(ErrorKind::AuthenticationError(
                 "MONGODB-CR is deprecated and not supported by this driver. Use SCRAM for \
                  password-based authentication instead"
