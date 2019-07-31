@@ -233,6 +233,8 @@ impl Client {
             .get_max_wire_version(address)
     }
 
+    // This method is only called for testing
+    #[allow(dead_code)]
     pub(crate) fn get_topology_type(&self) -> TopologyType {
         self.inner.topology.read().unwrap().topology_type()
     }

@@ -53,8 +53,32 @@ enum Topology {
 struct Operation {
     database: String,
     collection: String,
-    name: String,
-    arguments: Option<Document>,
+    #[serde(flatten)]
+    command: Command,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(tag = "name", content = "arguments")]
+#[serde(rename_all = "camelCase")]
+enum Command {
+    DeleteOne {
+        filter: Document,
+    },
+    Drop,
+    InsertOne {
+        document: Document,
+    },
+    Rename {
+        to: String,
+    },
+    ReplaceOne {
+        filter: Document,
+        replacement: Document,
+    },
+    UpdateOne {
+        filter: Document,
+        update: Document,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -129,10 +153,51 @@ fn run_test(
     };
 
     for operation in test_case.operations {
-        global_client
-            .database(&operation.database)
-            .collection(&operation.collection)
-            .run_command(operation.arguments, None)?;
+        let database = &operation.database;
+        let collection = &operation.collection;
+
+        match operation.command {
+            Command::DeleteOne { filter } => {
+                let _ = global_client
+                    .database(database)
+                    .collection(collection)
+                    .delete_one(filter, None)?;
+            }
+            Command::Drop => {
+                let _ = global_client
+                    .database(database)
+                    .collection(collection)
+                    .drop()?;
+            }
+            Command::InsertOne { document } => {
+                let _ = global_client
+                    .database(database)
+                    .collection(collection)
+                    .insert_one(document, None)?;
+            }
+            Command::Rename { to } => {
+                let rename_cmd = doc! { "renameCollection": collection, "to": to };
+
+                let _ = global_client
+                    .database(database)
+                    .run_command(rename_cmd, None)?;
+            }
+            Command::ReplaceOne {
+                filter,
+                replacement,
+            } => {
+                let _ = global_client
+                    .database(database)
+                    .collection(collection)
+                    .find_one_and_replace(filter, replacement, None)?;
+            }
+            Command::UpdateOne { filter, update } => {
+                let _ = global_client
+                    .database(database)
+                    .collection(collection)
+                    .update_one(filter, update, None)?;
+            }
+        }
     }
 
     let mut changes = Vec::new();
@@ -163,6 +228,9 @@ fn run_change_stream_test(test_file: TestFile) {
                 Outcome::Error { code } => match e.kind() {
                     ErrorKind::CommandError(ref inner) => {
                         assert!(matches(code, inner.code));
+                    }
+                    ErrorKind::ResponseError(_) => {
+                        continue;
                     }
                     _ => panic!("{}: wrong type of error ({}) returned", &description, e),
                 },
