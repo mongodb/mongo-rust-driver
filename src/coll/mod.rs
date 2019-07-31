@@ -1096,9 +1096,9 @@ impl Collection {
 
         let read_preference = self
             .read_preference()
-            .or(self.database().read_preference())
-            .or(self.client().read_preference())
-            .map(|pref: &ReadPreference| pref.clone());
+            .cloned()
+            .or_else(|| self.database().read_preference().cloned())
+            .or_else(|| self.client().read_preference().cloned());
 
         Ok(ChangeStream::new(
             cursor,
@@ -1145,9 +1145,9 @@ impl Collection {
 
         let read_preference = self
             .read_preference()
-            .or(self.database().read_preference())
-            .or(self.client().read_preference())
-            .map(|pref: &ReadPreference| pref.clone());
+            .cloned()
+            .or_else(|| self.database().read_preference().cloned())
+            .or_else(|| self.client().read_preference().cloned());
 
         Ok(ChangeStream::new(
             cursor,

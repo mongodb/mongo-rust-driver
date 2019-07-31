@@ -1,5 +1,4 @@
 mod auth;
-mod change_stream;
 mod crud;
 mod read_write_concern;
 

@@ -472,8 +472,8 @@ impl Database {
 
         let read_preference = self
             .read_preference()
-            .or(self.client().read_preference())
-            .map(|pref: &ReadPreference| pref.clone());
+            .cloned()
+            .or_else(|| self.client().read_preference().cloned());
 
         Ok(ChangeStream::new(
             cursor,
@@ -523,8 +523,8 @@ impl Database {
 
         let read_preference = self
             .read_preference()
-            .or(self.client().read_preference())
-            .map(|pref: &ReadPreference| pref.clone());
+            .cloned()
+            .or_else(|| self.client().read_preference().cloned());
 
         Ok(ChangeStream::new(
             cursor,

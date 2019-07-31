@@ -202,7 +202,7 @@ fn run_test(
 
     let mut changes = Vec::new();
     match test_case.result {
-        Outcome::Error { code: _ } => {
+        Outcome::Error { .. } => {
             change_stream.next().transpose()?;
         }
         Outcome::Success(_) => {

@@ -405,9 +405,7 @@ impl Client {
         let db = self.database("admin");
         let cursor = db.aggregate(watch_pipeline.clone(), aggregate_options)?;
 
-        let read_preference = self
-            .read_preference()
-            .map(|pref: &ReadPreference| pref.clone());
+        let read_preference = self.read_preference().cloned();
 
         Ok(ChangeStream::new(
             cursor,
@@ -465,9 +463,7 @@ impl Client {
         let db = self.database("admin");
         let cursor = db.aggregate(watch_pipeline.clone(), aggregate_options)?;
 
-        let read_preference = self
-            .read_preference()
-            .map(|pref: &ReadPreference| pref.clone());
+        let read_preference = self.read_preference().cloned();
 
         Ok(ChangeStream::new(
             cursor,
