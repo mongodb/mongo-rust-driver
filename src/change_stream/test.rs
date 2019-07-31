@@ -164,7 +164,7 @@ fn run_test(
                     .delete_one(filter, None)?;
             }
             Command::Drop => {
-                let _ = global_client
+                global_client
                     .database(database)
                     .collection(collection)
                     .drop()?;
