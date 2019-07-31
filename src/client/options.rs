@@ -78,6 +78,10 @@ impl Host {
     pub fn hostname(&self) -> &str {
         &self.hostname
     }
+
+    pub fn port(&self) -> &Option<u16> {
+        &self.port
+    }
 }
 
 impl fmt::Display for Host {
@@ -126,6 +130,9 @@ pub struct ClientOptions {
     #[builder(default)]
     pub server_selection_timeout: Option<Duration>,
 
+    #[builder(default)]
+    pub connect_timeout: Option<Duration>,
+
     /// The credential to use for authenticating connections made by this client.
     #[builder(default)]
     pub credential: Option<Credential>,
@@ -137,6 +144,7 @@ struct ClientOptionsParser {
     pub tls_options: Option<TlsOptions>,
     pub heartbeat_freq: Option<Duration>,
     pub local_threshold: Option<i64>,
+    pub connect_timeout: Option<Duration>,
     pub max_pool_size: Option<u32>,
     pub read_concern: Option<ReadConcern>,
     pub read_preference: Option<ReadPreference>,
@@ -235,6 +243,7 @@ impl From<ClientOptionsParser> for ClientOptions {
             write_concern: parser.write_concern,
             server_selection_timeout: parser.server_selection_timeout,
             credential: parser.credential,
+            connect_timeout: parser.connect_timeout,
         }
     }
 }
@@ -338,7 +347,7 @@ impl ClientOptionsParser {
         let (username, password) = match cred_section {
             Some(creds) => match creds.find(':') {
                 Some(index) => exclusive_split_at(creds, index),
-                None => (Some(creds), None), // Lack of ":" implies whole string is username
+                None => (Some(creds), None), // Lack of ":" implies whole string is username.
             },
             None => (None, None),
         };
@@ -661,6 +670,9 @@ impl ClientOptionsParser {
                     };
                 }
                 self.auth_mechanism_properties = Some(doc);
+            }
+            k @ "connecttimeoutms" => {
+                self.connect_timeout = Some(Duration::from_millis(get_ms!(value, k)));
             }
             _ => {}
         }

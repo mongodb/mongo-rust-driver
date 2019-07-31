@@ -51,7 +51,7 @@ fn run_auth_test(test_file: TestFile) {
 
         let skipped_mechanisms = ["GSSAPI", "MONGODB-X509", "PLAIN", "MONGODB-CR"];
 
-        // TODO: start testing other mechanisms as they're added
+        // TODO: start testing other mechanisms as they're added.
         if skipped_mechanisms
             .iter()
             .any(|mech| test_case.description.contains(mech))

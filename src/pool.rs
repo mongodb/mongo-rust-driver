@@ -4,6 +4,7 @@ use std::{
     net::{IpAddr, SocketAddr, TcpStream},
     ops::{Deref, DerefMut},
     sync::Arc,
+    time::Duration,
 };
 
 use bson::{Bson, Document};
@@ -23,6 +24,7 @@ use crate::{
     Client,
 };
 
+const DEFAULT_CONNECTION_TIMEOUT: u64 = 10000;
 const DEFAULT_POOL_SIZE: u32 = 5;
 pub const DRIVER_NAME: &str = "mrd";
 
@@ -54,10 +56,14 @@ impl Pool {
         host: Host,
         max_size: Option<u32>,
         tls_config: Option<Arc<rustls::ClientConfig>>,
+        connect_timeout: Option<Duration>,
         credential: Option<Credential>,
     ) -> Result<Self> {
         let pool = ::r2d2::Pool::builder()
             .max_size(max_size.unwrap_or(DEFAULT_POOL_SIZE))
+            .connection_timeout(
+                connect_timeout.unwrap_or(Duration::from_millis(DEFAULT_CONNECTION_TIMEOUT)),
+            )
             .build_unchecked(Connector {
                 host,
                 tls_config,

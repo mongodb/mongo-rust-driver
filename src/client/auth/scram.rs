@@ -3,7 +3,7 @@ use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},
     io::{Read, Write},
-    ops::{BitXor, Deref, Range},
+    ops::{BitXor, Range},
     str,
     sync::RwLock,
 };
@@ -228,17 +228,24 @@ impl ScramVersion {
         i: usize,
         salt: &[u8],
     ) -> Result<Vec<u8>> {
-        let pwd = match self {
+        let normalized_password = match self {
             ScramVersion::Sha1 => {
                 let mut md5 = Md5::new();
                 md5.input(format!("{}:mongo:{}", username, password));
-                Cow::from(hex::encode(md5.result()))
+                Cow::Owned(hex::encode(md5.result()))
             }
-            ScramVersion::Sha256 => Cow::Borrowed(password),
+            ScramVersion::Sha256 => match stringprep::saslprep(password) {
+                Ok(p) => p,
+                Err(_) => {
+                    return Err(Error::authentication_error(
+                        "SCRAM-SHA-256",
+                        "saslprep failure",
+                    ))
+                }
+            },
         };
-        let normalized_password = stringprep::saslprep(pwd.as_ref())
-            .or_else(|_| Err(Error::authentication_error("SCRAM", "saslprep failure")))?;
-        Ok(self.h_i(normalized_password.deref(), salt, i))
+
+        Ok(self.h_i(normalized_password.as_ref(), salt, i))
     }
 }
 
@@ -610,11 +617,11 @@ fn test_iteration_count() {
         salt: Vec::new(),
         i: 42,
     };
-    assert_eq!(invalid_iteration_count.validate(nonce).is_ok(), false);
+    assert!(invalid_iteration_count.validate(nonce).is_err());
 
     let valid_iteration_count = ServerFirst {
         i: 4096,
         ..invalid_iteration_count
     };
-    assert_eq!(valid_iteration_count.validate(nonce).is_ok(), true)
+    assert!(valid_iteration_count.validate(nonce).is_ok())
 }

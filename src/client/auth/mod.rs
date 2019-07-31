@@ -138,7 +138,7 @@ impl AuthMechanism {
         }
     }
 
-    pub(crate) fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         match self {
             AuthMechanism::ScramSha1 => SCRAM_SHA_1_STR,
             AuthMechanism::ScramSha256 => SCRAM_SHA_256_STR,
