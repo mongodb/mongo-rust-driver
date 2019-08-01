@@ -36,7 +36,7 @@ use crate::{
 /// let change_stream = coll.watch(None, None)?;
 ///
 /// for change in change_stream {
-///   println!("{}", change?)
+///   println!("{:?}", change?)
 /// }
 /// #
 /// # Ok(())
