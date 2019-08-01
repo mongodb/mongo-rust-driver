@@ -106,18 +106,6 @@ fn run_test(
 ) -> Result<Vec<Document>> {
     test_case.description = test_case.description.replace('$', "%");
 
-    let topology = match global_client.get_topology_type() {
-        TopologyType::Single => Topology::Single,
-        TopologyType::ReplicaSetNoPrimary | TopologyType::ReplicaSetWithPrimary => {
-            Topology::ReplicaSet
-        }
-        TopologyType::Sharded => Topology::Sharded,
-        TopologyType::Unknown => Topology::Unknown,
-    };
-    if !test_case.topology.contains(&topology) {
-        return Ok(Vec::new());
-    }
-
     global_client.database(&test_file.database_name).drop()?;
     global_client.database(&test_file.database2_name).drop()?;
 
@@ -222,7 +210,19 @@ fn run_change_stream_test(test_file: TestFile) {
 
     for test_case in test_file.tests.clone() {
         let description = test_case.description.clone();
+
         let result = test_case.result.clone();
+        let topology = match global_client.get_topology_type() {
+            TopologyType::Single => Topology::Single,
+            TopologyType::ReplicaSetNoPrimary | TopologyType::ReplicaSetWithPrimary => {
+                Topology::ReplicaSet
+            }
+            TopologyType::Sharded => Topology::Sharded,
+            TopologyType::Unknown => Topology::Unknown,
+        };
+        if !test_case.topology.contains(&topology) {
+            continue;
+        }
         match run_test(test_case, &test_file, &global_client) {
             Err(e) => match result {
                 Outcome::Error { code } => match e.kind() {
