@@ -23,7 +23,7 @@ version = "0.16.0"
 features = ["dangerous_configuration"]
 
 [dependencies.serde]
-version = "1.0.94"
+version = "1.0.98"
 features = ["derive"]
 
 [dev-dependencies]

@@ -1,6 +1,7 @@
 use std::{
     fmt,
     fs::File,
+    hash::{Hash, Hasher},
     io::{BufReader, Seek, SeekFrom},
     str::FromStr,
     sync::Arc,
@@ -20,10 +21,26 @@ use crate::{
 
 const DEFAULT_PORT: u16 = 27017;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq)]
 pub struct StreamAddress {
     pub hostname: String,
     pub port: Option<u16>,
+}
+
+impl PartialEq for StreamAddress {
+    fn eq(&self, other: &Self) -> bool {
+        self.hostname == other.hostname && self.port.unwrap_or(27017) == other.port.unwrap_or(27017)
+    }
+}
+
+impl Hash for StreamAddress {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        self.hostname.hash(state);
+        self.port.unwrap_or(27017).hash(state);
+    }
 }
 
 impl StreamAddress {
@@ -54,10 +71,6 @@ impl StreamAddress {
             hostname: hostname.to_string(),
             port,
         })
-    }
-
-    pub fn display(&self) -> String {
-        format!("{}", self)
     }
 
     pub fn hostname(&self) -> &str {
@@ -122,6 +135,9 @@ pub struct ClientOptions {
 
     #[builder(default)]
     pub wait_queue_timeout: Option<Duration>,
+
+    #[builder(default)]
+    pub direct_connection: Option<bool>,
 }
 
 impl Default for ClientOptions {
@@ -146,6 +162,7 @@ struct ClientOptionsParser {
     pub min_pool_size: Option<u32>,
     pub max_idle_time: Option<Duration>,
     pub wait_queue_timeout: Option<Duration>,
+    pub direct_connection: Option<bool>,
     read_preference_tags: Option<Vec<TagSet>>,
 }
 
@@ -237,6 +254,7 @@ impl From<ClientOptionsParser> for ClientOptions {
             max_idle_time: parser.max_idle_time,
             wait_queue_timeout: parser.wait_queue_timeout,
             server_selection_timeout: parser.server_selection_timeout,
+            direct_connection: parser.direct_connection,
         }
     }
 }
@@ -403,6 +421,9 @@ impl ClientOptionsParser {
         match key {
             "appname" => {
                 self.app_name = Some(value.into());
+            }
+            k @ "direct" => {
+                self.direct_connection = Some(get_bool!(value, k));
             }
             k @ "heartbeatfrequencyms" => {
                 self.heartbeat_freq = Some(Duration::from_millis(get_ms!(value, k)));

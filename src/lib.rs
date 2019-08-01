@@ -57,11 +57,13 @@ mod is_master;
 pub mod options;
 mod read_preference;
 pub mod results;
+#[allow(dead_code)]
+mod sdam;
+#[cfg(test)]
+mod test;
 
 #[cfg(test)]
 #[macro_use]
 extern crate derive_more;
-#[cfg(test)]
-mod test;
 
 pub use crate::{client::Client, coll::Collection, cursor::Cursor, db::Database};
