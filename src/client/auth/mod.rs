@@ -264,3 +264,53 @@ pub(crate) fn generate_nonce() -> String {
     let result: Vec<u8> = (0..32).map(|_| rng.gen()).collect();
     base64::encode(result.as_slice())
 }
+
+#[test]
+fn mechanism_negotiation() {
+    let mechs = [
+        AuthMechanism::ScramSha1.as_str().to_string(),
+        AuthMechanism::ScramSha256.as_str().to_string(),
+    ];
+
+    let is_master_both = IsMasterCommandResponse {
+        sasl_supported_mechs: Some(mechs.to_vec()),
+        ..Default::default()
+    };
+    assert_eq!(
+        AuthMechanism::from_is_master(&is_master_both),
+        AuthMechanism::ScramSha256
+    );
+
+    let is_master_sha1 = IsMasterCommandResponse {
+        sasl_supported_mechs: Some(mechs[0..=0].to_vec()),
+        ..Default::default()
+    };
+    assert_eq!(
+        AuthMechanism::from_is_master(&is_master_sha1),
+        AuthMechanism::ScramSha1
+    );
+
+    let is_master_sha256 = IsMasterCommandResponse {
+        sasl_supported_mechs: Some(mechs[1..=1].to_vec()),
+        ..Default::default()
+    };
+    assert_eq!(
+        AuthMechanism::from_is_master(&is_master_sha256),
+        AuthMechanism::ScramSha256
+    );
+
+    let is_master_none: IsMasterCommandResponse = Default::default();
+    assert_eq!(
+        AuthMechanism::from_is_master(&is_master_none),
+        AuthMechanism::ScramSha1
+    );
+
+    let is_master_mangled = IsMasterCommandResponse {
+        sasl_supported_mechs: Some(["NOT A MECHANISM".to_string(), "OTHER".to_string()].to_vec()),
+        ..Default::default()
+    };
+    assert_eq!(
+        AuthMechanism::from_is_master(&is_master_mangled),
+        AuthMechanism::ScramSha1
+    );
+}
