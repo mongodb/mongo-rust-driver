@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use bson::Document;
+use bson::{Bson, Document};
 
 use crate::{
     command_responses::{FindCommandResponse, FindCommandResponseInner},
@@ -125,6 +125,7 @@ pub struct Cursor {
     cursor_id: i64,
     batch_size: Option<i32>,
     buffer: VecDeque<Document>,
+    operation_time: Option<Bson>,
 }
 
 /// A `Tail` is a temporary `Iterator` created from `Cursor::tail` to facilitate using methods that
@@ -150,6 +151,7 @@ impl Cursor {
             cursor_id: reply.cursor.id,
             batch_size,
             buffer: reply.cursor.first_batch.into_iter().collect(),
+            operation_time: reply.operation_time,
         }
     }
 
@@ -162,6 +164,7 @@ impl Cursor {
                     first_batch: Vec::new(),
                     id: 0,
                 },
+                operation_time: None,
             },
             None,
         )
@@ -173,6 +176,7 @@ impl Cursor {
             .get_more_command(&self.address, self.cursor_id, self.batch_size)?;
         self.cursor_id = result.cursor.id;
         self.buffer.extend(result.cursor.next_batch.into_iter());
+        self.operation_time = result.operation_time;
 
         Ok(())
     }
@@ -186,6 +190,10 @@ impl Cursor {
     pub(crate) fn cursor_id(&self) -> i64 {
         self.cursor_id
     }
+
+    pub(crate) fn operation_time(&self) -> Option<Bson> {
+        self.operation_time.clone()
+    }
 }
 
 impl Drop for Cursor {
@@ -194,10 +202,7 @@ impl Drop for Cursor {
             let kill_command =
                 doc! { "killCursors": self.coll.name(), "cursors": [self.cursor_id()] };
 
-            match self.coll.database().run_command(kill_command, None) {
-                Ok(_) => return,
-                Err(_) => return,
-            }
+            let _ = self.coll.database().run_command(kill_command, None);
         }
     }
 }

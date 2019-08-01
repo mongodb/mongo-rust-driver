@@ -11,19 +11,17 @@ use std::{
 
 use bson::{Bson, Document};
 use rand::{seq::SliceRandom, thread_rng};
+use serde::Deserialize;
 use time::{Duration as TimeDuration, PreciseTime};
 
 use crate::{
-    change_stream::{
-        document::{ChangeStreamDocument, ResumeToken},
-        ChangeStream, ChangeStreamTarget,
-    },
+    change_stream::{ChangeStream, ChangeStreamTarget},
     command_responses::ListDatabasesResponse,
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::{ErrorKind, Result},
     event::{CommandEventHandler, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
-    options::{AggregateOptions, ChangeStreamOptions, ClientOptions, DatabaseOptions},
+    options::{ChangeStreamOptions, ClientOptions, DatabaseOptions},
     pool::Connection,
     read_preference::ReadPreference,
     topology::{ServerDescription, ServerType, Topology, TopologyType},
@@ -355,125 +353,22 @@ impl Client {
         }
     }
 
-    /// Allows a client to observe all changes in a cluster.
-    /// Excludes system collections. Excludes the "config",
-    /// "local", and "admin" databases.
+    /// Allows a client to observe all changes in a cluster. Excludes system collections. Excludes
+    /// the "config", "local", and "admin" databases.
     ///
-    /// At the time of writing, change streams require either a "majority"
-    /// read concern or no read concern. Anything else will cause a server
-    /// error.
+    /// At the time of writing, change streams require either a "majority" read concern or no read
+    /// concern. Anything else will cause a server error.
     ///
-    /// Note that using a `$project` stage to remove any of the `_id`
-    /// `operationType` or `ns` fields will cause an error. The driver
-    /// requires these fields to support resumability.
-    pub fn watch(
-        &self,
+    /// Note that using a `$project` stage to remove any of the `_id` `operationType` or `ns` fields
+    /// will cause an error. The driver requires these fields to support resumability.
+    pub fn watch<'a, T: Deserialize<'a>>(
+        &'a self,
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<ChangeStreamOptions>,
-    ) -> Result<ChangeStream<Document>> {
-        let pipeline: Vec<Document> = pipeline.into_iter().collect();
-
-        let mut watch_pipeline = Vec::new();
-        let mut aggregate_options: Option<AggregateOptions>;
-        let mut resume_token: Option<ResumeToken>;
-        let stream_options = options.clone();
-
-        if let Some(options) = options {
-            let options_bson = bson::to_bson(&options)?;
-            if let bson::Bson::Document(mut options_doc) = options_bson {
-                options_doc.insert("allChangesForCluster", true);
-                watch_pipeline.push(doc! { "$changeStream": options_doc });
-            } else {
-                // TODO: Throw the correct error here (options cannot be parsed as Document)
-                unreachable!();
-            }
-
-            aggregate_options = Some(
-                AggregateOptions::builder()
-                    .collation(options.collation)
-                    .build(),
-            );
-
-            resume_token = options.start_after.or(options.resume_after);
-        } else {
-            watch_pipeline.push(doc! { "$changeStream": { "allChangesForCluster": true } });
-            aggregate_options = None;
-            resume_token = None;
-        }
-        watch_pipeline.extend(pipeline.clone());
-
+    ) -> Result<ChangeStream<T>> {
         let db = self.database("admin");
-        let cursor = db.aggregate(watch_pipeline.clone(), aggregate_options)?;
-
-        let read_preference = self.read_preference().cloned();
-
-        Ok(ChangeStream::new(
-            cursor,
-            watch_pipeline,
-            self.clone(),
-            ChangeStreamTarget::Deployment(self.database("admin")),
-            resume_token,
-            stream_options,
-            read_preference,
-        ))
-    }
-
-    /// Allows a client to observe all changes in a cluster.
-    /// Excludes system collections. Excludes the "config",
-    /// "local", and "admin" databases.
-    ///
-    /// Returns a change stream that yields instances of
-    /// `ChangeStreamDocument`
-    pub fn watch_deserialized(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: Option<ChangeStreamOptions>,
-    ) -> Result<ChangeStream<ChangeStreamDocument>> {
-        let pipeline: Vec<Document> = pipeline.into_iter().collect();
-
-        let mut watch_pipeline = Vec::new();
-        let mut aggregate_options: Option<AggregateOptions>;
-        let mut resume_token: Option<ResumeToken>;
-        let stream_options = options.clone();
-
-        if let Some(options) = options {
-            let options_bson = bson::to_bson(&options)?;
-            if let bson::Bson::Document(mut options_doc) = options_bson {
-                options_doc.insert("allChangesForCluster", true);
-                watch_pipeline.push(doc! { "$changeStream": options_doc });
-            } else {
-                // TODO: Throw the correct error here (options cannot be parsed as Document)
-                unreachable!();
-            }
-
-            aggregate_options = Some(
-                AggregateOptions::builder()
-                    .collation(options.collation)
-                    .build(),
-            );
-
-            resume_token = options.start_after.or(options.resume_after);
-        } else {
-            watch_pipeline.push(doc! { "$changeStream": { "allChangesForCluster": true } });
-            aggregate_options = None;
-            resume_token = None;
-        }
-        watch_pipeline.extend(pipeline.clone());
-
-        let db = self.database("admin");
-        let cursor = db.aggregate(watch_pipeline.clone(), aggregate_options)?;
-
-        let read_preference = self.read_preference().cloned();
-
-        Ok(ChangeStream::new(
-            cursor,
-            watch_pipeline,
-            self.clone(),
-            ChangeStreamTarget::Deployment(self.database("admin")),
-            resume_token,
-            stream_options,
-            read_preference,
-        ))
+        let target = ChangeStreamTarget::Cluster(db.clone());
+        db.watch_helper(pipeline, target, options)
     }
 }
 

@@ -3,13 +3,11 @@ pub mod options;
 use std::sync::Arc;
 
 use bson::{Bson, Document};
+use serde::Deserialize;
 
 use self::options::{CreateCollectionOptions, DatabaseOptions};
 use crate::{
-    change_stream::{
-        document::{ChangeStreamDocument, ResumeToken},
-        ChangeStream, ChangeStreamTarget,
-    },
+    change_stream::{document::ResumeToken, ChangeStream, ChangeStreamTarget},
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{ErrorKind, Result},
@@ -430,72 +428,31 @@ impl Database {
         ))
     }
 
-    /// Allows a client to observe all changes in a database.
-    /// Excludes system collections.
+    /// Allows a client to observe all changes in a database. Excludes system collections.
     ///
-    /// At the time of writing, change streams require either a "majority"
-    /// read concern or no read concern. Anything else will cause a server
-    /// error.
+    /// At the time of writing, change streams require either a "majority" read concern or no read
+    /// concern. Anything else will cause a server error.
     ///
-    /// Note that using a `$project` stage to remove any of the `_id`
-    /// `operationType` or `ns` fields will cause an error. The driver
-    /// requires these fields to support resumability.
-    pub fn watch(
-        &self,
+    /// Note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
+    /// fields will cause an error. The driver requires these fields to support resumability.
+    pub fn watch<'a, T: Deserialize<'a>>(
+        &'a self,
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<ChangeStreamOptions>,
-    ) -> Result<ChangeStream<Document>> {
-        let pipeline: Vec<Document> = pipeline.into_iter().collect();
-
-        let mut watch_pipeline = Vec::new();
-        let mut aggregate_options: Option<AggregateOptions>;
-        let mut resume_token: Option<ResumeToken>;
-        let stream_options = options.clone();
-
-        if let Some(options) = options {
-            watch_pipeline.push(doc! { "$changeStream": bson::to_bson(&options)? });
-            aggregate_options = Some(
-                AggregateOptions::builder()
-                    .collation(options.collation)
-                    .build(),
-            );
-
-            resume_token = options.start_after.or(options.resume_after);
-        } else {
-            watch_pipeline.push(doc! { "$changeStream": {} });
-            aggregate_options = None;
-            resume_token = None;
-        }
-        watch_pipeline.extend(pipeline.clone());
-
-        let cursor = self.aggregate(watch_pipeline.clone(), aggregate_options)?;
-
-        let read_preference = self
-            .read_preference()
-            .cloned()
-            .or_else(|| self.client().read_preference().cloned());
-
-        Ok(ChangeStream::new(
-            cursor,
-            watch_pipeline,
-            self.client(),
+    ) -> Result<ChangeStream<T>> {
+        self.watch_helper(
+            pipeline,
             ChangeStreamTarget::Database(self.clone()),
-            resume_token,
-            stream_options,
-            read_preference,
-        ))
+            options,
+        )
     }
 
-    /// Allows a client to observe all changes in a database.
-    /// Excludes system collections.
-    ///
-    /// Returns a change stream that yields instances of
-    /// `ChangeStreamDocument`.
-    pub fn watch_deserialized(
-        &self,
+    pub(crate) fn watch_helper<'a, 'b, T: Deserialize<'a>>(
+        &'b self,
         pipeline: impl IntoIterator<Item = Document>,
+        target: ChangeStreamTarget,
         options: Option<ChangeStreamOptions>,
-    ) -> Result<ChangeStream<ChangeStreamDocument>> {
+    ) -> Result<ChangeStream<'a, T>> {
         let pipeline: Vec<Document> = pipeline.into_iter().collect();
 
         let mut watch_pipeline = Vec::new();
@@ -504,7 +461,22 @@ impl Database {
         let stream_options = options.clone();
 
         if let Some(options) = options {
-            watch_pipeline.push(doc! { "$changeStream": bson::to_bson(&options)? });
+            match target {
+                ChangeStreamTarget::Collection(_) | ChangeStreamTarget::Database(_) => {
+                    watch_pipeline.push(doc! { "$changeStream": bson::to_bson(&options)? })
+                }
+                ChangeStreamTarget::Cluster(_) => {
+                    let options_bson = bson::to_bson(&options)?;
+                    if let bson::Bson::Document(mut options_doc) = options_bson {
+                        options_doc.insert("allChangesForCluster", true);
+                        watch_pipeline.push(doc! { "$changeStream": options_doc });
+                    } else {
+                        // TODO: Throw the correct error here (options cannot be parsed as Document)
+                        unreachable!();
+                    }
+                }
+            }
+
             aggregate_options = Some(
                 AggregateOptions::builder()
                     .collation(options.collation)
@@ -513,24 +485,43 @@ impl Database {
 
             resume_token = options.start_after.or(options.resume_after);
         } else {
-            watch_pipeline.push(doc! { "$changeStream": {} });
+            match target {
+                ChangeStreamTarget::Collection(_) | ChangeStreamTarget::Database(_) => {
+                    watch_pipeline.push(doc! { "$changeStream": {} });
+                }
+                ChangeStreamTarget::Cluster(_) => {
+                    watch_pipeline.push(doc! { "$changeStream": { "allChangesForCluster": true } });
+                }
+            }
+
             aggregate_options = None;
             resume_token = None;
         }
         watch_pipeline.extend(pipeline.clone());
 
-        let cursor = self.aggregate(watch_pipeline.clone(), aggregate_options)?;
-
-        let read_preference = self
-            .read_preference()
-            .cloned()
-            .or_else(|| self.client().read_preference().cloned());
+        let (cursor, client, read_preference) = match target.clone() {
+            ChangeStreamTarget::Collection(coll) => (
+                coll.aggregate(watch_pipeline, aggregate_options)?,
+                coll.client(),
+                coll.read_preference()
+                    .cloned()
+                    .or_else(|| coll.database().read_preference().cloned())
+                    .or_else(|| coll.client().read_preference().cloned()),
+            ),
+            ChangeStreamTarget::Database(db) | ChangeStreamTarget::Cluster(db) => (
+                db.aggregate(watch_pipeline, aggregate_options)?,
+                db.client(),
+                db.read_preference()
+                    .cloned()
+                    .or_else(|| db.client().read_preference().cloned()),
+            ),
+        };
 
         Ok(ChangeStream::new(
             cursor,
-            watch_pipeline,
-            self.client(),
-            ChangeStreamTarget::Database(self.clone()),
+            pipeline,
+            client,
+            target,
             resume_token,
             stream_options,
             read_preference,
