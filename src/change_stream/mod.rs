@@ -43,7 +43,7 @@ use crate::{
 /// # }
 /// ```
 ///
-/// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/index.html) for more
+/// See the documentation [here](https://docs.mongodb.com/manual/changeStreams) for more
 /// details. Also see the documentation on [usage recommendations](https://docs.mongodb.com/manual/administration/change-streams-production-recommendations/).
 pub struct ChangeStream<'a, T: Deserialize<'a> = ChangeStreamEventDocument> {
     /// The cursor to iterate over `ChangeStreamEventDocument` instances.
