@@ -28,12 +28,6 @@ error_chain! {
                 inner.message)
         }
 
-        /// A change stream failed to resume.
-        ChangeStreamResumeError(msg: String) {
-            description("A change stream attempted and failed to resume.")
-            display("A change stream attempted and failed to resume: {}", msg)
-        }
-
         /// The driver was unable to send or receive a message to the server.
         InvalidHostname(hostname: String) {
             description("Unable to parse hostname")

@@ -428,9 +428,14 @@ impl Database {
         ))
     }
 
-    /// Allows a client to observe all changes in a database. Excludes system collections.
+    /// Starts a new `ChangeStream` that receives events for all changes in this database. The
+    /// stream does not observe changes from system collections and cannot be started on "config",
+    /// "local" or "admin" databases.
     ///
-    /// At the time of writing, change streams require either a "majority" read concern or no read
+    /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
+    /// streams.
+    ///
+    /// Change streams require either a "majority" read concern or no read
     /// concern. Anything else will cause a server error.
     ///
     /// Note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
@@ -499,8 +504,8 @@ impl Database {
         }
         watch_pipeline.extend(pipeline.clone());
 
-        let (cursor, client, read_preference) = match target.clone() {
-            ChangeStreamTarget::Collection(coll) => (
+        let (cursor, client, read_preference) = match target {
+            ChangeStreamTarget::Collection(ref coll) => (
                 coll.aggregate(watch_pipeline, aggregate_options)?,
                 coll.client(),
                 coll.read_preference()
@@ -508,7 +513,7 @@ impl Database {
                     .or_else(|| coll.database().read_preference().cloned())
                     .or_else(|| coll.client().read_preference().cloned()),
             ),
-            ChangeStreamTarget::Database(db) | ChangeStreamTarget::Cluster(db) => (
+            ChangeStreamTarget::Database(ref db) | ChangeStreamTarget::Cluster(ref db) => (
                 db.aggregate(watch_pipeline, aggregate_options)?,
                 db.client(),
                 db.read_preference()

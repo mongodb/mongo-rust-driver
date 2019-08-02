@@ -1053,10 +1053,14 @@ impl Collection {
         }
     }
 
-    /// Returns a change stream on a specific collection.
+    /// Starts a new `ChangeStream` that receives events for all changes in this collection.
+    /// A `ChangeStream` cannot be started on system collections.
     ///
-    /// At the time of writing, change streams require either a "majority" read concern or no read
-    /// concern. Anything else will cause a server error.
+    /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
+    /// streams.
+    ///
+    /// Change streams require either a "majority" read concern or no read concern. Anything else
+    /// will cause a server error.
     ///
     /// Also note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
     /// fields will cause an error. The driver requires these fields to support resumability.

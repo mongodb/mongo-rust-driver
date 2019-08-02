@@ -1,9 +1,9 @@
 use bson::Document;
 
-/// An opaque token for use when resuming an interrupted `ChangeStream`. `ResumeToken` is used
-/// during an automatic resume of a change stream.
+/// An opaque token used for resuming an interrupted `ChangeStream`.
 ///
-/// When starting a new change stream, `start_after` and `resume_after` fields can be specified
+/// When starting a new change stream, `start_after` and `resume_after` fields on
+/// `ChangeStreamOptions` can be specified
 /// with instances of `ResumeToken`.
 ///
 /// See the documentation

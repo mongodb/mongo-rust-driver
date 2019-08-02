@@ -136,7 +136,7 @@ where
     fn make_pipeline(&self) -> Result<Vec<Document>> {
         let mut watch_pipeline = Vec::new();
 
-        if let Some(options) = self.options.clone() {
+        if let Some(ref options) = self.options {
             match self.target {
                 ChangeStreamTarget::Collection(_) | ChangeStreamTarget::Database(_) => {
                     watch_pipeline.push(doc! { "$changeStream": bson::to_bson(&options)? })
@@ -198,7 +198,9 @@ where
         let resume_token = self.resume_token();
         let op_time = self.cursor.operation_time().and_then(|b| b.as_timestamp());
         let options = self.options.get_or_insert_with(Default::default);
-        let aggregate_options = AggregateOptions::builder().build();
+        let aggregate_options = AggregateOptions::builder()
+            .collation(options.collation.clone())
+            .build();
 
         if resume_token.is_some() {
             if options.start_after.is_some() && !self.document_returned {
@@ -246,9 +248,7 @@ where
                         Err(e) => Some(Err(e)),
                     }
                 } else {
-                    Some(Err(Error::from_kind(ErrorKind::ChangeStreamResumeError(
-                        "failed to resume".to_string(),
-                    ))))
+                    Some(Err(e))
                 }
             }
             None => None,
@@ -270,9 +270,9 @@ impl ChangeStreamTarget {
         options: Option<AggregateOptions>,
     ) -> Result<Cursor> {
         Ok(match self {
-            ChangeStreamTarget::Collection(coll) => coll.aggregate(pipeline.clone(), options)?,
-            ChangeStreamTarget::Database(db) => db.aggregate(pipeline.clone(), options)?,
-            ChangeStreamTarget::Cluster(db) => db.aggregate(pipeline.clone(), options)?,
+            ChangeStreamTarget::Collection(coll) => coll.aggregate(pipeline, options)?,
+            ChangeStreamTarget::Database(db) => db.aggregate(pipeline, options)?,
+            ChangeStreamTarget::Cluster(db) => db.aggregate(pipeline, options)?,
         })
     }
 }

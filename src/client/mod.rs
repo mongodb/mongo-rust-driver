@@ -353,10 +353,15 @@ impl Client {
         }
     }
 
-    /// Allows a client to observe all changes in a cluster. Excludes system collections. Excludes
-    /// the "config", "local", and "admin" databases.
+    /// Starts a new `ChangeStream` that receives events for all changes in the cluster. The stream
+    /// does not observe changes from system collections or the "config", "local" or "admin"
+    /// databases. Note that this method (`watch` on a cluster) is only supported in MongoDB 4.0 or
+    /// greater.
     ///
-    /// At the time of writing, change streams require either a "majority" read concern or no read
+    /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
+    /// streams.
+    ///
+    /// Change streams require either a "majority" read concern or no read
     /// concern. Anything else will cause a server error.
     ///
     /// Note that using a `$project` stage to remove any of the `_id` `operationType` or `ns` fields
