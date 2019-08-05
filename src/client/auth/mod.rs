@@ -130,14 +130,12 @@ impl AuthMechanism {
     /// Get the default authSource for a given mechanism depending on the database provided in the
     /// connection string.
     pub(crate) fn default_source(&self, uri_db: Option<&str>) -> String {
-        // TODO: X509 (RUST-147)
-        // TODO: GSSAPI (RUST-196)
-        // TODO: PLAIN (RUST-197)
         match self {
-            AuthMechanism::ScramSha1 | AuthMechanism::ScramSha256 => {
+            AuthMechanism::ScramSha1 | AuthMechanism::ScramSha256 | AuthMechanism::MongoDbCr => {
                 uri_db.unwrap_or("admin").to_string()
             }
-            _ => "".to_string(),
+            AuthMechanism::Gssapi | AuthMechanism::MongoDbX509 => "$external".to_string(),
+            AuthMechanism::Plain => uri_db.unwrap_or("$external").to_string(),
         }
     }
 
@@ -149,6 +147,28 @@ impl AuthMechanism {
             AuthMechanism::MongoDbCr => MONGODB_CR_STR,
             AuthMechanism::MongoDbX509 => MONGODB_X509_STR,
             AuthMechanism::Plain => PLAIN_STR,
+        }
+    }
+
+    pub(crate) fn authenticate_stream<T: Read + Write>(
+        &self,
+        stream: &mut T,
+        credential: &Credential,
+    ) -> Result<()> {
+        match self {
+            AuthMechanism::ScramSha1 => ScramVersion::Sha1.authenticate_stream(stream, credential),
+            AuthMechanism::ScramSha256 => {
+                ScramVersion::Sha256.authenticate_stream(stream, credential)
+            }
+            AuthMechanism::MongoDbCr => bail!(ErrorKind::AuthenticationError(
+                "MONGODB-CR is deprecated and not supported by this driver. Use SCRAM for \
+                 password-based authentication instead"
+                    .to_string()
+            )),
+            _ => bail!(ErrorKind::AuthenticationError(format!(
+                "Authentication mechanism {:?} not yet implemented.",
+                self
+            ))),
         }
     }
 }
@@ -246,19 +266,7 @@ impl Credential {
         };
 
         // Authenticate according to the chosen mechanism.
-        match mechanism.as_ref() {
-            AuthMechanism::ScramSha1 => ScramVersion::Sha1.authenticate_stream(stream, self),
-            AuthMechanism::ScramSha256 => ScramVersion::Sha256.authenticate_stream(stream, self),
-            AuthMechanism::MongoDbCr => bail!(ErrorKind::AuthenticationError(
-                "MONGODB-CR is deprecated and not supported by this driver. Use SCRAM for \
-                 password-based authentication instead"
-                    .to_string()
-            )),
-            _ => bail!(ErrorKind::AuthenticationError(format!(
-                "Authentication mechanism {:?} not yet implemented.",
-                mechanism
-            ))),
-        }
+        mechanism.authenticate_stream(stream, self)
     }
 }
 

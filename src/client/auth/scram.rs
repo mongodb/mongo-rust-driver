@@ -172,50 +172,24 @@ impl ScramVersion {
     /// HMAC function used as part of SCRAM authentication.
     fn hmac(&self, key: &[u8], str: &[u8]) -> Result<Vec<u8>> {
         match self {
-            ScramVersion::Sha1 => {
-                let mut mac = Hmac::<Sha1>::new_varkey(key)
-                    .or_else(|_| Err(Error::unknown_authentication_error("SCRAM")))?;
-                mac.input(str);
-                Ok(mac.result().code().to_vec())
-            }
-            ScramVersion::Sha256 => {
-                let mut mac = Hmac::<Sha256>::new_varkey(key)
-                    .or_else(|_| Err(Error::unknown_authentication_error("SCRAM")))?;
-                mac.input(str);
-                Ok(mac.result().code().to_vec())
-            }
+            ScramVersion::Sha1 => mac::<Hmac<Sha1>>(key, str),
+            ScramVersion::Sha256 => mac::<Hmac<Sha256>>(key, str),
         }
     }
 
     /// The "h" function defined in the SCRAM RFC.
     fn h(&self, str: &[u8]) -> Vec<u8> {
         match self {
-            ScramVersion::Sha1 => {
-                let mut hash = Sha1::new();
-                hash.input(str);
-                hash.result().to_vec()
-            }
-            ScramVersion::Sha256 => {
-                let mut hash = Sha256::new();
-                hash.input(str);
-                hash.result().to_vec()
-            }
+            ScramVersion::Sha1 => hash::<Sha1>(str),
+            ScramVersion::Sha256 => hash::<Sha256>(str),
         }
     }
 
     /// The "h_i" function as defined in the SCRAM RFC.
     fn h_i(&self, str: &str, salt: &[u8], iterations: usize) -> Vec<u8> {
         match self {
-            ScramVersion::Sha1 => {
-                let mut buf = vec![0u8; 20];
-                pbkdf2::pbkdf2::<Hmac<Sha1>>(str.as_bytes(), salt, iterations, &mut buf);
-                buf
-            }
-            ScramVersion::Sha256 => {
-                let mut buf = vec![0u8; 256 / 8];
-                pbkdf2::pbkdf2::<Hmac<Sha256>>(str.as_bytes(), salt, iterations, &mut buf);
-                buf
-            }
+            ScramVersion::Sha1 => h_i::<Hmac<Sha1>>(str, salt, iterations, 160 / 8),
+            ScramVersion::Sha256 => h_i::<Hmac<Sha256>>(str, salt, iterations, 256 / 8),
         }
     }
 
@@ -258,13 +232,32 @@ impl Display for ScramVersion {
     }
 }
 
-pub fn xor(lhs: &[u8], rhs: &[u8]) -> Vec<u8> {
+fn xor(lhs: &[u8], rhs: &[u8]) -> Vec<u8> {
     assert_eq!(lhs.len(), rhs.len());
 
     lhs.iter()
         .zip(rhs.iter())
         .map(|(l, r)| l.bitxor(r.clone()))
         .collect()
+}
+
+fn mac<M: Mac>(key: &[u8], input: &[u8]) -> Result<Vec<u8>> {
+    let mut mac =
+        M::new_varkey(key).or_else(|_| Err(Error::unknown_authentication_error("SCRAM")))?;
+    mac.input(input);
+    Ok(mac.result().code().to_vec())
+}
+
+fn hash<D: Digest>(val: &[u8]) -> Vec<u8> {
+    let mut hash = D::new();
+    hash.input(val);
+    hash.result().to_vec()
+}
+
+fn h_i<M: Mac + Sync>(str: &str, salt: &[u8], iterations: usize, output_size: usize) -> Vec<u8> {
+    let mut buf = vec![0u8; output_size];
+    pbkdf2::pbkdf2::<M>(str.as_bytes(), salt, iterations, buf.as_mut_slice());
+    buf
 }
 
 /// Parses a string slice of the form "<expected_key>=<body>" into "<body>", if possible.
