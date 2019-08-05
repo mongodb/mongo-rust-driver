@@ -276,6 +276,39 @@ tasks:
         vars:
           MONGODB_VERSION: "4.0"
 
+  - name: "test-4.2-standalone"
+    tags: ["4.2", "standalone"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: "4.2"
+          TOPOLOGY: "server"
+      - func: "run tests"
+        vars:
+          MONGODB_VERSION: "4.2"
+
+  - name: "test-4.2-replica_set"
+    tags: ["4.2", "replica_set"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: "4.2"
+          TOPOLOGY: "replica_set"
+      - func: "run tests"
+        vars:
+          MONGODB_VERSION: "4.2"
+
+  - name: "test-4.2-sharded_cluster"
+    tags: ["4.2", "sharded_cluster"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: "4.2"
+          TOPOLOGY: "sharded_cluster"
+      - func: "run tests"
+        vars:
+          MONGODB_VERSION: "4.2"
+
   - name: "test-latest-standalone"
     tags: ["latest", "standalone"]
     commands:
@@ -326,6 +359,10 @@ axes:
         display_name: "latest"
         variables:
            MONGODB_VERSION: "latest"
+      - id: "4.2"
+        display_name: "4.2"
+        variables:
+          MONGODB_VERSION: "4.2"
       - id: "4.0"
         display_name: "4.0"
         variables:
@@ -383,6 +420,7 @@ buildvariants:
   display_name: "${os}"
   tasks:
      - ".latest"
+     - ".4.2"
      - ".4.0"
      - ".3.6"
 -
