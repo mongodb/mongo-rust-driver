@@ -6,12 +6,12 @@ use mongodb::{
     error::{Error, ErrorKind},
     options::{
         auth::{AuthMechanism, Credential},
-        ClientOptions, Host,
+        ClientOptions,
     },
     Client,
 };
 
-use crate::{TestClient, CLIENT};
+use crate::CLIENT;
 
 #[derive(Debug, Deserialize)]
 struct Metadata {
@@ -138,7 +138,7 @@ fn list_database_names() {
 
 /// Brief connectTimeoutMS used to shorten the SCRAM tests. Can remove once dependency on R2D2 is
 /// removed.
-static CONNECT_TIMEOUT: u64 = 1000;
+const CONNECT_TIMEOUT: u64 = 1000;
 
 /// Authentication errors returned as part of connection establishment are consumed by R2D2 then
 /// converted into different `ErrorKind`'s by error_chain. For now, we simply dig down to the
@@ -146,34 +146,20 @@ static CONNECT_TIMEOUT: u64 = 1000;
 /// go away and we can just check for our own auth error types.
 fn is_auth_r2d2_error(e: Error) -> bool {
     match e {
-        Error(ErrorKind::R2D2(e), _) => e.to_string().find("Authentication").is_some(),
+        Error(ErrorKind::R2D2(e), _) => e.to_string().contains("Authentication"),
         _ => false,
     }
-}
-
-/// Convert a slice of hosts to a hostname string that could be put into a connection string.
-fn hostnames_string(hosts: &[Host]) -> String {
-    hosts
-        .iter()
-        .map(|h| {
-            let port = match h.port() {
-                Some(ref p) => Cow::Owned(format!(":{}", p)),
-                None => Cow::Borrowed(""),
-            };
-            format!("{}{}", h.hostname(), port.as_ref())
-        })
-        .collect::<Vec<String>>()
-        .join(",")
 }
 
 /// Performs an operation that requires authentication and verifies that it either succeeded or
 /// failed with an authentication error according to the `should_succeed` parameter.
 fn auth_test(client: Client, should_succeed: bool) {
-    assert!(match (should_succeed, client.list_database_names(None)) {
-        (true, Ok(_)) => true,
-        (false, Err(e)) => is_auth_r2d2_error(e),
-        _ => false,
-    });
+    let result = client.list_database_names(None);
+    if should_succeed {
+        result.unwrap();
+    } else {
+        assert!(is_auth_r2d2_error(result.unwrap_err()));
+    }
 }
 
 /// Attempts to authenticate using the given username/password, optionally specifying a mechanism,
@@ -206,7 +192,13 @@ fn auth_test_uri(
     mechanism: Option<AuthMechanism>,
     should_succeed: bool,
 ) {
-    let host = hostnames_string(CLIENT.options.hosts.as_slice());
+    let host = CLIENT
+        .options
+        .hosts
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<String>>()
+        .join(",");
     let mechanism_str = match mechanism {
         Some(mech) => Cow::Owned(format!("&authMechanism={}", mech.as_str())),
         None => Cow::Borrowed(""),
@@ -247,17 +239,32 @@ fn scram_test(username: &str, password: &str, mechanisms: &[AuthMechanism]) {
 }
 
 #[test]
-fn scram() {
-    if !CLIENT.version_at_least_40() || !TestClient::auth_enabled() {
+fn scram_sha1() {
+    if !CLIENT.version_at_least_40() || !CLIENT.auth_enabled() {
         return;
     }
-
     CLIENT
         .create_user("sha1", "sha1", &["root"], &[AuthMechanism::ScramSha1])
         .unwrap();
+    scram_test("sha1", "sha1", &[AuthMechanism::ScramSha1]);
+}
+
+#[test]
+fn scram_sha256() {
+    if !CLIENT.version_at_least_40() || !CLIENT.auth_enabled() {
+        return;
+    }
     CLIENT
         .create_user("sha256", "sha256", &["root"], &[AuthMechanism::ScramSha256])
         .unwrap();
+    scram_test("sha256", "sha256", &[AuthMechanism::ScramSha256]);
+}
+
+#[test]
+fn scram_both() {
+    if !CLIENT.version_at_least_40() || !CLIENT.auth_enabled() {
+        return;
+    }
     CLIENT
         .create_user(
             "both",
@@ -266,23 +273,32 @@ fn scram() {
             &[AuthMechanism::ScramSha1, AuthMechanism::ScramSha256],
         )
         .unwrap();
-
-    scram_test("sha1", "sha1", &[AuthMechanism::ScramSha1]);
-    scram_test("sha256", "sha256", &[AuthMechanism::ScramSha256]);
-
     scram_test(
         "both",
         "both",
         &[AuthMechanism::ScramSha1, AuthMechanism::ScramSha256],
     );
+}
 
+#[test]
+fn scram_missing_user_uri() {
+    if !CLIENT.version_at_least_40() || !CLIENT.auth_enabled() {
+        return;
+    }
     auth_test_uri("adsfasdf", "ASsdfsadf", None, false);
+}
+
+#[test]
+fn scram_missing_user_options() {
+    if !CLIENT.version_at_least_40() || !CLIENT.auth_enabled() {
+        return;
+    }
     auth_test_options("sadfasdf", "fsdadsfasdf", None, false);
 }
 
 #[test]
-fn saslprep() {
-    if !CLIENT.version_at_least_40() || !TestClient::auth_enabled() {
+fn saslprep_options() {
+    if !CLIENT.version_at_least_40() || !CLIENT.auth_enabled() {
         return;
     }
 
@@ -302,6 +318,26 @@ fn saslprep() {
     auth_test_options("IX", "I\u{00AD}X", None, true);
     auth_test_options("\u{2168}", "IV", None, true);
     auth_test_options("\u{2168}", "I\u{00AD}V", None, true);
+}
+
+#[test]
+fn saslprep_uri() {
+    if !CLIENT.version_at_least_40() || !CLIENT.auth_enabled() {
+        return;
+    }
+
+    CLIENT
+        .create_user("IX", "IX", &["root"], &[AuthMechanism::ScramSha256])
+        .unwrap();
+    CLIENT
+        .create_user(
+            "\u{2168}",
+            "\u{2163}",
+            &["root"],
+            &[AuthMechanism::ScramSha256],
+        )
+        .unwrap();
+
     auth_test_uri("IX", "IX", None, true);
     auth_test_uri("IX", "I%C2%ADX", None, true);
     auth_test_uri("%E2%85%A8", "IV", None, true);

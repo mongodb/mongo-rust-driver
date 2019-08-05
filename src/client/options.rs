@@ -79,8 +79,8 @@ impl Host {
         &self.hostname
     }
 
-    pub fn port(&self) -> &Option<u16> {
-        &self.port
+    pub fn port(&self) -> Option<u16> {
+        self.port
     }
 }
 

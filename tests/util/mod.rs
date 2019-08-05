@@ -8,19 +8,14 @@ use bson::{oid::ObjectId, Bson};
 use mongodb::{
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::Result,
-    options::{
-        auth::{AuthMechanism, Credential},
-        ClientOptions,
-    },
+    options::{auth::AuthMechanism, ClientOptions},
     read_preference::ReadPreference,
     Client, Collection,
 };
 
 use self::event::EventHandler;
 
-static USERNAME: &'static str = "user";
-static PASSWORD: &'static str = "pencil";
-static MAX_POOL_SIZE: u32 = 100;
+const MAX_POOL_SIZE: u32 = 100;
 
 pub struct TestClient {
     client: Client,
@@ -53,26 +48,6 @@ impl TestClient {
                 Some(WriteConcern::builder().w(Acknowledgment::Majority).build());
         }
 
-        if TestClient::auth_enabled() {
-            // Need to create user that this client will authenticate with.
-            let cred_creator = Client::with_uri_str(uri).unwrap();
-            cred_creator
-                .database("admin")
-                .run_command(
-                    doc! {
-                        "createUser": USERNAME, "pwd": PASSWORD, "roles": ["root"]
-                    },
-                    None,
-                )
-                .unwrap();
-
-            options.credential = Some(Credential {
-                username: Some(USERNAME.to_string()),
-                password: Some(PASSWORD.to_string()),
-                ..Default::default()
-            });
-        }
-
         let client = if let Some(handler) = event_handler {
             Client::with_event_handler(options.clone(), Box::new(handler)).unwrap()
         } else {
@@ -94,8 +69,8 @@ impl TestClient {
         }
     }
 
-    pub fn auth_enabled() -> bool {
-        option_env!("AUTH").unwrap_or("false") == "true"
+    pub fn auth_enabled(&self) -> bool {
+        self.options.credential.is_some()
     }
 
     pub fn version_at_least_40(&self) -> bool {

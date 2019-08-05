@@ -24,7 +24,7 @@ use crate::{
     Client,
 };
 
-const DEFAULT_CONNECTION_TIMEOUT: u64 = 10000;
+const DEFAULT_CONNECTION_TIMEOUT: Duration = Duration::from_millis(10000);
 const DEFAULT_POOL_SIZE: u32 = 5;
 pub const DRIVER_NAME: &str = "mrd";
 
@@ -61,9 +61,7 @@ impl Pool {
     ) -> Result<Self> {
         let pool = ::r2d2::Pool::builder()
             .max_size(max_size.unwrap_or(DEFAULT_POOL_SIZE))
-            .connection_timeout(
-                connect_timeout.unwrap_or(Duration::from_millis(DEFAULT_CONNECTION_TIMEOUT)),
-            )
+            .connection_timeout(connect_timeout.unwrap_or(DEFAULT_CONNECTION_TIMEOUT))
             .build_unchecked(Connector {
                 host,
                 tls_config,

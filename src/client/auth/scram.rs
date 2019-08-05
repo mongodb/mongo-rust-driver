@@ -605,23 +605,30 @@ impl ServerFinal {
     }
 }
 
-#[test]
-fn test_iteration_count() {
-    let nonce = "mocked";
+#[cfg(test)]
+mod tests {
+    use bson::Bson;
 
-    let invalid_iteration_count = ServerFirst {
-        conversation_id: Bson::Null,
-        done: false,
-        message: "mocked".to_string(),
-        nonce: nonce.to_string(),
-        salt: Vec::new(),
-        i: 42,
-    };
-    assert!(invalid_iteration_count.validate(nonce).is_err());
+    use crate::options::auth::scram::ServerFirst;
 
-    let valid_iteration_count = ServerFirst {
-        i: 4096,
-        ..invalid_iteration_count
-    };
-    assert!(valid_iteration_count.validate(nonce).is_ok())
+    #[test]
+    fn test_iteration_count() {
+        let nonce = "mocked";
+
+        let invalid_iteration_count = ServerFirst {
+            conversation_id: Bson::Null,
+            done: false,
+            message: "mocked".to_string(),
+            nonce: nonce.to_string(),
+            salt: Vec::new(),
+            i: 42,
+        };
+        assert!(invalid_iteration_count.validate(nonce).is_err());
+
+        let valid_iteration_count = ServerFirst {
+            i: 4096,
+            ..invalid_iteration_count
+        };
+        assert!(valid_iteration_count.validate(nonce).is_ok())
+    }
 }

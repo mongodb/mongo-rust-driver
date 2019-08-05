@@ -74,24 +74,25 @@ impl AuthMechanism {
     /// Get an `AuthenticationMechanism` from the response to an isMaster.
     /// If no mechanisms are present in the response, SCRAM-SHA-1 will be chosen by default.
     pub(crate) fn from_is_master(reply: &IsMasterCommandResponse) -> AuthMechanism {
-        match reply.sasl_supported_mechs {
-            Some(ref ms) => {
-                match ms
-                    .iter()
-                    .find(|s| s.as_str() == AuthMechanism::ScramSha256.as_str())
-                {
-                    Some(_) => AuthMechanism::ScramSha256,
-                    None => AuthMechanism::ScramSha1,
-                }
-            }
-            None => AuthMechanism::ScramSha1,
+        let scram_sha_256_found = reply
+            .sasl_supported_mechs
+            .as_ref()
+            .map(|ms| ms.iter().any(|m| m == AuthMechanism::ScramSha256.as_str()))
+            .unwrap_or(false);
+
+        if scram_sha_256_found {
+            AuthMechanism::ScramSha256
+        } else {
+            AuthMechanism::ScramSha1
         }
     }
 
     /// Determines if the provided credentials have the required information to perform
     /// authentication.
     pub fn validate_credential(&self, credential: &Credential) -> Result<()> {
-        // TODO: fill in others as they're implemented.
+        // TODO: X509 (RUST-147)
+        // TODO: GSSAPI (RUST-196)
+        // TODO: PLAIN (RUST-197)
         match self {
             AuthMechanism::ScramSha1 | AuthMechanism::ScramSha256 => {
                 match credential.username {
@@ -129,7 +130,9 @@ impl AuthMechanism {
     /// Get the default authSource for a given mechanism depending on the database provided in the
     /// connection string.
     pub(crate) fn default_source(&self, uri_db: Option<&str>) -> String {
-        // TODO: fill in others as they're implemented.
+        // TODO: X509 (RUST-147)
+        // TODO: GSSAPI (RUST-196)
+        // TODO: PLAIN (RUST-197)
         match self {
             AuthMechanism::ScramSha1 | AuthMechanism::ScramSha256 => {
                 uri_db.unwrap_or("admin").to_string()
@@ -265,52 +268,73 @@ pub(crate) fn generate_nonce() -> String {
     base64::encode(result.as_slice())
 }
 
-#[test]
-fn mechanism_negotiation() {
-    let mechs = [
-        AuthMechanism::ScramSha1.as_str().to_string(),
-        AuthMechanism::ScramSha256.as_str().to_string(),
-    ];
+#[cfg(test)]
+mod tests {
+    use crate::{command_responses::IsMasterCommandResponse, options::auth::AuthMechanism};
 
-    let is_master_both = IsMasterCommandResponse {
-        sasl_supported_mechs: Some(mechs.to_vec()),
-        ..Default::default()
-    };
-    assert_eq!(
-        AuthMechanism::from_is_master(&is_master_both),
-        AuthMechanism::ScramSha256
-    );
+    lazy_static! {
+        static ref MECHS: [String; 2] = [
+            AuthMechanism::ScramSha1.as_str().to_string(),
+            AuthMechanism::ScramSha256.as_str().to_string()
+        ];
+    }
 
-    let is_master_sha1 = IsMasterCommandResponse {
-        sasl_supported_mechs: Some(mechs[0..=0].to_vec()),
-        ..Default::default()
-    };
-    assert_eq!(
-        AuthMechanism::from_is_master(&is_master_sha1),
-        AuthMechanism::ScramSha1
-    );
+    #[test]
+    fn negotiate_both_scram() {
+        let is_master_both = IsMasterCommandResponse {
+            sasl_supported_mechs: Some(MECHS.to_vec()),
+            ..Default::default()
+        };
+        assert_eq!(
+            AuthMechanism::from_is_master(&is_master_both),
+            AuthMechanism::ScramSha256
+        );
+    }
 
-    let is_master_sha256 = IsMasterCommandResponse {
-        sasl_supported_mechs: Some(mechs[1..=1].to_vec()),
-        ..Default::default()
-    };
-    assert_eq!(
-        AuthMechanism::from_is_master(&is_master_sha256),
-        AuthMechanism::ScramSha256
-    );
+    #[test]
+    fn negotiate_sha1_only() {
+        let is_master_sha1 = IsMasterCommandResponse {
+            sasl_supported_mechs: Some(MECHS[0..=0].to_vec()),
+            ..Default::default()
+        };
+        assert_eq!(
+            AuthMechanism::from_is_master(&is_master_sha1),
+            AuthMechanism::ScramSha1
+        );
+    }
 
-    let is_master_none: IsMasterCommandResponse = Default::default();
-    assert_eq!(
-        AuthMechanism::from_is_master(&is_master_none),
-        AuthMechanism::ScramSha1
-    );
+    #[test]
+    fn negotiate_sha256_only() {
+        let is_master_sha256 = IsMasterCommandResponse {
+            sasl_supported_mechs: Some(MECHS[1..=1].to_vec()),
+            ..Default::default()
+        };
+        assert_eq!(
+            AuthMechanism::from_is_master(&is_master_sha256),
+            AuthMechanism::ScramSha256
+        );
+    }
 
-    let is_master_mangled = IsMasterCommandResponse {
-        sasl_supported_mechs: Some(["NOT A MECHANISM".to_string(), "OTHER".to_string()].to_vec()),
-        ..Default::default()
-    };
-    assert_eq!(
-        AuthMechanism::from_is_master(&is_master_mangled),
-        AuthMechanism::ScramSha1
-    );
+    #[test]
+    fn negotiate_none() {
+        let is_master_none: IsMasterCommandResponse = Default::default();
+        assert_eq!(
+            AuthMechanism::from_is_master(&is_master_none),
+            AuthMechanism::ScramSha1
+        );
+    }
+
+    #[test]
+    fn negotiate_mangled() {
+        let is_master_mangled = IsMasterCommandResponse {
+            sasl_supported_mechs: Some(
+                ["NOT A MECHANISM".to_string(), "OTHER".to_string()].to_vec(),
+            ),
+            ..Default::default()
+        };
+        assert_eq!(
+            AuthMechanism::from_is_master(&is_master_mangled),
+            AuthMechanism::ScramSha1
+        );
+    }
 }
