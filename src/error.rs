@@ -12,10 +12,15 @@ error_chain! {
     }
 
     errors {
-       /// A malformed or invalid argument was passed to the driver.
+        /// A malformed or invalid argument was passed to the driver.
         ArgumentError(msg: String) {
             description("An invalid argument was provided to a database operation")
             display("An invalid argument was provided to a database operation: {}", msg)
+        }
+
+        BsonConversionError(msg: String) {
+            description("Unable to convert generic BSON value into the desired type")
+            display("Unable to convert generic BSON value into the desired type: {}", msg)
         }
 
         /// The server encountered an error when executing the operation.
@@ -75,7 +80,7 @@ error_chain! {
 }
 
 impl Error {
-    pub(crate) fn from_command_response(mut response: Document) -> Option<Self> {
+    pub(crate) fn from_command_response(mut response: Document) -> Result<Document> {
         if let Some(ok_bson) = response.get("ok") {
             let ok = crate::bson_util::get_int(&ok_bson);
 
@@ -94,14 +99,22 @@ impl Error {
                                 error.code_name = Some(code_name);
                             }
 
-                            return Some(Error::from_kind(ErrorKind::CommandError(error)));
+                            if let Some(Bson::Array(labels)) = response.remove("errorLabels") {
+                                error.labels.extend(
+                                    labels
+                                        .into_iter()
+                                        .filter_map(|label| label.as_str().map(|s| s.to_string())),
+                                );
+                            }
+
+                            return Err(Error::from_kind(ErrorKind::CommandError(error)));
                         }
                     }
                 }
             }
         }
 
-        None
+        Ok(response)
     }
 
     /// Creates an `AuthenticationError` for the given mechanism with the provided reason.

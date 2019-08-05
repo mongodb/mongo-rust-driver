@@ -290,6 +290,11 @@ pub struct AggregateOptions {
     #[builder(default)]
     pub max_time: Option<Duration>,
 
+    /// The maximum amount of time for the server to wait on new documents to satisfy a tailable
+    /// cursor query. If the cursor is not tailable, this option is ignored.
+    #[builder(default)]
+    pub max_await_time: Option<Duration>,
+
     /// Tags the query with an arbitrary string to help trace the operation through the database
     /// profiler, currentOp and logs.
     #[builder(default)]

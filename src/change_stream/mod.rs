@@ -10,11 +10,16 @@ use serde::Deserialize;
 
 use self::{document::*, options::*};
 use crate::{
-    error::{Error, ErrorKind, Result},
+    error::{CommandError, Error, ErrorKind, Result},
     options::AggregateOptions,
     read_preference::ReadPreference,
     Client, Collection, Cursor, Database,
 };
+
+const NON_RESUMABLE_ERROR_LABEL: &str = "NonResumableChangeStreamError";
+const INTERRUPTED_ERROR_CODE: i32 = 11601;
+const CAPPED_POSITION_LOST_ERROR_CODE: i32 = 136;
+const CURSOR_KILLED_ERROR_CODE: i32 = 237;
 
 /// A `ChangeStream` streams the ongoing changes of its associated collection, database or
 /// deployment. `ChangeStream` instances should be created with method `watch` against the relevant
@@ -78,6 +83,9 @@ pub struct ChangeStream<'a, T: Deserialize<'a> = ChangeStreamEventDocument> {
     /// during an automatic resume.
     document_returned: bool,
 
+    /// Necessary to satisfy the compiler that `T` and `'a` are used in the struct definition.
+    ///
+    /// See the [Rust docs](https://doc.rust-lang.org/std/marker/struct.PhantomData.html) for more details.
     phantom: PhantomData<&'a T>,
 }
 
@@ -86,7 +94,7 @@ where
     T: Deserialize<'a>,
 {
     pub(crate) fn new(
-        cursor: Cursor,
+        mut cursor: Cursor,
         pipeline: Vec<Document>,
         client: Client,
         target: ChangeStreamTarget,
@@ -95,16 +103,16 @@ where
         read_preference: Option<ReadPreference>,
     ) -> Self {
         Self {
-            cursor,
             pipeline,
             client,
             target,
-            resume_token,
+            resume_token: cursor.resume_token().or(resume_token),
             options,
             read_preference,
             resume_attempted: false,
             document_returned: false,
             phantom: PhantomData,
+            cursor,
         }
     }
 
@@ -125,54 +133,12 @@ where
         }
     }
 
-    fn is_resumable(&self, operation: &str, msg: &str) -> bool {
-        !(operation == "getMore"
-            && (msg.contains("Interrupted")
-                || msg.contains("CappedPositionLost")
-                || msg.contains("CursorKilled")
-                || msg.contains("NonResumableChangeStreamError")))
-    }
-
-    fn make_pipeline(&self) -> Result<Vec<Document>> {
-        let mut watch_pipeline = Vec::new();
-
-        if let Some(ref options) = self.options {
-            match self.target {
-                ChangeStreamTarget::Collection(_) | ChangeStreamTarget::Database(_) => {
-                    watch_pipeline.push(doc! { "$changeStream": bson::to_bson(&options)? })
-                }
-                ChangeStreamTarget::Cluster(_) => {
-                    let options_bson = bson::to_bson(&options)?;
-                    if let bson::Bson::Document(mut options_doc) = options_bson {
-                        options_doc.insert("allChangesForCluster", true);
-                        watch_pipeline.push(doc! { "$changeStream": options_doc });
-                    } else {
-                        // TODO: Throw the correct error here (options cannot be parsed as Document)
-                        unreachable!();
-                    }
-                }
-            }
-        } else {
-            match self.target {
-                ChangeStreamTarget::Collection(_) | ChangeStreamTarget::Database(_) => {
-                    watch_pipeline.push(doc! { "$changeStream": {} });
-                }
-                ChangeStreamTarget::Cluster(_) => {
-                    watch_pipeline.push(doc! { "$changeStream": { "allChangesForCluster": true } });
-                }
-            }
-        }
-
-        watch_pipeline.extend(self.pipeline.clone());
-        Ok(watch_pipeline)
-    }
-
     fn try_resume(&mut self, error: Error) -> Result<()> {
         self.resume_attempted = true;
 
         match error.kind() {
-            ErrorKind::ServerError(ref operation, ref msg) => {
-                if self.is_resumable(operation, msg) {
+            ErrorKind::CommandError(err) => {
+                if err.is_resumable() {
                     self.resume()
                 } else {
                     Err(error)
@@ -198,9 +164,6 @@ where
         let resume_token = self.resume_token();
         let op_time = self.cursor.operation_time().and_then(|b| b.as_timestamp());
         let options = self.options.get_or_insert_with(Default::default);
-        let aggregate_options = AggregateOptions::builder()
-            .collation(options.collation.clone())
-            .build();
 
         if resume_token.is_some() {
             if options.start_after.is_some() && !self.document_returned {
@@ -211,13 +174,22 @@ where
                 options.start_after = None;
                 options.start_at_operation_time = None;
             }
-        } else if options.start_at_operation_time.is_some() && max_wire_version >= 7 {
-            options.start_at_operation_time = options.start_at_operation_time.or(op_time);
+        } else if max_wire_version >= 7 {
+            if let Some(time) = options.start_at_operation_time.or(op_time) {
+                options.start_at_operation_time = Some(time)
+            }
         }
 
-        self.cursor = self
-            .target
-            .aggregate(self.make_pipeline()?, Some(aggregate_options))?;
+        let aggregate_options = options.get_aggregation_options();
+
+        self.cursor = self.target.aggregate(
+            make_pipeline(&self.target, self.pipeline.clone(), self.options.as_ref())?,
+            Some(aggregate_options),
+        )?;
+
+        if let Some(resume_token) = self.cursor.resume_token() {
+            self.resume_token = Some(resume_token);
+        }
 
         Ok(())
     }
@@ -231,24 +203,32 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.cursor.next() {
-            Some(Ok(doc)) => Some(match bson::from_bson(Bson::Document(doc)) {
-                Ok(result) => {
-                    self.resume_attempted = false;
-                    self.document_returned = true;
-                    Ok(result)
+            Some(Ok(doc)) => {
+                self.resume_attempted = false;
+                self.document_returned = true;
+
+                if self.cursor.batch_exhausted() {
+                    self.resume_token = match doc.get("postBatchResumeToken") {
+                        Some(token) => Some(ResumeToken(token.clone())),
+                        None => doc.get("_id").map(|id| ResumeToken(id.clone())),
+                    };
                 }
-                Err(_) => Err(Error::from_kind(ErrorKind::ResponseError(
-                    "invalid server response to change stream getMore".to_string(),
-                ))),
-            }),
-            Some(Err(e)) => {
+
+                Some(match bson::from_bson(Bson::Document(doc)) {
+                    Ok(result) => Ok(result),
+                    Err(_) => Err(Error::from_kind(ErrorKind::ResponseError(
+                        "unable to deserialize change stream event document".to_string(),
+                    ))),
+                })
+            }
+            Some(Err(error)) => {
                 if !self.resume_attempted {
-                    match self.try_resume(e) {
+                    match self.try_resume(error) {
                         Ok(_) => self.next(),
-                        Err(e) => Some(Err(e)),
+                        Err(resume_error) => Some(Err(resume_error)),
                     }
                 } else {
-                    Some(Err(e))
+                    Some(Err(error))
                 }
             }
             None => None,
@@ -295,5 +275,46 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         self.change_stream.next()
+    }
+}
+
+pub(crate) fn make_pipeline(
+    target: &ChangeStreamTarget,
+    pipeline: Vec<Document>,
+    options: Option<&ChangeStreamOptions>,
+) -> Result<Vec<Document>> {
+    let mut options = match options {
+        Some(opts) => crate::bson_util::bson_into_document(bson::to_bson(opts)?)?,
+        None => Document::new(),
+    };
+
+    if let ChangeStreamTarget::Cluster(_) = target {
+        options.insert("allChangesForCluster", true);
+    };
+
+    let mut watch_pipeline = vec![doc! { "$changeStream": options }];
+    watch_pipeline.extend(pipeline);
+
+    Ok(watch_pipeline)
+}
+
+impl CommandError {
+    fn is_resumable(&self) -> bool {
+        if self
+            .labels
+            .iter()
+            .any(|label| label == NON_RESUMABLE_ERROR_LABEL)
+        {
+            return false;
+        }
+
+        if self.code == INTERRUPTED_ERROR_CODE
+            || self.code == CAPPED_POSITION_LOST_ERROR_CODE
+            || self.code == CURSOR_KILLED_ERROR_CODE
+        {
+            return false;
+        }
+
+        true
     }
 }

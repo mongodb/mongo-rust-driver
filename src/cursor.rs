@@ -1,8 +1,9 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, time::Duration};
 
 use bson::{Bson, Document};
 
 use crate::{
+    change_stream::document::ResumeToken,
     command_responses::{FindCommandResponse, FindCommandResponseInner},
     error::Result,
     Collection,
@@ -118,14 +119,17 @@ use crate::{
 /// # Ok(())
 /// # }
 /// ```
+#[derive(Debug)]
 #[allow(dead_code)]
 pub struct Cursor {
     coll: Collection,
     address: String,
     cursor_id: i64,
     batch_size: Option<i32>,
+    max_time: Option<Duration>,
     buffer: VecDeque<Document>,
     operation_time: Option<Bson>,
+    resume_token: Option<Bson>,
 }
 
 /// A `Tail` is a temporary `Iterator` created from `Cursor::tail` to facilitate using methods that
@@ -142,16 +146,25 @@ impl Cursor {
     pub(crate) fn new(
         address: String,
         coll: Collection,
-        reply: FindCommandResponse,
+        mut reply: FindCommandResponse,
         batch_size: Option<i32>,
+        max_time: Option<Duration>,
     ) -> Self {
+        let resume_token = if reply.cursor.first_batch.is_empty() {
+            reply.cursor.post_batch_resume_token.take()
+        } else {
+            None
+        };
+
         Self {
             address,
             coll,
             cursor_id: reply.cursor.id,
             batch_size,
+            max_time,
             buffer: reply.cursor.first_batch.into_iter().collect(),
             operation_time: reply.operation_time,
+            resume_token,
         }
     }
 
@@ -163,17 +176,27 @@ impl Cursor {
                 cursor: FindCommandResponseInner {
                     first_batch: Vec::new(),
                     id: 0,
+                    post_batch_resume_token: None,
                 },
                 operation_time: None,
             },
+            None,
             None,
         )
     }
 
     fn next_batch(&mut self) -> Result<()> {
-        let result = self
-            .coll
-            .get_more_command(&self.address, self.cursor_id, self.batch_size)?;
+        let result = self.coll.get_more_command(
+            &self.address,
+            self.cursor_id,
+            self.batch_size,
+            self.max_time,
+        )?;
+
+        if result.cursor.next_batch.is_empty() && result.cursor.post_batch_resume_token.is_some() {
+            self.resume_token = result.cursor.post_batch_resume_token;
+        }
+
         self.cursor_id = result.cursor.id;
         self.buffer.extend(result.cursor.next_batch.into_iter());
         self.operation_time = result.operation_time;
@@ -187,20 +210,24 @@ impl Cursor {
         Tail { cursor: self }
     }
 
-    pub(crate) fn cursor_id(&self) -> i64 {
-        self.cursor_id
-    }
-
     pub(crate) fn operation_time(&self) -> Option<Bson> {
         self.operation_time.clone()
+    }
+
+    pub(crate) fn resume_token(&mut self) -> Option<ResumeToken> {
+        self.resume_token.take().map(ResumeToken)
+    }
+
+    pub(crate) fn batch_exhausted(&self) -> bool {
+        self.buffer.is_empty()
     }
 }
 
 impl Drop for Cursor {
     fn drop(&mut self) {
-        if self.cursor_id() != 0 {
+        if self.cursor_id != 0 {
             let kill_command =
-                doc! { "killCursors": self.coll.name(), "cursors": [self.cursor_id()] };
+                doc! { "killCursors": self.coll.name(), "cursors": [self.cursor_id] };
 
             let _ = self.coll.database().run_command(kill_command, None);
         }

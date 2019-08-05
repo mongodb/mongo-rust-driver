@@ -70,6 +70,8 @@ mod cursor;
 mod db;
 pub mod error;
 pub mod event;
+#[cfg(test)]
+pub(crate) mod extjson_test_helper;
 pub mod options;
 mod pool;
 pub mod read_preference;

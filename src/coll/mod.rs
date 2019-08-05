@@ -1,7 +1,7 @@
 mod batch;
 pub mod options;
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use bson::{Bson, Document};
 use serde::Deserialize;
@@ -333,9 +333,16 @@ impl Collection {
     /// Finds the documents in the collection matching `filter`.
     pub fn find(&self, filter: Option<Document>, options: Option<FindOptions>) -> Result<Cursor> {
         let batch_size = options.as_ref().and_then(|opts| opts.batch_size);
+        let max_await_time = options.as_ref().and_then(|opts| opts.max_await_time);
         let (address, result) = self.find_command(filter, options)?;
 
-        Ok(Cursor::new(address, self.clone(), result, batch_size))
+        Ok(Cursor::new(
+            address,
+            self.clone(),
+            result,
+            batch_size,
+            max_await_time,
+        ))
     }
 
     /// Atomically finds up to one document in the collection matching `filter` and deletes it.
@@ -543,7 +550,7 @@ impl Collection {
         }
 
         match bson::from_bson(Bson::Document(result)) {
-            Ok(result) => Ok(Cursor::new(address, self.clone(), result, None)),
+            Ok(result) => Ok(Cursor::new(address, self.clone(), result, None, None)),
             Err(_) => bail!(ErrorKind::ResponseError(
                 "invalid server response to find command".to_string()
             )),
@@ -897,7 +904,7 @@ impl Collection {
 
     fn run_write_command_with_error_check(&self, command_doc: Document) -> Result<()> {
         if let Ok((_, document)) = self.run_write_command(command_doc) {
-            if let Some(error) = Error::from_command_response(document) {
+            if let Err(error) = Error::from_command_response(document) {
                 return Err(error);
             }
         }
@@ -1026,6 +1033,7 @@ impl Collection {
         address: &str,
         cursor_id: i64,
         batch_size: Option<i32>,
+        max_time: Option<Duration>,
     ) -> Result<GetMoreCommandResponse> {
         let mut command_doc = doc! {
             "getMore": cursor_id,
@@ -1036,6 +1044,10 @@ impl Collection {
             command_doc.insert("batchSize", batch_size);
         }
 
+        if let Some(max_time) = max_time {
+            command_doc.insert("maxTimeMS", max_time.as_millis() as i64);
+        }
+
         let (_, result) = self.run_command_with_address(
             doc! {
                 "getMore": cursor_id,
@@ -1044,6 +1056,8 @@ impl Collection {
             self.read_preference(),
             Some(address),
         )?;
+
+        let result = Error::from_command_response(result)?;
 
         match bson::from_bson(Bson::Document(result)) {
             Ok(result) => Ok(result),

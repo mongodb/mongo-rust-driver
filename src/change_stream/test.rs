@@ -1,8 +1,11 @@
 use bson::{Bson, Document};
+use pretty_assertions::assert_eq;
 
 use crate::{
+    change_stream::document::{ChangeStreamEventDocument, OperationType},
+    concern::ReadConcern,
     error::{ErrorKind, Result},
-    options::ChangeStreamOptions,
+    options::{ChangeStreamOptions, ClientOptions},
     topology::description::TopologyType,
     Client,
 };
@@ -57,6 +60,12 @@ struct Operation {
     command: Command,
 }
 
+impl Operation {
+    fn exec(self, client: &Client) -> Result<()> {
+        self.command.exec(client, &self.database, &self.collection)
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(tag = "name", content = "arguments")]
 #[serde(rename_all = "camelCase")]
@@ -81,31 +90,146 @@ enum Command {
     },
 }
 
+impl Command {
+    fn exec(self, client: &Client, database: &str, collection: &str) -> Result<()> {
+        match self {
+            Command::DeleteOne { filter } => {
+                client
+                    .database(database)
+                    .collection(collection)
+                    .delete_one(filter, None)?;
+            }
+            Command::Drop => {
+                client.database(database).collection(collection).drop()?;
+            }
+            Command::InsertOne { document } => {
+                client
+                    .database(database)
+                    .collection(collection)
+                    .insert_one(document, None)?;
+            }
+            Command::Rename { to } => {
+                let rename_cmd = doc! {
+                    "renameCollection": format!("{}.{}", database, collection),
+                    "to": format!("{}.{}", database, to)
+                };
+
+                client.database("admin").run_command(rename_cmd, None)?;
+            }
+            Command::ReplaceOne {
+                filter,
+                replacement,
+            } => {
+                client
+                    .database(database)
+                    .collection(collection)
+                    .find_one_and_replace(filter, replacement, None)?;
+            }
+            Command::UpdateOne { filter, update } => {
+                client
+                    .database(database)
+                    .collection(collection)
+                    .update_one(filter, update, None)?;
+            }
+        };
+
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum Outcome {
     Error { code: i32 },
-    Success(Vec<Document>),
+    Success(Vec<ExpectedChangeStreamEventDocument>),
 }
 
-fn matches(expected: impl Into<Bson>, actual: impl Into<Bson>) -> bool {
-    let expected_bson = expected.into();
-    let actual_bson = actual.into();
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ExpectedChangeStreamEventDocument {
+    operation_type: OperationType,
+    ns: Option<Document>,
+    update_description: Option<ExpectedUpdateDescription>,
+    #[serde(default)]
+    #[serde(deserialize_with = "crate::extjson_test_helper::deserialize_extjson_doc")]
+    full_document: Option<Document>,
+}
 
-    if expected_bson == bson::to_bson("42").unwrap() {
-        return true;
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ExpectedUpdateDescription {
+    updated_fields: Document,
+    removed_fields: Option<Vec<String>>,
+}
+
+lazy_static! {
+    static ref CHANGE_STREAM_CLIENT_OPTIONS: ClientOptions = {
+        let mut options = crate::test::CLIENT_OPTIONS.clone();
+        options.read_concern = Some(ReadConcern::Majority);
+        options
+    };
+}
+
+type DocElement = (String, Bson);
+
+fn normalize_integers((key, val): DocElement) -> DocElement {
+    (
+        key,
+        crate::bson_util::get_int(&val)
+            .map(Bson::I64)
+            .unwrap_or(val),
+    )
+}
+
+fn is_not_id((ref key, _): &DocElement) -> bool {
+    key != "_id"
+}
+
+fn full_document(document: Option<Document>) -> Option<Document> {
+    document.map(|doc| {
+        crate::extjson_test_helper::flatten_extjson_document(doc)
+            .filter(is_not_id)
+            .map(normalize_integers)
+            .collect()
+    })
+}
+
+fn updated_fields(document: Document) -> Document {
+    crate::extjson_test_helper::flatten_extjson_document(document)
+        .map(normalize_integers)
+        .collect()
+}
+
+impl ChangeStreamEventDocument {
+    fn assert_matches_expected(self, expected: ExpectedChangeStreamEventDocument, errmsg: &str) {
+        assert_eq!(self.operation_type, expected.operation_type, "{}", errmsg);
+
+        assert_eq!(self.ns, expected.ns, "{}", errmsg);
+
+        assert_eq!(
+            self.update_description
+                .map(|desc| updated_fields(desc.updated_fields)),
+            expected
+                .update_description
+                .map(|desc| updated_fields(desc.updated_fields)),
+            "{}",
+            errmsg
+        );
+
+        assert_eq!(
+            full_document(self.full_document),
+            full_document(expected.full_document),
+            "{}",
+            errmsg
+        );
     }
-
-    expected_bson == actual_bson
 }
 
 fn run_test(
-    mut test_case: TestCase,
+    test_case: TestCase,
     test_file: &TestFile,
     global_client: &Client,
-) -> Result<Vec<Document>> {
-    test_case.description = test_case.description.replace('$', "%");
-
+) -> Result<Vec<ChangeStreamEventDocument>> {
     global_client.database(&test_file.database_name).drop()?;
     global_client.database(&test_file.database2_name).drop()?;
 
@@ -120,8 +244,7 @@ fn run_test(
         admin_db.run_command(fail_point, None)?;
     }
 
-    let client =
-        Client::with_uri_str(option_env!("MONGODB_URI").unwrap_or("mongodb://localhost:27017"))?;
+    let client = Client::with_options(CHANGE_STREAM_CLIENT_OPTIONS.clone()).unwrap();
 
     // TODO: Begin monitoring all APM events for client
 
@@ -141,77 +264,26 @@ fn run_test(
     };
 
     for operation in test_case.operations {
-        let database = &operation.database;
-        let collection = &operation.collection;
-
-        match operation.command {
-            Command::DeleteOne { filter } => {
-                let _ = global_client
-                    .database(database)
-                    .collection(collection)
-                    .delete_one(filter, None)?;
-            }
-            Command::Drop => {
-                global_client
-                    .database(database)
-                    .collection(collection)
-                    .drop()?;
-            }
-            Command::InsertOne { document } => {
-                let _ = global_client
-                    .database(database)
-                    .collection(collection)
-                    .insert_one(document, None)?;
-            }
-            Command::Rename { to } => {
-                let rename_cmd = doc! { "renameCollection": collection, "to": to };
-
-                let _ = global_client
-                    .database(database)
-                    .run_command(rename_cmd, None)?;
-            }
-            Command::ReplaceOne {
-                filter,
-                replacement,
-            } => {
-                let _ = global_client
-                    .database(database)
-                    .collection(collection)
-                    .find_one_and_replace(filter, replacement, None)?;
-            }
-            Command::UpdateOne { filter, update } => {
-                let _ = global_client
-                    .database(database)
-                    .collection(collection)
-                    .update_one(filter, update, None)?;
-            }
-        }
+        operation.exec(&global_client)?;
     }
 
-    let mut changes = Vec::new();
     match test_case.result {
         Outcome::Error { .. } => {
             change_stream.next().transpose()?;
+            Ok(Vec::new())
         }
-        Outcome::Success(_) => {
-            for change in change_stream {
-                changes.push(change?);
-            }
-        }
+        Outcome::Success(_) => change_stream.collect(),
     }
-
-    Ok(changes)
 }
 
-fn run_change_stream_test(test_file: TestFile) {
-    let global_client =
-        Client::with_uri_str(option_env!("MONGODB_URI").unwrap_or("mongodb://localhost:27017"))
-            .unwrap();
+fn run_change_stream_test(mut test_file: TestFile) {
+    let global_client = Client::with_options(CHANGE_STREAM_CLIENT_OPTIONS.clone()).unwrap();
 
-    for test_case in test_file.tests.clone() {
+    let test_cases: Vec<_> = test_file.tests.drain(..).collect();
+
+    for test_case in test_cases {
         let description = test_case.description.clone();
 
-        let result = test_case.result.clone();
         let topology = match global_client.get_topology_type() {
             TopologyType::Single => Topology::Single,
             TopologyType::ReplicaSetNoPrimary | TopologyType::ReplicaSetWithPrimary => {
@@ -220,14 +292,20 @@ fn run_change_stream_test(test_file: TestFile) {
             TopologyType::Sharded => Topology::Sharded,
             TopologyType::Unknown => Topology::Unknown,
         };
+
         if !test_case.topology.contains(&topology) {
             continue;
         }
-        match run_test(test_case, &test_file, &global_client) {
-            Err(e) => match result {
+
+        if !crate::test::server_version_at_least(&global_client, &test_case.min_server_version) {
+            continue;
+        }
+
+        match run_test(test_case.clone(), &test_file, &global_client) {
+            Err(e) => match test_case.result {
                 Outcome::Error { code } => match e.kind() {
                     ErrorKind::CommandError(ref inner) => {
-                        assert!(matches(code, inner.code));
+                        assert_eq!(code, inner.code, "{}", description);
                     }
                     ErrorKind::ResponseError(_) => {
                         continue;
@@ -238,20 +316,22 @@ fn run_change_stream_test(test_file: TestFile) {
                     panic!("{}: unexpected error ({}) was returned", &description, e)
                 }
             },
-            Ok(changes) => match result {
+            Ok(changes) => match test_case.result {
                 Outcome::Error { code } => panic!(
                     "{}: expected error (code: {}) was not returned",
                     &description, code
                 ),
                 Outcome::Success(docs) => {
-                    for pair in docs.iter().zip(changes.iter()) {
-                        assert!(matches(pair.0.clone(), pair.1.clone()));
+                    assert_eq!(changes.len(), docs.len(), "{}", description);
+
+                    for (actual, expected) in changes.into_iter().zip(docs) {
+                        actual.assert_matches_expected(expected, &description);
                     }
                 }
             },
         }
 
-        // TODO: Assert expectations == command monitoring results
+        // TODO RUST-200: Assert expectations == command monitoring results
     }
 
     global_client
