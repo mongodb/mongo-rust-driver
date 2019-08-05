@@ -7,7 +7,7 @@ use serde::Deserialize;
 
 use self::options::{CreateCollectionOptions, DatabaseOptions};
 use crate::{
-    change_stream::{document::ResumeToken, ChangeStream, ChangeStreamTarget},
+    change_stream::{ChangeStream, ChangeStreamTarget},
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{ErrorKind, Result},
@@ -157,6 +157,7 @@ impl Database {
                 self.collection("$cmd.listCollections"),
                 result,
                 None,
+                None,
             )),
             Err(_) => bail!(ErrorKind::ResponseError(
                 "invalid server response to find command".to_string()
@@ -192,6 +193,7 @@ impl Database {
                 address,
                 self.collection("$cmd.listCollections"),
                 result,
+                None,
                 None,
             )),
             Err(_) => bail!(ErrorKind::ResponseError(
@@ -306,6 +308,7 @@ impl Database {
         };
 
         let mut cursor_option = Document::new();
+        let max_await_time = options.as_ref().and_then(|opts| opts.max_await_time);
 
         if let Some(opts) = options {
             if let Some(allow_disk_use) = opts.allow_disk_use {
@@ -374,6 +377,7 @@ impl Database {
                 self.collection(&cursor_coll_name),
                 result,
                 batch_size,
+                max_await_time,
             )),
             Err(_) => bail!(ErrorKind::ResponseError(
                 "invalid server response to aggregate command".to_string()
@@ -460,66 +464,30 @@ impl Database {
     ) -> Result<ChangeStream<'a, T>> {
         let pipeline: Vec<Document> = pipeline.into_iter().collect();
 
-        let mut watch_pipeline = Vec::new();
-        let mut aggregate_options: Option<AggregateOptions>;
-        let mut resume_token: Option<ResumeToken>;
-        let stream_options = options.clone();
+        let watch_pipeline =
+            crate::change_stream::make_pipeline(&target, pipeline.clone(), options.as_ref())?;
+        let aggregate_options: Option<AggregateOptions> = options
+            .as_ref()
+            .map(ChangeStreamOptions::get_aggregation_options);
+        let resume_token = options
+            .as_ref()
+            .and_then(ChangeStreamOptions::get_resume_token);
 
-        if let Some(options) = options {
-            match target {
-                ChangeStreamTarget::Collection(_) | ChangeStreamTarget::Database(_) => {
-                    watch_pipeline.push(doc! { "$changeStream": bson::to_bson(&options)? })
-                }
-                ChangeStreamTarget::Cluster(_) => {
-                    let options_bson = bson::to_bson(&options)?;
-                    if let bson::Bson::Document(mut options_doc) = options_bson {
-                        options_doc.insert("allChangesForCluster", true);
-                        watch_pipeline.push(doc! { "$changeStream": options_doc });
-                    } else {
-                        // TODO: Throw the correct error here (options cannot be parsed as Document)
-                        unreachable!();
-                    }
-                }
+        let cursor;
+        let client;
+        let read_preference;
+
+        match target {
+            ChangeStreamTarget::Collection(ref coll) => {
+                cursor = coll.aggregate(watch_pipeline, aggregate_options)?;
+                client = coll.client();
+                read_preference = coll.read_preference().map(Clone::clone);
             }
-
-            aggregate_options = Some(
-                AggregateOptions::builder()
-                    .collation(options.collation)
-                    .build(),
-            );
-
-            resume_token = options.start_after.or(options.resume_after);
-        } else {
-            match target {
-                ChangeStreamTarget::Collection(_) | ChangeStreamTarget::Database(_) => {
-                    watch_pipeline.push(doc! { "$changeStream": {} });
-                }
-                ChangeStreamTarget::Cluster(_) => {
-                    watch_pipeline.push(doc! { "$changeStream": { "allChangesForCluster": true } });
-                }
+            ChangeStreamTarget::Database(ref db) | ChangeStreamTarget::Cluster(ref db) => {
+                cursor = db.aggregate(watch_pipeline, aggregate_options)?;
+                client = db.client();
+                read_preference = db.read_preference().map(Clone::clone);
             }
-
-            aggregate_options = None;
-            resume_token = None;
-        }
-        watch_pipeline.extend(pipeline.clone());
-
-        let (cursor, client, read_preference) = match target {
-            ChangeStreamTarget::Collection(ref coll) => (
-                coll.aggregate(watch_pipeline, aggregate_options)?,
-                coll.client(),
-                coll.read_preference()
-                    .cloned()
-                    .or_else(|| coll.database().read_preference().cloned())
-                    .or_else(|| coll.client().read_preference().cloned()),
-            ),
-            ChangeStreamTarget::Database(ref db) | ChangeStreamTarget::Cluster(ref db) => (
-                db.aggregate(watch_pipeline, aggregate_options)?,
-                db.client(),
-                db.read_preference()
-                    .cloned()
-                    .or_else(|| db.client().read_preference().cloned()),
-            ),
         };
 
         Ok(ChangeStream::new(
@@ -528,7 +496,7 @@ impl Database {
             client,
             target,
             resume_token,
-            stream_options,
+            options,
             read_preference,
         ))
     }

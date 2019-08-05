@@ -85,8 +85,13 @@ pub struct Connector {
     pub credential: Option<Credential>,
 }
 
+pub struct Stream {
+    error: bool,
+    inner: StreamInner,
+}
+
 #[allow(clippy::large_enum_variant)]
-pub enum Stream {
+pub enum StreamInner {
     Basic(TcpStream),
     Tls(rustls::StreamOwned<rustls::ClientSession, TcpStream>),
 }
@@ -106,9 +111,9 @@ impl Stream {
     }
 
     fn addr(&self) -> Result<SocketAddr> {
-        let address = match self {
-            Stream::Basic(s) => s.peer_addr()?,
-            Stream::Tls(s) => s.sock.peer_addr()?,
+        let address = match self.inner {
+            StreamInner::Basic(ref s) => s.peer_addr()?,
+            StreamInner::Tls(ref s) => s.sock.peer_addr()?,
         };
 
         Ok(address)
@@ -117,25 +122,25 @@ impl Stream {
 
 impl Read for Stream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match self {
-            Stream::Basic(ref mut s) => s.read(buf),
-            Stream::Tls(ref mut s) => s.read(buf),
+        match self.inner {
+            StreamInner::Basic(ref mut s) => s.read(buf),
+            StreamInner::Tls(ref mut s) => s.read(buf),
         }
     }
 }
 
 impl Write for Stream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self {
-            Stream::Basic(ref mut s) => s.write(buf),
-            Stream::Tls(ref mut s) => s.write(buf),
+        match self.inner {
+            StreamInner::Basic(ref mut s) => s.write(buf),
+            StreamInner::Tls(ref mut s) => s.write(buf),
         }
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        match self {
-            Stream::Basic(ref mut s) => s.flush(),
-            Stream::Tls(ref mut s) => s.flush(),
+        match self.inner {
+            StreamInner::Basic(ref mut s) => s.flush(),
+            StreamInner::Tls(ref mut s) => s.flush(),
         }
     }
 }
@@ -148,14 +153,19 @@ impl ManageConnection for Connector {
         let socket = TcpStream::connect(&self.host.display())?;
         socket.set_nodelay(true)?;
 
-        let mut stream = match self.tls_config {
+        let inner = match self.tls_config {
             Some(ref cfg) => {
                 let name = DNSNameRef::try_from_ascii_str(self.host.hostname()).expect("TODO: fix");
                 let session = rustls::ClientSession::new(cfg, name);
 
-                Stream::Tls(rustls::StreamOwned::new(session, socket))
+                StreamInner::Tls(rustls::StreamOwned::new(session, socket))
             }
-            None => Stream::Basic(socket),
+            None => StreamInner::Basic(socket),
+        };
+
+        let mut stream = Stream {
+            error: false,
+            inner,
         };
 
         if let Some(ref credential) = self.credential {
@@ -174,8 +184,8 @@ impl ManageConnection for Connector {
         Ok(())
     }
 
-    fn has_broken(&self, _: &mut Self::Connection) -> bool {
-        false
+    fn has_broken(&self, conn: &mut Self::Connection) -> bool {
+        conn.error
     }
 }
 
@@ -226,6 +236,22 @@ pub fn run_command_stream<T: Read + Write>(
 }
 
 pub fn run_command(
+    client: Option<Client>,
+    conn: &mut Connection,
+    db: &str,
+    doc: Document,
+    slave_ok: bool,
+) -> Result<Document> {
+    let result = run_command_helper(client, conn, db, doc, slave_ok);
+
+    if result.is_err() {
+        conn.error = true;
+    }
+
+    result
+}
+
+fn run_command_helper(
     client: Option<Client>,
     conn: &mut Connection,
     db: &str,

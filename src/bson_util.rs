@@ -2,6 +2,16 @@ use bson::{oid::ObjectId, Bson, Document};
 
 use crate::error::{ErrorKind, Result};
 
+pub fn bson_into_document(bson: Bson) -> Result<Document> {
+    match bson {
+        Bson::Document(doc) => Ok(doc),
+        other => bail!(ErrorKind::BsonConversionError(format!(
+            "{:?} is not a document",
+            other
+        ))),
+    }
+}
+
 pub fn get_int(val: &Bson) -> Option<i64> {
     match *val {
         Bson::I32(i) => Some(i64::from(i)),

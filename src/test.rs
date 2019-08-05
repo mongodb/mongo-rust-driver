@@ -7,8 +7,34 @@ use std::{
     path::PathBuf,
 };
 
-use self::{serde::Deserialize, serde_json::Value};
 use bson::Bson;
+use semver::Version;
+use serde::Deserialize;
+use serde_json::Value;
+
+use crate::{
+    concern::{Acknowledgment, ReadConcern, WriteConcern},
+    options::ClientOptions,
+    read_preference::ReadPreference,
+    Client,
+};
+
+lazy_static! {
+    pub static ref CLIENT_OPTIONS: ClientOptions = {
+        let uri = option_env!("MONGODB_URI").unwrap_or("mongodb://localhost:27017");
+        let mut options = ClientOptions::parse(uri).unwrap();
+        options.max_pool_size = Some(100);
+
+        if options.repl_set_name.is_some() || options.hosts.len() > 1 {
+            options.read_preference = Some(ReadPreference::Primary);
+            options.read_concern = Some(ReadConcern::Linearizable);
+            options.write_concern =
+                Some(WriteConcern::builder().w(Acknowledgment::Majority).build());
+        }
+
+        options
+    };
+}
 
 pub fn run<'a, T, F>(spec: &[&str], run_test_file: F)
 where
@@ -40,4 +66,24 @@ where
 
         run_test_file(bson::from_bson(Bson::from(json)).unwrap())
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct ServerStatus {
+    version: String,
+}
+
+pub fn server_version_at_least(client: &Client, min_version: &str) -> bool {
+    let min_version = Version::parse(min_version).unwrap();
+
+    let server_status: ServerStatus = bson::from_bson(Bson::Document(
+        client
+            .database("admin")
+            .run_command(doc! { "serverStatus" : 1 }, Some(ReadPreference::Primary))
+            .unwrap(),
+    ))
+    .unwrap();
+
+    let server_version = Version::parse(&server_status.version).unwrap();
+    server_version >= min_version
 }

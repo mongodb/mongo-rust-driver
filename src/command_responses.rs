@@ -18,6 +18,7 @@ pub struct FindCommandResponse {
 pub struct FindCommandResponseInner {
     pub first_batch: Vec<Document>,
     pub id: i64,
+    pub post_batch_resume_token: Option<Bson>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -31,6 +32,7 @@ pub struct GetMoreCommandResponse {
 pub struct GetMoreCommandResponseInner {
     pub next_batch: Vec<Document>,
     pub id: i64,
+    pub post_batch_resume_token: Option<Bson>,
 }
 
 #[derive(Debug, Deserialize)]

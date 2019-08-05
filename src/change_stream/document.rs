@@ -1,16 +1,15 @@
-use bson::Document;
+use bson::{Bson, Document};
 
 /// An opaque token used for resuming an interrupted `ChangeStream`.
 ///
 /// When starting a new change stream, `start_after` and `resume_after` fields on
-/// `ChangeStreamOptions` can be specified
-/// with instances of `ResumeToken`.
+/// `ChangeStreamOptions` can be specified with instances of `ResumeToken`.
 ///
 /// See the documentation
 /// [here](https://docs.mongodb.com/manual/changeStreams/#change-stream-resume-token) for more
 /// information on resume tokens.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ResumeToken(Document);
+pub struct ResumeToken(pub(crate) Bson);
 
 /// A `ChangeStreamEventDocument` represents a [change event]
 /// (https://docs.mongodb.com/manual/reference/change-events/) in the associated change stream.
@@ -34,7 +33,7 @@ pub struct ChangeStreamEventDocument {
 
     /// Contains two fields: "db" and "coll" containing the database and collection name in which
     /// the change happened.
-    pub ns: Document,
+    pub ns: Option<Document>,
 
     /// For unsharded collections this contains a single field, id, with the value of the id of the
     /// document updated.  For sharded collections, this will contain all the components of the
@@ -66,14 +65,31 @@ pub struct UpdateDescription {
     pub removed_fields: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename = "camelCase")]
+/// The operation type represented in a given change notification.
+#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub enum OperationType {
+    /// See https://docs.mongodb.com/manual/reference/change-events/#insert-event.
     Insert,
+
+    /// See https://docs.mongodb.com/manual/reference/change-events/#update-event.
     Update,
+
+    /// See https://docs.mongodb.com/manual/reference/change-events/#replace-event.
+    Replace,
+
+    /// See https://docs.mongodb.com/manual/reference/change-events/#delete-event.
     Delete,
-    Invalidate,
+
+    /// See https://docs.mongodb.com/manual/reference/change-events/#drop-event.
     Drop,
-    DropDatabase,
+
+    /// See https://docs.mongodb.com/manual/reference/change-events/#rename-event.
     Rename,
+
+    /// See https://docs.mongodb.com/manual/reference/change-events/#dropdatabase-event.
+    DropDatabase,
+
+    /// See https://docs.mongodb.com/manual/reference/change-events/#invalidate-event.
+    Invalidate,
 }
