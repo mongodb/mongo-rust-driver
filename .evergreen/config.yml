@@ -210,132 +210,288 @@ post:
   - func: "cleanup"
 
 tasks:
-  - name: "test-3.6-standalone"
+  - name: "test-3.6-standalone-noauth"
     tags: ["3.6", "standalone"]
     commands:
       - func: "bootstrap mongo-orchestration"
         vars:
           MONGODB_VERSION: "3.6"
           TOPOLOGY: "server"
+          AUTH: "noauth"
       - func: "run tests"
         vars:
           MONGODB_VERSION: "3.6"
 
-  - name: "test-3.6-replica_set"
+  - name: "test-3.6-standalone-auth"
+    tags: ["3.6", "standalone", "auth"]
+    commands:
+    - func: "bootstrap mongo-orchestration"
+      vars:
+        MONGODB_VERSION: "3.6"
+        TOPOLOGY: "server"
+        AUTH: "auth"
+    - func: "run tests"
+      vars:
+        MONGODB_VERSION: "3.6"
+
+  - name: "test-3.6-replica_set-noauth"
     tags: ["3.6", "replica_set"]
     commands:
       - func: "bootstrap mongo-orchestration"
         vars:
+          AUTH: "noauth"
           MONGODB_VERSION: "3.6"
           TOPOLOGY: "replica_set"
       - func: "run tests"
         vars:
           MONGODB_VERSION: "3.6"
 
-  - name: "test-3.6-sharded_cluster"
+  - name: "test-3.6-replica_set-auth"
+    tags: ["3.6", "replica_set", "auth"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          AUTH: "auth"
+          MONGODB_VERSION: "3.6"
+          TOPOLOGY: "replica_set"
+      - func: "run tests"
+        vars:
+          MONGODB_VERSION: "3.6"
+
+  - name: "test-3.6-sharded_cluster-noauth"
     tags: ["3.6", "sharded_cluster"]
     commands:
       - func: "bootstrap mongo-orchestration"
         vars:
+          AUTH: "noauth"
           MONGODB_VERSION: "3.6"
           TOPOLOGY: "sharded_cluster"
       - func: "run tests"
         vars:
           MONGODB_VERSION: "3.6"
 
-  - name: "test-4.0-standalone"
+  - name: "test-3.6-sharded_cluster-auth"
+    tags: ["3.6", "sharded_cluster", "auth"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          AUTH: "auth"
+          MONGODB_VERSION: "3.6"
+          TOPOLOGY: "sharded_cluster"
+      - func: "run tests"
+        vars:
+          MONGODB_VERSION: "3.6"
+
+  - name: "test-4.0-standalone-noauth"
     tags: ["4.0", "standalone"]
     commands:
       - func: "bootstrap mongo-orchestration"
         vars:
+          AUTH: "noauth"
           MONGODB_VERSION: "4.0"
           TOPOLOGY: "server"
       - func: "run tests"
         vars:
           MONGODB_VERSION: "4.0"
 
-  - name: "test-4.0-replica_set"
+  - name: "test-4.0-standalone-auth"
+    tags: ["4.0", "standalone", "auth"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          AUTH: "auth"
+          MONGODB_VERSION: "4.0"
+          TOPOLOGY: "server"
+      - func: "run tests"
+        vars:
+          MONGODB_VERSION: "4.0"
+
+  - name: "test-4.0-replica_set-noauth"
     tags: ["4.0", "replica_set"]
     commands:
       - func: "bootstrap mongo-orchestration"
         vars:
+          AUTH: "noauth"
           MONGODB_VERSION: "4.0"
           TOPOLOGY: "replica_set"
       - func: "run tests"
         vars:
           MONGODB_VERSION: "4.0"
 
-  - name: "test-4.0-sharded_cluster"
+  - name: "test-4.0-replica_set-auth"
+    tags: ["4.0", "replica_set", "auth"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          AUTH: "auth"
+          MONGODB_VERSION: "4.0"
+          TOPOLOGY: "replica_set"
+      - func: "run tests"
+        vars:
+          MONGODB_VERSION: "4.0"
+
+  - name: "test-4.0-sharded_cluster-noauth"
     tags: ["4.0", "sharded_cluster"]
     commands:
       - func: "bootstrap mongo-orchestration"
         vars:
+          AUTH: "noauth"
           MONGODB_VERSION: "4.0"
           TOPOLOGY: "sharded_cluster"
       - func: "run tests"
         vars:
           MONGODB_VERSION: "4.0"
 
-  - name: "test-4.2-standalone"
+  - name: "test-4.0-sharded_cluster-auth"
+    tags: ["4.0", "sharded_cluster", "auth"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          AUTH: "auth"
+          MONGODB_VERSION: "4.0"
+          TOPOLOGY: "sharded_cluster"
+      - func: "run tests"
+        vars:
+          MONGODB_VERSION: "4.0"
+
+  - name: "test-4.2-standalone-noauth"
     tags: ["4.2", "standalone"]
     commands:
       - func: "bootstrap mongo-orchestration"
         vars:
+          AUTH: "noauth"
           MONGODB_VERSION: "4.2"
           TOPOLOGY: "server"
       - func: "run tests"
         vars:
           MONGODB_VERSION: "4.2"
 
-  - name: "test-4.2-replica_set"
+  - name: "test-4.2-standalone-auth"
+    tags: ["4.2", "standalone", "auth"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          AUTH: "auth"
+          MONGODB_VERSION: "4.2"
+          TOPOLOGY: "server"
+      - func: "run tests"
+        vars:
+          MONGODB_VERSION: "4.2"
+
+  - name: "test-4.2-replica_set-noauth"
     tags: ["4.2", "replica_set"]
     commands:
       - func: "bootstrap mongo-orchestration"
         vars:
+          AUTH: "noauth"
           MONGODB_VERSION: "4.2"
           TOPOLOGY: "replica_set"
       - func: "run tests"
         vars:
           MONGODB_VERSION: "4.2"
 
-  - name: "test-4.2-sharded_cluster"
+  - name: "test-4.2-replica_set-auth"
+    tags: ["4.2", "replica_set", "auth"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          AUTH: "auth"
+          MONGODB_VERSION: "4.2"
+          TOPOLOGY: "replica_set"
+      - func: "run tests"
+        vars:
+          MONGODB_VERSION: "4.2"
+
+  - name: "test-4.2-sharded_cluster-noauth"
     tags: ["4.2", "sharded_cluster"]
     commands:
       - func: "bootstrap mongo-orchestration"
         vars:
+          AUTH: "noauth"
           MONGODB_VERSION: "4.2"
           TOPOLOGY: "sharded_cluster"
       - func: "run tests"
         vars:
           MONGODB_VERSION: "4.2"
 
-  - name: "test-latest-standalone"
+  - name: "test-4.2-sharded_cluster-auth"
+    tags: ["4.2", "sharded_cluster", "auth"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          AUTH: "auth"
+          MONGODB_VERSION: "4.2"
+          TOPOLOGY: "sharded_cluster"
+      - func: "run tests"
+        vars:
+          MONGODB_VERSION: "4.2"
+
+  - name: "test-latest-standalone-noauth"
     tags: ["latest", "standalone"]
     commands:
       - func: "bootstrap mongo-orchestration"
         vars:
+          AUTH: "noauth"
           MONGODB_VERSION: "latest"
           TOPOLOGY: "server"
       - func: "run tests"
         vars:
           MONGODB_VERSION: "latest"
 
-  - name: "test-latest-replica_set"
+  - name: "test-latest-standalone-auth"
+    tags: ["latest", "standalone", "auth"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          AUTH: "auth"
+          MONGODB_VERSION: "latest"
+          TOPOLOGY: "server"
+      - func: "run tests"
+        vars:
+          MONGODB_VERSION: "latest"
+
+  - name: "test-latest-replica_set-noauth"
     tags: ["latest", "replica_set"]
     commands:
       - func: "bootstrap mongo-orchestration"
         vars:
+          AUTH: "noauth"
           MONGODB_VERSION: "latest"
           TOPOLOGY: "replica_set"
       - func: "run tests"
         vars:
           MONGODB_VERSION: "latest"
 
-  - name: "test-latest-sharded_cluster"
+  - name: "test-latest-replica_set-auth"
+    tags: ["latest", "replica_set", "auth"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          AUTH: "auth"
+          MONGODB_VERSION: "latest"
+          TOPOLOGY: "replica_set"
+      - func: "run tests"
+        vars:
+          MONGODB_VERSION: "latest"
+
+  - name: "test-latest-sharded_cluster-noauth"
     tags: ["latest", "sharded_cluster"]
     commands:
       - func: "bootstrap mongo-orchestration"
         vars:
+          AUTH: "noauth"
+          MONGODB_VERSION: "latest"
+          TOPOLOGY: "sharded_cluster"
+      - func: "run tests"
+        vars:
+          MONGODB_VERSION: "latest"
+
+  - name: "test-latest-sharded_cluster-auth"
+    tags: ["latest", "sharded_cluster", "auth"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          AUTH: "auth"
           MONGODB_VERSION: "latest"
           TOPOLOGY: "sharded_cluster"
       - func: "run tests"

@@ -6,10 +6,8 @@ use std::collections::HashMap;
 
 use bson::{oid::ObjectId, Bson};
 use mongodb::{
-    concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::Result,
     options::{auth::AuthMechanism, ClientOptions},
-    read_preference::ReadPreference,
     Client, Collection,
 };
 
@@ -40,13 +38,6 @@ impl TestClient {
         let uri = option_env!("MONGODB_URI").unwrap_or("mongodb://localhost:27017");
         let mut options = ClientOptions::parse(uri).unwrap();
         options.max_pool_size = Some(MAX_POOL_SIZE);
-
-        if options.repl_set_name.is_some() || options.hosts.len() > 1 {
-            options.read_preference = Some(ReadPreference::Primary);
-            options.read_concern = Some(ReadConcern::Linearizable);
-            options.write_concern =
-                Some(WriteConcern::builder().w(Acknowledgment::Majority).build());
-        }
 
         let client = if let Some(handler) = event_handler {
             Client::with_event_handler(options.clone(), Box::new(handler)).unwrap()
@@ -87,10 +78,13 @@ impl TestClient {
         roles: &[&str],
         mechanisms: &[AuthMechanism],
     ) -> Result<()> {
-        let ms: bson::Array = mechanisms.iter().map(|s| Bson::from(s.as_str())).collect();
         let rs: bson::Array = roles.iter().map(|&s| Bson::from(s)).collect();
-        let cmd = doc! { "createUser": user, "pwd": pwd, "roles": rs, "mechanisms": ms };
-        self.client.database("admin").run_command(cmd, None)?;
+        let mut cmd = doc! { "createUser": user, "pwd": pwd, "roles": rs };
+        if self.version_at_least_40() {
+            let ms: bson::Array = mechanisms.iter().map(|s| Bson::from(s.as_str())).collect();
+            cmd.insert("mechanisms", ms);
+        }
+        self.database("admin").run_command(cmd, None)?;
         Ok(())
     }
 

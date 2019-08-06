@@ -175,10 +175,7 @@ impl ServerDescription {
     }
 
     pub fn matches(&self, topology_type: TopologyType, read_pref: Option<&ReadPreference>) -> bool {
-        match read_pref {
-            Some(pref) => self.matches_mode(topology_type, &pref),
-            None => true,
-        }
+        self.matches_mode(topology_type, read_pref.unwrap_or(&ReadPreference::Primary))
     }
 
     fn matches_mode(&self, topology_type: TopologyType, mode: &ReadPreference) -> bool {

@@ -138,7 +138,7 @@ fn list_database_names() {
 
 /// Brief connectTimeoutMS used to shorten the SCRAM tests. Can remove once dependency on R2D2 is
 /// removed.
-const CONNECT_TIMEOUT: u64 = 1000;
+const CONNECT_TIMEOUT: u64 = 5000;
 
 /// Authentication errors returned as part of connection establishment are consumed by R2D2 then
 /// converted into different `ErrorKind`'s by error_chain. For now, we simply dig down to the
@@ -228,7 +228,7 @@ fn scram_test(username: &str, password: &str, mechanisms: &[AuthMechanism]) {
     }
 
     // If only one scram mechanism is specified, verify the other doesn't work.
-    if mechanisms.len() == 1 {
+    if mechanisms.len() == 1 && CLIENT.version_at_least_40() {
         let other = match mechanisms[0] {
             AuthMechanism::ScramSha1 => AuthMechanism::ScramSha256,
             _ => AuthMechanism::ScramSha1,
@@ -240,7 +240,7 @@ fn scram_test(username: &str, password: &str, mechanisms: &[AuthMechanism]) {
 
 #[test]
 fn scram_sha1() {
-    if !CLIENT.version_at_least_40() || !CLIENT.auth_enabled() {
+    if !CLIENT.auth_enabled() {
         return;
     }
     CLIENT
@@ -282,7 +282,7 @@ fn scram_both() {
 
 #[test]
 fn scram_missing_user_uri() {
-    if !CLIENT.version_at_least_40() || !CLIENT.auth_enabled() {
+    if !CLIENT.auth_enabled() {
         return;
     }
     auth_test_uri("adsfasdf", "ASsdfsadf", None, false);
@@ -290,7 +290,7 @@ fn scram_missing_user_uri() {
 
 #[test]
 fn scram_missing_user_options() {
-    if !CLIENT.version_at_least_40() || !CLIENT.auth_enabled() {
+    if !CLIENT.auth_enabled() {
         return;
     }
     auth_test_options("sadfasdf", "fsdadsfasdf", None, false);
