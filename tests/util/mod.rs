@@ -7,15 +7,19 @@ use std::collections::HashMap;
 use bson::{oid::ObjectId, Bson};
 use mongodb::{
     concern::{Acknowledgment, ReadConcern, WriteConcern},
-    options::ClientOptions,
+    error::Result,
+    options::{auth::AuthMechanism, ClientOptions},
     read_preference::ReadPreference,
     Client, Collection,
 };
 
 use self::event::EventHandler;
 
+const MAX_POOL_SIZE: u32 = 100;
+
 pub struct TestClient {
     client: Client,
+    pub options: ClientOptions,
     pub server_info: IsMasterCommandResponse,
 }
 
@@ -35,7 +39,7 @@ impl TestClient {
     fn with_handler(event_handler: Option<EventHandler>) -> Self {
         let uri = option_env!("MONGODB_URI").unwrap_or("mongodb://localhost:27017");
         let mut options = ClientOptions::parse(uri).unwrap();
-        options.max_pool_size = Some(100);
+        options.max_pool_size = Some(MAX_POOL_SIZE);
 
         if options.repl_set_name.is_some() || options.hosts.len() > 1 {
             options.read_preference = Some(ReadPreference::Primary);
@@ -45,9 +49,9 @@ impl TestClient {
         }
 
         let client = if let Some(handler) = event_handler {
-            Client::with_event_handler(options, Box::new(handler)).unwrap()
+            Client::with_event_handler(options.clone(), Box::new(handler)).unwrap()
         } else {
-            Client::with_options(options).unwrap()
+            Client::with_options(options.clone()).unwrap()
         };
 
         let server_info = bson::from_bson(Bson::Document(
@@ -60,8 +64,13 @@ impl TestClient {
 
         Self {
             client,
+            options,
             server_info,
         }
+    }
+
+    pub fn auth_enabled(&self) -> bool {
+        self.options.credential.is_some()
     }
 
     pub fn version_at_least_40(&self) -> bool {
@@ -69,6 +78,20 @@ impl TestClient {
             .max_wire_version
             .map(|v| v >= 7)
             .unwrap_or(false)
+    }
+
+    pub fn create_user(
+        &self,
+        user: &str,
+        pwd: &str,
+        roles: &[&str],
+        mechanisms: &[AuthMechanism],
+    ) -> Result<()> {
+        let ms: bson::Array = mechanisms.iter().map(|s| Bson::from(s.as_str())).collect();
+        let rs: bson::Array = roles.iter().map(|&s| Bson::from(s)).collect();
+        let cmd = doc! { "createUser": user, "pwd": pwd, "roles": rs, "mechanisms": ms };
+        self.client.database("admin").run_command(cmd, None)?;
+        Ok(())
     }
 
     pub fn get_coll(&self, db_name: &str, coll_name: &str) -> Collection {

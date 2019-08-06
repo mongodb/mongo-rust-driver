@@ -4,6 +4,7 @@ mod server;
 use std::{
     collections::HashMap,
     sync::{Arc, RwLock, Weak},
+    time::Duration,
 };
 
 use derivative::Derivative;
@@ -25,6 +26,7 @@ pub(crate) struct Topology {
     #[derivative(Debug = "ignore")]
     tls_config: Option<Arc<rustls::ClientConfig>>,
     max_pool_size: Option<u32>,
+    connect_timeout: Option<Duration>,
     description: TopologyDescription,
     servers: HashMap<String, Arc<RwLock<Server>>>,
 }
@@ -43,6 +45,7 @@ impl Topology {
                     host.clone(),
                     options.max_pool_size,
                     tls_config.clone(),
+                    options.connect_timeout,
                     options.credential.clone(),
                 )));
                 (host.display(), server)
@@ -54,6 +57,7 @@ impl Topology {
         let topology = Arc::new(RwLock::new(Self {
             tls_config,
             max_pool_size: options.max_pool_size,
+            connect_timeout: options.connect_timeout,
             description: TopologyDescription::new(options),
             servers,
         }));
@@ -124,6 +128,7 @@ impl Topology {
                         Host::parse(address).unwrap(),
                         self.max_pool_size,
                         self.tls_config.clone(),
+                        self.connect_timeout,
                         None,
                     ))),
                 )

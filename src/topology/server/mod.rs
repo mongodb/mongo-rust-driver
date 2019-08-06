@@ -1,7 +1,7 @@
 mod description;
 pub mod monitor;
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use derivative::Derivative;
 
@@ -19,6 +19,7 @@ use crate::{
 pub(crate) struct Server {
     #[derivative(Debug = "ignore")]
     tls_config: Option<Arc<rustls::ClientConfig>>,
+    connect_timeout: Option<Duration>,
     host: Host,
     pool: Pool,
     monitor_pool: Pool,
@@ -29,13 +30,29 @@ impl Server {
         host: Host,
         max_pool_size: Option<u32>,
         tls_config: Option<Arc<rustls::ClientConfig>>,
+        connect_timeout: Option<Duration>,
         credential: Option<Credential>,
     ) -> Self {
         Self {
-            pool: Pool::new(host.clone(), max_pool_size, tls_config.clone(), credential).unwrap(),
-            monitor_pool: Pool::new(host.clone(), Some(1), tls_config.clone(), None).unwrap(),
+            pool: Pool::new(
+                host.clone(),
+                max_pool_size,
+                tls_config.clone(),
+                connect_timeout,
+                credential,
+            )
+            .unwrap(),
+            monitor_pool: Pool::new(
+                host.clone(),
+                Some(1),
+                tls_config.clone(),
+                connect_timeout,
+                None,
+            )
+            .unwrap(),
             host,
             tls_config,
+            connect_timeout,
         }
     }
 
@@ -71,8 +88,21 @@ impl Server {
     }
 
     pub(crate) fn reset_pools(&mut self) {
-        self.pool = Pool::new(self.host.clone(), None, self.tls_config.clone(), None).unwrap();
-        self.monitor_pool =
-            Pool::new(self.host.clone(), Some(1), self.tls_config.clone(), None).unwrap();
+        self.pool = Pool::new(
+            self.host.clone(),
+            None,
+            self.tls_config.clone(),
+            self.connect_timeout,
+            None,
+        )
+        .unwrap();
+        self.monitor_pool = Pool::new(
+            self.host.clone(),
+            Some(1),
+            self.tls_config.clone(),
+            self.connect_timeout,
+            None,
+        )
+        .unwrap();
     }
 }

@@ -13,6 +13,7 @@ use rand::Rng;
 use crate::{
     command_responses::IsMasterCommandResponse,
     error::{Error, ErrorKind, Result},
+    options::auth::scram::ScramVersion,
     pool,
     topology::ServerType,
 };
@@ -41,8 +42,6 @@ pub enum AuthMechanism {
     /// The SCRAM-SHA-256 mechanism which extends [RFC 5802](http://tools.ietf.org/html/rfc5802) and is formally defined in [RFC 7677](https://tools.ietf.org/html/rfc7677).
     ///
     /// See the [MongoDB documentation](https://docs.mongodb.com/manual/core/security-scram/) for more information.
-    ///
-    /// Note: This mechanism is not currently supported by this driver but will be in the future.
     ScramSha256,
 
     /// The MONGODB-X509 mechanism based on the usage of X.509 certificates to validate a client
@@ -72,21 +71,56 @@ pub enum AuthMechanism {
 }
 
 impl AuthMechanism {
-    pub(crate) fn from_is_master(_reply: &IsMasterCommandResponse) -> AuthMechanism {
-        // TODO: RUST-87 check for SCRAM-SHA-256 first
-        AuthMechanism::ScramSha1
+    /// Get an `AuthenticationMechanism` from the response to an isMaster.
+    /// If no mechanisms are present in the response, SCRAM-SHA-1 will be chosen by default.
+    pub(crate) fn from_is_master(reply: &IsMasterCommandResponse) -> AuthMechanism {
+        let scram_sha_256_found = reply
+            .sasl_supported_mechs
+            .as_ref()
+            .map(|ms| ms.iter().any(|m| m == AuthMechanism::ScramSha256.as_str()))
+            .unwrap_or(false);
+
+        if scram_sha_256_found {
+            AuthMechanism::ScramSha256
+        } else {
+            AuthMechanism::ScramSha1
+        }
     }
 
     /// Determines if the provided credentials have the required information to perform
     /// authentication.
     pub fn validate_credential(&self, credential: &Credential) -> Result<()> {
+        // TODO: X509 (RUST-147)
+        // TODO: GSSAPI (RUST-196)
+        // TODO: PLAIN (RUST-197)
         match self {
-            AuthMechanism::ScramSha1 => {
-                if credential.username.is_none() {
+            AuthMechanism::ScramSha1 | AuthMechanism::ScramSha256 => {
+                match credential.username {
+                    Some(ref user) => {
+                        if user.is_empty() {
+                            bail!(ErrorKind::ArgumentError(
+                                "Username must be non-zero length in SCRAM authentication"
+                                    .to_string()
+                            ))
+                        }
+                    }
+                    None => bail!(ErrorKind::ArgumentError(
+                        "Username must be provided for SCRAM authentication".to_string()
+                    )),
+                };
+
+                if credential.password.is_none() {
                     bail!(ErrorKind::ArgumentError(
-                        "No username provided for SCRAM authentication".to_string()
+                        "Password must be provided for SCRAM authentication".to_string()
                     ))
                 };
+
+                if credential.mechanism_properties.is_some() {
+                    bail!(ErrorKind::ArgumentError(
+                        "Mechanism properties must not be provided for SCRAM authentication"
+                            .to_string()
+                    ))
+                }
                 Ok(())
             }
             _ => Ok(()),
@@ -96,12 +130,45 @@ impl AuthMechanism {
     /// Get the default authSource for a given mechanism depending on the database provided in the
     /// connection string.
     pub(crate) fn default_source(&self, uri_db: Option<&str>) -> String {
-        // TODO: fill in others as they're implemented.
         match self {
-            AuthMechanism::ScramSha1 | AuthMechanism::ScramSha256 => {
+            AuthMechanism::ScramSha1 | AuthMechanism::ScramSha256 | AuthMechanism::MongoDbCr => {
                 uri_db.unwrap_or("admin").to_string()
             }
-            _ => "".to_string(),
+            AuthMechanism::Gssapi | AuthMechanism::MongoDbX509 => "$external".to_string(),
+            AuthMechanism::Plain => uri_db.unwrap_or("$external").to_string(),
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            AuthMechanism::ScramSha1 => SCRAM_SHA_1_STR,
+            AuthMechanism::ScramSha256 => SCRAM_SHA_256_STR,
+            AuthMechanism::Gssapi => GSSAPI_STR,
+            AuthMechanism::MongoDbCr => MONGODB_CR_STR,
+            AuthMechanism::MongoDbX509 => MONGODB_X509_STR,
+            AuthMechanism::Plain => PLAIN_STR,
+        }
+    }
+
+    pub(crate) fn authenticate_stream<T: Read + Write>(
+        &self,
+        stream: &mut T,
+        credential: &Credential,
+    ) -> Result<()> {
+        match self {
+            AuthMechanism::ScramSha1 => ScramVersion::Sha1.authenticate_stream(stream, credential),
+            AuthMechanism::ScramSha256 => {
+                ScramVersion::Sha256.authenticate_stream(stream, credential)
+            }
+            AuthMechanism::MongoDbCr => bail!(ErrorKind::AuthenticationError(
+                "MONGODB-CR is deprecated and not supported by this driver. Use SCRAM for \
+                 password-based authentication instead"
+                    .to_string()
+            )),
+            _ => bail!(ErrorKind::AuthenticationError(format!(
+                "Authentication mechanism {:?} not yet implemented.",
+                self
+            ))),
         }
     }
 }
@@ -199,20 +266,7 @@ impl Credential {
         };
 
         // Authenticate according to the chosen mechanism.
-        match mechanism.as_ref() {
-            AuthMechanism::ScramSha1 => {
-                scram::authenticate_stream(stream, self, scram::ScramVersion::Sha1)
-            }
-            AuthMechanism::MongoDbCr => bail!(ErrorKind::AuthenticationError(
-                "MONGODB-CR is deprecated and not supported by this driver. Use SCRAM for \
-                 password-based authentication instead"
-                    .to_string()
-            )),
-            _ => bail!(ErrorKind::AuthenticationError(format!(
-                "Authentication mechanism {:?} not yet implemented.",
-                mechanism
-            ))),
-        }
+        mechanism.authenticate_stream(stream, self)
     }
 }
 
@@ -220,4 +274,75 @@ pub(crate) fn generate_nonce() -> String {
     let mut rng = rand::thread_rng();
     let result: Vec<u8> = (0..32).map(|_| rng.gen()).collect();
     base64::encode(result.as_slice())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{command_responses::IsMasterCommandResponse, options::auth::AuthMechanism};
+
+    lazy_static! {
+        static ref MECHS: [String; 2] = [
+            AuthMechanism::ScramSha1.as_str().to_string(),
+            AuthMechanism::ScramSha256.as_str().to_string()
+        ];
+    }
+
+    #[test]
+    fn negotiate_both_scram() {
+        let is_master_both = IsMasterCommandResponse {
+            sasl_supported_mechs: Some(MECHS.to_vec()),
+            ..Default::default()
+        };
+        assert_eq!(
+            AuthMechanism::from_is_master(&is_master_both),
+            AuthMechanism::ScramSha256
+        );
+    }
+
+    #[test]
+    fn negotiate_sha1_only() {
+        let is_master_sha1 = IsMasterCommandResponse {
+            sasl_supported_mechs: Some(MECHS[0..=0].to_vec()),
+            ..Default::default()
+        };
+        assert_eq!(
+            AuthMechanism::from_is_master(&is_master_sha1),
+            AuthMechanism::ScramSha1
+        );
+    }
+
+    #[test]
+    fn negotiate_sha256_only() {
+        let is_master_sha256 = IsMasterCommandResponse {
+            sasl_supported_mechs: Some(MECHS[1..=1].to_vec()),
+            ..Default::default()
+        };
+        assert_eq!(
+            AuthMechanism::from_is_master(&is_master_sha256),
+            AuthMechanism::ScramSha256
+        );
+    }
+
+    #[test]
+    fn negotiate_none() {
+        let is_master_none: IsMasterCommandResponse = Default::default();
+        assert_eq!(
+            AuthMechanism::from_is_master(&is_master_none),
+            AuthMechanism::ScramSha1
+        );
+    }
+
+    #[test]
+    fn negotiate_mangled() {
+        let is_master_mangled = IsMasterCommandResponse {
+            sasl_supported_mechs: Some(
+                ["NOT A MECHANISM".to_string(), "OTHER".to_string()].to_vec(),
+            ),
+            ..Default::default()
+        };
+        assert_eq!(
+            AuthMechanism::from_is_master(&is_master_mangled),
+            AuthMechanism::ScramSha1
+        );
+    }
 }

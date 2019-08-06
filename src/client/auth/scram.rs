@@ -1,8 +1,9 @@
 use std::{
+    borrow::Cow,
     collections::HashMap,
     fmt::{self, Display, Formatter},
     io::{Read, Write},
-    ops::{BitXor, Deref, Range},
+    ops::{BitXor, Range},
     str,
     sync::RwLock,
 };
@@ -10,6 +11,7 @@ use std::{
 use hmac::{Hmac, Mac};
 use md5::Md5;
 use sha1::{Digest, Sha1};
+use sha2::Sha256;
 
 use bson::{spec::BinarySubtype, Bson, Document};
 
@@ -55,40 +57,139 @@ struct CacheEntry {
 #[derive(Hash, Eq, PartialEq, Clone)]
 pub(crate) enum ScramVersion {
     Sha1,
+    Sha256,
 }
 
 impl ScramVersion {
+    /// Perform SCRAM authentication for a given stream.
+    pub(crate) fn authenticate_stream<T: Read + Write>(
+        &self,
+        stream: &mut T,
+        credential: &Credential,
+    ) -> Result<()> {
+        let username = credential
+            .username
+            .as_ref()
+            .ok_or_else(|| Error::authentication_error("SCRAM", "no username supplied"))?;
+
+        let password = credential
+            .password
+            .as_ref()
+            .ok_or_else(|| Error::authentication_error("SCRAM", "no password supplied"))?;
+
+        let source = match credential.source.as_ref() {
+            Some(s) => s.as_str(),
+            None => "admin",
+        };
+
+        if credential.mechanism_properties.is_some() {
+            return Err(Error::authentication_error(
+                "SCRAM",
+                "mechanism properties MUST NOT be specified",
+            ));
+        };
+
+        let nonce = auth::generate_nonce();
+
+        let client_first = ClientFirst::new(username, nonce.as_str());
+
+        let server_first_response =
+            pool::run_command_stream(stream, source, client_first.to_command(self), false)?;
+        let server_first = ServerFirst::parse(server_first_response)?;
+        server_first.validate(nonce.as_str())?;
+
+        let cache_entry_key = CacheEntry {
+            password: password.to_string(),
+            salt: server_first.salt().to_vec(),
+            i: server_first.i(),
+            mechanism: self.clone(),
+        };
+        let (should_update_cache, salted_password) =
+            match CREDENTIAL_CACHE.read().unwrap().get(&cache_entry_key) {
+                Some(pwd) => (false, pwd.clone()),
+                None => (
+                    true,
+                    self.compute_salted_password(
+                        username,
+                        password,
+                        server_first.i(),
+                        server_first.salt(),
+                    )?,
+                ),
+            };
+
+        let client_final = ClientFinal::new(
+            salted_password.as_slice(),
+            &client_first,
+            &server_first,
+            self,
+        )?;
+
+        let server_final_response =
+            pool::run_command_stream(stream, source, client_final.to_command(), false)?;
+        let server_final = ServerFinal::parse(server_final_response)?;
+        server_final.validate(salted_password.as_slice(), &client_final, self)?;
+
+        // Normal SCRAM implementations would cease here. The following round trip is MongoDB
+        // implementation specific and just consists of a client no-op followed by a server no-op
+        // with "done: true".
+        let noop = doc! {
+            "saslContinue": 1,
+            "conversationId": server_final.conversation_id().clone(),
+            "payload": Bson::Binary(BinarySubtype::Generic, Vec::new())
+        };
+        let server_noop_response = pool::run_command_stream(stream, source, noop, false)?;
+
+        if server_noop_response
+            .get("conversationId")
+            .and_then(|id| Some(id == server_final.conversation_id()))
+            != Some(true)
+        {
+            return Err(Error::authentication_error(
+                "SCRAM",
+                "mismatched conversationId's",
+            ));
+        };
+
+        if !server_noop_response.get_bool("done").unwrap_or(false) {
+            return Err(Error::authentication_error(
+                "SCRAM",
+                "authentication did not complete successfully",
+            ));
+        }
+
+        if should_update_cache {
+            if let Ok(ref mut cache) = CREDENTIAL_CACHE.write() {
+                if cache.get(&cache_entry_key).is_none() {
+                    cache.insert(cache_entry_key, salted_password);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// HMAC function used as part of SCRAM authentication.
     fn hmac(&self, key: &[u8], str: &[u8]) -> Result<Vec<u8>> {
         match self {
-            ScramVersion::Sha1 => {
-                let mut mac = Hmac::<Sha1>::new_varkey(key)
-                    .or_else(|_| Err(Error::unknown_authentication_error("SCRAM")))?;
-                mac.input(str);
-                Ok(mac.result().code().to_vec())
-            }
+            ScramVersion::Sha1 => mac::<Hmac<Sha1>>(key, str),
+            ScramVersion::Sha256 => mac::<Hmac<Sha256>>(key, str),
         }
     }
 
     /// The "h" function defined in the SCRAM RFC.
     fn h(&self, str: &[u8]) -> Vec<u8> {
         match self {
-            ScramVersion::Sha1 => {
-                let mut sha1 = Sha1::new();
-                sha1.input(str);
-                sha1.result().to_vec()
-            }
+            ScramVersion::Sha1 => hash::<Sha1>(str),
+            ScramVersion::Sha256 => hash::<Sha256>(str),
         }
     }
 
     /// The "h_i" function as defined in the SCRAM RFC.
     fn h_i(&self, str: &str, salt: &[u8], iterations: usize) -> Vec<u8> {
         match self {
-            ScramVersion::Sha1 => {
-                let mut buf = vec![0u8; 20];
-                pbkdf2::pbkdf2::<Hmac<Sha1>>(str.as_bytes(), salt, iterations, &mut buf);
-                buf
-            }
+            ScramVersion::Sha1 => h_i::<Hmac<Sha1>>(str, salt, iterations, 160 / 8),
+            ScramVersion::Sha256 => h_i::<Hmac<Sha256>>(str, salt, iterations, 256 / 8),
         }
     }
 
@@ -101,12 +202,24 @@ impl ScramVersion {
         i: usize,
         salt: &[u8],
     ) -> Result<Vec<u8>> {
-        let mut md5 = Md5::new();
-        md5.input(format!("{}:mongo:{}", username, password));
-        let hashed_password = hex::encode(md5.result());
-        let normalized_password = stringprep::saslprep(hashed_password.as_str())
-            .or_else(|_| Err(Error::authentication_error("SCRAM", "saslprep failure")))?;
-        Ok(self.h_i(normalized_password.deref(), salt, i))
+        let normalized_password = match self {
+            ScramVersion::Sha1 => {
+                let mut md5 = Md5::new();
+                md5.input(format!("{}:mongo:{}", username, password));
+                Cow::Owned(hex::encode(md5.result()))
+            }
+            ScramVersion::Sha256 => match stringprep::saslprep(password) {
+                Ok(p) => p,
+                Err(_) => {
+                    return Err(Error::authentication_error(
+                        "SCRAM-SHA-256",
+                        "saslprep failure",
+                    ))
+                }
+            },
+        };
+
+        Ok(self.h_i(normalized_password.as_ref(), salt, i))
     }
 }
 
@@ -114,17 +227,37 @@ impl Display for ScramVersion {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             ScramVersion::Sha1 => write!(f, "SCRAM-SHA-1"),
+            ScramVersion::Sha256 => write!(f, "SCRAM-SHA-256"),
         }
     }
 }
 
-pub fn xor(lhs: &[u8], rhs: &[u8]) -> Vec<u8> {
+fn xor(lhs: &[u8], rhs: &[u8]) -> Vec<u8> {
     assert_eq!(lhs.len(), rhs.len());
 
     lhs.iter()
         .zip(rhs.iter())
         .map(|(l, r)| l.bitxor(r.clone()))
         .collect()
+}
+
+fn mac<M: Mac>(key: &[u8], input: &[u8]) -> Result<Vec<u8>> {
+    let mut mac =
+        M::new_varkey(key).or_else(|_| Err(Error::unknown_authentication_error("SCRAM")))?;
+    mac.input(input);
+    Ok(mac.result().code().to_vec())
+}
+
+fn hash<D: Digest>(val: &[u8]) -> Vec<u8> {
+    let mut hash = D::new();
+    hash.input(val);
+    hash.result().to_vec()
+}
+
+fn h_i<M: Mac + Sync>(str: &str, salt: &[u8], iterations: usize, output_size: usize) -> Vec<u8> {
+    let mut buf = vec![0u8; output_size];
+    pbkdf2::pbkdf2::<M>(str.as_bytes(), salt, iterations, buf.as_mut_slice());
+    buf
 }
 
 /// Parses a string slice of the form "<expected_key>=<body>" into "<body>", if possible.
@@ -465,131 +598,30 @@ impl ServerFinal {
     }
 }
 
-/// Perform SCRAM authentication for a given stream.
-pub(crate) fn authenticate_stream<T: Read + Write>(
-    stream: &mut T,
-    credential: &Credential,
-    scram: ScramVersion,
-) -> Result<()> {
-    let username = credential
-        .username
-        .as_ref()
-        .ok_or_else(|| Error::authentication_error("SCRAM", "no username supplied"))?;
+#[cfg(test)]
+mod tests {
+    use bson::Bson;
 
-    let password = credential
-        .password
-        .as_ref()
-        .ok_or_else(|| Error::authentication_error("SCRAM", "no password supplied"))?;
+    use crate::options::auth::scram::ServerFirst;
 
-    let source = match credential.source.as_ref() {
-        Some(s) => s.as_str(),
-        None => "admin",
-    };
+    #[test]
+    fn test_iteration_count() {
+        let nonce = "mocked";
 
-    if credential.mechanism_properties.is_some() {
-        return Err(Error::authentication_error(
-            "SCRAM",
-            "mechanism properties MUST NOT be specified",
-        ));
-    };
-
-    let nonce = auth::generate_nonce();
-
-    let client_first = ClientFirst::new(username, nonce.as_str());
-
-    let server_first_response =
-        pool::run_command_stream(stream, source, client_first.to_command(&scram), false)?;
-    let server_first = ServerFirst::parse(server_first_response)?;
-    server_first.validate(nonce.as_str())?;
-
-    let cache_entry_key = CacheEntry {
-        password: password.to_string(),
-        salt: server_first.salt().to_vec(),
-        i: server_first.i(),
-        mechanism: scram.clone(),
-    };
-    let (should_update_cache, salted_password) =
-        match CREDENTIAL_CACHE.read().unwrap().get(&cache_entry_key) {
-            Some(pwd) => (false, pwd.clone()),
-            None => (
-                true,
-                scram.compute_salted_password(
-                    username,
-                    password,
-                    server_first.i(),
-                    server_first.salt(),
-                )?,
-            ),
+        let invalid_iteration_count = ServerFirst {
+            conversation_id: Bson::Null,
+            done: false,
+            message: "mocked".to_string(),
+            nonce: nonce.to_string(),
+            salt: Vec::new(),
+            i: 42,
         };
+        assert!(invalid_iteration_count.validate(nonce).is_err());
 
-    let client_final = ClientFinal::new(
-        salted_password.as_slice(),
-        &client_first,
-        &server_first,
-        &scram,
-    )?;
-
-    let server_final_response =
-        pool::run_command_stream(stream, source, client_final.to_command(), false)?;
-    let server_final = ServerFinal::parse(server_final_response)?;
-    server_final.validate(salted_password.as_slice(), &client_final, &scram)?;
-
-    // Normal SCRAM implementations would cease here. The following round trip is MongoDB
-    // implementation specific and just consists of a client no-op followed by a server no-op
-    // with "done: true".
-    let noop = doc! {
-        "saslContinue": 1,
-        "conversationId": server_final.conversation_id().clone(),
-        "payload": Bson::Binary(BinarySubtype::Generic, Vec::new())
-    };
-    let server_noop_response = pool::run_command_stream(stream, source, noop, false)?;
-
-    if server_noop_response
-        .get("conversationId")
-        .and_then(|id| Some(id == server_final.conversation_id()))
-        != Some(true)
-    {
-        return Err(Error::authentication_error(
-            "SCRAM",
-            "mismatched conversationId's",
-        ));
-    };
-
-    if !server_noop_response.get_bool("done").unwrap_or(false) {
-        return Err(Error::authentication_error(
-            "SCRAM",
-            "authentication did not complete successfully",
-        ));
+        let valid_iteration_count = ServerFirst {
+            i: 4096,
+            ..invalid_iteration_count
+        };
+        assert!(valid_iteration_count.validate(nonce).is_ok())
     }
-
-    if should_update_cache {
-        if let Ok(ref mut cache) = CREDENTIAL_CACHE.write() {
-            if cache.get(&cache_entry_key).is_none() {
-                cache.insert(cache_entry_key, salted_password);
-            }
-        }
-    }
-
-    Ok(())
-}
-
-#[test]
-fn test_iteration_count() {
-    let nonce = "mocked";
-
-    let invalid_iteration_count = ServerFirst {
-        conversation_id: Bson::Null,
-        done: false,
-        message: "mocked".to_string(),
-        nonce: nonce.to_string(),
-        salt: Vec::new(),
-        i: 42,
-    };
-    assert_eq!(invalid_iteration_count.validate(nonce).is_ok(), false);
-
-    let valid_iteration_count = ServerFirst {
-        i: 4096,
-        ..invalid_iteration_count
-    };
-    assert_eq!(valid_iteration_count.validate(nonce).is_ok(), true)
 }

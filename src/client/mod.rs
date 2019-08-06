@@ -77,6 +77,7 @@ struct ClientInner {
     command_event_handler: Option<Box<dyn CommandEventHandler>>,
     local_threshold: Option<i64>,
     server_selection_timeout: Option<Duration>,
+    connect_timeout: Option<Duration>,
 }
 
 impl Client {
@@ -84,7 +85,6 @@ impl Client {
     /// MongoDB connection string.
     pub fn with_uri_str(uri: &str) -> Result<Self> {
         let options = ClientOptions::parse(uri)?;
-
         Client::with_options(options)
     }
 
@@ -121,6 +121,7 @@ impl Client {
                 read_preference: options.read_preference.take(),
                 read_concern: options.read_concern.take(),
                 write_concern: options.write_concern.take(),
+                connect_timeout: options.connect_timeout,
                 topology: Topology::new(options, tls_config),
                 command_event_handler: event_handler,
             }),
