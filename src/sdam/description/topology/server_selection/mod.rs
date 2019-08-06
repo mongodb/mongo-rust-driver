@@ -185,17 +185,120 @@ impl TopologyDescription {
         &'a self,
         types: &'a [ServerType],
         tag_sets: Option<&'a Vec<TagSet>>,
-        _max_staleness: Option<Duration>,
+        max_staleness: Option<Duration>,
     ) -> Vec<&'a ServerDescription> {
         let mut servers = self.servers_with_type(types).collect();
+
+        if let Some(max_staleness) = max_staleness {
+            self.filter_servers_by_max_staleness(&mut servers, max_staleness);
+        }
 
         if let Some(tag_sets) = tag_sets {
             filter_servers_by_tag_sets(&mut servers, tag_sets);
         }
 
-        // TODO RUST-193: Max staleness
-
         servers
+    }
+
+    fn filter_servers_by_max_staleness(
+        &self,
+        servers: &mut Vec<&ServerDescription>,
+        max_staleness: Duration,
+    ) {
+        let primary = self
+            .servers
+            .values()
+            .find(|server| server.server_type == ServerType::RSPrimary);
+
+        match primary {
+            Some(primary) => {
+                self.filter_servers_by_max_staleness_with_primary(servers, primary, max_staleness)
+            }
+            None => self.filter_servers_by_max_staleness_without_primary(servers, max_staleness),
+        };
+    }
+
+    fn filter_servers_by_max_staleness_with_primary(
+        &self,
+        servers: &mut Vec<&ServerDescription>,
+        primary: &ServerDescription,
+        max_staleness: Duration,
+    ) {
+        let max_staleness_seconds = max_staleness.as_millis() as i64;
+
+        servers.retain(|server| {
+            let server_staleness = self.calculate_secondary_staleness_with_primary(server, primary);
+
+            server_staleness
+                .map(|staleness| staleness <= max_staleness_seconds)
+                .unwrap_or(false)
+        })
+    }
+
+    fn filter_servers_by_max_staleness_without_primary(
+        &self,
+        servers: &mut Vec<&ServerDescription>,
+        max_staleness: Duration,
+    ) {
+        let max_staleness = max_staleness.as_millis() as i64;
+        let max_write_date = self
+            .servers
+            .values()
+            .filter(|server| server.server_type == ServerType::RSSecondary)
+            .filter_map(|server| {
+                server
+                    .last_write_date()
+                    .ok()
+                    .and_then(std::convert::identity)
+            })
+            .map(|last_write_date| last_write_date.timestamp_millis())
+            .max();
+
+        let secondary_max_write_date = match max_write_date {
+            Some(max_write_date) => max_write_date,
+            None => return,
+        };
+
+        servers.retain(|server| {
+            let server_staleness = self
+                .calculate_secondary_staleness_without_primary(server, secondary_max_write_date);
+
+            server_staleness
+                .map(|staleness| staleness <= max_staleness)
+                .unwrap_or(false)
+        })
+    }
+
+    fn calculate_secondary_staleness_with_primary(
+        &self,
+        secondary: &ServerDescription,
+        primary: &ServerDescription,
+    ) -> Option<i64> {
+        let primary_last_update = primary.last_update_time?.timestamp_millis();
+        let primary_last_write = primary.last_write_date().ok()??.timestamp_millis();
+
+        let secondary_last_update = secondary.last_update_time?.timestamp_millis();
+        let secondary_last_write = secondary.last_write_date().ok()??.timestamp_millis();
+
+        let heartbeat_frequency = self.heartbeat_frequency().as_millis() as i64;
+
+        let staleness = (secondary_last_update - secondary_last_write)
+            - (primary_last_update - primary_last_write)
+            + heartbeat_frequency;
+
+        Some(staleness)
+    }
+
+    fn calculate_secondary_staleness_without_primary(
+        &self,
+        secondary: &ServerDescription,
+        max_last_write_date: i64,
+    ) -> Option<i64> {
+        let secondary_last_write = secondary.last_write_date().ok()??.timestamp_millis();
+        let heartbeat_frequency = self.heartbeat_frequency().as_millis() as i64;
+
+        let staleness = max_last_write_date - secondary_last_write + heartbeat_frequency;
+        Some(staleness)
     }
 }
 

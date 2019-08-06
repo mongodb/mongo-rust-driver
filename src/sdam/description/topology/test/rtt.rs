@@ -44,6 +44,7 @@ fn run_test(test_file: TestFile) {
         compatibility_error: None,
         logical_session_timeout_minutes: None,
         local_threshold: None,
+        heartbeat_freq: None,
         servers: {
             let mut servers = HashMap::new();
             servers.insert(Default::default(), old_server_desc);

@@ -19,6 +19,8 @@ use crate::{
 };
 pub(crate) use server_selection::SelectionCriteria;
 
+const DEFAULT_HEARTBEAT_FREQUENCY: Duration = Duration::from_secs(10);
+
 /// The TopologyType type, as described by the SDAM spec.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize)]
 pub(crate) enum TopologyType {
@@ -64,6 +66,9 @@ pub(crate) struct TopologyDescription {
     /// acceptable for a read operation.
     local_threshold: Option<Duration>,
 
+    /// The maximum amount of time to wait before checking a given server by sending an isMaster.
+    heartbeat_freq: Option<Duration>,
+
     /// The server descriptions of each member of the topology.
     servers: HashMap<StreamAddress, ServerDescription>,
 }
@@ -97,6 +102,7 @@ impl TopologyDescription {
             compatibility_error: None,
             logical_session_timeout_minutes: None,
             local_threshold: options.local_threshold,
+            heartbeat_freq: options.heartbeat_freq,
             servers,
         }
     }
@@ -172,6 +178,11 @@ impl TopologyDescription {
             }
             _ => {}
         }
+    }
+
+    /// Gets the heartbeat frequency.
+    fn heartbeat_frequency(&self) -> Duration {
+        self.heartbeat_freq.unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY)
     }
 
     /// Check the cluster for a compatibility error, and record the error message if one is found.

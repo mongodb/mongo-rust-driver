@@ -1,7 +1,11 @@
+use std::time::Duration;
+
+use bson::UtcDateTime;
+use chrono::{naive::NaiveDateTime, offset::Utc, DateTime};
 use serde::Deserialize;
 
 use crate::{
-    is_master::{IsMasterCommandResponse, IsMasterReply},
+    is_master::{IsMasterCommandResponse, IsMasterReply, LastWrite},
     options::StreamAddress,
     read_preference::{ReadPreference, TagSet},
     sdam::description::{
@@ -12,10 +16,13 @@ use crate::{
 
 #[derive(Debug, Deserialize)]
 struct TestFile {
+    #[serde(rename = "heartbeatFrequencyMS")]
+    heartbeat_frequency_ms: Option<u64>,
     topology_description: TestTopologyDescription,
     read_preference: TestReadPreference,
-    suitable_servers: Vec<TestServerDescription>,
-    in_latency_window: Vec<TestServerDescription>,
+    suitable_servers: Option<Vec<TestServerDescription>>,
+    in_latency_window: Option<Vec<TestServerDescription>>,
+    error: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -26,12 +33,29 @@ struct TestTopologyDescription {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct TestServerDescription {
     address: String,
-    avg_rtt_ms: f64,
+    #[serde(rename = "avg_rtt_ms")]
+    avg_rtt_ms: Option<f64>,
     #[serde(rename = "type")]
     server_type: TestServerType,
     tags: Option<TagSet>,
+    last_update_time: Option<i64>,
+    last_write: Option<LastWriteDate>,
+    max_wire_version: Option<i32>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LastWriteDate {
+    last_write_date: NumberLong,
+}
+
+#[derive(Debug, Deserialize)]
+struct NumberLong {
+    #[serde(rename = "$numberLong")]
+    number: String,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
@@ -65,31 +89,39 @@ impl TestServerType {
 
 #[derive(Debug, Deserialize)]
 pub struct TestReadPreference {
-    pub mode: String,
+    pub mode: Option<String>,
     pub tag_sets: Option<Vec<TagSet>>,
+    #[serde(rename = "maxStalenessSeconds")]
+    pub max_staleness_seconds: Option<u64>,
 }
 
-fn convert_read_preference(test_read_pref: TestReadPreference) -> ReadPreference {
-    match &test_read_pref.mode[..] {
+fn convert_read_preference(test_read_pref: TestReadPreference) -> Option<ReadPreference> {
+    let max_staleness = test_read_pref
+        .max_staleness_seconds
+        .map(Duration::from_secs);
+
+    let read_pref = match &test_read_pref.mode.as_ref()?[..] {
         "Primary" => ReadPreference::Primary,
         "Secondary" => ReadPreference::Secondary {
             tag_sets: test_read_pref.tag_sets,
-            max_staleness: None,
+            max_staleness,
         },
         "PrimaryPreferred" => ReadPreference::PrimaryPreferred {
             tag_sets: test_read_pref.tag_sets,
-            max_staleness: None,
+            max_staleness,
         },
         "SecondaryPreferred" => ReadPreference::SecondaryPreferred {
             tag_sets: test_read_pref.tag_sets,
-            max_staleness: None,
+            max_staleness,
         },
         "Nearest" => ReadPreference::Nearest {
             tag_sets: test_read_pref.tag_sets,
-            max_staleness: None,
+            max_staleness,
         },
         _ => panic!("invalid read preference: {:?}", test_read_pref),
-    }
+    };
+
+    Some(read_pref)
 }
 
 fn is_master_response_from_server_type(server_type: ServerType) -> IsMasterCommandResponse {
@@ -135,6 +167,16 @@ fn is_master_response_from_server_type(server_type: ServerType) -> IsMasterComma
     response
 }
 
+fn utc_datetime_from_millis(millis: i64) -> UtcDateTime {
+    let seconds_portion = millis / 1000;
+    let nanos_portion = (millis % 1000) * 1_000_000;
+
+    let naive_datetime = NaiveDateTime::from_timestamp(seconds_portion, nanos_portion as u32);
+    let datetime = DateTime::from_utc(naive_datetime, Utc);
+
+    UtcDateTime(datetime)
+}
+
 fn convert_server_description(
     test_server_desc: TestServerDescription,
 ) -> Option<ServerDescription> {
@@ -145,16 +187,26 @@ fn convert_server_description(
 
     let mut command_response = is_master_response_from_server_type(server_type);
     command_response.tags = test_server_desc.tags;
+    command_response.last_write = test_server_desc.last_write.map(|last_write| {
+        let millis: i64 = last_write.last_write_date.number.parse().unwrap();
+
+        LastWrite {
+            last_write_date: utc_datetime_from_millis(millis),
+        }
+    });
 
     let is_master = IsMasterReply {
         command_response,
-        round_trip_time: Some(f64_ms_as_duration(test_server_desc.avg_rtt_ms)),
+        round_trip_time: test_server_desc.avg_rtt_ms.map(f64_ms_as_duration),
     };
 
-    let server_desc = ServerDescription::new(
+    let mut server_desc = ServerDescription::new(
         StreamAddress::parse(&test_server_desc.address).unwrap(),
         Some(Ok(is_master)),
     );
+    server_desc.last_update_time = test_server_desc
+        .last_update_time
+        .map(utc_datetime_from_millis);
 
     Some(server_desc)
 }
@@ -168,10 +220,18 @@ macro_rules! get_sorted_addresses {
 }
 
 fn run_test(test_file: TestFile) {
+    let read_pref = match convert_read_preference(test_file.read_preference) {
+        Some(read_pref) => read_pref,
+        None => return,
+    };
+
     let servers: Option<Vec<ServerDescription>> = test_file
         .topology_description
         .servers
         .into_iter()
+        // The driver doesn't support server versions low enough not to support max staleness, so we
+        // just manually filter them out here.
+        .filter(|server| server.max_wire_version.map(|version| version >= 5).unwrap_or(true))
         .map(convert_server_description)
         .collect();
 
@@ -189,28 +249,30 @@ fn run_test(test_file: TestFile) {
         compatibility_error: None,
         logical_session_timeout_minutes: None,
         local_threshold: None,
+        heartbeat_freq: test_file.heartbeat_frequency_ms.map(Duration::from_millis),
         servers: servers
             .into_iter()
             .map(|server| (server.address.clone(), server))
             .collect(),
     };
 
-    let read_pref = convert_read_preference(test_file.read_preference);
+    if let Some(ref expected_suitable_servers) = test_file.suitable_servers {
+        let mut actual_servers: Vec<_> = topology.suitable_servers(&read_pref);
 
-    let mut suitable_servers: Vec<_> = topology.suitable_servers(&read_pref);
-    suitable_servers.sort_unstable_by_key(|server| (&server.address.hostname, server.address.port));
+        assert_eq!(
+            get_sorted_addresses!(expected_suitable_servers),
+            get_sorted_addresses!(&actual_servers),
+        );
 
-    assert_eq!(
-        get_sorted_addresses!(&test_file.suitable_servers),
-        get_sorted_addresses!(&suitable_servers),
-    );
+        if let Some(ref expected_in_latency_window) = test_file.in_latency_window {
+            topology.retain_servers_within_latency_window(&mut actual_servers);
 
-    topology.retain_servers_within_latency_window(&mut suitable_servers);
-
-    assert_eq!(
-        get_sorted_addresses!(&test_file.in_latency_window),
-        get_sorted_addresses!(&suitable_servers)
-    );
+            assert_eq!(
+                get_sorted_addresses!(expected_in_latency_window),
+                get_sorted_addresses!(&actual_servers)
+            );
+        }
+    }
 }
 
 #[test]
@@ -261,4 +323,29 @@ fn server_selection_unknown() {
         &["server-selection", "server_selection", "Unknown", "read"],
         run_test,
     );
+}
+
+#[test]
+fn max_staleness_replica_set_no_primary() {
+    crate::test::run(&["max-staleness", "ReplicaSetNoPrimary"], run_test);
+}
+
+#[test]
+fn max_staleness_replica_set_with_primary() {
+    crate::test::run(&["max-staleness", "ReplicaSetWithPrimary"], run_test);
+}
+
+#[test]
+fn max_staleness_sharded() {
+    crate::test::run(&["max-staleness", "Sharded"], run_test);
+}
+
+#[test]
+fn max_staleness_single() {
+    crate::test::run(&["max-staleness", "Single"], run_test);
+}
+
+#[test]
+fn max_staleness_unknown() {
+    crate::test::run(&["max-staleness", "Unknown"], run_test);
 }
