@@ -3,12 +3,12 @@ use mongodb::options::{collation::Collation, IndexModel};
 
 use crate::CLIENT;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 struct ListIndexesEntry {
     v: i64,
     key: Document,
     name: String,
-    ns: String,
+    ns: Option<String>,
     unique: Option<bool>,
 }
 
@@ -33,10 +33,10 @@ fn list_indexes_contains_id() {
 
     assert_eq!(entry.key, doc! { "_id": 1 });
     assert_eq!(entry.name, "_id_");
-    assert_eq!(
-        entry.ns,
-        format!("{}.{}", function_name!(), function_name!())
-    );
+
+    if let Some(ns) = entry.ns {
+        assert_eq!(ns, format!("{}.{}", function_name!(), function_name!()));
+    }
 }
 
 #[test]
@@ -89,37 +89,35 @@ fn index_management() {
 
     assert_eq!(listed_indexes.len(), 4);
 
-    assert_eq!(listed_indexes[0].key, doc! { "_id": 1 });
-    assert_eq!(listed_indexes[0].name, "_id_");
-    assert_eq!(
-        listed_indexes[0].ns,
-        format!("{}.{}", function_name!(), function_name!())
-    );
-    assert!(listed_indexes[0].unique.is_none());
+    let expected_entries: Vec<_> = (0..4)
+        .map(|i| {
+            let key;
+            let name;
 
-    assert_eq!(listed_indexes[1].key, keys[0]);
-    assert_eq!(listed_indexes[1].name, created_names[0]);
-    assert_eq!(
-        listed_indexes[1].ns,
-        format!("{}.{}", function_name!(), function_name!())
-    );
-    assert!(listed_indexes[1].unique.is_none());
+            if i == 0 {
+                key = doc! { "_id": 1 };
+                name = "_id_".to_string();
+            } else {
+                key = keys[i - 1].clone();
+                name = created_names[i - 1].clone();
+            };
 
-    assert_eq!(listed_indexes[2].key, keys[1]);
-    assert_eq!(listed_indexes[2].name, created_names[1]);
-    assert_eq!(
-        listed_indexes[2].ns,
-        format!("{}.{}", function_name!(), function_name!())
-    );
-    assert!(listed_indexes[2].unique.is_none());
+            let unique = if i == 3 { Some(true) } else { None };
 
-    assert_eq!(listed_indexes[3].key, keys[2]);
-    assert_eq!(listed_indexes[3].name, created_names[2]);
-    assert_eq!(
-        listed_indexes[3].ns,
-        format!("{}.{}", function_name!(), function_name!())
-    );
-    assert_eq!(listed_indexes[3].unique, Some(true));
+            ListIndexesEntry {
+                v: listed_indexes[0].v,
+                key,
+                name,
+                ns: listed_indexes[0]
+                    .ns
+                    .as_ref()
+                    .and_then(|_| Some(format!("{}.{}", function_name!(), function_name!()))),
+                unique,
+            }
+        })
+        .collect();
+
+    assert_eq!(listed_indexes, expected_entries);
 }
 
 /// This tests that creating two indexes with the same keys but different collations succeeds, and
