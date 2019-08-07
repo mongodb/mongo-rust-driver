@@ -402,6 +402,18 @@ axes:
            AUTH: "noauth"
            SSL: "nossl"
 
+  - id: "auth"
+    display_name: Authentication
+    values:
+      - id: "auth"
+        display_name: Auth
+        variables:
+          AUTH: "auth"
+      - id: "noauth"
+        display_name: NoAuth
+        variables:
+          AUTH: "noauth"
+
   - id: "os"
     display_name: OS
     values:
@@ -417,7 +429,8 @@ buildvariants:
   matrix_name: "tests"
   matrix_spec:
     os: "*"
-  display_name: "${os}"
+    auth: "*"
+  display_name: "${os} ${auth}"
   tasks:
      - ".latest"
      - ".4.2"
