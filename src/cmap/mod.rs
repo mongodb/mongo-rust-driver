@@ -29,63 +29,63 @@ use crate::{
 
 const DEFAULT_MAX_POOL_SIZE: u32 = 100;
 
-// A pool of connections implementing the CMAP spec. All state is kept internally in an `Arc`, and
-// internal state that is mutable is additionally wrapped by a lock.
+/// A pool of connections implementing the CMAP spec. All state is kept internally in an `Arc`, and
+/// internal state that is mutable is additionally wrapped by a lock.
 #[derive(Clone, Debug)]
 pub(crate) struct ConnectionPool {
     inner: Arc<ConnectionPoolInner>,
 }
 
-// The internal state of a connection pool.
+/// The internal state of a connection pool.
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub(crate) struct ConnectionPoolInner {
-    // The address of the server the pool's connections will connect to.
+    /// The address of the server the pool's connections will connect to.
     address: String,
 
-    // If a checkout operation takes longer than `wait_queue_timeout`, the pool will return an
-    // error. If `wait_queue_timeout` is `None`, then the checkout operation will not time out.
+    /// If a checkout operation takes longer than `wait_queue_timeout`, the pool will return an
+    /// error. If `wait_queue_timeout` is `None`, then the checkout operation will not time out.
     wait_queue_timeout: Option<Duration>,
 
-    // Connections that have been ready for usage in the pool for longer than `max_idle_time` will
-    // be closed either by the background thread or when popped off of the set of available
-    // connections. If `max_idle_time` is `None`, then connections will not be closed due to being
-    // idle.
+    /// Connections that have been ready for usage in the pool for longer than `max_idle_time` will
+    /// be closed either by the background thread or when popped off of the set of available
+    /// connections. If `max_idle_time` is `None`, then connections will not be closed due to being
+    /// idle.
     max_idle_time: Option<Duration>,
 
-    // The maximum number of connections that the pool can have at a given time. This includes
-    // connections which are currently checked out of the pool.
+    /// The maximum number of connections that the pool can have at a given time. This includes
+    /// connections which are currently checked out of the pool.
     max_pool_size: u32,
 
-    // The minimum number of connections that the pool can have at a given time. This includes
-    // connections which are currently checked out of the pool. If fewer than `min_pool_size`
-    // connections are in the pool, the background thread will create more connections and add them
-    // to the pool.
+    /// The minimum number of connections that the pool can have at a given time. This includes
+    /// connections which are currently checked out of the pool. If fewer than `min_pool_size`
+    /// connections are in the pool, the background thread will create more connections and add
+    /// them to the pool.
     min_pool_size: Option<u32>,
 
-    // The current generation of the pool. The generation is incremented whenever the pool is
-    // cleared. Connections belonging to a previous generation are considered stale and will be
-    // closed when checked back in or when popped off of the set of available connections.
+    /// The current generation of the pool. The generation is incremented whenever the pool is
+    /// cleared. Connections belonging to a previous generation are considered stale and will be
+    /// closed when checked back in or when popped off of the set of available connections.
     generation: AtomicU32,
 
-    // The total number of connections currently in the pool. This includes connections which are
-    // currently checked out of the pool.
+    /// The total number of connections currently in the pool. This includes connections which are
+    /// currently checked out of the pool.
     total_connection_count: AtomicU32,
 
-    // The ID of the next connection created by the pool.
+    /// The ID of the next connection created by the pool.
     next_connection_id: AtomicU32,
 
-    // Connections are checked out by concurrent threads on a first-come, first-server basis. This
-    // is enforced by threads entering the wait queue when they first try to check out a connection
-    // and then blocking until they are at the front of the queue.
+    /// Connections are checked out by concurrent threads on a first-come, first-server basis. This
+    /// is enforced by threads entering the wait queue when they first try to check out a
+    /// connection and then blocking until they are at the front of the queue.
     wait_queue: WaitQueue,
 
-    // The set of available connections in the pool. Because the CMAP spec requires that
-    // connections are checked out in a FIFO manner, connections are pushed/popped from the back of
-    // the Vec.
+    /// The set of available connections in the pool. Because the CMAP spec requires that
+    /// connections are checked out in a FIFO manner, connections are pushed/popped from the back
+    /// of the Vec.
     connections: Arc<RwLock<Vec<Connection>>>,
 
-    // The event handler specified by the user to process CMAP events.
+    /// The event handler specified by the user to process CMAP events.
     #[derivative(Debug = "ignore")]
     event_handler: Option<Arc<dyn CmapEventHandler>>,
 }
@@ -137,8 +137,8 @@ impl ConnectionPool {
         pool
     }
 
-    // Emits an event from the event handler if one is present, where `emit` is a closure that uses
-    // the event handler.
+    /// Emits an event from the event handler if one is present, where `emit` is a closure that uses
+    /// the event handler.
     fn emit_event<F>(&self, emit: F)
     where
         F: FnOnce(&Arc<dyn CmapEventHandler>),
@@ -148,10 +148,10 @@ impl ConnectionPool {
         }
     }
 
-    // Checks out a connection from the pool. This method will block until this thread is at the
-    // front of the wait queue, and then will block again if no available connections are in the
-    // pool and the total number of connections is not less than the max pool size. If the method
-    // blocks for longer than `wait_queue_timeout`, a `WaitQueueTimeoutError` will be returned.
+    /// Checks out a connection from the pool. This method will block until this thread is at the
+    /// front of the wait queue, and then will block again if no available connections are in the
+    /// pool and the total number of connections is not less than the max pool size. If the method
+    /// blocks for longer than `wait_queue_timeout`, a `WaitQueueTimeoutError` will be returned.
     pub(crate) fn check_out(&self) -> Result<Connection> {
         self.emit_event(|handler| {
             let event = ConnectionCheckoutStartedEvent {
@@ -161,8 +161,8 @@ impl ConnectionPool {
             handler.handle_connection_checkout_started_event(event);
         });
 
-        let mut conn = self.check_out_helper()?;
-        conn.setup();
+        let mut conn = self.acquire_or_create_connection()?;
+        conn.setup()?;
 
         self.emit_event(|handler| {
             handler.handle_connection_checked_out_event(conn.checked_out_event());
@@ -171,9 +171,9 @@ impl ConnectionPool {
         Ok(conn)
     }
 
-    // Waits for the thread to reach the front of the wait queue, then attempts to check out a
-    // connection.
-    fn check_out_helper(&self) -> Result<Connection> {
+    /// Waits for the thread to reach the front of the wait queue, then attempts to check out a
+    /// connection.
+    fn acquire_or_create_connection(&self) -> Result<Connection> {
         let start_time = Instant::now();
         let mut handle = self.inner.wait_queue.wait_until_at_front()?;
 
@@ -198,7 +198,7 @@ impl ConnectionPool {
 
             // Create a new connection if the pool is under max size.
             if self.inner.total_connection_count.load(Ordering::SeqCst) < self.inner.max_pool_size {
-                return Ok(self.inner.create_connection());
+                return Ok(self.inner.create_connection()?);
             }
 
             // Check if the pool has a max timeout.
@@ -222,18 +222,18 @@ impl ConnectionPool {
 
                 // Wait until the either the timeout has been reached or a connection is checked
                 // into the pool.
-                handle.wait(Some(timeout - time_waiting))?;
+                handle.wait_for_available_connection(Some(timeout - time_waiting))?;
             } else {
                 // Wait until a connection has been returned to the pool.
-                handle.wait(None)?;
+                handle.wait_for_available_connection(None)?;
             }
         }
     }
 
-    // Checks a connection back into the pool and notifies the wait queue that a connection is
-    // ready. If the connection is stale, it will be closed instead of being added to the set of
-    // available connections. The time that the connection is checked in will be marked to
-    // facilitate detecting if the connection becomes idle.
+    /// Checks a connection back into the pool and notifies the wait queue that a connection is
+    /// ready. If the connection is stale, it will be closed instead of being added to the set of
+    /// available connections. The time that the connection is checked in will be marked to
+    /// facilitate detecting if the connection becomes idle.
     pub(crate) fn check_in(&self, mut conn: Connection) {
         self.emit_event(|handler| {
             handler.handle_connection_checked_in_event(conn.checked_in_event());
@@ -251,8 +251,8 @@ impl ConnectionPool {
         self.inner.wait_queue.notify_ready();
     }
 
-    // Increments the generation of the pool. Rather than eagerly removing stale connections from
-    // the pool, they are left for the background thread to clean up.
+    /// Increments the generation of the pool. Rather than eagerly removing stale connections from
+    /// the pool, they are left for the background thread to clean up.
     pub(crate) fn clear(&self) {
         self.inner.generation.fetch_add(1, Ordering::SeqCst);
 
@@ -265,9 +265,9 @@ impl ConnectionPool {
         });
     }
 
-    // Internal helper to close a connection, emit the event for it being closed, and decrement the
-    // total connection count. Any connection being closed by the pool should be closed by using
-    // this method.
+    /// Internal helper to close a connection, emit the event for it being closed, and decrement the
+    /// total connection count. Any connection being closed by the pool should be closed by using
+    /// this method.
     fn close_connection(&self, conn: Connection, reason: ConnectionClosedReason, available: bool) {
         conn.close(reason);
 
@@ -278,10 +278,10 @@ impl ConnectionPool {
 }
 
 impl ConnectionPoolInner {
-    // Helper method to create a connection and increment the total connection count. This method is
-    // defined on `ConnectionPoolInner` rather than `ConnectionPool` itself to facilitate calling it
-    // from the background thread.
-    fn create_connection(&self) -> Connection {
+    /// Helper method to create a connection and increment the total connection count. This method
+    /// is defined on `ConnectionPoolInner` rather than `ConnectionPool` itself to facilitate
+    /// calling it from the background thread.
+    fn create_connection(&self) -> Result<Connection> {
         self.total_connection_count.fetch_add(1, Ordering::SeqCst);
 
         Connection::new(
@@ -294,9 +294,9 @@ impl ConnectionPoolInner {
 }
 
 impl Drop for ConnectionPoolInner {
-    // Automatic cleanup for the connection pool. This is defined on `ConnectionPoolInner` rather
-    // than `ConnectionPool` so that it only gets run once all (non-weak) references to the
-    // `ConnectionPoolInner` are dropped.
+    /// Automatic cleanup for the connection pool. This is defined on `ConnectionPoolInner` rather
+    /// than `ConnectionPool` so that it only gets run once all (non-weak) references to the
+    /// `ConnectionPoolInner` are dropped.
     fn drop(&mut self) {
         // Remove and close each connection currently available in the pool.
         for conn in self.connections.write().unwrap().drain(..) {

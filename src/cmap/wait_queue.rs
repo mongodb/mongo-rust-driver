@@ -72,12 +72,16 @@ impl<'a> WaitQueueHandle<'a> {
 
     // Blocks on the internal conditional variable until either the conditional variable is notified
     // (which indicates that a connection is ready) or a timeout occurs.
-    pub(crate) fn wait(&mut self, timeout: Option<Duration>) -> Result<()> {
+    pub(crate) fn wait_for_available_connection(
+        &mut self,
+        timeout: Option<Duration>,
+    ) -> Result<()> {
         // Temporarily remove the mutex guard from the field so that we can pass ownership of it to
         // the conditional variable.
         let guard = self.guard.take().unwrap();
 
         if let Some(timeout) = timeout {
+            // Wait until a connection is checked back in or the timeout has elapsed.
             let (guard, result) = self.condvar.wait_timeout(guard, timeout).unwrap();
 
             if result.timed_out() {
@@ -95,6 +99,7 @@ impl<'a> WaitQueueHandle<'a> {
 
             self.guard = Some(guard);
         } else {
+            // Wait until a connection is checked back in.
             self.guard = Some(self.condvar.wait(guard).unwrap());
         }
 
@@ -165,6 +170,8 @@ impl WaitQueue {
 
             guard
         } else {
+            // Wait until all of the WaitQueueHandles in the queue in front of the current thread's
+            // are dropped.
             condvar.wait(guard).unwrap()
         };
 

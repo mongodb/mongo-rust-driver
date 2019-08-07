@@ -5,9 +5,9 @@ use std::{
 
 use super::ConnectionPoolInner;
 
-// Initializes the background thread for a connection pool. A weak reference is used to ensure that
-// the connection pool is not kept alive by the background thread; the background thread will
-// terminate if the weak reference cannot be converted to a strong reference.
+/// Initializes the background thread for a connection pool. A weak reference is used to ensure that
+/// the connection pool is not kept alive by the background thread; the background thread will
+/// terminate if the weak reference cannot be converted to a strong reference.
 pub(crate) fn start_background_thread(pool: Weak<ConnectionPoolInner>) {
     std::thread::spawn(move || loop {
         match pool.upgrade() {
@@ -21,8 +21,8 @@ pub(crate) fn start_background_thread(pool: Weak<ConnectionPoolInner>) {
     });
 }
 
-// Cleans up any stale or idle connections and adds new connections if the total number is below the
-// min pool size.
+/// Cleans up any stale or idle connections and adds new connections if the total number is below
+/// the min pool size.
 fn perform_checks(pool: Arc<ConnectionPoolInner>) {
     // We remove the perished connections first to ensure that the number of connections does not
     // dip under the min pool size due to the removals.
@@ -30,7 +30,7 @@ fn perform_checks(pool: Arc<ConnectionPoolInner>) {
     ensure_min_connections_in_pool(&pool);
 }
 
-// Iterate over the connections and remove any that are stale or idle.
+/// Iterate over the connections and remove any that are stale or idle.
 fn remove_perished_connections_from_pool(pool: &Arc<ConnectionPoolInner>) {
     let mut connections = pool.connections.write().unwrap();
     let mut i = 0;
@@ -40,22 +40,34 @@ fn remove_perished_connections_from_pool(pool: &Arc<ConnectionPoolInner>) {
             || connections[i].is_idle(pool.max_idle_time)
         {
             connections.remove(i);
+        } else {
+            i += 1;
         }
-
-        i += 1;
     }
 }
 
-// Add connections until the min pool size it met. We explicitly release the lock at the end of each
-// iteration and acquire it again during the next one to ensure that the this method doesn't block
-// other threads from acquiring connections.
+/// Add connections until the min pool size it met. We explicitly release the lock at the end of
+/// each iteration and acquire it again during the next one to ensure that the this method doesn't
+/// block other threads from acquiring connections.
 fn ensure_min_connections_in_pool(pool: &Arc<ConnectionPoolInner>) {
     if let Some(min_pool_size) = pool.min_pool_size {
         loop {
             let mut connections = pool.connections.write().unwrap();
 
             if pool.total_connection_count.load(Ordering::SeqCst) < min_pool_size {
-                connections.push(pool.create_connection());
+                // If setting up a connection fails for some reason, there's no way to return the
+                // error to the user, and we don't want to background thread to get stuck, so we try
+                // to create a new connection once more. If it fails again, we
+                // return from the function so that the background thread doesn't
+                // get stuck forever.
+                if let Ok(connection) = pool
+                    .create_connection()
+                    .or_else(|_| pool.create_connection())
+                {
+                    connections.push(connection);
+                } else {
+                    return;
+                }
             } else {
                 return;
             }
