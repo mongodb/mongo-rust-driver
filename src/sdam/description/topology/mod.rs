@@ -1,3 +1,4 @@
+mod server_selection;
 #[cfg(test)]
 mod test;
 
