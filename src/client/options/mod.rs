@@ -48,6 +48,15 @@ pub struct StreamAddress {
     pub port: Option<u16>,
 }
 
+impl Default for StreamAddress {
+    fn default() -> Self {
+        Self {
+            hostname: "localhost".into(),
+            port: None,
+        }
+    }
+}
+
 impl PartialEq for StreamAddress {
     fn eq(&self, other: &Self) -> bool {
         self.hostname == other.hostname && self.port.unwrap_or(27017) == other.port.unwrap_or(27017)
@@ -152,7 +161,7 @@ pub struct ClientOptions {
     pub heartbeat_freq: Option<Duration>,
 
     #[builder(default)]
-    pub local_threshold: Option<i64>,
+    pub local_threshold: Option<Duration>,
 
     #[builder(default)]
     pub read_concern: Option<ReadConcern>,
@@ -230,7 +239,7 @@ struct ClientOptionsParser {
     pub app_name: Option<String>,
     pub tls_options: Option<TlsOptions>,
     pub heartbeat_freq: Option<Duration>,
-    pub local_threshold: Option<i64>,
+    pub local_threshold: Option<Duration>,
     pub read_concern: Option<ReadConcern>,
     pub read_preference: Option<ReadPreference>,
     pub repl_set_name: Option<String>,
@@ -804,7 +813,9 @@ impl ClientOptionsParser {
                 let mut write_concern = self.write_concern.get_or_insert_with(Default::default);
                 write_concern.journal = Some(get_bool!(value, k));
             }
-            k @ "localthresholdms" => self.local_threshold = Some(get_duration!(value, k) as i64),
+            k @ "localthresholdms" => {
+                self.local_threshold = Some(Duration::from_millis(get_duration!(value, k)))
+            }
             "readconcernlevel" => {
                 self.read_concern = Some(ReadConcern::Custom(value.to_string()));
             }
@@ -1309,7 +1320,7 @@ mod tests {
                 write_concern: Some(write_concern),
                 repl_set_name: Some("foo".to_string()),
                 heartbeat_freq: Some(Duration::from_millis(1000)),
-                local_threshold: Some(4000),
+                local_threshold: Some(Duration::from_millis(4000)),
                 server_selection_timeout: Some(Duration::from_millis(2000)),
                 ..Default::default()
             }

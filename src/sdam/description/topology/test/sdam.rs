@@ -87,7 +87,7 @@ fn run_test(test_file: TestFile) {
             } else {
                 Ok(IsMasterReply {
                     command_response,
-                    round_trip_time: Some(1234), // Doesn't matter for tests.
+                    round_trip_time: Some(1234.0), // Doesn't matter for tests.
                 })
             };
 

@@ -6,7 +6,7 @@ use crate::{read_preference::TagSet, sdam::ServerType};
 #[derive(Debug, Clone)]
 pub(crate) struct IsMasterReply {
     pub command_response: IsMasterCommandResponse,
-    pub round_trip_time: Option<i64>,
+    pub round_trip_time: Option<f64>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -62,10 +62,10 @@ impl IsMasterCommandResponse {
         } else if self.msg.as_ref().map(String::as_str) == Some("isdbgrid") {
             ServerType::Mongos
         } else if self.set_name.is_some() {
-            if let Some(true) = self.is_master {
-                ServerType::RSPrimary
-            } else if let Some(true) = self.hidden {
+            if let Some(true) = self.hidden {
                 ServerType::RSOther
+            } else if let Some(true) = self.is_master {
+                ServerType::RSPrimary
             } else if let Some(true) = self.secondary {
                 ServerType::RSSecondary
             } else if let Some(true) = self.arbiter_only {

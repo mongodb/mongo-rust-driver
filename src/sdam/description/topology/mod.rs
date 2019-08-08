@@ -2,7 +2,10 @@ mod server_selection;
 #[cfg(test)]
 mod test;
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    time::Duration,
+};
 
 use bson::oid::ObjectId;
 use serde::Deserialize;
@@ -57,6 +60,10 @@ pub(crate) struct TopologyDescription {
     // TODO RUST-149: Session support.
     logical_session_timeout_minutes: Option<u32>,
 
+    /// The amount of latency beyond that of the secondary with the minimum latency that is
+    /// acceptable for an operation routed to a secondary.
+    local_threshold: Option<Duration>,
+
     /// The server descriptions of each member of the topology.
     servers: HashMap<StreamAddress, ServerDescription>,
 }
@@ -89,6 +96,7 @@ impl TopologyDescription {
             max_election_id: None,
             compatibility_error: None,
             logical_session_timeout_minutes: None,
+            local_threshold: options.local_threshold,
             servers,
         }
     }
@@ -182,13 +190,30 @@ impl TopologyDescription {
         self.compatibility_error.as_ref()
     }
 
+    /// Update the ServerDescription's round trip time based on the rolling average.
+    fn update_round_trip_time(&self, server_description: &mut ServerDescription) {
+        if let Some(old_rtt) = self
+            .servers
+            .get(&server_description.address)
+            .and_then(|server_desc| server_desc.average_round_trip_time_ms)
+        {
+            if let Some(new_rtt) = server_description.average_round_trip_time_ms {
+                server_description.average_round_trip_time_ms = Some(0.2 * new_rtt + 0.8 * old_rtt);
+            }
+        }
+    }
+
     /// Update the topology based on the new information about the topology contained by the
     /// ServerDescription.
-    pub(crate) fn update(&mut self, server_description: ServerDescription) -> Result<()> {
+    pub(crate) fn update(&mut self, mut server_description: ServerDescription) -> Result<()> {
         // Ignore updates from servers not currently in the cluster.
         if !self.servers.contains_key(&server_description.address) {
             return Ok(());
         }
+
+        // Update the round trip time on the server description to the weighted average as described
+        // by the spec.
+        self.update_round_trip_time(&mut server_description);
 
         // Replace the old info about the server with the new info.
         self.servers.insert(

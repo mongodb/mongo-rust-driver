@@ -67,7 +67,7 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
     }
 
     if let Some(i) = options.local_threshold.take() {
-        doc.insert("localthresholdms", i);
+        doc.insert("localthresholdms", i.as_millis() as i64);
     }
 
     if let Some(i) = options.max_idle_time.take() {
