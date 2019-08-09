@@ -170,10 +170,18 @@ impl ScramVersion {
     }
 
     /// HMAC function used as part of SCRAM authentication.
-    fn hmac(&self, key: &[u8], str: &[u8]) -> Result<Vec<u8>> {
+    fn hmac(&self, key: &[u8], input: &[u8]) -> Result<Vec<u8>> {
         match self {
-            ScramVersion::Sha1 => mac::<Hmac<Sha1>>(key, str),
-            ScramVersion::Sha256 => mac::<Hmac<Sha256>>(key, str),
+            ScramVersion::Sha1 => mac::<Hmac<Sha1>>(key, input),
+            ScramVersion::Sha256 => mac::<Hmac<Sha256>>(key, input),
+        }
+    }
+
+    /// Compute the HMAC of the given key and input and verify it matches the given signature.
+    fn hmac_verify(&self, key: &[u8], input: &[u8], signature: &[u8]) -> Result<()> {
+        match self {
+            ScramVersion::Sha1 => mac_verify::<Hmac<Sha1>>(key, input, signature),
+            ScramVersion::Sha256 => mac_verify::<Hmac<Sha256>>(key, input, signature),
         }
     }
 
@@ -246,6 +254,19 @@ fn mac<M: Mac>(key: &[u8], input: &[u8]) -> Result<Vec<u8>> {
         M::new_varkey(key).or_else(|_| Err(Error::unknown_authentication_error("SCRAM")))?;
     mac.input(input);
     Ok(mac.result().code().to_vec())
+}
+
+fn mac_verify<M: Mac>(key: &[u8], input: &[u8], signature: &[u8]) -> Result<()> {
+    let mut mac =
+        M::new_varkey(key).or_else(|_| Err(Error::unknown_authentication_error("SCRAM")))?;
+    mac.input(input);
+    match mac.verify(signature) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(Error::authentication_error(
+            "SCRAM",
+            "Authentication failed.",
+        )),
+    }
 }
 
 fn hash<D: Digest>(val: &[u8]) -> Vec<u8> {
@@ -574,18 +595,14 @@ impl ServerFinal {
         match self.body {
             ServerFinalBody::Verifier(ref body) => {
                 let server_key = scram.hmac(salted_password, b"Server Key")?;
-                let server_signature = scram.hmac(
+                let body_decoded = base64::decode(body.as_bytes())
+                    .or_else(|_| Err(Error::invalid_authentication_response("SCRAM")))?;
+
+                scram.hmac_verify(
                     server_key.as_slice(),
                     client_final.auth_message().as_bytes(),
-                )?;
-                if base64::encode(server_signature.as_slice()).as_str() == body {
-                    Ok(())
-                } else {
-                    Err(Error::authentication_error(
-                        "SCRAM",
-                        "mismatched server signatures",
-                    ))
-                }
+                    body_decoded.as_slice(),
+                )
             }
             ServerFinalBody::Error(ref err) => {
                 Err(Error::authentication_error("SCRAM", err.as_str()))
