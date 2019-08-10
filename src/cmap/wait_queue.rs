@@ -153,6 +153,8 @@ impl WaitQueue {
         }
 
         let guard = if let Some(timeout) = guard.timeout {
+            // Wait until all of the WaitQueueHandles in the queue in front of the current thread's
+            // are dropped or a timeout occurs.
             let (guard, result) = condvar.wait_timeout(guard, timeout).unwrap();
 
             if result.timed_out() {
