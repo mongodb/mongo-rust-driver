@@ -1,9 +1,9 @@
 use std::{
-    sync::{atomic::Ordering, Arc, Weak},
+    sync::{atomic::Ordering, Weak},
     time::Duration,
 };
 
-use super::ConnectionPoolInner;
+use super::{ConnectionPool, ConnectionPoolInner};
 
 /// Initializes the background thread for a connection pool. A weak reference is used to ensure that
 /// the connection pool is not kept alive by the background thread; the background thread will
@@ -11,7 +11,7 @@ use super::ConnectionPoolInner;
 pub(crate) fn start_background_thread(pool: Weak<ConnectionPoolInner>) {
     std::thread::spawn(move || loop {
         match pool.upgrade() {
-            Some(pool) => perform_checks(pool),
+            Some(pool) => perform_checks(pool.into()),
             None => return,
         };
 
@@ -23,7 +23,7 @@ pub(crate) fn start_background_thread(pool: Weak<ConnectionPoolInner>) {
 
 /// Cleans up any stale or idle connections and adds new connections if the total number is below
 /// the min pool size.
-fn perform_checks(pool: Arc<ConnectionPoolInner>) {
+fn perform_checks(pool: ConnectionPool) {
     // We remove the perished connections first to ensure that the number of connections does not
     // dip under the min pool size due to the removals.
     remove_perished_connections_from_pool(&pool);
@@ -31,13 +31,13 @@ fn perform_checks(pool: Arc<ConnectionPoolInner>) {
 }
 
 /// Iterate over the connections and remove any that are stale or idle.
-fn remove_perished_connections_from_pool(pool: &Arc<ConnectionPoolInner>) {
-    let mut connections = pool.connections.write().unwrap();
+fn remove_perished_connections_from_pool(pool: &ConnectionPool) {
+    let mut connections = pool.inner.connections.write().unwrap();
     let mut i = 0;
 
     while i < connections.len() {
-        if connections[i].is_stale(pool.generation.load(Ordering::SeqCst))
-            || connections[i].is_idle(pool.max_idle_time)
+        if connections[i].is_stale(pool.inner.generation.load(Ordering::SeqCst))
+            || connections[i].is_idle(pool.inner.max_idle_time)
         {
             connections.remove(i);
         } else {
@@ -49,24 +49,23 @@ fn remove_perished_connections_from_pool(pool: &Arc<ConnectionPoolInner>) {
 /// Add connections until the min pool size it met. We explicitly release the lock at the end of
 /// each iteration and acquire it again during the next one to ensure that the this method doesn't
 /// block other threads from acquiring connections.
-fn ensure_min_connections_in_pool(pool: &Arc<ConnectionPoolInner>) {
-    if let Some(min_pool_size) = pool.min_pool_size {
+fn ensure_min_connections_in_pool(pool: &ConnectionPool) {
+    if let Some(min_pool_size) = pool.inner.min_pool_size {
         loop {
-            let mut connections = pool.connections.write().unwrap();
+            let mut connections = pool.inner.connections.write().unwrap();
 
-            if pool.total_connection_count.load(Ordering::SeqCst) < min_pool_size {
-                // If setting up a connection fails for some reason, there's no way to return the
-                // error to the user, and we don't want to background thread to get stuck, so we try
-                // to create a new connection once more. If it fails again, we
-                // return from the function so that the background thread doesn't
-                // get stuck forever.
-                if let Ok(connection) = pool
-                    .create_connection()
-                    .or_else(|_| pool.create_connection())
-                {
-                    connections.push(connection);
-                } else {
-                    return;
+            if pool.inner.total_connection_count.load(Ordering::SeqCst) < min_pool_size {
+                match pool.create_connection() {
+                    Ok(connection) => connections.push(connection),
+                    e @ Err(_) => {
+                        pool.clear();
+
+                        // Since we had to clear the pool, we return early from this function and
+                        // put the background thread back to sleep. Next time it wakes up, the
+                        // stale connections will be closed, and the thread can try to create new
+                        // ones after that.
+                        return;
+                    }
                 }
             } else {
                 return;

@@ -36,6 +36,12 @@ pub(crate) struct ConnectionPool {
     inner: Arc<ConnectionPoolInner>,
 }
 
+impl From<Arc<ConnectionPoolInner>> for ConnectionPool {
+    fn from(inner: Arc<ConnectionPoolInner>) -> Self {
+        Self { inner }
+    }
+}
+
 /// The internal state of a connection pool.
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -198,7 +204,7 @@ impl ConnectionPool {
 
             // Create a new connection if the pool is under max size.
             if self.inner.total_connection_count.load(Ordering::SeqCst) < self.inner.max_pool_size {
-                return Ok(self.inner.create_connection()?);
+                return Ok(self.create_connection()?);
             }
 
             // Check if the pool has a max timeout.
@@ -275,21 +281,25 @@ impl ConnectionPool {
             .total_connection_count
             .fetch_sub(1, Ordering::SeqCst);
     }
-}
 
-impl ConnectionPoolInner {
-    /// Helper method to create a connection and increment the total connection count. This method
-    /// is defined on `ConnectionPoolInner` rather than `ConnectionPool` itself to facilitate
-    /// calling it from the background thread.
+    /// Helper method to create a connection and increment the total connection count.
     fn create_connection(&self) -> Result<Connection> {
-        self.total_connection_count.fetch_add(1, Ordering::SeqCst);
+        self.inner
+            .total_connection_count
+            .fetch_add(1, Ordering::SeqCst);
 
-        Connection::new(
-            self.next_connection_id.fetch_add(1, Ordering::SeqCst),
-            &self.address,
-            self.generation.load(Ordering::SeqCst),
-            self.event_handler.clone(),
-        )
+        let conn_result = Connection::new(
+            self.inner.next_connection_id.fetch_add(1, Ordering::SeqCst),
+            &self.inner.address,
+            self.inner.generation.load(Ordering::SeqCst),
+            self.inner.event_handler.clone(),
+        );
+
+        if conn_result.is_err() {
+            self.clear();
+        }
+
+        conn_result
     }
 }
 
