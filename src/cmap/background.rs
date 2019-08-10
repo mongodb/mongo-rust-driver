@@ -58,8 +58,6 @@ fn ensure_min_connections_in_pool(pool: &ConnectionPool) {
                 match pool.create_connection() {
                     Ok(connection) => connections.push(connection),
                     e @ Err(_) => {
-                        pool.clear();
-
                         // Since we had to clear the pool, we return early from this function and
                         // put the background thread back to sleep. Next time it wakes up, the
                         // stale connections will be closed, and the thread can try to create new
