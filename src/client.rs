@@ -17,7 +17,7 @@ use crate::{
 /// so it can safely be shared across threads. For example:
 ///
 /// ```rust
-/// 
+///
 /// # use mongodb::{Client, error::Result};
 ///
 /// # fn start_workers() -> Result<()> {
@@ -51,7 +51,7 @@ struct ClientInner {
     read_concern: Option<ReadConcern>,
     write_concern: Option<WriteConcern>,
     #[derivative(Debug = "ignore")]
-    command_event_handler: Option<Box<CommandEventHandler>>,
+    command_event_handler: Option<Box<dyn CommandEventHandler>>,
 }
 
 impl Client {
