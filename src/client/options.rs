@@ -22,8 +22,8 @@ const DEFAULT_PORT: u16 = 27017;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Host {
-    hostname: String,
-    port: Option<u16>,
+    pub hostname: String,
+    pub port: Option<u16>,
 }
 
 impl Host {
@@ -76,7 +76,7 @@ impl fmt::Display for Host {
     }
 }
 
-#[derive(Debug, Default, PartialEq, TypedBuilder)]
+#[derive(Debug, PartialEq, TypedBuilder)]
 pub struct ClientOptions {
     #[builder(default_code = "vec![ Host {
         hostname: \"localhost\".to_string(),
@@ -107,6 +107,24 @@ pub struct ClientOptions {
 
     #[builder(default)]
     pub server_selection_timeout: Option<Duration>,
+
+    #[builder(default)]
+    pub max_pool_size: Option<u32>,
+
+    #[builder(default)]
+    pub min_pool_size: Option<u32>,
+
+    #[builder(default)]
+    pub max_idle_time: Option<Duration>,
+
+    #[builder(default)]
+    pub wait_queue_timeout: Option<Duration>,
+}
+
+impl Default for ClientOptions {
+    fn default() -> Self {
+        Self::builder().build()
+    }
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -120,10 +138,14 @@ struct ClientOptionsParser {
     pub repl_set_name: Option<String>,
     pub write_concern: Option<WriteConcern>,
     pub server_selection_timeout: Option<Duration>,
+    pub max_pool_size: Option<u32>,
+    pub min_pool_size: Option<u32>,
+    pub max_idle_time: Option<Duration>,
+    pub wait_queue_timeout: Option<Duration>,
     read_preference_tags: Option<Vec<TagSet>>,
 }
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct TlsOptions {
     pub allow_invalid_certificates: Option<bool>,
     pub ca_file_path: Option<String>,
@@ -205,6 +227,10 @@ impl From<ClientOptionsParser> for ClientOptions {
             read_preference: parser.read_preference,
             repl_set_name: parser.repl_set_name,
             write_concern: parser.write_concern,
+            max_pool_size: parser.max_pool_size,
+            min_pool_size: parser.min_pool_size,
+            max_idle_time: parser.max_idle_time,
+            wait_queue_timeout: parser.wait_queue_timeout,
             server_selection_timeout: parser.server_selection_timeout,
         }
     }
@@ -357,6 +383,18 @@ impl ClientOptionsParser {
             };
         }
 
+        macro_rules! get_u32 {
+            ($value:expr, $option:expr) => {
+                match u32::from_str_radix(value, 10) {
+                    Ok(u) => u,
+                    Err(_) => bail!(ErrorKind::ArgumentError(format!(
+                        "connection string `{}` argument must be a positive integer",
+                        $option,
+                    ))),
+                }
+            };
+        }
+
         match key {
             k @ "heartbeatfrequencyms" => {
                 self.heartbeat_freq = Some(Duration::from_millis(get_ms!(value, k)));
@@ -368,6 +406,15 @@ impl ClientOptionsParser {
             k @ "localthresholdms" => self.local_threshold = Some(get_ms!(value, k) as i64),
             "readconcernlevel" => {
                 self.read_concern = Some(ReadConcern::Custom(value.to_string()));
+            }
+            k @ "maxidletime" => {
+                self.max_idle_time = Some(Duration::from_millis(get_ms!(value, k)));
+            }
+            k @ "maxpoolsize" => {
+                self.max_pool_size = Some(get_u32!(value, k));
+            }
+            k @ "minpoolsize" => {
+                self.max_pool_size = Some(get_u32!(value, k));
             }
             "readpreference" => {
                 self.read_preference = Some(match &value.to_lowercase()[..] {
@@ -465,6 +512,9 @@ impl ClientOptionsParser {
                         write_concern.w = Some(Acknowledgment::from(value.to_string()));
                     }
                 };
+            }
+            k @ "waitqueuetimeoutms" => {
+                self.wait_queue_timeout = Some(Duration::from_millis(get_ms!(value, k)));
             }
             k @ "wtimeoutms" => {
                 let write_concern = self.write_concern.get_or_insert_with(Default::default);

@@ -1,0 +1,32 @@
+use std::net::TcpStream;
+
+use bson::{bson, doc, Bson};
+
+use super::message::{Message, MessageFlags, MessageSection};
+use crate::{options::Host, test::CLIENT_OPTIONS};
+
+#[test]
+fn basic() {
+    let message = Message {
+        response_to: 0,
+        flags: MessageFlags::empty(),
+        sections: vec![MessageSection::Document(
+            doc! { "isMaster": 1, "$db": "admin" },
+        )],
+        checksum: None,
+    };
+
+    let Host { ref hostname, port } = CLIENT_OPTIONS.hosts[0];
+
+    let mut stream = TcpStream::connect((&hostname[..], port.unwrap_or(27017))).unwrap();
+    message.write_to(&mut stream).unwrap();
+
+    let reply = Message::read_from(&mut stream).unwrap();
+
+    let response_doc = match reply.sections.into_iter().next().unwrap() {
+        MessageSection::Document(doc) => doc,
+        MessageSection::Sequence { documents, .. } => documents.into_iter().next().unwrap(),
+    };
+
+    assert_eq!(response_doc.get("ok"), Some(&Bson::FloatingPoint(1.0)));
+}

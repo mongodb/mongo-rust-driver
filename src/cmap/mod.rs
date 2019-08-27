@@ -312,7 +312,7 @@ impl ConnectionPool {
             self.inner.next_connection_id.fetch_add(1, Ordering::SeqCst),
             &self.inner.address,
             self.inner.generation.load(Ordering::SeqCst),
-        );
+        )?;
 
         self.emit_event(|handler| {
             handler.handle_connection_created_event(connection.created_event())

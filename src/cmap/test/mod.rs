@@ -1,5 +1,6 @@
 mod event;
 mod file;
+mod integration;
 
 use std::{
     collections::HashMap,
@@ -17,6 +18,7 @@ use self::{
 use crate::{
     cmap::{Connection, ConnectionPool},
     error::{Error, Result},
+    test::CLIENT_OPTIONS,
 };
 
 const TEST_DESCRIPTIONS_TO_SKIP: &[&str] = &[
@@ -69,15 +71,8 @@ impl Executor {
             .collect();
         let error = test_file.error;
 
-        // The CMAP spec tests use the placeholder value `42` to indicate that the presence of the
-        // value should be asserted without any constraints on the value itself. To facilitate
-        // deserializing the events from the spec test JSON files the event types we've defined, we
-        // substitute `"address": 42` with `"address": "42"` in the JSON files (since the address
-        // needs to be a string to deserialize correctly). Because of this, we use the address
-        // `"42"` for the connection pool we create for the tests as well, which allows us to
-        // naively assert equality between the expected events and the events that occur.
         let pool = ConnectionPool::new(
-            "42",
+            &CLIENT_OPTIONS.hosts[0].to_string(),
             test_file.pool_options,
             Some(Box::new(handler.clone())),
         );
@@ -213,39 +208,42 @@ impl Operation {
 
 fn assert_events_match(actual: &Event, expected: &Event) {
     match (actual, expected) {
-        (Event::ConnectionPoolCreated(actual), Event::ConnectionPoolCreated(expected)) => {
+        (Event::ConnectionPoolCreated(actual), Event::ConnectionPoolCreated(ref expected)) => {
             if let Some(ref expected_options) = expected.options {
                 assert_eq!(actual.options.as_ref(), Some(expected_options));
             }
         }
-        (Event::ConnectionCreated(actual), Event::ConnectionCreated(expected)) => {
+        (Event::ConnectionCreated(actual), Event::ConnectionCreated(ref expected)) => {
             if expected.connection_id != 42 {
                 assert_eq!(actual.connection_id, expected.connection_id);
             }
         }
-        (Event::ConnectionReady(actual), Event::ConnectionReady(expected)) => {
+        (Event::ConnectionReady(actual), Event::ConnectionReady(ref expected)) => {
             if expected.connection_id != 42 {
                 assert_eq!(actual.connection_id, expected.connection_id);
             }
         }
-        (Event::ConnectionClosed(actual), Event::ConnectionClosed(expected)) => {
+        (Event::ConnectionClosed(actual), Event::ConnectionClosed(ref expected)) => {
             assert_eq!(actual.reason, expected.reason);
 
             if expected.connection_id != 42 {
                 assert_eq!(actual.connection_id, expected.connection_id);
             }
         }
-        (Event::ConnectionCheckedOut(actual), Event::ConnectionCheckedOut(expected)) => {
+        (Event::ConnectionCheckedOut(actual), Event::ConnectionCheckedOut(ref expected)) => {
             if expected.connection_id != 42 {
                 assert_eq!(actual.connection_id, expected.connection_id);
             }
         }
-        (Event::ConnectionCheckedIn(actual), Event::ConnectionCheckedIn(expected)) => {
+        (Event::ConnectionCheckedIn(actual), Event::ConnectionCheckedIn(ref expected)) => {
             if expected.connection_id != 42 {
                 assert_eq!(actual.connection_id, expected.connection_id);
             }
         }
-        (Event::ConnectionCheckOutFailed(actual), Event::ConnectionCheckOutFailed(expected)) => {
+        (
+            Event::ConnectionCheckOutFailed(actual),
+            Event::ConnectionCheckOutFailed(ref expected),
+        ) => {
             assert_eq!(actual.reason, expected.reason);
         }
         (Event::ConnectionCheckOutStarted(_), Event::ConnectionCheckOutStarted(_)) => {}
