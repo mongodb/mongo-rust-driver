@@ -2,6 +2,8 @@ use std::fmt;
 
 error_chain! {
     foreign_links {
+        BsonDecode(bson::DecoderError);
+        BsonEncode(bson::EncoderError);
         Io(std::io::Error);
     }
 

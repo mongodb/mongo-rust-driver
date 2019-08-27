@@ -2,6 +2,8 @@ use std::time::Duration;
 
 use serde::{Deserialize, Deserializer};
 
+use crate::options::ClientOptions;
+
 /// Contains the options for creating a connection pool. While these options are specified at the
 /// client-level, `ConnectionPoolOptions` is exposed for the purpose of CMAP event handling.
 #[derive(Debug, Deserialize, TypedBuilder, PartialEq)]
@@ -51,4 +53,15 @@ where
 {
     let millis = Option::<u64>::deserialize(deserializer)?;
     Ok(millis.map(Duration::from_millis))
+}
+
+impl ConnectionPoolOptions {
+    pub(super) fn from_client_options(options: &ClientOptions) -> Self {
+        Self::builder()
+            .max_pool_size(options.max_pool_size)
+            .min_pool_size(options.min_pool_size)
+            .max_idle_time(options.max_idle_time)
+            .wait_queue_timeout(options.wait_queue_timeout)
+            .build()
+    }
 }

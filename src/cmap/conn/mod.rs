@@ -1,5 +1,11 @@
+mod stream;
+mod wire;
+
 use std::time::{Duration, Instant};
 
+use bson::Document;
+
+use self::{stream::Stream, wire::Message};
 use super::ConnectionPool;
 use crate::{
     error::Result,
@@ -9,6 +15,20 @@ use crate::{
     },
 };
 
+/// User-facing information about a connection to the database.
+#[derive(Clone, Debug)]
+pub struct ConnectionInfo {
+    /// A driver-generated identifier that uniquely identifies the connection.
+    pub id: u32,
+
+    /// The hostname of the address of the server that the connection is connected to.
+    pub hostname: String,
+
+    /// The port of the address of the server that the connection is connected to.
+    pub port: Option<u16>,
+}
+
+/// A wrapper around Stream that contains all the CMAP information needed to maintain a connection.
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub(crate) struct Connection {
@@ -25,34 +45,38 @@ pub(crate) struct Connection {
     /// checked into the pool, this will be None (to avoid the pool being kept alive indefinitely
     /// by a reference cycle).
     pub(super) pool: Option<ConnectionPool>,
+
+    stream: Stream,
 }
 
 impl Connection {
     /// Constructs a new connection.
-    pub(super) fn new(id: u32, address: &str, generation: u32) -> Self {
-        Self {
+    pub(super) fn new(id: u32, address: &str, generation: u32) -> Result<Self> {
+        Ok(Self {
             id,
             address: address.into(),
             generation,
             pool: None,
             established: false,
             ready_and_available_time: None,
-        }
+            // TODO RUST-203: Create TLS streams as applicable.
+            stream: Stream::connect(address)?,
+        })
     }
 
-    /// Returning a connection to its pool when it's dropped is not achievable directly due to
-    /// `drop` only taking a mutable reference to `self` rather than ownership. `duplicate` lets
-    /// us get around this by creating a new connection that's identical to the existing one and
-    /// adding that one back to the pool (which doesn't conflict with the original connection
-    /// due to it being dropped immediately afterwards).
-    fn duplicate(&self) -> Self {
+    /// In order to check a connection back into the pool when it's dropped, we need to be able to
+    /// replace it with something. The `null` method facilitates this by creating a dummy connection
+    /// which can be passed to `std::mem::replace` to be dropped in place of the original
+    /// connection.
+    fn null() -> Self {
         Self {
-            id: self.id,
-            address: self.address.clone(),
-            generation: self.generation,
+            id: 0,
+            address: String::new(),
+            generation: 0,
             pool: None,
-            established: self.established,
-            ready_and_available_time: self.ready_and_available_time,
+            established: true,
+            ready_and_available_time: None,
+            stream: Stream::Null,
         }
     }
 
@@ -130,25 +154,26 @@ impl Connection {
             reason,
         }
     }
+
+    /// Executes a command specified by `document` as an OP_MSG and returns a single-document
+    /// response.
+    ///
+    /// This API will likely be changed due to the operations layer implementation in RUST-183.
+    pub(crate) fn execute_operation(&mut self, document: Document) -> Result<Document> {
+        let message = Message::from_document(document);
+        message.write_to(&mut self.stream)?;
+
+        let response = Message::read_from(&mut self.stream)?;
+        let document = response.single_document_response()?;
+
+        Ok(document)
+    }
 }
 
 impl Drop for Connection {
     fn drop(&mut self) {
-        if let Some(ref pool) = self.pool.take() {
-            pool.check_in(self.duplicate());
+        if let Some(pool) = self.pool.take() {
+            pool.check_in(std::mem::replace(self, Self::null()));
         }
     }
-}
-
-/// User-facing information about a connection to the database.
-#[derive(Clone, Debug)]
-pub struct ConnectionInfo {
-    /// A driver-generated identifier that uniquely identifies the connection.
-    pub id: u32,
-
-    /// The hostname of the address of the server that the connection is connected to.
-    pub hostname: String,
-
-    /// The port of the address of the server that the connection is connected to.
-    pub port: Option<u16>,
 }
