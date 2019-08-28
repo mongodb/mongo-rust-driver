@@ -18,17 +18,20 @@ where
         .chain(spec.iter())
         .collect();
 
-    for entry in fs::read_dir(&base_path).unwrap() {
-        let test_file = entry.unwrap();
+    let mut entries: Vec<_> = fs::read_dir(&base_path).unwrap().map(Result::unwrap).collect();
+    entries.sort_unstable_by_key(|entry| entry.path());
 
-        if !test_file.file_type().unwrap().is_file() {
+    for entry in entries {
+        if !entry.file_type().unwrap().is_file() {
             continue;
         }
 
-        let test_file_path = PathBuf::from(test_file.file_name());
+        let test_file_path = PathBuf::from(entry.file_name());
         if test_file_path.extension().and_then(OsStr::to_str) != Some("json") {
             continue;
         }
+
+        dbg!(&test_file_path);
 
         let test_file_full_path = base_path.join(&test_file_path);
         let json: Value =

@@ -241,7 +241,9 @@ fn assert_events_match(actual: &Event, expected: &Event) {
         (Event::ConnectionCheckOutFailed(actual), Event::ConnectionCheckOutFailed(expected)) => {
             assert_eq!(actual.reason, expected.reason);
         }
-        (Event::ConnectionCheckOutStarted(actual), Event::ConnectionCheckOutStarted(expected)) => {}
+        (Event::ConnectionCheckOutStarted(_), Event::ConnectionCheckOutStarted(_)) => {}
+        (Event::ConnectionPoolCleared(_), Event::ConnectionPoolCleared(_)) => {}
+        (Event::ConnectionPoolClosed(_), Event::ConnectionPoolClosed(_)) => {}
         (actual, expected) => assert_eq!(actual, expected),
     }
 }

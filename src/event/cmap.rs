@@ -6,7 +6,7 @@ pub use crate::cmap::options::ConnectionPoolOptions;
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct PoolCreatedEvent {
     /// The address of the server that the pool's connections will connect to.
-    #[serde(default)]
+    #[serde(skip)]
     pub address: String,
 
     /// The options used for the pool.
@@ -17,7 +17,7 @@ pub struct PoolCreatedEvent {
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct PoolClearedEvent {
     /// The address of the server that the pool's connections will connect to.
-    #[serde(default)]
+    #[serde(skip)]
     pub address: String,
 }
 
@@ -25,7 +25,7 @@ pub struct PoolClearedEvent {
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct PoolClosedEvent {
     /// The address of the server that the pool's connections were connected to.
-    #[serde(default)]
+    #[serde(skip)]
     pub address: String,
 }
 
@@ -96,7 +96,7 @@ pub enum ConnectionClosedReason {
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct ConnectionCheckoutStartedEvent {
     /// The address of the server that the connection will connect to.
-    #[serde(default)]
+    #[serde(skip)]
     pub address: String,
 }
 
@@ -104,7 +104,7 @@ pub struct ConnectionCheckoutStartedEvent {
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct ConnectionCheckoutFailedEvent {
     /// The address of the server that the connection would have connected to.
-    #[serde(default)]
+    #[serde(skip)]
     pub address: String,
 
     /// The reason a connection was unable to be checked out.
@@ -128,7 +128,7 @@ pub enum ConnectionCheckoutFailedReason {
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionCheckedOutEvent {
     /// The address of the server that the connection will connect to.
-    #[serde(default)]
+    #[serde(skip)]
     pub address: String,
 
     /// The unique ID of the connection. This is not used for anything internally, but can be used
@@ -142,7 +142,7 @@ pub struct ConnectionCheckedOutEvent {
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionCheckedInEvent {
     /// The address of the server that the connection was connected to.
-    #[serde(default)]
+    #[serde(skip)]
     pub address: String,
 
     /// The unique ID of the connection. This is not used for anything internally, but can be used

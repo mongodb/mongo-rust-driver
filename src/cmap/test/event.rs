@@ -105,10 +105,7 @@ impl Event {
 
 #[derive(Debug, Deserialize)]
 struct PoolCreatedEventHelper {
-    #[serde(default)]
-    pub address: String,
-
-    #[serde(default)]
+   #[serde(default)]
     pub options: Option<PoolOptionsHelper>,
 }
 
@@ -144,16 +141,13 @@ where
     };
 
     Ok(PoolCreatedEvent {
-        address: helper.address,
+        address: String::new(),
         options,
     })
 }
 
 #[derive(Debug, Deserialize)]
 struct ConnectionCheckoutFailedHelper {
-    #[serde(default)]
-    pub address: String,
-
     pub reason: CheckoutFailedReasonHelper,
 }
 
@@ -186,7 +180,7 @@ where
     };
 
     Ok(ConnectionCheckoutFailedEvent {
-        address: helper.address,
+        address: String::new(),
         reason,
     })
 }
