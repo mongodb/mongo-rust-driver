@@ -105,7 +105,7 @@ impl Event {
 
 #[derive(Debug, Deserialize)]
 struct PoolCreatedEventHelper {
-   #[serde(default)]
+    #[serde(default)]
     pub options: Option<PoolOptionsHelper>,
 }
 

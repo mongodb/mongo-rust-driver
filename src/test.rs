@@ -18,7 +18,10 @@ where
         .chain(spec.iter())
         .collect();
 
-    let mut entries: Vec<_> = fs::read_dir(&base_path).unwrap().map(Result::unwrap).collect();
+    let mut entries: Vec<_> = fs::read_dir(&base_path)
+        .unwrap()
+        .map(Result::unwrap)
+        .collect();
     entries.sort_unstable_by_key(|entry| entry.path());
 
     for entry in entries {
