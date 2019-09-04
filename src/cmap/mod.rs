@@ -24,6 +24,8 @@ use crate::{
         CmapEventHandler, ConnectionCheckoutFailedEvent, ConnectionCheckoutFailedReason,
         ConnectionCheckoutStartedEvent, ConnectionClosedReason, PoolClearedEvent, PoolCreatedEvent,
     },
+    options::StreamAddress,
+    options::TlsOptions,
 };
 
 const DEFAULT_MAX_POOL_SIZE: u32 = 100;
@@ -45,8 +47,8 @@ impl From<Arc<ConnectionPoolInner>> for ConnectionPool {
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub(crate) struct ConnectionPoolInner {
-    /// The address of the server the pool's connections will connect to.
-    address: String,
+    /// The address the pool's connections will connect to.
+    address: StreamAddress,
 
     /// If a checkout operation takes longer than `wait_queue_timeout`, the pool will return an
     /// error. If `wait_queue_timeout` is `None`, then the checkout operation will not time out.
@@ -67,6 +69,10 @@ pub(crate) struct ConnectionPoolInner {
     /// connections are in the pool, the background thread will create more connections and add
     /// them to the pool.
     min_pool_size: Option<u32>,
+
+    /// The TLS options to use for the connections. If `tls_options` is None, then TLS will not be
+    /// used to connect to the server.
+    tls_options: Option<TlsOptions>,
 
     /// The current generation of the pool. The generation is incremented whenever the pool is
     /// cleared. Connections belonging to a previous generation are considered stale and will be
@@ -97,8 +103,8 @@ pub(crate) struct ConnectionPoolInner {
 
 impl ConnectionPool {
     pub(crate) fn new(
-        address: &str,
-        options: Option<ConnectionPoolOptions>,
+        address: StreamAddress,
+        mut options: Option<ConnectionPoolOptions>,
         event_handler: Option<Box<dyn CmapEventHandler>>,
     ) -> Self {
         // Get the individual options from `options`.
@@ -109,17 +115,19 @@ impl ConnectionPool {
             .and_then(|opts| opts.max_pool_size)
             .unwrap_or(DEFAULT_MAX_POOL_SIZE);
         let min_pool_size = options.as_ref().and_then(|opts| opts.min_pool_size);
+        let tls_options = options.as_mut().and_then(|opts| opts.tls_options.take());
 
         let inner = ConnectionPoolInner {
-            address: address.into(),
+            address: address.clone(),
             wait_queue_timeout,
             max_idle_time,
             max_pool_size,
             min_pool_size,
+            tls_options,
             generation: AtomicU32::new(0),
             total_connection_count: AtomicU32::new(0),
             next_connection_id: AtomicU32::new(1),
-            wait_queue: WaitQueue::new(address, wait_queue_timeout),
+            wait_queue: WaitQueue::new(address.clone(), wait_queue_timeout),
             connections: Default::default(),
             event_handler,
         };
@@ -129,10 +137,7 @@ impl ConnectionPool {
         };
 
         pool.emit_event(move |handler| {
-            let event = PoolCreatedEvent {
-                address: address.into(),
-                options,
-            };
+            let event = PoolCreatedEvent { address, options };
 
             handler.handle_pool_created_event(event);
         });
@@ -310,8 +315,9 @@ impl ConnectionPool {
 
         let mut connection = Connection::new(
             self.inner.next_connection_id.fetch_add(1, Ordering::SeqCst),
-            &self.inner.address,
+            self.inner.address.clone(),
             self.inner.generation.load(Ordering::SeqCst),
+            self.inner.tls_options.clone(),
         )?;
 
         self.emit_event(|handler| {
@@ -365,7 +371,7 @@ impl Drop for ConnectionPoolInner {
             self.emit_event(|handler| {
                 handler.handle_connection_closed_event(
                     conn.closed_event(ConnectionClosedReason::PoolClosed),
-                )
+                );
             });
         }
     }

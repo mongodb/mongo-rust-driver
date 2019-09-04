@@ -1,9 +1,12 @@
 use std::fmt;
 
+use crate::options::StreamAddress;
+
 error_chain! {
     foreign_links {
         BsonDecode(bson::DecoderError);
         BsonEncode(bson::EncoderError);
+        DnsName(webpki::InvalidDNSNameError);
         Io(std::io::Error);
     }
 
@@ -55,7 +58,7 @@ error_chain! {
             display("An error occurred during server selection: {}", msg)
         }
 
-        WaitQueueTimeoutError(address: String) {
+        WaitQueueTimeoutError(address: StreamAddress) {
             description("Timed out while checking out a connection from connection pool")
             display("Timed out while checking out a connection from connection pool with address {}", address)
         }

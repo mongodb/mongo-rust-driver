@@ -68,6 +68,7 @@ functions:
               export MONGO_ORCHESTRATION_HOME="$MONGO_ORCHESTRATION_HOME"
               export MONGODB_BINARIES="$MONGODB_BINARIES"
               export PROJECT_DIRECTORY="$PROJECT_DIRECTORY"
+              export DRIVERS_TOOLS_X509="$DRIVERS_TOOLS/.evergreen/x509gen"
 
               export TMPDIR="$MONGO_ORCHESTRATION_HOME/db"
               export PATH="$MONGODB_BINARIES:$PATH"
@@ -122,7 +123,11 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          MONGODB_URI="${MONGODB_URI}" .evergreen/run-tests.sh
+          export MONGODB_URI="${MONGODB_URI}"
+          export SSL="${SSL}"
+          . .evergreen/generate-uri.sh
+
+          .evergreen/run-tests.sh
 
   "check rustfmt":
     - command: shell.exec
@@ -333,18 +338,42 @@ axes:
         variables:
            TOPOLOGY: "sharded_cluster"
 
-  - id: "auth-and-ssl"
-    display_name: Authentication and SSL
+  # Note that drivers-evergreen-tools expects `SSL` as the environmental
+  # variable, not `TLS`, so we have to use that for the actual value used in the
+  # script; we use `TLS` for the metadata that isn't used by the actual shell
+  # scripts.
+  - id: "auth-and-tls"
+    display_name: Authentication and TLS
     values:
-      - id: "auth-and-ssl"
-        display_name: Auth SSL
+      - id: "auth-and-tls"
+        display_name: Auth TLS
         variables:
            AUTH: "auth"
            SSL: "ssl"
-      - id: "noauth-and-nossl"
-        display_name: NoAuth NoSSL
+      - id: "noauth-and-notls"
+        display_name: NoAuth NoTLS
         variables:
            AUTH: "noauth"
+           SSL: "nossl"
+
+  # This is a temporary axis used to test TLS until we've ported auth from
+  # `unreviewed-impl`, after which point whe should switch the matrix to use
+  # `auth-and-tls` and delete this.
+  #
+  # Note that drivers-evergreen-tools expects `SSL` as the environmental
+  # variable, not `TLS`, so we have to use that for the actual value used in the
+  # script; we use `TLS` for the metadata that isn't used by the actual shell
+  # scripts.
+  - id: "tls"
+    display_name: TLS
+    values:
+      - id: "tls"
+        display_name: TLS
+        variables:
+           SSL: "ssl"
+      - id: "notls"
+        display_name: NoTLS
+        variables:
            SSL: "nossl"
 
   - id: "os"
@@ -362,7 +391,8 @@ buildvariants:
   matrix_name: "tests"
   matrix_spec:
     os: "*"
-  display_name: "${os}"
+    tls: "*"
+  display_name: "${os} ${tls}"
   tasks:
      - ".latest"
      - ".4.0"
