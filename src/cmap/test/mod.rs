@@ -72,7 +72,7 @@ impl Executor {
         let error = test_file.error;
 
         let pool = ConnectionPool::new(
-            &CLIENT_OPTIONS.hosts[0].to_string(),
+            CLIENT_OPTIONS.hosts[0].clone(),
             test_file.pool_options,
             Some(Box::new(handler.clone())),
         );

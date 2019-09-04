@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Deserializer};
 
-use crate::options::ClientOptions;
+use crate::options::{ClientOptions, TlsOptions};
 
 /// Contains the options for creating a connection pool. While these options are specified at the
 /// client-level, `ConnectionPoolOptions` is exposed for the purpose of CMAP event handling.
@@ -43,6 +43,14 @@ pub struct ConnectionPoolOptions {
     #[serde(default)]
     #[serde(deserialize_with = "self::deserialize_duration_from_u64_millis")]
     pub wait_queue_timeout: Option<Duration>,
+
+    /// The options specifying how a TLS connection should be configured. If `tls_options` is
+    /// `None`, then TLS will not be used for the connections.
+    ///
+    /// The default is not to use TLS for connections.
+    #[builder(default)]
+    #[serde(skip)]
+    pub tls_options: Option<TlsOptions>,
 }
 
 fn deserialize_duration_from_u64_millis<'de, D>(
@@ -62,6 +70,7 @@ impl ConnectionPoolOptions {
             .min_pool_size(options.min_pool_size)
             .max_idle_time(options.max_idle_time)
             .wait_queue_timeout(options.wait_queue_timeout)
+            .tls_options(options.tls_options.clone())
             .build()
     }
 }

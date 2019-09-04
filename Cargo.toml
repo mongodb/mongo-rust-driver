@@ -8,7 +8,7 @@ version = "0.1.0"
 [dependencies]
 bson = "0.13.0"
 derivative = "1.0.2"
-webpki = "0.19.1"
+webpki = "0.21.0"
 percent-encoding = "2.0.0"
 error-chain = "0.12.1"
 typed-builder = "0.3.0"
@@ -17,7 +17,7 @@ lazy_static = "1.4.0"
 bitflags = "1.1.0"
 
 [dependencies.rustls]
-version = "0.15.2"
+version = "0.16.0"
 features = ["dangerous_configuration"]
 
 [dependencies.serde]

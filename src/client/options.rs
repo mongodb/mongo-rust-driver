@@ -21,12 +21,12 @@ use crate::{
 const DEFAULT_PORT: u16 = 27017;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Host {
+pub struct StreamAddress {
     pub hostname: String,
     pub port: Option<u16>,
 }
 
-impl Host {
+impl StreamAddress {
     pub fn parse(address: &str) -> Result<Self> {
         let mut parts = address.split(':');
 
@@ -50,7 +50,7 @@ impl Host {
             None => None,
         };
 
-        Ok(Self {
+        Ok(StreamAddress {
             hostname: hostname.to_string(),
             port,
         })
@@ -65,7 +65,7 @@ impl Host {
     }
 }
 
-impl fmt::Display for Host {
+impl fmt::Display for StreamAddress {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(
             fmt,
@@ -78,11 +78,11 @@ impl fmt::Display for Host {
 
 #[derive(Debug, PartialEq, TypedBuilder)]
 pub struct ClientOptions {
-    #[builder(default_code = "vec![ Host {
+    #[builder(default_code = "vec![ StreamAddress {
         hostname: \"localhost\".to_string(),
         port: Some(27017),
     }]")]
-    pub hosts: Vec<Host>,
+    pub hosts: Vec<StreamAddress>,
 
     #[builder(default)]
     pub tls_options: Option<TlsOptions>,
@@ -129,7 +129,7 @@ impl Default for ClientOptions {
 
 #[derive(Debug, Default, PartialEq)]
 struct ClientOptionsParser {
-    pub hosts: Vec<Host>,
+    pub hosts: Vec<StreamAddress>,
     pub tls_options: Option<TlsOptions>,
     pub heartbeat_freq: Option<Duration>,
     pub local_threshold: Option<i64>,
@@ -293,7 +293,7 @@ impl ClientOptionsParser {
                     Some(p)
                 };
 
-                Ok(Host {
+                Ok(StreamAddress {
                     hostname: hostname.to_lowercase(),
                     port,
                 })
@@ -531,7 +531,7 @@ impl ClientOptionsParser {
 mod tests {
     use std::time::Duration;
 
-    use super::{ClientOptions, Host};
+    use super::{ClientOptions, StreamAddress};
     use crate::{
         concern::{Acknowledgment, ReadConcern, WriteConcern},
         read_preference::ReadPreference,
@@ -554,8 +554,8 @@ mod tests {
         }
     }
 
-    fn host_without_port(hostname: &str) -> Host {
-        Host {
+    fn host_without_port(hostname: &str) -> StreamAddress {
+        StreamAddress {
             hostname: hostname.to_string(),
             port: None,
         }
@@ -613,7 +613,7 @@ mod tests {
         assert_eq!(
             ClientOptions::parse("mongodb://localhost:27017").unwrap(),
             ClientOptions {
-                hosts: vec![Host {
+                hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
                 }],
@@ -627,7 +627,7 @@ mod tests {
         assert_eq!(
             ClientOptions::parse("mongodb://localhost:27017/").unwrap(),
             ClientOptions {
-                hosts: vec![Host {
+                hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
                 }],
@@ -641,7 +641,7 @@ mod tests {
         assert_eq!(
             ClientOptions::parse("mongodb://localhost:27017/?readConcernLevel=foo").unwrap(),
             ClientOptions {
-                hosts: vec![Host {
+                hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
                 }],
@@ -663,7 +663,7 @@ mod tests {
         assert_eq!(
             ClientOptions::parse("mongodb://localhost:27017/?w=1").unwrap(),
             ClientOptions {
-                hosts: vec![Host {
+                hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
                 }],
@@ -682,7 +682,7 @@ mod tests {
         assert_eq!(
             ClientOptions::parse("mongodb://localhost:27017/?w=foo").unwrap(),
             ClientOptions {
-                hosts: vec![Host {
+                hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
                 }],
@@ -704,7 +704,7 @@ mod tests {
         assert_eq!(
             ClientOptions::parse("mongodb://localhost:27017/?journal=true").unwrap(),
             ClientOptions {
-                hosts: vec![Host {
+                hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
                 }],
@@ -733,7 +733,7 @@ mod tests {
         assert_eq!(
             ClientOptions::parse("mongodb://localhost:27017/?wtimeoutMS=27").unwrap(),
             ClientOptions {
-                hosts: vec![Host {
+                hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
                 }],
@@ -757,7 +757,7 @@ mod tests {
             )
             .unwrap(),
             ClientOptions {
-                hosts: vec![Host {
+                hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
                 }],
@@ -788,11 +788,11 @@ mod tests {
             .unwrap(),
             ClientOptions {
                 hosts: vec![
-                    Host {
+                    StreamAddress {
                         hostname: "localhost".to_string(),
                         port: None,
                     },
-                    Host {
+                    StreamAddress {
                         hostname: "localhost".to_string(),
                         port: Some(27018),
                     },

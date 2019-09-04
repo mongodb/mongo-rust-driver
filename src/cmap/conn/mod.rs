@@ -13,6 +13,8 @@ use crate::{
         ConnectionCheckedInEvent, ConnectionCheckedOutEvent, ConnectionClosedEvent,
         ConnectionClosedReason, ConnectionCreatedEvent, ConnectionReadyEvent,
     },
+    options::StreamAddress,
+    options::TlsOptions,
 };
 
 /// User-facing information about a connection to the database.
@@ -21,11 +23,8 @@ pub struct ConnectionInfo {
     /// A driver-generated identifier that uniquely identifies the connection.
     pub id: u32,
 
-    /// The hostname of the address of the server that the connection is connected to.
-    pub hostname: String,
-
-    /// The port of the address of the server that the connection is connected to.
-    pub port: Option<u16>,
+    /// The address that the connection is connected to.
+    pub address: StreamAddress,
 }
 
 /// A wrapper around Stream that contains all the CMAP information needed to maintain a connection.
@@ -33,7 +32,7 @@ pub struct ConnectionInfo {
 #[derivative(Debug)]
 pub(crate) struct Connection {
     pub(super) id: u32,
-    pub(super) address: String,
+    pub(super) address: StreamAddress,
     pub(super) generation: u32,
     established: bool,
 
@@ -46,22 +45,29 @@ pub(crate) struct Connection {
     /// by a reference cycle).
     pub(super) pool: Option<ConnectionPool>,
 
+    #[derivative(Debug = "ignore")]
     stream: Stream,
 }
 
 impl Connection {
     /// Constructs a new connection.
-    pub(super) fn new(id: u32, address: &str, generation: u32) -> Result<Self> {
-        Ok(Self {
+    pub(super) fn new(
+        id: u32,
+        address: StreamAddress,
+        generation: u32,
+        tls_options: Option<TlsOptions>,
+    ) -> Result<Self> {
+        let conn = Self {
             id,
-            address: address.into(),
             generation,
             pool: None,
             established: false,
             ready_and_available_time: None,
-            // TODO RUST-203: Create TLS streams as applicable.
-            stream: Stream::connect(address)?,
-        })
+            stream: Stream::connect(address.clone(), tls_options)?,
+            address,
+        };
+
+        Ok(conn)
     }
 
     /// In order to check a connection back into the pool when it's dropped, we need to be able to
@@ -71,7 +77,10 @@ impl Connection {
     fn null() -> Self {
         Self {
             id: 0,
-            address: String::new(),
+            address: StreamAddress {
+                hostname: Default::default(),
+                port: None,
+            },
             generation: 0,
             pool: None,
             established: true,

@@ -6,7 +6,10 @@ use std::{
 
 use derivative::Derivative;
 
-use crate::error::{ErrorKind, Result};
+use crate::{
+    error::{ErrorKind, Result},
+    options::StreamAddress,
+};
 
 /// The wait queue ensures that threads acquiring connections proceed in a first-come, first-serve
 /// order. We wrap the internal state in an both an `Arc` and a `Mutex`; the `Arc` allows us to
@@ -33,9 +36,9 @@ struct WaitQueueInner {
     /// error. This will be the `wait_queue_timeout` for a given connection pool.
     timeout: Option<Duration>,
 
-    /// The address of the server that the connection pool's connections will connect to. This is
-    /// needed to emit a ConnectionCheckoutFailedEvent when the timeout has elapsed.
-    address: String,
+    /// The address that the connection pool's connections will connect to. This is needed to
+    /// return a WaitQueueTimeoutError when the timeout has elapsed.
+    address: StreamAddress,
 }
 
 /// A thread will obtain a `WaitQueueHandle` when it reaches the front of the wait queue. This gives
@@ -105,10 +108,10 @@ impl<'a> Drop for WaitQueueHandle<'a> {
 
 impl WaitQueue {
     /// Creates a new `WaitQueue`.
-    pub(super) fn new(address: &str, timeout: Option<Duration>) -> Self {
+    pub(super) fn new(address: StreamAddress, timeout: Option<Duration>) -> Self {
         let inner = WaitQueueInner {
             queue: Default::default(),
-            address: address.to_string(),
+            address,
             timeout,
         };
 

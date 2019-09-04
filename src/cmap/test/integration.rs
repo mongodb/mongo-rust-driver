@@ -20,11 +20,7 @@ struct DatabaseEntry {
 fn acquire_connection_and_run_operation() {
     let pool_options = ConnectionPoolOptions::from_client_options(&CLIENT_OPTIONS);
 
-    let pool = ConnectionPool::new(
-        &CLIENT_OPTIONS.hosts[0].to_string(),
-        Some(pool_options),
-        None,
-    );
+    let pool = ConnectionPool::new(CLIENT_OPTIONS.hosts[0].clone(), Some(pool_options), None);
     let mut connection = pool.check_out().unwrap();
 
     let doc = connection

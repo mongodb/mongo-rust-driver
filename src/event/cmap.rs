@@ -1,13 +1,26 @@
 use serde::Deserialize;
 
-pub use crate::cmap::options::ConnectionPoolOptions;
+pub use crate::{cmap::options::ConnectionPoolOptions, options::StreamAddress};
+
+/// We implement `Deserialize` for all of the event types so that we can more easily parse the CMAP
+/// spec tests. However, we have no need to parse the address field from the JSON files (if it's
+/// even present). To facilitate populating the address field with an empty value when
+/// deserializing, we define a private `empty_address` function that the events can specify as the
+/// custom deserialization value for each address field.
+fn empty_address() -> StreamAddress {
+    StreamAddress {
+        hostname: Default::default(),
+        port: None,
+    }
+}
 
 /// Event emitted when a connection pool is created.
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct PoolCreatedEvent {
     /// The address of the server that the pool's connections will connect to.
+    #[serde(default = "self::empty_address")]
     #[serde(skip)]
-    pub address: String,
+    pub address: StreamAddress,
 
     /// The options used for the pool.
     pub options: Option<ConnectionPoolOptions>,
@@ -17,8 +30,9 @@ pub struct PoolCreatedEvent {
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct PoolClearedEvent {
     /// The address of the server that the pool's connections will connect to.
+    #[serde(default = "self::empty_address")]
     #[serde(skip)]
-    pub address: String,
+    pub address: StreamAddress,
 }
 
 /// Event emitted when a connection is created.
@@ -26,8 +40,9 @@ pub struct PoolClearedEvent {
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionCreatedEvent {
     /// The address of the server that the connection will connect to.
-    #[serde(default)]
-    pub address: String,
+    #[serde(default = "self::empty_address")]
+    #[serde(skip)]
+    pub address: StreamAddress,
 
     /// The unique ID of the connection. This is not used for anything internally, but can be used
     /// to identify other events related to this connection.
@@ -41,8 +56,9 @@ pub struct ConnectionCreatedEvent {
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionReadyEvent {
     /// The address of the server that the connection is connected to.
-    #[serde(default)]
-    pub address: String,
+    #[serde(default = "self::empty_address")]
+    #[serde(skip)]
+    pub address: StreamAddress,
 
     /// The unique ID of the connection. This is not used for anything internally, but can be used
     /// to identify other events related to this connection.
@@ -55,8 +71,9 @@ pub struct ConnectionReadyEvent {
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionClosedEvent {
     /// The address of the server that the connection was connected to.
-    #[serde(default)]
-    pub address: String,
+    #[serde(default = "self::empty_address")]
+    #[serde(skip)]
+    pub address: StreamAddress,
 
     /// The unique ID of the connection. This is not used for anything internally, but can be used
     /// to identify other events related to this connection.
@@ -88,16 +105,18 @@ pub enum ConnectionClosedReason {
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct ConnectionCheckoutStartedEvent {
     /// The address of the server that the connection will connect to.
+    #[serde(default = "self::empty_address")]
     #[serde(skip)]
-    pub address: String,
+    pub address: StreamAddress,
 }
 
 /// Event emitted when a thread is unable to check out a connection.
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct ConnectionCheckoutFailedEvent {
     /// The address of the server that the connection would have connected to.
+    #[serde(default = "self::empty_address")]
     #[serde(skip)]
-    pub address: String,
+    pub address: StreamAddress,
 
     /// The reason a connection was unable to be checked out.
     pub reason: ConnectionCheckoutFailedReason,
@@ -120,8 +139,9 @@ pub enum ConnectionCheckoutFailedReason {
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionCheckedOutEvent {
     /// The address of the server that the connection will connect to.
+    #[serde(default = "self::empty_address")]
     #[serde(skip)]
-    pub address: String,
+    pub address: StreamAddress,
 
     /// The unique ID of the connection. This is not used for anything internally, but can be used
     /// to identify other events related to this connection.
@@ -134,8 +154,9 @@ pub struct ConnectionCheckedOutEvent {
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionCheckedInEvent {
     /// The address of the server that the connection was connected to.
+    #[serde(default = "self::empty_address")]
     #[serde(skip)]
-    pub address: String,
+    pub address: StreamAddress,
 
     /// The unique ID of the connection. This is not used for anything internally, but can be used
     /// to identify other events related to this connection.

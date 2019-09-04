@@ -3,10 +3,14 @@ use std::net::TcpStream;
 use bson::{bson, doc, Bson};
 
 use super::message::{Message, MessageFlags, MessageSection};
-use crate::{options::Host, test::CLIENT_OPTIONS};
+use crate::{options::StreamAddress, test::CLIENT_OPTIONS};
 
 #[test]
 fn basic() {
+    if CLIENT_OPTIONS.tls_options.is_some() {
+        return;
+    }
+
     let message = Message {
         response_to: 0,
         flags: MessageFlags::empty(),
@@ -16,7 +20,7 @@ fn basic() {
         checksum: None,
     };
 
-    let Host { ref hostname, port } = CLIENT_OPTIONS.hosts[0];
+    let StreamAddress { ref hostname, port } = CLIENT_OPTIONS.hosts[0];
 
     let mut stream = TcpStream::connect((&hostname[..], port.unwrap_or(27017))).unwrap();
     message.write_to(&mut stream).unwrap();

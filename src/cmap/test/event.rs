@@ -140,7 +140,10 @@ where
     };
 
     Ok(PoolCreatedEvent {
-        address: String::new(),
+        address: StreamAddress {
+            hostname: Default::default(),
+            port: None,
+        },
         options,
     })
 }
@@ -179,7 +182,10 @@ where
     };
 
     Ok(ConnectionCheckoutFailedEvent {
-        address: String::new(),
+        address: StreamAddress {
+            hostname: Default::default(),
+            port: None,
+        },
         reason,
     })
 }
