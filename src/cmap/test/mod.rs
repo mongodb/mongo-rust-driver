@@ -22,6 +22,7 @@ use crate::{
 const TEST_DESCRIPTIONS_TO_SKIP: &[&str] = &[
     "must destroy checked in connection if pool has been closed",
     "must throw error if checkOut is called on a closed pool",
+    "When a pool is closed, it MUST first destroy all available connections in that pool",
 ];
 
 #[derive(Debug)]
@@ -167,10 +168,12 @@ impl Operation {
             }
             Operation::CheckOut { label } => {
                 if let Some(pool) = state.pool.read().unwrap().deref() {
-                    let conn = pool.check_out()?;
+                    let mut conn = pool.check_out()?;
 
                     if let Some(label) = label {
                         state.connections.write().unwrap().insert(label, conn);
+                    } else {
+                        conn.pool.take();
                     }
                 }
             }
@@ -192,6 +195,7 @@ impl Operation {
                 }
             }
             Operation::Close => {
+                state.connections.write().unwrap().clear();
                 state.pool.write().unwrap().take();
             }
 

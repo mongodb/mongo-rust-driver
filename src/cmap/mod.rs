@@ -149,9 +149,7 @@ impl ConnectionPool {
     where
         F: FnOnce(&Arc<dyn CmapEventHandler>),
     {
-        if let Some(ref handler) = self.inner.event_handler {
-            emit(handler);
-        }
+        self.inner.emit_event(emit)
     }
 
     /// Checks out a connection from the pool. This method will block until this thread is at the
@@ -168,11 +166,12 @@ impl ConnectionPool {
         });
 
         let mut conn = self.acquire_or_create_connection()?;
-        conn.setup()?;
 
         self.emit_event(|handler| {
             handler.handle_connection_checked_out_event(conn.checked_out_event());
         });
+
+        conn.pool = Some(self.clone());
 
         Ok(conn)
     }
@@ -188,13 +187,13 @@ impl ConnectionPool {
             while let Some(conn) = self.inner.connections.write().unwrap().pop() {
                 // Close the connection if it's stale.
                 if conn.is_stale(self.inner.generation.load(Ordering::SeqCst)) {
-                    self.close_connection(conn, ConnectionClosedReason::Stale, true);
+                    self.close_connection(conn, ConnectionClosedReason::Stale);
                     continue;
                 }
 
                 // Close the connection if it's idle.
                 if conn.is_idle(self.inner.max_idle_time) {
-                    self.close_connection(conn, ConnectionClosedReason::Idle, true);
+                    self.close_connection(conn, ConnectionClosedReason::Idle);
                     continue;
                 }
 
@@ -241,13 +240,15 @@ impl ConnectionPool {
     /// available connections. The time that the connection is checked in will be marked to
     /// facilitate detecting if the connection becomes idle.
     pub(crate) fn check_in(&self, mut conn: Connection) {
+        conn.pool.take();
+
         self.emit_event(|handler| {
             handler.handle_connection_checked_in_event(conn.checked_in_event());
         });
 
         // Close the connection if it's stale.
         if conn.is_stale(self.inner.generation.load(Ordering::SeqCst)) {
-            self.close_connection(conn, ConnectionClosedReason::Stale, false);
+            self.close_connection(conn, ConnectionClosedReason::Stale);
 
             return;
         }
@@ -274,8 +275,10 @@ impl ConnectionPool {
     /// Internal helper to close a connection, emit the event for it being closed, and decrement the
     /// total connection count. Any connection being closed by the pool should be closed by using
     /// this method.
-    fn close_connection(&self, conn: Connection, reason: ConnectionClosedReason, available: bool) {
-        conn.close(reason);
+    fn close_connection(&self, conn: Connection, reason: ConnectionClosedReason) {
+        self.emit_event(|handler| {
+            handler.handle_connection_closed_event(conn.closed_event(reason));
+        });
 
         self.inner
             .total_connection_count
@@ -288,18 +291,40 @@ impl ConnectionPool {
             .total_connection_count
             .fetch_add(1, Ordering::SeqCst);
 
-        let conn_result = Connection::new(
+        let mut connection = Connection::new(
             self.inner.next_connection_id.fetch_add(1, Ordering::SeqCst),
             &self.inner.address,
             self.inner.generation.load(Ordering::SeqCst),
-            self.inner.event_handler.clone(),
         );
 
-        if conn_result.is_err() {
+        self.emit_event(|handler| {
+            handler.handle_connection_created_event(connection.created_event())
+        });
+
+        let setup_result = connection.setup();
+
+        if let Err(e) = setup_result {
             self.clear();
+
+            return Err(e);
         }
 
-        conn_result
+        self.emit_event(|handler| handler.handle_connection_ready_event(connection.ready_event()));
+
+        Ok(connection)
+    }
+}
+
+impl ConnectionPoolInner {
+    /// Emits an event from the event handler if one is present, where `emit` is a closure that uses
+    /// the event handler.
+    fn emit_event<F>(&self, emit: F)
+    where
+        F: FnOnce(&Arc<dyn CmapEventHandler>),
+    {
+        if let Some(ref handler) = self.event_handler {
+            emit(handler);
+        }
     }
 }
 
@@ -308,16 +333,20 @@ impl Drop for ConnectionPoolInner {
     /// than `ConnectionPool` so that it only gets run once all (non-weak) references to the
     /// `ConnectionPoolInner` are dropped.
     fn drop(&mut self) {
-        // Remove and close each connection currently available in the pool.
-        for conn in self.connections.write().unwrap().drain(..) {
-            conn.close(ConnectionClosedReason::PoolClosed);
-        }
+        for mut conn in self.connections.write().unwrap().drain(..) {
+            conn.pool.take();
 
-        // Emit the pool closed event if a handler is present.
-        if let Some(ref handler) = self.event_handler {
-            handler.handle_pool_closed_event(PoolClosedEvent {
-                address: self.address.clone(),
+            self.emit_event(|handler| {
+                handler.handle_connection_closed_event(
+                    conn.closed_event(ConnectionClosedReason::PoolClosed),
+                )
             });
         }
+
+        self.emit_event(|handler| {
+            handler.handle_pool_closed_event(PoolClosedEvent {
+                address: self.address.clone(),
+            })
+        });
     }
 }
