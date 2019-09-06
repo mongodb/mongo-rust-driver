@@ -55,7 +55,7 @@ fn ensure_min_connections_in_pool(pool: &ConnectionPool) {
             let mut connections = pool.inner.connections.write().unwrap();
 
             if pool.inner.total_connection_count.load(Ordering::SeqCst) < min_pool_size {
-                match pool.create_connection() {
+                match pool.create_connection(false) {
                     Ok(connection) => connections.push(connection),
                     e @ Err(_) => {
                         // Since we had to clear the pool, we return early from this function and

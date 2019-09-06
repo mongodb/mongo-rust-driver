@@ -80,7 +80,7 @@ impl Executor {
         let pool = ConnectionPool::new(
             "42",
             test_file.pool_options,
-            Some(Arc::new(handler.clone())),
+            Some(Box::new(handler.clone())),
         );
 
         let state = State {

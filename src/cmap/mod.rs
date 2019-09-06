@@ -92,14 +92,14 @@ pub(crate) struct ConnectionPoolInner {
 
     /// The event handler specified by the user to process CMAP events.
     #[derivative(Debug = "ignore")]
-    event_handler: Option<Arc<dyn CmapEventHandler>>,
+    event_handler: Option<Box<dyn CmapEventHandler>>,
 }
 
 impl ConnectionPool {
     pub(crate) fn new(
         address: &str,
         options: Option<ConnectionPoolOptions>,
-        event_handler: Option<Arc<dyn CmapEventHandler>>,
+        event_handler: Option<Box<dyn CmapEventHandler>>,
     ) -> Self {
         // Get the individual options from `options`.
         let max_idle_time = options.as_ref().and_then(|opts| opts.max_idle_time);
@@ -119,7 +119,7 @@ impl ConnectionPool {
             generation: AtomicU32::new(0),
             total_connection_count: AtomicU32::new(0),
             next_connection_id: AtomicU32::new(1),
-            wait_queue: WaitQueue::new(address, wait_queue_timeout, event_handler.clone()),
+            wait_queue: WaitQueue::new(address, wait_queue_timeout),
             connections: Default::default(),
             event_handler,
         };
@@ -146,7 +146,7 @@ impl ConnectionPool {
     /// the event handler.
     fn emit_event<F>(&self, emit: F)
     where
-        F: FnOnce(&Arc<dyn CmapEventHandler>),
+        F: FnOnce(&Box<dyn CmapEventHandler>),
     {
         self.inner.emit_event(emit)
     }
@@ -164,7 +164,25 @@ impl ConnectionPool {
             handler.handle_connection_checkout_started_event(event);
         });
 
-        let mut conn = self.acquire_or_create_connection()?;
+        let result = self.acquire_or_create_connection();
+
+        let mut conn = match result {
+            Ok(conn) => conn,
+            Err(e) => {
+                if let ErrorKind::WaitQueueTimeoutError(..) = e.kind() {
+                    self.emit_event(|handler| {
+                        handler.handle_connection_checkout_failed_event(
+                            ConnectionCheckoutFailedEvent {
+                                address: self.inner.address.clone(),
+                                reason: ConnectionCheckoutFailedReason::Timeout,
+                            },
+                        )
+                    });
+                }
+
+                return Err(e);
+            }
+        };
 
         self.emit_event(|handler| {
             handler.handle_connection_checked_out_event(conn.checked_out_event());
@@ -202,7 +220,7 @@ impl ConnectionPool {
 
             // Create a new connection if the pool is under max size.
             if self.inner.total_connection_count.load(Ordering::SeqCst) < self.inner.max_pool_size {
-                return Ok(self.create_connection()?);
+                return Ok(self.create_connection(true)?);
             }
 
             // Check if the pool has a max timeout.
@@ -285,7 +303,7 @@ impl ConnectionPool {
     }
 
     /// Helper method to create a connection and increment the total connection count.
-    fn create_connection(&self) -> Result<Connection> {
+    fn create_connection(&self, checking_out: bool) -> Result<Connection> {
         self.inner
             .total_connection_count
             .fetch_add(1, Ordering::SeqCst);
@@ -305,6 +323,15 @@ impl ConnectionPool {
         if let Err(e) = setup_result {
             self.clear();
 
+            if checking_out {
+                self.emit_event(|handler| {
+                    handler.handle_connection_checkout_failed_event(ConnectionCheckoutFailedEvent {
+                        address: self.inner.address.clone(),
+                        reason: ConnectionCheckoutFailedReason::ConnectionError,
+                    })
+                });
+            }
+
             return Err(e);
         }
 
@@ -319,7 +346,7 @@ impl ConnectionPoolInner {
     /// the event handler.
     fn emit_event<F>(&self, emit: F)
     where
-        F: FnOnce(&Arc<dyn CmapEventHandler>),
+        F: FnOnce(&Box<dyn CmapEventHandler>),
     {
         if let Some(ref handler) = self.event_handler {
             emit(handler);

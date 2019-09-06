@@ -6,12 +6,7 @@ use std::{
 
 use derivative::Derivative;
 
-use crate::{
-    error::{ErrorKind, Result},
-    event::cmap::{
-        CmapEventHandler, ConnectionCheckoutFailedEvent, ConnectionCheckoutFailedReason,
-    },
-};
+use crate::error::{ErrorKind, Result};
 
 // The wait queue ensures that threads acquiring connections proceed in a first-come, first-serve
 // order. We wrap the internal state in an both an `Arc` and a `Mutex`; the `Arc` allows us to share
@@ -38,10 +33,6 @@ struct WaitQueueInner {
     // The address of the server that the connection pool's connections will connect to. This is
     // needed to emit a ConnectionCheckoutFailedEvent when the timeout has elapsed.
     address: String,
-
-    // The event handler specified by the user to process CMAP events.
-    #[derivative(Debug = "ignore")]
-    event_handler: Option<Arc<dyn CmapEventHandler>>,
 }
 
 // A thread will obtain a `WaitQueueHandle` when it reaches the front of the wait queue. This gives
@@ -72,7 +63,7 @@ impl<'a> WaitQueueHandle<'a> {
 
     // Blocks on the internal conditional variable until either the conditional variable is notified
     // (which indicates that a connection is ready) or a timeout occurs.
-    pub(crate) fn wait_for_available_connection(
+    pub(super) fn wait_for_available_connection(
         &mut self,
         timeout: Option<Duration>,
     ) -> Result<()> {
@@ -85,15 +76,6 @@ impl<'a> WaitQueueHandle<'a> {
             let (guard, result) = self.condvar.wait_timeout(guard, timeout).unwrap();
 
             if result.timed_out() {
-                if let Some(ref event_handler) = guard.event_handler {
-                    let event = ConnectionCheckoutFailedEvent {
-                        address: guard.address.clone(),
-                        reason: ConnectionCheckoutFailedReason::Timeout,
-                    };
-
-                    event_handler.handle_connection_checkout_failed_event(event);
-                }
-
                 bail!(ErrorKind::WaitQueueTimeoutError(guard.address.clone()));
             }
 
@@ -120,15 +102,10 @@ impl<'a> Drop for WaitQueueHandle<'a> {
 
 impl WaitQueue {
     // Creates a new `WaitQueue`.
-    pub(crate) fn new(
-        address: &str,
-        timeout: Option<Duration>,
-        event_handler: Option<Arc<dyn CmapEventHandler>>,
-    ) -> Self {
+    pub(super) fn new(address: &str, timeout: Option<Duration>) -> Self {
         let inner = WaitQueueInner {
             queue: Default::default(),
             address: address.to_string(),
-            event_handler,
             timeout,
         };
 
@@ -139,7 +116,7 @@ impl WaitQueue {
 
     // Enters the wait queue and blocks until it either reaches the front of the queue or the
     // timeout has elapsed.
-    pub(crate) fn wait_until_at_front(&self) -> Result<WaitQueueHandle> {
+    pub(super) fn wait_until_at_front(&self) -> Result<WaitQueueHandle> {
         let mut guard = self.inner.lock().unwrap();
 
         let condvar = Arc::new(Condvar::new());
@@ -158,15 +135,6 @@ impl WaitQueue {
             let (guard, result) = condvar.wait_timeout(guard, timeout).unwrap();
 
             if result.timed_out() {
-                if let Some(ref event_handler) = guard.event_handler {
-                    let event = ConnectionCheckoutFailedEvent {
-                        address: guard.address.clone(),
-                        reason: ConnectionCheckoutFailedReason::Timeout,
-                    };
-
-                    event_handler.handle_connection_checkout_failed_event(event);
-                }
-
                 bail!(ErrorKind::WaitQueueTimeoutError(guard.address.clone()));
             }
 
@@ -181,7 +149,7 @@ impl WaitQueue {
     }
 
     // Notifies the wait queue that the next thread in the queue can be woken up.
-    pub(crate) fn notify_ready(&self) {
+    pub(super) fn notify_ready(&self) {
         self.inner.lock().unwrap().notify_ready();
     }
 }
@@ -189,7 +157,7 @@ impl WaitQueue {
 impl WaitQueueInner {
     // Notifies the wait queue that the next thread in the queue can be woken up. This is explicitly
     // defined on `WaitQueueInner` so that `WaitQueueHandle::drop` can call it.
-    pub(crate) fn notify_ready(&self) {
+    pub(super) fn notify_ready(&self) {
         if let Some(condvar) = self.queue.front() {
             condvar.notify_one();
         }
