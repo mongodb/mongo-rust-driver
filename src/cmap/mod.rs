@@ -22,8 +22,7 @@ use crate::{
     error::{ErrorKind, Result},
     event::cmap::{
         CmapEventHandler, ConnectionCheckoutFailedEvent, ConnectionCheckoutFailedReason,
-        ConnectionCheckoutStartedEvent, ConnectionClosedReason, PoolClearedEvent, PoolClosedEvent,
-        PoolCreatedEvent,
+        ConnectionCheckoutStartedEvent, ConnectionClosedReason, PoolClearedEvent, PoolCreatedEvent,
     },
 };
 
@@ -342,11 +341,5 @@ impl Drop for ConnectionPoolInner {
                 )
             });
         }
-
-        self.emit_event(|handler| {
-            handler.handle_pool_closed_event(PoolClosedEvent {
-                address: self.address.clone(),
-            })
-        });
     }
 }

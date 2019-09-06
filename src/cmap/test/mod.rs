@@ -63,7 +63,11 @@ impl Executor {
     fn new(mut test_file: TestFile) -> Self {
         let operations = test_file.process_operations();
         let handler = EventHandler::new(test_file.ignore);
-        let events = test_file.events;
+        let events = test_file
+            .events
+            .into_iter()
+            .filter(|event| event.name() != "ConnectionPoolClosed")
+            .collect();
         let error = test_file.error;
 
         // The CMAP spec tests use the placeholder value `42` to indicate that the presence of the
@@ -247,7 +251,6 @@ fn assert_events_match(actual: &Event, expected: &Event) {
         }
         (Event::ConnectionCheckOutStarted(_), Event::ConnectionCheckOutStarted(_)) => {}
         (Event::ConnectionPoolCleared(_), Event::ConnectionPoolCleared(_)) => {}
-        (Event::ConnectionPoolClosed(_), Event::ConnectionPoolClosed(_)) => {}
         (actual, expected) => assert_eq!(actual, expected),
     }
 }
