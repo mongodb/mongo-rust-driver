@@ -22,7 +22,6 @@ use crate::{
 const TEST_DESCRIPTIONS_TO_SKIP: &[&str] = &[
     "must destroy checked in connection if pool has been closed",
     "must throw error if checkOut is called on a closed pool",
-    "When a pool is closed, it MUST first destroy all available connections in that pool",
 ];
 
 #[derive(Debug)]
