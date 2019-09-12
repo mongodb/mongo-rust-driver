@@ -36,6 +36,11 @@ error_chain! {
             display("Unable to parse {} data from {}", data_type, file_path)
         }
 
+        PoolClosedError(address: String) {
+            description("Attempted to check out a connection from closed connection pool")
+            display("Attempted to check out a connection from closed connection pool with address {}", address)
+        }
+
         /// The response the driver received from the server was not in the form expected.
         ResponseError(msg: String) {
             description("A database operation returned an invalid reply")
@@ -46,6 +51,11 @@ error_chain! {
         ServerSelectionError(msg: String) {
             description("An error occurred during server selection")
             display("An error occurred during server selection: {}", msg)
+        }
+
+        WaitQueueTimeoutError(address: String) {
+            description("Timed out while checking out a connection from connection pool")
+            display("Timed out while checking out a connection from connection pool with address {}", address)
         }
 
         /// An error occurred when trying to execute a write operation.

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bson::Document;
 
-use crate::{event::Failure, pool::ConnectionInfo};
+use crate::{cmap::ConnectionInfo, event::Failure};
 
 /// An event that triggers when a database command is initiated.
 #[derive(Clone, Debug)]
@@ -69,7 +69,7 @@ pub struct CommandFailedEvent {
 /// by the driver.
 ///
 /// ```rust
-/// # use mongodb::{Client, event::{CommandEventHandler, CommandFailedEvent}};
+/// # use mongodb::{Client, event::command::{CommandEventHandler, CommandFailedEvent}};
 ///
 /// struct FailedCommandLogger {}
 ///

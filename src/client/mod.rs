@@ -6,7 +6,9 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::Result,
-    event::{CommandEventHandler, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
+    event::command::{
+        CommandEventHandler, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent,
+    },
     options::{ClientOptions, DatabaseOptions},
     read_preference::ReadPreference,
 };
@@ -19,7 +21,7 @@ use crate::{
 /// so it can safely be shared across threads. For example:
 ///
 /// ```rust
-///
+/// 
 /// # use mongodb::{Client, error::Result};
 ///
 /// # fn start_workers() -> Result<()> {
