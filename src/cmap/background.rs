@@ -15,8 +15,7 @@ pub(crate) fn start_background_thread(pool: Weak<ConnectionPoolInner>) {
             None => return,
         };
 
-        // This number was chosen arbitrarily; the Java driver uses 10 ms, but our CMAP spec tests
-        // failed when we used that value.
+        // RUST-207 Investigate why tests fail when this duration is reduced.
         std::thread::sleep(Duration::from_millis(100));
     });
 }
