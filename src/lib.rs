@@ -43,6 +43,7 @@ extern crate error_chain;
 #[macro_use]
 extern crate typed_builder;
 
+mod bson_util;
 mod client;
 #[allow(dead_code)]
 mod cmap;

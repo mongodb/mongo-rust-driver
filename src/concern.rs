@@ -162,4 +162,13 @@ impl WriteConcern {
 
         Ok(doc)
     }
+
+    /// Returns whether a write executed with this write concern requires acknowledgement from the
+    /// server.
+    pub(crate) fn is_acknowledged(&self) -> bool {
+        if let Some(ref w) = self.w {
+            return w == &Acknowledgment::Nodes(0) && !self.journal.unwrap_or(false);
+        }
+        return true;
+    }
 }

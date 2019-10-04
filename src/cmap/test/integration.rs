@@ -1,8 +1,9 @@
-use bson::{bson, doc, Bson};
+use bson::{bson, doc};
 use serde::Deserialize;
 
+use crate::read_preference::ReadPreference;
 use crate::{
-    cmap::{options::ConnectionPoolOptions, ConnectionPool},
+    cmap::{conn::command::Command, options::ConnectionPoolOptions, ConnectionPool},
     test::CLIENT_OPTIONS,
 };
 
@@ -17,21 +18,23 @@ struct DatabaseEntry {
 }
 
 #[test]
-fn acquire_connection_and_run_operation() {
+fn acquire_connection_and_send_command() {
     let pool_options = ConnectionPoolOptions::from_client_options(&CLIENT_OPTIONS);
 
     let pool = ConnectionPool::new(CLIENT_OPTIONS.hosts[0].clone(), Some(pool_options), None);
     let mut connection = pool.check_out().unwrap();
 
-    let doc = connection
-        .execute_operation(doc! {
-            "listDatabases": 1,
-            "$db": "admin",
-            "$readPreference": { "mode": "primaryPreferred" },
-        })
-        .unwrap();
+    let body = doc! { "listDatabases": 1 };
+    let read_pref = ReadPreference::PrimaryPreferred {
+        tag_sets: None,
+        max_staleness: None,
+    };
+    let cmd = Command::new_read("listDatabases", "admin".to_string(), Some(read_pref), body);
+    let response = connection.send_command(cmd).unwrap();
 
-    let response: ListDatabasesResponse = bson::from_bson(Bson::Document(dbg!(doc))).unwrap();
+    assert!(response.is_success());
+
+    let response: ListDatabasesResponse = response.body().unwrap();
 
     let names: Vec<_> = response
         .databases

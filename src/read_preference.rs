@@ -1,5 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 
+use bson::{Bson, Document};
+
 use crate::error::{ErrorKind, Result};
 
 /// Specifies how the driver should route a read operation to members of a replica set.
@@ -71,6 +73,49 @@ impl ReadPreference {
         };
 
         Ok(read_pref)
+    }
+
+    pub(crate) fn to_document(&self) -> Document {
+        let (mode, tag_sets, max_staleness) = match self.clone() {
+            ReadPreference::Primary => ("primary", None, None),
+            ReadPreference::PrimaryPreferred {
+                tag_sets,
+                max_staleness,
+            } => ("primaryPreferred", tag_sets, max_staleness),
+            ReadPreference::Secondary {
+                tag_sets,
+                max_staleness,
+            } => ("secondary", tag_sets, max_staleness),
+            ReadPreference::SecondaryPreferred {
+                tag_sets,
+                max_staleness,
+            } => ("secondaryPreferred", tag_sets, max_staleness),
+            ReadPreference::Nearest {
+                tag_sets,
+                max_staleness,
+            } => ("nearest", tag_sets, max_staleness),
+        };
+        let mut doc = Document::new();
+        doc.insert("mode", mode);
+
+        if let Some(max_stale) = max_staleness {
+            doc.insert("maxStalenessSeconds", max_stale.as_secs());
+        }
+
+        if let Some(tag_sets) = tag_sets {
+            let tags: Vec<Bson> = tag_sets
+                .iter()
+                .map(|tag_set| {
+                    Bson::Document(tag_set.iter().fold(Document::new(), |mut doc, (k, v)| {
+                        doc.insert(k, v);
+                        doc
+                    }))
+                })
+                .collect();
+            doc.insert("tags", tags);
+        }
+
+        doc
     }
 }
 
