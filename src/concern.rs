@@ -169,6 +169,6 @@ impl WriteConcern {
         if let Some(ref w) = self.w {
             return w == &Acknowledgment::Nodes(0) && !self.journal.unwrap_or(false);
         }
-        return true;
+        true
     }
 }

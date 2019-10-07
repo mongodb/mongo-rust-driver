@@ -35,6 +35,14 @@
 //! ```
 
 #![allow(unused_variables)]
+#![cfg_attr(
+    feature = "cargo-clippy",
+    allow(
+        clippy::unreadable_literal,
+        clippy::cognitive_complexity,
+        clippy::float_cmp
+    )
+)]
 
 #[macro_use]
 extern crate derivative;
