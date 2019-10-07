@@ -85,6 +85,9 @@ pub struct ClientOptions {
     pub hosts: Vec<StreamAddress>,
 
     #[builder(default)]
+    pub app_name: Option<String>,
+
+    #[builder(default)]
     pub tls_options: Option<TlsOptions>,
 
     #[builder(default)]
@@ -130,6 +133,7 @@ impl Default for ClientOptions {
 #[derive(Debug, Default, PartialEq)]
 struct ClientOptionsParser {
     pub hosts: Vec<StreamAddress>,
+    pub app_name: Option<String>,
     pub tls_options: Option<TlsOptions>,
     pub heartbeat_freq: Option<Duration>,
     pub local_threshold: Option<i64>,
@@ -220,6 +224,7 @@ impl From<ClientOptionsParser> for ClientOptions {
     fn from(parser: ClientOptionsParser) -> Self {
         Self {
             hosts: parser.hosts,
+            app_name: parser.app_name,
             tls_options: parser.tls_options,
             heartbeat_freq: parser.heartbeat_freq,
             local_threshold: parser.local_threshold,
@@ -396,6 +401,9 @@ impl ClientOptionsParser {
         }
 
         match key {
+            "appname" => {
+                self.app_name = Some(value.into());
+            }
             k @ "heartbeatfrequencyms" => {
                 self.heartbeat_freq = Some(Duration::from_millis(get_ms!(value, k)));
             }

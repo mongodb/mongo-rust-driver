@@ -71,6 +71,11 @@ impl Executor {
             .collect();
         let error = test_file.error;
 
+        test_file
+            .pool_options
+            .get_or_insert_with(Default::default)
+            .tls_options = CLIENT_OPTIONS.tls_options.clone();
+
         let pool = ConnectionPool::new(
             CLIENT_OPTIONS.hosts[0].clone(),
             test_file.pool_options,

@@ -45,7 +45,6 @@ pub(crate) struct Connection {
     /// by a reference cycle).
     pub(super) pool: Option<ConnectionPool>,
 
-    #[derivative(Debug = "ignore")]
     stream: Stream,
 }
 
@@ -109,18 +108,6 @@ impl Connection {
     /// Checks if the connection is stale.
     pub(super) fn is_stale(&self, current_generation: u32) -> bool {
         self.generation != current_generation
-    }
-
-    /// Placeholder method that establishes the connection.
-    pub(super) fn setup(&mut self) -> Result<()> {
-        if self.established {
-            return Ok(());
-        }
-
-        // TODO: Auth, handshake, etc. No need to implement in this module though.
-
-        self.established = true;
-        Ok(())
     }
 
     /// Helper to create a `ConnectionCheckedOutEvent` for the connection.

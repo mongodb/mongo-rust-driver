@@ -6,9 +6,14 @@ use crate::options::{ClientOptions, TlsOptions};
 
 /// Contains the options for creating a connection pool. While these options are specified at the
 /// client-level, `ConnectionPoolOptions` is exposed for the purpose of CMAP event handling.
-#[derive(Debug, Deserialize, TypedBuilder, PartialEq)]
+#[derive(Debug, Default, Deserialize, TypedBuilder, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionPoolOptions {
+    /// The application name specified by the user. This is sent to the server as part of the
+    /// handshake that each connection makes when it's created.
+    #[builder(default)]
+    pub app_name: Option<String>,
+
     /// The maximum number of connections that the pool can have at a given time. This includes
     /// connections which are currently checked out of the pool.
     ///
