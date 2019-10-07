@@ -3,6 +3,7 @@ mod test;
 
 mod background;
 mod conn;
+mod establish;
 pub(crate) mod options;
 mod wait_queue;
 
@@ -17,7 +18,10 @@ use std::{
 use derivative::Derivative;
 
 pub use self::conn::ConnectionInfo;
-use self::{conn::Connection, options::ConnectionPoolOptions, wait_queue::WaitQueue};
+use self::{
+    conn::Connection, establish::ConnectionEstablisher, options::ConnectionPoolOptions,
+    wait_queue::WaitQueue,
+};
 use crate::{
     error::{ErrorKind, Result},
     event::cmap::{
@@ -96,6 +100,10 @@ pub(crate) struct ConnectionPoolInner {
     /// of the Vec.
     connections: Arc<RwLock<Vec<Connection>>>,
 
+    /// Contains the logic for "establishing" a connection. This includes handshaking and
+    /// authenticating a connection when it's first created.
+    establisher: ConnectionEstablisher,
+
     /// The event handler specified by the user to process CMAP events.
     #[derivative(Debug = "ignore")]
     event_handler: Option<Box<dyn CmapEventHandler>>,
@@ -117,6 +125,8 @@ impl ConnectionPool {
         let min_pool_size = options.as_ref().and_then(|opts| opts.min_pool_size);
         let tls_options = options.as_mut().and_then(|opts| opts.tls_options.take());
 
+        let establisher = ConnectionEstablisher::new(options.as_ref());
+
         let inner = ConnectionPoolInner {
             address: address.clone(),
             wait_queue_timeout,
@@ -129,6 +139,7 @@ impl ConnectionPool {
             next_connection_id: AtomicU32::new(1),
             wait_queue: WaitQueue::new(address.clone(), wait_queue_timeout),
             connections: Default::default(),
+            establisher,
             event_handler,
         };
 
@@ -324,9 +335,9 @@ impl ConnectionPool {
             handler.handle_connection_created_event(connection.created_event())
         });
 
-        let setup_result = connection.setup();
+        let establish_result = self.inner.establisher.establish_connection(&mut connection);
 
-        if let Err(e) = setup_result {
+        if let Err(e) = establish_result {
             self.clear();
 
             if checking_out {
