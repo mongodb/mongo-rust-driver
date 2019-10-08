@@ -80,7 +80,10 @@ fn run_test(test_file: TestFile) {
     for (i, phase) in test_file.phases.into_iter().enumerate() {
         for Response(address, command_response) in phase.responses {
             let is_master_reply = if command_response == Default::default() {
-                Err(ErrorKind::OperationError("dummy error".to_string()).into())
+                Err(ErrorKind::OperationError {
+                    message: "dummy error".to_string(),
+                }
+                .into())
             } else {
                 Ok(IsMasterReply {
                     command_response,

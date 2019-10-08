@@ -118,23 +118,26 @@ impl WriteConcern {
     pub fn validate(&self) -> Result<()> {
         if let Some(Acknowledgment::Nodes(i)) = self.w {
             if i < 0 {
-                bail!(ErrorKind::ArgumentError(
-                    "write concern `w` field cannot be negative integer".to_string()
-                ));
+                return Err(ErrorKind::ArgumentError {
+                    message: "write concern `w` field cannot be negative integer".to_string(),
+                }
+                .into());
             }
         }
 
         if self.w == Some(Acknowledgment::Nodes(0)) && self.journal == Some(true) {
-            bail!(ErrorKind::ArgumentError(
-                "write concern cannot have w=0 and j=true".to_string()
-            ));
+            return Err(ErrorKind::ArgumentError {
+                message: "write concern cannot have w=0 and j=true".to_string(),
+            }
+            .into());
         }
 
         if let Some(w_timeout) = self.w_timeout {
             if w_timeout < Duration::from_millis(0) {
-                bail!(ErrorKind::ArgumentError(
-                    "write concern `w_timeout` field cannot be negative".to_string()
-                ));
+                return Err(ErrorKind::ArgumentError {
+                    message: "write concern `w_timeout` field cannot be negative".to_string(),
+                }
+                .into());
             }
         }
 

@@ -10,7 +10,7 @@ use super::{
 };
 use crate::{
     cmap::conn::command::Command,
-    error::{Error, ErrorKind, Result},
+    error::{ErrorKind, Result},
 };
 
 /// Represents an OP_MSG wire protocol operation.
@@ -65,9 +65,10 @@ impl Message {
                 MessageSection::Sequence { documents, .. } => documents.into_iter().next(),
             })
             .ok_or_else(|| {
-                Error::from_kind(ErrorKind::ResponseError(
-                    "no response received from server".into(),
-                ))
+                ErrorKind::ResponseError {
+                    message: "no response received from server".into(),
+                }
+                .into()
             })
     }
 
@@ -104,11 +105,15 @@ impl Message {
         if length_remaining == 4 && flags.contains(MessageFlags::CHECKSUM_PRESENT) {
             checksum = Some(reader.read_u32::<LittleEndian>()?);
         } else if length_remaining != 0 {
-            bail!(ErrorKind::OperationError(format!(
-                "The server indicated that the reply would be {} bytes long, but it instead was {}",
-                header.length,
-                header.length - length_remaining + count_reader.bytes_read() as i32,
-            )));
+            return Err(ErrorKind::OperationError {
+                message: format!(
+                    "The server indicated that the reply would be {} bytes long, but it instead \
+                     was {}",
+                    header.length,
+                    header.length - length_remaining + count_reader.bytes_read() as i32,
+                ),
+            }
+            .into());
         }
 
         Ok(Self {
@@ -200,11 +205,15 @@ impl MessageSection {
         }
 
         if length_remaining - count_reader.bytes_read() as i32 != 0 {
-            bail!(ErrorKind::OperationError(format!(
-                "The server indicated that the reply would be {} bytes long, but it instead was {}",
-                size,
-                size - length_remaining + count_reader.bytes_read() as i32,
-            )));
+            return Err(ErrorKind::OperationError {
+                message: format!(
+                    "The server indicated that the reply would be {} bytes long, but it instead \
+                     was {}",
+                    size,
+                    size - length_remaining + count_reader.bytes_read() as i32,
+                ),
+            }
+            .into());
         }
 
         Ok(MessageSection::Sequence {

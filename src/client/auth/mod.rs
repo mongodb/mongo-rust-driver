@@ -65,9 +65,10 @@ impl AuthMechanism {
         match self {
             AuthMechanism::ScramSha1 => {
                 if credential.username.is_none() {
-                    bail!(ErrorKind::ArgumentError(
-                        "No username provided for SCRAM authentication".to_string()
-                    ))
+                    return Err(ErrorKind::ArgumentError {
+                        message: "No username provided for SCRAM authentication".to_string(),
+                    }
+                    .into());
                 };
                 Ok(())
             }
@@ -109,9 +110,9 @@ impl FromStr for AuthMechanism {
             MONGODB_X509_STR => Ok(AuthMechanism::MongoDbX509),
             GSSAPI_STR => Ok(AuthMechanism::Gssapi),
             PLAIN_STR => Ok(AuthMechanism::Plain),
-            _ => Err(ErrorKind::ArgumentError(
-                format!("invalid mechanism string: {}", str).to_string(),
-            )
+            _ => Err(ErrorKind::ArgumentError {
+                message: format!("invalid mechanism string: {}", str).to_string(),
+            }
             .into()),
         }
     }
