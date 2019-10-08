@@ -52,11 +52,15 @@ impl Reply {
         }
 
         if length_remaining as usize != r.bytes_read() {
-            bail!(ErrorKind::OperationError(format!(
-                "The server indicated that the reply would be {} bytes long, but it instead was {}",
-                header.length,
-                header.length - length_remaining + r.bytes_read() as i32,
-            )));
+            return Err(ErrorKind::OperationError {
+                message: format!(
+                    "The server indicated that the reply would be {} bytes long, but it instead \
+                     was {}",
+                    header.length,
+                    header.length - length_remaining + r.bytes_read() as i32,
+                ),
+            }
+            .into());
         }
 
         Ok(Self {

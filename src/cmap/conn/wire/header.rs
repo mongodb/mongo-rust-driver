@@ -19,10 +19,10 @@ impl OpCode {
             1 => Ok(OpCode::Reply),
             2004 => Ok(OpCode::Query),
             2013 => Ok(OpCode::Message),
-            other => bail!(ErrorKind::OperationError(format!(
-                "Invalid wire protocol opcode: {}",
-                other
-            ))),
+            other => Err(ErrorKind::OperationError {
+                message: format!("Invalid wire protocol opcode: {}", other),
+            }
+            .into()),
         }
     }
 }

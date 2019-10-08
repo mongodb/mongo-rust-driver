@@ -82,7 +82,10 @@ impl<'a> WaitQueueHandle<'a> {
             let (guard, result) = self.condvar.wait_timeout(guard, timeout).unwrap();
 
             if result.timed_out() {
-                bail!(ErrorKind::WaitQueueTimeoutError(guard.address.clone()));
+                return Err(ErrorKind::WaitQueueTimeoutError {
+                    address: guard.address.clone(),
+                }
+                .into());
             }
 
             self.guard = Some(guard);
@@ -141,7 +144,10 @@ impl WaitQueue {
             let (guard, result) = condvar.wait_timeout(guard, timeout).unwrap();
 
             if result.timed_out() {
-                bail!(ErrorKind::WaitQueueTimeoutError(guard.address.clone()));
+                return Err(ErrorKind::WaitQueueTimeoutError {
+                    address: guard.address.clone(),
+                }
+                .into());
             }
 
             guard

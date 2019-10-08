@@ -301,9 +301,12 @@ fn run_test(test_file: TestFile) {
         } else {
             let expected_type = if warning { "warning" } else { "error" };
 
-            match ClientOptions::parse(&test_case.uri).map_err(ErrorKind::from) {
+            match ClientOptions::parse(&test_case.uri)
+                .as_ref()
+                .map_err(|e| e.as_ref())
+            {
                 Ok(_) => panic!("expected {}", expected_type),
-                Err(ErrorKind::ArgumentError(s)) => {}
+                Err(ErrorKind::ArgumentError { .. }) => {}
                 Err(e) => panic!("expected ArgumentError, but got {:?}", e),
             }
         }

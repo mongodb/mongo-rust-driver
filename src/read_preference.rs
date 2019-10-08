@@ -46,10 +46,14 @@ impl ReadPreference {
         let tag_sets = Some(tag_sets);
 
         let read_pref = match self {
-            ReadPreference::Primary => bail!(ErrorKind::ArgumentError(
-                "read preference tags can only be specified when a non-primary mode is specified"
-                    .to_string()
-            )),
+            ReadPreference::Primary => {
+                return Err(ErrorKind::ArgumentError {
+                    message: "read preference tags can only be specified when a non-primary mode \
+                              is specified"
+                        .to_string(),
+                }
+                .into());
+            }
             ReadPreference::Secondary { max_staleness, .. } => ReadPreference::Secondary {
                 tag_sets,
                 max_staleness,

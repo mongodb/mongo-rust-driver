@@ -1,74 +1,103 @@
-use std::fmt;
+use std::{fmt, sync::Arc};
+
+use err_derive::Error;
 
 use crate::options::StreamAddress;
 
-error_chain! {
-    foreign_links {
-        BsonDecode(bson::DecoderError);
-        BsonEncode(bson::EncoderError);
-        DnsName(webpki::InvalidDNSNameError);
-        Io(std::io::Error);
-    }
+pub type Result<T> = std::result::Result<T, Error>;
 
-    errors {
-        /// A malformed or invalid argument was passed to the driver.
-        ArgumentError(msg: String) {
-            description("An invalid argument was provided to a database operation")
-            display("An invalid argument was provided to a database operation: {}", msg)
-        }
+#[derive(Clone, Debug, Error)]
+#[error(display = "{}", kind)]
+pub struct Error {
+    pub kind: Arc<ErrorKind>,
+}
 
-        /// The server encountered an error when executing the operation.
-        CommandError(err: CommandError) {
-            description("An error occurred when executing a command")
-            display("Command failed ({}): {}", err.code_name, err.message)
-        }
-
-        /// The driver was unable to send or receive a message to the server.
-        InvalidHostname(hostname: String) {
-            description("Unable to parse hostname")
-            display("Unable to parse hostname: '{}'", hostname)
-        }
-
-        /// The driver was unable to send or receive a message to the server.
-        OperationError(msg: String) {
-            description("A database operation failed to send or receive a reply")
-            display("A database operation failed to send or receive a reply: {}", msg)
-        }
-
-        /// The response the driver received from the server was not in the form expected.
-        ParseError(data_type: String, file_path: String) {
-            description("Unable to parse data from file")
-            display("Unable to parse {} data from {}", data_type, file_path)
-        }
-
-        PoolClosedError(address: String) {
-            description("Attempted to check out a connection from closed connection pool")
-            display("Attempted to check out a connection from closed connection pool with address {}", address)
-        }
-
-        /// The response the driver received from the server was not in the form expected.
-        ResponseError(msg: String) {
-            description("A database operation returned an invalid reply")
-            display("A database operation returned an invalid reply: {}", msg)
-        }
-
-        /// An error occurred during server selection.
-        ServerSelectionError(msg: String) {
-            description("An error occurred during server selection")
-            display("An error occurred during server selection: {}", msg)
-        }
-
-        WaitQueueTimeoutError(address: StreamAddress) {
-            description("Timed out while checking out a connection from connection pool")
-            display("Timed out while checking out a connection from connection pool with address {}", address)
-        }
-
-        /// An error occurred when trying to execute a write operation.
-        WriteError(inner: WriteFailure) {
-            description("An error occurred when trying to execute a write operation:")
-            display("{}", inner)
+impl<E> From<E> for Error
+where
+    ErrorKind: From<E>,
+{
+    fn from(err: E) -> Self {
+        Self {
+            kind: Arc::new(err.into()),
         }
     }
+}
+
+impl std::ops::Deref for Error {
+    type Target = Arc<ErrorKind>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.kind
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum ErrorKind {
+    #[error(
+        display = "An invalid argument was provided to a database operation: {}",
+        message
+    )]
+    ArgumentError { message: String },
+
+    #[error(display = "{}", _0)]
+    BsonDecode(#[error(source)] bson::DecoderError),
+
+    #[error(display = "{}", _0)]
+    BsonEncode(#[error(source)] bson::EncoderError),
+
+    #[error(display = "Command failed {}", inner)]
+    CommandError { inner: CommandError },
+
+    #[error(display = "{}", _0)]
+    DnsName(#[error(source)] webpki::InvalidDNSNameError),
+
+    #[error(display = "Unable to parse hostname: {}", hostname)]
+    InvalidHostname { hostname: String },
+
+    #[error(display = "{}", _0)]
+    Io(#[error(source)] std::io::Error),
+
+    #[error(
+        display = "A database operation failed to send or receive a reply: {}",
+        message
+    )]
+    OperationError { message: String },
+
+    #[error(display = "Unable to parse {} data from {}", data_type, file_path)]
+    ParseError {
+        data_type: String,
+        file_path: String,
+    },
+
+    #[error(
+        display = "Attempted to check out a connection from closed connection pool with address {}",
+        address
+    )]
+    PoolClosedError { address: String },
+
+    #[error(
+        display = "A database operation returned an invalid reply: {}",
+        message
+    )]
+    ResponseError { message: String },
+
+    #[error(
+        display = "A database operation returned an invalid reply: {}",
+        message
+    )]
+    ServerSelectionError { message: String },
+
+    #[error(
+        display = "Timed out while checking out a connection from connection pool with address {}",
+        address
+    )]
+    WaitQueueTimeoutError { address: StreamAddress },
+
+    #[error(
+        display = "An error occurred when trying to execute a write operation: {}",
+        inner
+    )]
+    WriteError { inner: WriteFailure },
 }
 
 /// An error that occurred due to a database command failing.
@@ -78,6 +107,12 @@ pub struct CommandError {
     code_name: String,
     message: String,
     labels: Vec<String>,
+}
+
+impl fmt::Display for CommandError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "({}): {})", self.code_name, self.message)
+    }
 }
 
 /// An error that occurred due to not being able to satisfy a write concern.

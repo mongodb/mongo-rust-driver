@@ -41,7 +41,7 @@ pub(crate) struct ServerDescription {
     // allows us to ensure that only valid states are possible (e.g. preventing that both an error
     // and a reply are present) while still making it easy to define helper methods on
     // ServerDescription for information we need from the isMaster reply by propagating with `?`.
-    reply: std::result::Result<Option<IsMasterReply>, String>,
+    reply: Result<Option<IsMasterReply>>,
 }
 
 impl PartialEq for ServerDescription {
@@ -50,16 +50,15 @@ impl PartialEq for ServerDescription {
             return false;
         }
 
-        let self_reply = self
-            .reply
-            .as_ref()
-            .map(|reply| reply.as_ref().map(|r| &r.command_response));
-        let other_reply = other
-            .reply
-            .as_ref()
-            .map(|reply| reply.as_ref().map(|r| &r.command_response));
+        match (self.reply.as_ref(), other.reply.as_ref()) {
+            (Ok(self_reply), Ok(other_reply)) => {
+                let self_response = self_reply.as_ref().map(|r| &r.command_response);
+                let other_response = other_reply.as_ref().map(|r| &r.command_response);
 
-        self_reply == other_reply
+                self_response == other_response
+            }
+            _ => false,
+        }
     }
 }
 
@@ -74,7 +73,7 @@ impl ServerDescription {
             address,
             server_type: Default::default(),
             last_update_time: None,
-            reply: is_master_reply.transpose().map_err(|e| e.to_string()),
+            reply: is_master_reply.transpose(),
         };
 
         if let Ok(Some(ref mut reply)) = description.reply {
@@ -152,33 +151,39 @@ impl ServerDescription {
         None
     }
 
-    pub(crate) fn set_name(&self) -> std::result::Result<Option<String>, String> {
+    pub(crate) fn set_name(&self) -> Result<Option<String>> {
         let set_name = self
             .reply
-            .as_ref()?
+            .as_ref()
+            .map_err(Clone::clone)?
             .as_ref()
             .and_then(|reply| reply.command_response.set_name.clone());
         Ok(set_name)
     }
 
-    pub(crate) fn known_hosts(&self) -> std::result::Result<impl Iterator<Item = &String>, String> {
-        let known_hosts = self.reply.as_ref()?.as_ref().map(|reply| {
-            let hosts = reply.command_response.hosts.as_ref();
-            let passives = reply.command_response.passives.as_ref();
-            let arbiters = reply.command_response.arbiters.as_ref();
+    pub(crate) fn known_hosts(&self) -> Result<impl Iterator<Item = &String>> {
+        let known_hosts = self
+            .reply
+            .as_ref()
+            .map_err(Clone::clone)?
+            .as_ref()
+            .map(|reply| {
+                let hosts = reply.command_response.hosts.as_ref();
+                let passives = reply.command_response.passives.as_ref();
+                let arbiters = reply.command_response.arbiters.as_ref();
 
-            hosts
-                .into_iter()
-                .flatten()
-                .chain(passives.into_iter().flatten())
-                .chain(arbiters.into_iter().flatten())
-        });
+                hosts
+                    .into_iter()
+                    .flatten()
+                    .chain(passives.into_iter().flatten())
+                    .chain(arbiters.into_iter().flatten())
+            });
 
         Ok(known_hosts.into_iter().flatten())
     }
 
-    pub(crate) fn invalid_me(&self) -> std::result::Result<bool, String> {
-        if let Some(ref reply) = self.reply.as_ref()? {
+    pub(crate) fn invalid_me(&self) -> Result<bool> {
+        if let Some(ref reply) = self.reply.as_ref().map_err(Clone::clone)? {
             if let Some(ref me) = reply.command_response.me {
                 return Ok(&self.address.to_string() != me);
             }
@@ -187,37 +192,41 @@ impl ServerDescription {
         Ok(false)
     }
 
-    pub(crate) fn set_version(&self) -> std::result::Result<Option<i32>, String> {
+    pub(crate) fn set_version(&self) -> Result<Option<i32>> {
         let me = self
             .reply
-            .as_ref()?
+            .as_ref()
+            .map_err(Clone::clone)?
             .as_ref()
             .and_then(|reply| reply.command_response.set_version);
         Ok(me)
     }
 
-    pub(crate) fn election_id(&self) -> std::result::Result<Option<ObjectId>, String> {
+    pub(crate) fn election_id(&self) -> Result<Option<ObjectId>> {
         let me = self
             .reply
-            .as_ref()?
+            .as_ref()
+            .map_err(Clone::clone)?
             .as_ref()
             .and_then(|reply| reply.command_response.election_id.clone());
         Ok(me)
     }
 
-    pub(crate) fn min_wire_version(&self) -> std::result::Result<Option<i32>, String> {
+    pub(crate) fn min_wire_version(&self) -> Result<Option<i32>> {
         let me = self
             .reply
-            .as_ref()?
+            .as_ref()
+            .map_err(Clone::clone)?
             .as_ref()
             .and_then(|reply| reply.command_response.min_wire_version);
         Ok(me)
     }
 
-    pub(crate) fn max_wire_version(&self) -> std::result::Result<Option<i32>, String> {
+    pub(crate) fn max_wire_version(&self) -> Result<Option<i32>> {
         let me = self
             .reply
-            .as_ref()?
+            .as_ref()
+            .map_err(Clone::clone)?
             .as_ref()
             .and_then(|reply| reply.command_response.max_wire_version);
         Ok(me)

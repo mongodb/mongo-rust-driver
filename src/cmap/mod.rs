@@ -187,7 +187,7 @@ impl ConnectionPool {
         let mut conn = match result {
             Ok(conn) => conn,
             Err(e) => {
-                if let ErrorKind::WaitQueueTimeoutError(..) = e.kind() {
+                if let ErrorKind::WaitQueueTimeoutError { .. } = e.kind.as_ref() {
                     self.emit_event(|handler| {
                         handler.handle_connection_checkout_failed_event(
                             ConnectionCheckoutFailedEvent {
@@ -257,7 +257,10 @@ impl ConnectionPool {
                         handler.handle_connection_checkout_failed_event(event);
                     });
 
-                    bail!(ErrorKind::WaitQueueTimeoutError(self.inner.address.clone()));
+                    return Err(ErrorKind::WaitQueueTimeoutError {
+                        address: self.inner.address.clone(),
+                    }
+                    .into());
                 }
 
                 // Wait until the either the timeout has been reached or a connection is checked
