@@ -7,7 +7,7 @@ use crate::{bson_util, concern::WriteConcern, error::Result, read_preference::Re
 /// `Command` is a driver side abstraction of a server command containing all the information
 /// necessary to serialize it to a wire message.
 pub(crate) struct Command {
-    name: &'static str,
+    name: String,
     target_db: String,
     read_pref: Option<ReadPreference>,
     write_concern: Option<WriteConcern>,
@@ -17,7 +17,7 @@ pub(crate) struct Command {
 impl Command {
     /// Constructs a read command.
     pub(crate) fn new_read(
-        name: &'static str,
+        name: String,
         target_db: String,
         read_pref: Option<ReadPreference>,
         body: Document,
@@ -33,7 +33,7 @@ impl Command {
 
     /// Constructs a write command.
     pub(crate) fn new_write(
-        name: &'static str,
+        name: String,
         target_db: String,
         write_concern: Option<WriteConcern>,
         body: Document,
@@ -49,7 +49,7 @@ impl Command {
 
     /// Constructs a command that may both read and write (e.g. findAndModify).
     pub(crate) fn new_read_write(
-        name: &'static str,
+        name: String,
         target_db: String,
         read_pref: Option<ReadPreference>,
         write_concern: Option<WriteConcern>,
@@ -64,8 +64,8 @@ impl Command {
         }
     }
 
-    pub(crate) fn name(&self) -> &'static str {
-        self.name
+    pub(crate) fn name(&self) -> &str {
+        self.name.as_str()
     }
 
     pub(crate) fn target_db(&self) -> &str {

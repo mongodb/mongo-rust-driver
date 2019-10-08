@@ -29,7 +29,7 @@ fn acquire_connection_and_send_command() {
         tag_sets: None,
         max_staleness: None,
     };
-    let cmd = Command::new_read("listDatabases", "admin".to_string(), Some(read_pref), body);
+    let cmd = Command::new_read("listDatabases".to_string(), "admin".to_string(), Some(read_pref), body);
     let response = connection.send_command(cmd).unwrap();
 
     assert!(response.is_success());
