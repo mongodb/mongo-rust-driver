@@ -7,11 +7,11 @@ use crate::{bson_util, concern::WriteConcern, error::Result, read_preference::Re
 /// `Command` is a driver side abstraction of a server command containing all the information
 /// necessary to serialize it to a wire message.
 pub(crate) struct Command {
-    name: String,
-    target_db: String,
-    read_pref: Option<ReadPreference>,
-    write_concern: Option<WriteConcern>,
-    body: Document,
+    pub(crate) name: String,
+    pub(crate) target_db: String,
+    pub(crate) read_pref: Option<ReadPreference>,
+    pub(crate) write_concern: Option<WriteConcern>,
+    pub(crate) body: Document,
 }
 
 impl Command {
@@ -63,26 +63,6 @@ impl Command {
             body,
         }
     }
-
-    pub(crate) fn name(&self) -> &str {
-        self.name.as_str()
-    }
-
-    pub(crate) fn target_db(&self) -> &str {
-        self.target_db.as_str()
-    }
-
-    pub(crate) fn read_preference(&self) -> Option<ReadPreference> {
-        self.read_pref.clone()
-    }
-
-    pub(crate) fn write_concern(&self) -> Option<WriteConcern> {
-        self.write_concern.clone()
-    }
-
-    pub(crate) fn body(&self) -> Document {
-        self.body.clone()
-    }
 }
 
 pub(crate) struct CommandResponse {
@@ -106,10 +86,8 @@ impl CommandResponse {
 
     /// Deserialize the body of the response.
     pub(crate) fn body<T: DeserializeOwned>(&self) -> Result<T> {
-        match bson::from_bson(Bson::Document(self.raw_response.clone())) {
-            Ok(r) => Ok(r),
-            Err(e) => Err(e.into()),
-        }
+        let body = bson::from_bson(Bson::Document(self.raw_response.clone()))?;
+        Ok(body)
     }
 
     /// The raw server response.

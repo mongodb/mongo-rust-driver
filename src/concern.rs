@@ -113,6 +113,15 @@ impl Acknowledgment {
 }
 
 impl WriteConcern {
+    /// Constructs an unacknowledged write concern.
+    pub(crate) fn unacknowledged() -> Self {
+        WriteConcern {
+            w: Some(Acknowledgment::Nodes(0)),
+            journal: Some(false),
+            w_timeout: None,
+        }
+    }
+
     /// Validates that the write concern. A write concern is invalid if the `w` field is 0
     /// and the `j` field is `true`.
     pub fn validate(&self) -> Result<()> {

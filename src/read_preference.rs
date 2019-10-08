@@ -1,6 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
-use bson::{Bson, Document};
+use bson::{bson, doc, Bson, Document};
 
 use crate::error::{ErrorKind, Result};
 
@@ -75,7 +75,7 @@ impl ReadPreference {
         Ok(read_pref)
     }
 
-    pub(crate) fn to_document(&self) -> Document {
+    pub(crate) fn into_document(self) -> Document {
         let (mode, tag_sets, max_staleness) = match self.clone() {
             ReadPreference::Primary => ("primary", None, None),
             ReadPreference::PrimaryPreferred {
@@ -95,8 +95,8 @@ impl ReadPreference {
                 max_staleness,
             } => ("nearest", tag_sets, max_staleness),
         };
-        let mut doc = Document::new();
-        doc.insert("mode", mode);
+
+        let mut doc = doc! { "mode": mode };
 
         if let Some(max_stale) = max_staleness {
             doc.insert("maxStalenessSeconds", max_stale.as_secs());
@@ -104,12 +104,9 @@ impl ReadPreference {
 
         if let Some(tag_sets) = tag_sets {
             let tags: Vec<Bson> = tag_sets
-                .iter()
+                .into_iter()
                 .map(|tag_set| {
-                    Bson::Document(tag_set.iter().fold(Document::new(), |mut doc, (k, v)| {
-                        doc.insert(k, v);
-                        doc
-                    }))
+                    Bson::Document(tag_set.into_iter().map(|(k, v)| (k, v.into())).collect())
                 })
                 .collect();
             doc.insert("tags", tags);

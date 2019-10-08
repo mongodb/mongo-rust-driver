@@ -26,10 +26,10 @@ impl Message {
     /// Creates a `Message` from a given `Command`.
     ///
     /// Note that `response_to` will need to be set manually.
-    pub(crate) fn from_command(command: Command) -> Self {
-        let acknowledged = match command.write_concern() {
-            Some(wc) => wc.is_acknowledged(),
-            None => true,
+    pub(crate) fn from_command(mut command: Command) -> Result<Self> {
+        let (acknowledged, write_concern) = match command.write_concern {
+            Some(wc) => (wc.is_acknowledged(), Some(wc)),
+            None => (true, None),
         };
 
         let flags = if !acknowledged {
@@ -38,19 +38,26 @@ impl Message {
             MessageFlags::empty()
         };
 
-        let mut body = command.body();
-        body.insert("$db", command.target_db());
+        command.body.insert("$db", command.target_db);
 
-        if let Some(read_pref) = command.read_preference() {
-            body.insert("$readPreference", read_pref.to_document());
+        if let Some(read_pref) = command.read_pref {
+            command
+                .body
+                .insert("$readPreference", read_pref.into_document());
         };
 
-        Self {
+        if let Some(write_concern) = write_concern {
+            command
+                .body
+                .insert("writeConcern", write_concern.into_document()?);
+        }
+
+        Ok(Self {
             response_to: 0,
             flags,
-            sections: vec![MessageSection::Document(body)],
+            sections: vec![MessageSection::Document(command.body)],
             checksum: None,
-        }
+        })
     }
 
     /// Creates a Message with a single section containing `document`.
