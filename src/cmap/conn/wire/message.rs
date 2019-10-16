@@ -26,7 +26,7 @@ impl Message {
     /// Creates a `Message` from a given `Command`.
     ///
     /// Note that `response_to` will need to be set manually.
-    pub(crate) fn from_command(mut command: Command) -> Result<Self> {
+    pub(crate) fn from_command(mut command: Command) -> Self {
         command.body.insert("$db", command.target_db);
 
         if let Some(read_pref) = command.read_pref {
@@ -35,18 +35,12 @@ impl Message {
                 .insert("$readPreference", read_pref.into_document());
         };
 
-        if let Some(write_concern) = command.write_concern {
-            command
-                .body
-                .insert("writeConcern", write_concern.into_document()?);
-        }
-
-        Ok(Self {
+        Self {
             response_to: 0,
             flags: MessageFlags::empty(),
             sections: vec![MessageSection::Document(command.body)],
             checksum: None,
-        })
+        }
     }
 
     /// Creates a Message with a single section containing `document`.

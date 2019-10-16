@@ -160,7 +160,7 @@ impl Connection {
     /// driver received the response; it does not imply anything about the success of the command
     /// itself.
     pub(crate) fn send_command(&mut self, command: Command) -> Result<CommandResponse> {
-        let message = Message::from_command(command)?;
+        let message = Message::from_command(command);
         message.write_to(&mut self.stream)?;
 
         let response_message = Message::read_from(&mut self.stream)?;

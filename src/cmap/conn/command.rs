@@ -10,7 +10,6 @@ pub(crate) struct Command {
     pub(crate) name: String,
     pub(crate) target_db: String,
     pub(crate) read_pref: Option<ReadPreference>,
-    pub(crate) write_concern: Option<WriteConcern>,
     pub(crate) body: Document,
 }
 
@@ -26,7 +25,6 @@ impl Command {
             name,
             target_db,
             read_pref,
-            write_concern: None,
             body,
         }
     }
@@ -36,13 +34,16 @@ impl Command {
         name: String,
         target_db: String,
         write_concern: Option<WriteConcern>,
-        body: Document,
+        mut body: Document,
     ) -> Self {
+        if let Some(write_concern) = write_concern {
+            body.insert("writeConcern", write_concern.into_document());
+        };
+
         Self {
             name,
             target_db,
             read_pref: None,
-            write_concern,
             body,
         }
     }
@@ -59,7 +60,6 @@ impl Command {
             name,
             target_db,
             read_pref,
-            write_concern,
             body,
         }
     }
