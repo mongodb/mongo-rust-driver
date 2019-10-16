@@ -10,7 +10,6 @@ use self::{
     wire::Message,
 };
 use super::ConnectionPool;
-use crate::concern::WriteConcern;
 use crate::{
     error::Result,
     event::cmap::{
@@ -153,18 +152,6 @@ impl Connection {
             connection_id: self.id,
             reason,
         }
-    }
-
-    /// Executes a `Command` and does not wait for a server response. The write concern is
-    /// provided to this method is ignored; the command will always be executed with an
-    /// unacknowledged write concern.
-    ///
-    /// This method will only return an error case if there is an error serializing the command
-    /// to the wire protocol.
-    pub(crate) fn send_unacknowledged_command(&mut self, mut command: Command) -> Result<()> {
-        command.write_concern = Some(WriteConcern::unacknowledged());
-        let message = Message::from_command(command)?;
-        message.write_to(&mut self.stream)
     }
 
     /// Executes a `Command` and returns a `CommandResponse` containing the result from the server.
