@@ -6,6 +6,7 @@ use crate::{bson_util, concern::WriteConcern, error::Result, read_preference::Re
 
 /// `Command` is a driver side abstraction of a server command containing all the information
 /// necessary to serialize it to a wire message.
+#[derive(Debug, Clone)]
 pub(crate) struct Command {
     pub(crate) name: String,
     pub(crate) target_db: String,
