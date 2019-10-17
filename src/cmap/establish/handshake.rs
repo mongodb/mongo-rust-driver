@@ -1,9 +1,9 @@
-use bson::{bson, doc, Bson, Document};
+use bson::{bson, doc, Document};
 use lazy_static::lazy_static;
 use os_info::{Type, Version};
 
 use crate::{
-    cmap::{options::ConnectionPoolOptions, Connection},
+    cmap::{conn::command::Command, options::ConnectionPoolOptions, Connection},
     error::Result,
     is_master::IsMasterCommandResponse,
 };
@@ -50,9 +50,9 @@ lazy_static! {
 /// Contains the logic needed to handshake a connection.
 #[derive(Debug, Clone)]
 pub(super) struct Handshaker {
-    /// The `isMaster` command document to send when handshaking. This will always be identical
+    /// The `isMaster` command to send when handshaking. This will always be identical
     /// given the same pool options, so it can be created at the time the Handshaker is created.
-    document: Document,
+    command: Command,
 }
 
 impl Handshaker {
@@ -69,20 +69,21 @@ impl Handshaker {
         // TODO RUST-204: Choose proper database to handshake against.
         let db = "admin";
 
-        Self {
-            document: doc! {
+        let body = doc! {
                 "isMaster": 1,
                 "client": document,
-                "$db": db,
-            },
+        };
+
+        Self {
+            command: Command::new_read("isMaster".to_string(), db.to_string(), None, body),
         }
     }
 
     /// Handshakes a connection.
     pub(super) fn handshake(&self, conn: &mut Connection) -> Result<IsMasterCommandResponse> {
-        let response_doc = conn.execute_operation(self.document.clone())?;
-        let command_response = bson::from_bson(Bson::Document(response_doc))?;
+        let response = conn.send_command(self.command.clone())?;
+        let deserialized_response = response.body()?;
 
-        Ok(command_response)
+        Ok(deserialized_response)
     }
 }

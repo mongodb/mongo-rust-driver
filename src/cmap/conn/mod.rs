@@ -1,11 +1,14 @@
+pub(crate) mod command;
 mod stream;
 mod wire;
 
 use std::time::{Duration, Instant};
 
-use bson::Document;
-
-use self::{stream::Stream, wire::Message};
+use self::{
+    command::{Command, CommandResponse},
+    stream::Stream,
+    wire::Message,
+};
 use super::ConnectionPool;
 use crate::{
     error::Result,
@@ -151,18 +154,17 @@ impl Connection {
         }
     }
 
-    /// Executes a command specified by `document` as an OP_MSG and returns a single-document
-    /// response.
+    /// Executes a `Command` and returns a `CommandResponse` containing the result from the server.
     ///
-    /// This API will likely be changed due to the operations layer implementation in RUST-183.
-    pub(crate) fn execute_operation(&mut self, document: Document) -> Result<Document> {
-        let message = Message::from_document(document);
+    /// An `Ok(...)` result simply means the server received the command and that the driver
+    /// driver received the response; it does not imply anything about the success of the command
+    /// itself.
+    pub(crate) fn send_command(&mut self, command: Command) -> Result<CommandResponse> {
+        let message = Message::from_command(command);
         message.write_to(&mut self.stream)?;
 
-        let response = Message::read_from(&mut self.stream)?;
-        let document = response.single_document_response()?;
-
-        Ok(document)
+        let response_message = Message::read_from(&mut self.stream)?;
+        CommandResponse::from_message(response_message)
     }
 }
 

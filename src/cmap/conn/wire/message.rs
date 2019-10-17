@@ -8,7 +8,10 @@ use super::{
     header::{Header, OpCode},
     util::CountReader,
 };
-use crate::error::{Error, ErrorKind, Result};
+use crate::{
+    cmap::conn::command::Command,
+    error::{Error, ErrorKind, Result},
+};
 
 /// Represents an OP_MSG wire protocol operation.
 #[derive(Debug)]
@@ -20,6 +23,26 @@ pub(crate) struct Message {
 }
 
 impl Message {
+    /// Creates a `Message` from a given `Command`.
+    ///
+    /// Note that `response_to` will need to be set manually.
+    pub(crate) fn from_command(mut command: Command) -> Self {
+        command.body.insert("$db", command.target_db);
+
+        if let Some(read_pref) = command.read_pref {
+            command
+                .body
+                .insert("$readPreference", read_pref.into_document());
+        };
+
+        Self {
+            response_to: 0,
+            flags: MessageFlags::empty(),
+            sections: vec![MessageSection::Document(command.body)],
+            checksum: None,
+        }
+    }
+
     /// Creates a Message with a single section containing `document`.
     ///
     /// Note that `response_to` will need to be set manually, as well as any non-default flags.

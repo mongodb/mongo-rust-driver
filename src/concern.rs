@@ -141,11 +141,9 @@ impl WriteConcern {
         Ok(())
     }
 
-    /// Converts the write concern into a `Document`. This method will return an error if the write
-    /// concern is invalid.
-    pub fn into_document(self) -> Result<Document> {
-        self.validate()?;
-
+    /// Converts the write concern into a `Document`. This method will not validate the
+    /// produced write concern.
+    pub(crate) fn into_document(self) -> Document {
         let mut doc = Document::new();
 
         if let Some(acknowledgment) = self.w {
@@ -160,6 +158,6 @@ impl WriteConcern {
             doc.insert("j", j);
         }
 
-        Ok(doc)
+        doc
     }
 }
