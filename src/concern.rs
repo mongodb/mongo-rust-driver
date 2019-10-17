@@ -143,7 +143,7 @@ impl WriteConcern {
 
     /// Converts the write concern into a `Document`. This method will not validate the
     /// produced write concern.
-    pub fn into_document(self) -> Document {
+    pub(crate) fn into_document(self) -> Document {
         let mut doc = Document::new();
 
         if let Some(acknowledgment) = self.w {
