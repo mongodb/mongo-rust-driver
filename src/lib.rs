@@ -60,6 +60,8 @@ mod db;
 pub mod error;
 pub mod event;
 mod is_master;
+#[allow(dead_code)]
+mod operation;
 pub mod options;
 mod read_preference;
 pub mod results;

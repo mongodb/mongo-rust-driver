@@ -48,7 +48,7 @@ impl Topology {
     }
 
     /// Selects a server description with the given criteria.
-    pub(crate) fn select_server(&self, selector: SelectionCriteria) -> Result<Arc<Server>> {
+    pub(crate) fn select_server(&self, selector: &SelectionCriteria) -> Result<Arc<Server>> {
         // TODO RUST-205: If no server is found, request an update, loop, and check for timeout.
 
         let server_description = self.description.select_server(selector).ok_or_else(|| {

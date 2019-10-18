@@ -15,14 +15,14 @@ pub(crate) enum SelectionCriteria {
 
 impl TopologyDescription {
     /// Selects a server for an operation given criteria.
-    pub(crate) fn select_server(&self, criteria: SelectionCriteria) -> Option<&ServerDescription> {
+    pub(crate) fn select_server(&self, criteria: &SelectionCriteria) -> Option<&ServerDescription> {
         self.suitable_servers(criteria)
             .into_iter()
             .choose(&mut rand::thread_rng())
     }
 
     /// Gets all of the suitable servers for an operation given criteria.
-    fn suitable_servers(&self, selector: SelectionCriteria) -> Vec<&ServerDescription> {
+    fn suitable_servers(&self, selector: &SelectionCriteria) -> Vec<&ServerDescription> {
         unimplemented!()
     }
 }
