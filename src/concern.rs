@@ -103,9 +103,9 @@ impl From<String> for Acknowledgment {
 }
 
 impl Acknowledgment {
-    fn to_bson(&self) -> Bson {
+    pub(crate) fn to_bson(&self) -> Bson {
         match self {
-            Acknowledgment::Nodes(i) => Bson::I32(*i),
+            Acknowledgment::Nodes(i) => Bson::I64(i64::from(*i)),
             Acknowledgment::Majority => Bson::String("majority".to_string()),
             Acknowledgment::Tag(s) => Bson::String(s.to_string()),
         }

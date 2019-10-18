@@ -86,6 +86,18 @@ impl AuthMechanism {
             _ => "".to_string(),
         }
     }
+
+    #[allow(dead_code)]
+    pub(crate) fn as_str(&self) -> &'static str {
+        match self {
+            AuthMechanism::ScramSha1 => SCRAM_SHA_1_STR,
+            AuthMechanism::ScramSha256 => SCRAM_SHA_256_STR,
+            AuthMechanism::MongoDbCr => MONGODB_CR_STR,
+            AuthMechanism::MongoDbX509 => MONGODB_X509_STR,
+            AuthMechanism::Gssapi => GSSAPI_STR,
+            AuthMechanism::Plain => PLAIN_STR,
+        }
+    }
 }
 
 impl FromStr for AuthMechanism {
