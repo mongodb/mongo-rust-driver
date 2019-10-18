@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod test;
+
 use std::{
     collections::HashSet,
     fmt,
@@ -9,7 +12,7 @@ use std::{
     time::Duration,
 };
 
-use bson::Document;
+use bson::{Bson, Document};
 use lazy_static::lazy_static;
 use rustls::{
     internal::pemfile, Certificate, RootCertStore, ServerCertVerified, ServerCertVerifier, TLSError,
@@ -153,7 +156,28 @@ pub struct ClientOptions {
     pub wait_queue_timeout: Option<Duration>,
 
     #[builder(default)]
+    pub(crate) compressors: Option<Vec<String>>,
+
+    #[builder(default)]
+    pub(crate) connect_timeout: Option<Duration>,
+
+    #[builder(default)]
+    pub(crate) retry_reads: Option<bool>,
+
+    #[builder(default)]
+    pub(crate) retry_writes: Option<bool>,
+
+    #[builder(default)]
+    pub(crate) socket_timeout: Option<Duration>,
+
+    #[builder(default)]
+    pub(crate) zlib_compression: Option<i32>,
+
+    #[builder(default)]
     pub direct_connection: Option<bool>,
+
+    #[builder(default)]
+    pub(crate) max_staleness: Option<Duration>,
 
     /// The credential to use for authenticating connections made by this client.
     #[builder(default)]
@@ -182,12 +206,21 @@ struct ClientOptionsParser {
     pub min_pool_size: Option<u32>,
     pub max_idle_time: Option<Duration>,
     pub wait_queue_timeout: Option<Duration>,
+    pub compressors: Option<Vec<String>>,
+    pub connect_timeout: Option<Duration>,
+    pub retry_reads: Option<bool>,
+    pub retry_writes: Option<bool>,
+    pub socket_timeout: Option<Duration>,
+    pub zlib_compression: Option<i32>,
+    pub max_staleness: Option<Duration>,
     pub direct_connection: Option<bool>,
     pub credential: Option<Credential>,
+    tls_insecure: Option<bool>,
     auth_mechanism: Option<AuthMechanism>,
     auth_source: Option<String>,
     auth_mechanism_properties: Option<Document>,
     read_preference_tags: Option<Vec<TagSet>>,
+    tls_values: Vec<bool>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -278,8 +311,15 @@ impl From<ClientOptionsParser> for ClientOptions {
             max_idle_time: parser.max_idle_time,
             wait_queue_timeout: parser.wait_queue_timeout,
             server_selection_timeout: parser.server_selection_timeout,
+            compressors: parser.compressors,
+            connect_timeout: parser.connect_timeout,
+            retry_reads: parser.retry_reads,
+            retry_writes: parser.retry_writes,
+            socket_timeout: parser.socket_timeout,
+            zlib_compression: parser.zlib_compression,
             direct_connection: parser.direct_connection,
             credential: parser.credential,
+            max_staleness: parser.max_staleness,
         }
     }
 }
@@ -463,7 +503,26 @@ impl ClientOptionsParser {
                     .auth_source
                     .take()
                     .or_else(|| Some(mechanism.default_source(db_str)));
-                credential.mechanism_properties = options.auth_mechanism_properties.take();
+
+                if let Some(mut doc) = options.auth_mechanism_properties.take() {
+                    match doc.remove("CANONICALIZE_HOST_NAME") {
+                        Some(Bson::String(s)) => {
+                            let val = match &s.to_lowercase()[..] {
+                                "true" => Bson::Boolean(true),
+                                "false" => Bson::Boolean(false),
+                                _ => Bson::String(s),
+                            };
+                            doc.insert("CANONICALIZE_HOST_NAME", val);
+                        }
+                        Some(val) => {
+                            doc.insert("CANONICALIZE_HOST_NAME", val);
+                        }
+                        None => {}
+                    }
+
+                    credential.mechanism_properties = Some(doc);
+                }
+
                 mechanism.validate_credential(&credential)?;
                 credential.mechanism = options.auth_mechanism.take();
             }
@@ -530,6 +589,24 @@ impl ClientOptionsParser {
             };
         }
 
+        if !self.tls_values.is_empty() {
+            let tls_value = self.tls_values[0];
+
+            if self.tls_values.drain(..).any(|val| val != tls_value) {
+                bail!(ErrorKind::ArgumentError(
+                    "All instances of `tls` and `ssl` must have the same value".to_string()
+                ))
+            }
+
+            if tls_value {
+                if self.tls_options == None {
+                    self.tls_options = Some(Default::default());
+                }
+            } else {
+                self.tls_options = None;
+            }
+        }
+
         Ok(())
     }
 
@@ -547,7 +624,7 @@ impl ClientOptionsParser {
             };
         }
 
-        macro_rules! get_ms {
+        macro_rules! get_duration {
             ($value:expr, $option:expr) => {
                 match u64::from_str_radix($value, 10) {
                     Ok(i) => i,
@@ -571,6 +648,18 @@ impl ClientOptionsParser {
             };
         }
 
+        macro_rules! get_i32 {
+            ($value:expr, $option:expr) => {
+                match i32::from_str_radix(value, 10) {
+                    Ok(u) => u,
+                    Err(_) => bail!(ErrorKind::ArgumentError(format!(
+                        "connection string `{}` argument must be an integer",
+                        $option,
+                    ))),
+                }
+            };
+        }
+
         match key {
             "appname" => {
                 self.app_name = Some(value.into());
@@ -579,18 +668,18 @@ impl ClientOptionsParser {
                 self.direct_connection = Some(get_bool!(value, k));
             }
             k @ "heartbeatfrequencyms" => {
-                self.heartbeat_freq = Some(Duration::from_millis(get_ms!(value, k)));
+                self.heartbeat_freq = Some(Duration::from_millis(get_duration!(value, k)));
             }
             k @ "journal" => {
                 let mut write_concern = self.write_concern.get_or_insert_with(Default::default);
                 write_concern.journal = Some(get_bool!(value, k));
             }
-            k @ "localthresholdms" => self.local_threshold = Some(get_ms!(value, k) as i64),
+            k @ "localthresholdms" => self.local_threshold = Some(get_duration!(value, k) as i64),
             "readconcernlevel" => {
                 self.read_concern = Some(ReadConcern::Custom(value.to_string()));
             }
-            k @ "maxidletime" => {
-                self.max_idle_time = Some(Duration::from_millis(get_ms!(value, k)));
+            k @ "maxidletimems" => {
+                self.max_idle_time = Some(Duration::from_millis(get_duration!(value, k)));
             }
             k @ "maxpoolsize" => {
                 self.max_pool_size = Some(get_u32!(value, k));
@@ -654,17 +743,34 @@ impl ClientOptionsParser {
                 self.repl_set_name = Some(value.to_string());
             }
             k @ "serverselectiontimeoutms" => {
-                self.server_selection_timeout = Some(Duration::from_millis(get_ms!(value, k)))
+                self.server_selection_timeout = Some(Duration::from_millis(get_duration!(value, k)))
             }
             k @ "tls" | k @ "ssl" => {
-                if get_bool!(value, k) {
-                    self.tls_options = Some(Default::default());
-                }
+                self.tls_values.push(get_bool!(value, k));
             }
-            k @ "tlsallowinvalidcertificates" => {
+            k @ "tlsinsecure" | k @ "tlsallowinvalidcertificates" => {
+                let val = get_bool!(value, k);
+
+                let allow_invalid_certificates = if k == "tlsinsecure" { !val } else { val };
+
+                if let Some(existing_val) = self
+                    .tls_options
+                    .as_ref()
+                    .and_then(|opts| opts.allow_invalid_certificates)
+                {
+                    if allow_invalid_certificates != existing_val {
+                        bail!(ErrorKind::ArgumentError(
+                            "all instances of 'tlsInsecure' and 'tlsAllowInvalidCertificates' \
+                             must be consistent (e.g. 'tlsInsecure' cannot be true when \
+                             'tlsAllowInvalidCertificates' is false, or vice-versa)"
+                                .into()
+                        ));
+                    }
+                }
+
                 self.tls_options
                     .get_or_insert_with(Default::default)
-                    .allow_invalid_certificates = Some(get_bool!(value, k));
+                    .allow_invalid_certificates = Some(allow_invalid_certificates);
             }
             "tlscafile" => {
                 self.tls_options
@@ -696,11 +802,11 @@ impl ClientOptionsParser {
                 };
             }
             k @ "waitqueuetimeoutms" => {
-                self.wait_queue_timeout = Some(Duration::from_millis(get_ms!(value, k)));
+                self.wait_queue_timeout = Some(Duration::from_millis(get_duration!(value, k)));
             }
             k @ "wtimeoutms" => {
                 let write_concern = self.write_concern.get_or_insert_with(Default::default);
-                write_concern.w_timeout = Some(Duration::from_millis(get_ms!(value, k)));
+                write_concern.w_timeout = Some(Duration::from_millis(get_duration!(value, k)));
             }
             "authmechanism" => {
                 self.auth_mechanism = Some(AuthMechanism::from_str(value)?);
@@ -727,6 +833,40 @@ impl ClientOptionsParser {
                     };
                 }
                 self.auth_mechanism_properties = Some(doc);
+            }
+            "compressors" => {
+                self.compressors = Some(value.split(',').map(String::from).collect());
+            }
+            k @ "connecttimeoutms" => {
+                self.connect_timeout = Some(Duration::from_millis(get_duration!(value, k)));
+            }
+            k @ "retrywrites" => {
+                self.retry_writes = Some(get_bool!(value, k));
+            }
+            k @ "retryreads" => {
+                self.retry_reads = Some(get_bool!(value, k));
+            }
+            k @ "sockettimeoutms" => {
+                self.socket_timeout = Some(Duration::from_millis(get_duration!(value, k)));
+            }
+            k @ "zlibcompressionlevel" => {
+                let i = get_i32!(value, k);
+                if i < -1 {
+                    bail!(ErrorKind::ArgumentError(
+                        "'zlibCompressionLevel' cannot be less than -1".to_string()
+                    ));
+                }
+
+                if i > 9 {
+                    bail!(ErrorKind::ArgumentError(
+                        "'zlibCompressionLevel' cannot be greater than 9".to_string()
+                    ));
+                }
+
+                self.zlib_compression = Some(i);
+            }
+            k @ "maxstalenessseconds" => {
+                self.max_staleness = Some(Duration::from_millis(get_duration!(value, k)));
             }
             _ => {}
         }
