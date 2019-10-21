@@ -1,4 +1,7 @@
 mod description;
 mod state;
 
-pub(crate) use self::description::{server::ServerType, topology::TopologyDescription};
+pub(crate) use self::{
+    description::{server::ServerType, topology::TopologyDescription},
+    state::Topology,
+};

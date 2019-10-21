@@ -2,7 +2,7 @@
 mod test;
 
 mod background;
-mod conn;
+pub(crate) mod conn;
 mod establish;
 pub(crate) mod options;
 mod wait_queue;
@@ -107,15 +107,11 @@ pub(crate) struct ConnectionPoolInner {
 
     /// The event handler specified by the user to process CMAP events.
     #[derivative(Debug = "ignore")]
-    event_handler: Option<Box<dyn CmapEventHandler>>,
+    event_handler: Option<Arc<dyn CmapEventHandler>>,
 }
 
 impl ConnectionPool {
-    pub(crate) fn new(
-        address: StreamAddress,
-        mut options: Option<ConnectionPoolOptions>,
-        event_handler: Option<Box<dyn CmapEventHandler>>,
-    ) -> Self {
+    pub(crate) fn new(address: StreamAddress, mut options: Option<ConnectionPoolOptions>) -> Self {
         // Get the individual options from `options`.
         let max_idle_time = options.as_ref().and_then(|opts| opts.max_idle_time);
         let wait_queue_timeout = options.as_ref().and_then(|opts| opts.wait_queue_timeout);
@@ -125,6 +121,7 @@ impl ConnectionPool {
             .unwrap_or(DEFAULT_MAX_POOL_SIZE);
         let min_pool_size = options.as_ref().and_then(|opts| opts.min_pool_size);
         let tls_options = options.as_mut().and_then(|opts| opts.tls_options.take());
+        let event_handler = options.as_mut().and_then(|opts| opts.event_handler.take());
 
         let establisher = ConnectionEstablisher::new(options.as_ref());
 
@@ -163,7 +160,7 @@ impl ConnectionPool {
     /// the event handler.
     fn emit_event<F>(&self, emit: F)
     where
-        F: FnOnce(&Box<dyn CmapEventHandler>),
+        F: FnOnce(&Arc<dyn CmapEventHandler>),
     {
         self.inner.emit_event(emit)
     }
@@ -367,7 +364,7 @@ impl ConnectionPoolInner {
     /// the event handler.
     fn emit_event<F>(&self, emit: F)
     where
-        F: FnOnce(&Box<dyn CmapEventHandler>),
+        F: FnOnce(&Arc<dyn CmapEventHandler>),
     {
         if let Some(ref handler) = self.event_handler {
             emit(handler);

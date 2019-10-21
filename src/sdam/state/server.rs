@@ -18,7 +18,6 @@ impl Server {
             pool: ConnectionPool::new(
                 address,
                 Some(ConnectionPoolOptions::from_client_options(options)),
-                None,
             ),
         }
     }

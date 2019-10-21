@@ -1,7 +1,7 @@
 pub mod auth;
 pub mod options;
 
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use crate::{
     concern::{ReadConcern, WriteConcern},
@@ -12,6 +12,7 @@ use crate::{
     },
     options::{ClientOptions, DatabaseOptions},
     read_preference::ReadPreference,
+    sdam::Topology,
 };
 
 /// This is the main entry point for the API. A `Client` is used to connect to a MongoDB cluster.
@@ -52,11 +53,13 @@ pub struct Client {
 #[derive(Derivative)]
 #[derivative(Debug)]
 struct ClientInner {
+    topology: Arc<RwLock<Topology>>,
+
     read_preference: Option<ReadPreference>,
     read_concern: Option<ReadConcern>,
     write_concern: Option<WriteConcern>,
     #[derivative(Debug = "ignore")]
-    command_event_handler: Option<Box<dyn CommandEventHandler>>,
+    command_event_handler: Option<Arc<dyn CommandEventHandler>>,
 }
 
 impl Client {
@@ -68,9 +71,22 @@ impl Client {
         Client::with_options(options)
     }
 
-    /// Creates a new `Client` connected to the cluster specified by ClientOptions `options`.
-    pub fn with_options(options: ClientOptions) -> Result<Self> {
-        unimplemented!()
+    /// Creates a new `Client` connected to the cluster specified by `options`.
+    pub fn with_options(mut options: ClientOptions) -> Result<Self> {
+        let read_preference = options.read_preference.take();
+        let read_concern = options.read_concern.take();
+        let write_concern = options.write_concern.take();
+        let command_event_handler = options.command_event_handler.take();
+
+        let inner = Arc::new(ClientInner {
+            topology: Topology::new(options)?,
+            read_preference,
+            read_concern,
+            write_concern,
+            command_event_handler,
+        });
+
+        Ok(Self { inner })
     }
 
     /// Gets the read preference of the `Client`.
