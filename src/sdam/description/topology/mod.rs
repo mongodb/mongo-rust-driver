@@ -12,6 +12,7 @@ use crate::{
     options::{ClientOptions, StreamAddress},
     sdam::description::server::{ServerDescription, ServerType},
 };
+pub(crate) use server_selection::SelectionCriteria;
 
 /// The TopologyType type, as described by the SDAM spec.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize)]
@@ -31,7 +32,7 @@ impl Default for TopologyType {
 
 /// The TopologyDescription type, as described by the SDAM spec.
 #[derive(Debug, Clone)]
-struct TopologyDescription {
+pub(crate) struct TopologyDescription {
     /// Whether or not the topology was initialized with a single seed.
     single_seed: bool,
 
@@ -59,7 +60,7 @@ struct TopologyDescription {
 }
 
 impl TopologyDescription {
-    fn new(options: ClientOptions) -> Self {
+    pub(crate) fn new(options: ClientOptions) -> Self {
         let topology_type = if options.repl_set_name.is_some() {
             TopologyType::ReplicaSetNoPrimary
         } else if let Some(true) = options.direct_connection {

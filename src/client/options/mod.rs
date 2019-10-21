@@ -131,7 +131,7 @@ impl fmt::Display for StreamAddress {
     }
 }
 
-#[derive(Debug, PartialEq, TypedBuilder)]
+#[derive(Clone, Debug, PartialEq, TypedBuilder)]
 pub struct ClientOptions {
     #[builder(default_code = "vec![ StreamAddress {
         hostname: \"localhost\".to_string(),

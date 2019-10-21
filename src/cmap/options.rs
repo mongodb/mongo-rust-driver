@@ -69,7 +69,7 @@ where
 }
 
 impl ConnectionPoolOptions {
-    pub(super) fn from_client_options(options: &ClientOptions) -> Self {
+    pub(crate) fn from_client_options(options: &ClientOptions) -> Self {
         Self::builder()
             .max_pool_size(options.max_pool_size)
             .min_pool_size(options.min_pool_size)
