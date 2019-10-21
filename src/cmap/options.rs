@@ -1,12 +1,17 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
+use derivative::Derivative;
 use serde::{Deserialize, Deserializer};
 
-use crate::options::{ClientOptions, TlsOptions};
+use crate::{
+    event::cmap::CmapEventHandler,
+    options::{ClientOptions, TlsOptions},
+};
 
 /// Contains the options for creating a connection pool. While these options are specified at the
 /// client-level, `ConnectionPoolOptions` is exposed for the purpose of CMAP event handling.
-#[derive(Debug, Default, Deserialize, TypedBuilder, PartialEq)]
+#[derive(Default, Deserialize, TypedBuilder, Derivative)]
+#[derivative(Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionPoolOptions {
     /// The application name specified by the user. This is sent to the server as part of the
@@ -56,6 +61,11 @@ pub struct ConnectionPoolOptions {
     #[builder(default)]
     #[serde(skip)]
     pub tls_options: Option<TlsOptions>,
+
+    #[derivative(Debug = "ignore", PartialEq = "ignore")]
+    #[builder(default)]
+    #[serde(skip)]
+    pub event_handler: Option<Arc<dyn CmapEventHandler>>,
 }
 
 fn deserialize_duration_from_u64_millis<'de, D>(
@@ -76,6 +86,7 @@ impl ConnectionPoolOptions {
             .max_idle_time(options.max_idle_time)
             .wait_queue_timeout(options.wait_queue_timeout)
             .tls_options(options.tls_options.clone())
+            .event_handler(options.cmap_event_handler.clone())
             .build()
     }
 }

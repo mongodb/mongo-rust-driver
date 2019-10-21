@@ -59,7 +59,6 @@ mod cursor;
 mod db;
 pub mod error;
 pub mod event;
-#[allow(dead_code)]
 mod is_master;
 pub mod options;
 mod read_preference;

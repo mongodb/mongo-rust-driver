@@ -13,6 +13,7 @@ use std::{
 };
 
 use bson::{Bson, Document};
+use derivative::Derivative;
 use lazy_static::lazy_static;
 use rustls::{
     internal::pemfile, Certificate, RootCertStore, ServerCertVerified, ServerCertVerifier, TLSError,
@@ -22,6 +23,7 @@ use crate::{
     client::auth::{AuthMechanism, Credential},
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::{ErrorKind, Result},
+    event::{cmap::CmapEventHandler, command::CommandEventHandler},
     read_preference::{ReadPreference, TagSet},
 };
 
@@ -131,7 +133,8 @@ impl fmt::Display for StreamAddress {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, TypedBuilder)]
+#[derive(Clone, Derivative, TypedBuilder)]
+#[derivative(Debug, PartialEq)]
 pub struct ClientOptions {
     #[builder(default_code = "vec![ StreamAddress {
         hostname: \"localhost\".to_string(),
@@ -205,6 +208,14 @@ pub struct ClientOptions {
     /// The credential to use for authenticating connections made by this client.
     #[builder(default)]
     pub credential: Option<Credential>,
+
+    #[derivative(Debug = "ignore", PartialEq = "ignore")]
+    #[builder(default)]
+    pub cmap_event_handler: Option<Arc<dyn CmapEventHandler>>,
+
+    #[derivative(Debug = "ignore", PartialEq = "ignore")]
+    #[builder(default)]
+    pub command_event_handler: Option<Arc<dyn CommandEventHandler>>,
 }
 
 impl Default for ClientOptions {
@@ -347,6 +358,8 @@ impl From<ClientOptionsParser> for ClientOptions {
             direct_connection: parser.direct_connection,
             credential: parser.credential,
             max_staleness: parser.max_staleness,
+            cmap_event_handler: None,
+            command_event_handler: None,
         }
     }
 }

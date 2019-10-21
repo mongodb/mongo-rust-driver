@@ -57,7 +57,7 @@ pub(crate) struct Connection {
 
 impl Connection {
     /// Constructs a new connection.
-    pub(super) fn new(
+    pub(crate) fn new(
         id: u32,
         address: StreamAddress,
         generation: u32,

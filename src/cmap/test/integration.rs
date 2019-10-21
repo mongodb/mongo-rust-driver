@@ -21,7 +21,7 @@ struct DatabaseEntry {
 fn acquire_connection_and_send_command() {
     let pool_options = ConnectionPoolOptions::from_client_options(&CLIENT_OPTIONS);
 
-    let pool = ConnectionPool::new(CLIENT_OPTIONS.hosts[0].clone(), Some(pool_options), None);
+    let pool = ConnectionPool::new(CLIENT_OPTIONS.hosts[0].clone(), Some(pool_options));
     let mut connection = pool.check_out().unwrap();
 
     let body = doc! { "listDatabases": 1 };

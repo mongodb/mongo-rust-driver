@@ -36,7 +36,7 @@ struct Executor {
 
 #[derive(Debug)]
 struct State {
-    handler: EventHandler,
+    handler: Arc<EventHandler>,
     connections: RwLock<HashMap<String, Connection>>,
     threads: RwLock<HashMap<String, JoinHandle<Result<()>>>>,
 
@@ -63,7 +63,7 @@ impl State {
 impl Executor {
     fn new(mut test_file: TestFile) -> Self {
         let operations = test_file.process_operations();
-        let handler = EventHandler::new(test_file.ignore);
+        let handler = Arc::new(EventHandler::new(test_file.ignore));
         let events = test_file
             .events
             .into_iter()
@@ -76,11 +76,12 @@ impl Executor {
             .get_or_insert_with(Default::default)
             .tls_options = CLIENT_OPTIONS.tls_options.clone();
 
-        let pool = ConnectionPool::new(
-            CLIENT_OPTIONS.hosts[0].clone(),
-            test_file.pool_options,
-            Some(Box::new(handler.clone())),
-        );
+        test_file
+            .pool_options
+            .get_or_insert_with(Default::default)
+            .event_handler = Some(handler.clone());
+
+        let pool = ConnectionPool::new(CLIENT_OPTIONS.hosts[0].clone(), test_file.pool_options);
 
         let state = State {
             handler,
