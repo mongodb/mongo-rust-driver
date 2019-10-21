@@ -15,8 +15,8 @@ pub(crate) enum SelectionCriteria {
 
 impl TopologyDescription {
     /// Selects a server for an operation given criteria.
-    pub(crate) fn select_server(&self, selector: SelectionCriteria) -> Option<&ServerDescription> {
-        self.suitable_servers(selector)
+    pub(crate) fn select_server(&self, criteria: SelectionCriteria) -> Option<&ServerDescription> {
+        self.suitable_servers(criteria)
             .into_iter()
             .choose(&mut rand::thread_rng())
     }

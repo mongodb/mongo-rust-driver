@@ -17,11 +17,10 @@ use std::{
 
 use derivative::Derivative;
 
+pub(crate) use self::conn::Connection;
 pub use self::conn::ConnectionInfo;
 use self::{
-    conn::{Connection, StreamDescription},
-    establish::ConnectionEstablisher,
-    options::ConnectionPoolOptions,
+    conn::StreamDescription, establish::ConnectionEstablisher, options::ConnectionPoolOptions,
     wait_queue::WaitQueue,
 };
 use crate::{
