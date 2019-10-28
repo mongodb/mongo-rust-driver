@@ -19,7 +19,9 @@ use derivative::Derivative;
 
 pub use self::conn::ConnectionInfo;
 use self::{
-    conn::Connection, establish::ConnectionEstablisher, options::ConnectionPoolOptions,
+    conn::{Connection, StreamDescription},
+    establish::ConnectionEstablisher,
+    options::ConnectionPoolOptions,
     wait_queue::WaitQueue,
 };
 use crate::{

@@ -1,5 +1,6 @@
 pub(crate) mod command;
 mod stream;
+mod stream_description;
 mod wire;
 
 use std::time::{Duration, Instant};
@@ -19,6 +20,7 @@ use crate::{
     options::StreamAddress,
     options::TlsOptions,
 };
+pub(crate) use stream_description::StreamDescription;
 
 /// User-facing information about a connection to the database.
 #[derive(Clone, Debug)]
@@ -37,7 +39,9 @@ pub(crate) struct Connection {
     pub(super) id: u32,
     pub(super) address: StreamAddress,
     pub(super) generation: u32,
-    established: bool,
+
+    /// The cached StreamDescription from the connection's handshake.
+    pub(super) stream_description: Option<StreamDescription>,
 
     /// Marks the time when the connection was checked into the pool and established. This is used
     /// to detect if the connection is idle.
@@ -63,7 +67,7 @@ impl Connection {
             id,
             generation,
             pool: None,
-            established: false,
+            stream_description: None,
             ready_and_available_time: None,
             stream: Stream::connect(address.clone(), tls_options)?,
             address,
@@ -85,7 +89,7 @@ impl Connection {
             },
             generation: 0,
             pool: None,
-            established: true,
+            stream_description: Some(Default::default()),
             ready_and_available_time: None,
             stream: Stream::Null,
         }
@@ -165,6 +169,11 @@ impl Connection {
 
         let response_message = Message::read_from(&mut self.stream)?;
         CommandResponse::from_message(response_message)
+    }
+
+    /// Gets the connection's StreamDescription.
+    pub(crate) fn stream_description(&self) -> Option<&StreamDescription> {
+        self.stream_description.as_ref()
     }
 }
 

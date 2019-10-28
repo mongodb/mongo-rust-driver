@@ -3,9 +3,9 @@ use lazy_static::lazy_static;
 use os_info::{Type, Version};
 
 use crate::{
-    cmap::{conn::command::Command, options::ConnectionPoolOptions, Connection},
+    cmap::{conn::command::Command, options::ConnectionPoolOptions, Connection, StreamDescription},
     error::Result,
-    is_master::IsMasterCommandResponse,
+    is_master::IsMasterReply,
 };
 
 lazy_static! {
@@ -80,10 +80,20 @@ impl Handshaker {
     }
 
     /// Handshakes a connection.
-    pub(super) fn handshake(&self, conn: &mut Connection) -> Result<IsMasterCommandResponse> {
+    pub(super) fn handshake<'a>(
+        &'a self,
+        conn: &'a mut Connection,
+    ) -> Result<&'a StreamDescription> {
         let response = conn.send_command(self.command.clone())?;
-        let deserialized_response = response.body()?;
+        let command_response = response.body()?;
 
-        Ok(deserialized_response)
+        // TODO RUST-192: Calculate round trip time.
+        let is_master_reply = IsMasterReply {
+            command_response,
+            round_trip_time: None,
+        };
+
+        conn.stream_description = Some(StreamDescription::from_is_master(is_master_reply));
+        conn.stream_description().ok_or_else(|| unreachable!())
     }
 }
