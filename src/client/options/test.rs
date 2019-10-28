@@ -1,14 +1,7 @@
 use bson::{Bson, Document};
 use serde::Deserialize;
 
-use crate::{
-    client::{
-        auth::Credential,
-        options::{ClientOptions, StreamAddress},
-    },
-    error::ErrorKind,
-    read_preference::ReadPreference,
-};
+use crate::{client::options::ClientOptions, error::ErrorKind, read_preference::ReadPreference};
 
 #[derive(Debug, Deserialize)]
 struct TestFile {
@@ -255,42 +248,6 @@ fn run_uri_options_test(test_file: TestFile) {
     }
 }
 
-fn document_from_client_credentials(mut auth: Credential) -> Document {
-    let mut doc = Document::new();
-
-    if let Some(s) = auth.username.take() {
-        doc.insert("username", s);
-    }
-
-    if let Some(s) = auth.password.take() {
-        doc.insert("password", s);
-    } else {
-        doc.insert("password", Bson::Null);
-    }
-
-    if let Some(s) = auth.source.take() {
-        doc.insert("db", s);
-    } else {
-        doc.insert("db", Bson::Null);
-    }
-
-    doc
-}
-
-fn document_from_client_host(mut host: StreamAddress) -> Document {
-    let mut doc = Document::new();
-
-    doc.insert("host", host.hostname);
-
-    if let Some(i) = host.port.take() {
-        doc.insert("port", i64::from(i));
-    } else {
-        doc.insert("port", Bson::Null);
-    }
-
-    doc
-}
-
 fn run_connection_string_test(test_file: TestFile) {
     for mut test_case in test_file.tests {
         if test_case.description.contains("ipv6")
@@ -331,7 +288,7 @@ fn run_connection_string_test(test_file: TestFile) {
                     let mut hosts = options.hosts;
                     for _ in 0..num_hosts {
                         let json_host = filtered_json_hosts.pop().unwrap();
-                        let host_client_doc = document_from_client_host(hosts.pop().unwrap());
+                        let host_client_doc = hosts.pop().unwrap().into_document();
                         assert_eq!(host_client_doc, json_host);
                     }
                 }
@@ -354,7 +311,7 @@ fn run_connection_string_test(test_file: TestFile) {
                 if let Some(json_auth) = test_case.auth {
                     let mut options = ClientOptions::parse(&test_case.uri).unwrap();
                     if let Some(credential) = options.credential.take() {
-                        let auth_doc = document_from_client_credentials(credential);
+                        let auth_doc = credential.into_document();
                         assert_eq!(auth_doc, json_auth);
                     }
                 }

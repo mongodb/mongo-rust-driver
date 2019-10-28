@@ -95,6 +95,21 @@ impl StreamAddress {
     pub fn hostname(&self) -> &str {
         &self.hostname
     }
+
+    #[allow(dead_code)]
+    pub(crate) fn into_document(mut self) -> Document {
+        let mut doc = Document::new();
+
+        doc.insert("host", self.hostname());
+
+        if let Some(i) = self.port.take() {
+            doc.insert("port", i64::from(i));
+        } else {
+            doc.insert("port", Bson::Null);
+        }
+
+        doc
+    }
 }
 
 impl fmt::Display for StreamAddress {
@@ -590,7 +605,9 @@ impl ClientOptionsParser {
             };
 
             if key.to_lowercase() != "readpreferencetags" && keys.contains(&key) {
-                bail!(ErrorKind::ArgumentError("repeated options".to_string()));
+                bail!(ErrorKind::ArgumentError(
+                    "repeated options are not allowed in the connection string".to_string()
+                ));
             } else {
                 keys.push(key);
             }

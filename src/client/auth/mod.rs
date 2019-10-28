@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use bson::Document;
+use bson::{Bson, Document};
 
 use crate::error::{Error, ErrorKind, Result};
 
@@ -147,4 +147,29 @@ pub struct Credential {
     /// Additional properties for the given mechanism.
     #[builder(default)]
     pub mechanism_properties: Option<Document>,
+}
+
+impl Credential {
+    #[allow(dead_code)]
+    pub(crate) fn into_document(mut self) -> Document {
+        let mut doc = Document::new();
+
+        if let Some(s) = self.username.take() {
+            doc.insert("username", s);
+        }
+
+        if let Some(s) = self.password.take() {
+            doc.insert("password", s);
+        } else {
+            doc.insert("password", Bson::Null);
+        }
+
+        if let Some(s) = self.source.take() {
+            doc.insert("db", s);
+        } else {
+            doc.insert("db", Bson::Null);
+        }
+
+        doc
+    }
 }
