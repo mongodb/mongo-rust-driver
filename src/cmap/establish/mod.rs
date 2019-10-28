@@ -22,7 +22,7 @@ impl ConnectionEstablisher {
 
     /// Establishes a connection.
     pub(super) fn establish_connection(&self, connection: &mut Connection) -> Result<()> {
-        let _response = self.handshaker.handshake(connection)?;
+        let _stream_description = self.handshaker.handshake(connection)?;
 
         // TODO RUST-204: Authenticate connection if applicable.
 
