@@ -336,7 +336,7 @@ fn exclusive_split_at(s: &str, i: usize) -> (Option<&str>, Option<&str>) {
     let (l, r) = s.split_at(i);
 
     let lout = if !l.is_empty() { Some(l) } else { None };
-    let rout = if r.len() > 1 { Some(&r[1..]) } else { None };
+    let rout = if r.len() > 1 { Some(&r[1..]) } else { Some("") };
 
     (lout, rout)
 }
@@ -380,7 +380,14 @@ impl ClientOptionsParser {
                 (Some(section), o) => (section, o),
                 (None, _) => bail!(ErrorKind::ArgumentError("missing hosts".to_string())),
             },
-            None => (after_scheme, None),
+            None => {
+                if after_scheme.find('?').is_some() {
+                    bail!(ErrorKind::ArgumentError(
+                        "Missing delimiting slash between hosts and options".to_string()
+                    ));
+                }
+                (after_scheme, None)
+            }
         };
 
         let (database, options_section) = match post_slash {
@@ -441,7 +448,6 @@ impl ClientOptionsParser {
                         "connection string contains no host".to_string(),
                     ));
                 }
-
                 let port = if port.is_empty() {
                     None
                 } else {
@@ -452,6 +458,13 @@ impl ClientOptionsParser {
                             port
                         ))
                     })?;
+
+                    if p == 0 {
+                        bail!(ErrorKind::ArgumentError(format!(
+                            "invalid port specified in connection string: {}",
+                            port
+                        )));
+                    }
 
                     Some(p)
                 };
@@ -483,6 +496,12 @@ impl ClientOptionsParser {
             let mut credential = options.credential.get_or_insert_with(Default::default);
             validate_userinfo(u, "username")?;
             let decoded_u = percent_decode(u, "username must be URL encoded")?;
+            if decoded_u.chars().any(|c| c == '%') {
+                bail!(ErrorKind::ArgumentError(
+                    "username/passowrd cannot contain unescaped %".to_string()
+                ))
+            }
+
             credential.username = Some(decoded_u);
 
             if let Some(pass) = password {
@@ -532,12 +551,10 @@ impl ClientOptionsParser {
                     // default source is chosen from the following list in
                     // order (skipping null ones): authSource option, connection string db,
                     // SCRAM default (i.e. "admin").
-                    credential.source = Some(
-                        options
-                            .auth_source
-                            .take()
-                            .unwrap_or_else(|| AuthMechanism::ScramSha1.default_source(db_str)),
-                    )
+                    credential.source = options
+                        .auth_source
+                        .take()
+                        .or_else(|| db_str.and_then(|s| Some(s.to_string())));
                 } else if authentication_requested {
                     bail!(ErrorKind::ArgumentError(
                         "username and mechanism both not provided, but authentication was \
@@ -561,6 +578,8 @@ impl ClientOptionsParser {
             return Ok(());
         }
 
+        let mut keys: Vec<&str> = Vec::new();
+
         for option_pair in options.split('&') {
             let (key, value) = match option_pair.find('=') {
                 Some(index) => option_pair.split_at(index),
@@ -569,6 +588,12 @@ impl ClientOptionsParser {
                     option_pair,
                 ))),
             };
+
+            if key.to_lowercase() != "readpreferencetags" && keys.contains(&key) {
+                bail!(ErrorKind::ArgumentError("repeated options".to_string()));
+            } else {
+                keys.push(key);
+            }
 
             // Skip leading '=' in value.
             self.parse_option_pair(
@@ -868,7 +893,12 @@ impl ClientOptionsParser {
             k @ "maxstalenessseconds" => {
                 self.max_staleness = Some(Duration::from_millis(get_duration!(value, k)));
             }
-            _ => {}
+
+            _ => {
+                bail!(ErrorKind::ArgumentError(
+                    "invalid option warning".to_string()
+                ));
+            }
         }
 
         Ok(())
