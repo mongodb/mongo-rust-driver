@@ -204,8 +204,8 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
     doc
 }
 
-fn run_uri_options_test(test_file: TestFile) {
-    for test_case in test_file.tests {
+fn run_test(test_file: TestFile) {
+    for mut test_case in test_file.tests {
         // TODO: RUST-226
         if test_case.description.contains("tlsAllowInvalidHostnames")
             || test_case.description.contains("single-threaded")
@@ -213,44 +213,7 @@ fn run_uri_options_test(test_file: TestFile) {
             || test_case
                 .description
                 .contains("tlsCertificateKeyFilePassword")
-        {
-            continue;
-        }
-
-        let mut json_options = test_case
-            .options
-            .unwrap()
-            .into_iter()
-            .map(|(k, v)| (k.to_lowercase(), v))
-            .collect::<Document>();
-
-        if !json_options.contains_key("tlsallowinvalidcertificates") {
-            if let Some(val) = json_options.remove("tlsinsecure") {
-                json_options.insert("tlsallowinvalidcertificates", !val.as_bool().unwrap());
-            }
-        }
-
-        let warning = test_case.warning.unwrap();
-
-        if test_case.valid && !warning {
-            let options = ClientOptions::parse(&test_case.uri).unwrap();
-            let options_doc = document_from_client_options(options);
-            assert_eq!(options_doc, json_options)
-        } else {
-            let expected_type = if warning { "warning" } else { "error" };
-
-            match ClientOptions::parse(&test_case.uri).map_err(ErrorKind::from) {
-                Ok(_) => panic!("expected {}", expected_type),
-                Err(ErrorKind::ArgumentError(s)) => {}
-                Err(e) => panic!("expected ArgumentError, but got {:?}", e),
-            }
-        }
-    }
-}
-
-fn run_connection_string_test(test_file: TestFile) {
-    for mut test_case in test_file.tests {
-        if test_case.description.contains("ipv6")
+            || test_case.description.contains("ipv6")
             || test_case.description.contains("Unix")
             || test_case.description.contains("MONGODB-CR")
             || test_case.description.contains("X509")
@@ -260,10 +223,13 @@ fn run_connection_string_test(test_file: TestFile) {
         {
             continue;
         }
-        let mut warning = false;
-        if let Some(warn_val) = test_case.warning.take() {
-            warning = warn_val;
-        }
+
+        let warning = if let Some(warn_val) = test_case.warning.take() {
+            warn_val
+        } else {
+            false
+        };
+
         if test_case.valid && !warning {
             let mut is_unsupported_host_type = false;
             // hosts
@@ -297,18 +263,33 @@ fn run_connection_string_test(test_file: TestFile) {
                 // options
                 let options = ClientOptions::parse(&test_case.uri).unwrap();
                 let mut options_doc = document_from_client_options(options);
-                options_doc.remove("authsource");
                 if let Some(json_options) = test_case.options {
+                    let mut json_options = json_options
+                        .into_iter()
+                        .map(|(k, v)| (k.to_lowercase(), v))
+                        .collect::<Document>();
+
+                    if !json_options.contains_key("tlsallowinvalidcertificates") {
+                        if let Some(val) = json_options.remove("tlsinsecure") {
+                            json_options
+                                .insert("tlsallowinvalidcertificates", !val.as_bool().unwrap());
+                        }
+                    }
+
+                    if !json_options.contains_key("authsource") {
+                        options_doc.remove("authsource");
+                    }
+
                     assert_eq!(options_doc, json_options)
                 }
                 // auth
-                // skip over unsupported auth types
-                if let Some(auth_mechanism) = options_doc.get("authmechanism") {
-                    if *auth_mechanism == Bson::String("MONGODB-CR".to_string()) {
-                        continue;
-                    }
-                }
                 if let Some(json_auth) = test_case.auth {
+                    // skip over unsupported auth types
+                    if let Some(auth_mechanism) = options_doc.get("authmechanism") {
+                        if *auth_mechanism == Bson::String("MONGODB-CR".to_string()) {
+                            continue;
+                        }
+                    }
                     let mut options = ClientOptions::parse(&test_case.uri).unwrap();
                     if let Some(credential) = options.credential.take() {
                         let auth_doc = credential.into_document();
@@ -330,10 +311,10 @@ fn run_connection_string_test(test_file: TestFile) {
 
 #[test]
 fn run_uri_options_spec_tests() {
-    crate::test::run(&["uri-options"], run_uri_options_test);
+    crate::test::run(&["uri-options"], run_test);
 }
 
 #[test]
 fn run_connection_string_spec_tests() {
-    crate::test::run(&["connection-string"], run_connection_string_test);
+    crate::test::run(&["connection-string"], run_test);
 }
