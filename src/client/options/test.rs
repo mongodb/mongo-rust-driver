@@ -206,7 +206,7 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
 
 fn run_test(test_file: TestFile) {
     for mut test_case in test_file.tests {
-        // TODO: RUST-226
+        // TODO: RUST-226: Investigate whether tlsCertificateKeyFilePassword is supported in rustls
         if test_case.description.contains("tlsAllowInvalidHostnames")
             || test_case.description.contains("single-threaded")
             || test_case.description.contains("serverSelectionTryOnce")
@@ -233,16 +233,13 @@ fn run_test(test_file: TestFile) {
         if test_case.valid && !warning {
             let mut is_unsupported_host_type = false;
             // hosts
-            if let Some(mut json_hosts) = test_case.hosts.take() {
+            if let Some(json_hosts) = test_case.hosts.take() {
                 // skip over unsupported host types
                 let num_hosts = json_hosts.len();
                 let mut filtered_json_hosts: Vec<Document> = Vec::new();
-                for i in 0..num_hosts {
-                    let mut h_json = json_hosts.pop().unwrap();
+                for mut h_json in json_hosts {
                     if let Some(t) = h_json.remove("type") {
-                        if t == Bson::String("ip_literal".to_string())
-                            || t == Bson::String("unix".to_string())
-                        {
+                        if t.as_str() == Some("ip_literal") || t.as_str() == Some("unix") {
                             is_unsupported_host_type = true;
                         }
                     }
@@ -252,8 +249,7 @@ fn run_test(test_file: TestFile) {
                 if !is_unsupported_host_type {
                     let options = ClientOptions::parse(&test_case.uri).unwrap();
                     let mut hosts = options.hosts;
-                    for _ in 0..num_hosts {
-                        let json_host = filtered_json_hosts.pop().unwrap();
+                    for json_host in filtered_json_hosts {
                         let host_client_doc = hosts.pop().unwrap().into_document();
                         assert_eq!(host_client_doc, json_host);
                     }
@@ -286,7 +282,7 @@ fn run_test(test_file: TestFile) {
                 if let Some(json_auth) = test_case.auth {
                     // skip over unsupported auth types
                     if let Some(auth_mechanism) = options_doc.get("authmechanism") {
-                        if *auth_mechanism == Bson::String("MONGODB-CR".to_string()) {
+                        if (*auth_mechanism).as_str() == Some("MONGODB-CR") {
                             continue;
                         }
                     }
