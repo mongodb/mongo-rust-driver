@@ -1,8 +1,11 @@
 use bson::{Bson, Document};
 use serde::Deserialize;
 
-use crate::{client::options::ClientOptions, error::ErrorKind, read_preference::ReadPreference};
-
+use crate::{
+    client::options::{ClientOptions, StreamAddress},
+    error::ErrorKind,
+    read_preference::ReadPreference,
+};
 #[derive(Debug, Deserialize)]
 struct TestFile {
     pub tests: Vec<TestCase>,
@@ -233,26 +236,27 @@ fn run_test(test_file: TestFile) {
         if test_case.valid && !warning {
             let mut is_unsupported_host_type = false;
             // hosts
-            if let Some(json_hosts) = test_case.hosts.take() {
+            if let Some(mut json_hosts) = test_case.hosts.take() {
                 // skip over unsupported host types
-                let num_hosts = json_hosts.len();
-                let mut filtered_json_hosts: Vec<Document> = Vec::new();
-                for mut h_json in json_hosts {
-                    if let Some(t) = h_json.remove("type") {
-                        if t.as_str() == Some("ip_literal") || t.as_str() == Some("unix") {
-                            is_unsupported_host_type = true;
-                        }
-                    }
-                    filtered_json_hosts.insert(0, h_json);
-                }
+                is_unsupported_host_type =
+                    json_hosts
+                        .iter_mut()
+                        .any(|h_json| match h_json.remove("type") {
+                            Some(t) => {
+                                t.as_str() == Some("ip_literal") || t.as_str() == Some("unix")
+                            }
+                            _ => false,
+                        });
 
                 if !is_unsupported_host_type {
                     let options = ClientOptions::parse(&test_case.uri).unwrap();
-                    let mut hosts = options.hosts;
-                    for json_host in filtered_json_hosts {
-                        let host_client_doc = hosts.pop().unwrap().into_document();
-                        assert_eq!(host_client_doc, json_host);
-                    }
+                    let hosts: Vec<_> = options
+                        .hosts
+                        .into_iter()
+                        .map(StreamAddress::into_document)
+                        .collect();
+
+                    assert_eq!(hosts, json_hosts);
                 }
             }
             if !is_unsupported_host_type {
@@ -282,7 +286,7 @@ fn run_test(test_file: TestFile) {
                 if let Some(json_auth) = test_case.auth {
                     // skip over unsupported auth types
                     if let Some(auth_mechanism) = options_doc.get("authmechanism") {
-                        if (*auth_mechanism).as_str() == Some("MONGODB-CR") {
+                        if auth_mechanism.as_str() == Some("MONGODB-CR") {
                             continue;
                         }
                     }
