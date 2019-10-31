@@ -1,4 +1,4 @@
-use bson::{Bson, Document};
+use bson::{bson, doc, Bson, Document};
 use serde::Deserialize;
 
 use crate::{
@@ -213,10 +213,6 @@ fn run_test(test_file: TestFile) {
         // TODO: RUST-229: Implement IPv6 Support
         test_case.description.contains("ipv6")
             || test_case.description.contains("IP literal")
-            // TODO: RUST-147: Implement X.509 Authentication
-            // || test_case.description.contains("X509")
-            // TODO: RUST-196: Implement GSSAPI Authentication
-            // || test_case.description.contains("GSSAPI")
             // TODO: RUST-226: Investigate whether tlsCertificateKeyFilePassword is supported in rustls
             || test_case
                 .description
@@ -227,9 +223,6 @@ fn run_test(test_file: TestFile) {
             || test_case.description.contains("serverSelectionTryOnce")
             || test_case.description.contains("Unix")
             || test_case.description.contains("relative path")
-        // || test_case.description.contains("MONGODB-CR")
-        // This test uses MONGODB-CR
-        // || test_case.description.contains("Option names are normalized to lowercase")
         {
             continue;
         }
@@ -260,10 +253,10 @@ fn run_test(test_file: TestFile) {
                 }
             }
             if !is_unsupported_host_type {
-                println!("{}", test_case.description);
                 // options
+                dbg!(test_case.description);
                 let options = ClientOptions::parse(&test_case.uri).unwrap();
-                let mut options_doc = document_from_client_options(options);
+                let options_doc = document_from_client_options(options);
                 if let Some(json_options) = test_case.options {
                     let mut json_options: Document = json_options
                         .into_iter()
@@ -278,18 +271,29 @@ fn run_test(test_file: TestFile) {
                         }
                     }
 
-                    // connection string spec tests do not include authsource
-                    if !json_options.contains_key("authsource") {
-                        options_doc.remove("authsource");
+                    // connection string spec tests do treat db as authsource
+                    if let Some(ref json_auth) = test_case.auth {
+                        if let Some(db) = json_auth.get("db") {
+                            if !json_options.contains_key("authsource") && *db != Bson::Null {
+                                let mut temp = doc! { "authsource": db.clone() };
+                                std::mem::swap(&mut json_options, &mut temp);
+                                json_options.extend(temp);
+                            }
+                        }
                     }
 
                     assert_eq!(options_doc, json_options)
                 }
                 // auth
-                if let Some(json_auth) = test_case.auth {
+                if let Some(mut json_auth) = test_case.auth {
                     let mut options = ClientOptions::parse(&test_case.uri).unwrap();
                     if let Some(credential) = options.credential.take() {
                         let auth_doc = credential.into_document();
+                        if let Some(db) = json_auth.get("db") {
+                            if *db == Bson::Null {
+                                json_auth.remove("db");
+                            }
+                        }
                         assert_eq!(auth_doc, json_auth);
                     }
                 }

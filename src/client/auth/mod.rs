@@ -176,8 +176,6 @@ impl Credential {
 
         if let Some(s) = self.source.take() {
             doc.insert("db", s);
-        } else {
-            doc.insert("db", Bson::Null);
         }
 
         doc

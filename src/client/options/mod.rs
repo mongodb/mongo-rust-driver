@@ -32,7 +32,7 @@ lazy_static! {
     /// Usernames / passwords that contain these characters must instead include the URL encoded version of them when included
     /// as part of the connection string.
     static ref USERINFO_RESERVED_CHARACTERS: HashSet<&'static char> = {
-        [':', '/', '?', '#', '[', ']', '@', '!'].iter().collect()
+        [':', '/', '?', '#', '[', ']', '@'].iter().collect()
     };
 
     static ref ILLEGAL_DATABASE_CHARACTERS: HashSet<&'static char> = {
@@ -357,7 +357,6 @@ fn exclusive_split_at(s: &str, i: usize) -> (Option<&str>, Option<&str>) {
 }
 
 fn percent_decode(s: &str, err_message: &str) -> Result<String> {
-    println!("{}", s);
     match percent_encoding::percent_decode_str(s).decode_utf8() {
         Ok(result) => Ok(result.to_string()),
         Err(_) => Err(ErrorKind::ArgumentError(err_message.to_string()).into()),
