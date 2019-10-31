@@ -1,4 +1,4 @@
-use bson::{bson, doc, Bson, Document};
+use bson::{Bson, Document};
 use serde::Deserialize;
 
 use crate::{
@@ -275,9 +275,8 @@ fn run_test(test_file: TestFile) {
                     if let Some(ref json_auth) = test_case.auth {
                         if let Some(db) = json_auth.get("db") {
                             if !json_options.contains_key("authsource") && *db != Bson::Null {
-                                let mut temp = doc! { "authsource": db.clone() };
-                                std::mem::swap(&mut json_options, &mut temp);
-                                json_options.extend(temp);
+                                json_options.insert("authsource", db.clone());
+                                sort_document(&mut json_options);
                             }
                         }
                     }

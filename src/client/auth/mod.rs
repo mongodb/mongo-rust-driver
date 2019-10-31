@@ -75,18 +75,6 @@ impl AuthMechanism {
         }
     }
 
-    /// Get the default authSource for a given mechanism depending on the database provided in the
-    /// connection string.
-    pub(crate) fn default_source(&self, uri_db: Option<&str>) -> String {
-        // TODO: fill in others as they're implemented.
-        match self {
-            AuthMechanism::ScramSha1 | AuthMechanism::ScramSha256 => {
-                uri_db.unwrap_or("admin").to_string()
-            }
-            _ => "".to_string(),
-        }
-    }
-
     pub(crate) fn uses_db_as_source(&self) -> bool {
         match self {
             AuthMechanism::ScramSha1
