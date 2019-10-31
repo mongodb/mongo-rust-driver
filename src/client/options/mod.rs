@@ -351,7 +351,7 @@ fn exclusive_split_at(s: &str, i: usize) -> (Option<&str>, Option<&str>) {
     let (l, r) = s.split_at(i);
 
     let lout = if !l.is_empty() { Some(l) } else { None };
-    let rout = if r.len() > 1 { Some(&r[1..]) } else { Some("") };
+    let rout = if r.len() > 1 { Some(&r[1..]) } else { None };
 
     (lout, rout)
 }
@@ -444,7 +444,10 @@ impl ClientOptionsParser {
 
         let (username, password) = match cred_section {
             Some(creds) => match creds.find(':') {
-                Some(index) => exclusive_split_at(creds, index),
+                Some(index) => match exclusive_split_at(creds, index) {
+                    (username, None) => (username, Some("")),
+                    (username, password) => (username, password),
+                },
                 None => (Some(creds), None), // Lack of ":" implies whole string is username
             },
             None => (None, None),

@@ -209,29 +209,32 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
 
 fn run_test(test_file: TestFile) {
     for mut test_case in test_file.tests {
-        // TODO: RUST-226: Investigate whether tlsCertificateKeyFilePassword is supported in rustls
-        if test_case.description.contains("tlsAllowInvalidHostnames")
-            || test_case.description.contains("single-threaded")
-            || test_case.description.contains("serverSelectionTryOnce")
+        if
+        // TODO: RUST-229: Implement IPv6 Support
+        test_case.description.contains("ipv6")
+            || test_case.description.contains("IP literal")
+            // TODO: RUST-147: Implement X.509 Authentication
+            || test_case.description.contains("X509")
+            // TODO: RUST-196: Implement GSSAPI Authentication
+            || test_case.description.contains("GSSAPI")
+            // TODO: RUST-226: Investigate whether tlsCertificateKeyFilePassword is supported in rustls
             || test_case
                 .description
                 .contains("tlsCertificateKeyFilePassword")
-            || test_case.description.contains("ipv6")
+            // Not Implementing
+            || test_case.description.contains("tlsAllowInvalidHostnames")
+            || test_case.description.contains("single-threaded")
+            || test_case.description.contains("serverSelectionTryOnce")
             || test_case.description.contains("Unix")
-            || test_case.description.contains("MONGODB-CR")
-            || test_case.description.contains("X509")
-            || test_case.description.contains("GSSAPI")
-            || test_case.description.contains("IP literal")
             || test_case.description.contains("relative path")
+            || test_case.description.contains("MONGODB-CR")
+            // This test uses MONGODB-CR
+            || test_case.description.contains("Option names are normalized to lowercase")
         {
             continue;
         }
 
-        let warning = if let Some(warn_val) = test_case.warning.take() {
-            warn_val
-        } else {
-            false
-        };
+        let warning = test_case.warning.take().unwrap_or(false);
 
         if test_case.valid && !warning {
             let mut is_unsupported_host_type = false;
@@ -266,6 +269,7 @@ fn run_test(test_file: TestFile) {
                         .map(|(k, v)| (k.to_lowercase(), v))
                         .collect();
 
+                    // tlsallowinvalidcertificates and tlsinsecure must be inverse of each other
                     if !json_options.contains_key("tlsallowinvalidcertificates") {
                         if let Some(val) = json_options.remove("tlsinsecure") {
                             json_options
@@ -273,6 +277,7 @@ fn run_test(test_file: TestFile) {
                         }
                     }
 
+                    // connection string spec tests do not include authsource
                     if !json_options.contains_key("authsource") {
                         options_doc.remove("authsource");
                     }
@@ -281,12 +286,6 @@ fn run_test(test_file: TestFile) {
                 }
                 // auth
                 if let Some(json_auth) = test_case.auth {
-                    // skip over unsupported auth types
-                    if let Some(auth_mechanism) = options_doc.get("authmechanism") {
-                        if auth_mechanism.as_str() == Some("MONGODB-CR") {
-                            continue;
-                        }
-                    }
                     let mut options = ClientOptions::parse(&test_case.uri).unwrap();
                     if let Some(credential) = options.credential.take() {
                         let auth_doc = credential.into_document();
