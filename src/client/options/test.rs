@@ -18,6 +18,15 @@ struct TestCase {
     pub options: Document,
 }
 
+fn sort_document(document: &mut Document) {
+    let temp = std::mem::replace(document, Default::default());
+
+    let mut elements: Vec<_> = temp.into_iter().collect();
+    elements.sort_by(|e1, e2| e1.0.cmp(&e2.0));
+
+    document.extend(elements);
+}
+
 fn document_from_client_options(mut options: ClientOptions) -> Document {
     let mut doc = Document::new();
 
