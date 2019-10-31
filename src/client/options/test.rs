@@ -238,15 +238,12 @@ fn run_test(test_file: TestFile) {
             // hosts
             if let Some(mut json_hosts) = test_case.hosts.take() {
                 // skip over unsupported host types
-                is_unsupported_host_type =
-                    json_hosts
-                        .iter_mut()
-                        .any(|h_json| match h_json.remove("type") {
-                            Some(t) => {
-                                t.as_str() == Some("ip_literal") || t.as_str() == Some("unix")
-                            }
-                            _ => false,
-                        });
+                is_unsupported_host_type = json_hosts.iter_mut().any(|h_json| {
+                    match h_json.remove("type").as_ref().and_then(Bson::as_str) {
+                        Some("ip_literal") | Some("unix") => true,
+                        _ => false,
+                    }
+                });
 
                 if !is_unsupported_host_type {
                     let options = ClientOptions::parse(&test_case.uri).unwrap();
@@ -264,10 +261,10 @@ fn run_test(test_file: TestFile) {
                 let options = ClientOptions::parse(&test_case.uri).unwrap();
                 let mut options_doc = document_from_client_options(options);
                 if let Some(json_options) = test_case.options {
-                    let mut json_options = json_options
+                    let mut json_options: Document = json_options
                         .into_iter()
                         .map(|(k, v)| (k.to_lowercase(), v))
-                        .collect::<Document>();
+                        .collect();
 
                     if !json_options.contains_key("tlsallowinvalidcertificates") {
                         if let Some(val) = json_options.remove("tlsinsecure") {
