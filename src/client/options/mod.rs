@@ -357,6 +357,7 @@ fn exclusive_split_at(s: &str, i: usize) -> (Option<&str>, Option<&str>) {
 }
 
 fn percent_decode(s: &str, err_message: &str) -> Result<String> {
+    println!("{}", s);
     match percent_encoding::percent_decode_str(s).decode_utf8() {
         Ok(result) => Ok(result.to_string()),
         Err(_) => Err(ErrorKind::ArgumentError(err_message.to_string()).into()),
@@ -529,17 +530,18 @@ impl ClientOptionsParser {
             }
         }
 
-        let db_str = db.as_ref().map(String::as_str);
-
         match options.auth_mechanism {
             Some(ref mechanism) => {
                 let mut credential = options.credential.get_or_insert_with(Default::default);
                 // If a source is provided, use that. Otherwise, choose a default based on the
                 // mechanism.
-                credential.source = options
-                    .auth_source
-                    .take()
-                    .or_else(|| Some(mechanism.default_source(db_str)));
+                credential.source = options.auth_source.take().or_else(|| {
+                    if mechanism.uses_db_as_source() {
+                        db
+                    } else {
+                        None
+                    }
+                });
 
                 if let Some(mut doc) = options.auth_mechanism_properties.take() {
                     match doc.remove("CANONICALIZE_HOST_NAME") {
@@ -569,10 +571,7 @@ impl ClientOptionsParser {
                     // default source is chosen from the following list in
                     // order (skipping null ones): authSource option, connection string db,
                     // SCRAM default (i.e. "admin").
-                    credential.source = options
-                        .auth_source
-                        .take()
-                        .or_else(|| db_str.and_then(|s| Some(s.to_string())));
+                    credential.source = options.auth_source.take().or(db);
                 } else if authentication_requested {
                     bail!(ErrorKind::ArgumentError(
                         "username and mechanism both not provided, but authentication was \

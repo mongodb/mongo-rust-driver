@@ -87,6 +87,16 @@ impl AuthMechanism {
         }
     }
 
+    pub(crate) fn uses_db_as_source(&self) -> bool {
+        match self {
+            AuthMechanism::ScramSha1
+            | AuthMechanism::ScramSha256
+            | AuthMechanism::MongoDbCr
+            | AuthMechanism::Plain => true,
+            _ => false,
+        }
+    }
+
     #[allow(dead_code)]
     pub(crate) fn as_str(&self) -> &'static str {
         match self {

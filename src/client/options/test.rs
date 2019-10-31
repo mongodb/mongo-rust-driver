@@ -214,9 +214,9 @@ fn run_test(test_file: TestFile) {
         test_case.description.contains("ipv6")
             || test_case.description.contains("IP literal")
             // TODO: RUST-147: Implement X.509 Authentication
-            || test_case.description.contains("X509")
+            // || test_case.description.contains("X509")
             // TODO: RUST-196: Implement GSSAPI Authentication
-            || test_case.description.contains("GSSAPI")
+            // || test_case.description.contains("GSSAPI")
             // TODO: RUST-226: Investigate whether tlsCertificateKeyFilePassword is supported in rustls
             || test_case
                 .description
@@ -227,9 +227,9 @@ fn run_test(test_file: TestFile) {
             || test_case.description.contains("serverSelectionTryOnce")
             || test_case.description.contains("Unix")
             || test_case.description.contains("relative path")
-            || test_case.description.contains("MONGODB-CR")
-            // This test uses MONGODB-CR
-            || test_case.description.contains("Option names are normalized to lowercase")
+        // || test_case.description.contains("MONGODB-CR")
+        // This test uses MONGODB-CR
+        // || test_case.description.contains("Option names are normalized to lowercase")
         {
             continue;
         }
@@ -260,6 +260,7 @@ fn run_test(test_file: TestFile) {
                 }
             }
             if !is_unsupported_host_type {
+                println!("{}", test_case.description);
                 // options
                 let options = ClientOptions::parse(&test_case.uri).unwrap();
                 let mut options_doc = document_from_client_options(options);
