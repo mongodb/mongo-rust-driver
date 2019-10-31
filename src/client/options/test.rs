@@ -254,7 +254,6 @@ fn run_test(test_file: TestFile) {
             }
             if !is_unsupported_host_type {
                 // options
-                dbg!(test_case.description);
                 let options = ClientOptions::parse(&test_case.uri).unwrap();
                 let options_doc = document_from_client_options(options);
                 if let Some(json_options) = test_case.options {
@@ -271,7 +270,7 @@ fn run_test(test_file: TestFile) {
                         }
                     }
 
-                    // connection string spec tests do treat db as authsource
+                    // the options don't contain a key for authSource if it is specified as a db
                     if let Some(ref json_auth) = test_case.auth {
                         if let Some(db) = json_auth.get("db") {
                             if !json_options.contains_key("authsource") && *db != Bson::Null {
@@ -288,6 +287,8 @@ fn run_test(test_file: TestFile) {
                     let mut options = ClientOptions::parse(&test_case.uri).unwrap();
                     if let Some(credential) = options.credential.take() {
                         let auth_doc = credential.into_document();
+                        // in auth, an unspecified db is listed as a Bson::Null, so we remove it
+                        // here
                         if let Some(db) = json_auth.get("db") {
                             if *db == Bson::Null {
                                 json_auth.remove("db");
