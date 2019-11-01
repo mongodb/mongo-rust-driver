@@ -238,7 +238,7 @@ pub struct AggregateOptions {
     #[builder(default)]
     pub hint: Option<Hint>,
 
-    // The level of the read concern
+    /// The level of the read concern
     #[builder(default)]
     pub read_concern: Option<ReadConcern>,
 }
@@ -265,7 +265,7 @@ pub struct CountOptions {
     #[builder(default)]
     pub skip: Option<i64>,
 
-    // The level of the read concern
+    /// The level of the read concern
     #[builder(default)]
     pub read_concern: Option<ReadConcern>,
 }
@@ -280,7 +280,7 @@ pub struct EstimatedDocumentCountOptions {
     #[builder(default)]
     pub max_time: Option<Duration>,
 
-    // The level of the read concern
+    /// The level of the read concern
     #[builder(default)]
     pub read_concern: Option<ReadConcern>,
 }
@@ -295,7 +295,7 @@ pub struct DistinctOptions {
     #[builder(default)]
     pub max_time: Option<Duration>,
 
-    // The level of the read concern
+    /// The level of the read concern
     #[builder(default)]
     pub read_concern: Option<ReadConcern>,
 }
@@ -387,7 +387,7 @@ pub struct FindOptions {
     #[builder(default)]
     pub sort: Option<Document>,
 
-    // The level of the read concern
+    /// The level of the read concern
     #[builder(default)]
     pub read_concern: Option<ReadConcern>,
 }
