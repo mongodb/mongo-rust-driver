@@ -64,6 +64,10 @@ pub struct InsertOneOptions {
     /// Opt out of document-level validation.
     #[builder(default)]
     pub bypass_document_validation: Option<bool>,
+
+    // The level of the write concern
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
 }
 
 /// Specifies the options to a `Collection::insert_many` operation.
@@ -77,6 +81,10 @@ pub struct InsertManyOptions {
     /// when a write fails, continue with the remaining writes, if any.
     #[builder(default)]
     pub ordered: Option<bool>,
+
+    // The level of the write concern
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
 }
 
 /// Specifies the options to a `Collection::update_one` or `Collection::update_many` operation.
@@ -96,6 +104,10 @@ pub struct UpdateOptions {
     /// If true, insert a document if no matching document is found.
     #[builder(default)]
     pub upsert: Option<bool>,
+
+    // The level of the write concern
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
 }
 
 /// Specifies the options to a `Collection::replace_one` operation.
@@ -108,11 +120,19 @@ pub struct ReplaceOptions {
     /// If true, insert a document if no matching document is found.
     #[builder(default)]
     pub upsert: Option<bool>,
+
+    // The level of the write concern
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
 }
 
 /// Specifies the options to a `Collection::delete_one` or `Collection::delete_many` operation.
 #[derive(Debug, Default, TypedBuilder)]
-pub struct DeleteOptions {}
+pub struct DeleteOptions {
+    // The level of the write concern
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
+}
 
 /// Specifies the options to a `Collection::find_one_and_delete` operation.
 #[derive(Debug, Default, TypedBuilder)]
@@ -131,6 +151,10 @@ pub struct FindOneAndDeleteOptions {
     /// The order of the documents for the purposes of the operation.
     #[builder(default)]
     pub sort: Option<Document>,
+
+    // The level of the write concern
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
 }
 
 /// Specifies the options to a `Collection::find_one_and_replace` operation.
@@ -162,6 +186,10 @@ pub struct FindOneAndReplaceOptions {
     /// If true, insert a document if no matching document is found.
     #[builder(default)]
     pub upsert: Option<bool>,
+
+    // The level of the write concern
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
 }
 
 /// Specifies the options to a `Collection::find_one_and_update` operation.
@@ -199,6 +227,10 @@ pub struct FindOneAndUpdateOptions {
     /// If true, insert a document if no matching document is found.
     #[builder(default)]
     pub upsert: Option<bool>,
+
+    // The level of the write concern
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
 }
 
 /// Specifies the options to a `Collection::aggregate` operation.
@@ -237,6 +269,10 @@ pub struct AggregateOptions {
     /// The index to use for the operation.
     #[builder(default)]
     pub hint: Option<Hint>,
+
+    // The level of the write concern
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
 }
 
 /// Specifies the options to a `Collection::count_documents` operation.
