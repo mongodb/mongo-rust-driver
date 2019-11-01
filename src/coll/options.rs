@@ -65,7 +65,7 @@ pub struct InsertOneOptions {
     #[builder(default)]
     pub bypass_document_validation: Option<bool>,
 
-    // The level of the write concern
+    /// The level of the write concern
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 }
@@ -82,7 +82,7 @@ pub struct InsertManyOptions {
     #[builder(default)]
     pub ordered: Option<bool>,
 
-    // The level of the write concern
+    /// The level of the write concern
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 }
@@ -105,7 +105,7 @@ pub struct UpdateOptions {
     #[builder(default)]
     pub upsert: Option<bool>,
 
-    // The level of the write concern
+    /// The level of the write concern
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 }
@@ -121,7 +121,7 @@ pub struct ReplaceOptions {
     #[builder(default)]
     pub upsert: Option<bool>,
 
-    // The level of the write concern
+    /// The level of the write concern
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 }
@@ -129,7 +129,7 @@ pub struct ReplaceOptions {
 /// Specifies the options to a `Collection::delete_one` or `Collection::delete_many` operation.
 #[derive(Debug, Default, TypedBuilder)]
 pub struct DeleteOptions {
-    // The level of the write concern
+    /// The level of the write concern
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 }
@@ -152,7 +152,7 @@ pub struct FindOneAndDeleteOptions {
     #[builder(default)]
     pub sort: Option<Document>,
 
-    // The level of the write concern
+    /// The level of the write concern
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 }
@@ -187,7 +187,7 @@ pub struct FindOneAndReplaceOptions {
     #[builder(default)]
     pub upsert: Option<bool>,
 
-    // The level of the write concern
+    /// The level of the write concern
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 }
@@ -228,7 +228,7 @@ pub struct FindOneAndUpdateOptions {
     #[builder(default)]
     pub upsert: Option<bool>,
 
-    // The level of the write concern
+    /// The level of the write concern
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 }
@@ -270,7 +270,7 @@ pub struct AggregateOptions {
     #[builder(default)]
     pub hint: Option<Hint>,
 
-    // The level of the write concern
+    /// The level of the write concern
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 }
