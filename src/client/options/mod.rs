@@ -32,7 +32,7 @@ lazy_static! {
     /// Usernames / passwords that contain these characters must instead include the URL encoded version of them when included
     /// as part of the connection string.
     static ref USERINFO_RESERVED_CHARACTERS: HashSet<&'static char> = {
-        [':', '/', '?', '#', '[', ']', '@', '!'].iter().collect()
+        [':', '/', '?', '#', '[', ']', '@'].iter().collect()
     };
 
     static ref ILLEGAL_DATABASE_CHARACTERS: HashSet<&'static char> = {
@@ -94,6 +94,21 @@ impl StreamAddress {
 
     pub fn hostname(&self) -> &str {
         &self.hostname
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn into_document(mut self) -> Document {
+        let mut doc = Document::new();
+
+        doc.insert("host", self.hostname());
+
+        if let Some(i) = self.port.take() {
+            doc.insert("port", i64::from(i));
+        } else {
+            doc.insert("port", Bson::Null);
+        }
+
+        doc
     }
 }
 
@@ -380,7 +395,14 @@ impl ClientOptionsParser {
                 (Some(section), o) => (section, o),
                 (None, _) => bail!(ErrorKind::ArgumentError("missing hosts".to_string())),
             },
-            None => (after_scheme, None),
+            None => {
+                if after_scheme.find('?').is_some() {
+                    bail!(ErrorKind::ArgumentError(
+                        "Missing delimiting slash between hosts and options".to_string()
+                    ));
+                }
+                (after_scheme, None)
+            }
         };
 
         let (database, options_section) = match post_slash {
@@ -422,7 +444,10 @@ impl ClientOptionsParser {
 
         let (username, password) = match cred_section {
             Some(creds) => match creds.find(':') {
-                Some(index) => exclusive_split_at(creds, index),
+                Some(index) => match exclusive_split_at(creds, index) {
+                    (username, None) => (username, Some("")),
+                    (username, password) => (username, password),
+                },
                 None => (Some(creds), None), // Lack of ":" implies whole string is username
             },
             None => (None, None),
@@ -441,7 +466,6 @@ impl ClientOptionsParser {
                         "connection string contains no host".to_string(),
                     ));
                 }
-
                 let port = if port.is_empty() {
                     None
                 } else {
@@ -452,6 +476,13 @@ impl ClientOptionsParser {
                             port
                         ))
                     })?;
+
+                    if p == 0 {
+                        bail!(ErrorKind::ArgumentError(format!(
+                            "invalid port specified in connection string: {}",
+                            port
+                        )));
+                    }
 
                     Some(p)
                 };
@@ -483,6 +514,12 @@ impl ClientOptionsParser {
             let mut credential = options.credential.get_or_insert_with(Default::default);
             validate_userinfo(u, "username")?;
             let decoded_u = percent_decode(u, "username must be URL encoded")?;
+            if decoded_u.chars().any(|c| c == '%') {
+                bail!(ErrorKind::ArgumentError(
+                    "username/passowrd cannot contain unescaped %".to_string()
+                ))
+            }
+
             credential.username = Some(decoded_u);
 
             if let Some(pass) = password {
@@ -492,17 +529,18 @@ impl ClientOptionsParser {
             }
         }
 
-        let db_str = db.as_ref().map(String::as_str);
-
         match options.auth_mechanism {
             Some(ref mechanism) => {
                 let mut credential = options.credential.get_or_insert_with(Default::default);
                 // If a source is provided, use that. Otherwise, choose a default based on the
                 // mechanism.
-                credential.source = options
-                    .auth_source
-                    .take()
-                    .or_else(|| Some(mechanism.default_source(db_str)));
+                credential.source = options.auth_source.take().or_else(|| {
+                    if mechanism.uses_db_as_source() {
+                        db
+                    } else {
+                        None
+                    }
+                });
 
                 if let Some(mut doc) = options.auth_mechanism_properties.take() {
                     match doc.remove("CANONICALIZE_HOST_NAME") {
@@ -532,12 +570,7 @@ impl ClientOptionsParser {
                     // default source is chosen from the following list in
                     // order (skipping null ones): authSource option, connection string db,
                     // SCRAM default (i.e. "admin").
-                    credential.source = Some(
-                        options
-                            .auth_source
-                            .take()
-                            .unwrap_or_else(|| AuthMechanism::ScramSha1.default_source(db_str)),
-                    )
+                    credential.source = options.auth_source.take().or(db);
                 } else if authentication_requested {
                     bail!(ErrorKind::ArgumentError(
                         "username and mechanism both not provided, but authentication was \
@@ -561,6 +594,8 @@ impl ClientOptionsParser {
             return Ok(());
         }
 
+        let mut keys: Vec<&str> = Vec::new();
+
         for option_pair in options.split('&') {
             let (key, value) = match option_pair.find('=') {
                 Some(index) => option_pair.split_at(index),
@@ -569,6 +604,14 @@ impl ClientOptionsParser {
                     option_pair,
                 ))),
             };
+
+            if key.to_lowercase() != "readpreferencetags" && keys.contains(&key) {
+                bail!(ErrorKind::ArgumentError(
+                    "repeated options are not allowed in the connection string".to_string()
+                ));
+            } else {
+                keys.push(key);
+            }
 
             // Skip leading '=' in value.
             self.parse_option_pair(
@@ -868,7 +911,12 @@ impl ClientOptionsParser {
             k @ "maxstalenessseconds" => {
                 self.max_staleness = Some(Duration::from_millis(get_duration!(value, k)));
             }
-            _ => {}
+
+            _ => {
+                bail!(ErrorKind::ArgumentError(
+                    "invalid option warning".to_string()
+                ));
+            }
         }
 
         Ok(())

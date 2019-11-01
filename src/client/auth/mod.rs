@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use bson::Document;
+use bson::{Bson, Document};
 
 use crate::error::{Error, ErrorKind, Result};
 
@@ -75,15 +75,13 @@ impl AuthMechanism {
         }
     }
 
-    /// Get the default authSource for a given mechanism depending on the database provided in the
-    /// connection string.
-    pub(crate) fn default_source(&self, uri_db: Option<&str>) -> String {
-        // TODO: fill in others as they're implemented.
+    pub(crate) fn uses_db_as_source(&self) -> bool {
         match self {
-            AuthMechanism::ScramSha1 | AuthMechanism::ScramSha256 => {
-                uri_db.unwrap_or("admin").to_string()
-            }
-            _ => "".to_string(),
+            AuthMechanism::ScramSha1
+            | AuthMechanism::ScramSha256
+            | AuthMechanism::MongoDbCr
+            | AuthMechanism::Plain => true,
+            _ => false,
         }
     }
 
@@ -147,4 +145,27 @@ pub struct Credential {
     /// Additional properties for the given mechanism.
     #[builder(default)]
     pub mechanism_properties: Option<Document>,
+}
+
+impl Credential {
+    #[allow(dead_code)]
+    pub(crate) fn into_document(mut self) -> Document {
+        let mut doc = Document::new();
+
+        if let Some(s) = self.username.take() {
+            doc.insert("username", s);
+        }
+
+        if let Some(s) = self.password.take() {
+            doc.insert("password", s);
+        } else {
+            doc.insert("password", Bson::Null);
+        }
+
+        if let Some(s) = self.source.take() {
+            doc.insert("db", s);
+        }
+
+        doc
+    }
 }

@@ -1,8 +1,11 @@
 use bson::{Bson, Document};
 use serde::Deserialize;
 
-use crate::{client::options::ClientOptions, error::ErrorKind, read_preference::ReadPreference};
-
+use crate::{
+    client::options::{ClientOptions, StreamAddress},
+    error::ErrorKind,
+    read_preference::ReadPreference,
+};
 #[derive(Debug, Deserialize)]
 struct TestFile {
     pub tests: Vec<TestCase>,
@@ -14,8 +17,10 @@ struct TestCase {
     pub description: String,
     pub uri: String,
     pub valid: bool,
-    pub warning: bool,
-    pub options: Document,
+    pub warning: Option<bool>,
+    pub hosts: Option<Vec<Document>>,
+    pub auth: Option<Document>,
+    pub options: Option<Document>,
 }
 
 fn sort_document(document: &mut Document) {
@@ -40,7 +45,7 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
         .mechanism
         .take()
     {
-        doc.insert("authMechanism", mechanism.as_str().to_string());
+        doc.insert("authmechanism", mechanism.as_str().to_string());
     }
 
     if let Some(d) = options
@@ -49,7 +54,7 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
         .mechanism_properties
         .take()
     {
-        doc.insert("authMechanismProperties", d);
+        doc.insert("authmechanismproperties", d);
     }
 
     if let Some(s) = options
@@ -58,27 +63,27 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
         .source
         .take()
     {
-        doc.insert("authSource", s);
+        doc.insert("authsource", s);
     }
 
     if let Some(i) = options.connect_timeout.take() {
-        doc.insert("connectTimeoutMS", i.as_millis() as i64);
+        doc.insert("connecttimeoutms", i.as_millis() as i64);
     }
 
     if let Some(i) = options.heartbeat_freq.take() {
-        doc.insert("heartbeatFrequencyMS", i.as_millis() as i64);
+        doc.insert("heartbeatfrequencyms", i.as_millis() as i64);
     }
 
     if let Some(i) = options.local_threshold.take() {
-        doc.insert("localThresholdMS", i);
+        doc.insert("localthresholdms", i);
     }
 
     if let Some(i) = options.max_idle_time.take() {
-        doc.insert("maxIdleTimeMS", i.as_millis() as i64);
+        doc.insert("maxidletimems", i.as_millis() as i64);
     }
 
     if let Some(s) = options.repl_set_name.take() {
-        doc.insert("replicaSet", s);
+        doc.insert("replicaset", s);
     }
 
     if let Some(read_pref) = options.read_preference.take() {
@@ -102,7 +107,7 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
             } => ("nearest", tag_sets, max_staleness),
         };
 
-        doc.insert("readPreference", level);
+        doc.insert("readpreference", level);
 
         if let Some(tag_sets) = tag_sets {
             let tags: Vec<Bson> = tag_sets
@@ -114,28 +119,28 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
                 })
                 .collect();
 
-            doc.insert("readPreferenceTags", tags);
+            doc.insert("readpreferencetags", tags);
         }
     }
 
     if let Some(i) = options.max_staleness.take() {
-        doc.insert("maxStalenessSeconds", i.as_millis() as i64);
+        doc.insert("maxstalenessseconds", i.as_millis() as i64);
     }
 
     if let Some(b) = options.retry_reads.take() {
-        doc.insert("retryReads", b);
+        doc.insert("retryreads", b);
     }
 
     if let Some(b) = options.retry_writes.take() {
-        doc.insert("retryWrites", b);
+        doc.insert("retrywrites", b);
     }
 
     if let Some(i) = options.server_selection_timeout.take() {
-        doc.insert("serverSelectionTimeoutMS", i.as_millis() as i64);
+        doc.insert("serverselectiontimeoutms", i.as_millis() as i64);
     }
 
     if let Some(i) = options.socket_timeout.take() {
-        doc.insert("socketTimeoutMS", i.as_millis() as i64);
+        doc.insert("sockettimeoutms", i.as_millis() as i64);
     }
 
     if let Some(mut opt) = options.tls_options.take() {
@@ -145,15 +150,15 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
 
         if let Some(s) = ca_file_path {
             doc.insert("tls", true);
-            doc.insert("tlsCAFile", s);
+            doc.insert("tlscafile", s);
         }
 
         if let Some(s) = cert_key_file_path {
-            doc.insert("tlsCertificateKeyFile", s);
+            doc.insert("tlscertificatekeyfile", s);
         }
 
         if let Some(b) = allow_invalid_certificates {
-            doc.insert("tlsAllowInvalidCertificates", b);
+            doc.insert("tlsallowinvalidcertificates", b);
         }
     }
 
@@ -165,7 +170,7 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
     }
 
     if let Some(s) = options.read_concern.take() {
-        doc.insert("readConcernLevel", s.as_str());
+        doc.insert("readconcernlevel", s.as_str());
     }
 
     if let Some(i_or_s) = options
@@ -183,7 +188,7 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
         .w_timeout
         .take()
     {
-        doc.insert("wTimeoutMS", i.as_millis() as i64);
+        doc.insert("wtimeoutms", i.as_millis() as i64);
     }
 
     if let Some(b) = options
@@ -196,42 +201,106 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
     }
 
     if let Some(i) = options.zlib_compression.take() {
-        doc.insert("zlibCompressionLevel", i64::from(i));
+        doc.insert("zlibcompressionlevel", i64::from(i));
     }
 
     doc
 }
 
 fn run_test(test_file: TestFile) {
-    for test_case in test_file.tests {
-        // TODO: RUST-226
-        if test_case.description.contains("tlsAllowInvalidHostnames")
-            || test_case.description.contains("single-threaded")
-            || test_case.description.contains("serverSelectionTryOnce")
+    for mut test_case in test_file.tests {
+        if
+        // TODO: RUST-229: Implement IPv6 Support
+        test_case.description.contains("ipv6")
+            || test_case.description.contains("IP literal")
+            // TODO: RUST-226: Investigate whether tlsCertificateKeyFilePassword is supported in rustls
             || test_case
                 .description
                 .contains("tlsCertificateKeyFilePassword")
+            // Not Implementing
+            || test_case.description.contains("tlsAllowInvalidHostnames")
+            || test_case.description.contains("single-threaded")
+            || test_case.description.contains("serverSelectionTryOnce")
+            || test_case.description.contains("Unix")
+            || test_case.description.contains("relative path")
         {
             continue;
         }
 
-        let mut json_options = test_case.options;
-        if !json_options.contains_key("tlsAllowInvalidCertificates") {
-            if let Some(val) = json_options.remove("tlsInsecure") {
-                json_options.insert("tlsAllowInvalidCertificates", !val.as_bool().unwrap());
-            }
-        }
+        let warning = test_case.warning.take().unwrap_or(false);
 
-        if test_case.valid && !test_case.warning {
-            let options = ClientOptions::parse(&test_case.uri).unwrap();
-            let options_doc = document_from_client_options(options);
-            assert_eq!(options_doc, json_options)
+        if test_case.valid && !warning {
+            let mut is_unsupported_host_type = false;
+            // hosts
+            if let Some(mut json_hosts) = test_case.hosts.take() {
+                // skip over unsupported host types
+                is_unsupported_host_type = json_hosts.iter_mut().any(|h_json| {
+                    match h_json.remove("type").as_ref().and_then(Bson::as_str) {
+                        Some("ip_literal") | Some("unix") => true,
+                        _ => false,
+                    }
+                });
+
+                if !is_unsupported_host_type {
+                    let options = ClientOptions::parse(&test_case.uri).unwrap();
+                    let hosts: Vec<_> = options
+                        .hosts
+                        .into_iter()
+                        .map(StreamAddress::into_document)
+                        .collect();
+
+                    assert_eq!(hosts, json_hosts);
+                }
+            }
+            if !is_unsupported_host_type {
+                // options
+                let options = ClientOptions::parse(&test_case.uri).unwrap();
+                let options_doc = document_from_client_options(options);
+                if let Some(json_options) = test_case.options {
+                    let mut json_options: Document = json_options
+                        .into_iter()
+                        .map(|(k, v)| (k.to_lowercase(), v))
+                        .collect();
+
+                    // tlsallowinvalidcertificates and tlsinsecure must be inverse of each other
+                    if !json_options.contains_key("tlsallowinvalidcertificates") {
+                        if let Some(val) = json_options.remove("tlsinsecure") {
+                            json_options
+                                .insert("tlsallowinvalidcertificates", !val.as_bool().unwrap());
+                        }
+                    }
+
+                    // the options don't contain a key for authSource if it is specified as a db
+                    if let Some(ref json_auth) = test_case.auth {
+                        if let Some(db) = json_auth.get("db") {
+                            if !json_options.contains_key("authsource") && *db != Bson::Null {
+                                json_options.insert("authsource", db.clone());
+                                sort_document(&mut json_options);
+                            }
+                        }
+                    }
+
+                    assert_eq!(options_doc, json_options)
+                }
+                // auth
+                if let Some(mut json_auth) = test_case.auth {
+                    let mut options = ClientOptions::parse(&test_case.uri).unwrap();
+                    if let Some(credential) = options.credential.take() {
+                        let auth_doc = credential.into_document();
+                        // in auth, an unspecified db is listed as a Bson::Null, so we remove it
+                        // here
+                        if let Some(db) = json_auth.get("db") {
+                            if *db == Bson::Null {
+                                json_auth.remove("db");
+                            }
+                        }
+                        assert_eq!(auth_doc, json_auth);
+                    }
+                }
+            }
         } else {
-            let expected_type = if test_case.warning {
-                "warning"
-            } else {
-                "error"
-            };
+            let expected_type = if warning { "warning" } else { "error" };
+
             match ClientOptions::parse(&test_case.uri).map_err(ErrorKind::from) {
                 Ok(_) => panic!("expected {}", expected_type),
                 Err(ErrorKind::ArgumentError(s)) => {}
@@ -244,4 +313,9 @@ fn run_test(test_file: TestFile) {
 #[test]
 fn run_uri_options_spec_tests() {
     crate::test::run(&["uri-options"], run_test);
+}
+
+#[test]
+fn run_connection_string_spec_tests() {
+    crate::test::run(&["connection-string"], run_test);
 }
