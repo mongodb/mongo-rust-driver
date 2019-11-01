@@ -237,6 +237,10 @@ pub struct AggregateOptions {
     /// The index to use for the operation.
     #[builder(default)]
     pub hint: Option<Hint>,
+
+    // The level of the read concern
+    #[builder(default)]
+    pub read_concern: Option<ReadConcern>,
 }
 
 /// Specifies the options to a `Collection::count_documents` operation.
@@ -260,6 +264,10 @@ pub struct CountOptions {
     /// The number of documents to skip before counting.
     #[builder(default)]
     pub skip: Option<i64>,
+
+    // The level of the read concern
+    #[builder(default)]
+    pub read_concern: Option<ReadConcern>,
 }
 
 /// Specifies the options to a `Collection::estimated_document_count` operation.
@@ -282,6 +290,10 @@ pub struct DistinctOptions {
     /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     pub max_time: Option<Duration>,
+
+    // The level of the read concern
+    #[builder(default)]
+    pub read_concern: Option<ReadConcern>,
 }
 
 /// Specifies the options to a `Collection::find` operation.
@@ -370,6 +382,10 @@ pub struct FindOptions {
     /// The order of the documents for the purposes of the operation.
     #[builder(default)]
     pub sort: Option<Document>,
+
+    // The level of the read concern
+    #[builder(default)]
+    pub read_concern: Option<ReadConcern>,
 }
 
 /// Specifies an index to create.
