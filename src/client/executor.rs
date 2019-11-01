@@ -12,23 +12,24 @@ impl Client {
         connection: Option<&mut Connection>,
     ) -> Result<T::O> {
         // if no connection provided, select one.
-        let mut selected_connection = match connection {
-            Some(_) => None,
+        match connection {
+            Some(conn) => self.execute_operation_on_connection(op, conn),
             None => {
                 let server = self.select_server(op.selection_criteria())?;
-                Some(server.checkout_connection()?)
+                let mut conn = server.checkout_connection()?;
+
+                self.execute_operation_on_connection(op, &mut conn)
             }
-        };
+        }
+    }
 
-        // get a reference to the selected connection if it exists, otherwise get it from the
-        // provided connection. exactly one of these will be non-null, so the final unwrap
-        // will always succeed.
-        let connection_ref = selected_connection
-            .as_mut()
-            .unwrap_or_else(|| connection.unwrap());
-
-        let cmd = op.build(connection_ref.stream_description()?)?;
-        let response = connection_ref.send_command(cmd)?;
+    fn execute_operation_on_connection<T: Operation>(
+        &self,
+        op: &T,
+        connection: &mut Connection,
+    ) -> Result<T::O> {
+        let cmd = op.build(connection.stream_description()?)?;
+        let response = connection.send_command(cmd)?;
         op.handle_response(response)
     }
 }
