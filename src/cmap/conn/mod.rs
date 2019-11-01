@@ -3,19 +3,23 @@ mod stream;
 mod stream_description;
 mod wire;
 
-use std::time::{Duration, Instant};
+use std::{
+    sync::{Arc, Weak},
+    time::{Duration, Instant},
+};
 
 use self::{
     command::{Command, CommandResponse},
     stream::Stream,
     wire::Message,
 };
-use super::ConnectionPool;
+use super::ConnectionPoolInner;
 use crate::{
     error::Result,
     event::cmap::{
-        ConnectionCheckedInEvent, ConnectionCheckedOutEvent, ConnectionClosedEvent,
-        ConnectionClosedReason, ConnectionCreatedEvent, ConnectionReadyEvent,
+        CmapEventHandler, ConnectionCheckedInEvent, ConnectionCheckedOutEvent,
+        ConnectionClosedEvent, ConnectionClosedReason, ConnectionCreatedEvent,
+        ConnectionReadyEvent,
     },
     options::StreamAddress,
     options::TlsOptions,
@@ -47,12 +51,15 @@ pub(crate) struct Connection {
     /// to detect if the connection is idle.
     ready_and_available_time: Option<Instant>,
 
+    /// The connection will have a weak reference to its pool when it's checked out. When it's
     /// A reference to the pool that maintains the connection. If the connection is currently
-    /// checked into the pool, this will be None (to avoid the pool being kept alive indefinitely
-    /// by a reference cycle).
-    pub(super) pool: Option<ConnectionPool>,
+    /// currently checked into the pool, this will be None.
+    pub(super) pool: Option<Weak<ConnectionPoolInner>>,
 
     stream: Stream,
+
+    #[derivative(Debug = "ignore")]
+    handler: Option<Arc<dyn CmapEventHandler>>,
 }
 
 impl Connection {
@@ -62,6 +69,7 @@ impl Connection {
         address: StreamAddress,
         generation: u32,
         tls_options: Option<TlsOptions>,
+        handler: Option<Arc<dyn CmapEventHandler>>,
     ) -> Result<Self> {
         let conn = Self {
             id,
@@ -71,6 +79,7 @@ impl Connection {
             ready_and_available_time: None,
             stream: Stream::connect(address.clone(), tls_options)?,
             address,
+            handler,
         };
 
         Ok(conn)
@@ -92,6 +101,7 @@ impl Connection {
             stream_description: Some(Default::default()),
             ready_and_available_time: None,
             stream: Stream::Null,
+            handler: None,
         }
     }
 
@@ -179,8 +189,22 @@ impl Connection {
 
 impl Drop for Connection {
     fn drop(&mut self) {
-        if let Some(pool) = self.pool.take() {
-            pool.check_in(std::mem::replace(self, Self::null()));
+        // If the connection has a weak reference to a pool, that means that the connection is being
+        // dropped when it's checked out. If the pool is still alive, it should check itself back
+        // in. Otherwise, the connection should close itself and emit a ConnectionClosed event
+        // (because the `close` helper was not called explicitly).
+        //
+        // If the connection does not have a weak reference to a pool, then the connection is being
+        // dropped while it's not checked out. This means that the pool called the close helper
+        // explicitly, so we don't add it back to the pool or emit any events.
+        if let Some(ref weak_pool_ref) = self.pool {
+            if let Some(strong_pool_ref) = weak_pool_ref.upgrade() {
+                strong_pool_ref.check_in(std::mem::replace(self, Self::null()));
+            } else if let Some(ref handler) = self.handler {
+                handler.handle_connection_closed_event(
+                    self.closed_event(ConnectionClosedReason::PoolClosed),
+                );
+            }
         }
     }
 }

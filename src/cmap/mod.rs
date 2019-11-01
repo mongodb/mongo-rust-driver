@@ -202,7 +202,7 @@ impl ConnectionPool {
             handler.handle_connection_checked_out_event(conn.checked_out_event());
         });
 
-        conn.pool = Some(self.clone());
+        conn.pool = Some(Arc::downgrade(&self.inner));
 
         Ok(conn)
     }
@@ -273,23 +273,8 @@ impl ConnectionPool {
     /// ready. If the connection is stale, it will be closed instead of being added to the set of
     /// available connections. The time that the connection is checked in will be marked to
     /// facilitate detecting if the connection becomes idle.
-    pub(crate) fn check_in(&self, mut conn: Connection) {
-        conn.pool.take();
-
-        self.emit_event(|handler| {
-            handler.handle_connection_checked_in_event(conn.checked_in_event());
-        });
-
-        // Close the connection if it's stale.
-        if conn.is_stale(self.inner.generation.load(Ordering::SeqCst)) {
-            self.close_connection(conn, ConnectionClosedReason::Stale);
-
-            return;
-        }
-
-        conn.mark_as_ready_and_available();
-        self.inner.connections.write().unwrap().push(conn);
-        self.inner.wait_queue.notify_ready();
+    pub(crate) fn check_in(&self, conn: Connection) {
+        self.inner.check_in(conn);
     }
 
     /// Increments the generation of the pool. Rather than eagerly removing stale connections from
@@ -330,6 +315,7 @@ impl ConnectionPool {
             self.inner.address.clone(),
             self.inner.generation.load(Ordering::SeqCst),
             self.inner.tls_options.clone(),
+            self.inner.event_handler.clone(),
         )?;
 
         self.emit_event(|handler| {
@@ -369,6 +355,40 @@ impl ConnectionPoolInner {
         if let Some(ref handler) = self.event_handler {
             emit(handler);
         }
+    }
+
+    /// Checks a connection back into the pool and notifies the wait queue that a connection is
+    /// ready. If the connection is stale, it will be closed instead of being added to the set of
+    /// available connections. The time that the connection is checked in will be marked to
+    /// facilitate detecting if the connection becomes idle.
+    fn check_in(&self, mut conn: Connection) {
+        conn.pool.take();
+
+        self.emit_event(|handler| {
+            handler.handle_connection_checked_in_event(conn.checked_in_event());
+        });
+
+        // Close the connection if it's stale.
+        if conn.is_stale(self.generation.load(Ordering::SeqCst)) {
+            self.close_connection(conn, ConnectionClosedReason::Stale);
+
+            return;
+        }
+
+        conn.mark_as_ready_and_available();
+        self.connections.write().unwrap().push(conn);
+        self.wait_queue.notify_ready();
+    }
+
+    /// Internal helper to close a connection, emit the event for it being closed, and decrement the
+    /// total connection count. Any connection being closed by the pool should be closed by using
+    /// this method.
+    fn close_connection(&self, conn: Connection, reason: ConnectionClosedReason) {
+        self.emit_event(|handler| {
+            handler.handle_connection_closed_event(conn.closed_event(reason));
+        });
+
+        self.total_connection_count.fetch_sub(1, Ordering::SeqCst);
     }
 }
 
