@@ -23,7 +23,9 @@ impl Client {
         // get a reference to the selected connection if it exists, otherwise get it from the
         // provided connection. exactly one of these will be non-null, so the final unwrap
         // will always succeed.
-        let connection_ref = selected_connection.as_mut().unwrap_or(connection.unwrap());
+        let connection_ref = selected_connection
+            .as_mut()
+            .unwrap_or_else(|| connection.unwrap());
 
         let cmd = op.build(connection_ref.stream_description()?)?;
         let response = connection_ref.send_command(cmd)?;

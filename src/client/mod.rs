@@ -5,14 +5,12 @@ pub mod options;
 use std::sync::{Arc, RwLock};
 
 use crate::{
-    cmap::Connection,
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::Result,
     event::command::{
         CommandEventHandler, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent,
     },
-    operation::Operation,
     options::{ClientOptions, DatabaseOptions},
     read_preference::ReadPreference,
     sdam::{SelectionCriteria, Server, Topology},
