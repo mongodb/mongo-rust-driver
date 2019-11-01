@@ -279,6 +279,10 @@ pub struct EstimatedDocumentCountOptions {
     /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     pub max_time: Option<Duration>,
+
+    // The level of the read concern
+    #[builder(default)]
+    pub read_concern: Option<ReadConcern>,
 }
 
 /// Specifies the options to a `Collection::distinct` operation.
