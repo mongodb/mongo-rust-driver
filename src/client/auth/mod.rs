@@ -86,8 +86,7 @@ impl AuthMechanism {
         }
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             AuthMechanism::ScramSha1 => SCRAM_SHA_1_STR,
             AuthMechanism::ScramSha256 => SCRAM_SHA_256_STR,
