@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 
-mod read_concern;
+mod concern;
 mod util;
 
 use util::TestClient;
