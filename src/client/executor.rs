@@ -1,7 +1,11 @@
 use super::Client;
+
+use time::PreciseTime;
+
 use crate::{
     cmap::Connection,
-    error::Result,
+    error::{ErrorKind, Result},
+    event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
     operation::Operation,
     sdam::{update_topology, ServerDescription},
 };
@@ -83,13 +87,52 @@ impl Client {
         connection: &mut Connection,
     ) -> Result<T::O> {
         let mut cmd = op.build(connection.stream_description()?)?;
-
         self.topology()
             .read()
             .unwrap()
             .update_command_with_read_pref(connection.address(), &mut cmd, op.selection_criteria());
 
-        let response = connection.send_command(cmd)?;
-        op.handle_response(response)
+        let connection_info = connection.info();
+        let request_id = crate::cmap::conn::next_request_id();
+        let command_started_event = CommandStartedEvent {
+            command: cmd.body.clone(),
+            db: cmd.target_db.clone(),
+            command_name: cmd.name.clone(),
+            request_id,
+            connection: connection_info.clone(),
+        };
+
+        self.send_command_started_event(command_started_event);
+
+        let start_time = PreciseTime::now();
+        let response = connection.send_command(cmd.clone(), request_id)?;
+        let end_time = PreciseTime::now();
+        let duration = start_time.to(end_time).to_std().unwrap();
+
+        let result = op.handle_response(response.clone());
+
+        match result.as_ref().map_err(|e| e.as_ref()) {
+            Err(ErrorKind::CommandError(command_error)) => {
+                let command_failed_event = CommandFailedEvent {
+                    duration,
+                    command_name: cmd.name.clone(),
+                    failure: command_error.clone(),
+                    request_id,
+                    connection: connection_info.clone(),
+                };
+                self.send_command_failed_event(command_failed_event);
+            }
+            _ => {
+                let command_succeeded_event = CommandSucceededEvent {
+                    duration,
+                    reply: response.raw_response.clone(),
+                    command_name: cmd.name.clone(),
+                    request_id,
+                    connection: connection_info.clone(),
+                };
+                self.send_command_succeeded_event(command_succeeded_event);
+            }
+        };
+        result
     }
 }

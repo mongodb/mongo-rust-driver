@@ -4,4 +4,4 @@ mod message;
 mod test;
 mod util;
 
-pub(super) use message::Message;
+pub(crate) use self::{message::Message, util::next_request_id};

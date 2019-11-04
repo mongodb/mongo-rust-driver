@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use bson::{doc, Bson, Document};
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
@@ -87,7 +87,7 @@ pub struct InsertOneOptions {
 
 /// Specifies the options to a `Collection::insert_many` operation.
 #[skip_serializing_none]
-#[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
+#[derive(Clone, Debug, Default, TypedBuilder, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InsertManyOptions {
     /// Opt out of document-level validation.
@@ -101,6 +101,7 @@ pub struct InsertManyOptions {
 
     /// The write concern for the operation.
     #[builder(default)]
+    #[serde(skip_deserializing)]
     pub write_concern: Option<WriteConcern>,
 }
 

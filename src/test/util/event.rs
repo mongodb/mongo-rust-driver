@@ -1,6 +1,13 @@
 use std::sync::{Arc, RwLock};
 
 use bson::{bson, doc};
+use mongodb::{
+    event::{
+        cmap::{CmapEventHandler, PoolClearedEvent},
+        command::{CommandEventHandler, CommandStartedEvent},
+    },
+    Collection,
+};
 
 use super::TestClient;
 use crate::{
@@ -64,6 +71,22 @@ impl EventClient {
             command_started_events,
             pool_cleared_events,
         }
+    }
+
+    pub fn run_operation_with_events(
+        &self,
+        command_names: &[&str],
+        database_name: &str,
+        collection_name: &str,
+        function: impl FnOnce(Collection),
+    ) -> Vec<CommandStartedEvent> {
+        function(self.database(database_name).collection(collection_name));
+        self.command_started_events
+            .write()
+            .unwrap()
+            .drain(..)
+            .filter(|event| command_names.contains(&event.command_name.as_str()))
+            .collect()
     }
 }
 

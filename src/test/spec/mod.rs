@@ -1,4 +1,5 @@
 mod auth;
+mod command_monitoring;
 mod connection_stepdown;
 mod crud;
 mod initial_dns_seedlist_discovery;

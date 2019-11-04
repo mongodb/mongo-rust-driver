@@ -23,6 +23,7 @@ fn basic() {
             doc! { "isMaster": 1, "$db": "admin" },
         )],
         checksum: None,
+        request_id: None,
     };
 
     let StreamAddress { ref hostname, port } = CLIENT_OPTIONS.hosts[0];

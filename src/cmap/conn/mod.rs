@@ -23,10 +23,14 @@ use crate::{
         ConnectionCreatedEvent,
         ConnectionReadyEvent,
     },
-    options::{StreamAddress, TlsOptions},
+    options::StreamAddress,
+    options::TlsOptions,
 };
-pub(crate) use command::{Command, CommandResponse};
-pub(crate) use stream_description::StreamDescription;
+pub(crate) use {
+    command::{Command, CommandResponse},
+    stream_description::StreamDescription,
+    wire::next_request_id,
+};
 
 /// User-facing information about a connection to the database.
 #[derive(Clone, Debug)]
@@ -86,6 +90,13 @@ impl Connection {
         };
 
         Ok(conn)
+    }
+
+    pub(crate) fn info(&self) -> ConnectionInfo {
+        ConnectionInfo {
+            id: self.id,
+            address: self.address.clone(),
+        }
     }
 
     pub(crate) fn address(&self) -> &StreamAddress {
@@ -189,8 +200,12 @@ impl Connection {
     /// An `Ok(...)` result simply means the server received the command and that the driver
     /// driver received the response; it does not imply anything about the success of the command
     /// itself.
-    pub(crate) fn send_command(&mut self, command: Command) -> Result<CommandResponse> {
-        let message = Message::from_command(command);
+    pub(crate) fn send_command(
+        &mut self,
+        command: Command,
+        request_id: impl Into<Option<i32>>,
+    ) -> Result<CommandResponse> {
+        let message = Message::with_command(command, request_id.into());
         message.write_to(&mut self.stream)?;
 
         let response_message = Message::read_from(&mut self.stream)?;

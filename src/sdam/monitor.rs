@@ -101,7 +101,7 @@ fn is_master(conn: &mut Connection) -> Result<IsMasterReply> {
     );
 
     let start_time = PreciseTime::now();
-    let command_response = conn.send_command(command)?;
+    let command_response = conn.send_command(command, None)?;
     let end_time = PreciseTime::now();
 
     let command_response = command_response.body()?;
