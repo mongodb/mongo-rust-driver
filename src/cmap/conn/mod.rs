@@ -12,7 +12,7 @@ use self::{
 };
 use super::ConnectionPool;
 use crate::{
-    error::Result,
+    error::{ErrorKind, Result},
     event::cmap::{
         ConnectionCheckedInEvent, ConnectionCheckedOutEvent, ConnectionClosedEvent,
         ConnectionClosedReason, ConnectionCreatedEvent, ConnectionReadyEvent,
@@ -172,8 +172,13 @@ impl Connection {
     }
 
     /// Gets the connection's StreamDescription.
-    pub(crate) fn stream_description(&self) -> Option<&StreamDescription> {
-        self.stream_description.as_ref()
+    pub(crate) fn stream_description(&self) -> Result<&StreamDescription> {
+        self.stream_description.as_ref().ok_or_else(|| {
+            ErrorKind::OperationError {
+                message: "Stream checked out but not handshaked".to_string(),
+            }
+            .into()
+        })
     }
 }
 

@@ -1,4 +1,5 @@
 pub mod auth;
+mod executor;
 pub mod options;
 
 use std::sync::{Arc, RwLock};
@@ -12,7 +13,7 @@ use crate::{
     },
     options::{ClientOptions, DatabaseOptions},
     read_preference::ReadPreference,
-    sdam::Topology,
+    sdam::{SelectionCriteria, Server, Topology},
 };
 
 /// This is the main entry point for the API. A `Client` is used to connect to a MongoDB cluster.
@@ -143,5 +144,13 @@ impl Client {
         if let Some(ref handler) = self.inner.command_event_handler {
             handler.handle_command_failed_event(event.clone());
         }
+    }
+
+    /// Select a server using the provided criteria. If none is provided, a primary read preference
+    /// will be used instead.
+    fn select_server(&self, criteria: Option<&SelectionCriteria>) -> Result<Arc<Server>> {
+        self.inner.topology.read().unwrap().select_server(
+            criteria.unwrap_or_else(|| &SelectionCriteria::ReadPreference(ReadPreference::Primary)),
+        )
     }
 }

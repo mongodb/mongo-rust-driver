@@ -94,6 +94,6 @@ impl Handshaker {
         };
 
         conn.stream_description = Some(StreamDescription::from_is_master(is_master_reply));
-        conn.stream_description().ok_or_else(|| unreachable!())
+        Ok(conn.stream_description.as_ref().unwrap())
     }
 }
