@@ -74,7 +74,8 @@ fn test_delete_many_with_write_concern() {
         .filter(|event| event.command_name == "delete_many")
         .collect();
     assert_eq!(events.len(), 1);
-    assert!(!events[0].command.contains_key("writeConcern"));
+    let read_concern = events[0].command.get("writeConcern").unwrap();
+    assert_eq!(read_concern, &Bson::Document(doc! {"w" : "majority"}));
 }
 
 #[test]
@@ -115,7 +116,8 @@ fn test_delete_one_with_write_concern() {
         .filter(|event| event.command_name == "delete_one")
         .collect();
     assert_eq!(events.len(), 1);
-    assert!(!events[0].command.contains_key("writeConcern"));
+    let read_concern = events[0].command.get("writeConcern").unwrap();
+    assert_eq!(read_concern, &Bson::Document(doc! {"w" : "majority"}));
 }
 
 #[test]
@@ -156,7 +158,8 @@ fn test_find_one_and_delete_with_write_concern() {
         .filter(|event| event.command_name == "find_one_and_delete")
         .collect();
     assert_eq!(events.len(), 1);
-    assert!(!events[0].command.contains_key("writeConcern"));
+    let read_concern = events[0].command.get("writeConcern").unwrap();
+    assert_eq!(read_concern, &Bson::Document(doc! {"w" : "majority"}));
 }
 
 #[test]
@@ -198,7 +201,8 @@ fn test_find_one_and_replace_with_write_concern() {
         .filter(|event| event.command_name == "find_one_and_replace")
         .collect();
     assert_eq!(events.len(), 1);
-    assert!(!events[0].command.contains_key("writeConcern"));
+    let read_concern = events[0].command.get("writeConcern").unwrap();
+    assert_eq!(read_concern, &Bson::Document(doc! {"w" : "majority"}));
 }
 
 #[test]
@@ -242,7 +246,8 @@ fn test_find_one_and_update_with_write_concern() {
         .filter(|event| event.command_name == "find_one_and_update")
         .collect();
     assert_eq!(events.len(), 1);
-    assert!(!events[0].command.contains_key("writeConcern"));
+    let read_concern = events[0].command.get("writeConcern").unwrap();
+    assert_eq!(read_concern, &Bson::Document(doc! {"w" : "majority"}));
 }
 
 #[test]
@@ -285,7 +290,8 @@ fn test_insert_many_with_write_concern() {
         .filter(|event| event.command_name == "insert_many")
         .collect();
     assert_eq!(events.len(), 1);
-    assert!(!events[0].command.contains_key("writeConcern"));
+    let read_concern = events[0].command.get("writeConcern").unwrap();
+    assert_eq!(read_concern, &Bson::Document(doc! {"w" : "majority"}));
 }
 
 #[test]
@@ -326,7 +332,8 @@ fn test_insert_one_with_write_concern() {
         .filter(|event| event.command_name == "insert_one")
         .collect();
     assert_eq!(events.len(), 1);
-    assert!(!events[0].command.contains_key("writeConcern"));
+    let read_concern = events[0].command.get("writeConcern").unwrap();
+    assert_eq!(read_concern, &Bson::Document(doc! {"w" : "majority"}));
 }
 
 #[test]
@@ -368,7 +375,8 @@ fn test_replace_one_with_write_concern() {
         .filter(|event| event.command_name == "replace_one")
         .collect();
     assert_eq!(events.len(), 1);
-    assert!(!events[0].command.contains_key("writeConcern"));
+    let read_concern = events[0].command.get("writeConcern").unwrap();
+    assert_eq!(read_concern, &Bson::Document(doc! {"w" : "majority"}));
 }
 
 #[test]
@@ -410,7 +418,8 @@ fn test_update_many_with_write_concern() {
         .filter(|event| event.command_name == "update_many")
         .collect();
     assert_eq!(events.len(), 1);
-    assert!(!events[0].command.contains_key("writeConcern"));
+    let read_concern = events[0].command.get("writeConcern").unwrap();
+    assert_eq!(read_concern, &Bson::Document(doc! {"w" : "majority"}));
 }
 
 #[test]
@@ -452,7 +461,8 @@ fn test_update_one_with_write_concern() {
         .filter(|event| event.command_name == "update_one")
         .collect();
     assert_eq!(events.len(), 1);
-    assert!(!events[0].command.contains_key("writeConcern"));
+    let read_concern = events[0].command.get("writeConcern").unwrap();
+    assert_eq!(read_concern, &Bson::Document(doc! {"w" : "majority"}));
 }
 
 #[test]
