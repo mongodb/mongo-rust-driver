@@ -27,7 +27,7 @@ fn test_count_with_read_concern() {
         .write()
         .unwrap()
         .drain(..)
-        .filter(|event| event.command_name == "count")
+        .filter(|event| event.command_name == "count_documents")
         .collect();
     assert_eq!(events.len(), 1);
     let read_concern = events[0].command.get("readConcern").unwrap();
@@ -44,7 +44,7 @@ fn test_count_without_read_concern() {
         .write()
         .unwrap()
         .drain(..)
-        .filter(|event| event.command_name == "count")
+        .filter(|event| event.command_name == "count_documents")
         .collect();
     assert_eq!(events.len(), 1);
     assert!(!events[0].command.contains_key("readConcern"));
@@ -66,7 +66,7 @@ fn test_estimated_count_documents_with_read_concern() {
         .write()
         .unwrap()
         .drain(..)
-        .filter(|event| event.command_name == "count")
+        .filter(|event| event.command_name == "estimated_document_count")
         .collect();
     assert_eq!(events.len(), 1);
     let read_concern = events[0].command.get("readConcern").unwrap();
@@ -83,7 +83,7 @@ fn test_estimated_count_documents_without_read_concern() {
         .write()
         .unwrap()
         .drain(..)
-        .filter(|event| event.command_name == "count")
+        .filter(|event| event.command_name == "estimated_document_count")
         .collect();
     assert_eq!(events.len(), 1);
     assert!(!events[0].command.contains_key("readConcern"));
@@ -184,7 +184,7 @@ fn test_find_with_read_concern() {
         .write()
         .unwrap()
         .drain(..)
-        .filter(|event| event.command_name == "aggregate")
+        .filter(|event| event.command_name == "find")
         .collect();
     assert_eq!(events.len(), 1);
     assert!(!events[0].command.contains_key("readConcern"));
@@ -209,7 +209,7 @@ fn test_find_without_read_concern() {
         .write()
         .unwrap()
         .drain(..)
-        .filter(|event| event.command_name == "aggregate")
+        .filter(|event| event.command_name == "find")
         .collect();
     assert_eq!(events.len(), 1);
     assert!(!events[0].command.contains_key("readConcern"));
