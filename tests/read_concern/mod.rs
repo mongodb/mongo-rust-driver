@@ -1,4 +1,5 @@
 use bson::{bson, doc, Bson};
+use function_name::named;
 use mongodb::{
     concern::ReadConcern,
     options::{
@@ -9,9 +10,12 @@ use mongodb::{
 use crate::util::EventClient;
 
 #[test]
+#[named]
 fn test_count_with_read_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection
         .count_documents(
             None,
@@ -35,9 +39,12 @@ fn test_count_with_read_concern() {
 }
 
 #[test]
+#[named]
 fn test_count_without_read_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection.count_documents(None, None).unwrap();
     let events: Vec<_> = client
         .events
@@ -51,9 +58,12 @@ fn test_count_without_read_concern() {
 }
 
 #[test]
+#[named]
 fn test_estimated_count_documents_with_read_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection
         .estimated_document_count(Some(
             EstimatedDocumentCountOptions::builder()
@@ -74,9 +84,12 @@ fn test_estimated_count_documents_with_read_concern() {
 }
 
 #[test]
+#[named]
 fn test_estimated_count_documents_without_read_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection.estimated_document_count(None).unwrap();
     let events: Vec<_> = client
         .events
@@ -90,9 +103,12 @@ fn test_estimated_count_documents_without_read_concern() {
 }
 
 #[test]
+#[named]
 fn test_aggregate_with_read_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection
         .aggregate(
             None,
@@ -116,9 +132,12 @@ fn test_aggregate_with_read_concern() {
 }
 
 #[test]
+#[named]
 fn test_aggregate_without_read_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection.aggregate(None, None).unwrap();
     let events: Vec<_> = client
         .events
@@ -132,9 +151,12 @@ fn test_aggregate_without_read_concern() {
 }
 
 #[test]
+#[named]
 fn test_distinct_with_read_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection
         .distinct(
             "",
@@ -159,9 +181,12 @@ fn test_distinct_with_read_concern() {
 }
 
 #[test]
+#[named]
 fn test_distinct_without_read_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection.distinct("", None, None).unwrap();
     let events: Vec<_> = client
         .events
@@ -175,9 +200,12 @@ fn test_distinct_without_read_concern() {
 }
 
 #[test]
+#[named]
 fn test_find_with_read_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection.find(None, None).unwrap();
     let events: Vec<_> = client
         .events
@@ -191,9 +219,12 @@ fn test_find_with_read_concern() {
 }
 
 #[test]
+#[named]
 fn test_find_without_read_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection
         .find(
             None,
