@@ -199,6 +199,7 @@ pub struct FindOneAndUpdateOptions {
     ///
     /// See the documentation [here](https://docs.mongodb.com/manual/reference/command/update/) for
     /// more information on array filters.#[builder(default)]
+    #[builder(default)]
     pub array_filters: Option<Vec<Document>>,
 
     /// Opt out of document-level validation.
