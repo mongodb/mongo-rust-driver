@@ -1,4 +1,5 @@
 use bson::{bson, doc, Bson};
+use function_name::named;
 use mongodb::{
     concern::{Acknowledgment, WriteConcern},
     options::{
@@ -11,9 +12,12 @@ use mongodb::{
 use crate::util::EventClient;
 
 #[test]
+#[named]
 fn test_aggregate_with_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection
         .aggregate(
             None,
@@ -37,9 +41,12 @@ fn test_aggregate_with_write_concern() {
 }
 
 #[test]
+#[named]
 fn test_aggregate_without_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection.aggregate(None, None).unwrap();
     let events: Vec<_> = client
         .events
@@ -53,9 +60,12 @@ fn test_aggregate_without_write_concern() {
 }
 
 #[test]
+#[named]
 fn test_delete_many_with_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection
         .delete_many(
             doc! {},
@@ -79,9 +89,12 @@ fn test_delete_many_with_write_concern() {
 }
 
 #[test]
+#[named]
 fn test_delete_many_without_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection.delete_many(doc! {}, None).unwrap();
     let events: Vec<_> = client
         .events
@@ -95,9 +108,12 @@ fn test_delete_many_without_write_concern() {
 }
 
 #[test]
+#[named]
 fn test_delete_one_with_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection
         .delete_one(
             doc! {},
@@ -121,9 +137,12 @@ fn test_delete_one_with_write_concern() {
 }
 
 #[test]
+#[named]
 fn test_delete_one_without_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection.delete_one(doc! {}, None).unwrap();
     let events: Vec<_> = client
         .events
@@ -137,9 +156,12 @@ fn test_delete_one_without_write_concern() {
 }
 
 #[test]
+#[named]
 fn test_find_one_and_delete_with_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection
         .find_one_and_delete(
             doc! {},
@@ -163,9 +185,12 @@ fn test_find_one_and_delete_with_write_concern() {
 }
 
 #[test]
+#[named]
 fn test_find_one_and_delete_without_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection.find_one_and_delete(doc! {}, None).unwrap();
     let events: Vec<_> = client
         .events
@@ -179,9 +204,12 @@ fn test_find_one_and_delete_without_write_concern() {
 }
 
 #[test]
+#[named]
 fn test_find_one_and_replace_with_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection
         .find_one_and_replace(
             doc! {},
@@ -206,9 +234,12 @@ fn test_find_one_and_replace_with_write_concern() {
 }
 
 #[test]
+#[named]
 fn test_find_one_and_replace_without_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection
         .find_one_and_replace(doc! {}, doc! {}, None)
         .unwrap();
@@ -224,9 +255,12 @@ fn test_find_one_and_replace_without_write_concern() {
 }
 
 #[test]
+#[named]
 fn test_find_one_and_update_with_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection
         .find_one_and_update(
             doc! {},
@@ -251,9 +285,12 @@ fn test_find_one_and_update_with_write_concern() {
 }
 
 #[test]
+#[named]
 fn test_find_one_and_update_without_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection
         .find_one_and_update(doc! {}, doc! {}, None)
         .unwrap();
@@ -269,9 +306,12 @@ fn test_find_one_and_update_without_write_concern() {
 }
 
 #[test]
+#[named]
 fn test_insert_many_with_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection
         .insert_many(
             None,
@@ -295,9 +335,12 @@ fn test_insert_many_with_write_concern() {
 }
 
 #[test]
+#[named]
 fn test_insert_many_without_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection.insert_many(None, None).unwrap();
     let events: Vec<_> = client
         .events
@@ -311,9 +354,12 @@ fn test_insert_many_without_write_concern() {
 }
 
 #[test]
+#[named]
 fn test_insert_one_with_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection
         .insert_one(
             doc! {},
@@ -337,9 +383,12 @@ fn test_insert_one_with_write_concern() {
 }
 
 #[test]
+#[named]
 fn test_insert_one_without_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection.insert_one(doc! {}, None).unwrap();
     let events: Vec<_> = client
         .events
@@ -353,9 +402,12 @@ fn test_insert_one_without_write_concern() {
 }
 
 #[test]
+#[named]
 fn test_replace_one_with_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection
         .replace_one(
             doc! {},
@@ -380,9 +432,12 @@ fn test_replace_one_with_write_concern() {
 }
 
 #[test]
+#[named]
 fn test_replace_one_without_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection.replace_one(doc! {}, doc! {}, None).unwrap();
     let events: Vec<_> = client
         .events
@@ -396,9 +451,12 @@ fn test_replace_one_without_write_concern() {
 }
 
 #[test]
+#[named]
 fn test_update_many_with_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection
         .update_many(
             doc! {},
@@ -423,9 +481,12 @@ fn test_update_many_with_write_concern() {
 }
 
 #[test]
+#[named]
 fn test_update_many_without_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection.update_many(doc! {}, doc! {}, None).unwrap();
     let events: Vec<_> = client
         .events
@@ -439,9 +500,12 @@ fn test_update_many_without_write_concern() {
 }
 
 #[test]
+#[named]
 fn test_update_one_with_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection
         .update_one(
             doc! {},
@@ -466,9 +530,12 @@ fn test_update_one_with_write_concern() {
 }
 
 #[test]
+#[named]
 fn test_update_one_without_write_concern() {
     let client = EventClient::new();
-    let collection = client.database("test_db").collection("test_col");
+    let collection = client
+        .database(function_name!())
+        .collection(function_name!());
     collection.update_one(doc! {}, doc! {}, None).unwrap();
     let events: Vec<_> = client
         .events
