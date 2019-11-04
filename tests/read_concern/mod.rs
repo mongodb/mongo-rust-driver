@@ -1,13 +1,57 @@
 use bson::{bson, doc, Bson};
 use mongodb::{
     concern::ReadConcern,
-    options::{AggregateOptions, DistinctOptions, EstimatedDocumentCountOptions, FindOptions},
+    options::{
+        AggregateOptions, CountOptions, DistinctOptions, EstimatedDocumentCountOptions, FindOptions,
+    },
 };
 
 use crate::util::EventClient;
 
 #[test]
 fn test_count_with_read_concern() {
+    let client = EventClient::new();
+    let collection = client.database("test_db").collection("test_col");
+    collection
+        .count_documents(
+            None,
+            Some(
+                CountOptions::builder()
+                    .read_concern(ReadConcern::Local)
+                    .build(),
+            ),
+        )
+        .unwrap();
+    let events: Vec<_> = client
+        .events
+        .write()
+        .unwrap()
+        .drain(..)
+        .filter(|event| event.command_name == "count")
+        .collect();
+    assert_eq!(events.len(), 1);
+    let read_concern = events[0].command.get("readConcern").unwrap();
+    assert_eq!(read_concern, &Bson::Document(doc! {"level" : "local"}));
+}
+
+#[test]
+fn test_count_without_read_concern() {
+    let client = EventClient::new();
+    let collection = client.database("test_db").collection("test_col");
+    collection.count_documents(None, None).unwrap();
+    let events: Vec<_> = client
+        .events
+        .write()
+        .unwrap()
+        .drain(..)
+        .filter(|event| event.command_name == "count")
+        .collect();
+    assert_eq!(events.len(), 1);
+    assert!(!events[0].command.contains_key("readConcern"));
+}
+
+#[test]
+fn test_estimated_count_documents_with_read_concern() {
     let client = EventClient::new();
     let collection = client.database("test_db").collection("test_col");
     collection
@@ -30,7 +74,7 @@ fn test_count_with_read_concern() {
 }
 
 #[test]
-fn test_count_without_read_concern() {
+fn test_estimated_count_documents_without_read_concern() {
     let client = EventClient::new();
     let collection = client.database("test_db").collection("test_col");
     collection.estimated_document_count(None).unwrap();
