@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use bson::Bson;
+use bson::{Bson, Document};
 
 use crate::error::{ErrorKind, Result};
 
@@ -143,5 +143,23 @@ impl WriteConcern {
         }
 
         Ok(())
+    }
+
+    pub(crate) fn to_bson(&self) -> Bson {
+        let mut doc = Document::new();
+
+        if let Some(ref w) = self.w {
+            doc.insert("w", w.to_bson());
+        }
+
+        if let Some(j) = self.journal {
+            doc.insert("j", j);
+        }
+
+        if let Some(wtimeout) = self.w_timeout {
+            doc.insert("wtimeout", wtimeout.as_millis() as i64);
+        }
+
+        Bson::Document(doc)
     }
 }

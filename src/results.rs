@@ -11,6 +11,18 @@ pub struct InsertOneResult {
     pub inserted_id: Bson,
 }
 
+impl InsertOneResult {
+    pub(crate) fn from_insert_many_result(result: InsertManyResult) -> Self {
+        Self {
+            inserted_id: result
+                .inserted_ids
+                .get(&0)
+                .cloned()
+                .unwrap_or_else(|| Bson::Null),
+        }
+    }
+}
+
 /// The result of a `Collection::insert_many` operation.
 #[derive(Debug)]
 pub struct InsertManyResult {

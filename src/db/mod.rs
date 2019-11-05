@@ -8,9 +8,10 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::Result,
+    operation::{Create, DropDatabase},
     options::{CollectionOptions, CreateCollectionOptions},
     read_preference::ReadPreference,
-    Client, Collection,
+    Client, Collection, Namespace,
 };
 
 /// `Database` is the client-side abstraction of a MongoDB database. It can be used to perform
@@ -60,6 +61,11 @@ struct DatabaseInner {
 }
 
 impl Database {
+    /// Get the `Client` that this collection descended from.
+    fn client(&self) -> &Client {
+        &self.inner.client
+    }
+
     /// Gets the name of the `Database`.
     pub fn name(&self) -> &str {
         unimplemented!()
@@ -101,7 +107,9 @@ impl Database {
 
     /// Drops the database, deleting all data, collections, users, and indexes stored in in.
     pub fn drop(&self) -> Result<()> {
-        unimplemented!()
+        let drop_database =
+            DropDatabase::new(self.name().to_string(), self.write_concern().cloned());
+        self.client().execute_operation(&drop_database, None)
     }
 
     /// Gets information about each of the collections in the database. The cursor will yield a
@@ -124,7 +132,15 @@ impl Database {
         name: &str,
         options: Option<CreateCollectionOptions>,
     ) -> Result<()> {
-        unimplemented!()
+        let create = Create::new(
+            Namespace {
+                db: self.name().to_string(),
+                coll: name.to_string(),
+            },
+            self.write_concern().cloned(),
+            options,
+        );
+        self.client().execute_operation(&create, None)
     }
 
     /// Runs a database-level command.

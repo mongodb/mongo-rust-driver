@@ -73,4 +73,9 @@ mod test;
 #[macro_use]
 extern crate derive_more;
 
-pub use crate::{client::Client, coll::Collection, cursor::Cursor, db::Database};
+pub use crate::{
+    client::Client,
+    coll::{Collection, Namespace},
+    cursor::Cursor,
+    db::Database,
+};
