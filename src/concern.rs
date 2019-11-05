@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use bson::{Bson, Document};
+use bson::Bson;
 
 use crate::error::{ErrorKind, Result};
 
@@ -103,6 +103,7 @@ impl From<String> for Acknowledgment {
 }
 
 impl Acknowledgment {
+    #[allow(dead_code)]
     pub(crate) fn to_bson(&self) -> Bson {
         match self {
             Acknowledgment::Nodes(i) => Bson::I64(i64::from(*i)),
@@ -142,25 +143,5 @@ impl WriteConcern {
         }
 
         Ok(())
-    }
-
-    /// Converts the write concern into a `Document`. This method will not validate the
-    /// produced write concern.
-    pub(crate) fn into_document(self) -> Document {
-        let mut doc = Document::new();
-
-        if let Some(acknowledgment) = self.w {
-            doc.insert("w", acknowledgment.to_bson());
-        }
-
-        if let Some(w_timeout) = self.w_timeout {
-            doc.insert("wtimeout", w_timeout.as_millis() as i64);
-        }
-
-        if let Some(j) = self.journal {
-            doc.insert("j", j);
-        }
-
-        doc
     }
 }

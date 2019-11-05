@@ -1,15 +1,11 @@
-pub(crate) mod command;
+mod command;
 mod stream;
 mod stream_description;
 mod wire;
 
 use std::time::{Duration, Instant};
 
-use self::{
-    command::{Command, CommandResponse},
-    stream::Stream,
-    wire::Message,
-};
+use self::{stream::Stream, wire::Message};
 use super::ConnectionPool;
 use crate::{
     error::{ErrorKind, Result},
@@ -20,7 +16,10 @@ use crate::{
     options::StreamAddress,
     options::TlsOptions,
 };
-pub(crate) use stream_description::StreamDescription;
+pub(crate) use {
+    command::{Command, CommandResponse},
+    stream_description::StreamDescription,
+};
 
 /// User-facing information about a connection to the database.
 #[derive(Clone, Debug)]
