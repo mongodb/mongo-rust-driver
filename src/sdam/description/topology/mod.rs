@@ -8,8 +8,10 @@ use bson::oid::ObjectId;
 use serde::Deserialize;
 
 use crate::{
+    cmap::Command,
     error::Result,
     options::{ClientOptions, StreamAddress},
+    read_preference::ReadPreference,
     sdam::description::server::{ServerDescription, ServerType},
 };
 pub(crate) use server_selection::SelectionCriteria;
@@ -88,6 +90,79 @@ impl TopologyDescription {
             compatibility_error: None,
             logical_session_timeout_minutes: None,
             servers,
+        }
+    }
+
+    pub(crate) fn update_command_with_read_pref(
+        &self,
+        server_type: ServerType,
+        command: &mut Command,
+        criteria: Option<&SelectionCriteria>,
+    ) {
+        match (self.topology_type, server_type) {
+            (TopologyType::Sharded, ServerType::Mongos)
+            | (TopologyType::Single, ServerType::Mongos) => {
+                self.update_command_read_pref_for_mongos(command, criteria);
+            }
+            (TopologyType::Single, ServerType::Standalone) => {}
+            (TopologyType::Single, _) => {
+                command.read_pref = Some(
+                    criteria
+                        .and_then(SelectionCriteria::as_read_pref)
+                        .map(Clone::clone)
+                        .unwrap_or(ReadPreference::PrimaryPreferred {
+                            max_staleness: None,
+                            tag_sets: None,
+                        }),
+                );
+            }
+            _ => {}
+        }
+    }
+
+    fn update_command_read_pref_for_mongos(
+        &self,
+        command: &mut Command,
+        criteria: Option<&SelectionCriteria>,
+    ) {
+        match criteria {
+            Some(SelectionCriteria::ReadPreference(ReadPreference::Secondary {
+                max_staleness,
+                tag_sets,
+            })) => {
+                command.read_pref = Some(ReadPreference::Secondary {
+                    max_staleness: max_staleness.clone(),
+                    tag_sets: tag_sets.clone(),
+                });
+            }
+            Some(SelectionCriteria::ReadPreference(ReadPreference::PrimaryPreferred {
+                max_staleness,
+                tag_sets,
+            })) => {
+                command.read_pref = Some(ReadPreference::PrimaryPreferred {
+                    max_staleness: max_staleness.clone(),
+                    tag_sets: tag_sets.clone(),
+                });
+            }
+            Some(SelectionCriteria::ReadPreference(ReadPreference::SecondaryPreferred {
+                max_staleness,
+                tag_sets,
+            })) if max_staleness.is_some() || tag_sets.is_some() => {
+                command.read_pref = Some(ReadPreference::SecondaryPreferred {
+                    max_staleness: max_staleness.clone(),
+                    tag_sets: tag_sets.clone(),
+                });
+            }
+            Some(SelectionCriteria::ReadPreference(ReadPreference::Nearest {
+                max_staleness,
+                tag_sets,
+            })) => {
+                command.read_pref = Some(ReadPreference::Nearest {
+                    max_staleness: max_staleness.clone(),
+                    tag_sets: tag_sets.clone(),
+                });
+            }
+            _ => {}
         }
     }
 

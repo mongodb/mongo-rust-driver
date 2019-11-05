@@ -8,9 +8,10 @@ use std::{
 use self::server::Server;
 use super::TopologyDescription;
 use crate::{
+    cmap::Command,
     error::{ErrorKind, Result},
     options::{ClientOptions, StreamAddress},
-    sdam::description::topology::SelectionCriteria,
+    sdam::description::{server::ServerType, topology::SelectionCriteria},
 };
 
 /// Contains the SDAM state for a Client.
@@ -45,6 +46,16 @@ impl Topology {
         // TODO RUST-205: Start monitoring threads.
 
         Ok(topology)
+    }
+
+    pub(crate) fn update_command_with_read_pref(
+        &self,
+        server_type: ServerType,
+        command: &mut Command,
+        criteria: Option<&SelectionCriteria>,
+    ) {
+        self.description
+            .update_command_with_read_pref(server_type, command, criteria)
     }
 
     /// Selects a server description with the given criteria.

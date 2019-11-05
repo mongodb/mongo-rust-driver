@@ -62,7 +62,7 @@ pub mod event;
 mod is_master;
 mod operation;
 pub mod options;
-mod read_preference;
+pub mod read_preference;
 pub mod results;
 #[allow(dead_code)]
 mod sdam;
