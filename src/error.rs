@@ -1,6 +1,7 @@
 use std::{fmt, sync::Arc};
 
 use err_derive::Error;
+use serde::Deserialize;
 
 use crate::options::StreamAddress;
 
@@ -101,11 +102,17 @@ pub enum ErrorKind {
 }
 
 /// An error that occurred due to a database command failing.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct CommandError {
     code: u32,
+
+    #[serde(rename = "camelCase", default)]
     code_name: String,
+
+    #[serde(rename = "errmsg")]
     message: String,
+
+    #[serde(rename = "errorLabels", default)]
     labels: Vec<String>,
 }
 

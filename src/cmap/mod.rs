@@ -18,7 +18,8 @@ use std::{
 use derivative::Derivative;
 
 pub use self::conn::ConnectionInfo;
-pub(crate) use self::conn::{Connection, StreamDescription};
+pub(crate) use self::conn::{Command, CommandResponse, Connection, StreamDescription};
+
 use self::{
     establish::ConnectionEstablisher, options::ConnectionPoolOptions, wait_queue::WaitQueue,
 };

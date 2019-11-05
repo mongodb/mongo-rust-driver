@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 use crate::read_preference::ReadPreference;
 use crate::{
-    cmap::{conn::command::Command, options::ConnectionPoolOptions, ConnectionPool},
+    cmap::{options::ConnectionPoolOptions, Command, ConnectionPool},
     test::CLIENT_OPTIONS,
 };
 

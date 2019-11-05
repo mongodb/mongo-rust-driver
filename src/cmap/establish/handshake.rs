@@ -3,7 +3,7 @@ use lazy_static::lazy_static;
 use os_info::{Type, Version};
 
 use crate::{
-    cmap::{conn::command::Command, options::ConnectionPoolOptions, Connection, StreamDescription},
+    cmap::{options::ConnectionPoolOptions, Command, Connection, StreamDescription},
     error::Result,
     is_master::IsMasterReply,
 };
