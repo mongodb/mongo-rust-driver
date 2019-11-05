@@ -37,9 +37,7 @@ pub(crate) fn append_options<T: Serialize>(doc: &mut Document, options: Option<&
             let temp_doc = bson::to_bson(options)?;
             match temp_doc {
                 Bson::Document(d) => {
-                    d.into_iter().for_each(move |(k, v)| {
-                        doc.insert(k, v);
-                    });
+                    doc.extend(d);
                     Ok(())
                 }
                 _ => Err(ErrorKind::OperationError {
