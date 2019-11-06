@@ -131,7 +131,7 @@ impl TopologyDescription {
                 tag_sets,
             })) => {
                 command.read_pref = Some(ReadPreference::Secondary {
-                    max_staleness: max_staleness.clone(),
+                    max_staleness: *max_staleness,
                     tag_sets: tag_sets.clone(),
                 });
             }
@@ -140,7 +140,7 @@ impl TopologyDescription {
                 tag_sets,
             })) => {
                 command.read_pref = Some(ReadPreference::PrimaryPreferred {
-                    max_staleness: max_staleness.clone(),
+                    max_staleness: *max_staleness,
                     tag_sets: tag_sets.clone(),
                 });
             }
@@ -149,7 +149,7 @@ impl TopologyDescription {
                 tag_sets,
             })) if max_staleness.is_some() || tag_sets.is_some() => {
                 command.read_pref = Some(ReadPreference::SecondaryPreferred {
-                    max_staleness: max_staleness.clone(),
+                    max_staleness: *max_staleness,
                     tag_sets: tag_sets.clone(),
                 });
             }
@@ -158,7 +158,7 @@ impl TopologyDescription {
                 tag_sets,
             })) => {
                 command.read_pref = Some(ReadPreference::Nearest {
-                    max_staleness: max_staleness.clone(),
+                    max_staleness: *max_staleness,
                     tag_sets: tag_sets.clone(),
                 });
             }
