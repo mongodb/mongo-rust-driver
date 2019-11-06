@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use bson::{Bson, Document};
+use bson::{bson, doc, Bson, Document};
 use serde::{Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
@@ -52,6 +52,18 @@ impl ReadConcern {
             ReadConcern::Available => "available",
             ReadConcern::Custom(ref s) => s,
         }
+    }
+}
+
+impl Serialize for ReadConcern {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        (doc! {
+            "level": self.as_str().to_string()
+        })
+        .serialize(serializer)
     }
 }
 

@@ -44,6 +44,7 @@ impl Command {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct CommandResponse {
     pub(crate) raw_response: Document,
 }
@@ -89,8 +90,13 @@ impl CommandResponse {
     /// be returned.
     pub(crate) fn body<T: DeserializeOwned>(&self) -> Result<T> {
         self.validate()?;
-        let body = bson::from_bson(Bson::Document(self.raw_response.clone()))?;
-        Ok(body)
+        match bson::from_bson(Bson::Document(self.raw_response.clone())) {
+            Ok(body) => Ok(body),
+            Err(e) => Err(ErrorKind::ResponseError {
+                message: format!("{}", e),
+            }
+            .into()),
+        }
     }
 
     /// The raw server response.

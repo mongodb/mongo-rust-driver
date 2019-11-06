@@ -9,7 +9,7 @@ use crate::{
     bson_util,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, Result},
-    operation::{Delete, DropCollection, Insert, Update},
+    operation::{Count, Delete, Distinct, DropCollection, Insert, Update},
     results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
     selection_criteria::SelectionCriteria,
     Client, Cursor, Database,
@@ -148,9 +148,12 @@ impl Collection {
     /// Estimates the number of documents in the collection using collection metadata.
     pub fn estimated_document_count(
         &self,
-        options: Option<EstimatedDocumentCountOptions>,
+        mut options: Option<EstimatedDocumentCountOptions>,
     ) -> Result<i64> {
-        unimplemented!()
+        resolve_options!(self, options, [read_concern, selection_criteria]);
+
+        let op = Count::new(self.namespace(), options);
+        self.client().execute_operation(&op, None)
     }
 
     /// Gets the number of documents matching `filter`.
@@ -194,9 +197,12 @@ impl Collection {
         &self,
         field_name: &str,
         filter: Option<Document>,
-        options: Option<DistinctOptions>,
+        mut options: Option<DistinctOptions>,
     ) -> Result<Vec<Bson>> {
-        unimplemented!()
+        resolve_options!(self, options, [read_concern, selection_criteria]);
+
+        let op = Distinct::new(self.namespace(), field_name.to_string(), filter, options);
+        self.client().execute_operation(&op, None)
     }
 
     /// Finds the documents in the collection matching `filter`.
