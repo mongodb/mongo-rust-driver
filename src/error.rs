@@ -47,7 +47,7 @@ pub enum ErrorKind {
     BsonEncode(#[error(source)] bson::EncoderError),
 
     #[error(
-        display = "An error ocurred when trying to execute a write operation: {}",
+        display = "An error ocurred when trying to execute a write operation: {:?}",
         inner
     )]
     BulkWriteError { inner: BulkWriteFailure },
@@ -187,12 +187,6 @@ pub struct BulkWriteFailure {
 
     /// The error that ocurred on account of write concern failure.
     pub write_concern_error: Option<WriteConcernError>,
-}
-
-impl fmt::Display for BulkWriteFailure {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        unimplemented!()
-    }
 }
 
 /// An error that occurred when trying to execute a write operation.

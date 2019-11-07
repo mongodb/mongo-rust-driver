@@ -46,7 +46,7 @@ impl Operation for Insert {
     fn build(&self, description: &StreamDescription) -> Result<Command> {
         let mut body = doc! {
             Self::NAME: self.ns.coll.clone(),
-            "documents": Bson::Array(self.documents.iter().map(|d| Bson::Document(d.clone())).collect()),
+            "documents": bson_util::to_bson_array(&self.documents),
         };
         append_options(&mut body, self.options.as_ref())?;
 
