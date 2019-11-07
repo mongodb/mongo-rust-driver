@@ -32,7 +32,7 @@ pub(crate) fn sort_document(document: &mut Document) {
     document.extend(elements);
 }
 
-pub fn replacement_document_check(replacement: &Document) -> Result<()> {
+pub(crate) fn replacement_document_check(replacement: &Document) -> Result<()> {
     match replacement.iter().next() {
         Some((s, _)) if !s.starts_with('$') => Ok(()),
         _ => Err(ErrorKind::ArgumentError {
@@ -42,7 +42,7 @@ pub fn replacement_document_check(replacement: &Document) -> Result<()> {
     }
 }
 
-pub fn update_document_check(update: &Document) -> Result<()> {
+pub(crate) fn update_document_check(update: &Document) -> Result<()> {
     match update.iter().next() {
         Some((s, _)) if s.starts_with('$') => Ok(()),
         _ => Err(ErrorKind::ArgumentError {

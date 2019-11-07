@@ -5,7 +5,7 @@ use crate::{
     coll::Namespace,
     concern::WriteConcern,
     error::{convert_bulk_errors, Result},
-    operation::{Operation, WriteResponseBody, append_options},
+    operation::{append_options, Operation, WriteResponseBody},
     options::DeleteOptions,
     results::DeleteResult,
 };
