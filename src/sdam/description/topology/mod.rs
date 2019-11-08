@@ -178,9 +178,13 @@ impl TopologyDescription {
         }
     }
 
+    pub(crate) fn compatibility_error(&self) -> Option<&String> {
+        self.compatibility_error.as_ref()
+    }
+
     /// Update the topology based on the new information about the topology contained by the
     /// ServerDescription.
-    fn update(&mut self, server_description: ServerDescription) -> Result<()> {
+    pub(crate) fn update(&mut self, server_description: ServerDescription) -> Result<()> {
         // Ignore updates from servers not currently in the cluster.
         if !self.servers.contains_key(&server_description.address) {
             return Ok(());

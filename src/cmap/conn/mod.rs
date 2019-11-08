@@ -84,6 +84,10 @@ impl Connection {
         Ok(conn)
     }
 
+    pub(crate) fn address(&self) -> &StreamAddress {
+        &self.address
+    }
+
     /// In order to check a connection back into the pool when it's dropped, we need to be able to
     /// replace it with something. The `null` method facilitates this by creating a dummy connection
     /// which can be passed to `std::mem::replace` to be dropped in place of the original
