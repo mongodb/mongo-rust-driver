@@ -124,6 +124,18 @@ impl UpdateModifications {
     }
 }
 
+impl From<Document> for UpdateModifications {
+    fn from(item: Document) -> Self {
+        UpdateModifications::Document(item)
+    }
+}
+
+impl From<Vec<Document>> for UpdateModifications {
+    fn from(item: Vec<Document>) -> Self {
+        UpdateModifications::Pipeline(item)
+    }
+}
+
 /// Specifies the options to a `Collection::update_one` or `Collection::update_many` operation.
 #[derive(Debug, Default, TypedBuilder)]
 pub struct UpdateOptions {

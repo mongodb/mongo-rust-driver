@@ -261,12 +261,19 @@ impl Collection {
     }
 
     /// Updates all documents matching `query` in the collection.
+    ///
+    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
+    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
+    /// in MongoDB 4.2+. See the official MongoDB
+    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#behavior) for more information on specifying updates.
     pub fn update_many(
         &self,
         query: Document,
-        update: UpdateModifications,
+        update: impl Into<UpdateModifications>,
         options: Option<UpdateOptions>,
     ) -> Result<UpdateResult> {
+        let update = update.into();
+
         if let UpdateModifications::Document(ref d) = update {
             bson_util::update_document_check(d)?;
         };
@@ -283,16 +290,21 @@ impl Collection {
     }
 
     /// Updates up to one document matching `query` in the collection.
+    ///
+    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
+    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
+    /// in MongoDB 4.2+. See the official MongoDB
+    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#behavior) for more information on specifying updates.
     pub fn update_one(
         &self,
         query: Document,
-        update: UpdateModifications,
+        update: impl Into<UpdateModifications>,
         options: Option<UpdateOptions>,
     ) -> Result<UpdateResult> {
         let update = Update::new(
             self.namespace(),
             query,
-            update,
+            update.into(),
             false,
             self.write_concern().cloned(),
             options,
