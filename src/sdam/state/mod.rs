@@ -58,8 +58,13 @@ impl Topology {
             topology_lock.servers = servers;
 
             for server in topology_lock.servers.values() {
-                let conn =
-                    Connection::new(0, server.address.clone(), 0, options.tls_options.clone())?;
+                let conn = Connection::new(
+                    0,
+                    server.address.clone(),
+                    0,
+                    options.tls_options.clone(),
+                    options.cmap_event_handler.clone(),
+                )?;
 
                 monitor_server(conn, Arc::downgrade(server), options.heartbeat_freq);
             }

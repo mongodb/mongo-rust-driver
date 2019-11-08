@@ -112,7 +112,7 @@ fn is_master(conn: &mut Connection) -> Result<IsMasterReply> {
 
     Ok(IsMasterReply {
         command_response,
-        // TODO: Round-trip time
+        // TODO RUST-193: Round-trip time
         round_trip_time: None,
     })
 }
