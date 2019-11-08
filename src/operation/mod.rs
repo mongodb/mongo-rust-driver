@@ -78,10 +78,9 @@ struct WriteConcernOnlyBody {
 impl WriteConcernOnlyBody {
     fn validate(&self) -> Result<()> {
         match self.write_concern_error {
-            Some(ref wc_error) => Err(ErrorKind::WriteError {
-                inner: WriteFailure::WriteConcernError(wc_error.clone()),
+            Some(ref wc_error) => {
+                Err(ErrorKind::WriteError(WriteFailure::WriteConcernError(wc_error.clone())).into())
             }
-            .into()),
             None => Ok(()),
         }
     }
@@ -112,7 +111,7 @@ impl<T> WriteResponseBody<T> {
             write_concern_error: self.write_concern_error.clone(),
         };
 
-        Err(ErrorKind::BulkWriteError { inner: failure }.into())
+        Err(ErrorKind::BulkWriteError(failure).into())
     }
 }
 
@@ -138,7 +137,7 @@ mod test {
         assert!(cmd_error_result.is_err());
 
         match *cmd_error_result.unwrap_err().kind {
-            ErrorKind::CommandError { inner: ref error } => {
+            ErrorKind::CommandError(ref error) => {
                 assert_eq!(error.code, 123);
                 assert_eq!(error.code_name, "woops");
                 assert_eq!(error.message, "My error message")

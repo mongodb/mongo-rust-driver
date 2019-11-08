@@ -48,12 +48,12 @@ pub enum ErrorKind {
 
     #[error(
         display = "An error ocurred when trying to execute a write operation: {:?}",
-        inner
+        _0
     )]
-    BulkWriteError { inner: BulkWriteFailure },
+    BulkWriteError(BulkWriteFailure),
 
-    #[error(display = "Command failed {}", inner)]
-    CommandError { inner: CommandError },
+    #[error(display = "Command failed {}", _0)]
+    CommandError(CommandError),
 
     #[error(display = "{}", _0)]
     DnsName(#[error(source)] webpki::InvalidDNSNameError),
@@ -102,9 +102,9 @@ pub enum ErrorKind {
 
     #[error(
         display = "An error occurred when trying to execute a write operation: {}",
-        inner
+        _0
     )]
-    WriteError { inner: WriteFailure },
+    WriteError(WriteFailure),
 }
 
 /// An error that occurred due to a database command failing.
@@ -226,12 +226,12 @@ impl fmt::Display for WriteFailure {
 /// untouched.
 pub(crate) fn convert_bulk_errors(error: Error) -> Error {
     match *error.kind {
-        ErrorKind::BulkWriteError {
-            inner: ref bulk_failure,
-        } => match WriteFailure::from_bulk_failure(bulk_failure.clone()) {
-            Ok(failure) => ErrorKind::WriteError { inner: failure }.into(),
-            Err(e) => e,
-        },
+        ErrorKind::BulkWriteError(ref bulk_failure) => {
+            match WriteFailure::from_bulk_failure(bulk_failure.clone()) {
+                Ok(failure) => ErrorKind::WriteError(failure).into(),
+                Err(e) => e,
+            }
+        }
         _ => error,
     }
 }

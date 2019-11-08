@@ -76,9 +76,7 @@ fn handle_write_concern_error() {
     assert!(result.is_err());
 
     match *result.unwrap_err().kind {
-        ErrorKind::WriteError {
-            inner: WriteFailure::WriteConcernError(ref wc_err),
-        } => {
+        ErrorKind::WriteError(WriteFailure::WriteConcernError(ref wc_err)) => {
             assert_eq!(wc_err.code, 100);
             assert_eq!(wc_err.code_name, "hello world");
             assert_eq!(wc_err.message, "12345");
