@@ -1,3 +1,10 @@
+mod create;
+mod delete;
+mod drop;
+mod drop_database;
+mod insert;
+mod update;
+
 use std::{fmt::Debug, ops::Deref};
 
 use bson::{self, Bson, Document};
@@ -8,13 +15,6 @@ use crate::{
     error::{BulkWriteError, BulkWriteFailure, ErrorKind, Result, WriteConcernError, WriteFailure},
     sdam::SelectionCriteria,
 };
-
-mod create;
-mod delete;
-mod drop;
-mod drop_database;
-mod insert;
-mod update;
 
 pub(crate) use create::Create;
 pub(crate) use delete::Delete;
