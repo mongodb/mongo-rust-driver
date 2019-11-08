@@ -1,4 +1,4 @@
-use std::{fmt, ops::Deref};
+use std::{fmt::Debug, ops::Deref};
 
 use bson::{self, Bson, Document};
 use serde::{Deserialize, Serialize};
@@ -26,7 +26,7 @@ pub(crate) use update::Update;
 /// A trait modeling the behavior of a server side operation.
 pub(super) trait Operation {
     /// The output type of this operation.
-    type O: fmt::Debug;
+    type O: Debug;
 
     /// The name of the server side command associated with this operation.
     const NAME: &'static str;

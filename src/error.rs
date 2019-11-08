@@ -197,16 +197,16 @@ pub enum WriteFailure {
 }
 
 impl WriteFailure {
-    fn from_bulk_failure(bulk: &BulkWriteFailure) -> Result<Self> {
-        if let Some(bulk_write_error) = bulk.write_errors.as_ref().and_then(|es| es.first()) {
+    fn from_bulk_failure(bulk: BulkWriteFailure) -> Result<Self> {
+        if let Some(bulk_write_error) = bulk.write_errors.and_then(|es| es.into_iter().next()) {
             let write_error = WriteError {
                 code: bulk_write_error.code,
-                code_name: bulk_write_error.code_name.clone(),
-                message: bulk_write_error.message.clone(),
+                code_name: bulk_write_error.code_name,
+                message: bulk_write_error.message,
             };
             Ok(WriteFailure::WriteError(write_error))
-        } else if let Some(ref wc_error) = bulk.write_concern_error {
-            Ok(WriteFailure::WriteConcernError(wc_error.clone()))
+        } else if let Some(wc_error) = bulk.write_concern_error {
+            Ok(WriteFailure::WriteConcernError(wc_error))
         } else {
             Err(ErrorKind::ResponseError {
                 message: "error missing write errors and write concern errors".to_string(),
@@ -228,7 +228,7 @@ pub(crate) fn convert_bulk_errors(error: Error) -> Error {
     match *error.kind {
         ErrorKind::BulkWriteError {
             inner: ref bulk_failure,
-        } => match WriteFailure::from_bulk_failure(bulk_failure) {
+        } => match WriteFailure::from_bulk_failure(bulk_failure.clone()) {
             Ok(failure) => ErrorKind::WriteError { inner: failure }.into(),
             Err(e) => e,
         },

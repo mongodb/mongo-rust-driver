@@ -17,14 +17,11 @@ pub(crate) struct DropDatabase {
 impl DropDatabase {
     #[allow(dead_code)]
     fn empty() -> Self {
-        Self {
-            target_db: "".to_string(),
-            write_concern: None,
-        }
+        Self::new("".to_string(), None)
     }
 
     pub(crate) fn new(target_db: String, write_concern: Option<WriteConcern>) -> Self {
-        // TODO: use write concern from options ?
+        // TODO: RUST-35 use write concern from options ?
         Self {
             target_db,
             write_concern,
@@ -77,7 +74,7 @@ mod test {
             }),
         };
 
-        let description = StreamDescription::new_42();
+        let description = StreamDescription::new_testing();
         let cmd = op.build(&description).unwrap();
 
         assert_eq!(cmd.name.as_str(), "dropDatabase");

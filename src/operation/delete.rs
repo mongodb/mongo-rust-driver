@@ -22,16 +22,16 @@ pub(crate) struct Delete {
 impl Delete {
     #[allow(dead_code)]
     fn empty() -> Self {
-        Self {
-            ns: Namespace {
+        Self::new(
+            Namespace {
                 db: "".to_string(),
                 coll: "".to_string(),
             },
-            filter: Document::new(),
-            limit: 0,
-            write_concern: None,
-            options: None,
-        }
+            Document::new(),
+            None,
+            None,
+            None,
+        )
     }
 
     pub(crate) fn new(
@@ -45,7 +45,7 @@ impl Delete {
             ns,
             filter,
             limit: limit.unwrap_or(0),         // 0 = no limit
-            write_concern: coll_write_concern, // TODO: check wc from options
+            write_concern: coll_write_concern, // TODO: RUST-35 check wc from options
             options,
         }
     }
@@ -79,7 +79,7 @@ impl Operation for Delete {
     }
 
     fn handle_response(&self, response: CommandResponse) -> Result<Self::O> {
-        let body = response.body::<WriteResponseBody>()?;
+        let body: WriteResponseBody = response.body()?;
         body.validate().map_err(convert_bulk_errors)?;
 
         Ok(DeleteResult {
@@ -116,7 +116,7 @@ mod test {
 
         let op = Delete::new(ns, filter.clone(), None, Some(wc), None);
 
-        let description = StreamDescription::new_42();
+        let description = StreamDescription::new_testing();
         let mut cmd = op.build(&description).unwrap();
 
         assert_eq!(cmd.name.as_str(), "delete");
@@ -157,7 +157,7 @@ mod test {
 
         let op = Delete::new(ns, filter.clone(), Some(1), Some(wc), None);
 
-        let description = StreamDescription::new_42();
+        let description = StreamDescription::new_testing();
         let mut cmd = op.build(&description).unwrap();
 
         assert_eq!(cmd.name.as_str(), "delete");

@@ -25,17 +25,17 @@ pub(crate) struct Update {
 impl Update {
     #[allow(dead_code)]
     fn empty() -> Self {
-        Update {
-            ns: Namespace {
+        Update::new(
+            Namespace {
                 db: "".to_string(),
                 coll: "".to_string(),
             },
-            filter: Document::new(),
-            update: UpdateModifications::Document(Document::new()),
-            multi: None,
-            write_concern: None,
-            options: None,
-        }
+            Document::new(),
+            UpdateModifications::Document(Document::new()),
+            false,
+            None,
+            None,
+        )
     }
 
     pub(crate) fn new(
@@ -51,7 +51,7 @@ impl Update {
             filter,
             update,
             multi: if multi { Some(true) } else { None },
-            write_concern: coll_write_concern, // TODO: check wc from options
+            write_concern: coll_write_concern, // TODO: RUST-35 check wc from options
             options,
         }
     }
@@ -107,7 +107,7 @@ impl Operation for Update {
     }
 
     fn handle_response(&self, response: CommandResponse) -> Result<Self::O> {
-        let body = response.body::<WriteResponseBody<UpdateBody>>()?;
+        let body: WriteResponseBody<UpdateBody> = response.body()?;
         body.validate().map_err(convert_bulk_errors)?;
 
         let matched_count = body.n;
@@ -174,7 +174,7 @@ mod test {
             Some(options),
         );
 
-        let description = StreamDescription::new_42();
+        let description = StreamDescription::new_testing();
         let mut cmd = op.build(&description).unwrap();
 
         assert_eq!(cmd.name.as_str(), "update");
@@ -213,7 +213,7 @@ mod test {
 
         let op = Update::new(ns, filter.clone(), update.clone(), true, None, None);
 
-        let description = StreamDescription::new_42();
+        let description = StreamDescription::new_testing();
         let mut cmd = op.build(&description).unwrap();
 
         assert_eq!(cmd.name.as_str(), "update");

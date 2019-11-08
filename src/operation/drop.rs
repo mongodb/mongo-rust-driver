@@ -19,19 +19,19 @@ impl Drop {
     pub(crate) fn new(ns: Namespace, coll_write_concern: Option<WriteConcern>) -> Self {
         Self {
             ns,
-            write_concern: coll_write_concern, // TODO: check options first
+            write_concern: coll_write_concern, // TODO: RUST-35 check options first
         }
     }
 
     #[allow(dead_code)]
     fn empty() -> Self {
-        Self {
-            ns: Namespace {
+        Self::new(
+            Namespace {
                 db: "".to_string(),
                 coll: "".to_string(),
             },
-            write_concern: None,
-        }
+            None,
+        )
     }
 }
 
@@ -84,7 +84,7 @@ mod test {
             }),
         );
 
-        let description = StreamDescription::new_42();
+        let description = StreamDescription::new_testing();
         let cmd = op.build(&description).unwrap();
 
         assert_eq!(cmd.name.as_str(), "drop");

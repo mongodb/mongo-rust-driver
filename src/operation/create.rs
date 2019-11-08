@@ -20,14 +20,14 @@ pub(crate) struct Create {
 impl Create {
     #[allow(dead_code)]
     fn empty() -> Self {
-        Self {
-            ns: Namespace {
+        Self::new(
+            Namespace {
                 db: "".to_string(),
                 coll: "".to_string(),
             },
-            write_concern: None,
-            options: None,
-        }
+            None,
+            None,
+        )
     }
 
     pub(crate) fn new(
@@ -37,7 +37,7 @@ impl Create {
     ) -> Self {
         Self {
             ns,
-            write_concern: db_write_concern, // TODO: first try options wc
+            write_concern: db_write_concern, // TODO: RUST-35 first try options wc
             options,
         }
     }
@@ -100,7 +100,7 @@ mod test {
             }),
         );
 
-        let description = StreamDescription::new_42();
+        let description = StreamDescription::new_testing();
         let cmd = op.build(&description).unwrap();
 
         assert_eq!(cmd.name.as_str(), "create");

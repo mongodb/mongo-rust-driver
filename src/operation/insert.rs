@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use bson::{bson, doc, Bson, Document};
+use bson::{bson, doc, Document};
 
 use crate::{
     bson_util,
     cmap::{Command, CommandResponse, StreamDescription},
-    error::Result,
+    error::{ErrorKind, Result},
     operation::{append_options, Operation, WriteResponseBody},
     options::InsertManyOptions,
     results::InsertManyResult,
@@ -58,12 +58,19 @@ impl Operation for Insert {
     }
 
     fn handle_response(&self, response: CommandResponse) -> Result<Self::O> {
-        let body = response.body::<WriteResponseBody>()?;
+        let body: WriteResponseBody = response.body()?;
         body.validate()?;
 
-        let mut map = HashMap::<usize, Bson>::new();
+        let mut map = HashMap::new();
         for (i, doc) in self.documents.iter().enumerate() {
-            map.insert(i, doc.get("_id").unwrap().clone());
+            map.insert(
+                i,
+                doc.get("_id")
+                    .ok_or_else(|| ErrorKind::OperationError {
+                        message: "missing _id in inserted document".to_string(),
+                    })?
+                    .clone(),
+            );
         }
         Ok(InsertManyResult { inserted_ids: map })
     }
@@ -81,8 +88,14 @@ mod test {
         Namespace,
     };
 
+    struct TestFixtures {
+        op: Insert,
+        documents: Vec<Document>,
+        options: InsertManyOptions,
+    }
+
     /// Get an Insert operation and the documents/options used to construct it.
-    fn fixtures() -> (Insert, Vec<Document>, InsertManyOptions) {
+    fn fixtures() -> TestFixtures {
         let documents = vec![
             Document::new(),
             doc! {"_id": 1234, "a": 1},
@@ -103,15 +116,19 @@ mod test {
             Some(options.clone()),
         );
 
-        (op, documents, options)
+        TestFixtures {
+            op,
+            documents,
+            options,
+        }
     }
 
     #[test]
     fn build() {
-        let (op, documents, options) = fixtures();
+        let fixtures = fixtures();
 
-        let description = StreamDescription::new_42();
-        let cmd = op.build(&description).unwrap();
+        let description = StreamDescription::new_testing();
+        let cmd = fixtures.op.build(&description).unwrap();
 
         assert_eq!(cmd.name.as_str(), "insert");
         assert_eq!(cmd.target_db.as_str(), "test_db");
@@ -131,9 +148,9 @@ mod test {
             .iter()
             .map(|b| b.as_document().unwrap().clone())
             .collect();
-        assert_eq!(cmd_docs.len(), documents.len());
+        assert_eq!(cmd_docs.len(), fixtures.documents.len());
 
-        for (original_doc, cmd_doc) in documents.iter().zip(cmd_docs.iter_mut()) {
+        for (original_doc, cmd_doc) in fixtures.documents.iter().zip(cmd_docs.iter_mut()) {
             assert!(cmd_doc.get("_id").is_some());
             if original_doc.get("_id").is_some() {
                 assert_eq!(original_doc, cmd_doc);
@@ -143,44 +160,54 @@ mod test {
             };
         }
 
-        assert_eq!(cmd.body.get("ordered"), Some(&Bson::Boolean(true)));
-        assert!(cmd.body.get("bypassDocumentValidation").is_none());
+        assert_eq!(
+            cmd.body.get("ordered"),
+            fixtures.options.ordered.map(Bson::Boolean).as_ref()
+        );
+        assert_eq!(
+            cmd.body.get("bypassDocumentValidation"),
+            fixtures
+                .options
+                .bypass_document_validation
+                .map(Bson::Boolean)
+                .as_ref()
+        );
     }
 
     #[test]
     fn handle_success() {
-        let (op, documents, _) = fixtures();
+        let fixtures = fixtures();
 
         let ok_response = CommandResponse::from_document(doc! { "ok": 1.0, "n": 3 });
-        let ok_result = op.handle_response(ok_response);
+        let ok_result = fixtures.op.handle_response(ok_response);
         assert!(ok_result.is_ok());
 
         let inserted_ids = ok_result.unwrap().inserted_ids;
         assert_eq!(inserted_ids.len(), 3); // populate _id for documents that don't provide it
         assert_eq!(
             inserted_ids.get(&1).unwrap(),
-            documents[1].get("_id").unwrap()
+            fixtures.documents[1].get("_id").unwrap()
         );
     }
 
     #[test]
     fn handle_invalid_response() {
-        let (op, ..) = fixtures();
+        let fixtures = fixtures();
 
         let invalid_response =
             CommandResponse::from_document(doc! { "ok": 1.0, "asdfadsf": 123123 });
-        assert!(op.handle_response(invalid_response).is_err());
+        assert!(fixtures.op.handle_response(invalid_response).is_err());
     }
 
     #[test]
     fn handle_command_error() {
-        let (op, ..) = fixtures();
-        test::handle_command_error(op);
+        let fixtures = fixtures();
+        test::handle_command_error(fixtures.op);
     }
 
     #[test]
     fn handle_write_failure() {
-        let (op, ..) = fixtures();
+        let fixtures = fixtures();
 
         let write_error_response = CommandResponse::from_document(doc! {
             "ok": 1.0,
@@ -199,7 +226,7 @@ mod test {
             }
         });
 
-        let write_error_result = op.handle_response(write_error_response);
+        let write_error_result = fixtures.op.handle_response(write_error_response);
         assert!(write_error_result.is_err());
 
         match *write_error_result.unwrap_err().kind {

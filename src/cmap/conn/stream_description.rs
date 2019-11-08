@@ -23,7 +23,7 @@ impl StreamDescription {
 
     /// Gets a description of a stream for a 4.2 connection.
     /// This should be used for test purposes only.
-    pub(crate) fn new_42() -> Self {
+    pub(crate) fn new_testing() -> Self {
         Self {
             max_wire_version: Some(8),
             min_wire_version: Some(8),
