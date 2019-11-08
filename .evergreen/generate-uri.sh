@@ -3,7 +3,7 @@
 set -o errexit
 
 if [ "$SSL" != "ssl" ]; then
-    exit
+    return
 fi
 
 DRIVERS_TOOLS_X509=`echo "$DRIVERS_TOOLS_X509" | sed 's/\//%2F/g'`
