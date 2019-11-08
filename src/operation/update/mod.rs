@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod test;
+
 use bson::{bson, doc, Bson, Document};
 use serde::Deserialize;
 
@@ -11,9 +14,6 @@ use crate::{
     results::UpdateResult,
     Namespace,
 };
-
-#[cfg(test)]
-mod test;
 
 #[derive(Debug)]
 pub(crate) struct Update {
@@ -30,8 +30,8 @@ impl Update {
     fn empty() -> Self {
         Update::new(
             Namespace {
-                db: "".to_string(),
-                coll: "".to_string(),
+                db: String::new(),
+                coll: String::new(),
             },
             Document::new(),
             UpdateModifications::Document(Document::new()),

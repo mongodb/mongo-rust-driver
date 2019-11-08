@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod test;
+
 use bson::{bson, doc, Document};
 
 use crate::{
@@ -9,9 +12,6 @@ use crate::{
     options::DeleteOptions,
     results::DeleteResult,
 };
-
-#[cfg(test)]
-mod test;
 
 #[derive(Debug)]
 pub(crate) struct Delete {
@@ -27,8 +27,8 @@ impl Delete {
     fn empty() -> Self {
         Self::new(
             Namespace {
-                db: "".to_string(),
-                coll: "".to_string(),
+                db: String::new(),
+                coll: String::new(),
             },
             Document::new(),
             None,

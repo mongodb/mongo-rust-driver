@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod test;
+
 use bson::bson;
 use bson::doc;
 
@@ -8,9 +11,6 @@ use crate::{
     operation::{Operation, WriteConcernOnlyBody},
 };
 
-#[cfg(test)]
-mod test;
-
 #[derive(Debug)]
 pub(crate) struct DropDatabase {
     target_db: String,
@@ -20,7 +20,7 @@ pub(crate) struct DropDatabase {
 impl DropDatabase {
     #[allow(dead_code)]
     fn empty() -> Self {
-        Self::new("".to_string(), None)
+        Self::new(String::new(), None)
     }
 
     pub(crate) fn new(target_db: String, write_concern: Option<WriteConcern>) -> Self {

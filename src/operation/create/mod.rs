@@ -1,5 +1,7 @@
-use bson::bson;
-use bson::doc;
+#[cfg(test)]
+mod test;
+
+use bson::{bson, doc};
 
 use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
@@ -9,9 +11,6 @@ use crate::{
     options::CreateCollectionOptions,
     Namespace,
 };
-
-#[cfg(test)]
-mod test;
 
 #[derive(Debug)]
 pub(crate) struct Create {
@@ -25,8 +24,8 @@ impl Create {
     fn empty() -> Self {
         Self::new(
             Namespace {
-                db: "".to_string(),
-                coll: "".to_string(),
+                db: String::new(),
+                coll: String::new(),
             },
             None,
             None,

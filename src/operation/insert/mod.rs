@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod test;
+
 use std::collections::HashMap;
 
 use bson::{bson, doc, Document};
@@ -11,9 +14,6 @@ use crate::{
     results::InsertManyResult,
     Namespace,
 };
-
-#[cfg(test)]
-mod test;
 
 #[derive(Debug)]
 pub(crate) struct Insert {

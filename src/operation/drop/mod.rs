@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod test;
+
 use bson::bson;
 use bson::doc;
 
@@ -8,9 +11,6 @@ use crate::{
     operation::{Operation, WriteConcernOnlyBody},
     Namespace,
 };
-
-#[cfg(test)]
-mod test;
 
 #[derive(Debug)]
 pub(crate) struct Drop {
@@ -30,8 +30,8 @@ impl Drop {
     fn empty() -> Self {
         Self::new(
             Namespace {
-                db: "".to_string(),
-                coll: "".to_string(),
+                db: String::new(),
+                coll: String::new(),
             },
             None,
         )
