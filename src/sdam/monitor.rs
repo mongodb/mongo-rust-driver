@@ -67,7 +67,7 @@ fn monitor_server_check(
     // Copy the topology description and update it with the new server description.
     let mut topology_description = topology.read().unwrap().description.clone();
 
-    // TODO RUST-232: Theoretically, `TopologyDescription::update` can return an update. However,
+    // TODO RUST-232: Theoretically, `TopologyDescription::update` can return an error. However,
     // this can only happen if we try to access a field from the isMaster response when an error
     // occurred during the check. In practice, this can't happen, because the SDAM algorithm doesn't
     // check the fields of an Unknown server, and we only return Unknown server descriptions when

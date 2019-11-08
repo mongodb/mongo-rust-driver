@@ -119,7 +119,7 @@ impl Topology {
         }
 
         Err(ErrorKind::ServerSelectionError {
-            message: "timeed out while trying to select server".into(),
+            message: "timed out while trying to select server".into(),
         }
         .into())
     }
