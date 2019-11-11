@@ -1,6 +1,8 @@
 use std::time::Duration;
 
-use bson::Document;
+use bson::{Bson, Document};
+use serde::Serialize;
+use serde_with::skip_serializing_none;
 
 use crate::{
     concern::{ReadConcern, WriteConcern},
@@ -43,6 +45,15 @@ pub enum Hint {
     Name(String),
 }
 
+impl Hint {
+    pub(crate) fn to_bson(&self) -> Bson {
+        match self {
+            Hint::Keys(ref d) => Bson::Document(d.clone()),
+            Hint::Name(ref s) => Bson::String(s.clone()),
+        }
+    }
+}
+
 /// Specifies the type of cursor to return from a find operation.
 #[derive(Debug)]
 pub enum CursorType {
@@ -67,7 +78,8 @@ pub struct InsertOneOptions {
 }
 
 /// Specifies the options to a `Collection::insert_many` operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[skip_serializing_none]
+#[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
 pub struct InsertManyOptions {
     /// Opt out of document-level validation.
     #[builder(default)]
@@ -77,6 +89,51 @@ pub struct InsertManyOptions {
     /// when a write fails, continue with the remaining writes, if any.
     #[builder(default)]
     pub ordered: Option<bool>,
+}
+
+impl InsertManyOptions {
+    pub(crate) fn from_insert_one_options(options: InsertOneOptions) -> Self {
+        Self {
+            bypass_document_validation: options.bypass_document_validation,
+            ordered: None,
+        }
+    }
+}
+
+/// Enum modeling the modifications to apply during an update.
+/// For details, see the official MongoDB
+/// [documentation](https://docs.mongodb.com/manual/reference/command/update/#update-command-behaviors)
+#[derive(Clone, Debug)]
+pub enum UpdateModifications {
+    /// A document that contains only update operator expressions.
+    Document(Document),
+
+    /// An aggregation pipeline.
+    /// Only available in MongoDB 4.2+.
+    Pipeline(Vec<Document>),
+}
+
+impl UpdateModifications {
+    pub(crate) fn to_bson(&self) -> Bson {
+        match self {
+            UpdateModifications::Document(ref d) => Bson::Document(d.clone()),
+            UpdateModifications::Pipeline(ref p) => {
+                Bson::Array(p.iter().map(|d| Bson::Document(d.clone())).collect())
+            }
+        }
+    }
+}
+
+impl From<Document> for UpdateModifications {
+    fn from(item: Document) -> Self {
+        UpdateModifications::Document(item)
+    }
+}
+
+impl From<Vec<Document>> for UpdateModifications {
+    fn from(item: Vec<Document>) -> Self {
+        UpdateModifications::Pipeline(item)
+    }
 }
 
 /// Specifies the options to a `Collection::update_one` or `Collection::update_many` operation.
@@ -96,6 +153,23 @@ pub struct UpdateOptions {
     /// If true, insert a document if no matching document is found.
     #[builder(default)]
     pub upsert: Option<bool>,
+
+    /// A document or string that specifies the index to use to support the query predicate.
+    ///
+    /// Only available in MongoDB 4.2+. See the official MongoDB
+    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#ex-update-command-hint) for examples.
+    pub hint: Option<Hint>,
+}
+
+impl UpdateOptions {
+    pub(crate) fn from_replace_options(options: ReplaceOptions) -> Self {
+        Self {
+            bypass_document_validation: options.bypass_document_validation,
+            upsert: options.upsert,
+            hint: options.hint,
+            ..Default::default()
+        }
+    }
 }
 
 /// Specifies the options to a `Collection::replace_one` operation.
@@ -108,10 +182,16 @@ pub struct ReplaceOptions {
     /// If true, insert a document if no matching document is found.
     #[builder(default)]
     pub upsert: Option<bool>,
+
+    /// A document or string that specifies the index to use to support the query predicate.
+    ///
+    /// Only available in MongoDB 4.2+. See the official MongoDB
+    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#ex-update-command-hint) for examples.
+    pub hint: Option<Hint>,
 }
 
 /// Specifies the options to a `Collection::delete_one` or `Collection::delete_many` operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Debug, Default, TypedBuilder, Serialize)]
 pub struct DeleteOptions {}
 
 /// Specifies the options to a `Collection::find_one_and_delete` operation.

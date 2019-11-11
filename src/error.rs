@@ -46,8 +46,14 @@ pub enum ErrorKind {
     #[error(display = "{}", _0)]
     BsonEncode(#[error(source)] bson::EncoderError),
 
-    #[error(display = "Command failed {}", inner)]
-    CommandError { inner: CommandError },
+    #[error(
+        display = "An error ocurred when trying to execute a write operation: {:?}",
+        _0
+    )]
+    BulkWriteError(BulkWriteFailure),
+
+    #[error(display = "Command failed {}", _0)]
+    CommandError(CommandError),
 
     #[error(display = "{}", _0)]
     DnsName(#[error(source)] webpki::InvalidDNSNameError),
@@ -96,24 +102,24 @@ pub enum ErrorKind {
 
     #[error(
         display = "An error occurred when trying to execute a write operation: {}",
-        inner
+        _0
     )]
-    WriteError { inner: WriteFailure },
+    WriteError(WriteFailure),
 }
 
 /// An error that occurred due to a database command failing.
 #[derive(Clone, Debug, Deserialize)]
 pub struct CommandError {
-    code: u32,
+    pub code: u32,
 
-    #[serde(rename = "camelCase", default)]
-    code_name: String,
+    #[serde(rename = "codeName", default)]
+    pub code_name: String,
 
     #[serde(rename = "errmsg")]
-    message: String,
+    pub message: String,
 
     #[serde(rename = "errorLabels", default)]
-    labels: Vec<String>,
+    pub labels: Vec<String>,
 }
 
 impl fmt::Display for CommandError {
@@ -123,21 +129,23 @@ impl fmt::Display for CommandError {
 }
 
 /// An error that occurred due to not being able to satisfy a write concern.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct WriteConcernError {
     /// Identifies the type of write concern error.
     pub code: i32,
 
     /// The name associated with the error code.
+    #[serde(rename = "codeName")]
     pub code_name: String,
 
     /// A description of the error that occurred.
+    #[serde(rename = "errmsg")]
     pub message: String,
 }
 
 /// An error that occurred during a write operation that wasn't due to being unable to satisfy a
 /// write concern.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct WriteError {
     /// Identifies the type of write concern error.
     pub code: i32,
@@ -152,6 +160,35 @@ pub struct WriteError {
     pub message: String,
 }
 
+#[derive(Debug, PartialEq, Clone, Deserialize)]
+pub struct BulkWriteError {
+    /// Index into the list of operations that this error corresponds to.
+    pub index: i32,
+
+    /// Identifies the type of write concern error.
+    pub code: i32,
+
+    /// The name associated with the error code.
+    ///
+    /// Note that the server will not return this in some cases, hence `code_name` being an
+    /// `Option`.
+    #[serde(rename = "codeName", default)]
+    pub code_name: Option<String>,
+
+    /// A description of the error that occurred.
+    #[serde(rename = "errmsg")]
+    pub message: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct BulkWriteFailure {
+    /// The error(s) that occured on account of a non write concern failure.
+    pub write_errors: Option<Vec<BulkWriteError>>,
+
+    /// The error that ocurred on account of write concern failure.
+    pub write_concern_error: Option<WriteConcernError>,
+}
+
 /// An error that occurred when trying to execute a write operation.
 #[derive(Clone, Debug)]
 pub enum WriteFailure {
@@ -159,8 +196,42 @@ pub enum WriteFailure {
     WriteError(WriteError),
 }
 
+impl WriteFailure {
+    fn from_bulk_failure(bulk: BulkWriteFailure) -> Result<Self> {
+        if let Some(bulk_write_error) = bulk.write_errors.and_then(|es| es.into_iter().next()) {
+            let write_error = WriteError {
+                code: bulk_write_error.code,
+                code_name: bulk_write_error.code_name,
+                message: bulk_write_error.message,
+            };
+            Ok(WriteFailure::WriteError(write_error))
+        } else if let Some(wc_error) = bulk.write_concern_error {
+            Ok(WriteFailure::WriteConcernError(wc_error))
+        } else {
+            Err(ErrorKind::ResponseError {
+                message: "error missing write errors and write concern errors".to_string(),
+            }
+            .into())
+        }
+    }
+}
+
 impl fmt::Display for WriteFailure {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         unimplemented!()
+    }
+}
+
+/// Translates ErrorKind::BulkWriteError cases to ErrorKind::WriteErrors, leaving all other errors
+/// untouched.
+pub(crate) fn convert_bulk_errors(error: Error) -> Error {
+    match *error.kind {
+        ErrorKind::BulkWriteError(ref bulk_failure) => {
+            match WriteFailure::from_bulk_failure(bulk_failure.clone()) {
+                Ok(failure) => ErrorKind::WriteError(failure).into(),
+                Err(e) => e,
+            }
+        }
+        _ => error,
     }
 }

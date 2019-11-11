@@ -1,13 +1,15 @@
 pub mod options;
 
-use std::sync::Arc;
+use std::{fmt, sync::Arc};
 
 use bson::{Bson, Document};
 
 use self::options::*;
 use crate::{
+    bson_util,
     concern::{ReadConcern, WriteConcern},
-    error::Result,
+    error::{convert_bulk_errors, Result},
+    operation::{Delete, Drop, Insert, Update},
     read_preference::ReadPreference,
     results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
     Client, Cursor, Database,
@@ -61,6 +63,11 @@ struct CollectionInner {
 }
 
 impl Collection {
+    /// Get the `Client` that this collection descended from.
+    fn client(&self) -> &Client {
+        &self.inner.client
+    }
+
     /// Gets the name of the `Collection`.
     pub fn name(&self) -> &str {
         unimplemented!()
@@ -72,7 +79,7 @@ impl Collection {
     /// containing it, the '.' character, and the name of the collection itself. For example, if a
     /// collection named "bar" is created in a database named "foo", the namespace of the collection
     /// is "foo.bar".
-    pub fn namespace(&self) -> String {
+    pub fn namespace(&self) -> Namespace {
         unimplemented!()
     }
 
@@ -93,7 +100,8 @@ impl Collection {
 
     /// Drops the collection, deleting all data, users, and indexes stored in in.
     pub fn drop(&self) -> Result<()> {
-        unimplemented!()
+        let drop = Drop::new(self.namespace(), self.write_concern().cloned());
+        self.client().execute_operation(&drop, None)
     }
 
     /// Runs an aggregation operation.
@@ -134,7 +142,14 @@ impl Collection {
         query: Document,
         options: Option<DeleteOptions>,
     ) -> Result<DeleteResult> {
-        unimplemented!()
+        let delete = Delete::new(
+            self.namespace(),
+            query,
+            None,
+            self.write_concern().cloned(),
+            options,
+        );
+        self.client().execute_operation(&delete, None)
     }
 
     /// Deletes up to one document found matching `query`.
@@ -143,7 +158,14 @@ impl Collection {
         query: Document,
         options: Option<DeleteOptions>,
     ) -> Result<DeleteResult> {
-        unimplemented!()
+        let delete = Delete::new(
+            self.namespace(),
+            query,
+            Some(1),
+            self.write_concern().cloned(),
+            options,
+        );
+        self.client().execute_operation(&delete, None)
     }
 
     /// Finds the distinct values of the field specified by `field_name` across the collection.
@@ -197,7 +219,8 @@ impl Collection {
         docs: impl IntoIterator<Item = Document>,
         options: Option<InsertManyOptions>,
     ) -> Result<InsertManyResult> {
-        unimplemented!()
+        let insert = Insert::new(self.namespace(), docs.into_iter().collect(), options);
+        self.client().execute_operation(&insert, None)
     }
 
     /// Inserts `doc` into the collection.
@@ -206,7 +229,15 @@ impl Collection {
         doc: Document,
         options: Option<InsertOneOptions>,
     ) -> Result<InsertOneResult> {
-        unimplemented!()
+        let insert = Insert::new(
+            self.namespace(),
+            vec![doc],
+            options.map(InsertManyOptions::from_insert_one_options),
+        );
+        self.client()
+            .execute_operation(&insert, None)
+            .map(InsertOneResult::from_insert_many_result)
+            .map_err(convert_bulk_errors)
     }
 
     /// Replaces up to one document matching `query` in the collection with `replacement`.
@@ -216,27 +247,69 @@ impl Collection {
         replacement: Document,
         options: Option<ReplaceOptions>,
     ) -> Result<UpdateResult> {
-        unimplemented!()
+        bson_util::replacement_document_check(&replacement)?;
+
+        let update = Update::new(
+            self.namespace(),
+            query,
+            UpdateModifications::Document(replacement),
+            false,
+            self.write_concern().cloned(),
+            options.map(UpdateOptions::from_replace_options),
+        );
+        self.client().execute_operation(&update, None)
     }
 
     /// Updates all documents matching `query` in the collection.
+    ///
+    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
+    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
+    /// in MongoDB 4.2+. See the official MongoDB
+    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#behavior) for more information on specifying updates.
     pub fn update_many(
         &self,
         query: Document,
-        update: Document,
+        update: impl Into<UpdateModifications>,
         options: Option<UpdateOptions>,
     ) -> Result<UpdateResult> {
-        unimplemented!()
+        let update = update.into();
+
+        if let UpdateModifications::Document(ref d) = update {
+            bson_util::update_document_check(d)?;
+        };
+
+        let update = Update::new(
+            self.namespace(),
+            query,
+            update,
+            true,
+            self.write_concern().cloned(),
+            options,
+        );
+        self.client().execute_operation(&update, None)
     }
 
     /// Updates up to one document matching `query` in the collection.
+    ///
+    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
+    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
+    /// in MongoDB 4.2+. See the official MongoDB
+    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#behavior) for more information on specifying updates.
     pub fn update_one(
         &self,
         query: Document,
-        update: Document,
+        update: impl Into<UpdateModifications>,
         options: Option<UpdateOptions>,
     ) -> Result<UpdateResult> {
-        unimplemented!()
+        let update = Update::new(
+            self.namespace(),
+            query,
+            update.into(),
+            false,
+            self.write_concern().cloned(),
+            options,
+        );
+        self.client().execute_operation(&update, None)
     }
 
     /// Creates the indexes specified by `models`.
@@ -260,5 +333,21 @@ impl Collection {
     /// Drops all indexes in the collection.
     pub fn drop_indexes(&self) -> Result<Document> {
         unimplemented!()
+    }
+}
+
+/// A struct modeling the canonical name for a collection in MongoDB.
+#[derive(Debug)]
+pub struct Namespace {
+    /// The name of the database associated with this namespace.
+    pub db: String,
+
+    /// The name of the collection this namespace corresponds to.
+    pub coll: String,
+}
+
+impl fmt::Display for Namespace {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "{}.{}", self.db, self.coll)
     }
 }

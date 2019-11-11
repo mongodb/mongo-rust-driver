@@ -2,6 +2,7 @@ use bson::{Bson, Document};
 use serde::Deserialize;
 
 use crate::{
+    bson_util,
     client::options::{ClientOptions, StreamAddress},
     error::ErrorKind,
     read_preference::ReadPreference,
@@ -21,15 +22,6 @@ struct TestCase {
     pub hosts: Option<Vec<Document>>,
     pub auth: Option<Document>,
     pub options: Option<Document>,
-}
-
-fn sort_document(document: &mut Document) {
-    let temp = std::mem::replace(document, Default::default());
-
-    let mut elements: Vec<_> = temp.into_iter().collect();
-    elements.sort_by(|e1, e2| e1.0.cmp(&e2.0));
-
-    document.extend(elements);
 }
 
 fn document_from_client_options(mut options: ClientOptions) -> Document {
@@ -275,7 +267,7 @@ fn run_test(test_file: TestFile) {
                         if let Some(db) = json_auth.get("db") {
                             if !json_options.contains_key("authsource") && *db != Bson::Null {
                                 json_options.insert("authsource", db.clone());
-                                sort_document(&mut json_options);
+                                bson_util::sort_document(&mut json_options);
                             }
                         }
                     }

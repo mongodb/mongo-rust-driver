@@ -78,10 +78,7 @@ impl CommandResponse {
                         message: "invalid server response".to_string(),
                     }
                 })?;
-            Err(ErrorKind::CommandError {
-                inner: command_error,
-            }
-            .into())
+            Err(ErrorKind::CommandError(command_error).into())
         } else {
             Ok(())
         }
