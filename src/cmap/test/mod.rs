@@ -64,11 +64,6 @@ impl Executor {
     fn new(mut test_file: TestFile) -> Self {
         let operations = test_file.process_operations();
         let handler = Arc::new(EventHandler::new(test_file.ignore));
-        let events = test_file
-            .events
-            .into_iter()
-            .filter(|event| event.name() != "ConnectionPoolClosed")
-            .collect();
         let error = test_file.error;
 
         test_file
@@ -92,7 +87,7 @@ impl Executor {
 
         Self {
             error,
-            events,
+            events: test_file.events,
             operations,
             state: Arc::new(state),
         }
@@ -254,6 +249,7 @@ fn assert_events_match(actual: &Event, expected: &Event) {
         }
         (Event::ConnectionCheckOutStarted(_), Event::ConnectionCheckOutStarted(_)) => {}
         (Event::ConnectionPoolCleared(_), Event::ConnectionPoolCleared(_)) => {}
+        (Event::ConnectionPoolClosed(_), Event::ConnectionPoolClosed(_)) => {}
         (actual, expected) => assert_eq!(actual, expected),
     }
 }

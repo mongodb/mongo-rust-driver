@@ -35,6 +35,15 @@ pub struct PoolClearedEvent {
     pub address: StreamAddress,
 }
 
+/// Event emitted when a connection pool is cleared.
+#[derive(Debug, Deserialize, PartialEq)]
+pub struct PoolClosedEvent {
+    /// The address of the server that the pool's connections will connect to.
+    #[serde(default = "self::empty_address")]
+    #[serde(skip)]
+    pub address: StreamAddress,
+}
+
 /// Event emitted when a connection is created.
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -192,6 +201,10 @@ pub trait CmapEventHandler: Send + Sync {
     /// A `Client` will call this method on each registered handler whenever a connection pool is
     /// cleared.
     fn handle_pool_cleared_event(&self, event: PoolClearedEvent) {}
+
+    /// A `Client` will call this method on each registered handler whenever a connection pool is
+    /// cleared.
+    fn handle_pool_closed_event(&self, event: PoolClosedEvent) {}
 
     /// A `Client` will call this method on each registered handler whenever a connection is
     /// created.

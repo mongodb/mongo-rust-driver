@@ -36,6 +36,10 @@ impl CmapEventHandler for EventHandler {
         self.handle(event);
     }
 
+    fn handle_pool_closed_event(&self, event: PoolClosedEvent) {
+        self.handle(event);
+    }
+
     fn handle_connection_created_event(&self, event: ConnectionCreatedEvent) {
         self.handle(event);
     }
@@ -81,9 +85,6 @@ pub enum Event {
     ConnectionPoolCleared(PoolClearedEvent),
     ConnectionCheckedIn(ConnectionCheckedInEvent),
 }
-
-#[derive(Debug, Deserialize, PartialEq)]
-pub struct PoolClosedEvent {}
 
 impl Event {
     pub fn name(&self) -> &'static str {
