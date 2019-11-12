@@ -195,10 +195,11 @@ impl TopologyDescription {
         if let Some(old_rtt) = self
             .servers
             .get(&server_description.address)
-            .and_then(|server_desc| server_desc.average_round_trip_time_ms)
+            .and_then(|server_desc| server_desc.average_round_trip_time)
         {
-            if let Some(new_rtt) = server_description.average_round_trip_time_ms {
-                server_description.average_round_trip_time_ms = Some(0.2 * new_rtt + 0.8 * old_rtt);
+            if let Some(new_rtt) = server_description.average_round_trip_time {
+                server_description.average_round_trip_time =
+                    Some((new_rtt / 5) + (old_rtt * 4 / 5));
             }
         }
     }

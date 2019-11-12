@@ -99,19 +99,18 @@ impl TopologyDescription {
     ) {
         let shortest_average_rtt = suitable_servers
             .iter()
-            .filter_map(|server_desc| server_desc.average_round_trip_time_ms)
-            .fold(Option::<f64>::None, |min, curr| match min {
+            .filter_map(|server_desc| server_desc.average_round_trip_time)
+            .fold(Option::<Duration>::None, |min, curr| match min {
                 Some(prev) => Some(prev.min(curr)),
                 None => Some(curr),
             });
 
         let local_threshold = self.local_threshold.unwrap_or(DEFAULT_LOCAL_THRESHOLD);
 
-        let max_rtt_within_window =
-            shortest_average_rtt.map(|rtt| rtt + local_threshold.as_millis() as f64);
+        let max_rtt_within_window = shortest_average_rtt.map(|rtt| rtt + local_threshold);
 
         suitable_servers.retain(move |server_desc| {
-            if let Some(server_rtt) = server_desc.average_round_trip_time_ms {
+            if let Some(server_rtt) = server_desc.average_round_trip_time {
                 if let Some(max_rtt) = max_rtt_within_window {
                     return server_rtt <= max_rtt;
                 }

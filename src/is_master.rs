@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bson::{oid::ObjectId, TimeStamp, UtcDateTime};
 use serde::Deserialize;
 
@@ -6,7 +8,7 @@ use crate::{read_preference::TagSet, sdam::ServerType};
 #[derive(Debug, Clone)]
 pub(crate) struct IsMasterReply {
     pub command_response: IsMasterCommandResponse,
-    pub round_trip_time: Option<f64>,
+    pub round_trip_time: Option<Duration>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bson::{oid::ObjectId, UtcDateTime};
 
 use crate::{
@@ -31,7 +33,7 @@ pub(crate) struct ServerDescription {
     pub(crate) address: StreamAddress,
     pub(crate) server_type: ServerType,
     pub(crate) last_update_time: Option<UtcDateTime>,
-    pub(crate) average_round_trip_time_ms: Option<f64>,
+    pub(crate) average_round_trip_time: Option<Duration>,
 
     // The SDAM spec indicates that a ServerDescription needs to contain an error message if an
     // error occurred when trying to send an isMaster for the server's heartbeat. Additionally,
@@ -77,7 +79,7 @@ impl ServerDescription {
             server_type: Default::default(),
             last_update_time: None,
             reply: is_master_reply.transpose(),
-            average_round_trip_time_ms: None,
+            average_round_trip_time: None,
         };
 
         if let Ok(Some(ref mut reply)) = description.reply {
@@ -87,7 +89,7 @@ impl ServerDescription {
             // Initialize the average round trip time. If a previous value is present for the
             // server, this will be updated before the server description is added to the topology
             // description.
-            description.average_round_trip_time_ms = reply.round_trip_time;
+            description.average_round_trip_time = reply.round_trip_time;
 
             // If the server type is unknown, we don't want to take into account the round trip time
             // when checking the latency during server selection.

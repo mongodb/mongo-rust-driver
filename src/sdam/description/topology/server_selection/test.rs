@@ -6,7 +6,7 @@ use crate::{
     read_preference::{ReadPreference, TagSet},
     sdam::description::{
         server::{ServerDescription, ServerType},
-        topology::{TopologyDescription, TopologyType},
+        topology::{test::f64_ms_as_duration, TopologyDescription, TopologyType},
     },
 };
 
@@ -148,7 +148,7 @@ fn convert_server_description(
 
     let is_master = IsMasterReply {
         command_response,
-        round_trip_time: Some(test_server_desc.avg_rtt_ms),
+        round_trip_time: Some(f64_ms_as_duration(test_server_desc.avg_rtt_ms)),
     };
 
     let server_desc = ServerDescription::new(

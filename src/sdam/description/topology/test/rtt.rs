@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use crate::sdam::description::{
     server::ServerDescription,
-    topology::{TopologyDescription, TopologyType},
+    topology::{test::f64_ms_as_duration, TopologyDescription, TopologyType},
 };
 
 #[derive(Debug, Deserialize)]
@@ -32,8 +32,8 @@ fn run_test(test_file: TestFile) {
     let mut old_server_desc = ServerDescription::new(Default::default(), None);
     let mut new_server_desc = old_server_desc.clone();
 
-    old_server_desc.average_round_trip_time_ms = avg_rtt_ms;
-    new_server_desc.average_round_trip_time_ms = Some(test_file.new_rtt_ms);
+    old_server_desc.average_round_trip_time = avg_rtt_ms.map(f64_ms_as_duration);
+    new_server_desc.average_round_trip_time = Some(f64_ms_as_duration(test_file.new_rtt_ms));
 
     let topology = TopologyDescription {
         single_seed: false,
@@ -55,8 +55,8 @@ fn run_test(test_file: TestFile) {
     topology.update_round_trip_time(&mut new_server_desc);
 
     assert_eq!(
-        new_server_desc.average_round_trip_time_ms,
-        Some(test_file.new_avg_rtt)
+        new_server_desc.average_round_trip_time,
+        Some(f64_ms_as_duration(test_file.new_avg_rtt))
     );
 }
 
