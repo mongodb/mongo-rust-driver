@@ -60,8 +60,8 @@ pub(crate) struct TopologyDescription {
     // TODO RUST-149: Session support.
     logical_session_timeout_minutes: Option<u32>,
 
-    /// The amount of latency beyond that of the secondary with the minimum latency that is
-    /// acceptable for an operation routed to a secondary.
+    /// The amount of latency beyond that of the suitable server with the minimum latency that is
+    /// acceptable for a read operation.
     local_threshold: Option<Duration>,
 
     /// The server descriptions of each member of the topology.

@@ -117,7 +117,7 @@ impl TopologyDescription {
                 }
             }
 
-            return false;
+            false
         });
     }
 
@@ -147,20 +147,14 @@ impl TopologyDescription {
             ReadPreference::PrimaryPreferred {
                 ref tag_sets,
                 max_staleness,
-            } => {
-                match self
-                    .servers
-                    .values()
-                    .find(|server| server.server_type == ServerType::RSPrimary)
-                {
-                    Some(primary) => vec![primary],
-                    None => self.suitable_servers_for_read_preference(
-                        &[ServerType::RSSecondary],
-                        tag_sets.as_ref(),
-                        *max_staleness,
-                    ),
-                }
-            }
+            } => match self.servers_with_type(&[ServerType::RSPrimary]).next() {
+                Some(primary) => vec![primary],
+                None => self.suitable_servers_for_read_preference(
+                    &[ServerType::RSSecondary],
+                    tag_sets.as_ref(),
+                    *max_staleness,
+                ),
+            },
             ReadPreference::SecondaryPreferred {
                 ref tag_sets,
                 max_staleness,
