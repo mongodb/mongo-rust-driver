@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use bson::oid::ObjectId;
 use serde::Deserialize;
@@ -87,7 +87,7 @@ fn run_test(test_file: TestFile) {
             } else {
                 Ok(IsMasterReply {
                     command_response,
-                    round_trip_time: Some(1234), // Doesn't matter for tests.
+                    round_trip_time: Some(Duration::from_millis(1234)), // Doesn't matter for tests.
                 })
             };
 

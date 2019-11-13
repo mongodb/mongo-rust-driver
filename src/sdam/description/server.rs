@@ -1,6 +1,10 @@
+use std::time::Duration;
+
 use bson::{oid::ObjectId, UtcDateTime};
 
-use crate::{error::Result, is_master::IsMasterReply, options::StreamAddress};
+use crate::{
+    error::Result, is_master::IsMasterReply, options::StreamAddress, read_preference::TagSet,
+};
 
 const DRIVER_MIN_DB_VERSION: &str = "3.6";
 const DRIVER_MIN_WIRE_VERSION: i32 = 6;
@@ -29,6 +33,7 @@ pub(crate) struct ServerDescription {
     pub(crate) address: StreamAddress,
     pub(crate) server_type: ServerType,
     pub(crate) last_update_time: Option<UtcDateTime>,
+    pub(crate) average_round_trip_time: Option<Duration>,
 
     // The SDAM spec indicates that a ServerDescription needs to contain an error message if an
     // error occurred when trying to send an isMaster for the server's heartbeat. Additionally,
@@ -74,11 +79,17 @@ impl ServerDescription {
             server_type: Default::default(),
             last_update_time: None,
             reply: is_master_reply.transpose(),
+            average_round_trip_time: None,
         };
 
         if let Ok(Some(ref mut reply)) = description.reply {
             // Infer the server type from the isMaster response.
             description.server_type = reply.command_response.server_type();
+
+            // Initialize the average round trip time. If a previous value is present for the
+            // server, this will be updated before the server description is added to the topology
+            // description.
+            description.average_round_trip_time = reply.round_trip_time;
 
             // If the server type is unknown, we don't want to take into account the round trip time
             // when checking the latency during server selection.
@@ -230,5 +241,21 @@ impl ServerDescription {
             .as_ref()
             .and_then(|reply| reply.command_response.max_wire_version);
         Ok(me)
+    }
+
+    pub(crate) fn matches_tag_set(&self, tag_set: &TagSet) -> bool {
+        let reply = match self.reply.as_ref() {
+            Ok(Some(ref reply)) => reply,
+            _ => return false,
+        };
+
+        let server_tags = match reply.command_response.tags {
+            Some(ref tags) => tags,
+            None => return false,
+        };
+
+        tag_set
+            .iter()
+            .all(|(key, val)| server_tags.get(key) == Some(val))
     }
 }
