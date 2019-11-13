@@ -10,7 +10,7 @@ use crate::{
     bson_util,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, Result},
-    operation::{Count, Delete, Distinct, DropCollection, Find, Insert, Update},
+    operation::{Count, Delete, Distinct, DropCollection, Find, FindAndModify, Insert, Update},
     results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
     selection_criteria::SelectionCriteria,
     Client, Cursor, Database,
@@ -231,9 +231,12 @@ impl Collection {
     pub fn find_one_and_delete(
         &self,
         filter: Document,
-        options: Option<FindOneAndDeleteOptions>,
+        mut options: Option<FindOneAndDeleteOptions>,
     ) -> Result<Option<Document>> {
-        unimplemented!()
+        resolve_options!(self, options, [write_concern]);
+
+        let op = FindAndModify::with_delete(self.namespace(), filter, options);
+        self.client().execute_operation(&op, None)
     }
 
     /// Atomically finds up to one document in the collection matching `filter` and replaces it with
@@ -242,19 +245,29 @@ impl Collection {
         &self,
         filter: Document,
         replacement: Document,
-        options: Option<FindOneAndReplaceOptions>,
+        mut options: Option<FindOneAndReplaceOptions>,
     ) -> Result<Option<Document>> {
-        unimplemented!()
+        resolve_options!(self, options, [write_concern]);
+
+        let op = FindAndModify::with_replace(self.namespace(), filter, replacement, options)?;
+        self.client().execute_operation(&op, None)
     }
 
     /// Atomically finds up to one document in the collection matching `filter` and updates it.
+    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
+    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
+    /// in MongoDB 4.2+.
     pub fn find_one_and_update(
         &self,
         filter: Document,
-        update: Document,
-        options: Option<FindOneAndUpdateOptions>,
+        update: impl Into<UpdateModifications>,
+        mut options: Option<FindOneAndUpdateOptions>,
     ) -> Result<Option<Document>> {
-        unimplemented!()
+        let update = update.into();
+        resolve_options!(self, options, [write_concern]);
+
+        let op = FindAndModify::with_update(self.namespace(), filter, update, options)?;
+        self.client().execute_operation(&op, None)
     }
 
     /// Inserts the documents in `docs` into the collection.

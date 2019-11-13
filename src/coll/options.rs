@@ -116,7 +116,8 @@ impl InsertManyOptions {
 /// Enum modeling the modifications to apply during an update.
 /// For details, see the official MongoDB
 /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#update-command-behaviors)
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
+#[serde(untagged)]
 pub enum UpdateModifications {
     /// A document that contains only update operator expressions.
     Document(Document),
@@ -238,6 +239,10 @@ pub struct FindOneAndDeleteOptions {
     /// The order of the documents for the purposes of the operation.
     #[builder(default)]
     pub sort: Option<Document>,
+
+    /// The level of the write concern
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
 }
 
 /// Specifies the options to a `Collection::find_one_and_replace` operation.
@@ -269,6 +274,10 @@ pub struct FindOneAndReplaceOptions {
     /// If true, insert a document if no matching document is found.
     #[builder(default)]
     pub upsert: Option<bool>,
+
+    /// The level of the write concern
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
 }
 
 /// Specifies the options to a `Collection::find_one_and_update` operation.
@@ -306,6 +315,10 @@ pub struct FindOneAndUpdateOptions {
     /// If true, insert a document if no matching document is found.
     #[builder(default)]
     pub upsert: Option<bool>,
+
+    /// The level of the write concern
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
 }
 
 /// Specifies the options to a `Collection::aggregate` operation.
