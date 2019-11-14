@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test;
 
-use std::time::Duration;
+use std::{rc::Rc, time::Duration};
 
 use derivative::Derivative;
 use rand::seq::IteratorRandom;
@@ -13,7 +13,7 @@ use crate::{
 };
 
 /// Describes which servers are suitable for a given operation.
-#[derive(Derivative)]
+#[derive(Derivative, Clone)]
 #[derivative(Debug)]
 pub(crate) enum SelectionCriteria {
     /// A read preference that describes the suitable servers based on the server type, max
@@ -22,7 +22,7 @@ pub(crate) enum SelectionCriteria {
 
     /// A predicate used to filter servers that are considered suitable. A `server` will be
     /// considered suitable by a `predicate` if `predicate(server)` returns true.
-    Predicate(#[derivative(Debug = "ignore")] Box<dyn Fn(&ServerDescription) -> bool>),
+    Predicate(#[derivative(Debug = "ignore")] Rc<dyn Fn(&ServerDescription) -> bool>),
 }
 
 impl SelectionCriteria {

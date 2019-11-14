@@ -123,11 +123,21 @@ impl<T> Deref for WriteResponseBody<T> {
     }
 }
 
+#[allow(dead_code)]
 #[cfg(test)]
 mod test {
-    use bson::{bson, doc};
+    use std::ops::Fn;
 
-    use crate::{cmap::CommandResponse, error::ErrorKind, operation::Operation};
+    use bson::{bson, doc, Bson};
+
+    use crate::{
+        cmap::{CommandResponse, StreamDescription},
+        concern::{Acknowledgment, ReadConcern, WriteConcern},
+        error::ErrorKind,
+        operation::Operation,
+        read_preference::ReadPreference,
+        sdam::SelectionCriteria,
+    };
 
     pub(crate) fn handle_command_error<T: Operation>(op: T) {
         let cmd_error = CommandResponse::from_document(
@@ -144,5 +154,133 @@ mod test {
             }
             _ => panic!("expected command error"),
         };
+    }
+
+    fn verify_write_concern<T: Operation>(op: T, wc: Option<WriteConcern>) {
+        let cmd = op
+            .build(&StreamDescription::new_testing())
+            .expect("build should succeed");
+        assert_eq!(
+            cmd.body.get("writeConcern"),
+            wc.map(|wc| wc.to_bson()).as_ref()
+        );
+    }
+
+    /// Verifies that the given operation builds a command with the appropriate write concern
+    /// depending on where it was set.
+    ///
+    /// In the provided factory function, the first argument is the write concern coming from a
+    /// client/db/collection and the second argument is one coming from an options struct.
+    pub(crate) fn build_write_concern<F, O>(factory: F)
+    where
+        O: Operation,
+        F: Fn(Option<WriteConcern>, Option<WriteConcern>) -> O,
+    {
+        let majority = WriteConcern {
+            w: Some(Acknowledgment::Majority),
+            ..Default::default()
+        };
+
+        let w_1 = WriteConcern {
+            w: Some(Acknowledgment::Nodes(1)),
+            ..Default::default()
+        };
+
+        verify_write_concern(factory(None, None), None);
+        verify_write_concern(
+            factory(Some(majority.clone()), None),
+            Some(majority.clone()),
+        );
+        verify_write_concern(
+            factory(Some(majority.clone()), Some(w_1.clone())),
+            Some(w_1.clone()),
+        );
+        verify_write_concern(factory(None, Some(majority.clone())), Some(majority));
+    }
+
+    fn verify_read_concern<T: Operation>(op: T, rc: Option<ReadConcern>) {
+        let cmd = op
+            .build(&StreamDescription::new_testing())
+            .expect("build should succeed");
+        match rc {
+            Some(rc) => assert_eq!(
+                cmd.body.get("readConcern"),
+                Some(Bson::String(rc.as_str().to_string())).as_ref()
+            ),
+            None => assert!(cmd.body.get("readConcern").is_none()),
+        }
+    }
+
+    /// Verifies that the given operation builds a command with the appropriate read concern
+    /// depending on where it was set.
+    ///
+    /// In the provided factory function, the first argument is the read concern coming from a
+    /// client/db/collection and the second comes from an options struct.
+    pub(crate) fn build_read_concern<F, O>(factory: F)
+    where
+        O: Operation,
+        F: Fn(Option<ReadConcern>, Option<ReadConcern>) -> O,
+    {
+        verify_read_concern(factory(None, None), None);
+        verify_read_concern(
+            factory(Some(ReadConcern::Majority), None),
+            Some(ReadConcern::Majority),
+        );
+        verify_read_concern(
+            factory(Some(ReadConcern::Majority), Some(ReadConcern::Available)),
+            Some(ReadConcern::Available),
+        );
+        verify_read_concern(
+            factory(None, Some(ReadConcern::Available)),
+            Some(ReadConcern::Available),
+        );
+    }
+
+    fn verify_selection_criteria<O: Operation>(
+        op: O,
+        expected_criteria: Option<SelectionCriteria>,
+    ) {
+        match (op.selection_criteria(), expected_criteria) {
+            (None, None) => {}
+            (
+                Some(SelectionCriteria::ReadPreference(op_rp)),
+                Some(SelectionCriteria::ReadPreference(ref expected_rp)),
+            ) => {
+                assert_eq!(op_rp, expected_rp);
+            }
+            (Some(SelectionCriteria::Predicate(_)), Some(SelectionCriteria::Predicate(_))) => {}
+            (op_criteria, expected_criteria) => panic!(
+                "expected critera {:?}, got {:?}",
+                expected_criteria,
+                op.selection_criteria()
+            ),
+        }
+    }
+
+    /// Verifies that the given operation returns the appropriate selection criteria.
+    ///
+    /// In the provided factory function, the first argument is the read preference coming from a
+    /// client/db/collection, and the second arg is the criteria coming from an options struct.
+    pub(crate) fn op_selection_criteria<F, O>(factory: F)
+    where
+        O: Operation,
+        F: Fn(Option<ReadPreference>, Option<SelectionCriteria>) -> O,
+    {
+        let primary = SelectionCriteria::ReadPreference(ReadPreference::Primary);
+        let nearest = SelectionCriteria::ReadPreference(ReadPreference::Nearest {
+            tag_sets: None,
+            max_staleness: None,
+        });
+
+        verify_selection_criteria(factory(None, None), None);
+        verify_selection_criteria(
+            factory(primary.as_read_pref().cloned(), None),
+            Some(primary.clone()),
+        );
+        verify_selection_criteria(factory(None, Some(primary.clone())), Some(primary.clone()));
+        verify_selection_criteria(
+            factory(primary.as_read_pref().cloned(), Some(nearest.clone())),
+            Some(nearest),
+        );
     }
 }
