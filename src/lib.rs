@@ -49,6 +49,9 @@ extern crate derivative;
 #[macro_use]
 extern crate typed_builder;
 
+#[macro_use]
+pub mod options;
+
 mod bson_util;
 mod client;
 #[allow(dead_code)]
@@ -61,7 +64,6 @@ pub mod error;
 pub mod event;
 mod is_master;
 mod operation;
-pub mod options;
 pub mod read_preference;
 pub mod results;
 #[allow(dead_code)]

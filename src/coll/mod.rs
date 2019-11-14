@@ -140,8 +140,10 @@ impl Collection {
     pub fn delete_many(
         &self,
         query: Document,
-        options: Option<DeleteOptions>,
+        mut options: Option<DeleteOptions>,
     ) -> Result<DeleteResult> {
+        resolve_options!(self, options, [write_concern]);
+
         let delete = Delete::new(
             self.namespace(),
             query,
@@ -156,8 +158,10 @@ impl Collection {
     pub fn delete_one(
         &self,
         query: Document,
-        options: Option<DeleteOptions>,
+        mut options: Option<DeleteOptions>,
     ) -> Result<DeleteResult> {
+        resolve_options!(self, options, [write_concern]);
+
         let delete = Delete::new(
             self.namespace(),
             query,
@@ -217,8 +221,10 @@ impl Collection {
     pub fn insert_many(
         &self,
         docs: impl IntoIterator<Item = Document>,
-        options: Option<InsertManyOptions>,
+        mut options: Option<InsertManyOptions>,
     ) -> Result<InsertManyResult> {
+        resolve_options!(self, options, [write_concern]);
+
         let insert = Insert::new(self.namespace(), docs.into_iter().collect(), options);
         self.client().execute_operation(&insert, None)
     }
@@ -227,8 +233,10 @@ impl Collection {
     pub fn insert_one(
         &self,
         doc: Document,
-        options: Option<InsertOneOptions>,
+        mut options: Option<InsertOneOptions>,
     ) -> Result<InsertOneResult> {
+        resolve_options!(self, options, [write_concern]);
+
         let insert = Insert::new(
             self.namespace(),
             vec![doc],
@@ -245,9 +253,10 @@ impl Collection {
         &self,
         query: Document,
         replacement: Document,
-        options: Option<ReplaceOptions>,
+        mut options: Option<ReplaceOptions>,
     ) -> Result<UpdateResult> {
         bson_util::replacement_document_check(&replacement)?;
+        resolve_options!(self, options, [write_concern]);
 
         let update = Update::new(
             self.namespace(),
@@ -270,13 +279,15 @@ impl Collection {
         &self,
         query: Document,
         update: impl Into<UpdateModifications>,
-        options: Option<UpdateOptions>,
+        mut options: Option<UpdateOptions>,
     ) -> Result<UpdateResult> {
         let update = update.into();
 
         if let UpdateModifications::Document(ref d) = update {
             bson_util::update_document_check(d)?;
         };
+
+        resolve_options!(self, options, [write_concern]);
 
         let update = Update::new(
             self.namespace(),
@@ -299,8 +310,10 @@ impl Collection {
         &self,
         query: Document,
         update: impl Into<UpdateModifications>,
-        options: Option<UpdateOptions>,
+        mut options: Option<UpdateOptions>,
     ) -> Result<UpdateResult> {
+        resolve_options!(self, options, [write_concern]);
+
         let update = Update::new(
             self.namespace(),
             query,
