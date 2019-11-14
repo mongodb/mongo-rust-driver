@@ -5,20 +5,23 @@ use crate::{
     concern::{Acknowledgment, WriteConcern},
     error::{ErrorKind, WriteFailure},
     operation::{test, DropDatabase, Operation},
+    options::DropDatabaseOptions,
 };
 
 #[test]
 fn build() {
     let op = DropDatabase {
         target_db: "test_db".to_string(),
-        write_concern: Some(WriteConcern {
-            w: Some(Acknowledgment::Tag("abc".to_string())),
-            ..Default::default()
+        options: Some(DropDatabaseOptions {
+            write_concern: Some(WriteConcern {
+                w: Some(Acknowledgment::Tag("abc".to_string())),
+                ..Default::default()
+            }),
         }),
     };
 
     let description = StreamDescription::new_testing();
-    let cmd = op.build(&description).unwrap();
+    let cmd = op.build(&description).expect("build should succeed");
 
     assert_eq!(cmd.name.as_str(), "dropDatabase");
     assert_eq!(cmd.target_db.as_str(), "test_db");
@@ -28,6 +31,21 @@ fn build() {
         doc! {
             "dropDatabase": 1,
             "writeConcern": { "w": "abc" }
+        }
+    );
+
+    let op = DropDatabase {
+        target_db: "test_db".to_string(),
+        options: None,
+    };
+    let cmd = op.build(&description).expect("build should succeed");
+    assert_eq!(cmd.name.as_str(), "dropDatabase");
+    assert_eq!(cmd.target_db.as_str(), "test_db");
+    assert_eq!(cmd.read_pref.as_ref(), None);
+    assert_eq!(
+        cmd.body,
+        doc! {
+            "dropDatabase": 1,
         }
     );
 }

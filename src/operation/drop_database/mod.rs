@@ -5,15 +5,15 @@ use bson::{bson, doc};
 
 use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
-    concern::WriteConcern,
     error::Result,
-    operation::{Operation, WriteConcernOnlyBody},
+    operation::{append_options, Operation, WriteConcernOnlyBody},
+    options::DropDatabaseOptions,
 };
 
 #[derive(Debug)]
 pub(crate) struct DropDatabase {
     target_db: String,
-    write_concern: Option<WriteConcern>,
+    options: Option<DropDatabaseOptions>,
 }
 
 impl DropDatabase {
@@ -22,12 +22,8 @@ impl DropDatabase {
         Self::new(String::new(), None)
     }
 
-    pub(crate) fn new(target_db: String, write_concern: Option<WriteConcern>) -> Self {
-        // TODO: RUST-35 use write concern from options ?
-        Self {
-            target_db,
-            write_concern,
-        }
+    pub(crate) fn new(target_db: String, options: Option<DropDatabaseOptions>) -> Self {
+        Self { target_db, options }
     }
 }
 
@@ -39,9 +35,8 @@ impl Operation for DropDatabase {
         let mut body = doc! {
             Self::NAME: 1,
         };
-        if let Some(ref wc) = self.write_concern {
-            body.insert("writeConcern", wc.to_bson());
-        }
+
+        append_options(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(
             Self::NAME.to_string(),

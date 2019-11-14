@@ -103,3 +103,12 @@ pub enum ValidationAction {
     Error,
     Warn,
 }
+
+/// Specifies the options to a `Database::drop` operation.
+#[derive(Debug, Default, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DropDatabaseOptions {
+    /// The write concern for the operation.
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
+}

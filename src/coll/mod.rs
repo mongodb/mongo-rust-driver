@@ -99,8 +99,10 @@ impl Collection {
     }
 
     /// Drops the collection, deleting all data, users, and indexes stored in in.
-    pub fn drop(&self) -> Result<()> {
-        let drop = Drop::new(self.namespace(), self.write_concern().cloned());
+    pub fn drop(&self, mut options: Option<DropCollectionOptions>) -> Result<()> {
+        resolve_options!(self, options, [write_concern]);
+
+        let drop = Drop::new(self.namespace(), options);
         self.client().execute_operation(&drop, None)
     }
 
@@ -144,13 +146,7 @@ impl Collection {
     ) -> Result<DeleteResult> {
         resolve_options!(self, options, [write_concern]);
 
-        let delete = Delete::new(
-            self.namespace(),
-            query,
-            None,
-            self.write_concern().cloned(),
-            options,
-        );
+        let delete = Delete::new(self.namespace(), query, None, options);
         self.client().execute_operation(&delete, None)
     }
 
@@ -162,13 +158,7 @@ impl Collection {
     ) -> Result<DeleteResult> {
         resolve_options!(self, options, [write_concern]);
 
-        let delete = Delete::new(
-            self.namespace(),
-            query,
-            Some(1),
-            self.write_concern().cloned(),
-            options,
-        );
+        let delete = Delete::new(self.namespace(), query, Some(1), options);
         self.client().execute_operation(&delete, None)
     }
 
@@ -263,7 +253,6 @@ impl Collection {
             query,
             UpdateModifications::Document(replacement),
             false,
-            self.write_concern().cloned(),
             options.map(UpdateOptions::from_replace_options),
         );
         self.client().execute_operation(&update, None)
@@ -289,14 +278,7 @@ impl Collection {
 
         resolve_options!(self, options, [write_concern]);
 
-        let update = Update::new(
-            self.namespace(),
-            query,
-            update,
-            true,
-            self.write_concern().cloned(),
-            options,
-        );
+        let update = Update::new(self.namespace(), query, update, true, options);
         self.client().execute_operation(&update, None)
     }
 
@@ -314,14 +296,7 @@ impl Collection {
     ) -> Result<UpdateResult> {
         resolve_options!(self, options, [write_concern]);
 
-        let update = Update::new(
-            self.namespace(),
-            query,
-            update.into(),
-            false,
-            self.write_concern().cloned(),
-            options,
-        );
+        let update = Update::new(self.namespace(), query, update.into(), false, options);
         self.client().execute_operation(&update, None)
     }
 
@@ -350,7 +325,7 @@ impl Collection {
 }
 
 /// A struct modeling the canonical name for a collection in MongoDB.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Namespace {
     /// The name of the database associated with this namespace.
     pub db: String,

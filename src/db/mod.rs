@@ -9,7 +9,7 @@ use crate::{
     cursor::Cursor,
     error::Result,
     operation::{Create, DropDatabase},
-    options::{CollectionOptions, CreateCollectionOptions},
+    options::{CollectionOptions, CreateCollectionOptions, DropDatabaseOptions},
     read_preference::ReadPreference,
     Client, Collection, Namespace,
 };
@@ -106,9 +106,10 @@ impl Database {
     }
 
     /// Drops the database, deleting all data, collections, users, and indexes stored in in.
-    pub fn drop(&self) -> Result<()> {
-        let drop_database =
-            DropDatabase::new(self.name().to_string(), self.write_concern().cloned());
+    pub fn drop(&self, mut options: Option<DropDatabaseOptions>) -> Result<()> {
+        resolve_options!(self, options, [write_concern]);
+
+        let drop_database = DropDatabase::new(self.name().to_string(), options);
         self.client().execute_operation(&drop_database, None)
     }
 

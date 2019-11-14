@@ -65,7 +65,7 @@ impl TestClient {
     #[allow(dead_code)]
     pub fn init_db_and_coll(&self, db_name: &str, coll_name: &str) -> Collection {
         let coll = self.get_coll(db_name, coll_name);
-        coll.drop().unwrap();
+        coll.drop(None).unwrap();
         coll
     }
 }

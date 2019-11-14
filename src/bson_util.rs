@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use bson::{oid::ObjectId, Bson, Document};
-use serde::{Serializer};
+use serde::Serializer;
 
 use crate::error::{ErrorKind, Result};
 

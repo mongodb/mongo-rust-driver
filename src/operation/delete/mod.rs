@@ -6,7 +6,6 @@ use bson::{bson, doc, Document};
 use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
     coll::Namespace,
-    concern::WriteConcern,
     error::{convert_bulk_errors, Result},
     operation::{append_options, Operation, WriteResponseBody},
     options::DeleteOptions,
@@ -18,7 +17,6 @@ pub(crate) struct Delete {
     ns: Namespace,
     filter: Document,
     limit: u32,
-    write_concern: Option<WriteConcern>,
     options: Option<DeleteOptions>,
 }
 
@@ -33,7 +31,6 @@ impl Delete {
             Document::new(),
             None,
             None,
-            None,
         )
     }
 
@@ -41,14 +38,12 @@ impl Delete {
         ns: Namespace,
         filter: Document,
         limit: Option<u32>,
-        coll_write_concern: Option<WriteConcern>,
         options: Option<DeleteOptions>,
     ) -> Self {
         Self {
             ns,
             filter,
-            limit: limit.unwrap_or(0),         // 0 = no limit
-            write_concern: coll_write_concern, // TODO: RUST-35 check wc from options
+            limit: limit.unwrap_or(0), // 0 = no limit
             options,
         }
     }
@@ -69,10 +64,6 @@ impl Operation for Delete {
             ]
         };
         append_options(&mut body, self.options.as_ref())?;
-
-        if let Some(ref write_concern) = self.write_concern {
-            body.insert("writeConcern", write_concern.to_bson());
-        }
 
         Ok(Command::new(
             Self::NAME.to_string(),

@@ -84,6 +84,7 @@ pub struct InsertOneOptions {
 /// Specifies the options to a `Collection::insert_many` operation.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InsertManyOptions {
     /// Opt out of document-level validation.
     #[builder(default)]
@@ -95,8 +96,6 @@ pub struct InsertManyOptions {
     pub ordered: Option<bool>,
 
     /// The write concern for the operation.
-    // TODO RUST-220: Remove skip.
-    #[serde(skip)]
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 }
@@ -182,6 +181,7 @@ impl UpdateOptions {
             bypass_document_validation: options.bypass_document_validation,
             upsert: options.upsert,
             hint: options.hint,
+            write_concern: options.write_concern,
             ..Default::default()
         }
     }
@@ -211,10 +211,9 @@ pub struct ReplaceOptions {
 
 /// Specifies the options to a `Collection::delete_one` or `Collection::delete_many` operation.
 #[derive(Debug, Default, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DeleteOptions {
     /// The write concern for the operation.
-    // TODO RUST-220: Remove skip.
-    #[serde(skip)]
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 }
@@ -486,4 +485,13 @@ pub struct IndexModel {
     /// Extra options to use when creating the index.
     #[builder(default)]
     pub options: Option<Document>,
+}
+
+/// Specifies the options to a `Collection::drop` operation.
+#[derive(Debug, Default, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DropCollectionOptions {
+    /// The write concern for the operation.
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
 }

@@ -7,7 +7,6 @@ use serde::Deserialize;
 use crate::{
     bson_util,
     cmap::{Command, CommandResponse, StreamDescription},
-    concern::WriteConcern,
     error::{convert_bulk_errors, Result},
     operation::{Operation, WriteResponseBody},
     options::{UpdateModifications, UpdateOptions},
@@ -21,7 +20,6 @@ pub(crate) struct Update {
     filter: Document,
     update: UpdateModifications,
     multi: Option<bool>,
-    write_concern: Option<WriteConcern>,
     options: Option<UpdateOptions>,
 }
 
@@ -37,7 +35,6 @@ impl Update {
             UpdateModifications::Document(Document::new()),
             false,
             None,
-            None,
         )
     }
 
@@ -46,7 +43,6 @@ impl Update {
         filter: Document,
         update: UpdateModifications,
         multi: bool,
-        coll_write_concern: Option<WriteConcern>,
         options: Option<UpdateOptions>,
     ) -> Self {
         Self {
@@ -54,7 +50,6 @@ impl Update {
             filter,
             update,
             multi: if multi { Some(true) } else { None },
-            write_concern: coll_write_concern, // TODO: RUST-35 check wc from options
             options,
         }
     }
@@ -90,14 +85,14 @@ impl Operation for Update {
             if let Some(bypass_doc_validation) = options.bypass_document_validation {
                 body.insert("bypassDocumentValidation", bypass_doc_validation);
             }
+
+            if let Some(ref write_concern) = options.write_concern {
+                body.insert("writeConcern", write_concern.to_bson());
+            }
         };
 
         if let Some(multi) = self.multi {
             update.insert("multi", multi);
-        }
-
-        if let Some(ref write_concern) = self.write_concern {
-            body.insert("writeConcern", write_concern.to_bson());
         }
 
         body.insert("updates", vec![Bson::Document(update)]);

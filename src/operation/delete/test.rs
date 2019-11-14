@@ -6,6 +6,7 @@ use crate::{
     concern::{Acknowledgment, WriteConcern},
     error::{ErrorKind, WriteConcernError, WriteError, WriteFailure},
     operation::{test, Delete, Operation},
+    options::DeleteOptions,
     Namespace,
 };
 
@@ -21,8 +22,9 @@ fn build_many() {
         w: Some(Acknowledgment::Majority),
         ..Default::default()
     };
+    let options = DeleteOptions::builder().write_concern(wc).build();
 
-    let op = Delete::new(ns, filter.clone(), None, Some(wc), None);
+    let op = Delete::new(ns, filter.clone(), None, Some(options));
 
     let description = StreamDescription::new_testing();
     let mut cmd = op.build(&description).unwrap();
@@ -62,8 +64,9 @@ fn build_one() {
         w: Some(Acknowledgment::Majority),
         ..Default::default()
     };
+    let options = DeleteOptions::builder().write_concern(wc).build();
 
-    let op = Delete::new(ns, filter.clone(), Some(1), Some(wc), None);
+    let op = Delete::new(ns, filter.clone(), Some(1), Some(options));
 
     let description = StreamDescription::new_testing();
     let mut cmd = op.build(&description).unwrap();
