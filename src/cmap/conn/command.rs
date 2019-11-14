@@ -45,7 +45,7 @@ impl Command {
 }
 
 pub(crate) struct CommandResponse {
-    raw_response: Document,
+    pub(crate) raw_response: Document,
 }
 
 impl CommandResponse {
