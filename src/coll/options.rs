@@ -75,6 +75,10 @@ pub struct InsertOneOptions {
     /// Opt out of document-level validation.
     #[builder(default)]
     pub bypass_document_validation: Option<bool>,
+
+    /// The write concern for the operation.
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
 }
 
 /// Specifies the options to a `Collection::insert_many` operation.
@@ -89,6 +93,12 @@ pub struct InsertManyOptions {
     /// when a write fails, continue with the remaining writes, if any.
     #[builder(default)]
     pub ordered: Option<bool>,
+
+    /// The write concern for the operation.
+    // TODO RUST-220: Remove skip.
+    #[serde(skip)]
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
 }
 
 impl InsertManyOptions {
@@ -96,6 +106,7 @@ impl InsertManyOptions {
         Self {
             bypass_document_validation: options.bypass_document_validation,
             ordered: None,
+            write_concern: options.write_concern,
         }
     }
 }
@@ -159,6 +170,10 @@ pub struct UpdateOptions {
     /// Only available in MongoDB 4.2+. See the official MongoDB
     /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#ex-update-command-hint) for examples.
     pub hint: Option<Hint>,
+
+    /// The write concern for the operation.
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
 }
 
 impl UpdateOptions {
@@ -188,11 +203,21 @@ pub struct ReplaceOptions {
     /// Only available in MongoDB 4.2+. See the official MongoDB
     /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#ex-update-command-hint) for examples.
     pub hint: Option<Hint>,
+
+    /// The write concern for the operation.
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
 }
 
 /// Specifies the options to a `Collection::delete_one` or `Collection::delete_many` operation.
 #[derive(Debug, Default, TypedBuilder, Serialize)]
-pub struct DeleteOptions {}
+pub struct DeleteOptions {
+    /// The write concern for the operation.
+    // TODO RUST-220: Remove skip.
+    #[serde(skip)]
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
+}
 
 /// Specifies the options to a `Collection::find_one_and_delete` operation.
 #[derive(Debug, Default, TypedBuilder)]
