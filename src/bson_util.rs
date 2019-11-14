@@ -1,4 +1,7 @@
+use std::time::Duration;
+
 use bson::{oid::ObjectId, Bson, Document};
+use serde::{Serializer};
 
 use crate::error::{ErrorKind, Result};
 
@@ -49,5 +52,15 @@ pub(crate) fn update_document_check(update: &Document) -> Result<()> {
             message: "update document must have first key starting with '$".to_string(),
         }
         .into()),
+    }
+}
+
+pub(crate) fn serialize_duration_as_i64_millis<S: Serializer>(
+    val: &Option<Duration>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    match val {
+        Some(duration) => serializer.serialize_i64(duration.as_millis() as i64),
+        None => serializer.serialize_none(),
     }
 }

@@ -3,8 +3,13 @@
 use std::time::Duration;
 
 use bson::{Bson, Document};
+use serde::{Serialize, Serializer};
+use serde_with::skip_serializing_none;
 
-use crate::error::{ErrorKind, Result};
+use crate::{
+    bson_util,
+    error::{ErrorKind, Result},
+};
 
 /// Specifies the consistency and isolation properties of read operations from replica sets and
 /// replica set shards.
@@ -53,7 +58,8 @@ impl ReadConcern {
 ///
 /// See the documentation [here](https://docs.mongodb.com/manual/reference/write-concern/) for more
 /// information about write concerns.
-#[derive(Clone, Debug, Default, PartialEq, TypedBuilder)]
+#[skip_serializing_none]
+#[derive(Clone, Debug, Default, PartialEq, TypedBuilder, Serialize)]
 pub struct WriteConcern {
     /// Requests acknowledgement that the operation has propagated to a specific number or variety
     /// of servers.
@@ -62,6 +68,7 @@ pub struct WriteConcern {
 
     /// Requests acknowledgement that the operation has propagated to the on-disk journal.
     #[builder(default)]
+    #[serde(rename = "j")]
     pub journal: Option<bool>,
 
     /// Specifies a time limit for the write concern. If an operation has not propagated to the
@@ -71,6 +78,8 @@ pub struct WriteConcern {
     /// write would not have finished propagating if allowed more time to finish, and the
     /// server will not roll back the writes that occurred before the timeout was reached.
     #[builder(default)]
+    #[serde(rename = "wtimeout")]
+    #[serde(serialize_with = "bson_util::serialize_duration_as_i64_millis")]
     pub w_timeout: Option<Duration>,
 }
 
@@ -84,6 +93,19 @@ pub enum Acknowledgment {
     /// Requires acknowledgement according to the given write tag. See [here](https://docs.mongodb.com/manual/tutorial/configure-replica-set-tag-sets/#tag-sets-and-custom-write-concern-behavior)
     /// for more information.
     Tag(String),
+}
+
+impl Serialize for Acknowledgment {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Acknowledgment::Majority => serializer.serialize_str("majority"),
+            Acknowledgment::Nodes(n) => serializer.serialize_i32(n.clone()),
+            Acknowledgment::Tag(tag) => serializer.serialize_str(tag),
+        }
+    }
 }
 
 impl From<i32> for Acknowledgment {
