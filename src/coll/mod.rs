@@ -142,7 +142,7 @@ impl Collection {
         query: Document,
         mut options: Option<DeleteOptions>,
     ) -> Result<DeleteResult> {
-        resolve_write_concern!(self, options);
+        resolve_options!(self, options, [write_concern]);
 
         let delete = Delete::new(
             self.namespace(),
@@ -160,7 +160,7 @@ impl Collection {
         query: Document,
         mut options: Option<DeleteOptions>,
     ) -> Result<DeleteResult> {
-        resolve_write_concern!(self, options);
+        resolve_options!(self, options, [write_concern]);
 
         let delete = Delete::new(
             self.namespace(),
@@ -223,7 +223,7 @@ impl Collection {
         docs: impl IntoIterator<Item = Document>,
         mut options: Option<InsertManyOptions>,
     ) -> Result<InsertManyResult> {
-        resolve_write_concern!(self, options);
+        resolve_options!(self, options, [write_concern]);
 
         let insert = Insert::new(self.namespace(), docs.into_iter().collect(), options);
         self.client().execute_operation(&insert, None)
@@ -235,7 +235,7 @@ impl Collection {
         doc: Document,
         mut options: Option<InsertOneOptions>,
     ) -> Result<InsertOneResult> {
-        resolve_write_concern!(self, options);
+        resolve_options!(self, options, [write_concern]);
 
         let insert = Insert::new(
             self.namespace(),
@@ -256,7 +256,7 @@ impl Collection {
         mut options: Option<ReplaceOptions>,
     ) -> Result<UpdateResult> {
         bson_util::replacement_document_check(&replacement)?;
-        resolve_write_concern!(self, options);
+        resolve_options!(self, options, [write_concern]);
 
         let update = Update::new(
             self.namespace(),
@@ -287,7 +287,7 @@ impl Collection {
             bson_util::update_document_check(d)?;
         };
 
-        resolve_write_concern!(self, options);
+        resolve_options!(self, options, [write_concern]);
 
         let update = Update::new(
             self.namespace(),
@@ -312,7 +312,7 @@ impl Collection {
         update: impl Into<UpdateModifications>,
         mut options: Option<UpdateOptions>,
     ) -> Result<UpdateResult> {
-        resolve_write_concern!(self, options);
+        resolve_options!(self, options, [write_concern]);
 
         let update = Update::new(
             self.namespace(),
