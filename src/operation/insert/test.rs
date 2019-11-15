@@ -2,6 +2,7 @@ use bson::{bson, doc, Bson, Document};
 
 use crate::{
     cmap::{CommandResponse, StreamDescription},
+    concern::WriteConcern,
     error::{BulkWriteError, ErrorKind, WriteConcernError},
     operation::{test, Insert, Operation},
     options::InsertManyOptions,
@@ -24,6 +25,7 @@ fn fixtures() -> TestFixtures {
 
     let options = InsertManyOptions {
         ordered: Some(true),
+        write_concern: Some(WriteConcern::builder().journal(true).build()),
         ..Default::default()
     };
 
@@ -90,6 +92,15 @@ fn build() {
             .options
             .bypass_document_validation
             .map(Bson::Boolean)
+            .as_ref()
+    );
+    assert_eq!(
+        cmd.body.get("writeConcern"),
+        fixtures
+            .options
+            .write_concern
+            .as_ref()
+            .map(WriteConcern::to_bson)
             .as_ref()
     );
 }

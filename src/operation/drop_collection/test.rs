@@ -4,25 +4,29 @@ use crate::{
     cmap::{CommandResponse, StreamDescription},
     concern::{Acknowledgment, WriteConcern},
     error::{ErrorKind, WriteFailure},
-    operation::{test, Drop, Operation},
+    operation::{test, DropCollection, Operation},
+    options::DropCollectionOptions,
     Namespace,
 };
 
 #[test]
 fn build() {
-    let op = Drop::new(
-        Namespace {
-            db: "test_db".to_string(),
-            coll: "test_coll".to_string(),
-        },
-        Some(WriteConcern {
+    let options = DropCollectionOptions {
+        write_concern: Some(WriteConcern {
             w: Some(Acknowledgment::Tag("abc".to_string())),
             ..Default::default()
         }),
-    );
+    };
+
+    let ns = Namespace {
+        db: "test_db".to_string(),
+        coll: "test_coll".to_string(),
+    };
+
+    let op = DropCollection::new(ns.clone(), Some(options));
 
     let description = StreamDescription::new_testing();
-    let cmd = op.build(&description).unwrap();
+    let cmd = op.build(&description).expect("build should succeed");
 
     assert_eq!(cmd.name.as_str(), "drop");
     assert_eq!(cmd.target_db.as_str(), "test_db");
@@ -34,11 +38,23 @@ fn build() {
             "writeConcern": { "w": "abc" }
         }
     );
+
+    let op = DropCollection::new(ns, None);
+    let cmd = op.build(&description).expect("build should succeed");
+    assert_eq!(cmd.name.as_str(), "drop");
+    assert_eq!(cmd.target_db.as_str(), "test_db");
+    assert_eq!(cmd.read_pref.as_ref(), None);
+    assert_eq!(
+        cmd.body,
+        doc! {
+            "drop": "test_coll",
+        }
+    );
 }
 
 #[test]
 fn handle_success() {
-    let op = Drop::empty();
+    let op = DropCollection::empty();
 
     let ok_response = CommandResponse::from_document(doc! { "ok": 1.0 });
     assert!(op.handle_response(ok_response).is_ok());
@@ -48,12 +64,12 @@ fn handle_success() {
 
 #[test]
 fn handle_command_error() {
-    test::handle_command_error(Drop::empty());
+    test::handle_command_error(DropCollection::empty());
 }
 
 #[test]
 fn handle_write_concern_error() {
-    let op = Drop::empty();
+    let op = DropCollection::empty();
 
     let response = CommandResponse::from_document(doc! {
         "writeConcernError": {

@@ -5,24 +5,21 @@ use bson::{bson, doc};
 
 use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
-    concern::WriteConcern,
     error::Result,
-    operation::{Operation, WriteConcernOnlyBody},
+    operation::{append_options, Operation, WriteConcernOnlyBody},
+    options::DropCollectionOptions,
     Namespace,
 };
 
 #[derive(Debug)]
-pub(crate) struct Drop {
+pub(crate) struct DropCollection {
     ns: Namespace,
-    write_concern: Option<WriteConcern>,
+    options: Option<DropCollectionOptions>,
 }
 
-impl Drop {
-    pub(crate) fn new(ns: Namespace, coll_write_concern: Option<WriteConcern>) -> Self {
-        Self {
-            ns,
-            write_concern: coll_write_concern, // TODO: RUST-35 check options first
-        }
+impl DropCollection {
+    pub(crate) fn new(ns: Namespace, options: Option<DropCollectionOptions>) -> Self {
+        DropCollection { ns, options }
     }
 
     #[allow(dead_code)]
@@ -37,7 +34,7 @@ impl Drop {
     }
 }
 
-impl Operation for Drop {
+impl Operation for DropCollection {
     type O = ();
     const NAME: &'static str = "drop";
 
@@ -45,9 +42,8 @@ impl Operation for Drop {
         let mut body = doc! {
             Self::NAME: self.ns.coll.clone(),
         };
-        if let Some(ref wc) = self.write_concern {
-            body.insert("writeConcern", wc.to_bson());
-        }
+
+        append_options(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(
             Self::NAME.to_string(),
