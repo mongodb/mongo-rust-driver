@@ -10,6 +10,7 @@ use crate::{
         FindOneAndDeleteOptions, FindOneAndReplaceOptions, FindOneAndUpdateOptions, ReturnDocument,
         UpdateModifications,
     },
+    collation::Collation,
     concern::WriteConcern,
 };
 
@@ -51,6 +52,9 @@ pub(super) struct FindAndModifyOptions {
     #[builder(default)]
     #[serde(rename = "fields")]
     pub(crate) projection: Option<Document>,
+
+    #[builder(default)]
+    pub(crate) collation: Option<Collation>,
 }
 
 impl FindAndModifyOptions {
@@ -58,6 +62,7 @@ impl FindAndModifyOptions {
         opts: FindOneAndDeleteOptions,
     ) -> FindAndModifyOptions {
         FindAndModifyOptions::builder()
+            .collation(opts.collation)
             .max_time(opts.max_time)
             .projection(opts.projection)
             .sort(opts.sort)
@@ -72,6 +77,7 @@ impl FindAndModifyOptions {
     ) -> FindAndModifyOptions {
         let replacement = UpdateModifications::Document(replacement);
         FindAndModifyOptions::builder()
+            .collation(opts.collation)
             .bypass_document_validation(opts.bypass_document_validation)
             .max_time(opts.max_time)
             .projection(opts.projection)
@@ -88,6 +94,7 @@ impl FindAndModifyOptions {
         opts: FindOneAndUpdateOptions,
     ) -> FindAndModifyOptions {
         FindAndModifyOptions::builder()
+            .collation(opts.collation)
             .array_filters(opts.array_filters)
             .bypass_document_validation(opts.bypass_document_validation)
             .max_time(opts.max_time)

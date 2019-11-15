@@ -64,7 +64,7 @@ impl AuthMechanism {
     /// authentication.
     pub fn validate_credential(&self, credential: &Credential) -> Result<()> {
         match self {
-            AuthMechanism::ScramSha1 => {
+            AuthMechanism::ScramSha1 | AuthMechanism::ScramSha256 => {
                 if credential.username.is_none() {
                     return Err(ErrorKind::ArgumentError {
                         message: "No username provided for SCRAM authentication".to_string(),
@@ -122,7 +122,7 @@ impl FromStr for AuthMechanism {
 ///
 /// Some fields (mechanism and source) may be omitted and will either be negotiated or assigned a
 /// default value, depending on the values of other fields in the credential.
-#[derive(Clone, PartialEq, Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct Credential {
     /// The username to authenticate with. This applies to all mechanisms but may be omitted when
     /// authenticating via MONGODB-X509.
@@ -130,7 +130,7 @@ pub struct Credential {
     pub username: Option<String>,
 
     /// The database used to authenticate. This applies to all mechanisms and defaults to "admin"
-    /// in SCRAM authentication mechanisms and "$external" for GSSAPI and MONGODB-X509.
+    /// in SCRAM authentication mechanisms and "$external" for GSSAPI, MONGODB-X509 and PLAIN.
     #[builder(default)]
     pub source: Option<String>,
 
@@ -146,6 +146,16 @@ pub struct Credential {
     /// Additional properties for the given mechanism.
     #[builder(default)]
     pub mechanism_properties: Option<Document>,
+}
+
+impl PartialEq for Credential {
+    fn eq(&self, other: &Self) -> bool {
+        self.username == other.username
+            && self.resolved_source() == other.resolved_source()
+            && self.password == other.password
+            && self.mechanism == other.mechanism
+            && self.mechanism_properties == other.mechanism_properties
+    }
 }
 
 impl Credential {
@@ -168,5 +178,17 @@ impl Credential {
         }
 
         doc
+    }
+
+    fn resolved_source(&self) -> &str {
+        self.source
+            .as_ref()
+            .map(|s| s.as_str())
+            .unwrap_or_else(|| match self.mechanism {
+                Some(AuthMechanism::Gssapi)
+                | Some(AuthMechanism::Plain)
+                | Some(AuthMechanism::MongoDbX509) => "$external",
+                _ => "admin",
+            })
     }
 }

@@ -5,7 +5,11 @@ pub use self::event::EventClient;
 use std::{collections::HashMap, sync::Arc};
 
 use bson::{bson, doc, oid::ObjectId, Bson};
-use mongodb::{options::ClientOptions, Client, Collection};
+use mongodb::{
+    error::{CommandError, ErrorKind},
+    options::ClientOptions,
+    Client, Collection,
+};
 use semver::Version;
 use serde::Deserialize;
 
@@ -70,15 +74,13 @@ impl TestClient {
         }
     }
 
-    #[allow(dead_code)]
     pub fn get_coll(&self, db_name: &str, coll_name: &str) -> Collection {
         self.database(db_name).collection(coll_name)
     }
 
-    #[allow(dead_code)]
     pub fn init_db_and_coll(&self, db_name: &str, coll_name: &str) -> Collection {
         let coll = self.get_coll(db_name, coll_name);
-        coll.drop(None).unwrap();
+        drop_collection(&coll);
         coll
     }
 
@@ -99,7 +101,6 @@ impl TestClient {
             || (self.server_version.major == major && self.server_version.minor >= minor)
     }
 
-    #[allow(dead_code)]
     pub fn server_version_lt(&self, major: u64, minor: u64) -> bool {
         self.server_version.major < major
             || (self.server_version.major == major && self.server_version.minor < minor)
@@ -110,6 +111,20 @@ impl TestClient {
         self.server_version.major < major
             || (self.server_version.major == major && self.server_version.minor <= minor)
     }
+
+    pub fn drop_collection(&self, db_name: &str, coll_name: &str) {
+        let coll = self.get_coll(db_name, coll_name);
+        drop_collection(&coll);
+    }
+}
+
+pub fn drop_collection(coll: &Collection) {
+    match coll.drop(None).as_ref().map_err(|e| e.as_ref()) {
+        Err(ErrorKind::CommandError(CommandError { code: 26, .. })) | Ok(_) => {}
+        e @ Err(_) => {
+            e.unwrap();
+        }
+    };
 }
 
 #[derive(Debug, Deserialize)]

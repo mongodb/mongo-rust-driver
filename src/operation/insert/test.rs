@@ -100,7 +100,7 @@ fn build() {
             .options
             .write_concern
             .as_ref()
-            .map(WriteConcern::to_bson)
+            .map(|wc| WriteConcern::to_bson(wc).unwrap())
             .as_ref()
     );
 }

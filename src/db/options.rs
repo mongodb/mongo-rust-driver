@@ -6,6 +6,7 @@ use typed_builder::TypedBuilder;
 use crate::{
     bson_util,
     concern::{ReadConcern, WriteConcern},
+    options::Collation,
     selection_criteria::SelectionCriteria,
 };
 
@@ -80,7 +81,7 @@ pub struct CreateCollectionOptions {
 
     /// The default collation for the collection or view.   
     #[builder(default)]
-    pub collation: Option<Document>,
+    pub collation: Option<Collation>,
 
     /// The write concern for the operation.   
     #[builder(default)]

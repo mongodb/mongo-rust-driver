@@ -201,6 +201,7 @@ impl Collection {
             AggregateOptions::builder()
                 .hint(opts.hint)
                 .max_time(opts.max_time)
+                .collation(opts.collation)
                 .build()
         });
 
@@ -486,16 +487,10 @@ impl<'de> Deserialize<'de> for Namespace {
         let mut parts = s.split('.');
 
         let db = parts.next();
-        let coll = parts.next();
-
-        if parts.count() != 0 {
-            return Err(D::Error::custom(
-                "Expected a single dot in the namepsace, got more than one",
-            ));
-        }
+        let coll = parts.collect::<Vec<_>>().join(".");
 
         match (db, coll) {
-            (Some(db), Some(coll)) => Ok(Self {
+            (Some(db), coll) if !coll.is_empty() => Ok(Self {
                 db: db.to_string(),
                 coll: coll.to_string(),
             }),

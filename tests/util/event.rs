@@ -50,7 +50,6 @@ impl std::ops::DerefMut for EventClient {
 }
 
 impl EventClient {
-    #[allow(dead_code)]
     pub fn new() -> Self {
         let handler = EventHandler::default();
         let command_started_events = handler.command_started_events.clone();
@@ -66,7 +65,7 @@ impl EventClient {
 }
 
 // TODO: Enable once operations are working.
-// #[test]
+//#[test]
 #[allow(dead_code)]
 fn command_started_event_count() {
     let client = EventClient::new();

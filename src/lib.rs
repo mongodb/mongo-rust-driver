@@ -51,6 +51,7 @@ mod bson_util;
 mod client;
 mod cmap;
 mod coll;
+mod collation;
 mod concern;
 mod cursor;
 mod db;
