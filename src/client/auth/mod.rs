@@ -1,9 +1,18 @@
-use std::str::FromStr;
+mod scram;
+#[cfg(test)]
+mod test;
+
+use std::{borrow::Cow, str::FromStr};
 
 use bson::{Bson, Document};
+use rand::Rng;
 use typed_builder::TypedBuilder;
 
-use crate::error::{Error, ErrorKind, Result};
+use self::scram::ScramVersion;
+use crate::{
+    cmap::{Connection, StreamDescription},
+    error::{Error, ErrorKind, Result},
+};
 
 const SCRAM_SHA_1_STR: &str = "SCRAM-SHA-1";
 const SCRAM_SHA_256_STR: &str = "SCRAM-SHA-256";
@@ -60,6 +69,20 @@ pub enum AuthMechanism {
 }
 
 impl AuthMechanism {
+    pub(crate) fn from_stream_description(description: &StreamDescription) -> AuthMechanism {
+        let scram_sha_256_found = description
+            .sasl_supported_mechs
+            .as_ref()
+            .map(|ms| ms.iter().any(|m| m == AuthMechanism::ScramSha256.as_str()))
+            .unwrap_or(false);
+
+        if scram_sha_256_found {
+            AuthMechanism::ScramSha256
+        } else {
+            AuthMechanism::ScramSha1
+        }
+    }
+
     /// Determines if the provided credentials have the required information to perform
     /// authentication.
     pub fn validate_credential(&self, credential: &Credential) -> Result<()> {
@@ -97,6 +120,29 @@ impl AuthMechanism {
                 uri_db.unwrap_or("admin").to_string()
             }
             _ => String::new(),
+        }
+    }
+
+    pub(crate) fn authenticate_stream(
+        &self,
+        stream: &mut Connection,
+        credential: &Credential,
+    ) -> Result<()> {
+        match self {
+            AuthMechanism::ScramSha1 => ScramVersion::Sha1.authenticate_stream(stream, credential),
+            AuthMechanism::ScramSha256 => {
+                ScramVersion::Sha256.authenticate_stream(stream, credential)
+            }
+            AuthMechanism::MongoDbCr => Err(ErrorKind::AuthenticationError {
+                message: "MONGODB-CR is deprecated and not supported by this driver. Use SCRAM \
+                          for password-based authentication instead"
+                    .into(),
+            }
+            .into()),
+            _ => Err(ErrorKind::AuthenticationError {
+                message: format!("Authentication mechanism {:?} not yet implemented.", self),
+            }
+            .into()),
         }
     }
 }
@@ -171,4 +217,53 @@ impl Credential {
 
         doc
     }
+
+    fn source_str(&self) -> Option<&str> {
+        self.source.as_ref().map(|s| s.as_str())
+    }
+
+    pub(crate) fn resolved_source(&self) -> &str {
+        match self.mechanism {
+            Some(AuthMechanism::Gssapi) | Some(AuthMechanism::MongoDbX509) => "$external",
+            Some(AuthMechanism::Plain) => self.source_str().unwrap_or("$external"),
+            _ => self.source_str().unwrap_or("admin"),
+        }
+    }
+
+    /// If the mechanism is missing, append the appropriate mechanism negotiation key-value-pair to
+    /// the provided isMaster command document.
+    pub(crate) fn append_needed_mechanism_negotiation(&self, command: &mut Document) {
+        if let (Some(username), None) = (self.username.as_ref(), self.mechanism.as_ref()) {
+            command.insert(
+                "saslSupportedMechs",
+                format!("{}.{}", self.resolved_source(), username),
+            );
+        }
+    }
+
+    /// Attempts to authenticate a stream according this credential, returning an error
+    /// result on failure. A mechanism may be negotiated if one is not provided as part of the
+    /// credential.
+    pub(crate) fn authenticate_stream(&self, conn: &mut Connection) -> Result<()> {
+        let stream_description = conn.stream_description()?;
+
+        // Verify server can authenticate.
+        if !stream_description.server_type.can_auth() {
+            return Ok(());
+        };
+
+        let mechanism = match self.mechanism {
+            None => Cow::Owned(AuthMechanism::from_stream_description(stream_description)),
+            Some(ref m) => Cow::Borrowed(m),
+        };
+
+        // Authenticate according to the chosen mechanism.
+        mechanism.authenticate_stream(conn, self)
+    }
+}
+
+pub(crate) fn generate_nonce() -> String {
+    let mut rng = rand::thread_rng();
+    let result: Vec<u8> = (0..32).map(|_| rng.gen()).collect();
+    base64::encode(result.as_slice())
 }

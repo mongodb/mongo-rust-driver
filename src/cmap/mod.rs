@@ -24,6 +24,7 @@ use self::{
     establish::ConnectionEstablisher, options::ConnectionPoolOptions, wait_queue::WaitQueue,
 };
 use crate::{
+    client::auth::Credential,
     error::{ErrorKind, Result},
     event::cmap::{
         CmapEventHandler, ConnectionCheckoutFailedEvent, ConnectionCheckoutFailedReason,
@@ -80,6 +81,9 @@ pub(crate) struct ConnectionPoolInner {
     /// used to connect to the server.
     tls_options: Option<TlsOptions>,
 
+    /// The credential to use for authenticating connections in this pool.
+    credential: Option<Credential>,
+
     /// The current generation of the pool. The generation is incremented whenever the pool is
     /// cleared. Connections belonging to a previous generation are considered stale and will be
     /// closed when checked back in or when popped off of the set of available connections.
@@ -124,6 +128,7 @@ impl ConnectionPool {
         let tls_options = options.as_mut().and_then(|opts| opts.tls_options.take());
         let event_handler = options.as_mut().and_then(|opts| opts.event_handler.take());
 
+        let credential = options.as_mut().and_then(|opts| opts.credential.clone());
         let establisher = ConnectionEstablisher::new(options.as_ref());
 
         let inner = ConnectionPoolInner {
@@ -133,6 +138,7 @@ impl ConnectionPool {
             max_pool_size,
             min_pool_size,
             tls_options,
+            credential,
             generation: AtomicU32::new(0),
             total_connection_count: AtomicU32::new(0),
             next_connection_id: AtomicU32::new(1),
@@ -324,7 +330,10 @@ impl ConnectionPool {
             handler.handle_connection_created_event(connection.created_event())
         });
 
-        let establish_result = self.inner.establisher.establish_connection(&mut connection);
+        let establish_result = self
+            .inner
+            .establisher
+            .establish_connection(&mut connection, self.inner.credential.as_ref());
 
         if let Err(e) = establish_result {
             self.clear();

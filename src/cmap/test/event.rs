@@ -69,6 +69,7 @@ impl CmapEventHandler for EventHandler {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Deserialize, From, PartialEq)]
 #[serde(tag = "type")]
 pub enum Event {
@@ -109,6 +110,7 @@ struct PoolCreatedEventHelper {
     pub options: Option<PoolOptionsHelper>,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 enum PoolOptionsHelper {

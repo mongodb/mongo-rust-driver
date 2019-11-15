@@ -7,8 +7,8 @@ use std::{collections::HashMap, sync::Arc};
 
 use bson::{bson, doc, oid::ObjectId, Bson};
 use mongodb::{
-    error::{CommandError, ErrorKind},
-    options::ClientOptions,
+    error::{CommandError, ErrorKind, Result},
+    options::{auth::AuthMechanism, ClientOptions},
     Client, Collection,
 };
 use semver::Version;
@@ -75,6 +75,23 @@ impl TestClient {
         }
     }
 
+    pub fn create_user(
+        &self,
+        user: &str,
+        pwd: &str,
+        roles: &[&str],
+        mechanisms: &[AuthMechanism],
+    ) -> Result<()> {
+        let rs: bson::Array = roles.iter().map(|&s| Bson::from(s)).collect();
+        let mut cmd = doc! { "createUser": user, "pwd": pwd, "roles": rs };
+        if self.server_version_gte(4, 0) {
+            let ms: bson::Array = mechanisms.iter().map(|s| Bson::from(s.as_str())).collect();
+            cmd.insert("mechanisms", ms);
+        }
+        self.database("admin").run_command(cmd, None)?;
+        Ok(())
+    }
+
     pub fn get_coll(&self, db_name: &str, coll_name: &str) -> Collection {
         self.database(db_name).collection(coll_name)
     }
@@ -83,6 +100,10 @@ impl TestClient {
         let coll = self.get_coll(db_name, coll_name);
         drop_collection(&coll);
         coll
+    }
+
+    pub fn auth_enabled(&self) -> bool {
+        self.options.credential.is_some()
     }
 
     #[allow(dead_code)]
