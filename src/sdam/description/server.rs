@@ -250,7 +250,7 @@ impl ServerDescription {
                 .command_response
                 .last_write
                 .as_ref()
-                .map(|write| write.last_write_date.clone())),
+                .map(|write| write.last_write_date)),
             Err(ref e) => Err(e.clone()),
         }
     }
