@@ -1,6 +1,6 @@
 mod create;
 mod delete;
-mod drop;
+mod drop_collection;
 mod drop_database;
 mod insert;
 mod update;
@@ -18,7 +18,7 @@ use crate::{
 
 pub(crate) use create::Create;
 pub(crate) use delete::Delete;
-pub(crate) use drop::Drop;
+pub(crate) use drop_collection::DropCollection;
 pub(crate) use drop_database::DropDatabase;
 pub(crate) use insert::Insert;
 pub(crate) use update::Update;

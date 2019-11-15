@@ -9,7 +9,7 @@ use crate::{
     bson_util,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, Result},
-    operation::{Delete, Drop, Insert, Update},
+    operation::{Delete, DropCollection, Insert, Update},
     read_preference::ReadPreference,
     results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
     Client, Cursor, Database,
@@ -102,7 +102,7 @@ impl Collection {
     pub fn drop(&self, mut options: Option<DropCollectionOptions>) -> Result<()> {
         resolve_options!(self, options, [write_concern]);
 
-        let drop = Drop::new(self.namespace(), options);
+        let drop = DropCollection::new(self.namespace(), options);
         self.client().execute_operation(&drop, None)
     }
 

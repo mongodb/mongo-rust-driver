@@ -12,14 +12,14 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub(crate) struct Drop {
+pub(crate) struct DropCollection {
     ns: Namespace,
     options: Option<DropCollectionOptions>,
 }
 
-impl Drop {
+impl DropCollection {
     pub(crate) fn new(ns: Namespace, options: Option<DropCollectionOptions>) -> Self {
-        Self { ns, options }
+        DropCollection { ns, options }
     }
 
     #[allow(dead_code)]
@@ -34,7 +34,7 @@ impl Drop {
     }
 }
 
-impl Operation for Drop {
+impl Operation for DropCollection {
     type O = ();
     const NAME: &'static str = "drop";
 
