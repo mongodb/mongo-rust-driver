@@ -4,7 +4,7 @@ use crate::{
     cmap::{CommandResponse, StreamDescription},
     concern::{Acknowledgment, WriteConcern},
     error::{ErrorKind, WriteFailure},
-    operation::{test, Drop, Operation},
+    operation::{test, DropCollection, Operation},
     options::DropCollectionOptions,
     Namespace,
 };
@@ -23,7 +23,7 @@ fn build() {
         coll: "test_coll".to_string(),
     };
 
-    let op = Drop::new(ns.clone(), Some(options));
+    let op = DropCollection::new(ns.clone(), Some(options));
 
     let description = StreamDescription::new_testing();
     let cmd = op.build(&description).expect("build should succeed");
@@ -39,7 +39,7 @@ fn build() {
         }
     );
 
-    let op = Drop::new(ns, None);
+    let op = DropCollection::new(ns, None);
     let cmd = op.build(&description).expect("build should succeed");
     assert_eq!(cmd.name.as_str(), "drop");
     assert_eq!(cmd.target_db.as_str(), "test_db");
@@ -54,7 +54,7 @@ fn build() {
 
 #[test]
 fn handle_success() {
-    let op = Drop::empty();
+    let op = DropCollection::empty();
 
     let ok_response = CommandResponse::from_document(doc! { "ok": 1.0 });
     assert!(op.handle_response(ok_response).is_ok());
@@ -64,12 +64,12 @@ fn handle_success() {
 
 #[test]
 fn handle_command_error() {
-    test::handle_command_error(Drop::empty());
+    test::handle_command_error(DropCollection::empty());
 }
 
 #[test]
 fn handle_write_concern_error() {
-    let op = Drop::empty();
+    let op = DropCollection::empty();
 
     let response = CommandResponse::from_document(doc! {
         "writeConcernError": {
