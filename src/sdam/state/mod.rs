@@ -36,7 +36,7 @@ impl Topology {
     /// just Topology so that monitoring threads can hold a Weak reference to it.
     pub(crate) fn new(mut options: ClientOptions) -> Result<Arc<RwLock<Self>>> {
         let topology = Arc::new(RwLock::new(Topology {
-            description: TopologyDescription::new(options.clone()),
+            description: TopologyDescription::new(options.clone())?,
             servers: Default::default(),
             server_selection_timeout: options.server_selection_timeout,
         }));
@@ -101,7 +101,7 @@ impl Topology {
 
             // Attempt to select a server. If none is found, request a topology update and restart
             // loop.
-            let server_description = match self.description.select_server(&selector) {
+            let server_description = match self.description.select_server(&selector)? {
                 Some(description) => description,
                 None => {
                     self.request_topology_check();

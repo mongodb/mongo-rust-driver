@@ -86,7 +86,6 @@ impl IsMasterCommandResponse {
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct LastWrite {
-    pub op_time: OpTime,
     pub last_write_date: UtcDateTime,
 }
 

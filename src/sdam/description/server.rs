@@ -243,6 +243,18 @@ impl ServerDescription {
         Ok(me)
     }
 
+    pub(crate) fn last_write_date(&self) -> Result<Option<UtcDateTime>> {
+        match self.reply {
+            Ok(None) => Ok(None),
+            Ok(Some(ref reply)) => Ok(reply
+                .command_response
+                .last_write
+                .as_ref()
+                .map(|write| write.last_write_date)),
+            Err(ref e) => Err(e.clone()),
+        }
+    }
+
     pub(crate) fn matches_tag_set(&self, tag_set: &TagSet) -> bool {
         let reply = match self.reply.as_ref() {
             Ok(Some(ref reply)) => reply,

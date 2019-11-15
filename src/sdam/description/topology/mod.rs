@@ -12,12 +12,14 @@ use serde::Deserialize;
 
 use crate::{
     cmap::Command,
-    error::Result,
+    error::{ErrorKind, Result},
     options::{ClientOptions, StreamAddress},
     read_preference::ReadPreference,
     sdam::description::server::{ServerDescription, ServerType},
 };
 pub(crate) use server_selection::SelectionCriteria;
+
+const DEFAULT_HEARTBEAT_FREQUENCY: Duration = Duration::from_secs(10);
 
 /// The TopologyType type, as described by the SDAM spec.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize)]
@@ -64,12 +66,20 @@ pub(crate) struct TopologyDescription {
     /// acceptable for a read operation.
     local_threshold: Option<Duration>,
 
+    /// The maximum amount of time to wait before checking a given server by sending an isMaster.
+    heartbeat_freq: Option<Duration>,
+
     /// The server descriptions of each member of the topology.
     servers: HashMap<StreamAddress, ServerDescription>,
+
+    /// The default max staleness for read operations.
+    max_staleness: Option<Duration>,
 }
 
 impl TopologyDescription {
-    pub(crate) fn new(options: ClientOptions) -> Self {
+    pub(crate) fn new(options: ClientOptions) -> Result<Self> {
+        verify_max_staleness(options.max_staleness)?;
+
         let topology_type = if options.repl_set_name.is_some() {
             TopologyType::ReplicaSetNoPrimary
         } else if let Some(true) = options.direct_connection {
@@ -88,7 +98,7 @@ impl TopologyDescription {
             })
             .collect();
 
-        Self {
+        Ok(Self {
             single_seed: servers.len() == 1,
             topology_type,
             set_name: options.repl_set_name,
@@ -97,8 +107,10 @@ impl TopologyDescription {
             compatibility_error: None,
             logical_session_timeout_minutes: None,
             local_threshold: options.local_threshold,
+            heartbeat_freq: options.heartbeat_freq,
+            max_staleness: options.max_staleness,
             servers,
-        }
+        })
     }
 
     pub(crate) fn update_command_with_read_pref(
@@ -172,6 +184,11 @@ impl TopologyDescription {
             }
             _ => {}
         }
+    }
+
+    /// Gets the heartbeat frequency.
+    fn heartbeat_frequency(&self) -> Duration {
+        self.heartbeat_freq.unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY)
     }
 
     /// Check the cluster for a compatibility error, and record the error message if one is found.
@@ -471,4 +488,18 @@ impl TopologyDescription {
 
         Ok(())
     }
+}
+
+fn verify_max_staleness(max_staleness: Option<Duration>) -> Result<()> {
+    if max_staleness
+        .map(|staleness| staleness > Duration::from_secs(0) && staleness < Duration::from_secs(90))
+        .unwrap_or(false)
+    {
+        return Err(ErrorKind::ArgumentError {
+            message: "max staleness cannot be both positive and below 90 seconds".into(),
+        }
+        .into());
+    }
+
+    Ok(())
 }

@@ -1018,7 +1018,18 @@ impl ClientOptionsParser {
                 self.zlib_compression = Some(i);
             }
             k @ "maxstalenessseconds" => {
-                self.max_staleness = Some(Duration::from_millis(get_duration!(value, k)));
+                let max_staleness = Duration::from_secs(get_duration!(value, k));
+
+                if max_staleness > Duration::from_secs(0) && max_staleness < Duration::from_secs(90)
+                {
+                    return Err(ErrorKind::ArgumentError {
+                        message: "'maxStalenessSeconds' cannot be both positive and below 90"
+                            .into(),
+                    }
+                    .into());
+                }
+
+                self.max_staleness = Some(max_staleness);
             }
 
             _ => {
