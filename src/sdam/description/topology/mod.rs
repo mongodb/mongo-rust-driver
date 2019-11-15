@@ -112,6 +112,14 @@ impl TopologyDescription {
         })
     }
 
+    pub(crate) fn contains_address(&self, address: &StreamAddress) -> bool {
+        self.servers.contains_key(address)
+    }
+
+    pub(crate) fn server_addresses(&self) -> impl Iterator<Item = &StreamAddress> {
+        self.servers.keys()
+    }
+
     pub(crate) fn update_command_with_read_pref(
         &self,
         server_type: ServerType,

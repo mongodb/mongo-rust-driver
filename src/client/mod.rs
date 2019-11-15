@@ -2,21 +2,28 @@ pub mod auth;
 mod executor;
 pub mod options;
 
-use std::sync::{Arc, RwLock};
+use std::{
+    sync::{Arc, RwLock},
+    time::Duration,
+};
+
+use time::PreciseTime;
 
 use derivative::Derivative;
 
 use crate::{
     concern::{ReadConcern, WriteConcern},
     db::Database,
-    error::Result,
+    error::{ErrorKind, Result},
     event::command::{
         CommandEventHandler, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent,
     },
     options::{ClientOptions, DatabaseOptions},
-    sdam::{Server, Topology},
+    sdam::{Server, Topology, TopologyUpdateCondvar},
     selection_criteria::{ReadPreference, SelectionCriteria},
 };
+
+const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// This is the main entry point for the API. A `Client` is used to connect to a MongoDB cluster.
 /// By default, it will monitor the topology of the cluster, keeping track of any changes, such
@@ -57,12 +64,9 @@ pub struct Client {
 #[derivative(Debug)]
 struct ClientInner {
     topology: Arc<RwLock<Topology>>,
-
-    selection_criteria: Option<SelectionCriteria>,
-    read_concern: Option<ReadConcern>,
-    write_concern: Option<WriteConcern>,
+    options: ClientOptions,
     #[derivative(Debug = "ignore")]
-    command_event_handler: Option<Arc<dyn CommandEventHandler>>,
+    condvar: TopologyUpdateCondvar,
 }
 
 impl Client {
@@ -75,36 +79,37 @@ impl Client {
     }
 
     /// Creates a new `Client` connected to the cluster specified by `options`.
-    pub fn with_options(mut options: ClientOptions) -> Result<Self> {
-        let selection_criteria = options.selection_criteria.take();
-        let read_concern = options.read_concern.take();
-        let write_concern = options.write_concern.take();
-        let command_event_handler = options.command_event_handler.take();
+    pub fn with_options(options: ClientOptions) -> Result<Self> {
+        let condvar = TopologyUpdateCondvar::new();
 
         let inner = Arc::new(ClientInner {
-            topology: Topology::new(options)?,
-            selection_criteria,
-            read_concern,
-            write_concern,
-            command_event_handler,
+            topology: Topology::new(condvar.clone(), options.clone())?,
+            condvar,
+            options,
         });
 
         Ok(Self { inner })
     }
 
-    /// Gets the selection criteria of the `Client`.
+    fn emit_command_event(&self, emit: impl FnOnce(&Arc<dyn CommandEventHandler>)) {
+        if let Some(ref handler) = self.inner.options.command_event_handler {
+            emit(handler);
+        }
+    }
+
+    /// Gets the read preference of the `Client`.
     pub fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        self.inner.selection_criteria.as_ref()
+        self.inner.options.selection_criteria.as_ref()
     }
 
     /// Gets the read concern of the `Client`.
     pub fn read_concern(&self) -> Option<&ReadConcern> {
-        self.inner.read_concern.as_ref()
+        self.inner.options.read_concern.as_ref()
     }
 
     /// Gets the write concern of the `Client`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
-        self.inner.write_concern.as_ref()
+        self.inner.options.write_concern.as_ref()
     }
 
     /// Gets a handle to a database specified by `name` in the cluster the `Client` is connected to.
@@ -129,30 +134,63 @@ impl Client {
 
     #[allow(dead_code)]
     pub(crate) fn send_command_started_event(&self, event: CommandStartedEvent) {
-        if let Some(ref handler) = self.inner.command_event_handler {
-            handler.handle_command_started_event(event.clone());
-        }
+        self.emit_command_event(|handler| handler.handle_command_started_event(event.clone()));
     }
 
     #[allow(dead_code)]
     pub(crate) fn send_command_succeeded_event(&self, event: CommandSucceededEvent) {
-        if let Some(ref handler) = self.inner.command_event_handler {
-            handler.handle_command_succeeded_event(event.clone());
-        }
+        self.emit_command_event(|handler| handler.handle_command_succeeded_event(event.clone()));
     }
 
     #[allow(dead_code)]
     pub(crate) fn send_command_failed_event(&self, event: CommandFailedEvent) {
-        if let Some(ref handler) = self.inner.command_event_handler {
-            handler.handle_command_failed_event(event.clone());
-        }
+        self.emit_command_event(|handler| handler.handle_command_failed_event(event.clone()));
     }
 
     /// Select a server using the provided criteria. If none is provided, a primary read preference
     /// will be used instead.
     fn select_server(&self, criteria: Option<&SelectionCriteria>) -> Result<Arc<Server>> {
-        self.inner.topology.read().unwrap().select_server(
-            criteria.unwrap_or_else(|| &SelectionCriteria::ReadPreference(ReadPreference::Primary)),
-        )
+        let criteria =
+            criteria.unwrap_or_else(|| &SelectionCriteria::ReadPreference(ReadPreference::Primary));
+        let start_time = PreciseTime::now();
+        let timeout = self
+            .inner
+            .options
+            .server_selection_timeout
+            .unwrap_or(DEFAULT_SERVER_SELECTION_TIMEOUT);
+
+        while start_time.to(PreciseTime::now()).to_std().unwrap() < timeout {
+            // Because we're calling clone on the lock guard, we're actually copying the
+            // Topology itself, not just making a new reference to it. The
+            // `servers` field will contain references to the same instances
+            // though, since each is wrapped in an `Arc`.
+            let topology = self.inner.topology.read().unwrap().clone();
+
+            // Return error if the wire version is invalid.
+            if let Some(error_msg) = topology.description.compatibility_error() {
+                return Err(ErrorKind::ServerSelectionError {
+                    message: error_msg.into(),
+                }
+                .into());
+            }
+
+            let server = topology
+                .description
+                .select_server(&criteria)?
+                .and_then(|server| topology.servers.get(&server.address));
+
+            if let Some(server) = server {
+                return Ok(server.clone());
+            }
+
+            self.inner
+                .condvar
+                .wait_timeout(timeout - start_time.to(PreciseTime::now()).to_std().unwrap());
+        }
+
+        Err(ErrorKind::ServerSelectionError {
+            message: "timed out while trying to select server".into(),
+        }
+        .into())
     }
 }

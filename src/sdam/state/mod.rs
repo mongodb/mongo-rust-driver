@@ -1,77 +1,95 @@
 pub(super) mod server;
 
 use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock},
+    collections::{HashMap, HashSet},
+    sync::{Arc, Condvar, Mutex, RwLock},
     time::Duration,
 };
 
-use time::PreciseTime;
+use derivative::Derivative;
 
 use self::server::Server;
-use super::{monitor::monitor_server, TopologyDescription};
+use super::TopologyDescription;
 use crate::{
     cmap::{Command, Connection},
-    error::{ErrorKind, Result},
+    error::Result,
     options::{ClientOptions, StreamAddress},
-    sdam::description::server::ServerType,
+    sdam::{
+        description::server::{ServerDescription, ServerType},
+        monitor::monitor_server,
+    },
     selection_criteria::SelectionCriteria,
 };
 
-const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
+#[derive(Clone)]
+pub(crate) struct TopologyUpdateCondvar {
+    condvar: Arc<Condvar>,
+}
+
+impl TopologyUpdateCondvar {
+    pub(crate) fn new() -> Self {
+        Self {
+            condvar: Arc::new(Condvar::new()),
+        }
+    }
+
+    pub(crate) fn wait_timeout(&self, duration: Duration) {
+        let _ = self
+            .condvar
+            .wait_timeout(Mutex::new(()).lock().unwrap(), duration)
+            .unwrap();
+    }
+
+    fn notify(&self) {
+        self.condvar.notify_all()
+    }
+}
 
 /// Contains the SDAM state for a Client.
-#[derive(Debug)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub(crate) struct Topology {
     /// The SDAM and server selection state machine.
-    pub(super) description: TopologyDescription,
+    pub(crate) description: TopologyDescription,
 
     /// The state associated with each server in the cluster.
-    servers: HashMap<StreamAddress, Arc<Server>>,
+    pub(crate) servers: HashMap<StreamAddress, Arc<Server>>,
 
-    server_selection_timeout: Option<Duration>,
+    #[derivative(Debug = "ignore")]
+    condvar: TopologyUpdateCondvar,
+
+    options: ClientOptions,
 }
 
 impl Topology {
     /// Creates a new Topology given the `options`. Arc<RwLock<Topology> is returned rather than
     /// just Topology so that monitoring threads can hold a Weak reference to it.
-    pub(crate) fn new(mut options: ClientOptions) -> Result<Arc<RwLock<Self>>> {
+    pub(crate) fn new(
+        condvar: TopologyUpdateCondvar,
+        mut options: ClientOptions,
+    ) -> Result<Arc<RwLock<Self>>> {
+        let hosts: Vec<_> = options.hosts.drain(..).collect();
+
         let topology = Arc::new(RwLock::new(Topology {
             description: TopologyDescription::new(options.clone())?,
             servers: Default::default(),
-            server_selection_timeout: options.server_selection_timeout,
+            condvar,
+            options,
         }));
-
-        let hosts: Vec<_> = options.hosts.drain(..).collect();
-        let mut servers = HashMap::new();
-
-        for address in hosts {
-            let server = Arc::new(Server::new(
-                Arc::downgrade(&topology),
-                address.clone(),
-                &options,
-            ));
-            servers.insert(address.clone(), server);
-        }
 
         {
             let mut topology_lock = topology.write().unwrap();
-            topology_lock.servers = servers;
 
-            for server in topology_lock.servers.values() {
-                let conn = Connection::new(
-                    0,
-                    server.address.clone(),
-                    0,
-                    options.tls_options.clone(),
-                    options.cmap_event_handler.clone(),
-                )?;
-
-                monitor_server(conn, Arc::downgrade(server), options.heartbeat_freq);
+            for address in hosts {
+                topology_lock.add_new_server(address, &topology)?;
             }
         }
 
         Ok(topology)
+    }
+
+    pub(crate) fn notify(&self) {
+        self.condvar.notify()
     }
 
     pub(crate) fn update_command_with_read_pref(
@@ -84,55 +102,65 @@ impl Topology {
             .update_command_with_read_pref(server_type, command, criteria)
     }
 
-    /// Selects a server description with the given criteria.
-    pub(crate) fn select_server(&self, selector: &SelectionCriteria) -> Result<Arc<Server>> {
-        let start_time = PreciseTime::now();
-        let timeout = self
-            .server_selection_timeout
-            .unwrap_or(DEFAULT_SERVER_SELECTION_TIMEOUT);
-
-        while start_time.to(PreciseTime::now()).to_std().unwrap() < timeout {
-            // Return error if the wire version is invalid.
-            if let Some(error_msg) = self.description.compatibility_error() {
-                return Err(ErrorKind::ServerSelectionError {
-                    message: error_msg.into(),
-                }
-                .into());
-            }
-
-            // Attempt to select a server. If none is found, request a topology update and restart
-            // loop.
-            let server_description = match self.description.select_server(&selector)? {
-                Some(description) => description,
-                None => {
-                    self.request_topology_check();
-                    continue;
-                }
-            };
-
-            // Attempt to find selected server. If it is not found, then it has been removed since
-            // we started our most recent selection attempt, so we should retry.
-            let server = match self.servers.get(&server_description.address) {
-                Some(server) => server,
-                None => {
-                    self.request_topology_check();
-                    continue;
-                }
-            };
-
-            // Return the selected server.
-            return Ok(server.clone());
-        }
-
-        Err(ErrorKind::ServerSelectionError {
-            message: "timed out while trying to select server".into(),
-        }
-        .into())
-    }
-
-    fn request_topology_check(&self) {
+    pub(crate) fn request_topology_check(&self) {
         for server in self.servers.values() {
             server.request_topology_check();
         }
+    }
+
+    fn add_new_server(
+        &mut self,
+        address: StreamAddress,
+        wrapped_topology: &Arc<RwLock<Topology>>,
+    ) -> Result<()> {
+        if self.servers.contains_key(&address) {
+            return Ok(());
+        }
+
+        let options = self.options.clone();
+
+        let server = Arc::new(Server::new(
+            Arc::downgrade(wrapped_topology),
+            address.clone(),
+            &options,
+        ));
+        self.servers.insert(address.clone(), server.clone());
+
+        let conn = Connection::new(
+            0,
+            server.address.clone(),
+            0,
+            options.tls_options.clone(),
+            options.cmap_event_handler.clone(),
+        )?;
+
+        monitor_server(conn, Arc::downgrade(&server), options.heartbeat_freq);
+
+        Ok(())
+    }
+
+    /// Start/stop monitoring threads and create/destroy connection pools based on the new and
+    /// removed servers in the topology description.
+    ///
+    /// This must **ONLY** be called on a copy of a topology, not one that is stored in a client.
+    /// The `wrapped_topology` parameter should contain a reference to the Topology that is actually
+    /// stored in a client.
+    pub(crate) fn update_state(
+        &mut self,
+        server: ServerDescription,
+        wrapped_topology: &Arc<RwLock<Topology>>,
+    ) -> Result<()> {
+        self.description.update(server)?;
+
+        let addresses: HashSet<_> = self.description.server_addresses().cloned().collect();
+
+        for address in addresses.iter() {
+            self.add_new_server(address.clone(), wrapped_topology)?;
+        }
+
+        self.servers
+            .retain(|address, _| addresses.contains(address));
+
+        Ok(())
     }
 }
