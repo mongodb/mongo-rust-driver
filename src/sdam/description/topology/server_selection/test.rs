@@ -250,6 +250,7 @@ fn run_test(test_file: TestFile) {
         logical_session_timeout_minutes: None,
         local_threshold: None,
         heartbeat_freq: test_file.heartbeat_frequency_ms.map(Duration::from_millis),
+        max_staleness: None,
         servers: servers
             .into_iter()
             .map(|server| (server.address.clone(), server))
@@ -257,7 +258,7 @@ fn run_test(test_file: TestFile) {
     };
 
     if let Some(ref expected_suitable_servers) = test_file.suitable_servers {
-        let mut actual_servers: Vec<_> = topology.suitable_servers(&read_pref);
+        let mut actual_servers: Vec<_> = topology.suitable_servers(&read_pref).unwrap();
 
         assert_eq!(
             get_sorted_addresses!(expected_suitable_servers),

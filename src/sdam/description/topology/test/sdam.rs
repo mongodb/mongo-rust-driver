@@ -75,7 +75,7 @@ fn run_test(test_file: TestFile) {
         options.direct_connection = Some(true);
     }
 
-    let mut topology_description = TopologyDescription::new(options);
+    let mut topology_description = TopologyDescription::new(options).unwrap();
 
     for (i, phase) in test_file.phases.into_iter().enumerate() {
         for Response(address, command_response) in phase.responses {

@@ -12,7 +12,7 @@ use serde::Deserialize;
 
 use crate::{
     cmap::Command,
-    error::Result,
+    error::{ErrorKind, Result},
     options::{ClientOptions, StreamAddress},
     read_preference::ReadPreference,
     sdam::description::server::{ServerDescription, ServerType},
@@ -71,10 +71,15 @@ pub(crate) struct TopologyDescription {
 
     /// The server descriptions of each member of the topology.
     servers: HashMap<StreamAddress, ServerDescription>,
+
+    /// The default max staleness for read operations.
+    max_staleness: Option<Duration>,
 }
 
 impl TopologyDescription {
-    pub(crate) fn new(options: ClientOptions) -> Self {
+    pub(crate) fn new(options: ClientOptions) -> Result<Self> {
+        verify_max_staleness(options.max_staleness)?;
+
         let topology_type = if options.repl_set_name.is_some() {
             TopologyType::ReplicaSetNoPrimary
         } else if let Some(true) = options.direct_connection {
@@ -93,7 +98,7 @@ impl TopologyDescription {
             })
             .collect();
 
-        Self {
+        Ok(Self {
             single_seed: servers.len() == 1,
             topology_type,
             set_name: options.repl_set_name,
@@ -103,8 +108,9 @@ impl TopologyDescription {
             logical_session_timeout_minutes: None,
             local_threshold: options.local_threshold,
             heartbeat_freq: options.heartbeat_freq,
+            max_staleness: options.max_staleness,
             servers,
-        }
+        })
     }
 
     pub(crate) fn update_command_with_read_pref(
@@ -482,4 +488,18 @@ impl TopologyDescription {
 
         Ok(())
     }
+}
+
+fn verify_max_staleness(max_staleness: Option<Duration>) -> Result<()> {
+    if max_staleness
+        .map(|staleness| staleness > Duration::from_secs(0) && staleness < Duration::from_secs(90))
+        .unwrap_or(false)
+    {
+        return Err(ErrorKind::ArgumentError {
+            message: "max staleness cannot be both positive and below 90 seconds".into(),
+        }
+        .into());
+    }
+
+    Ok(())
 }

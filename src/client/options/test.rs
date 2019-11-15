@@ -116,7 +116,7 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
     }
 
     if let Some(i) = options.max_staleness.take() {
-        doc.insert("maxstalenessseconds", i.as_millis() as i64);
+        doc.insert("maxstalenessseconds", i.as_secs() as i64);
     }
 
     if let Some(b) = options.retry_reads.take() {

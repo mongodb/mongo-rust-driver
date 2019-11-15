@@ -244,13 +244,15 @@ impl ServerDescription {
     }
 
     pub(crate) fn last_write_date(&self) -> Result<Option<UtcDateTime>> {
-        let last_write_date = self
-            .reply
-            .clone()?
-            .as_ref()
-            .and_then(|reply| reply.command_response.last_write.as_ref())
-            .map(|last_write| last_write.last_write_date);
-        Ok(last_write_date)
+        match self.reply {
+            Ok(None) => Ok(None),
+            Ok(Some(ref reply)) => Ok(reply
+                .command_response
+                .last_write
+                .as_ref()
+                .map(|write| write.last_write_date.clone())),
+            Err(ref e) => Err(e.clone()),
+        }
     }
 
     pub(crate) fn matches_tag_set(&self, tag_set: &TagSet) -> bool {
