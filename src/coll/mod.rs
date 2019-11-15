@@ -63,6 +63,30 @@ struct CollectionInner {
 }
 
 impl Collection {
+    pub(crate) fn new(db: Database, name: &str, options: Option<CollectionOptions>) -> Self {
+        let options = options.unwrap_or_default();
+        let read_preference = options
+            .read_preference
+            .or_else(|| db.read_preference().cloned());
+
+        let read_concern = options.read_concern.or_else(|| db.read_concern().cloned());
+
+        let write_concern = options
+            .write_concern
+            .or_else(|| db.write_concern().cloned());
+
+        Self {
+            inner: Arc::new(CollectionInner {
+                client: db.client().clone(),
+                db,
+                name: name.to_string(),
+                read_preference,
+                read_concern,
+                write_concern,
+            }),
+        }
+    }
+
     /// Get the `Client` that this collection descended from.
     fn client(&self) -> &Client {
         &self.inner.client
@@ -70,7 +94,7 @@ impl Collection {
 
     /// Gets the name of the `Collection`.
     pub fn name(&self) -> &str {
-        unimplemented!()
+        &self.inner.name
     }
 
     /// Gets the namespace of the `Collection`.
@@ -80,22 +104,25 @@ impl Collection {
     /// collection named "bar" is created in a database named "foo", the namespace of the collection
     /// is "foo.bar".
     pub fn namespace(&self) -> Namespace {
-        unimplemented!()
+        Namespace {
+            db: self.inner.db.name().into(),
+            coll: self.name().into(),
+        }
     }
 
     /// Gets the read preference of the `Collection`.
     pub fn read_preference(&self) -> Option<&ReadPreference> {
-        unimplemented!()
+        self.inner.read_preference.as_ref()
     }
 
     /// Gets the read concern of the `Collection`.
     pub fn read_concern(&self) -> Option<&ReadConcern> {
-        unimplemented!()
+        self.inner.read_concern.as_ref()
     }
 
     /// Gets the write concern of the `Collection`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
-        unimplemented!()
+        self.inner.write_concern.as_ref()
     }
 
     /// Drops the collection, deleting all data, users, and indexes stored in in.
