@@ -5,6 +5,7 @@ use std::time::Duration;
 use bson::{Bson, Document};
 use serde::{Serialize, Serializer};
 use serde_with::skip_serializing_none;
+use typed_builder::TypedBuilder;
 
 use crate::{
     bson_util,

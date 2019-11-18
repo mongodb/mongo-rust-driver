@@ -7,11 +7,11 @@ use serde::Deserialize;
 use crate::{
     is_master::{IsMasterCommandResponse, IsMasterReply, LastWrite},
     options::StreamAddress,
-    read_preference::{ReadPreference, TagSet},
     sdam::description::{
         server::{ServerDescription, ServerType},
         topology::{test::f64_ms_as_duration, TopologyDescription, TopologyType},
     },
+    selection_criteria::{ReadPreference, TagSet},
 };
 
 #[derive(Debug, Deserialize)]

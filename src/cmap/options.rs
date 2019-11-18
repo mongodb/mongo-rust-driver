@@ -2,6 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use derivative::Derivative;
 use serde::{Deserialize, Deserializer};
+use typed_builder::TypedBuilder;
 
 use crate::{
     event::cmap::CmapEventHandler,

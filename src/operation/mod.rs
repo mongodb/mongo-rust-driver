@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
     error::{BulkWriteError, BulkWriteFailure, ErrorKind, Result, WriteConcernError, WriteFailure},
-    sdam::SelectionCriteria,
+    selection_criteria::SelectionCriteria,
 };
 
 pub(crate) use create::Create;

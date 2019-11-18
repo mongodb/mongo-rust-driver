@@ -3,46 +3,17 @@ mod test;
 
 use std::time::Duration;
 
-use derivative::Derivative;
 use rand::seq::IteratorRandom;
 
 use super::{TopologyDescription, TopologyType};
 use crate::{
     error::Result,
-    read_preference::{ReadPreference, TagSet},
-    sdam::description::server::{ServerDescription, ServerType},
+    sdam::{
+        description::server::{ServerDescription, ServerType},
+        public::ServerInfo,
+    },
+    selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
 };
-
-/// Describes which servers are suitable for a given operation.
-#[derive(Derivative)]
-#[derivative(Debug)]
-pub(crate) enum SelectionCriteria {
-    /// A read preference that describes the suitable servers based on the server type, max
-    /// staleness, and server tags.
-    ReadPreference(ReadPreference),
-
-    /// A predicate used to filter servers that are considered suitable. A `server` will be
-    /// considered suitable by a `predicate` if `predicate(server)` returns true.
-    Predicate(#[derivative(Debug = "ignore")] Box<dyn Fn(&ServerDescription) -> bool>),
-}
-
-impl SelectionCriteria {
-    pub(crate) fn as_read_pref(&self) -> Option<&ReadPreference> {
-        match self {
-            Self::ReadPreference(ref read_pref) => Some(read_pref),
-            Self::Predicate(..) => None,
-        }
-    }
-}
-
-impl SelectionCriteria {
-    fn is_read_pref_primary(&self) -> bool {
-        match self {
-            Self::ReadPreference(ReadPreference::Primary) => true,
-            _ => false,
-        }
-    }
-}
 
 const DEFAULT_LOCAL_THRESHOLD: Duration = Duration::from_millis(15);
 
@@ -65,9 +36,11 @@ impl TopologyDescription {
 
         let mut suitable_servers = match criteria {
             SelectionCriteria::ReadPreference(ref read_pref) => self.suitable_servers(read_pref)?,
-            SelectionCriteria::Predicate(ref filter) => {
-                self.servers.values().filter(|s| filter(s)).collect()
-            }
+            SelectionCriteria::Predicate(ref filter) => self
+                .servers
+                .values()
+                .filter(|s| filter(&ServerInfo::new(s)))
+                .collect(),
         };
 
         // If the read preference is primary, we skip the overhead of calculating the latency window

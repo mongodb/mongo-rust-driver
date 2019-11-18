@@ -4,7 +4,7 @@ use serde::de::DeserializeOwned;
 use super::wire::Message;
 use crate::{
     bson_util, error::CommandError, error::ErrorKind, error::Result,
-    read_preference::ReadPreference,
+    selection_criteria::ReadPreference,
 };
 
 /// `Command` is a driver side abstraction of a server command containing all the information

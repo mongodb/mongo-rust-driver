@@ -14,7 +14,8 @@ use crate::{
     cmap::{Command, Connection},
     error::{ErrorKind, Result},
     options::{ClientOptions, StreamAddress},
-    sdam::description::{server::ServerType, topology::SelectionCriteria},
+    sdam::description::server::ServerType,
+    selection_criteria::SelectionCriteria,
 };
 
 const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);

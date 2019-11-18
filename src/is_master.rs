@@ -3,7 +3,7 @@ use std::time::Duration;
 use bson::{oid::ObjectId, TimeStamp, UtcDateTime};
 use serde::Deserialize;
 
-use crate::{read_preference::TagSet, sdam::ServerType};
+use crate::{sdam::ServerType, selection_criteria::TagSet};
 
 #[derive(Debug, Clone)]
 pub(crate) struct IsMasterReply {

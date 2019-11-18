@@ -4,6 +4,7 @@ use std::{
     sync::Arc,
 };
 
+use derivative::Derivative;
 use webpki::DNSNameRef;
 
 use crate::{

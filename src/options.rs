@@ -1,5 +1,7 @@
-pub use crate::{client::auth, client::options::*, coll::options::*, db::options::*};
-pub use crate::{client::options::*, coll::options::*, db::options::*};
+pub use crate::{
+    client::auth, client::options::*, coll::options::*, concern::*, db::options::*,
+    selection_criteria::*,
+};
 
 /// Updates an options struct with the read preference/read concern/write concern of a
 /// client/database/collection.

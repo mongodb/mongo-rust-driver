@@ -5,7 +5,7 @@ use crate::{
     bson_util,
     client::options::{ClientOptions, StreamAddress},
     error::ErrorKind,
-    read_preference::ReadPreference,
+    selection_criteria::{ReadPreference, SelectionCriteria},
 };
 #[derive(Debug, Deserialize)]
 struct TestFile {
@@ -78,7 +78,7 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
         doc.insert("replicaset", s);
     }
 
-    if let Some(read_pref) = options.read_preference.take() {
+    if let Some(SelectionCriteria::ReadPreference(read_pref)) = options.selection_criteria.take() {
         let (level, tag_sets, max_staleness) = match read_pref {
             ReadPreference::Primary => ("primary", None, None),
             ReadPreference::PrimaryPreferred {

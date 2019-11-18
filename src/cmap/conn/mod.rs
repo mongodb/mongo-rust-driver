@@ -8,6 +8,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+use derivative::Derivative;
+
 use self::{stream::Stream, wire::Message};
 use super::ConnectionPoolInner;
 use crate::{

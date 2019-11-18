@@ -3,10 +3,11 @@ use std::time::Duration;
 use bson::{Bson, Document};
 use serde::Serialize;
 use serde_with::skip_serializing_none;
+use typed_builder::TypedBuilder;
 
 use crate::{
     concern::{ReadConcern, WriteConcern},
-    read_preference::ReadPreference,
+    selection_criteria::SelectionCriteria,
 };
 
 /// These are the valid options for creating a `Collection` with
@@ -15,7 +16,7 @@ use crate::{
 pub struct CollectionOptions {
     /// The default read preference for operations.
     #[builder(default)]
-    pub read_preference: Option<ReadPreference>,
+    pub selection_criteria: Option<SelectionCriteria>,
 
     /// The default read concern for operations.
     #[builder(default)]
