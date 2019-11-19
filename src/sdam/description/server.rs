@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use bson::{oid::ObjectId, UtcDateTime};
+use chrono::offset::Utc;
 
 use crate::{
     error::Result, is_master::IsMasterReply, options::StreamAddress, selection_criteria::TagSet,
@@ -80,6 +81,12 @@ impl ServerDescription {
             last_update_time: None,
             reply: is_master_reply.transpose(),
             average_round_trip_time: None,
+        };
+
+        // We want to set last_update_time if we got any sort of response from the server.
+        match description.reply {
+            Ok(None) => {}
+            _ => description.last_update_time = Some(Utc::now().into()),
         };
 
         if let Ok(Some(ref mut reply)) = description.reply {
