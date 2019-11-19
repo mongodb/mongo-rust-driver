@@ -25,6 +25,7 @@ impl PartialEq for SelectionCriteria {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::ReadPreference(r1), Self::ReadPreference(r2)) => r1 == r2,
+            (Self::Predicate(p1), Self::Predicate(p2)) => Arc::ptr_eq(p1, p2),
             _ => false,
         }
     }

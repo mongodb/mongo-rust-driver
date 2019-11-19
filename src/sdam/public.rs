@@ -48,16 +48,16 @@ impl<'a> ServerInfo<'a> {
         self.command_response_getter(|r| r.min_wire_version)
     }
 
-    pub fn server_type(&self) -> ServerType {
-        self.description.server_type
+    pub fn replica_set_name(&self) -> Option<&str> {
+        self.command_response_getter(|r| r.set_name.as_ref().map(String::as_str))
     }
 
-    pub fn set_version(&self) -> Option<i32> {
+    pub fn replica_set_version(&self) -> Option<i32> {
         self.command_response_getter(|r| r.set_version)
     }
 
-    pub fn set_name(&self) -> Option<&str> {
-        self.command_response_getter(|r| r.set_name.as_ref().map(String::as_str))
+    pub fn server_type(&self) -> ServerType {
+        self.description.server_type
     }
 
     pub fn tags(&self) -> Option<&TagSet> {
