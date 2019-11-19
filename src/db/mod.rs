@@ -9,7 +9,7 @@ use crate::{
     cursor::Cursor,
     error::Result,
     operation::{Create, DropDatabase},
-    options::{CollectionOptions, CreateCollectionOptions, DropDatabaseOptions},
+    options::{CollectionOptions, CreateCollectionOptions, DatabaseOptions, DropDatabaseOptions},
     read_preference::ReadPreference,
     Client, Collection, Namespace,
 };
@@ -61,29 +61,54 @@ struct DatabaseInner {
 }
 
 impl Database {
+    pub(crate) fn new(client: Client, name: &str, options: Option<DatabaseOptions>) -> Self {
+        let options = options.unwrap_or_default();
+        let read_preference = options
+            .read_preference
+            .or_else(|| client.read_preference().cloned());
+
+        let read_concern = options
+            .read_concern
+            .or_else(|| client.read_concern().cloned());
+
+        let write_concern = options
+            .write_concern
+            .or_else(|| client.write_concern().cloned());
+
+        Self {
+            inner: Arc::new(DatabaseInner {
+                client,
+                name: name.to_string(),
+                read_preference,
+                read_concern,
+                write_concern,
+            }),
+        }
+    }
+
     /// Get the `Client` that this collection descended from.
-    fn client(&self) -> &Client {
+    pub(crate) fn client(&self) -> &Client {
         &self.inner.client
     }
 
     /// Gets the name of the `Database`.
     pub fn name(&self) -> &str {
-        unimplemented!()
+        &self.inner.name
     }
 
     /// Gets the read preference of the `Database`.
     pub fn read_preference(&self) -> Option<&ReadPreference> {
-        unimplemented!()
+        self.inner.read_preference.as_ref()
     }
 
     /// Gets the read concern of the `Database`.
     pub fn read_concern(&self) -> Option<&ReadConcern> {
-        unimplemented!()
+        self.inner.read_concern.as_ref()
     }
 
     /// Gets the write concern of the `Database`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
-        unimplemented!()
+        self.inner.write_concern.as_ref()
     }
 
     /// Gets a handle to a collection specified by `name` of the database. The `Collection` options
@@ -92,7 +117,7 @@ impl Database {
     /// This method does not send or receive anything across the wire to the database, so it can be
     /// used repeatedly without incurring any costs from I/O.
     pub fn collection(&self, name: &str) -> Collection {
-        unimplemented!()
+        Collection::new(self.clone(), name, None)
     }
 
     /// Gets a handle to a collection specified by `name` in the cluster the `Client` is connected
@@ -102,7 +127,7 @@ impl Database {
     /// This method does not send or receive anything across the wire to the database, so it can be
     /// used repeatedly without incurring any costs from I/O.
     pub fn collection_with_options(&self, name: &str, options: CollectionOptions) -> Collection {
-        unimplemented!()
+        Collection::new(self.clone(), name, Some(options))
     }
 
     /// Drops the database, deleting all data, collections, users, and indexes stored in in.

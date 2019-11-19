@@ -92,17 +92,17 @@ impl Client {
 
     /// Gets the read preference of the `Client`.
     pub fn read_preference(&self) -> Option<&ReadPreference> {
-        unimplemented!()
+        self.inner.read_preference.as_ref()
     }
 
     /// Gets the read concern of the `Client`.
     pub fn read_concern(&self) -> Option<&ReadConcern> {
-        unimplemented!()
+        self.inner.read_concern.as_ref()
     }
 
     /// Gets the write concern of the `Client`.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
-        unimplemented!()
+        self.inner.write_concern.as_ref()
     }
 
     /// Gets a handle to a database specified by `name` in the cluster the `Client` is connected to.
@@ -112,7 +112,7 @@ impl Client {
     /// This method does not send or receive anything across the wire to the database, so it can be
     /// used repeatedly without incurring any costs from I/O.
     pub fn database(&self, name: &str) -> Database {
-        unimplemented!()
+        Database::new(self.clone(), name, None)
     }
 
     /// Gets a handle to a database specified by `name` in the cluster the `Client` is connected to.
@@ -122,7 +122,7 @@ impl Client {
     /// This method does not send or receive anything across the wire to the database, so it can be
     /// used repeatedly without incurring any costs from I/O.
     pub fn database_with_options(&self, name: &str, options: DatabaseOptions) -> Database {
-        unimplemented!()
+        Database::new(self.clone(), name, Some(options))
     }
 
     #[allow(dead_code)]
