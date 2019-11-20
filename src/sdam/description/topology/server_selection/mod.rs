@@ -5,11 +5,14 @@ use std::time::Duration;
 
 use rand::seq::IteratorRandom;
 
-use super::{TopologyDescription, TopologyType};
+use super::TopologyDescription;
 use crate::{
     error::Result,
     sdam::{
-        description::server::{ServerDescription, ServerType},
+        description::{
+            server::{ServerDescription, ServerType},
+            topology::TopologyType,
+        },
         public::ServerInfo,
     },
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},

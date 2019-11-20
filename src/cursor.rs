@@ -1,8 +1,8 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, time::Duration};
 
 use bson::Document;
 
-use crate::{error::Result, Client};
+use crate::{error::Result, operation::GetMore, options::StreamAddress, Client, Namespace};
 
 /// A `Cursor` streams the result of a query. When a query is made, a `Cursor` will be returned with
 /// the first batch of results from the server; the documents will be returned as the `Cursor` is
@@ -56,19 +56,56 @@ use crate::{error::Result, Client};
 /// # Ok(())
 /// # }
 /// ```
-#[allow(dead_code)]
+#[derive(Debug)]
 pub struct Cursor {
     client: Client,
-    address: String,
-    cursor_id: i64,
-    batch_size: Option<i32>,
     buffer: VecDeque<Document>,
+    get_more: GetMore,
+    exhausted: bool,
+}
+
+impl Cursor {
+    pub(crate) fn new(client: Client, spec: CursorSpecification) -> Self {
+        let get_more = GetMore::new(
+            spec.ns,
+            spec.id,
+            spec.address,
+            spec.batch_size,
+            spec.max_time,
+        );
+
+        Self {
+            client,
+            buffer: spec.buffer,
+            get_more,
+            exhausted: spec.id == 0,
+        }
+    }
 }
 
 impl Iterator for Cursor {
     type Item = Result<Document>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        unimplemented!()
+        if self.buffer.is_empty() && !self.exhausted {
+            match self.client.execute_operation(&self.get_more, None) {
+                Ok(get_more_result) => {
+                    self.buffer.extend(get_more_result.batch);
+                    self.exhausted = get_more_result.exhausted;
+                }
+                Err(e) => return Some(Err(e)),
+            };
+        }
+        self.buffer.pop_front().map(Ok)
     }
+}
+
+#[derive(Debug)]
+pub(crate) struct CursorSpecification {
+    pub(crate) ns: Namespace,
+    pub(crate) address: StreamAddress,
+    pub(crate) id: i64,
+    pub(crate) batch_size: Option<i32>,
+    pub(crate) max_time: Option<Duration>,
+    pub(crate) buffer: VecDeque<Document>,
 }

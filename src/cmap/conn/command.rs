@@ -3,7 +3,7 @@ use serde::de::DeserializeOwned;
 
 use super::wire::Message;
 use crate::{
-    bson_util, error::CommandError, error::ErrorKind, error::Result,
+    bson_util, error::CommandError, error::ErrorKind, error::Result, options::StreamAddress,
     selection_criteria::ReadPreference,
 };
 
@@ -44,20 +44,35 @@ impl Command {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct CommandResponse {
+    source: StreamAddress,
     pub(crate) raw_response: Document,
 }
 
 impl CommandResponse {
+    pub(crate) fn from_document_and_address(source: StreamAddress, doc: Document) -> Self {
+        Self {
+            source,
+            raw_response: doc,
+        }
+    }
+
     /// Initialize a resposne from a document.
     /// This should be used for test purposes only.
     pub(crate) fn from_document(doc: Document) -> Self {
-        Self { raw_response: doc }
+        Self::from_document_and_address(
+            StreamAddress {
+                hostname: "localhost".to_string(),
+                port: None,
+            },
+            doc,
+        )
     }
 
-    pub(crate) fn from_message(message: Message) -> Result<Self> {
+    pub(crate) fn new(source: StreamAddress, message: Message) -> Result<Self> {
         Ok(Self {
+            source,
             raw_response: message.single_document_response()?,
         })
     }
@@ -102,5 +117,10 @@ impl CommandResponse {
     /// The raw server response.
     pub(crate) fn raw(&self) -> &Document {
         &self.raw_response
+    }
+
+    /// The address of the server that sent this response.
+    pub(crate) fn source_address(&self) -> &StreamAddress {
+        &self.source
     }
 }

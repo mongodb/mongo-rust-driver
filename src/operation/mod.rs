@@ -4,12 +4,14 @@ mod delete;
 mod distinct;
 mod drop_collection;
 mod drop_database;
+mod find;
+mod get_more;
 mod insert;
 mod list_databases;
 mod run_command;
 mod update;
 
-use std::{fmt::Debug, ops::Deref};
+use std::{collections::VecDeque, fmt::Debug, ops::Deref};
 
 use bson::{self, Bson, Document};
 use serde::{Deserialize, Serialize};
@@ -18,6 +20,7 @@ use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
     error::{BulkWriteError, BulkWriteFailure, ErrorKind, Result, WriteConcernError, WriteFailure},
     selection_criteria::SelectionCriteria,
+    Namespace,
 };
 
 pub(crate) use count::Count;
@@ -26,6 +29,8 @@ pub(crate) use delete::Delete;
 pub(crate) use distinct::Distinct;
 pub(crate) use drop_collection::DropCollection;
 pub(crate) use drop_database::DropDatabase;
+pub(crate) use find::Find;
+pub(crate) use get_more::GetMore;
 pub(crate) use insert::Insert;
 pub(crate) use list_databases::ListDatabases;
 pub(crate) use run_command::RunCommand;
@@ -129,6 +134,19 @@ impl<T> Deref for WriteResponseBody<T> {
     fn deref(&self) -> &Self::Target {
         &self.body
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct CursorBody {
+    cursor: CursorInfo,
+}
+
+#[derive(Debug, Deserialize)]
+struct CursorInfo {
+    id: i64,
+    ns: Namespace,
+    #[serde(rename = "firstBatch")]
+    first_batch: VecDeque<Document>,
 }
 
 #[cfg(test)]

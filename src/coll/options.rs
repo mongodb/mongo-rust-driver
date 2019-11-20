@@ -1,14 +1,14 @@
 use std::time::Duration;
 
 use bson::{Bson, Document};
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
 use crate::{
     bson_util::serialize_duration_as_i64_millis,
     concern::{ReadConcern, WriteConcern},
-    selection_criteria::SelectionCriteria,
+    options::SelectionCriteria,
 };
 
 /// These are the valid options for creating a `Collection` with
@@ -39,7 +39,8 @@ pub enum ReturnDocument {
 }
 
 /// Specifies the index to use for an operation.
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
 pub enum Hint {
     /// Specifies the keys of the index to use.
     Keys(Document),
@@ -57,7 +58,7 @@ impl Hint {
 }
 
 /// Specifies the type of cursor to return from a find operation.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum CursorType {
     /// Default; close the cursor after the last document is received from the server.
     NonTailable,
@@ -419,7 +420,9 @@ pub struct DistinctOptions {
 }
 
 /// Specifies the options to a `Collection::find` operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[skip_serializing_none]
+#[derive(Debug, Default, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FindOptions {
     /// If true, partial results will be returned from a mongos rather than an error being
     /// returned if one or more shards is down.
@@ -442,6 +445,7 @@ pub struct FindOptions {
 
     /// The type of cursor to return.
     #[builder(default)]
+    #[serde(skip)]
     pub cursor_type: Option<CursorType>,
 
     /// The index to use for the operation.
@@ -449,7 +453,10 @@ pub struct FindOptions {
     pub hint: Option<Hint>,
 
     /// The maximum number of documents to query.
+    /// If a negative number is specified, the documents will be returned in a single batch limited
+    /// in number by the positive value of the specified limit.
     #[builder(default)]
+    #[serde(serialize_with = "serialize_absolute_value")]
     pub limit: Option<i64>,
 
     /// The exclusive upper bound for a specific index.
@@ -459,9 +466,13 @@ pub struct FindOptions {
     /// The maximum amount of time for the server to wait on new documents to satisfy a tailable
     /// cursor query. If the cursor is not tailable, this option is ignored.
     #[builder(default)]
+    #[serde(skip)]
     pub max_await_time: Option<Duration>,
 
     /// Maximum number of documents or index keys to scan when executing the query.
+    ///
+    /// Note: this option is deprecated starting in MongoDB version 4.0 and removed in MongoDB 4.2.
+    /// Use the maxTimeMS option instead.
     #[builder(default)]
     pub max_scan: Option<i64>,
 
@@ -470,6 +481,10 @@ pub struct FindOptions {
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
     #[builder(default)]
+    #[serde(
+        rename = "maxTimeMS",
+        serialize_with = "serialize_duration_as_i64_millis"
+    )]
     pub max_time: Option<Duration>,
 
     /// The inclusive lower bound for a specific index.
@@ -484,9 +499,22 @@ pub struct FindOptions {
     #[builder(default)]
     pub projection: Option<Document>,
 
+    /// The read concern to use for this find query.
+    ///
+    /// If none specified, the default set on the collection will be used.
+    #[builder(default)]
+    pub read_concern: Option<ReadConcern>,
+
     /// Whether to return only the index keys in the documents.
     #[builder(default)]
     pub return_key: Option<bool>,
+
+    /// The criteria used to select a server for this find query.
+    ///
+    /// If none specified, the default set on the collection will be used.
+    #[builder(default)]
+    #[serde(skip)]
+    pub selection_criteria: Option<SelectionCriteria>,
 
     /// Whether to return the record identifier for each document.
     #[builder(default)]
@@ -496,14 +524,23 @@ pub struct FindOptions {
     #[builder(default)]
     pub skip: Option<i64>,
 
-    /// Prevents the cursor from returning a document more than once because of an intervening
-    /// write operation.
-    #[builder(default)]
-    pub snapshot: Option<bool>,
-
     /// The order of the documents for the purposes of the operation.
     #[builder(default)]
     pub sort: Option<Document>,
+}
+
+/// Custom serializer used to serialize limit as its absolute value.
+fn serialize_absolute_value<S>(
+    val: &Option<i64>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match val {
+        Some(v) => serializer.serialize_i64(v.abs()),
+        None => serializer.serialize_none(),
+    }
 }
 
 /// Specifies an index to create.
