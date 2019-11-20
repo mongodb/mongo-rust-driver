@@ -14,7 +14,7 @@ fn build_test(
     ns: Namespace,
     cursor_id: i64,
     address: StreamAddress,
-    batch_size: Option<i32>,
+    batch_size: Option<u32>,
     max_time: Option<Duration>,
     mut expected_body: Document,
 ) {
@@ -44,7 +44,7 @@ fn build() {
         hostname: "localhost".to_string(),
         port: Some(1234),
     };
-    let batch_size: i32 = 123;
+    let batch_size: u32 = 123;
     let max_time = Duration::from_millis(456);
 
     let expected_body = doc! {
@@ -80,12 +80,11 @@ fn build_batch_size() {
         ns.clone(),
         cursor_id,
         address.clone(),
-        Some(-123),
+        Some(0),
         None,
         doc! {
             "getMore": cursor_id,
             "collection": ns.coll.clone(),
-            "batchSize": 123,
         },
     );
 
@@ -93,11 +92,12 @@ fn build_batch_size() {
         ns.clone(),
         cursor_id,
         address.clone(),
-        Some(0),
+        Some(123),
         None,
         doc! {
             "getMore": cursor_id,
             "collection": ns.coll.clone(),
+            "batchSize": 123,
         },
     );
 }

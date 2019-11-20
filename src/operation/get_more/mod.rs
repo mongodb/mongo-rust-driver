@@ -20,7 +20,7 @@ pub(crate) struct GetMore {
     ns: Namespace,
     cursor_id: i64,
     selection_criteria: SelectionCriteria,
-    batch_size: Option<i32>,
+    batch_size: Option<u32>,
     max_time: Option<Duration>,
 }
 
@@ -46,7 +46,7 @@ impl GetMore {
         ns: Namespace,
         cursor_id: i64,
         address: StreamAddress,
-        batch_size: Option<i32>,
+        batch_size: Option<u32>,
         max_time: Option<Duration>,
     ) -> Self {
         Self {
@@ -71,7 +71,7 @@ impl Operation for GetMore {
 
         if let Some(batch_size) = self.batch_size {
             if batch_size != 0 {
-                body.insert("batchSize", batch_size.abs());
+                body.insert("batchSize", batch_size);
             }
         }
 

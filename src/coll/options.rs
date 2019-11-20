@@ -436,7 +436,7 @@ pub struct FindOptions {
     /// number of round trips needed to return the entire set of documents returned by the
     /// query.
     #[builder(default)]
-    pub batch_size: Option<i32>,
+    pub batch_size: Option<u32>,
 
     /// Tags the query with an arbitrary string to help trace the operation through the database
     /// profiler, currentOp and logs.

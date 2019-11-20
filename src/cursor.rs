@@ -105,7 +105,7 @@ pub(crate) struct CursorSpecification {
     pub(crate) ns: Namespace,
     pub(crate) address: StreamAddress,
     pub(crate) id: i64,
-    pub(crate) batch_size: Option<i32>,
+    pub(crate) batch_size: Option<u32>,
     pub(crate) max_time: Option<Duration>,
     pub(crate) buffer: VecDeque<Document>,
 }
