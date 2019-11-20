@@ -1,8 +1,57 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use bson::{bson, doc, Bson, Document};
+use derivative::Derivative;
 
-use crate::error::{ErrorKind, Result};
+use crate::{
+    error::{ErrorKind, Result},
+    sdam::public::ServerInfo,
+};
+
+/// Describes which servers are suitable for a given operation.
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
+pub enum SelectionCriteria {
+    /// A read preference that describes the suitable servers based on the server type, max
+    /// staleness, and server tags.
+    ReadPreference(ReadPreference),
+
+    /// A predicate used to filter servers that are considered suitable. A `server` will be
+    /// considered suitable by a `predicate` if `predicate(server)` returns true.
+    Predicate(#[derivative(Debug = "ignore")] Arc<dyn Send + Sync + Fn(&ServerInfo) -> bool>),
+}
+
+impl PartialEq for SelectionCriteria {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::ReadPreference(r1), Self::ReadPreference(r2)) => r1 == r2,
+            (Self::Predicate(p1), Self::Predicate(p2)) => Arc::ptr_eq(p1, p2),
+            _ => false,
+        }
+    }
+}
+
+impl From<ReadPreference> for SelectionCriteria {
+    fn from(read_pref: ReadPreference) -> Self {
+        Self::ReadPreference(read_pref)
+    }
+}
+
+impl SelectionCriteria {
+    pub(crate) fn as_read_pref(&self) -> Option<&ReadPreference> {
+        match self {
+            Self::ReadPreference(ref read_pref) => Some(read_pref),
+            Self::Predicate(..) => None,
+        }
+    }
+
+    pub(crate) fn is_read_pref_primary(&self) -> bool {
+        match self {
+            Self::ReadPreference(ReadPreference::Primary) => true,
+            _ => false,
+        }
+    }
+}
 
 /// Specifies how the driver should route a read operation to members of a replica set.
 ///

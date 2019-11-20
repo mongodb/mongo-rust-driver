@@ -10,8 +10,8 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, Result},
     operation::{Delete, DropCollection, Insert, Update},
-    read_preference::ReadPreference,
     results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
+    selection_criteria::SelectionCriteria,
     Client, Cursor, Database,
 };
 
@@ -57,7 +57,7 @@ struct CollectionInner {
     client: Client,
     db: Database,
     name: String,
-    read_preference: Option<ReadPreference>,
+    selection_criteria: Option<SelectionCriteria>,
     read_concern: Option<ReadConcern>,
     write_concern: Option<WriteConcern>,
 }
@@ -65,9 +65,9 @@ struct CollectionInner {
 impl Collection {
     pub(crate) fn new(db: Database, name: &str, options: Option<CollectionOptions>) -> Self {
         let options = options.unwrap_or_default();
-        let read_preference = options
-            .read_preference
-            .or_else(|| db.read_preference().cloned());
+        let selection_criteria = options
+            .selection_criteria
+            .or_else(|| db.selection_criteria().cloned());
 
         let read_concern = options.read_concern.or_else(|| db.read_concern().cloned());
 
@@ -80,7 +80,7 @@ impl Collection {
                 client: db.client().clone(),
                 db,
                 name: name.to_string(),
-                read_preference,
+                selection_criteria,
                 read_concern,
                 write_concern,
             }),
@@ -110,9 +110,9 @@ impl Collection {
         }
     }
 
-    /// Gets the read preference of the `Collection`.
-    pub fn read_preference(&self) -> Option<&ReadPreference> {
-        self.inner.read_preference.as_ref()
+    /// Gets the selection criteria of the `Collection`.
+    pub fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+        self.inner.selection_criteria.as_ref()
     }
 
     /// Gets the read concern of the `Collection`.

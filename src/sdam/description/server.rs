@@ -1,9 +1,10 @@
 use std::time::Duration;
 
 use bson::{oid::ObjectId, UtcDateTime};
+use chrono::offset::Utc;
 
 use crate::{
-    error::Result, is_master::IsMasterReply, options::StreamAddress, read_preference::TagSet,
+    error::Result, is_master::IsMasterReply, options::StreamAddress, selection_criteria::TagSet,
 };
 
 const DRIVER_MIN_DB_VERSION: &str = "3.6";
@@ -11,7 +12,7 @@ const DRIVER_MIN_WIRE_VERSION: i32 = 6;
 const DRIVER_MAX_WIRE_VERSION: i32 = 7;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub(crate) enum ServerType {
+pub enum ServerType {
     Standalone,
     Mongos,
     RSPrimary,
@@ -46,7 +47,7 @@ pub(crate) struct ServerDescription {
     // allows us to ensure that only valid states are possible (e.g. preventing that both an error
     // and a reply are present) while still making it easy to define helper methods on
     // ServerDescription for information we need from the isMaster reply by propagating with `?`.
-    reply: Result<Option<IsMasterReply>>,
+    pub(crate) reply: Result<Option<IsMasterReply>>,
 }
 
 impl PartialEq for ServerDescription {
@@ -80,6 +81,12 @@ impl ServerDescription {
             last_update_time: None,
             reply: is_master_reply.transpose(),
             average_round_trip_time: None,
+        };
+
+        // We want to set last_update_time if we got any sort of response from the server.
+        match description.reply {
+            Ok(None) => {}
+            _ => description.last_update_time = Some(Utc::now().into()),
         };
 
         if let Ok(Some(ref mut reply)) = description.reply {

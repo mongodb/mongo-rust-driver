@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use bson::{Bson, Document};
+use typed_builder::TypedBuilder;
 
 use crate::error::{Error, ErrorKind, Result};
 

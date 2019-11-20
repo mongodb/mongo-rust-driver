@@ -18,13 +18,14 @@ use lazy_static::lazy_static;
 use rustls::{
     internal::pemfile, Certificate, RootCertStore, ServerCertVerified, ServerCertVerifier, TLSError,
 };
+use typed_builder::TypedBuilder;
 
 use crate::{
     client::auth::{AuthMechanism, Credential},
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::{ErrorKind, Result},
     event::{cmap::CmapEventHandler, command::CommandEventHandler},
-    read_preference::{ReadPreference, TagSet},
+    selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
 };
 
 const DEFAULT_PORT: u16 = 27017;
@@ -167,7 +168,7 @@ pub struct ClientOptions {
     pub read_concern: Option<ReadConcern>,
 
     #[builder(default)]
-    pub read_preference: Option<ReadPreference>,
+    pub selection_criteria: Option<SelectionCriteria>,
 
     #[builder(default)]
     pub repl_set_name: Option<String>,
@@ -241,7 +242,7 @@ struct ClientOptionsParser {
     pub heartbeat_freq: Option<Duration>,
     pub local_threshold: Option<Duration>,
     pub read_concern: Option<ReadConcern>,
-    pub read_preference: Option<ReadPreference>,
+    pub selection_criteria: Option<SelectionCriteria>,
     pub repl_set_name: Option<String>,
     pub write_concern: Option<WriteConcern>,
     pub server_selection_timeout: Option<Duration>,
@@ -262,6 +263,7 @@ struct ClientOptionsParser {
     auth_mechanism: Option<AuthMechanism>,
     auth_source: Option<String>,
     auth_mechanism_properties: Option<Document>,
+    read_preference: Option<ReadPreference>,
     read_preference_tags: Option<Vec<TagSet>>,
     tls_values: Vec<bool>,
 }
@@ -350,7 +352,7 @@ impl From<ClientOptionsParser> for ClientOptions {
             heartbeat_freq: parser.heartbeat_freq,
             local_threshold: parser.local_threshold,
             read_concern: parser.read_concern,
-            read_preference: parser.read_preference,
+            selection_criteria: parser.selection_criteria,
             repl_set_name: parser.repl_set_name,
             write_concern: parser.write_concern,
             max_pool_size: parser.max_pool_size,
@@ -693,8 +695,8 @@ impl ClientOptionsParser {
         }
 
         if let Some(tags) = self.read_preference_tags.take() {
-            self.read_preference = match self.read_preference.take() {
-                Some(read_pref) => Some(read_pref.with_tags(tags)?),
+            self.selection_criteria = match self.read_preference.take() {
+                Some(read_pref) => Some(read_pref.with_tags(tags)?.into()),
                 None => {
                     return Err(ErrorKind::ArgumentError {
                         message: "cannot set read preference tags without also setting read \
@@ -1051,7 +1053,7 @@ mod tests {
     use super::{ClientOptions, StreamAddress};
     use crate::{
         concern::{Acknowledgment, ReadConcern, WriteConcern},
-        read_preference::ReadPreference,
+        selection_criteria::ReadPreference,
     };
 
     macro_rules! tag_set {
@@ -1314,19 +1316,22 @@ mod tests {
                         port: Some(27018),
                     },
                 ],
-                read_preference: Some(ReadPreference::SecondaryPreferred {
-                    tag_sets: Some(vec![
-                        tag_set! {
-                            "dc" => "ny",
-                            "rack" => "1"
-                        },
-                        tag_set! {
-                            "dc" => "ny"
-                        },
-                        tag_set! {},
-                    ]),
-                    max_staleness: None,
-                }),
+                selection_criteria: Some(
+                    ReadPreference::SecondaryPreferred {
+                        tag_sets: Some(vec![
+                            tag_set! {
+                                "dc" => "ny",
+                                "rack" => "1"
+                            },
+                            tag_set! {
+                                "dc" => "ny"
+                            },
+                            tag_set! {},
+                        ]),
+                        max_staleness: None,
+                    }
+                    .into()
+                ),
                 read_concern: Some(ReadConcern::Majority),
                 write_concern: Some(write_concern),
                 repl_set_name: Some("foo".to_string()),

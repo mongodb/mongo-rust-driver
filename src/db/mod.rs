@@ -10,7 +10,7 @@ use crate::{
     error::Result,
     operation::{Create, DropDatabase},
     options::{CollectionOptions, CreateCollectionOptions, DatabaseOptions, DropDatabaseOptions},
-    read_preference::ReadPreference,
+    selection_criteria::SelectionCriteria,
     Client, Collection, Namespace,
 };
 
@@ -55,7 +55,7 @@ pub struct Database {
 struct DatabaseInner {
     client: Client,
     name: String,
-    read_preference: Option<ReadPreference>,
+    selection_criteria: Option<SelectionCriteria>,
     read_concern: Option<ReadConcern>,
     write_concern: Option<WriteConcern>,
 }
@@ -63,9 +63,9 @@ struct DatabaseInner {
 impl Database {
     pub(crate) fn new(client: Client, name: &str, options: Option<DatabaseOptions>) -> Self {
         let options = options.unwrap_or_default();
-        let read_preference = options
-            .read_preference
-            .or_else(|| client.read_preference().cloned());
+        let selection_criteria = options
+            .selection_criteria
+            .or_else(|| client.selection_criteria().cloned());
 
         let read_concern = options
             .read_concern
@@ -79,7 +79,7 @@ impl Database {
             inner: Arc::new(DatabaseInner {
                 client,
                 name: name.to_string(),
-                read_preference,
+                selection_criteria,
                 read_concern,
                 write_concern,
             }),
@@ -97,8 +97,8 @@ impl Database {
     }
 
     /// Gets the read preference of the `Database`.
-    pub fn read_preference(&self) -> Option<&ReadPreference> {
-        self.inner.read_preference.as_ref()
+    pub fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+        self.inner.selection_criteria.as_ref()
     }
 
     /// Gets the read concern of the `Database`.
@@ -177,7 +177,7 @@ impl Database {
     pub fn run_command(
         &self,
         doc: Document,
-        read_pref: Option<ReadPreference>,
+        selection_criteria: Option<SelectionCriteria>,
     ) -> Result<Document> {
         unimplemented!()
     }

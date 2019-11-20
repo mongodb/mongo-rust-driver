@@ -14,10 +14,9 @@ use crate::{
     cmap::Command,
     error::{ErrorKind, Result},
     options::{ClientOptions, StreamAddress},
-    read_preference::ReadPreference,
     sdam::description::server::{ServerDescription, ServerType},
+    selection_criteria::{ReadPreference, SelectionCriteria},
 };
-pub(crate) use server_selection::SelectionCriteria;
 
 const DEFAULT_HEARTBEAT_FREQUENCY: Duration = Duration::from_secs(10);
 

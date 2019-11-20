@@ -4,6 +4,8 @@ pub mod options;
 
 use std::sync::{Arc, RwLock};
 
+use derivative::Derivative;
+
 use crate::{
     concern::{ReadConcern, WriteConcern},
     db::Database,
@@ -12,8 +14,8 @@ use crate::{
         CommandEventHandler, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent,
     },
     options::{ClientOptions, DatabaseOptions},
-    read_preference::ReadPreference,
-    sdam::{SelectionCriteria, Server, Topology},
+    sdam::{Server, Topology},
+    selection_criteria::{ReadPreference, SelectionCriteria},
 };
 
 /// This is the main entry point for the API. A `Client` is used to connect to a MongoDB cluster.
@@ -56,7 +58,7 @@ pub struct Client {
 struct ClientInner {
     topology: Arc<RwLock<Topology>>,
 
-    read_preference: Option<ReadPreference>,
+    selection_criteria: Option<SelectionCriteria>,
     read_concern: Option<ReadConcern>,
     write_concern: Option<WriteConcern>,
     #[derivative(Debug = "ignore")]
@@ -74,14 +76,14 @@ impl Client {
 
     /// Creates a new `Client` connected to the cluster specified by `options`.
     pub fn with_options(mut options: ClientOptions) -> Result<Self> {
-        let read_preference = options.read_preference.take();
+        let selection_criteria = options.selection_criteria.take();
         let read_concern = options.read_concern.take();
         let write_concern = options.write_concern.take();
         let command_event_handler = options.command_event_handler.take();
 
         let inner = Arc::new(ClientInner {
             topology: Topology::new(options)?,
-            read_preference,
+            selection_criteria,
             read_concern,
             write_concern,
             command_event_handler,
@@ -90,9 +92,9 @@ impl Client {
         Ok(Self { inner })
     }
 
-    /// Gets the read preference of the `Client`.
-    pub fn read_preference(&self) -> Option<&ReadPreference> {
-        self.inner.read_preference.as_ref()
+    /// Gets the selection criteria of the `Client`.
+    pub fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+        self.inner.selection_criteria.as_ref()
     }
 
     /// Gets the read concern of the `Client`.
