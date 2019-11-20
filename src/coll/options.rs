@@ -529,6 +529,27 @@ pub struct FindOptions {
     pub sort: Option<Document>,
 }
 
+impl From<FindOneOptions> for FindOptions {
+    fn from(options: FindOneOptions) -> Self {
+        FindOptions {
+            allow_partial_results: options.allow_partial_results,
+            comment: options.comment,
+            hint: options.hint,
+            max: options.max,
+            max_scan: options.max_scan,
+            max_time: options.max_time,
+            min: options.min,
+            projection: options.projection,
+            read_concern: options.read_concern,
+            return_key: options.return_key,
+            selection_criteria: options.selection_criteria,
+            show_record_id: options.show_record_id,
+            skip: options.skip,
+            ..Default::default()
+        }
+    }
+}
+
 /// Custom serializer used to serialize limit as its absolute value.
 fn serialize_absolute_value<S>(
     val: &Option<i64>,
@@ -541,6 +562,81 @@ where
         Some(v) => serializer.serialize_i64(v.abs()),
         None => serializer.serialize_none(),
     }
+}
+
+/// Specifies the options to a `Collection::find` operation.
+#[skip_serializing_none]
+#[derive(Debug, Default, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FindOneOptions {
+    /// If true, partial results will be returned from a mongos rather than an error being
+    /// returned if one or more shards is down.
+    #[builder(default)]
+    pub allow_partial_results: Option<bool>,
+
+    /// Tags the query with an arbitrary string to help trace the operation through the database
+    /// profiler, currentOp and logs.
+    #[builder(default)]
+    pub comment: Option<String>,
+
+    /// The index to use for the operation.
+    #[builder(default)]
+    pub hint: Option<Hint>,
+
+    /// The exclusive upper bound for a specific index.
+    #[builder(default)]
+    pub max: Option<Document>,
+
+    /// Maximum number of documents or index keys to scan when executing the query.
+    ///
+    /// Note: this option is deprecated starting in MongoDB version 4.0 and removed in MongoDB 4.2.
+    /// Use the maxTimeMS option instead.
+    #[builder(default)]
+    pub max_scan: Option<i64>,
+
+    /// The maximum amount of time to allow the query to run.
+    ///
+    /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
+    #[builder(default)]
+    #[serde(
+        rename = "maxTimeMS",
+        serialize_with = "bson_util::serialize_duration_as_i64_millis"
+    )]
+    pub max_time: Option<Duration>,
+
+    /// The inclusive lower bound for a specific index.
+    #[builder(default)]
+    pub min: Option<Document>,
+
+    /// Limits the fields of the document being returned.
+    #[builder(default)]
+    pub projection: Option<Document>,
+
+    /// The read concern to use for this find query.
+    ///
+    /// If none specified, the default set on the collection will be used.
+    #[builder(default)]
+    pub read_concern: Option<ReadConcern>,
+
+    /// Whether to return only the index keys in the documents.
+    #[builder(default)]
+    pub return_key: Option<bool>,
+
+    /// The criteria used to select a server for this find query.
+    ///
+    /// If none specified, the default set on the collection will be used.
+    #[builder(default)]
+    #[serde(skip)]
+    pub selection_criteria: Option<SelectionCriteria>,
+
+    /// Whether to return the record identifier for each document.
+    #[builder(default)]
+    pub show_record_id: Option<bool>,
+
+    /// The number of documents to skip before counting.
+    #[builder(default)]
+    pub skip: Option<i64>,
 }
 
 /// Specifies an index to create.

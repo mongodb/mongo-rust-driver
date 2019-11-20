@@ -221,8 +221,8 @@ impl Collection {
         filter: Option<Document>,
         options: Option<FindOptions>,
     ) -> Result<Option<Document>> {
-        let mut options = options.unwrap_or_else(FindOptions::default);
-        options.limit = Some(1);
+        let mut options: FindOptions = options.map(Into::into).unwrap_or_else(Default::default);
+        options.limit = Some(-1);
         let mut cursor = self.find(filter, Some(options))?;
         cursor.next().transpose()
     }
