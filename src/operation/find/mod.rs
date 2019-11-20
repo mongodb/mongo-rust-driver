@@ -117,7 +117,7 @@ impl Find {
     fn cursor_type(&self) -> CursorType {
         self.options
             .as_ref()
-            .and_then(|opts| opts.cursor_type.clone())
+            .and_then(|opts| opts.cursor_type)
             .unwrap_or(CursorType::NonTailable)
     }
 }
