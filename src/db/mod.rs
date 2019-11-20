@@ -2,14 +2,17 @@ pub mod options;
 
 use std::sync::Arc;
 
-use bson::Document;
+use bson::{Bson, Document};
 
 use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
-    error::Result,
-    operation::{Create, DropDatabase, RunCommand},
-    options::{CollectionOptions, CreateCollectionOptions, DatabaseOptions, DropDatabaseOptions},
+    error::{ErrorKind, Result},
+    operation::{Create, DropDatabase, ListCollections, RunCommand},
+    options::{
+        CollectionOptions, CreateCollectionOptions, DatabaseOptions, DropDatabaseOptions,
+        ListCollectionsOptions,
+    },
     selection_criteria::SelectionCriteria,
     Client, Collection, Namespace,
 };
@@ -140,13 +143,39 @@ impl Database {
 
     /// Gets information about each of the collections in the database. The cursor will yield a
     /// document pertaining to each collection in the database.
-    pub fn list_collections(&self, filter: Option<Document>) -> Result<Cursor> {
-        unimplemented!()
+    pub fn list_collections(
+        &self,
+        filter: Option<Document>,
+        options: Option<ListCollectionsOptions>,
+    ) -> Result<Cursor> {
+        let list_collections =
+            ListCollections::new(self.name().to_string(), filter, false, options);
+        self.client()
+            .execute_operation(&list_collections, None)
+            .map(|spec| Cursor::new(self.client().clone(), spec))
     }
 
     /// Gets the names of the collections in the database.
     pub fn list_collection_names(&self, filter: Option<Document>) -> Result<Vec<String>> {
-        unimplemented!()
+        let list_collections = ListCollections::new(self.name().to_string(), filter, true, None);
+        let cursor = self
+            .client()
+            .execute_operation(&list_collections, None)
+            .map(|spec| Cursor::new(self.client().clone(), spec))?;
+
+        cursor
+            .map(|doc| {
+                let name = doc?
+                    .get("name")
+                    .and_then(Bson::as_str)
+                    .ok_or_else(|| ErrorKind::ResponseError {
+                        message: "Expected name field in server response, but there was none."
+                            .to_string(),
+                    })?
+                    .to_string();
+                Ok(name)
+            })
+            .collect()
     }
 
     /// Creates a new collection in the database with the given `name` and `options`.

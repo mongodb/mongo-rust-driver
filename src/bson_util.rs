@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-use bson::{oid::ObjectId, Bson, Document};
-use serde::{ser, Serializer};
+use bson::{bson, doc, oid::ObjectId, Bson, Document};
+use serde::{ser, Serialize, Serializer};
 
 use crate::error::{ErrorKind, Result};
 
@@ -74,5 +74,22 @@ pub(crate) fn serialize_u32_as_i32<S: Serializer>(
         Some(val) if { *val <= std::i32::MAX as u32 } => serializer.serialize_i32(*val as i32),
         None => serializer.serialize_none(),
         _ => Err(ser::Error::custom("u32 specified does not fit into an i32")),
+    }
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+pub(crate) fn serialize_batch_size<S: Serializer>(
+    val: &Option<u32>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    match val {
+        Some(val) if { *val <= std::i32::MAX as u32 } => (doc! {
+            "batchSize": (*val as i32)
+        })
+        .serialize(serializer),
+        None => Document::new().serialize(serializer),
+        _ => Err(ser::Error::custom(
+            "batch size must be able to fit into a signed 32-bit integer",
+        )),
     }
 }
