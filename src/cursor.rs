@@ -24,12 +24,13 @@ use crate::{error::Result, operation::GetMore, options::StreamAddress, Client, N
 /// documents it yields:
 ///
 /// ```rust
+/// # use bson::Document;
 /// # use mongodb::{Client, error::Result};
 /// #
 /// # fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com")?;
 /// # let coll = client.database("foo").collection("bar");
-/// # let cursor = coll.find(None, None)?;
+/// # let cursor = coll.find(Document::new(), None)?;
 /// #
 /// for doc in cursor {
 ///   println!("{}", doc?)
@@ -50,7 +51,7 @@ use crate::{error::Result, operation::GetMore, options::StreamAddress, Client, N
 /// # fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com")?;
 /// # let coll = client.database("foo").collection("bar");
-/// # let cursor = coll.find(Some(doc! { "x": 1 }), None)?;
+/// # let cursor = coll.find(doc! { "x": 1 }, None)?;
 /// #
 /// let results: Vec<Result<Document>> = cursor.collect();
 /// # Ok(())
