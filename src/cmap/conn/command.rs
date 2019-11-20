@@ -51,17 +51,17 @@ pub(crate) struct CommandResponse {
 }
 
 impl CommandResponse {
-    pub(crate) fn from_document_and_address(source: StreamAddress, doc: Document) -> Self {
+    pub(crate) fn with_document_and_address(source: StreamAddress, doc: Document) -> Self {
         Self {
             source,
             raw_response: doc,
         }
     }
 
-    /// Initialize a resposne from a document.
+    /// Initialize a response from a document.
     /// This should be used for test purposes only.
-    pub(crate) fn from_document(doc: Document) -> Self {
-        Self::from_document_and_address(
+    pub(crate) fn with_document(doc: Document) -> Self {
+        Self::with_document_and_address(
             StreamAddress {
                 hostname: "localhost".to_string(),
                 port: None,

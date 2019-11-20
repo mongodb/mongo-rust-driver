@@ -118,7 +118,7 @@ fn handle_success() {
 
     let batch = vec![doc! { "_id": 1 }, doc! { "_id": 2 }, doc! { "_id": 3 }];
 
-    let response = CommandResponse::from_document(doc! {
+    let response = CommandResponse::with_document(doc! {
         "cursor": {
             "id": 123,
             "ns": "test_db.test_coll",
@@ -133,7 +133,7 @@ fn handle_success() {
     assert!(!result.exhausted);
     assert_eq!(result.batch, batch);
 
-    let response = CommandResponse::from_document(doc! {
+    let response = CommandResponse::with_document(doc! {
         "cursor": {
             "id": 0,
             "ns": "test_db.test_coll",

@@ -207,7 +207,7 @@ fn handle_success() {
         "ok": 1.0
     };
 
-    let result = find.handle_response(CommandResponse::from_document_and_address(
+    let result = find.handle_response(CommandResponse::with_document_and_address(
         address.clone(),
         response.clone(),
     ));
@@ -227,7 +227,7 @@ fn handle_success() {
         Document::new(),
         Some(FindOptions::builder().batch_size(123).build()),
     );
-    let result = find.handle_response(CommandResponse::from_document_and_address(
+    let result = find.handle_response(CommandResponse::with_document_and_address(
         address.clone(),
         response,
     ));
@@ -263,7 +263,7 @@ fn verify_max_await_time(
         }),
     );
 
-    let response = CommandResponse::from_document_and_address(
+    let response = CommandResponse::with_document_and_address(
         address,
         doc! {
             "cursor": {
@@ -317,7 +317,7 @@ fn handle_invalid_response() {
 
     let garbled = doc! { "asdfasf": "ASdfasdf" };
     assert!(find
-        .handle_response(CommandResponse::from_document(garbled))
+        .handle_response(CommandResponse::with_document(garbled))
         .is_err());
 
     let missing_cursor_field = doc! {
@@ -327,6 +327,6 @@ fn handle_invalid_response() {
         }
     };
     assert!(find
-        .handle_response(CommandResponse::from_document(missing_cursor_field))
+        .handle_response(CommandResponse::with_document(missing_cursor_field))
         .is_err());
 }

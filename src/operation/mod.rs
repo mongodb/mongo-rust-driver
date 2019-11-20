@@ -156,7 +156,7 @@ mod test {
     use crate::{cmap::CommandResponse, error::ErrorKind, operation::Operation};
 
     pub(crate) fn handle_command_error<T: Operation>(op: T) {
-        let cmd_error = CommandResponse::from_document(
+        let cmd_error = CommandResponse::with_document(
             doc! { "ok": 0.0, "code": 123, "codeName": "woops", "errmsg": "My error message" },
         );
         let cmd_error_result = op.handle_response(cmd_error);
