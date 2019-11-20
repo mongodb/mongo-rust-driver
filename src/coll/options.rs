@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-use bson::{Bson, Document};
-use serde::{Serialize, Serializer};
+use bson::{bson, doc, Bson, Document};
+use serde::{ser, Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
@@ -39,7 +39,7 @@ pub enum ReturnDocument {
 }
 
 /// Specifies the index to use for an operation.
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(untagged)]
 pub enum Hint {
     /// Specifies the keys of the index to use.
@@ -322,7 +322,9 @@ pub struct FindOneAndUpdateOptions {
 }
 
 /// Specifies the options to a `Collection::aggregate` operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[skip_serializing_none]
+#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
 pub struct AggregateOptions {
     /// Enables writing to temporary files. When set to true, aggregation stages can write data to
     /// the _tmp subdirectory in the dbPath directory.
@@ -336,18 +338,12 @@ pub struct AggregateOptions {
     /// number of round trips needed to return the entire set of documents returned by the
     /// query).
     #[builder(default)]
-    pub batch_size: Option<i32>,
+    #[serde(serialize_with = "serialize_batch_size", rename = "cursor")]
+    pub batch_size: Option<u32>,
 
     /// Opt out of document-level validation.
     #[builder(default)]
     pub bypass_document_validation: Option<bool>,
-
-    /// The maximum amount of time to allow the query to run.
-    ///
-    /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
-    /// across the wire as an integer number of milliseconds.
-    #[builder(default)]
-    pub max_time: Option<Duration>,
 
     /// Tags the query with an arbitrary string to help trace the operation through the database
     /// profiler, currentOp and logs.
@@ -357,6 +353,64 @@ pub struct AggregateOptions {
     /// The index to use for the operation.
     #[builder(default)]
     pub hint: Option<Hint>,
+
+    /// The maximum amount of time for the server to wait on new documents to satisfy a tailable
+    /// await cursor query.
+    ///
+    /// This option will have no effect on non-tailable cursors that result from this operation.
+    #[builder(default)]
+    #[serde(skip)]
+    pub max_await_time: Option<Duration>,
+
+    /// The maximum amount of time to allow the query to run.
+    ///
+    /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
+    #[builder(default)]
+    #[serde(
+        serialize_with = "serialize_duration_as_i64_millis",
+        rename = "maxTimeMS"
+    )]
+    pub max_time: Option<Duration>,
+
+    /// The read concern to use for the operation.
+    ///
+    /// If none is specified, the read concern defined on the object executing this operation will
+    /// be used.
+    #[builder(default)]
+    pub read_concern: Option<ReadConcern>,
+
+    /// The criteria used to select a server for this operation.
+    ///
+    /// If none is specified, the selection criteria defined on the object executing this operation
+    /// will be used.
+    #[builder(default)]
+    #[serde(skip)]
+    pub selection_criteria: Option<SelectionCriteria>,
+
+    /// The write concern to use for the operation.
+    ///
+    /// If none is specified, the write concern defined on the object executing this operation will
+    /// be used.
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn serialize_batch_size<S: Serializer>(
+    val: &Option<u32>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    match val {
+        Some(val) if { *val <= std::i32::MAX as u32 } => (doc! {
+            "batchSize": (*val as i32)
+        })
+        .serialize(serializer),
+        None => Document::new().serialize(serializer),
+        _ => Err(ser::Error::custom(
+            "batch size must be able to fit into a signed 32-bit integer",
+        )),
+    }
 }
 
 /// Specifies the options to a `Collection::count_documents` operation.

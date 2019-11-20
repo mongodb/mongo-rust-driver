@@ -8,10 +8,10 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{ErrorKind, Result},
-    operation::{Create, DropDatabase, ListCollections, RunCommand},
+    operation::{Aggregate, Create, DropDatabase, ListCollections, RunCommand},
     options::{
-        CollectionOptions, CreateCollectionOptions, DatabaseOptions, DropDatabaseOptions,
-        ListCollectionsOptions,
+        AggregateOptions, CollectionOptions, CreateCollectionOptions, DatabaseOptions,
+        DropDatabaseOptions, ListCollectionsOptions,
     },
     selection_criteria::SelectionCriteria,
     Client, Collection, Namespace,
@@ -210,5 +210,27 @@ impl Database {
     ) -> Result<Document> {
         let operation = RunCommand::new(self.name().into(), command, selection_criteria);
         self.client().execute_operation(&operation, None)
+    }
+
+    /// Runs an aggregation operation.
+    ///
+    /// See the documentation [here](https://docs.mongodb.com/manual/aggregation/) for more
+    /// information on aggregations.
+    pub fn aggregate(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        mut options: Option<AggregateOptions>,
+    ) -> Result<Cursor> {
+        resolve_options!(
+            self,
+            options,
+            [read_concern, write_concern, selection_criteria]
+        );
+
+        let aggregate = Aggregate::new(self.name().to_string(), pipeline, options);
+        let client = self.client();
+        client
+            .execute_operation(&aggregate, None)
+            .map(|spec| Cursor::new(client.clone(), spec))
     }
 }

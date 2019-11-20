@@ -10,7 +10,9 @@ use crate::{
     bson_util,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, Result},
-    operation::{Count, Delete, Distinct, DropCollection, Find, FindAndModify, Insert, Update},
+    operation::{
+        Aggregate, Count, Delete, Distinct, DropCollection, Find, FindAndModify, Insert, Update,
+    },
     results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
     selection_criteria::SelectionCriteria,
     Client, Cursor, Database,
@@ -141,9 +143,19 @@ impl Collection {
     pub fn aggregate(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
-        options: Option<AggregateOptions>,
+        mut options: Option<AggregateOptions>,
     ) -> Result<Cursor> {
-        unimplemented!()
+        resolve_options!(
+            self,
+            options,
+            [read_concern, write_concern, selection_criteria]
+        );
+
+        let aggregate = Aggregate::new(self.namespace().clone(), pipeline, options);
+        let client = self.client();
+        client
+            .execute_operation(&aggregate, None)
+            .map(|spec| Cursor::new(client.clone(), spec))
     }
 
     /// Estimates the number of documents in the collection using collection metadata.
