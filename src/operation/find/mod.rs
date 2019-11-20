@@ -15,7 +15,7 @@ use crate::{
 #[derive(Debug)]
 pub(crate) struct Find {
     ns: Namespace,
-    filter: Document,
+    filter: Option<Document>,
     options: Option<FindOptions>,
 }
 
@@ -27,12 +27,16 @@ impl Find {
                 db: String::new(),
                 coll: String::new(),
             },
-            Document::new(),
+            None,
             None,
         )
     }
 
-    pub(crate) fn new(ns: Namespace, filter: Document, options: Option<FindOptions>) -> Self {
+    pub(crate) fn new(
+        ns: Namespace,
+        filter: Option<Document>,
+        options: Option<FindOptions>,
+    ) -> Self {
         Self {
             ns,
             filter,
@@ -48,9 +52,12 @@ impl Operation for Find {
     fn build(&self, description: &StreamDescription) -> Result<Command> {
         let mut body = doc! {
             Self::NAME: self.ns.coll.clone(),
-            "filter": self.filter.clone(),
         };
         append_options(&mut body, self.options.as_ref())?;
+
+        if let Some(ref filter) = self.filter {
+            body.insert("filter", filter.clone());
+        }
 
         match self.cursor_type() {
             CursorType::Tailable => {

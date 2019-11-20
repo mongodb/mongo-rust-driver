@@ -207,7 +207,7 @@ impl Collection {
     }
 
     /// Finds the documents in the collection matching `filter`.
-    pub fn find(&self, filter: Document, options: Option<FindOptions>) -> Result<Cursor> {
+    pub fn find(&self, filter: Option<Document>, options: Option<FindOptions>) -> Result<Cursor> {
         let find = Find::new(self.namespace(), filter, options);
         let client = self.client();
         client
@@ -218,7 +218,7 @@ impl Collection {
     /// Finds a single document in the collection matching `filter`.
     pub fn find_one(
         &self,
-        filter: Document,
+        filter: Option<Document>,
         options: Option<FindOptions>,
     ) -> Result<Option<Document>> {
         let mut options = options.unwrap_or_else(FindOptions::default);

@@ -12,11 +12,11 @@ use crate::{
 
 fn build_test(
     ns: Namespace,
-    filter: Document,
+    filter: Option<Document>,
     options: Option<FindOptions>,
     mut expected_body: Document,
 ) {
-    let find = Find::new(ns.clone(), filter.clone(), options);
+    let find = Find::new(ns.clone(), filter, options);
 
     let mut cmd = find.build(&StreamDescription::new_testing()).unwrap();
 
@@ -60,7 +60,7 @@ fn build() {
         "allowPartialResults": true,
     };
 
-    build_test(ns, filter, Some(options), expected_body);
+    build_test(ns, Some(filter), Some(options), expected_body);
 }
 
 #[test]
@@ -76,12 +76,11 @@ fn build_cursor_type() {
 
     let non_tailable_body = doc! {
         "find": "test_coll",
-        "filter": {},
     };
 
     build_test(
         ns.clone(),
-        Document::new(),
+        None,
         Some(non_tailable_options),
         non_tailable_body,
     );
@@ -92,16 +91,10 @@ fn build_cursor_type() {
 
     let tailable_body = doc! {
         "find": "test_coll",
-        "filter": {},
         "tailable": true
     };
 
-    build_test(
-        ns.clone(),
-        Document::new(),
-        Some(tailable_options),
-        tailable_body,
-    );
+    build_test(ns.clone(), None, Some(tailable_options), tailable_body);
 
     let tailable_await_options = FindOptions::builder()
         .cursor_type(CursorType::TailableAwait)
@@ -109,14 +102,13 @@ fn build_cursor_type() {
 
     let tailable_await_body = doc! {
         "find": "test_coll",
-        "filter": {},
         "tailable": true,
         "awaitData": true,
     };
 
     build_test(
         ns.clone(),
-        Document::new(),
+        None,
         Some(tailable_await_options),
         tailable_await_body,
     );
@@ -136,11 +128,10 @@ fn build_max_await_time() {
 
     let body = doc! {
         "find": "test_coll",
-        "filter": {},
         "maxTimeMS": 10 as i64
     };
 
-    build_test(ns.clone(), Document::new(), Some(options), body);
+    build_test(ns.clone(), None, Some(options), body);
 }
 
 #[test]
@@ -154,32 +145,20 @@ fn build_limit() {
 
     let positive_body = doc! {
         "find": "test_coll",
-        "filter": {},
         "limit": 5 as i64
     };
 
-    build_test(
-        ns.clone(),
-        Document::new(),
-        Some(positive_options),
-        positive_body,
-    );
+    build_test(ns.clone(), None, Some(positive_options), positive_body);
 
     let negative_options = FindOptions::builder().limit(-5).build();
 
     let negative_body = doc! {
         "find": "test_coll",
-        "filter": {},
         "limit": 5 as i64,
         "singleBatch": true
     };
 
-    build_test(
-        ns.clone(),
-        Document::new(),
-        Some(negative_options),
-        negative_body,
-    );
+    build_test(ns.clone(), None, Some(negative_options), negative_body);
 }
 
 #[test]
@@ -224,7 +203,7 @@ fn handle_success() {
 
     let find = Find::new(
         ns.clone(),
-        Document::new(),
+        None,
         Some(FindOptions::builder().batch_size(123).build()),
     );
     let result = find.handle_response(CommandResponse::with_document_and_address(
@@ -255,7 +234,7 @@ fn verify_max_await_time(
     };
     let find = Find::new(
         ns,
-        Document::new(),
+        None,
         Some(FindOptions {
             cursor_type,
             max_await_time,
