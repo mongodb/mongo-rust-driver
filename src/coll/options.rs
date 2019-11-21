@@ -564,7 +564,7 @@ where
     }
 }
 
-/// Specifies the options to a `Collection::find` operation.
+/// Specifies the options to a `Collection::find_one` operation.
 #[skip_serializing_none]
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
