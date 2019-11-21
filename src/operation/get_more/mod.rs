@@ -8,7 +8,7 @@ use serde::Deserialize;
 
 use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
-    error::Result,
+    error::{ErrorKind, Result},
     operation::Operation,
     options::{SelectionCriteria, StreamAddress},
     results::GetMoreResult,
@@ -70,7 +70,12 @@ impl Operation for GetMore {
         };
 
         if let Some(batch_size) = self.batch_size {
-            if batch_size != 0 {
+            if batch_size > std::i32::MAX as u32 {
+                return Err(ErrorKind::ArgumentError {
+                    message: "The batch size must fit into a signed 32-bit integer".to_string(),
+                }
+                .into());
+            } else if batch_size != 0 {
                 body.insert("batchSize", batch_size);
             }
         }

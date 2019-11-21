@@ -6,7 +6,7 @@ use bson::{bson, doc, Document};
 use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
     cursor::CursorSpecification,
-    error::Result,
+    error::{ErrorKind, Result},
     operation::{append_options, CursorBody, Operation},
     options::{CursorType, FindOptions, SelectionCriteria},
     Namespace,
@@ -70,15 +70,22 @@ impl Operation for Find {
             _ => {}
         };
 
-        // negative limits should be interpreted as request for single batch as per crud spec.
-        if self
-            .options
-            .as_ref()
-            .and_then(|opts| opts.limit)
-            .map(|limit| limit < 0)
-            == Some(true)
-        {
-            body.insert("singleBatch", true);
+        if let Some(ref options) = self.options {
+            // negative limits should be interpreted as request for single batch as per crud spec.
+            if options.limit.map(|limit| limit < 0) == Some(true) {
+                body.insert("singleBatch", true);
+            }
+
+            if options
+                .batch_size
+                .map(|batch_size| batch_size > std::i32::MAX as u32)
+                == Some(true)
+            {
+                return Err(ErrorKind::ArgumentError {
+                    message: "The batch size must fit into a signed 32-bit integer".to_string(),
+                }
+                .into());
+            }
         }
 
         Ok(Command::new(
