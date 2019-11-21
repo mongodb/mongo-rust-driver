@@ -6,7 +6,7 @@ use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    bson_util::serialize_duration_as_i64_millis,
+    bson_util::{serialize_duration_as_i64_millis, serialize_u32_as_i32},
     concern::{ReadConcern, WriteConcern},
     options::SelectionCriteria,
 };
@@ -436,7 +436,7 @@ pub struct FindOptions {
     /// number of round trips needed to return the entire set of documents returned by the
     /// query.
     #[builder(default)]
-    #[serde(serialize_with = "bson_util::serialize_u32_as_i32")]
+    #[serde(serialize_with = "serialize_u32_as_i32")]
     pub batch_size: Option<u32>,
 
     /// Tags the query with an arbitrary string to help trace the operation through the database

@@ -10,7 +10,7 @@ use crate::{
     bson_util,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, Result},
-    operation::{Count, Delete, Distinct, Find, DropCollection, Insert, Update},
+    operation::{Count, Delete, Distinct, DropCollection, Find, Insert, Update},
     results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
     selection_criteria::SelectionCriteria,
     Client, Cursor, Database,
