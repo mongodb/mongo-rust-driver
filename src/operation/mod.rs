@@ -3,6 +3,7 @@ mod delete;
 mod drop_collection;
 mod drop_database;
 mod insert;
+mod run_command;
 mod update;
 
 use std::{fmt::Debug, ops::Deref};
@@ -21,6 +22,7 @@ pub(crate) use delete::Delete;
 pub(crate) use drop_collection::DropCollection;
 pub(crate) use drop_database::DropDatabase;
 pub(crate) use insert::Insert;
+pub(crate) use run_command::RunCommand;
 pub(crate) use update::Update;
 
 /// A trait modeling the behavior of a server side operation.

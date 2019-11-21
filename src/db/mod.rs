@@ -8,7 +8,7 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::Result,
-    operation::{Create, DropDatabase},
+    operation::{Create, DropDatabase, RunCommand},
     options::{CollectionOptions, CreateCollectionOptions, DatabaseOptions, DropDatabaseOptions},
     selection_criteria::SelectionCriteria,
     Client, Collection, Namespace,
@@ -176,9 +176,10 @@ impl Database {
     /// be specified manually.
     pub fn run_command(
         &self,
-        doc: Document,
+        command: Document,
         selection_criteria: Option<SelectionCriteria>,
     ) -> Result<Document> {
-        unimplemented!()
+        let operation = RunCommand::new(self.name().into(), command, selection_criteria);
+        self.client().execute_operation(&operation, None)
     }
 }
