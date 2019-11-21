@@ -219,7 +219,7 @@ impl Collection {
     pub fn find_one(
         &self,
         filter: Option<Document>,
-        options: Option<FindOptions>,
+        options: Option<FindOneOptions>,
     ) -> Result<Option<Document>> {
         let mut options: FindOptions = options.map(Into::into).unwrap_or_else(Default::default);
         options.limit = Some(-1);
