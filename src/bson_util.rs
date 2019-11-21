@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use bson::{oid::ObjectId, Bson, Document};
-use serde::Serializer;
+use serde::{ser, Serializer};
 
 use crate::error::{ErrorKind, Result};
 
@@ -62,5 +62,17 @@ pub(crate) fn serialize_duration_as_i64_millis<S: Serializer>(
     match val {
         Some(duration) => serializer.serialize_i64(duration.as_millis() as i64),
         None => serializer.serialize_none(),
+    }
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+pub(crate) fn serialize_u32_as_i32<S: Serializer>(
+    val: &Option<u32>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    match val {
+        Some(val) if { *val <= std::i32::MAX as u32 } => serializer.serialize_i32(*val as i32),
+        None => serializer.serialize_none(),
+        _ => Err(ser::Error::custom("u32 specified does not fit into an i32")),
     }
 }

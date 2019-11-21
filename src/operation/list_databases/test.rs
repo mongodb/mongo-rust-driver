@@ -91,7 +91,7 @@ fn handle_success() {
 
     let expected_values: Vec<Document> = databases.clone();
 
-    let response = CommandResponse::from_document(doc! {
+    let response = CommandResponse::with_document(doc! {
        "databases" : bson_util::to_bson_array(&databases),
        "totalSize" : total_size,
        "ok" : 1
@@ -108,7 +108,7 @@ fn handle_success() {
 fn handle_response_no_databases() {
     let list_databases_op = ListDatabases::empty();
 
-    let response = CommandResponse::from_document(doc! {
+    let response = CommandResponse::with_document(doc! {
        "ok" : 1
     });
 
@@ -123,7 +123,7 @@ fn handle_response_no_databases() {
 fn handle_response_no_ok() {
     let list_databases_op = ListDatabases::empty();
 
-    let response = CommandResponse::from_document(doc! {
+    let response = CommandResponse::with_document(doc! {
        "databases" :
        [
            {

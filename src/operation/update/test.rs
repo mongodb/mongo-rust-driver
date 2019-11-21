@@ -98,7 +98,7 @@ fn build_many() {
 fn handle_success() {
     let op = Update::empty();
 
-    let ok_response = CommandResponse::from_document(doc! {
+    let ok_response = CommandResponse::with_document(doc! {
         "ok": 1.0,
         "n": 3,
         "nModified": 1,
@@ -120,7 +120,7 @@ fn handle_success() {
 fn handle_success_no_upsert() {
     let op = Update::empty();
 
-    let ok_response = CommandResponse::from_document(doc! {
+    let ok_response = CommandResponse::with_document(doc! {
         "ok": 1.0,
         "n": 5,
         "nModified": 2
@@ -139,7 +139,7 @@ fn handle_success_no_upsert() {
 fn handle_invalid_response() {
     let op = Update::empty();
 
-    let invalid_response = CommandResponse::from_document(doc! { "ok": 1.0, "asdfadsf": 123123 });
+    let invalid_response = CommandResponse::with_document(doc! { "ok": 1.0, "asdfadsf": 123123 });
     assert!(op.handle_response(invalid_response).is_err());
 }
 
@@ -152,7 +152,7 @@ fn handle_command_error() {
 fn handle_write_failure() {
     let op = Update::empty();
 
-    let write_error_response = CommandResponse::from_document(doc! {
+    let write_error_response = CommandResponse::with_document(doc! {
         "ok": 1.0,
         "n": 12,
         "nModified": 0,
@@ -183,7 +183,7 @@ fn handle_write_failure() {
 fn handle_write_concern_failure() {
     let op = Update::empty();
 
-    let wc_error_response = CommandResponse::from_document(doc! {
+    let wc_error_response = CommandResponse::with_document(doc! {
         "ok": 1.0,
         "n": 0,
         "nModified": 0,
