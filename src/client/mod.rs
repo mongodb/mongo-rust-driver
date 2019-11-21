@@ -9,6 +9,7 @@ use std::{
 
 use time::PreciseTime;
 
+use bson::{Bson, Document};
 use derivative::Derivative;
 
 use crate::{
@@ -18,6 +19,7 @@ use crate::{
     event::command::{
         CommandEventHandler, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent,
     },
+    operation::ListDatabases,
     options::{ClientOptions, DatabaseOptions},
     sdam::{Server, Topology, TopologyUpdateCondvar},
     selection_criteria::{ReadPreference, SelectionCriteria},
@@ -130,6 +132,31 @@ impl Client {
     /// used repeatedly without incurring any costs from I/O.
     pub fn database_with_options(&self, name: &str, options: DatabaseOptions) -> Database {
         Database::new(self.clone(), name, Some(options))
+    }
+
+    pub fn list_databases(&self, filter: Option<Document>) -> Result<Vec<Document>> {
+        let op = ListDatabases::new(filter, false);
+        self.execute_operation(&op, None)
+    }
+
+    pub fn list_database_names(&self, filter: Option<Document>) -> Result<Vec<String>> {
+        let op = ListDatabases::new(filter, true);
+        match self.execute_operation(&op, None) {
+            Ok(databases) => databases
+                .into_iter()
+                .map(|doc| {
+                    let name = doc.get("name").and_then(Bson::as_str).ok_or_else(|| {
+                        ErrorKind::ResponseError {
+                            message: "Expected \"name\" field in server response, but it was not \
+                                      found"
+                                .to_string(),
+                        }
+                    })?;
+                    Ok(name.to_string())
+                })
+                .collect(),
+            Err(e) => Err(e),
+        }
     }
 
     #[allow(dead_code)]

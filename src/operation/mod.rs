@@ -1,8 +1,11 @@
+mod count;
 mod create;
 mod delete;
+mod distinct;
 mod drop_collection;
 mod drop_database;
 mod insert;
+mod list_databases;
 mod run_command;
 mod update;
 
@@ -17,16 +20,19 @@ use crate::{
     selection_criteria::SelectionCriteria,
 };
 
+pub(crate) use count::Count;
 pub(crate) use create::Create;
 pub(crate) use delete::Delete;
+pub(crate) use distinct::Distinct;
 pub(crate) use drop_collection::DropCollection;
 pub(crate) use drop_database::DropDatabase;
 pub(crate) use insert::Insert;
+pub(crate) use list_databases::ListDatabases;
 pub(crate) use run_command::RunCommand;
 pub(crate) use update::Update;
 
 /// A trait modeling the behavior of a server side operation.
-pub(super) trait Operation {
+pub(crate) trait Operation {
     /// The output type of this operation.
     type O: Debug;
 
