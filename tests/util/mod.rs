@@ -39,7 +39,9 @@ impl TestClient {
         options.max_pool_size = Some(MAX_POOL_SIZE);
 
         if let Some(event_handler) = event_handler {
-            options.command_event_handler = Some(Arc::new(event_handler));
+            let handler = Arc::new(event_handler);
+            options.command_event_handler = Some(handler.clone());
+            options.cmap_event_handler = Some(handler);
         }
 
         let client = Client::with_options(options.clone()).unwrap();
@@ -81,30 +83,30 @@ impl TestClient {
     }
 
     #[allow(dead_code)]
-    pub fn server_version_eq(&mut self, major: u64, minor: u64) -> bool {
+    pub fn server_version_eq(&self, major: u64, minor: u64) -> bool {
         self.server_version.major == major && self.server_version.minor == minor
     }
 
     #[allow(dead_code)]
-    pub fn server_version_gt(&mut self, major: u64, minor: u64) -> bool {
+    pub fn server_version_gt(&self, major: u64, minor: u64) -> bool {
         self.server_version.major > major
             || (self.server_version.major == major && self.server_version.minor > minor)
     }
 
     #[allow(dead_code)]
-    pub fn server_version_gte(&mut self, major: u64, minor: u64) -> bool {
+    pub fn server_version_gte(&self, major: u64, minor: u64) -> bool {
         self.server_version.major > major
             || (self.server_version.major == major && self.server_version.minor >= minor)
     }
 
     #[allow(dead_code)]
-    pub fn server_version_lt(&mut self, major: u64, minor: u64) -> bool {
+    pub fn server_version_lt(&self, major: u64, minor: u64) -> bool {
         self.server_version.major < major
             || (self.server_version.major == major && self.server_version.minor < minor)
     }
 
     #[allow(dead_code)]
-    pub fn server_version_lte(&mut self, major: u64, minor: u64) -> bool {
+    pub fn server_version_lte(&self, major: u64, minor: u64) -> bool {
         self.server_version.major < major
             || (self.server_version.major == major && self.server_version.minor <= minor)
     }

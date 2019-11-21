@@ -10,10 +10,10 @@ DRIVERS_TOOLS_X509=`echo "$DRIVERS_TOOLS_X509" | sed 's/\//%2F/g'`
 CA_FILE="${DRIVERS_TOOLS_X509}%2Fca.pem"
 CERT_FILE="${DRIVERS_TOOLS_X509}%2Fclient.pem"
 
-if [[ "$MONGODB_URI" == *?* ]]; then
-    export MONGODB_URI="${MONGODB_URI}/?"
-else
+if [[ "$MONGODB_URI" == *"?"* ]]; then
     export MONGODB_URI="${MONGODB_URI}&"
+else
+    export MONGODB_URI="${MONGODB_URI}/?"
 fi
 
 export MONGODB_URI="${MONGODB_URI}tls=true&tlsCAFile=${CA_FILE}&tlsCertificateKeyFile=${CERT_FILE}&tlsAllowInvalidCertificates=true"

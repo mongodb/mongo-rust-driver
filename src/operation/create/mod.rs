@@ -5,7 +5,6 @@ use bson::{bson, doc};
 
 use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
-    concern::WriteConcern,
     error::Result,
     operation::{append_options, Operation, WriteConcernOnlyBody},
     options::CreateCollectionOptions,
@@ -15,7 +14,6 @@ use crate::{
 #[derive(Debug)]
 pub(crate) struct Create {
     ns: Namespace,
-    write_concern: Option<WriteConcern>,
     options: Option<CreateCollectionOptions>,
 }
 
@@ -28,20 +26,11 @@ impl Create {
                 coll: String::new(),
             },
             None,
-            None,
         )
     }
 
-    pub(crate) fn new(
-        ns: Namespace,
-        db_write_concern: Option<WriteConcern>,
-        options: Option<CreateCollectionOptions>,
-    ) -> Self {
-        Self {
-            ns,
-            write_concern: db_write_concern, // TODO: RUST-35 first try options wc
-            options,
-        }
+    pub(crate) fn new(ns: Namespace, options: Option<CreateCollectionOptions>) -> Self {
+        Self { ns, options }
     }
 }
 
@@ -54,10 +43,6 @@ impl Operation for Create {
             Self::NAME: self.ns.coll.clone(),
         };
         append_options(&mut body, self.options.as_ref())?;
-
-        if let Some(ref wc) = self.write_concern {
-            body.insert("writeConcern", wc.to_bson());
-        }
 
         Ok(Command::new(
             Self::NAME.to_string(),
