@@ -135,8 +135,9 @@ fn run_test(test_file: TestFile) {
         let description = &test_file.description;
 
         for (address, server) in phase.outcome.servers {
-            let actual_server = dbg!(&topology_description.servers)
-                .get(&dbg!(StreamAddress::parse(&address)).unwrap())
+            let actual_server = &topology_description
+                .servers
+                .get(&StreamAddress::parse(&address).unwrap())
                 .unwrap_or_else(|| panic!("{} (phase {})", description, i));
 
             let server_type = server_type_from_str(&server.server_type)
