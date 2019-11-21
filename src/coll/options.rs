@@ -6,6 +6,7 @@ use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
 use crate::{
+    bson_util::serialize_duration_as_i64_millis,
     concern::{ReadConcern, WriteConcern},
     selection_criteria::SelectionCriteria,
 };
@@ -368,25 +369,53 @@ pub struct CountOptions {
 }
 
 /// Specifies the options to a `Collection::estimated_document_count` operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[serde_with::skip_serializing_none]
+#[derive(Debug, Default, TypedBuilder, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct EstimatedDocumentCountOptions {
     /// The maximum amount of time to allow the query to run.
     ///
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
     #[builder(default)]
+    #[serde(
+        serialize_with = "serialize_duration_as_i64_millis",
+        rename = "maxTimeMS"
+    )]
     pub max_time: Option<Duration>,
+
+    #[builder(default)]
+    #[serde(skip_serializing)]
+    pub selection_criteria: Option<SelectionCriteria>,
+
+    /// The level of the read concern
+    #[builder(default)]
+    pub read_concern: Option<ReadConcern>,
 }
 
 /// Specifies the options to a `Collection::distinct` operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[serde_with::skip_serializing_none]
+#[derive(Debug, Default, TypedBuilder, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct DistinctOptions {
     /// The maximum amount of time to allow the query to run.
     ///
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
     #[builder(default)]
+    #[serde(
+        serialize_with = "serialize_duration_as_i64_millis",
+        rename = "maxTimeMS"
+    )]
     pub max_time: Option<Duration>,
+
+    #[builder(default)]
+    #[serde(skip_serializing)]
+    pub selection_criteria: Option<SelectionCriteria>,
+
+    /// The level of the read concern
+    #[builder(default)]
+    pub read_concern: Option<ReadConcern>,
 }
 
 /// Specifies the options to a `Collection::find` operation.
