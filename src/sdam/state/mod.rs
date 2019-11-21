@@ -68,10 +68,11 @@ impl Topology {
         condvar: TopologyUpdateCondvar,
         mut options: ClientOptions,
     ) -> Result<Arc<RwLock<Self>>> {
+        let description = TopologyDescription::new(options.clone())?;
         let hosts: Vec<_> = options.hosts.drain(..).collect();
 
         let topology = Arc::new(RwLock::new(Topology {
-            description: TopologyDescription::new(options.clone())?,
+            description,
             servers: Default::default(),
             condvar,
             options,
