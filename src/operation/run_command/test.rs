@@ -7,7 +7,7 @@ use crate::{
 };
 
 #[test]
-fn basic_construction() {
+fn build() {
     let op = RunCommand::new("foo".into(), doc! { "isMaster": 1 }, None);
     assert!(op.selection_criteria().is_none());
 
