@@ -53,22 +53,6 @@ impl Operation for Find {
         let mut body = doc! {
             Self::NAME: self.ns.coll.clone(),
         };
-        append_options(&mut body, self.options.as_ref())?;
-
-        if let Some(ref filter) = self.filter {
-            body.insert("filter", filter.clone());
-        }
-
-        match self.cursor_type() {
-            CursorType::Tailable => {
-                body.insert("tailable", true);
-            }
-            CursorType::TailableAwait => {
-                body.insert("tailable", true);
-                body.insert("awaitData", true);
-            }
-            _ => {}
-        };
 
         if let Some(ref options) = self.options {
             // negative limits should be interpreted as request for single batch as per crud spec.
@@ -86,6 +70,23 @@ impl Operation for Find {
                 }
                 .into());
             }
+
+            match options.cursor_type {
+                Some(CursorType::Tailable) => {
+                    body.insert("tailable", true);
+                }
+                Some(CursorType::TailableAwait) => {
+                    body.insert("tailable", true);
+                    body.insert("awaitData", true);
+                }
+                _ => {}
+            };
+        }
+
+        append_options(&mut body, self.options.as_ref())?;
+
+        if let Some(ref filter) = self.filter {
+            body.insert("filter", filter.clone());
         }
 
         Ok(Command::new(
@@ -112,14 +113,5 @@ impl Operation for Find {
         self.options
             .as_ref()
             .and_then(|opts| opts.selection_criteria.as_ref())
-    }
-}
-
-impl Find {
-    fn cursor_type(&self) -> CursorType {
-        self.options
-            .as_ref()
-            .and_then(|opts| opts.cursor_type)
-            .unwrap_or(CursorType::NonTailable)
     }
 }

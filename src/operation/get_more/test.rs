@@ -100,6 +100,15 @@ fn build_batch_size() {
             "batchSize": 123,
         },
     );
+
+    let op = GetMore::new(
+        Namespace::empty(),
+        cursor_id,
+        address,
+        Some((std::i32::MAX as u32) + 1),
+        None,
+    );
+    assert!(op.build(&StreamDescription::new_testing()).is_err())
 }
 
 #[test]

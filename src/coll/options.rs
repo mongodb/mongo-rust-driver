@@ -436,6 +436,7 @@ pub struct FindOptions {
     /// number of round trips needed to return the entire set of documents returned by the
     /// query.
     #[builder(default)]
+    #[serde(serialize_with = "bson_util::serialize_u32_as_i32")]
     pub batch_size: Option<u32>,
 
     /// Tags the query with an arbitrary string to help trace the operation through the database
@@ -565,9 +566,7 @@ where
 }
 
 /// Specifies the options to a `Collection::find_one` operation.
-#[skip_serializing_none]
-#[derive(Debug, Default, TypedBuilder, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Default, TypedBuilder)]
 pub struct FindOneOptions {
     /// If true, partial results will be returned from a mongos rather than an error being
     /// returned if one or more shards is down.
@@ -599,10 +598,6 @@ pub struct FindOneOptions {
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
     #[builder(default)]
-    #[serde(
-        rename = "maxTimeMS",
-        serialize_with = "bson_util::serialize_duration_as_i64_millis"
-    )]
     pub max_time: Option<Duration>,
 
     /// The inclusive lower bound for a specific index.
@@ -627,7 +622,6 @@ pub struct FindOneOptions {
     ///
     /// If none specified, the default set on the collection will be used.
     #[builder(default)]
-    #[serde(skip)]
     pub selection_criteria: Option<SelectionCriteria>,
 
     /// Whether to return the record identifier for each document.

@@ -166,6 +166,22 @@ fn build_limit() {
 }
 
 #[test]
+fn build_batch_size() {
+    let options = FindOptions::builder().batch_size(1).build();
+    let body = doc! {
+        "find": "",
+        "batchSize": 1
+    };
+    build_test(Namespace::empty(), None, Some(options), body);
+
+    let options = FindOptions::builder()
+        .batch_size((std::i32::MAX as u32) + 1)
+        .build();
+    let op = Find::new(Namespace::empty(), None, Some(options));
+    assert!(op.build(&StreamDescription::new_testing()).is_err())
+}
+
+#[test]
 fn handle_success() {
     let ns = Namespace {
         db: "test_db".to_string(),
