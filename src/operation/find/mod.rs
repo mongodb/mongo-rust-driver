@@ -91,17 +91,12 @@ impl Operation for Find {
     fn handle_response(&self, response: CommandResponse) -> Result<Self::O> {
         let body: CursorBody = response.body()?;
 
-        let max_await_time = match self.cursor_type() {
-            CursorType::TailableAwait => self.options.as_ref().and_then(|opts| opts.max_await_time),
-            _ => None,
-        };
-
         Ok(CursorSpecification {
             ns: self.ns.clone(),
             address: response.source_address().clone(),
             id: body.cursor.id,
             batch_size: self.options.as_ref().and_then(|opts| opts.batch_size),
-            max_time: max_await_time,
+            max_time: self.options.as_ref().and_then(|opts| opts.max_await_time),
             buffer: body.cursor.first_batch,
         })
     }

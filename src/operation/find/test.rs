@@ -226,11 +226,7 @@ fn handle_success() {
     );
 }
 
-fn verify_max_await_time(
-    max_await_time: Option<Duration>,
-    cursor_type: Option<CursorType>,
-    expects_max_time: bool,
-) {
+fn verify_max_await_time(max_await_time: Option<Duration>, cursor_type: Option<CursorType>) {
     let ns = Namespace::empty();
     let address = StreamAddress {
         hostname: "localhost".to_string(),
@@ -261,31 +257,21 @@ fn verify_max_await_time(
     let spec = find
         .handle_response(response)
         .expect("should handle correctly");
-    if expects_max_time {
-        assert_eq!(spec.max_time, max_await_time);
-    } else {
-        assert!(spec.max_time.is_none());
-    }
+    assert_eq!(spec.max_time, max_await_time);
 }
 
 #[test]
 fn handle_max_await_time() {
-    verify_max_await_time(None, None, false);
-    verify_max_await_time(Some(Duration::from_millis(5)), None, false);
+    verify_max_await_time(None, None);
+    verify_max_await_time(Some(Duration::from_millis(5)), None);
     verify_max_await_time(
         Some(Duration::from_millis(5)),
         Some(CursorType::NonTailable),
-        false,
     );
-    verify_max_await_time(
-        Some(Duration::from_millis(5)),
-        Some(CursorType::Tailable),
-        false,
-    );
+    verify_max_await_time(Some(Duration::from_millis(5)), Some(CursorType::Tailable));
     verify_max_await_time(
         Some(Duration::from_millis(5)),
         Some(CursorType::TailableAwait),
-        true,
     );
 }
 
