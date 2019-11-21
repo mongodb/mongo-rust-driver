@@ -3,13 +3,14 @@ pub mod options;
 use std::{fmt, sync::Arc};
 
 use bson::{Bson, Document};
+use serde::{de::Error, Deserialize, Deserializer};
 
 use self::options::*;
 use crate::{
     bson_util,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, Result},
-    operation::{Count, Delete, Distinct, DropCollection, Insert, Update},
+    operation::{Count, Delete, Distinct, DropCollection, Find, Insert, Update},
     results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
     selection_criteria::SelectionCriteria,
     Client, Cursor, Database,
@@ -207,7 +208,23 @@ impl Collection {
 
     /// Finds the documents in the collection matching `filter`.
     pub fn find(&self, filter: Option<Document>, options: Option<FindOptions>) -> Result<Cursor> {
-        unimplemented!()
+        let find = Find::new(self.namespace(), filter, options);
+        let client = self.client();
+        client
+            .execute_operation(&find, None)
+            .map(|spec| Cursor::new(client.clone(), spec))
+    }
+
+    /// Finds a single document in the collection matching `filter`.
+    pub fn find_one(
+        &self,
+        filter: Option<Document>,
+        options: Option<FindOneOptions>,
+    ) -> Result<Option<Document>> {
+        let mut options: FindOptions = options.map(Into::into).unwrap_or_else(Default::default);
+        options.limit = Some(-1);
+        let mut cursor = self.find(filter, Some(options))?;
+        cursor.next().transpose()
     }
 
     /// Atomically finds up to one document in the collection matching `filter` and deletes it.
@@ -367,8 +384,45 @@ pub struct Namespace {
     pub coll: String,
 }
 
+impl Namespace {
+    #[allow(dead_code)]
+    pub(crate) fn empty() -> Self {
+        Self {
+            db: String::new(),
+            coll: String::new(),
+        }
+    }
+}
+
 impl fmt::Display for Namespace {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "{}.{}", self.db, self.coll)
+    }
+}
+
+impl<'de> Deserialize<'de> for Namespace {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s: String = Deserialize::deserialize(deserializer)?;
+        let mut parts = s.split('.');
+
+        let db = parts.next();
+        let coll = parts.next();
+
+        if parts.count() != 0 {
+            return Err(D::Error::custom(
+                "Expected a single dot in the namepsace, got more than one",
+            ));
+        }
+
+        match (db, coll) {
+            (Some(db), Some(coll)) => Ok(Self {
+                db: db.to_string(),
+                coll: coll.to_string(),
+            }),
+            _ => Err(D::Error::custom("Missing one or more fields in namespace")),
+        }
     }
 }

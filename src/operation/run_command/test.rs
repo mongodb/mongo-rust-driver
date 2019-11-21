@@ -30,7 +30,7 @@ fn no_error_ok_0() {
     let op = RunCommand::new("foo".into(), doc! { "isMaster": 1 }, None);
     assert!(op.selection_criteria().is_none());
 
-    let command_response = CommandResponse::from_document(doc! {
+    let command_response = CommandResponse::with_document(doc! {
         "ok": 0
     });
 

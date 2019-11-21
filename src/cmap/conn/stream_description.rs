@@ -4,10 +4,10 @@ use crate::is_master::IsMasterReply;
 #[derive(Debug, Default)]
 pub(crate) struct StreamDescription {
     /// The maximum wire version that the server understands.
-    pub max_wire_version: Option<i32>,
+    pub(crate) max_wire_version: Option<i32>,
 
     /// The minimum wire version that the server understands.
-    pub min_wire_version: Option<i32>,
+    pub(crate) min_wire_version: Option<i32>,
     // TODO RUST-204: Add "saslSupportedMechs" if applicable.
 }
 

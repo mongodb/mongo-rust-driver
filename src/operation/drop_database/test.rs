@@ -54,9 +54,9 @@ fn build() {
 fn handle_success() {
     let op = DropDatabase::empty();
 
-    let ok_response = CommandResponse::from_document(doc! { "ok": 1.0 });
+    let ok_response = CommandResponse::with_document(doc! { "ok": 1.0 });
     assert!(op.handle_response(ok_response).is_ok());
-    let ok_extra = CommandResponse::from_document(doc! { "ok": 1.0, "hello": "world" });
+    let ok_extra = CommandResponse::with_document(doc! { "ok": 1.0, "hello": "world" });
     assert!(op.handle_response(ok_extra).is_ok());
 }
 
@@ -69,7 +69,7 @@ fn handle_command_error() {
 fn handle_write_concern_error() {
     let op = DropDatabase::empty();
 
-    let response = CommandResponse::from_document(doc! {
+    let response = CommandResponse::with_document(doc! {
         "writeConcernError": {
             "code": 100,
             "codeName": "hello world",

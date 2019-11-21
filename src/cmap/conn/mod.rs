@@ -183,7 +183,7 @@ impl Connection {
         message.write_to(&mut self.stream)?;
 
         let response_message = Message::read_from(&mut self.stream)?;
-        CommandResponse::from_message(response_message)
+        CommandResponse::new(self.address.clone(), response_message)
     }
 
     /// Gets the connection's StreamDescription.

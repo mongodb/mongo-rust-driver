@@ -109,7 +109,7 @@ fn build() {
 fn handle_success() {
     let fixtures = fixtures();
 
-    let ok_response = CommandResponse::from_document(doc! { "ok": 1.0, "n": 3 });
+    let ok_response = CommandResponse::with_document(doc! { "ok": 1.0, "n": 3 });
     let ok_result = fixtures.op.handle_response(ok_response);
     assert!(ok_result.is_ok());
 
@@ -125,7 +125,7 @@ fn handle_success() {
 fn handle_invalid_response() {
     let fixtures = fixtures();
 
-    let invalid_response = CommandResponse::from_document(doc! { "ok": 1.0, "asdfadsf": 123123 });
+    let invalid_response = CommandResponse::with_document(doc! { "ok": 1.0, "asdfadsf": 123123 });
     assert!(fixtures.op.handle_response(invalid_response).is_err());
 }
 
@@ -139,7 +139,7 @@ fn handle_command_error() {
 fn handle_write_failure() {
     let fixtures = fixtures();
 
-    let write_error_response = CommandResponse::from_document(doc! {
+    let write_error_response = CommandResponse::with_document(doc! {
         "ok": 1.0,
         "n": 1,
         "writeErrors": [

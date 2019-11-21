@@ -89,7 +89,7 @@ fn handle_success() {
     let expected_values: Vec<Bson> =
         vec![Bson::String("A".to_string()), Bson::String("B".to_string())];
 
-    let response = CommandResponse::from_document(doc! {
+    let response = CommandResponse::with_document(doc! {
        "values" : expected_values.clone(),
        "ok" : 1
     });
@@ -105,7 +105,7 @@ fn handle_success() {
 fn handle_response_with_empty_values() {
     let distinct_op = Distinct::empty();
 
-    let response = CommandResponse::from_document(doc! {
+    let response = CommandResponse::with_document(doc! {
        "values" : [],
        "ok" : 1
     });
@@ -123,7 +123,7 @@ fn handle_response_with_empty_values() {
 fn handle_response_no_values() {
     let distinct_op = Distinct::empty();
 
-    let response = CommandResponse::from_document(doc! {
+    let response = CommandResponse::with_document(doc! {
        "ok" : 1
     });
 
@@ -138,7 +138,7 @@ fn handle_response_no_values() {
 fn handle_response_no_ok() {
     let distinct_op = Distinct::empty();
 
-    let response = CommandResponse::from_document(doc! {
+    let response = CommandResponse::with_document(doc! {
        "values" : [ "A", "B" ],
     });
 

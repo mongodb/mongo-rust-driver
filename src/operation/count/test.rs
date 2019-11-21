@@ -65,7 +65,7 @@ fn handle_success() {
     let count_op = Count::empty();
 
     let n = 26;
-    let response = CommandResponse::from_document(doc! { "n" : n, "ok" : 1 });
+    let response = CommandResponse::with_document(doc! { "n" : n, "ok" : 1 });
 
     let actual_values = count_op
         .handle_response(response)
@@ -78,7 +78,7 @@ fn handle_success() {
 fn handle_response_no_n() {
     let count_op = Count::empty();
 
-    let response = CommandResponse::from_document(doc! { "ok" : 1 });
+    let response = CommandResponse::with_document(doc! { "ok" : 1 });
 
     let result = count_op.handle_response(response);
     match result.as_ref().map_err(|e| e.as_ref()) {
@@ -91,7 +91,7 @@ fn handle_response_no_n() {
 fn handle_response_no_ok() {
     let count_op = Count::empty();
 
-    let response = CommandResponse::from_document(doc! { "n" : 26 });
+    let response = CommandResponse::with_document(doc! { "n" : 26 });
 
     let result = count_op.handle_response(response);
     match result.as_ref().map_err(|e| e.as_ref()) {

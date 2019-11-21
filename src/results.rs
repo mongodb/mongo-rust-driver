@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use bson::Bson;
+use bson::{Bson, Document};
 
 /// The result of a `Collection::insert_one` operation.
 #[derive(Debug)]
@@ -46,4 +46,10 @@ pub struct UpdateResult {
 pub struct DeleteResult {
     /// The number of documents deleted by the operation.
     pub deleted_count: i64,
+}
+
+#[derive(Debug)]
+pub(crate) struct GetMoreResult {
+    pub(crate) batch: Vec<Document>,
+    pub(crate) exhausted: bool,
 }

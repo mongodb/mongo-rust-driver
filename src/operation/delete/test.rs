@@ -98,7 +98,7 @@ fn build_one() {
 fn handle_success() {
     let op = Delete::empty();
 
-    let ok_response = CommandResponse::from_document(doc! {
+    let ok_response = CommandResponse::with_document(doc! {
         "ok": 1.0,
         "n": 3,
     });
@@ -114,7 +114,7 @@ fn handle_success() {
 fn handle_invalid_response() {
     let op = Delete::empty();
 
-    let invalid_response = CommandResponse::from_document(doc! { "ok": 1.0, "asdfadsf": 123123 });
+    let invalid_response = CommandResponse::with_document(doc! { "ok": 1.0, "asdfadsf": 123123 });
     assert!(op.handle_response(invalid_response).is_err());
 }
 
@@ -127,7 +127,7 @@ fn handle_command_error() {
 fn handle_write_failure() {
     let op = Delete::empty();
 
-    let write_error_response = CommandResponse::from_document(doc! {
+    let write_error_response = CommandResponse::with_document(doc! {
         "ok": 1.0,
         "n": 0,
         "writeErrors": [
@@ -157,7 +157,7 @@ fn handle_write_failure() {
 fn handle_write_concern_failure() {
     let op = Delete::empty();
 
-    let wc_error_response = CommandResponse::from_document(doc! {
+    let wc_error_response = CommandResponse::with_document(doc! {
         "ok": 1.0,
         "n": 0,
         "writeConcernError": {

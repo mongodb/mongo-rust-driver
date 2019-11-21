@@ -5,6 +5,7 @@ use derivative::Derivative;
 
 use crate::{
     error::{ErrorKind, Result},
+    options::StreamAddress,
     sdam::public::ServerInfo,
 };
 
@@ -50,6 +51,10 @@ impl SelectionCriteria {
             Self::ReadPreference(ReadPreference::Primary) => true,
             _ => false,
         }
+    }
+
+    pub(crate) fn from_address(address: StreamAddress) -> Self {
+        SelectionCriteria::Predicate(Arc::new(move |server| server.address() == &address))
     }
 }
 
