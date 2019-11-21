@@ -1,7 +1,10 @@
 use bson::{bson, doc};
 
 use super::RunCommand;
-use crate::{cmap::StreamDescription, operation::Operation};
+use crate::{
+    cmap::{CommandResponse, StreamDescription},
+    operation::Operation,
+};
 
 #[test]
 fn basic_construction() {
@@ -19,5 +22,20 @@ fn basic_construction() {
             .get("isMaster")
             .and_then(crate::bson_util::get_int),
         Some(1)
+    );
+}
+
+#[test]
+fn no_error_ok_0() {
+    let op = RunCommand::new("foo".into(), doc! { "isMaster": 1 }, None);
+    assert!(op.selection_criteria().is_none());
+
+    let command_response = CommandResponse::from_document(doc! {
+        "ok": 0
+    });
+
+    assert_eq!(
+        op.handle_response(command_response).ok(),
+        Some(doc! { "ok": 0 })
     );
 }
