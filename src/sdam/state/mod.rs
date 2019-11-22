@@ -24,19 +24,21 @@ use crate::{
 #[derive(Clone)]
 pub(crate) struct TopologyUpdateCondvar {
     condvar: Arc<Condvar>,
+    mutex: Arc<Mutex<()>>,
 }
 
 impl TopologyUpdateCondvar {
     pub(crate) fn new() -> Self {
         Self {
             condvar: Arc::new(Condvar::new()),
+            mutex: Default::default(),
         }
     }
 
     pub(crate) fn wait_timeout(&self, duration: Duration) {
         let _ = self
             .condvar
-            .wait_timeout(Mutex::new(()).lock().unwrap(), duration)
+            .wait_timeout(self.mutex.lock().unwrap(), duration)
             .unwrap();
     }
 

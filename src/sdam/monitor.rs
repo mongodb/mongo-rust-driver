@@ -4,6 +4,7 @@ use std::{
 };
 
 use bson::{bson, doc};
+use time::PreciseTime;
 
 use super::{
     description::server::{ServerDescription, ServerType},
@@ -109,18 +110,22 @@ fn check_server(
 }
 
 fn is_master(conn: &mut Connection) -> Result<IsMasterReply> {
-    let command_response = conn
-        .send_command(Command::new_read(
-            "isMaster".into(),
-            "admin".into(),
-            None,
-            doc! { "isMaster": 1 },
-        ))?
-        .body()?;
+    let command = Command::new_read(
+        "isMaster".into(),
+        "admin".into(),
+        None,
+        doc! { "isMaster": 1 },
+    );
+
+    let start_time = PreciseTime::now();
+    let command_response = conn.send_command(command)?;
+    let end_time = PreciseTime::now();
+
+    let command_response = command_response.body()?;
 
     Ok(IsMasterReply {
         command_response,
         // TODO RUST-193: Round-trip time
-        round_trip_time: None,
+        round_trip_time: Some(start_time.to(end_time).to_std().unwrap()),
     })
 }
