@@ -7,6 +7,7 @@ use crate::{
     bson_util,
     cmap::{CommandResponse, StreamDescription},
     concern::ReadConcern,
+    error::{ErrorKind, WriteFailure},
     operation::{test, Aggregate, Operation},
     options::{AggregateOptions, Hint, StreamAddress},
     Namespace,
@@ -239,7 +240,7 @@ fn handle_max_await_time() {
         },
     );
 
-    let aggregate = Aggregate::new(Namespace::empty(), Vec::new(), None);
+    let aggregate = Aggregate::empty();
 
     let spec = aggregate
         .handle_response(response.clone())
@@ -260,6 +261,70 @@ fn handle_max_await_time() {
 #[test]
 fn handle_command_error() {
     test::handle_command_error(Aggregate::empty())
+}
+
+#[test]
+fn handle_write_concern_error() {
+    let response = CommandResponse::with_document(doc! {
+        "cursor" : {
+            "firstBatch" : [ ],
+            "id" : 0 as i64,
+            "ns" : "test.test"
+        },
+        "writeConcernError" : {
+            "code" : 64,
+            "codeName" : "WriteConcernFailed",
+            "errmsg" : "waiting for replication timed out",
+            "errInfo" : {
+                "wtimeout" : true
+            }
+        },
+        "ok" : 1,
+    });
+
+    let aggregate = Aggregate::new(
+        Namespace::empty(),
+        vec![doc! { "$merge": { "into": "a" } }],
+        None,
+    );
+
+    let error = aggregate
+        .handle_response(response)
+        .expect_err("should get wc error");
+    match *error.kind {
+        ErrorKind::WriteError(WriteFailure::WriteConcernError(_)) => {}
+        ref e => panic!("should have gotten WriteConcernError, got {:?} instead", e),
+    }
+
+    // should return CommandError in case both are present.
+    let response = CommandResponse::with_document(doc! {
+        "writeConcernError" : {
+            "code" : 64,
+            "codeName" : "WriteConcernFailed",
+            "errmsg" : "waiting for replication timed out",
+            "errInfo" : {
+                "wtimeout" : true
+            }
+        },
+        "ok" : 0,
+        "errmsg" : "E11000 duplicate key error collection: test.other index: _id_ dup key: { _id: 1.0 }",
+        "code" : 11000,
+        "codeName" : "DuplicateKey",
+        "keyPattern" : {
+            "_id" : 1
+        },
+        "keyValue" : {
+            "_id" : 1
+        }
+    });
+
+    let error = aggregate
+        .handle_response(response)
+        .expect_err("should get command error");
+    match *error.kind {
+        ErrorKind::CommandError(_) => {}
+        ref e => panic!("should have gotten CommandError, got {:?} instead", e),
+    }
 }
 
 #[test]
