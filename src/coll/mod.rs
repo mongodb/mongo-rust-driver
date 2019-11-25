@@ -398,6 +398,7 @@ pub struct Namespace {
 }
 
 impl Namespace {
+    /// Used for testing.
     #[allow(dead_code)]
     pub(crate) fn empty() -> Self {
         Self {

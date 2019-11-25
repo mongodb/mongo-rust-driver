@@ -4,6 +4,7 @@ use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
 use crate::{
+    bson_util,
     concern::{ReadConcern, WriteConcern},
     selection_criteria::SelectionCriteria,
 };
@@ -112,4 +113,17 @@ pub struct DropDatabaseOptions {
     /// The write concern for the operation.
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
+}
+
+#[derive(Debug, Default, TypedBuilder, Serialize)]
+pub struct ListCollectionsOptions {
+    /// The number of documents the server should return per cursor batch.
+    ///
+    /// Note that this does not have any affect on the documents that are returned by a cursor,
+    /// only the number of documents kept in memory at a given time (and by extension, the
+    /// number of round trips needed to return the entire set of documents returned by the
+    /// query).
+    #[builder(default)]
+    #[serde(serialize_with = "bson_util::serialize_batch_size", rename = "cursor")]
+    pub batch_size: Option<u32>,
 }
