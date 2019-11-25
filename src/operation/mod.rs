@@ -1,3 +1,4 @@
+mod aggregate;
 mod count;
 mod create;
 mod delete;
@@ -25,6 +26,7 @@ use crate::{
     Namespace,
 };
 
+pub(crate) use aggregate::Aggregate;
 pub(crate) use count::Count;
 pub(crate) use create::Create;
 pub(crate) use delete::Delete;

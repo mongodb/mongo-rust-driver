@@ -35,9 +35,13 @@ pub(crate) fn sort_document(document: &mut Document) {
     document.extend(elements);
 }
 
+pub(crate) fn first_key(document: &Document) -> Option<&str> {
+    document.keys().next().map(String::as_str)
+}
+
 pub(crate) fn replacement_document_check(replacement: &Document) -> Result<()> {
-    match replacement.iter().next() {
-        Some((s, _)) if !s.starts_with('$') => Ok(()),
+    match first_key(replacement) {
+        Some(s) if !s.starts_with('$') => Ok(()),
         _ => Err(ErrorKind::ArgumentError {
             message: "replace document must have first key not starting with '$".to_string(),
         }
@@ -46,8 +50,8 @@ pub(crate) fn replacement_document_check(replacement: &Document) -> Result<()> {
 }
 
 pub(crate) fn update_document_check(update: &Document) -> Result<()> {
-    match update.iter().next() {
-        Some((s, _)) if s.starts_with('$') => Ok(()),
+    match first_key(update) {
+        Some(s) if s.starts_with('$') => Ok(()),
         _ => Err(ErrorKind::ArgumentError {
             message: "update document must have first key starting with '$".to_string(),
         }
