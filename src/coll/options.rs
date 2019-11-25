@@ -1,12 +1,12 @@
 use std::time::Duration;
 
-use bson::{bson, doc, Bson, Document};
-use serde::{ser, Serialize, Serializer};
+use bson::{doc, Bson, Document};
+use serde::{Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    bson_util::{serialize_duration_as_i64_millis, serialize_u32_as_i32},
+    bson_util::{serialize_batch_size, serialize_duration_as_i64_millis, serialize_u32_as_i32},
     concern::{ReadConcern, WriteConcern},
     options::SelectionCriteria,
 };
@@ -394,23 +394,6 @@ pub struct AggregateOptions {
     /// be used.
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
-}
-
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn serialize_batch_size<S: Serializer>(
-    val: &Option<u32>,
-    serializer: S,
-) -> Result<S::Ok, S::Error> {
-    match val {
-        Some(val) if { *val <= std::i32::MAX as u32 } => (doc! {
-            "batchSize": (*val as i32)
-        })
-        .serialize(serializer),
-        None => Document::new().serialize(serializer),
-        _ => Err(ser::Error::custom(
-            "batch size must be able to fit into a signed 32-bit integer",
-        )),
-    }
 }
 
 /// Specifies the options to a `Collection::count_documents` operation.
