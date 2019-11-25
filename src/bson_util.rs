@@ -83,7 +83,7 @@ pub(crate) fn serialize_batch_size<S: Serializer>(
     serializer: S,
 ) -> std::result::Result<S::Ok, S::Error> {
     match val {
-        Some(val) if { *val <= std::i32::MAX as u32 } => (doc! {
+        Some(val) if *val <= std::i32::MAX as u32 => (doc! {
             "batchSize": (*val as i32)
         })
         .serialize(serializer),
