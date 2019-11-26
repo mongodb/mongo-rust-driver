@@ -167,3 +167,29 @@ impl Topology {
         Ok(())
     }
 }
+
+/// Updates the provided topology in a minimally contentious way by cloning first.
+pub(crate) fn update_topology(
+    topology: Arc<RwLock<Topology>>,
+    server_description: ServerDescription,
+) {
+    // Because we're calling clone on the lock guard, we're actually copying the Topology itself,
+    // not just making a new reference to it. The `servers` field will contain references to the
+    // same instances though, since each is wrapped in an `Arc`.
+    let mut topology_clone = topology.read().unwrap().clone();
+
+    // TODO RUST-232: Theoretically, `TopologyDescription::update` can return an error. However,
+    // this can only happen if we try to access a field from the isMaster response when an error
+    // occurred during the check. In practice, this can't happen, because the SDAM algorithm doesn't
+    // check the fields of an Unknown server, and we only return Unknown server descriptions when
+    // errors occur. Once we implement SDAM monitoring, we can properly inform users of errors that
+    // occur here.
+    let _ = topology_clone.update_state(server_description, &topology);
+
+    // Now that we have the proper state in the copy, acquire a lock on the proper topology and move
+    // the info over.
+    let mut topology_lock = topology.write().unwrap();
+    topology_lock.description = topology_clone.description;
+    topology_lock.servers = topology_clone.servers;
+    topology_lock.notify();
+}
