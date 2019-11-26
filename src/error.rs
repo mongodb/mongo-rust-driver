@@ -115,7 +115,7 @@ pub enum ErrorKind {
 }
 
 impl ErrorKind {
-    pub(crate) fn is_network_error(&self) -> bool {
+    pub(crate) fn is_non_timeout_network_error(&self) -> bool {
         match self {
             ErrorKind::Io(ref io_err) if io_err.kind() != std::io::ErrorKind::TimedOut => true,
             _ => false,

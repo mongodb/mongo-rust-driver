@@ -48,7 +48,7 @@ impl Client {
                         update_topology(self.topology(), description);
                     };
 
-                    if e.is_network_error() {
+                    if e.is_non_timeout_network_error() {
                         update();
                     } else if e.is_recovering() || e.is_not_master() {
                         update();
