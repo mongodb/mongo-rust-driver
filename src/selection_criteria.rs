@@ -46,6 +46,14 @@ impl SelectionCriteria {
         }
     }
 
+    #[allow(dead_code)]
+    pub(crate) fn as_predicate(&self) -> Option<&Arc<dyn Send + Sync + Fn(&ServerInfo) -> bool>> {
+        match self {
+            Self::Predicate(ref p) => Some(p),
+            _ => None,
+        }
+    }
+
     pub(crate) fn is_read_pref_primary(&self) -> bool {
         match self {
             Self::ReadPreference(ReadPreference::Primary) => true,

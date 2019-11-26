@@ -160,6 +160,17 @@ fn build_max_await_time() {
 }
 
 #[test]
+fn op_selection_criteria() {
+    test::op_selection_criteria(|selection_criteria| {
+        let options = AggregateOptions {
+            selection_criteria,
+            ..Default::default()
+        };
+        Aggregate::new("".to_string(), Vec::new(), Some(options))
+    });
+}
+
+#[test]
 fn handle_success() {
     let ns = Namespace {
         db: "test_db".to_string(),

@@ -120,6 +120,13 @@ impl TopologyDescription {
         self.servers.keys()
     }
 
+    pub(crate) fn get_server_description(
+        &self,
+        address: &StreamAddress,
+    ) -> Option<&ServerDescription> {
+        self.servers.get(address)
+    }
+
     pub(crate) fn update_command_with_read_pref(
         &self,
         server_type: ServerType,

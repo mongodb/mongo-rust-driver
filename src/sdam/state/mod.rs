@@ -97,10 +97,16 @@ impl Topology {
 
     pub(crate) fn update_command_with_read_pref(
         &self,
-        server_type: ServerType,
+        server_address: &StreamAddress,
         command: &mut Command,
         criteria: Option<&SelectionCriteria>,
     ) {
+        let server_type = self
+            .description
+            .get_server_description(server_address)
+            .map(|desc| desc.server_type)
+            .unwrap_or(ServerType::Unknown);
+
         self.description
             .update_command_with_read_pref(server_type, command, criteria)
     }

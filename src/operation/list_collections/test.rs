@@ -121,6 +121,14 @@ fn build_batch_size() {
 }
 
 #[test]
+fn op_selection_criteria() {
+    assert!(ListCollections::empty()
+        .selection_criteria()
+        .expect("should have criteria")
+        .is_read_pref_primary());
+}
+
+#[test]
 fn handle_success() {
     let ns = Namespace {
         db: "test_db".to_string(),

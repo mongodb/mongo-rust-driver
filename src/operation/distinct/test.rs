@@ -83,6 +83,17 @@ fn build_with_options() {
 }
 
 #[test]
+fn op_selection_criteria() {
+    test::op_selection_criteria(|selection_criteria| {
+        let options = DistinctOptions {
+            selection_criteria,
+            ..Default::default()
+        };
+        Distinct::new(Namespace::empty(), String::new(), None, Some(options))
+    });
+}
+
+#[test]
 fn handle_success() {
     let distinct_op = Distinct::empty();
 
