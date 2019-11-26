@@ -17,7 +17,7 @@ impl Client {
         let mut conn = self
             .select_server(op.selection_criteria())?
             .checkout_connection()?;
-        self.execute_operation_on_connection(op, &mut conn)?
+        self.execute_operation_on_connection(op, &mut conn)
             .map(|r| (r, conn))
     }
 
@@ -32,71 +32,58 @@ impl Client {
     ) -> Result<T::O> {
         // if no connection provided, select one.
         match connection {
-            Some(conn) => self.execute_operation_on_connection(op, conn)?,
+            Some(conn) => self.execute_operation_on_connection(op, conn),
             None => {
                 let server = self.select_server(op.selection_criteria())?;
                 let mut conn = server.checkout_connection()?;
 
-                match self.execute_operation_on_connection(op, &mut conn) {
-                    Ok(handled_result) => {
-                        if let Err(ref e) = handled_result {
-                            // If we encounter a "not master" or "node is recovering" error, we must
-                            // update the topology as per the SDAM spec.
-                            if e.is_recovering() || e.is_not_master() {
-                                let description = ServerDescription::new(
-                                    conn.address().clone(),
-                                    Some(Err(e.clone())),
-                                );
-                                update_topology(self.topology(), description);
-                                server.request_topology_check();
+                let result = self.execute_operation_on_connection(op, &mut conn);
 
-                                // in 4.2+, we only clear connection pool if we've received a
-                                // "node is shutting down" error.
-                                if conn
-                                    .stream_description()
-                                    .map(|sd| sd.max_wire_version.unwrap_or(0) >= 8)
-                                    .unwrap_or(false)
-                                {
-                                    if e.is_shutting_down() {
-                                        server.clear_connection_pool();
-                                    }
-                                } else {
-                                    // otherwise, clear the pool for all "node is recovering or "not
-                                    // master" errors.
-                                    server.clear_connection_pool();
-                                }
-                            }
+                // If we encounter certain errors, we must update the topology as per the
+                // SDAM spec.
+                if let Err(ref e) = result {
+                    let update = || {
+                        let description =
+                            ServerDescription::new(conn.address().clone(), Some(Err(e.clone())));
+                        update_topology(self.topology(), description);
+                    };
+
+                    if e.is_network_error() {
+                        update();
+                    } else if e.is_recovering() || e.is_not_master() {
+                        update();
+
+                        // For "node is recovering" or "not master" errors, we must request a
+                        // topology check.
+                        server.request_topology_check();
+
+                        let wire_version = conn
+                            .stream_description()
+                            .map(|sd| sd.max_wire_version)
+                            .ok()
+                            .and_then(std::convert::identity)
+                            .unwrap_or(0);
+
+                        // in 4.2+, we only clear connection pool if we've received a
+                        // "node is shutting down" error. Otherwise, we always clear the pool.
+                        if wire_version < 8 || e.is_shutting_down() {
+                            server.clear_connection_pool();
                         }
-                        handled_result
-                    }
-                    Err(e) => {
-                        // If we encounter a network error, we must update the topology as per the
-                        // SDAM spec.
-                        if e.is_network_error() {
-                            let description = ServerDescription::new(
-                                conn.address().clone(),
-                                Some(Err(e.clone())),
-                            );
-                            update_topology(self.topology(), description);
-                        }
-                        Err(e)
                     }
                 }
+                result
             }
         }
     }
 
     /// Executes an operation on a given connection.
-    /// The first layer of errors correspond to any connection errors sending the command or
-    /// receiving a response. The second layer correspond to those generated by
-    /// `Operation::handle_response`.
     fn execute_operation_on_connection<T: Operation>(
         &self,
         op: &T,
         connection: &mut Connection,
-    ) -> Result<Result<T::O>> {
+    ) -> Result<T::O> {
         let cmd = op.build(connection.stream_description()?)?;
         let response = connection.send_command(cmd)?;
-        Ok(op.handle_response(response))
+        op.handle_response(response)
     }
 }
