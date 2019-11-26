@@ -1,9 +1,16 @@
 use std::{fmt, sync::Arc};
 
 use err_derive::Error;
+use lazy_static::lazy_static;
 use serde::Deserialize;
 
 use crate::options::StreamAddress;
+
+lazy_static! {
+    static ref RECOVERING_CODES: Vec<i32> = vec![11600, 11602, 13436, 189, 91];
+    static ref NOTMASTER_CODES: Vec<i32> = vec![10107, 13435];
+    static ref SHUTTING_DOWN_CODES: Vec<i32> = vec![11600, 91];
+}
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -107,10 +114,72 @@ pub enum ErrorKind {
     WriteError(WriteFailure),
 }
 
+impl ErrorKind {
+    pub(crate) fn is_network_error(&self) -> bool {
+        match self {
+            ErrorKind::Io(ref io_err) if io_err.kind() != std::io::ErrorKind::TimedOut => true,
+            _ => false,
+        }
+    }
+
+    /// Gets the code/message tuple from this error, if applicable. In the case of write errors, the
+    /// code and message are taken from the write concern error, if there is one.
+    fn code_and_message(&self) -> Option<(i32, &str)> {
+        match self {
+            ErrorKind::CommandError(ref cmd_err) => Some((cmd_err.code, cmd_err.message.as_str())),
+            ErrorKind::WriteError(WriteFailure::WriteConcernError(ref wc_err)) => {
+                Some((wc_err.code, wc_err.message.as_str()))
+            }
+            ErrorKind::BulkWriteError(ref bwe) => bwe
+                .write_concern_error
+                .as_ref()
+                .map(|wc_err| (wc_err.code, wc_err.message.as_str())),
+            _ => None,
+        }
+    }
+
+    /// If this error corresponds to a "not master" error as per the SDAM spec.
+    pub(crate) fn is_not_master(&self) -> bool {
+        self.code_and_message()
+            .map(|(code, msg)| is_not_master(code, msg))
+            .unwrap_or(false)
+    }
+
+    /// If this error corresponds to a "node is recovering" error as per the SDAM spec.
+    pub(crate) fn is_recovering(&self) -> bool {
+        self.code_and_message()
+            .map(|(code, msg)| is_recovering(code, msg))
+            .unwrap_or(false)
+    }
+
+    /// If this error corresponds to a "node is shutting down" error as per the SDAM spec.
+    pub(crate) fn is_shutting_down(&self) -> bool {
+        self.code_and_message()
+            .map(|(code, _)| SHUTTING_DOWN_CODES.contains(&code))
+            .unwrap_or(false)
+    }
+}
+
+fn is_not_master(code: i32, message: &str) -> bool {
+    if NOTMASTER_CODES.contains(&code) {
+        return true;
+    } else if is_recovering(code, message) {
+        return false;
+    }
+    message.contains("not master")
+}
+
+fn is_recovering(code: i32, message: &str) -> bool {
+    if RECOVERING_CODES.contains(&code) {
+        return true;
+    }
+    message.contains("not master or secondary") || message.contains("node is recovering")
+}
+
 /// An error that occurred due to a database command failing.
 #[derive(Clone, Debug, Deserialize)]
 pub struct CommandError {
-    pub code: u32,
+    pub code: i32,
 
     #[serde(rename = "codeName", default)]
     pub code_name: String,

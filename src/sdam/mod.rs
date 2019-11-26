@@ -6,6 +6,6 @@ mod state;
 pub use self::public::{ServerInfo, ServerType};
 
 pub(crate) use self::{
-    description::topology::TopologyDescription,
-    state::{server::Server, Topology, TopologyUpdateCondvar},
+    description::{server::ServerDescription, topology::TopologyDescription},
+    state::{server::Server, update_topology, Topology, TopologyUpdateCondvar},
 };

@@ -174,6 +174,10 @@ impl Client {
         self.emit_command_event(|handler| handler.handle_command_failed_event(event.clone()));
     }
 
+    fn topology(&self) -> Arc<RwLock<Topology>> {
+        self.inner.topology.clone()
+    }
+
     /// Select a server using the provided criteria. If none is provided, a primary read preference
     /// will be used instead.
     fn select_server(&self, criteria: Option<&SelectionCriteria>) -> Result<Arc<Server>> {
