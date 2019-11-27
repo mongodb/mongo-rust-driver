@@ -66,7 +66,7 @@ impl SelectionCriteria {
     }
 }
 
-/// A predicate used to filter servers that are considered sitable.
+/// A predicate used to filter servers that are considered suitable.
 pub type Predicate = Arc<dyn Send + Sync + Fn(&ServerInfo) -> bool>;
 
 /// Specifies how the driver should route a read operation to members of a replica set.
