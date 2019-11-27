@@ -6,6 +6,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use bson::{bson, doc, oid::ObjectId, Bson};
 use mongodb::{options::ClientOptions, Client, Collection};
+use semver::Version;
 use serde::Deserialize;
 
 use self::event::EventHandler;
@@ -16,6 +17,7 @@ pub struct TestClient {
     client: Client,
     pub options: ClientOptions,
     pub server_info: IsMasterCommandResponse,
+    pub server_version: Version,
 }
 
 impl std::ops::Deref for TestClient {
@@ -50,10 +52,19 @@ impl TestClient {
         ))
         .unwrap();
 
+        let response = client
+            .database("test")
+            .run_command(doc! { "buildInfo": 1 }, None)
+            .unwrap();
+
+        let info: BuildInfo = bson::from_bson(Bson::Document(response)).unwrap();
+        let server_version = Version::parse(&info.version).unwrap();
+
         Self {
             client,
             options,
             server_info,
+            server_version,
         }
     }
 
@@ -68,6 +79,40 @@ impl TestClient {
         coll.drop(None).unwrap();
         coll
     }
+
+    #[allow(dead_code)]
+    pub fn server_version_eq(&mut self, major: u64, minor: u64) -> bool {
+        self.server_version.major == major && self.server_version.minor == minor
+    }
+
+    #[allow(dead_code)]
+    pub fn server_version_gt(&mut self, major: u64, minor: u64) -> bool {
+        self.server_version.major > major
+            || (self.server_version.major == major && self.server_version.minor > minor)
+    }
+
+    #[allow(dead_code)]
+    pub fn server_version_gte(&mut self, major: u64, minor: u64) -> bool {
+        self.server_version.major > major
+            || (self.server_version.major == major && self.server_version.minor >= minor)
+    }
+
+    #[allow(dead_code)]
+    pub fn server_version_lt(&mut self, major: u64, minor: u64) -> bool {
+        self.server_version.major < major
+            || (self.server_version.major == major && self.server_version.minor < minor)
+    }
+
+    #[allow(dead_code)]
+    pub fn server_version_lte(&mut self, major: u64, minor: u64) -> bool {
+        self.server_version.major < major
+            || (self.server_version.major == major && self.server_version.minor <= minor)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct BuildInfo {
+    version: String,
 }
 
 // Copy of the internal isMaster struct; fix this later.
