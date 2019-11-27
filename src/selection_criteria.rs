@@ -19,7 +19,7 @@ pub enum SelectionCriteria {
 
     /// A predicate used to filter servers that are considered suitable. A `server` will be
     /// considered suitable by a `predicate` if `predicate(server)` returns true.
-    Predicate(#[derivative(Debug = "ignore")] Arc<dyn Send + Sync + Fn(&ServerInfo) -> bool>),
+    Predicate(#[derivative(Debug = "ignore")] Predicate),
 }
 
 impl PartialEq for SelectionCriteria {
@@ -47,7 +47,7 @@ impl SelectionCriteria {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn as_predicate(&self) -> Option<&Arc<dyn Send + Sync + Fn(&ServerInfo) -> bool>> {
+    pub(crate) fn as_predicate(&self) -> Option<&Predicate> {
         match self {
             Self::Predicate(ref p) => Some(p),
             _ => None,
@@ -65,6 +65,9 @@ impl SelectionCriteria {
         SelectionCriteria::Predicate(Arc::new(move |server| server.address() == &address))
     }
 }
+
+/// A predicate used to filter servers that are considered sitable.
+pub type Predicate = Arc<dyn Send + Sync + Fn(&ServerInfo) -> bool>;
 
 /// Specifies how the driver should route a read operation to members of a replica set.
 ///
