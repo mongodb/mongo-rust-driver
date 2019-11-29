@@ -95,6 +95,7 @@ impl Topology {
         self.condvar.notify()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn update_command_with_read_pref(
         &self,
         server_address: &StreamAddress,

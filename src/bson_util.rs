@@ -25,7 +25,7 @@ pub(crate) fn to_bson_array(docs: &[Document]) -> Bson {
     Bson::Array(docs.iter().map(|doc| Bson::Document(doc.clone())).collect())
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) fn sort_document(document: &mut Document) {
     let temp = std::mem::replace(document, Default::default());
 

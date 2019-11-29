@@ -214,6 +214,12 @@ impl Client {
                 return Ok(server.clone());
             }
 
+            // Because the servers in the copied Topology are Arc aliases of the servers in the
+            // original Topology, requesting a check on the copy will in turn request a check from
+            // each of the original servers, so the monitoring threads will be woken the same way
+            // they would if `request_topology_check` were called on the original Topology.
+            topology.request_topology_check();
+
             self.inner
                 .condvar
                 .wait_timeout(timeout - start_time.to(PreciseTime::now()).to_std().unwrap());

@@ -138,7 +138,6 @@ impl From<String> for Acknowledgment {
 }
 
 impl Acknowledgment {
-    #[allow(dead_code)]
     pub(crate) fn to_bson(&self) -> Bson {
         match self {
             Acknowledgment::Nodes(i) => Bson::I64(i64::from(*i)),

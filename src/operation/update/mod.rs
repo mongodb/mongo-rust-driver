@@ -24,7 +24,7 @@ pub(crate) struct Update {
 }
 
 impl Update {
-    #[allow(dead_code)]
+    #[cfg(test)]
     fn empty() -> Self {
         Update::new(
             Namespace {

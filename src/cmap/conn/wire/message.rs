@@ -43,18 +43,6 @@ impl Message {
         }
     }
 
-    /// Creates a Message with a single section containing `document`.
-    ///
-    /// Note that `response_to` will need to be set manually, as well as any non-default flags.
-    pub(crate) fn from_document(document: Document) -> Self {
-        Self {
-            response_to: 0,
-            flags: MessageFlags::empty(),
-            sections: vec![MessageSection::Document(document)],
-            checksum: None,
-        }
-    }
-
     /// Gets the first document contained in this Message.
     pub(crate) fn single_document_response(self) -> Result<Document> {
         self.sections
@@ -73,6 +61,7 @@ impl Message {
     }
 
     /// Gets all documents contained in this Message flattened to a single Vec.
+    #[allow(dead_code)]
     pub(crate) fn documents(self) -> Vec<Document> {
         self.sections
             .into_iter()

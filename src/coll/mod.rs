@@ -410,8 +410,7 @@ pub struct Namespace {
 }
 
 impl Namespace {
-    /// Used for testing.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) fn empty() -> Self {
         Self {
             db: String::new(),

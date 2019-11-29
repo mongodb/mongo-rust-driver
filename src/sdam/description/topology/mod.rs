@@ -112,10 +112,6 @@ impl TopologyDescription {
         })
     }
 
-    pub(crate) fn contains_address(&self, address: &StreamAddress) -> bool {
-        self.servers.contains_key(address)
-    }
-
     pub(crate) fn server_addresses(&self) -> impl Iterator<Item = &StreamAddress> {
         self.servers.keys()
     }
@@ -154,6 +150,7 @@ impl TopologyDescription {
         }
     }
 
+    #[allow(dead_code)]
     fn update_command_read_pref_for_mongos(
         &self,
         command: &mut Command,
