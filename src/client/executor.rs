@@ -82,7 +82,13 @@ impl Client {
         op: &T,
         connection: &mut Connection,
     ) -> Result<T::O> {
-        let cmd = op.build(connection.stream_description()?)?;
+        let mut cmd = op.build(connection.stream_description()?)?;
+
+        self.topology()
+            .read()
+            .unwrap()
+            .update_command_with_read_pref(connection.address(), &mut cmd, op.selection_criteria());
+
         let response = connection.send_command(cmd)?;
         op.handle_response(response)
     }

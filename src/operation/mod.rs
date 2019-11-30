@@ -157,9 +157,16 @@ struct CursorInfo {
 
 #[cfg(test)]
 mod test {
+    use std::sync::Arc;
+
     use bson::{bson, doc};
 
-    use crate::{cmap::CommandResponse, error::ErrorKind, operation::Operation};
+    use crate::{
+        cmap::CommandResponse,
+        error::ErrorKind,
+        operation::Operation,
+        options::{ReadPreference, SelectionCriteria},
+    };
 
     pub(crate) fn handle_command_error<T: Operation>(op: T) {
         let cmd_error = CommandResponse::with_document(
@@ -176,5 +183,27 @@ mod test {
             }
             _ => panic!("expected command error"),
         };
+    }
+
+    pub(crate) fn op_selection_criteria<F, T>(constructor: F)
+    where
+        T: Operation,
+        F: Fn(Option<SelectionCriteria>) -> T,
+    {
+        let op = constructor(None);
+        assert_eq!(op.selection_criteria(), None);
+
+        let read_pref: SelectionCriteria = ReadPreference::Secondary {
+            tag_sets: None,
+            max_staleness: None,
+        }
+        .into();
+
+        let op = constructor(Some(read_pref.clone()));
+        assert_eq!(op.selection_criteria(), Some(&read_pref));
+
+        let predicate = SelectionCriteria::Predicate(Arc::new(|_| true));
+        let op = constructor(Some(predicate.clone()));
+        assert_eq!(op.selection_criteria(), Some(&predicate));
     }
 }

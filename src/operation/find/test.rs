@@ -182,6 +182,17 @@ fn build_batch_size() {
 }
 
 #[test]
+fn op_selection_criteria() {
+    test::op_selection_criteria(|selection_criteria| {
+        let options = FindOptions {
+            selection_criteria,
+            ..Default::default()
+        };
+        Find::new(Namespace::empty(), None, Some(options))
+    });
+}
+
+#[test]
 fn handle_success() {
     let ns = Namespace {
         db: "test_db".to_string(),

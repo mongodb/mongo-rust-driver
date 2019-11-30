@@ -61,6 +61,17 @@ fn build_with_options() {
 }
 
 #[test]
+fn op_selection_criteria() {
+    test::op_selection_criteria(|selection_criteria| {
+        let options = EstimatedDocumentCountOptions {
+            selection_criteria,
+            ..Default::default()
+        };
+        Count::new(Namespace::empty(), Some(options))
+    });
+}
+
+#[test]
 fn handle_success() {
     let count_op = Count::empty();
 

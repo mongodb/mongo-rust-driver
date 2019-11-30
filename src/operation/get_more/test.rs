@@ -7,6 +7,7 @@ use crate::{
     cmap::{CommandResponse, StreamDescription},
     operation::{test, GetMore, Operation},
     options::StreamAddress,
+    sdam::{ServerDescription, ServerInfo, ServerType},
     Namespace,
 };
 
@@ -109,6 +110,38 @@ fn build_batch_size() {
         None,
     );
     assert!(op.build(&StreamDescription::new_testing()).is_err())
+}
+
+#[test]
+fn op_selection_criteria() {
+    let address = StreamAddress {
+        hostname: "myhost.com".to_string(),
+        port: Some(1234),
+    };
+
+    let get_more = GetMore::new(Namespace::empty(), 123, address.clone(), None, None);
+    let server_description = ServerDescription {
+        address,
+        server_type: ServerType::Unknown,
+        reply: Ok(None),
+        last_update_time: None,
+        average_round_trip_time: None,
+    };
+    let server_info = ServerInfo::new(&server_description);
+
+    let predicate = get_more
+        .selection_criteria()
+        .expect("should not be none")
+        .as_predicate()
+        .expect("should be predicate");
+    assert!(predicate(&server_info));
+
+    let server_description = ServerDescription {
+        address: StreamAddress::default(),
+        ..server_description
+    };
+    let server_info = ServerInfo::new(&server_description);
+    assert!(!predicate(&server_info));
 }
 
 #[test]
