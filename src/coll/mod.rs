@@ -2,14 +2,14 @@ pub mod options;
 
 use std::{fmt, sync::Arc};
 
-use bson::{Bson, Document};
+use bson::{bson, doc, Bson, Document};
 use serde::{de::Error, Deserialize, Deserializer};
 
 use self::options::*;
 use crate::{
     bson_util,
     concern::{ReadConcern, WriteConcern},
-    error::{convert_bulk_errors, Result},
+    error::{convert_bulk_errors, ErrorKind, Result},
     operation::{
         Aggregate, Count, Delete, Distinct, DropCollection, Find, FindAndModify, Insert, Update,
     },
@@ -173,12 +173,64 @@ impl Collection {
     ///
     /// Note that using `Collection::estimated_document_count` is recommended instead of this method
     /// is most cases.
-    pub fn count_documents(
-        &self,
-        filter: Option<Document>,
-        options: Option<CountOptions>,
-    ) -> Result<i64> {
-        unimplemented!()
+    pub fn count_documents(&self, filter: Document, options: Option<CountOptions>) -> Result<i64> {
+        let mut pipeline = vec![doc! {
+            "$match": filter,
+        }];
+
+        if let Some(skip) = options.as_ref().and_then(|opts| opts.skip) {
+            pipeline.push(doc! {
+                "$skip": skip
+            });
+        }
+
+        if let Some(limit) = options.as_ref().and_then(|opts| opts.limit) {
+            pipeline.push(doc! {
+                "$limit": limit
+            });
+        }
+
+        pipeline.push(doc! {
+            "$group": {
+                "_id": 1,
+                "n": { "$sum": 1 },
+            }
+        });
+
+        let aggregate_options = options.map(|opts| {
+            AggregateOptions::builder()
+                .hint(opts.hint)
+                .max_time(opts.max_time)
+                .build()
+        });
+
+        let result = match self.aggregate(pipeline, aggregate_options)?.next() {
+            Some(doc) => doc?,
+            None => return Ok(0),
+        };
+
+        let n = match result.get("n") {
+            Some(n) => n,
+            None => {
+                return Err(ErrorKind::ResponseError {
+                    message: "server response to count_documents aggregate did not contain the \
+                              'n' field"
+                        .into(),
+                }
+                .into())
+            }
+        };
+
+        bson_util::get_int(n).ok_or_else(|| {
+            ErrorKind::ResponseError {
+                message: format!(
+                    "server response to count_documents aggregate should have contained integer \
+                     'n', but instead had {:?}",
+                    n
+                ),
+            }
+            .into()
+        })
     }
 
     /// Deletes all documents stored in the collection matching `query`.
