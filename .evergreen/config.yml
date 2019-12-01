@@ -77,7 +77,7 @@ functions:
               export AUTH=${AUTH}
               export SSL=${SSL}
               export TOPOLOGY=${TOPOLOGY}
-              export MONGODB_VERSION=${VERSION}
+              export MONGODB_VERSION=${MONGODB_VERSION}
            EOT
            # See what we've done
            cat expansion.yml
@@ -109,7 +109,7 @@ functions:
       params:
         script: |
           ${PREPARE_SHELL}
-          MONGODB_VERSION=${VERSION} TOPOLOGY=${TOPOLOGY} AUTH=${AUTH} SSL=${SSL} sh ${DRIVERS_TOOLS}/.evergreen/run-orchestration.sh
+          MONGODB_VERSION=${MONGODB_VERSION} TOPOLOGY=${TOPOLOGY} AUTH=${AUTH} SSL=${SSL} sh ${DRIVERS_TOOLS}/.evergreen/run-orchestration.sh
     # run-orchestration generates expansion file with the MONGODB_URI for the cluster
     - command: expansions.update
       params:
@@ -351,7 +351,7 @@ axes:
       - id: "3.6"
         display_name: "3.6"
         variables:
-           MONGODB_VERSION: "3.6"
+          MONGODB_VERSION: "3.6"
 
   - id: "topology"
     display_name: Topology
@@ -410,9 +410,9 @@ axes:
   - id: "os"
     display_name: OS
     values:
-      - id: ubuntu-18.04
-        display_name: "Ubuntu 18.04"
-        run_on: ubuntu1804-test
+      - id: ubuntu-16.04
+        display_name: "Ubuntu 16.04"
+        run_on: ubuntu1604-test
       - id: macos-10.14
         display_name: "MacOS 10.14"
         run_on: macos-1014
