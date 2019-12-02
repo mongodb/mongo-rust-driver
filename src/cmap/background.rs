@@ -4,6 +4,7 @@ use std::{
 };
 
 use super::{ConnectionPool, ConnectionPoolInner};
+use crate::event::cmap::ConnectionClosedReason;
 
 /// Initializes the background thread for a connection pool. A weak reference is used to ensure that
 /// the connection pool is not kept alive by the background thread; the background thread will
@@ -15,8 +16,7 @@ pub(crate) fn start_background_thread(pool: Weak<ConnectionPoolInner>) {
             None => return,
         };
 
-        // RUST-207 Investigate why tests fail when this duration is reduced.
-        std::thread::sleep(Duration::from_millis(100));
+        std::thread::sleep(Duration::from_millis(10));
     });
 }
 
@@ -35,10 +35,10 @@ fn remove_perished_connections_from_pool(pool: &ConnectionPool) {
     let mut i = 0;
 
     while i < connections.len() {
-        if connections[i].is_stale(pool.inner.generation.load(Ordering::SeqCst))
-            || connections[i].is_idle(pool.inner.max_idle_time)
-        {
-            connections.remove(i);
+        if connections[i].is_stale(pool.inner.generation.load(Ordering::SeqCst)) {
+            pool.close_connection(connections.remove(i), ConnectionClosedReason::Stale);
+        } else if connections[i].is_idle(pool.inner.max_idle_time) {
+            pool.close_connection(connections.remove(i), ConnectionClosedReason::Idle);
         } else {
             i += 1;
         }
