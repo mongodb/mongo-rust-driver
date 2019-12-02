@@ -65,7 +65,7 @@ fn run_find_one_and_update_test(test_file: TestFile) {
         };
 
         let result = coll
-            .find_one_and_update(arguments.filter, arguments.update, Some(options))
+            .find_one_and_update(arguments.filter, arguments.update, options)
             .expect(&test_case.description);
         assert_eq!(
             result, outcome.result,

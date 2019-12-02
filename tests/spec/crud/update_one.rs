@@ -58,7 +58,7 @@ fn run_update_one_test(test_file: TestFile) {
         };
 
         let result = coll
-            .update_one(arguments.filter, arguments.update, Some(options))
+            .update_one(arguments.filter, arguments.update, options)
             .expect(&test_case.description);
         assert_eq!(
             outcome.result.matched_count, result.matched_count,

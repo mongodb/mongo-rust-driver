@@ -45,7 +45,7 @@ fn run_distinct_test(test_file: TestFile) {
         };
 
         let result = coll
-            .distinct(&arguments.field_name, arguments.filter, Some(opts))
+            .distinct(&arguments.field_name, arguments.filter, opts)
             .expect(&test_case.description);
         assert_eq!(result, outcome.result, "{}", test_case.description);
     }

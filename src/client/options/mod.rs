@@ -598,7 +598,7 @@ impl ClientOptionsParser {
                 // mechanism.
                 credential.source = options.auth_source.take().or_else(|| {
                     if mechanism.uses_db_as_source() {
-                        db.or_else(|| Some("admin".into()))
+                        db.or_else(|| Some(credential.resolve_source().into()))
                     } else {
                         None
                     }

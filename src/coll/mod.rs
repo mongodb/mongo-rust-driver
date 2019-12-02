@@ -129,7 +129,8 @@ impl Collection {
     }
 
     /// Drops the collection, deleting all data, users, and indexes stored in in.
-    pub fn drop(&self, mut options: Option<DropCollectionOptions>) -> Result<()> {
+    pub fn drop(&self, options: impl Into<Option<DropCollectionOptions>>) -> Result<()> {
+        let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
         let drop = DropCollection::new(self.namespace(), options);
@@ -143,8 +144,9 @@ impl Collection {
     pub fn aggregate(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
-        mut options: Option<AggregateOptions>,
+        options: impl Into<Option<AggregateOptions>>,
     ) -> Result<Cursor> {
+        let mut options = options.into();
         resolve_options!(
             self,
             options,
@@ -161,8 +163,9 @@ impl Collection {
     /// Estimates the number of documents in the collection using collection metadata.
     pub fn estimated_document_count(
         &self,
-        mut options: Option<EstimatedDocumentCountOptions>,
+        options: impl Into<Option<EstimatedDocumentCountOptions>>,
     ) -> Result<i64> {
+        let mut options = options.into();
         resolve_options!(self, options, [read_concern, selection_criteria]);
 
         let op = Count::new(self.namespace(), options);
@@ -175,11 +178,13 @@ impl Collection {
     /// is most cases.
     pub fn count_documents(
         &self,
-        filter: Option<Document>,
-        options: Option<CountOptions>,
+        filter: impl Into<Option<Document>>,
+        options: impl Into<Option<CountOptions>>,
     ) -> Result<i64> {
+        let options = options.into();
+
         let mut pipeline = vec![doc! {
-            "$match": filter.unwrap_or_default(),
+            "$match": filter.into().unwrap_or_default(),
         }];
 
         if let Some(skip) = options.as_ref().and_then(|opts| opts.skip) {
@@ -242,8 +247,9 @@ impl Collection {
     pub fn delete_many(
         &self,
         query: Document,
-        mut options: Option<DeleteOptions>,
+        options: impl Into<Option<DeleteOptions>>,
     ) -> Result<DeleteResult> {
+        let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
         let delete = Delete::new(self.namespace(), query, None, options);
@@ -254,8 +260,9 @@ impl Collection {
     pub fn delete_one(
         &self,
         query: Document,
-        mut options: Option<DeleteOptions>,
+        options: impl Into<Option<DeleteOptions>>,
     ) -> Result<DeleteResult> {
+        let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
         let delete = Delete::new(self.namespace(), query, Some(1), options);
@@ -266,18 +273,28 @@ impl Collection {
     pub fn distinct(
         &self,
         field_name: &str,
-        filter: Option<Document>,
-        mut options: Option<DistinctOptions>,
+        filter: impl Into<Option<Document>>,
+        options: impl Into<Option<DistinctOptions>>,
     ) -> Result<Vec<Bson>> {
+        let mut options = options.into();
         resolve_options!(self, options, [read_concern, selection_criteria]);
 
-        let op = Distinct::new(self.namespace(), field_name.to_string(), filter, options);
+        let op = Distinct::new(
+            self.namespace(),
+            field_name.to_string(),
+            filter.into(),
+            options.into(),
+        );
         self.client().execute_operation(&op, None)
     }
 
     /// Finds the documents in the collection matching `filter`.
-    pub fn find(&self, filter: Option<Document>, options: Option<FindOptions>) -> Result<Cursor> {
-        let find = Find::new(self.namespace(), filter, options);
+    pub fn find(
+        &self,
+        filter: impl Into<Option<Document>>,
+        options: impl Into<Option<FindOptions>>,
+    ) -> Result<Cursor> {
+        let find = Find::new(self.namespace(), filter.into(), options.into());
         let client = self.client();
         client
             .execute_operation(&find, None)
@@ -287,10 +304,13 @@ impl Collection {
     /// Finds a single document in the collection matching `filter`.
     pub fn find_one(
         &self,
-        filter: Option<Document>,
-        options: Option<FindOneOptions>,
+        filter: impl Into<Option<Document>>,
+        options: impl Into<Option<FindOneOptions>>,
     ) -> Result<Option<Document>> {
-        let mut options: FindOptions = options.map(Into::into).unwrap_or_else(Default::default);
+        let mut options: FindOptions = options
+            .into()
+            .map(Into::into)
+            .unwrap_or_else(Default::default);
         options.limit = Some(-1);
         let mut cursor = self.find(filter, Some(options))?;
         cursor.next().transpose()
@@ -300,8 +320,9 @@ impl Collection {
     pub fn find_one_and_delete(
         &self,
         filter: Document,
-        mut options: Option<FindOneAndDeleteOptions>,
+        options: impl Into<Option<FindOneAndDeleteOptions>>,
     ) -> Result<Option<Document>> {
+        let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
         let op = FindAndModify::with_delete(self.namespace(), filter, options);
@@ -314,8 +335,9 @@ impl Collection {
         &self,
         filter: Document,
         replacement: Document,
-        mut options: Option<FindOneAndReplaceOptions>,
+        options: impl Into<Option<FindOneAndReplaceOptions>>,
     ) -> Result<Option<Document>> {
+        let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
         let op = FindAndModify::with_replace(self.namespace(), filter, replacement, options)?;
@@ -330,9 +352,10 @@ impl Collection {
         &self,
         filter: Document,
         update: impl Into<UpdateModifications>,
-        mut options: Option<FindOneAndUpdateOptions>,
+        options: impl Into<Option<FindOneAndUpdateOptions>>,
     ) -> Result<Option<Document>> {
         let update = update.into();
+        let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
         let op = FindAndModify::with_update(self.namespace(), filter, update, options)?;
@@ -343,8 +366,9 @@ impl Collection {
     pub fn insert_many(
         &self,
         docs: impl IntoIterator<Item = Document>,
-        mut options: Option<InsertManyOptions>,
+        options: impl Into<Option<InsertManyOptions>>,
     ) -> Result<InsertManyResult> {
+        let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
         let insert = Insert::new(self.namespace(), docs.into_iter().collect(), options);
@@ -355,8 +379,9 @@ impl Collection {
     pub fn insert_one(
         &self,
         doc: Document,
-        mut options: Option<InsertOneOptions>,
+        options: impl Into<Option<InsertOneOptions>>,
     ) -> Result<InsertOneResult> {
+        let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
         let insert = Insert::new(
@@ -375,9 +400,11 @@ impl Collection {
         &self,
         query: Document,
         replacement: Document,
-        mut options: Option<ReplaceOptions>,
+        options: impl Into<Option<ReplaceOptions>>,
     ) -> Result<UpdateResult> {
         bson_util::replacement_document_check(&replacement)?;
+
+        let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
         let update = Update::new(
@@ -400,9 +427,10 @@ impl Collection {
         &self,
         query: Document,
         update: impl Into<UpdateModifications>,
-        mut options: Option<UpdateOptions>,
+        options: impl Into<Option<UpdateOptions>>,
     ) -> Result<UpdateResult> {
         let update = update.into();
+        let mut options = options.into();
 
         if let UpdateModifications::Document(ref d) = update {
             bson_util::update_document_check(d)?;
@@ -410,7 +438,7 @@ impl Collection {
 
         resolve_options!(self, options, [write_concern]);
 
-        let update = Update::new(self.namespace(), query, update, true, options);
+        let update = Update::new(self.namespace(), query, update, true, options.into());
         self.client().execute_operation(&update, None)
     }
 
@@ -424,8 +452,9 @@ impl Collection {
         &self,
         query: Document,
         update: impl Into<UpdateModifications>,
-        mut options: Option<UpdateOptions>,
+        options: impl Into<Option<UpdateOptions>>,
     ) -> Result<UpdateResult> {
+        let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
         let update = Update::new(self.namespace(), query, update.into(), false, options);

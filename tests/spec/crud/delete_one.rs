@@ -50,7 +50,7 @@ fn run_delete_one_test(test_file: TestFile) {
         };
 
         let result = coll
-            .delete_one(arguments.filter, Some(opts))
+            .delete_one(arguments.filter, opts)
             .expect(&test_case.description);
 
         assert_eq!(

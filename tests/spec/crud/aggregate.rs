@@ -48,7 +48,7 @@ fn run_aggregate_test(test_file: TestFile) {
 
         {
             let cursor = coll
-                .aggregate(arguments.pipeline, Some(options))
+                .aggregate(arguments.pipeline, options)
                 .expect(&test_case.description);
 
             assert_eq!(

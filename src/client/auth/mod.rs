@@ -169,4 +169,16 @@ impl Credential {
 
         doc
     }
+
+    pub(crate) fn resolve_source(&self) -> &str {
+        self.source
+            .as_ref()
+            .map(|s| s.as_str())
+            .unwrap_or_else(|| match self.mechanism {
+                Some(AuthMechanism::Gssapi)
+                | Some(AuthMechanism::Plain)
+                | Some(AuthMechanism::MongoDbX509) => "$external",
+                _ => "admin",
+            })
+    }
 }

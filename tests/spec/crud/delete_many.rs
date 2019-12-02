@@ -50,7 +50,7 @@ fn run_delete_many_test(test_file: TestFile) {
         };
 
         let result = coll
-            .delete_many(arguments.filter, Some(options))
+            .delete_many(arguments.filter, options)
             .expect(&test_case.description);
 
         assert_eq!(

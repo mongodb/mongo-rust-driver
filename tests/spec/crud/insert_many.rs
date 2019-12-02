@@ -44,7 +44,7 @@ fn run_insert_many_test(test_file: TestFile) {
             .ordered(arguments.options.ordered)
             .build();
 
-        let result = match coll.insert_many(arguments.documents, Some(options)) {
+        let result = match coll.insert_many(arguments.documents, options) {
             Ok(result) => {
                 assert_ne!(outcome.error, Some(true), "{}", test_case.description);
                 result.inserted_ids

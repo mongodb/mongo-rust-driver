@@ -66,7 +66,7 @@ fn update() {
 
     let options = UpdateOptions::builder().upsert(true).build();
     let upsert_results = coll
-        .update_one(doc! {"b": 7}, doc! {"$set": { "b": 7 }}, Some(options))
+        .update_one(doc! {"b": 7}, doc! {"$set": { "b": 7 }}, options)
         .unwrap();
     assert_eq!(upsert_results.modified_count, 0);
     assert!(upsert_results.upserted_id.is_some());
@@ -124,11 +124,8 @@ fn aggregate_out() {
     crate::util::drop_collection(&out_coll);
 
     // check that even with a batch size of 0, a new collection is created.
-    coll.aggregate(
-        pipeline,
-        Some(AggregateOptions::builder().batch_size(0).build()),
-    )
-    .unwrap();
+    coll.aggregate(pipeline, AggregateOptions::builder().batch_size(0).build())
+        .unwrap();
     assert!(db
         .list_collection_names(None)
         .unwrap()

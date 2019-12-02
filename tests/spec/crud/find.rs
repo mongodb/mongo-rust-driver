@@ -50,7 +50,7 @@ fn run_find_test(test_file: TestFile) {
         };
 
         let cursor = coll
-            .find(Some(arguments.filter), Some(options))
+            .find(arguments.filter, options)
             .expect(&test_case.description);
         assert_eq!(
             outcome.result,

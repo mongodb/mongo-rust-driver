@@ -57,7 +57,7 @@ fn run_replace_one_test(test_file: TestFile) {
         };
 
         let result = coll
-            .replace_one(arguments.filter, arguments.replacement, Some(options))
+            .replace_one(arguments.filter, arguments.replacement, options)
             .expect(&test_case.description);
         assert_eq!(
             outcome.result.matched_count, result.matched_count,
