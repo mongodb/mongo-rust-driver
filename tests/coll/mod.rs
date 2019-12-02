@@ -1,11 +1,13 @@
 use bson::{bson, doc, Bson};
 use mongodb::options::{AggregateOptions, UpdateOptions};
 
-use crate::CLIENT;
+use crate::{CLIENT, LOCK};
 
 #[test]
 #[function_name::named]
 fn count() {
+    let _guard = LOCK.run_concurrently();
+
     let coll = CLIENT.init_db_and_coll(function_name!(), function_name!());
 
     assert_eq!(coll.estimated_document_count(None).unwrap(), 0);
@@ -23,6 +25,8 @@ fn count() {
 #[test]
 #[function_name::named]
 fn find() {
+    let _guard = LOCK.run_concurrently();
+
     let coll = CLIENT.init_db_and_coll(function_name!(), function_name!());
 
     let result = coll
@@ -45,6 +49,8 @@ fn find() {
 #[test]
 #[function_name::named]
 fn update() {
+    let _guard = LOCK.run_concurrently();
+
     let coll = CLIENT.init_db_and_coll(function_name!(), function_name!());
 
     let result = coll
@@ -75,6 +81,8 @@ fn update() {
 #[test]
 #[function_name::named]
 fn delete() {
+    let _guard = LOCK.run_concurrently();
+
     let coll = CLIENT.init_db_and_coll(function_name!(), function_name!());
 
     let result = coll
@@ -94,6 +102,8 @@ fn delete() {
 #[test]
 #[function_name::named]
 fn aggregate_out() {
+    let _guard = LOCK.run_concurrently();
+
     let db = CLIENT.database(function_name!());
     let coll = db.collection(function_name!());
 

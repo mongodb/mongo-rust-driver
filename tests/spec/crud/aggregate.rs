@@ -3,7 +3,7 @@ use mongodb::options::{AggregateOptions, Collation};
 use serde::Deserialize;
 
 use super::{Outcome, TestFile};
-use crate::CLIENT;
+use crate::{CLIENT, LOCK};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -21,6 +21,8 @@ fn run_aggregate_test(test_file: TestFile) {
         if test_case.operation.name != "aggregate" {
             continue;
         }
+
+        let _guard = LOCK.run_concurrently();
 
         let coll = CLIENT.init_db_and_coll(
             function_name!(),

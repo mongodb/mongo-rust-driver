@@ -8,7 +8,7 @@ use mongodb::{
 };
 use serde::Deserialize;
 
-use crate::CLIENT;
+use crate::{CLIENT, LOCK};
 
 #[derive(Debug, Deserialize)]
 struct CollectionInfo {
@@ -46,6 +46,8 @@ fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<CollectionInfo>
 
 #[test]
 fn is_master() {
+    let _guard = LOCK.run_concurrently();
+
     let db = CLIENT.database("test");
     let doc = db.run_command(doc! { "ismaster": 1 }, None).unwrap();
     let is_master_reply: IsMasterReply = bson::from_bson(Bson::Document(doc)).unwrap();
@@ -57,6 +59,8 @@ fn is_master() {
 #[test]
 #[function_name::named]
 fn list_collections() {
+    let _guard = LOCK.run_concurrently();
+
     let db = CLIENT.database(function_name!());
     db.drop(None).unwrap();
 
@@ -92,6 +96,8 @@ fn list_collections() {
 #[test]
 #[function_name::named]
 fn list_collections_filter() {
+    let _guard = LOCK.run_concurrently();
+
     let db = CLIENT.database(function_name!());
     db.drop(None).unwrap();
 
@@ -129,6 +135,8 @@ fn list_collections_filter() {
 #[test]
 #[function_name::named]
 fn list_collection_names() {
+    let _guard = LOCK.run_concurrently();
+
     let db = CLIENT.database(function_name!());
     db.drop(None).unwrap();
 
@@ -155,6 +163,8 @@ fn list_collection_names() {
 #[test]
 #[function_name::named]
 fn collection_management() {
+    let _guard = LOCK.run_concurrently();
+
     let db = CLIENT.database(function_name!());
     db.drop(None).unwrap();
 
@@ -190,6 +200,8 @@ fn db_aggregate() {
     if CLIENT.server_version_lt(4, 0) {
         return;
     }
+
+    let _guard = LOCK.run_concurrently();
 
     let db = CLIENT.database("admin");
 
@@ -228,6 +240,8 @@ fn db_aggregate_disk_use() {
     if CLIENT.server_version_lt(4, 0) {
         return;
     }
+
+    let _guard = LOCK.run_concurrently();
 
     let db = CLIENT.database("admin");
 

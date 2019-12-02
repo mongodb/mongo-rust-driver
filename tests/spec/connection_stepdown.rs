@@ -1,8 +1,5 @@
-use std::sync::Mutex;
-
 use assert_matches::assert_matches;
 use bson::{bson, doc};
-use lazy_static::lazy_static;
 use mongodb::{
     error::{CommandError, ErrorKind},
     options::{
@@ -12,12 +9,7 @@ use mongodb::{
     Collection, Database,
 };
 
-use crate::util::EventClient;
-
-lazy_static! {
-    // Ensures that only one of the stepdown tests is running at a time. This is necessary due to the use of failpoints.
-    static ref STEPDOWN_TEST_MUTEX: Mutex<()> = Mutex::new(());
-}
+use crate::{util::EventClient, LOCK};
 
 fn run_test(name: &str, test: impl Fn(EventClient, Database, Collection)) {
     // TODO RUST-51: Disable retryable writes once they're implemented.
@@ -57,12 +49,12 @@ fn run_test(name: &str, test: impl Fn(EventClient, Database, Collection)) {
 #[test]
 fn get_more() {
     run_test(function_name!(), |client, db, coll| {
-        let _lock = STEPDOWN_TEST_MUTEX.lock();
-
         // This test requires server version 4.2 or higher.
         if client.server_version_lt(4, 2) {
             return;
         }
+
+        let _guard = LOCK.run_concurrently();
 
         let docs = vec![doc! { "x": 1 }; 5];
         coll.insert_many(
@@ -102,7 +94,7 @@ fn not_master_keep_pool() {
             return;
         }
 
-        let _lock = STEPDOWN_TEST_MUTEX.lock();
+        let _guard = LOCK.run_exclusively();
 
         client
             .database("admin")
@@ -142,7 +134,7 @@ fn not_master_reset_pool() {
             return;
         }
 
-        let _lock = STEPDOWN_TEST_MUTEX.lock();
+        let _guard = LOCK.run_exclusively();
 
         client
             .database("admin")
@@ -181,7 +173,7 @@ fn shutdown_in_progress() {
             return;
         }
 
-        let _lock = STEPDOWN_TEST_MUTEX.lock();
+        let _guard = LOCK.run_exclusively();
 
         client
             .database("admin")
@@ -220,7 +212,7 @@ fn interrupted_at_shutdown() {
             return;
         }
 
-        let _lock = STEPDOWN_TEST_MUTEX.lock();
+        let _guard = LOCK.run_exclusively();
 
         client
             .database("admin")

@@ -8,8 +8,9 @@ mod util;
 
 use lazy_static::lazy_static;
 
-use crate::util::TestClient;
+use crate::util::{TestClient, TestLock};
 
 lazy_static! {
     static ref CLIENT: TestClient = TestClient::new();
+    static ref LOCK: TestLock = TestLock::new();
 }

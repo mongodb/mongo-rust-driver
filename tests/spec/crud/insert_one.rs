@@ -2,7 +2,7 @@ use bson::{Bson, Document};
 use serde::Deserialize;
 
 use super::{Outcome, TestFile};
-use crate::CLIENT;
+use crate::{CLIENT, LOCK};
 
 #[derive(Debug, Deserialize)]
 struct Arguments {
@@ -23,6 +23,8 @@ fn run_insert_one_test(test_file: TestFile) {
         if test_case.operation.name != "insertOne" {
             continue;
         }
+
+        let _guard = LOCK.run_concurrently();
 
         test_case.description = test_case.description.replace('$', "%");
 

@@ -7,6 +7,7 @@ use mongodb::event::{
 };
 
 use super::TestClient;
+use crate::LOCK;
 
 pub type EventQueue<T> = Arc<RwLock<Vec<T>>>;
 
@@ -68,6 +69,8 @@ impl EventClient {
 //#[test]
 #[allow(dead_code)]
 fn command_started_event_count() {
+    let _guard = LOCK.run_concurrently();
+
     let client = EventClient::new();
     let coll = client.database("foo").collection("bar");
 

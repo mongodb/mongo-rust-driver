@@ -3,7 +3,7 @@ use mongodb::options::{Collation, DeleteOptions};
 use serde::Deserialize;
 
 use super::{Outcome, TestFile};
-use crate::CLIENT;
+use crate::{CLIENT, LOCK};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -26,6 +26,8 @@ fn run_delete_one_test(test_file: TestFile) {
         if test_case.operation.name != "deleteOne" {
             continue;
         }
+
+        let _guard = LOCK.run_concurrently();
 
         test_case.description = test_case.description.replace('$', "%");
 

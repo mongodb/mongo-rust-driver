@@ -1,7 +1,7 @@
 use bson::{bson, doc, Bson};
 use serde::Deserialize;
 
-use crate::CLIENT;
+use crate::{CLIENT, LOCK};
 
 #[derive(Debug, Deserialize)]
 struct Metadata {
@@ -50,6 +50,8 @@ fn metadata_sent_in_handshake() {
 #[test]
 #[function_name::named]
 fn list_databases() {
+    let _guard = LOCK.run_concurrently();
+
     let expected_dbs = &[
         format!("{}1", function_name!()),
         format!("{}2", function_name!()),
@@ -97,6 +99,8 @@ fn list_databases() {
 #[test]
 #[function_name::named]
 fn list_database_names() {
+    let _guard = LOCK.run_concurrently();
+
     let expected_dbs = &[
         format!("{}1", function_name!()),
         format!("{}2", function_name!()),

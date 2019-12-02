@@ -1,5 +1,5 @@
 use bson::{Bson, Document};
-use mongodb::Client;
+use mongodb::options::ClientOptions;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -35,14 +35,14 @@ fn normalize_write_concern_doc(mut write_concern_doc: Document) -> Document {
 
 fn run_connection_string_test(test_file: TestFile) {
     for test_case in test_file.tests {
-        match Client::with_uri_str(&test_case.uri) {
-            Ok(client) => {
+        match ClientOptions::parse(&test_case.uri) {
+            Ok(options) => {
                 assert!(test_case.valid);
 
                 if let Some(ref expected_read_concern) = test_case.read_concern {
                     let mut actual_read_concern = Document::new();
 
-                    if let Some(client_read_concern) = client.read_concern() {
+                    if let Some(client_read_concern) = options.read_concern {
                         actual_read_concern.insert("level", client_read_concern.as_str());
                     }
 
@@ -56,8 +56,8 @@ fn run_connection_string_test(test_file: TestFile) {
                 if let Some(ref write_concern) = test_case.write_concern {
                     assert_eq!(
                         &normalize_write_concern_doc(
-                            client
-                                .write_concern()
+                            options
+                                .write_concern
                                 .map(|w| super::write_concern_to_document(&w)
                                     .expect(&test_case.description))
                                 .unwrap_or_default()

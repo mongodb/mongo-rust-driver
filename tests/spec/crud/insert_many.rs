@@ -3,7 +3,7 @@ use mongodb::options::InsertManyOptions;
 use serde::Deserialize;
 
 use super::{Outcome, TestFile};
-use crate::CLIENT;
+use crate::{CLIENT, LOCK};
 
 #[derive(Debug, Deserialize)]
 struct Arguments {
@@ -30,6 +30,8 @@ fn run_insert_many_test(test_file: TestFile) {
         if test_case.operation.name != "insertMany" {
             continue;
         }
+
+        let _guard = LOCK.run_concurrently();
 
         let coll = CLIENT.init_db_and_coll(function_name!(), &test_case.description);
         coll.insert_many(data.clone(), None)

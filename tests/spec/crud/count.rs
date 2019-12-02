@@ -3,7 +3,7 @@ use mongodb::options::{Collation, CountOptions};
 use serde::Deserialize;
 
 use super::{Outcome, TestFile};
-use crate::CLIENT;
+use crate::{CLIENT, LOCK};
 
 #[derive(Debug, Deserialize)]
 struct Arguments {
@@ -24,6 +24,8 @@ fn run_count_test(test_file: TestFile) {
         if !test_case.operation.name.contains("count") || lower_description.contains("deprecated") {
             continue;
         }
+
+        let _guard = LOCK.run_concurrently();
 
         test_case.description = test_case.description.replace('$', "%");
 
