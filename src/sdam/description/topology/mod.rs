@@ -150,7 +150,6 @@ impl TopologyDescription {
         }
     }
 
-    #[allow(dead_code)]
     fn update_command_read_pref_for_mongos(
         &self,
         command: &mut Command,
