@@ -173,9 +173,13 @@ impl Collection {
     ///
     /// Note that using `Collection::estimated_document_count` is recommended instead of this method
     /// is most cases.
-    pub fn count_documents(&self, filter: Document, options: Option<CountOptions>) -> Result<i64> {
+    pub fn count_documents(
+        &self,
+        filter: Option<Document>,
+        options: Option<CountOptions>,
+    ) -> Result<i64> {
         let mut pipeline = vec![doc! {
-            "$match": filter,
+            "$match": filter.unwrap_or_default(),
         }];
 
         if let Some(skip) = options.as_ref().and_then(|opts| opts.skip) {
