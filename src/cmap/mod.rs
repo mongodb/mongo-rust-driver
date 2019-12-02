@@ -203,7 +203,7 @@ impl ConnectionPool {
             handler.handle_connection_checked_out_event(conn.checked_out_event());
         });
 
-        conn.pool = Some(Arc::downgrade(&self.inner));
+        conn.mark_checked_out(Arc::downgrade(&self.inner));
 
         Ok(conn)
     }
@@ -363,11 +363,11 @@ impl ConnectionPoolInner {
     /// available connections. The time that the connection is checked in will be marked to
     /// facilitate detecting if the connection becomes idle.
     fn check_in(&self, mut conn: Connection) {
-        conn.pool.take();
-
         self.emit_event(|handler| {
             handler.handle_connection_checked_in_event(conn.checked_in_event());
         });
+
+        conn.mark_checked_in();
 
         // Close the connection if it's stale.
         if conn.is_stale(self.generation.load(Ordering::SeqCst)) {
@@ -376,7 +376,6 @@ impl ConnectionPoolInner {
             return;
         }
 
-        conn.mark_as_ready_and_available();
         self.connections.write().unwrap().push(conn);
         self.wait_queue.notify_ready();
     }

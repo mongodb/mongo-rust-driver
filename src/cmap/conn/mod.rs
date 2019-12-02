@@ -112,8 +112,17 @@ impl Connection {
 
     /// Helper to mark the time that the connection was checked into the pool for the purpose of
     /// detecting when it becomes idle.
-    pub(super) fn mark_as_ready_and_available(&mut self) {
+    pub(super) fn mark_checked_in(&mut self) {
+        self.pool.take();
         self.ready_and_available_time = Some(Instant::now());
+    }
+
+    /// Helper to mark that the connection has been checked out of the pool. This ensures that the
+    /// connection is not marked as idle based on the time that it's checked out and that it has a
+    /// reference to the pool.
+    pub(super) fn mark_checked_out(&mut self, pool: Weak<ConnectionPoolInner>) {
+        self.pool = Some(pool);
+        self.ready_and_available_time.take();
     }
 
     /// Checks if the connection is idle.
