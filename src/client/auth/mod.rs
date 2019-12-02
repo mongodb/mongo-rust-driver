@@ -122,7 +122,7 @@ impl FromStr for AuthMechanism {
 ///
 /// Some fields (mechanism and source) may be omitted and will either be negotiated or assigned a
 /// default value, depending on the values of other fields in the credential.
-#[derive(Clone, Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder, PartialEq)]
 pub struct Credential {
     /// The username to authenticate with. This applies to all mechanisms but may be omitted when
     /// authenticating via MONGODB-X509.
@@ -148,16 +148,6 @@ pub struct Credential {
     pub mechanism_properties: Option<Document>,
 }
 
-impl PartialEq for Credential {
-    fn eq(&self, other: &Self) -> bool {
-        self.username == other.username
-            && self.resolved_source() == other.resolved_source()
-            && self.password == other.password
-            && self.mechanism == other.mechanism
-            && self.mechanism_properties == other.mechanism_properties
-    }
-}
-
 impl Credential {
     #[allow(dead_code)]
     pub(crate) fn into_document(mut self) -> Document {
@@ -178,17 +168,5 @@ impl Credential {
         }
 
         doc
-    }
-
-    fn resolved_source(&self) -> &str {
-        self.source
-            .as_ref()
-            .map(|s| s.as_str())
-            .unwrap_or_else(|| match self.mechanism {
-                Some(AuthMechanism::Gssapi)
-                | Some(AuthMechanism::Plain)
-                | Some(AuthMechanism::MongoDbX509) => "$external",
-                _ => "admin",
-            })
     }
 }

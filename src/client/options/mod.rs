@@ -598,7 +598,7 @@ impl ClientOptionsParser {
                 // mechanism.
                 credential.source = options.auth_source.take().or_else(|| {
                     if mechanism.uses_db_as_source() {
-                        db
+                        db.or_else(|| Some("admin".into()))
                     } else {
                         None
                     }
@@ -632,7 +632,11 @@ impl ClientOptionsParser {
                     // default source is chosen from the following list in
                     // order (skipping null ones): authSource option, connection string db,
                     // SCRAM default (i.e. "admin").
-                    credential.source = options.auth_source.take().or(db);
+                    credential.source = options
+                        .auth_source
+                        .take()
+                        .or(db)
+                        .or_else(|| Some("admin".into()));
                 } else if authentication_requested {
                     return Err(ErrorKind::ArgumentError {
                         message: "username and mechanism both not provided, but authentication \
