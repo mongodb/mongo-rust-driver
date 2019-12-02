@@ -274,6 +274,7 @@ impl ConnectionPool {
     /// ready. If the connection is stale, it will be closed instead of being added to the set of
     /// available connections. The time that the connection is checked in will be marked to
     /// facilitate detecting if the connection becomes idle.
+    #[cfg(test)]
     pub(crate) fn check_in(&self, conn: Connection) {
         self.inner.check_in(conn);
     }

@@ -116,7 +116,7 @@ impl StreamAddress {
         &self.hostname
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) fn into_document(mut self) -> Document {
         let mut doc = Document::new();
 

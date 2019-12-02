@@ -21,7 +21,7 @@ pub(crate) struct Aggregate {
 }
 
 impl Aggregate {
-    #[allow(dead_code)]
+    #[cfg(test)]
     fn empty() -> Self {
         Self::new(Namespace::empty(), Vec::new(), None)
     }

@@ -1,4 +1,3 @@
-#[allow(dead_code)]
 pub mod cmap;
 pub mod command;
 

@@ -49,7 +49,6 @@ pub mod options;
 
 mod bson_util;
 mod client;
-#[allow(dead_code)]
 mod cmap;
 mod coll;
 mod concern;
@@ -60,7 +59,6 @@ pub mod event;
 mod is_master;
 mod operation;
 pub mod results;
-#[allow(dead_code)]
 mod sdam;
 mod selection_criteria;
 #[cfg(test)]

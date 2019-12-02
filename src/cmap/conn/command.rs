@@ -51,6 +51,7 @@ pub(crate) struct CommandResponse {
 }
 
 impl CommandResponse {
+    #[cfg(test)]
     pub(crate) fn with_document_and_address(source: StreamAddress, doc: Document) -> Self {
         Self {
             source,
@@ -59,7 +60,7 @@ impl CommandResponse {
     }
 
     /// Initialize a response from a document.
-    /// This should be used for test purposes only.
+    #[cfg(test)]
     pub(crate) fn with_document(doc: Document) -> Self {
         Self::with_document_and_address(
             StreamAddress {
@@ -112,11 +113,6 @@ impl CommandResponse {
             }
             .into()),
         }
-    }
-
-    /// The raw server response.
-    pub(crate) fn raw(&self) -> &Document {
-        &self.raw_response
     }
 
     /// The address of the server that sent this response.
