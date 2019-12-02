@@ -91,7 +91,7 @@ impl Operation for Update {
             }
 
             if let Some(ref write_concern) = options.write_concern {
-                body.insert("writeConcern", write_concern.to_bson()?);
+                body.insert("writeConcern", bson::to_bson(write_concern)?);
             }
         };
 

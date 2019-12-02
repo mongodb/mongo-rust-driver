@@ -178,9 +178,4 @@ impl WriteConcern {
 
         Ok(())
     }
-
-    pub(crate) fn to_bson(&self) -> Result<Bson> {
-        let bson = bson::to_bson(self)?;
-        Ok(bson)
-    }
 }
