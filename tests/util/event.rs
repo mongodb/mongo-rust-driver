@@ -1,37 +1,51 @@
 use std::sync::{Arc, RwLock};
 
 use bson::{bson, doc};
-use mongodb::{
-    event::command::{CommandEventHandler, CommandStartedEvent},
-    Client,
+use mongodb::event::{
+    cmap::{CmapEventHandler, PoolClearedEvent},
+    command::{CommandEventHandler, CommandStartedEvent},
 };
 
 use super::TestClient;
 
-pub type Events = Arc<RwLock<Vec<CommandStartedEvent>>>;
+pub type EventQueue<T> = Arc<RwLock<Vec<T>>>;
 
 #[derive(Default)]
 pub struct EventHandler {
-    pub events: Events,
+    pub command_started_events: EventQueue<CommandStartedEvent>,
+    pub pool_cleared_events: EventQueue<PoolClearedEvent>,
+}
+
+impl CmapEventHandler for EventHandler {
+    fn handle_pool_cleared_event(&self, event: PoolClearedEvent) {
+        self.pool_cleared_events.write().unwrap().push(event)
+    }
 }
 
 impl CommandEventHandler for EventHandler {
     fn handle_command_started_event(&self, event: CommandStartedEvent) {
-        self.events.write().unwrap().push(event)
+        self.command_started_events.write().unwrap().push(event)
     }
 }
 
 pub struct EventClient {
     client: TestClient,
     #[allow(dead_code)]
-    pub events: Events,
+    pub command_started_events: EventQueue<CommandStartedEvent>,
+    pub pool_cleared_events: EventQueue<PoolClearedEvent>,
 }
 
 impl std::ops::Deref for EventClient {
-    type Target = Client;
+    type Target = TestClient;
 
     fn deref(&self) -> &Self::Target {
-        self.client.deref()
+        &self.client
+    }
+}
+
+impl std::ops::DerefMut for EventClient {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.client
     }
 }
 
@@ -39,17 +53,22 @@ impl EventClient {
     #[allow(dead_code)]
     pub fn new() -> Self {
         let handler = EventHandler::default();
-        let events = handler.events.clone();
+        let command_started_events = handler.command_started_events.clone();
+        let pool_cleared_events = handler.pool_cleared_events.clone();
         let client = TestClient::with_handler(Some(handler));
 
-        Self { client, events }
+        Self {
+            client,
+            command_started_events,
+            pool_cleared_events,
+        }
     }
 }
 
 // TODO: Enable once operations are working.
 // #[test]
 #[allow(dead_code)]
-fn event_count() {
+fn command_started_event_count() {
     let client = EventClient::new();
     let coll = client.database("foo").collection("bar");
 
@@ -59,7 +78,7 @@ fn event_count() {
 
     assert_eq!(
         client
-            .events
+            .command_started_events
             .read()
             .unwrap()
             .iter()

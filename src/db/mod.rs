@@ -185,14 +185,15 @@ impl Database {
     pub fn create_collection(
         &self,
         name: &str,
-        options: Option<CreateCollectionOptions>,
+        mut options: Option<CreateCollectionOptions>,
     ) -> Result<()> {
+        resolve_options!(self, options, [write_concern]);
+
         let create = Create::new(
             Namespace {
                 db: self.name().to_string(),
                 coll: name.to_string(),
             },
-            self.write_concern().cloned(),
             options,
         );
         self.client().execute_operation(&create, None)

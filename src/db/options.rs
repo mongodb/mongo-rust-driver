@@ -81,6 +81,10 @@ pub struct CreateCollectionOptions {
     /// The default collation for the collection or view.   
     #[builder(default)]
     pub collation: Option<Document>,
+
+    /// The write concern for the operation.   
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
 }
 
 /// Specifies how strictly the database should apply validation rules to existing documents during

@@ -16,11 +16,11 @@ fn build() {
             db: "test_db".to_string(),
             coll: "test_coll".to_string(),
         },
-        Some(WriteConcern {
-            journal: Some(true),
-            ..Default::default()
-        }),
         Some(CreateCollectionOptions {
+            write_concern: Some(WriteConcern {
+                journal: Some(true),
+                ..Default::default()
+            }),
             validation_level: Some(ValidationLevel::Moderate),
             validation_action: Some(ValidationAction::Warn),
             ..Default::default()
