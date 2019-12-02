@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use bson::{bson, doc, Bson};
+use bson::{bson, doc};
 use serde::{Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
@@ -137,7 +137,11 @@ impl From<String> for Acknowledgment {
     }
 }
 
+#[cfg(test)]
+use bson::Bson;
+
 impl Acknowledgment {
+    #[cfg(test)]
     pub(crate) fn to_bson(&self) -> Bson {
         match self {
             Acknowledgment::Nodes(i) => Bson::I64(i64::from(*i)),
