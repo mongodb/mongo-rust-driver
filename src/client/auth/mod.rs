@@ -77,16 +77,6 @@ impl AuthMechanism {
         }
     }
 
-    pub(crate) fn uses_db_as_source(&self) -> bool {
-        match self {
-            AuthMechanism::ScramSha1
-            | AuthMechanism::ScramSha256
-            | AuthMechanism::MongoDbCr
-            | AuthMechanism::Plain => true,
-            _ => false,
-        }
-    }
-
     pub fn as_str(&self) -> &'static str {
         match self {
             AuthMechanism::ScramSha1 => SCRAM_SHA_1_STR,
@@ -95,6 +85,18 @@ impl AuthMechanism {
             AuthMechanism::MongoDbX509 => MONGODB_X509_STR,
             AuthMechanism::Gssapi => GSSAPI_STR,
             AuthMechanism::Plain => PLAIN_STR,
+        }
+    }
+
+    /// Get the default authSource for a given mechanism depending on the database provided in the
+    /// connection string.
+    pub(crate) fn default_source(&self, uri_db: Option<&str>) -> String {
+        // TODO: fill in others as they're implemented
+        match self {
+            AuthMechanism::ScramSha1 | AuthMechanism::ScramSha256 | AuthMechanism::MongoDbCr => {
+                uri_db.unwrap_or("admin").to_string()
+            }
+            _ => String::new(),
         }
     }
 }
@@ -168,17 +170,5 @@ impl Credential {
         }
 
         doc
-    }
-
-    pub(crate) fn resolve_source(&self) -> &str {
-        self.source
-            .as_ref()
-            .map(|s| s.as_str())
-            .unwrap_or_else(|| match self.mechanism {
-                Some(AuthMechanism::Gssapi)
-                | Some(AuthMechanism::Plain)
-                | Some(AuthMechanism::MongoDbX509) => "$external",
-                _ => "admin",
-            })
     }
 }

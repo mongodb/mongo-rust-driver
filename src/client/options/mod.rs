@@ -591,18 +591,16 @@ impl ClientOptionsParser {
             }
         }
 
+        let db_str = db.as_ref().map(String::as_str);
+
         match options.auth_mechanism {
             Some(ref mechanism) => {
                 let mut credential = options.credential.get_or_insert_with(Default::default);
-                // If a source is provided, use that. Otherwise, choose a default based on the
-                // mechanism.
-                credential.source = options.auth_source.take().or_else(|| {
-                    if mechanism.uses_db_as_source() {
-                        db.or_else(|| Some(credential.resolve_source().into()))
-                    } else {
-                        None
-                    }
-                });
+
+                credential.source = options
+                    .auth_source
+                    .take()
+                    .or_else(|| Some(mechanism.default_source(db_str)));
 
                 if let Some(mut doc) = options.auth_mechanism_properties.take() {
                     match doc.remove("CANONICALIZE_HOST_NAME") {
