@@ -65,7 +65,7 @@ impl EventClient {
     }
 }
 
-// TODO: Enable once operations are working.
+// TODO RUST-185: Enable once command monitoring is implemented.
 //#[test]
 #[allow(dead_code)]
 fn command_started_event_count() {
