@@ -2,7 +2,6 @@ use bson::{Bson, Document};
 use serde::Deserialize;
 
 use crate::{
-    bson_util,
     client::options::{ClientOptions, StreamAddress},
     error::ErrorKind,
     selection_criteria::{ReadPreference, SelectionCriteria},
@@ -247,11 +246,17 @@ fn run_test(test_file: TestFile) {
             if !is_unsupported_host_type {
                 // options
                 let options = ClientOptions::parse(&test_case.uri).unwrap();
-                let options_doc = document_from_client_options(options);
+                let mut options_doc = document_from_client_options(options);
                 if let Some(json_options) = test_case.options {
                     let mut json_options: Document = json_options
                         .into_iter()
-                        .map(|(k, v)| (k.to_lowercase(), v))
+                        .filter_map(|(k, v)| {
+                            if let Bson::Null = v {
+                                None
+                            } else {
+                                Some((k.to_lowercase(), v))
+                            }
+                        })
                         .collect();
 
                     // tlsallowinvalidcertificates and tlsinsecure must be inverse of each other
@@ -262,32 +267,34 @@ fn run_test(test_file: TestFile) {
                         }
                     }
 
-                    // the options don't contain a key for authSource if it is specified as a db
-                    if let Some(ref json_auth) = test_case.auth {
-                        if let Some(db) = json_auth.get("db") {
-                            if !json_options.contains_key("authsource") && *db != Bson::Null {
-                                json_options.insert("authsource", db.clone());
-                                bson_util::sort_document(&mut json_options);
-                            }
-                        }
-                    }
+                    options_doc = options_doc
+                        .into_iter()
+                        .filter(|(ref key, _)| json_options.contains_key(key))
+                        .collect();
 
-                    assert_eq!(options_doc, json_options)
+                    assert_eq!(options_doc, json_options, "{}", test_case.description)
                 }
                 // auth
-                if let Some(mut json_auth) = test_case.auth {
-                    let mut options = ClientOptions::parse(&test_case.uri).unwrap();
-                    if let Some(credential) = options.credential.take() {
-                        let auth_doc = credential.into_document();
-                        // in auth, an unspecified db is listed as a Bson::Null, so we remove it
-                        // here
-                        if let Some(db) = json_auth.get("db") {
-                            if *db == Bson::Null {
-                                json_auth.remove("db");
+                if let Some(json_auth) = test_case.auth {
+                    let json_auth: Document = json_auth
+                        .into_iter()
+                        .filter_map(|(k, v)| {
+                            if let Bson::Null = v {
+                                None
+                            } else {
+                                Some((k.to_lowercase(), v))
                             }
-                        }
-                        assert_eq!(auth_doc, json_auth);
-                    }
+                        })
+                        .collect();
+
+                    let options = ClientOptions::parse(&test_case.uri).unwrap();
+                    let mut expected_auth = options.credential.unwrap_or_default().into_document();
+                    expected_auth = expected_auth
+                        .into_iter()
+                        .filter(|(ref key, _)| json_auth.contains_key(key))
+                        .collect();
+
+                    assert_eq!(expected_auth, json_auth);
                 }
             }
         } else {

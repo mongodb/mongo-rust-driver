@@ -134,7 +134,8 @@ impl Database {
     }
 
     /// Drops the database, deleting all data, collections, users, and indexes stored in in.
-    pub fn drop(&self, mut options: Option<DropDatabaseOptions>) -> Result<()> {
+    pub fn drop(&self, options: impl Into<Option<DropDatabaseOptions>>) -> Result<()> {
+        let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
         let drop_database = DropDatabase::new(self.name().to_string(), options);
@@ -145,19 +146,27 @@ impl Database {
     /// document pertaining to each collection in the database.
     pub fn list_collections(
         &self,
-        filter: Option<Document>,
-        options: Option<ListCollectionsOptions>,
+        filter: impl Into<Option<Document>>,
+        options: impl Into<Option<ListCollectionsOptions>>,
     ) -> Result<Cursor> {
-        let list_collections =
-            ListCollections::new(self.name().to_string(), filter, false, options);
+        let list_collections = ListCollections::new(
+            self.name().to_string(),
+            filter.into(),
+            false,
+            options.into(),
+        );
         self.client()
             .execute_operation(&list_collections, None)
             .map(|spec| Cursor::new(self.client().clone(), spec))
     }
 
     /// Gets the names of the collections in the database.
-    pub fn list_collection_names(&self, filter: Option<Document>) -> Result<Vec<String>> {
-        let list_collections = ListCollections::new(self.name().to_string(), filter, true, None);
+    pub fn list_collection_names(
+        &self,
+        filter: impl Into<Option<Document>>,
+    ) -> Result<Vec<String>> {
+        let list_collections =
+            ListCollections::new(self.name().to_string(), filter.into(), true, None);
         let cursor = self
             .client()
             .execute_operation(&list_collections, None)
@@ -185,8 +194,9 @@ impl Database {
     pub fn create_collection(
         &self,
         name: &str,
-        mut options: Option<CreateCollectionOptions>,
+        options: impl Into<Option<CreateCollectionOptions>>,
     ) -> Result<()> {
+        let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
         let create = Create::new(
@@ -207,9 +217,9 @@ impl Database {
     pub fn run_command(
         &self,
         command: Document,
-        selection_criteria: Option<SelectionCriteria>,
+        selection_criteria: impl Into<Option<SelectionCriteria>>,
     ) -> Result<Document> {
-        let operation = RunCommand::new(self.name().into(), command, selection_criteria);
+        let operation = RunCommand::new(self.name().into(), command, selection_criteria.into());
         self.client().execute_operation(&operation, None)
     }
 
@@ -220,8 +230,9 @@ impl Database {
     pub fn aggregate(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
-        mut options: Option<AggregateOptions>,
+        options: impl Into<Option<AggregateOptions>>,
     ) -> Result<Cursor> {
+        let mut options = options.into();
         resolve_options!(
             self,
             options,

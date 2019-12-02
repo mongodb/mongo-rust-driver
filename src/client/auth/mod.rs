@@ -64,7 +64,7 @@ impl AuthMechanism {
     /// authentication.
     pub fn validate_credential(&self, credential: &Credential) -> Result<()> {
         match self {
-            AuthMechanism::ScramSha1 => {
+            AuthMechanism::ScramSha1 | AuthMechanism::ScramSha256 => {
                 if credential.username.is_none() {
                     return Err(ErrorKind::ArgumentError {
                         message: "No username provided for SCRAM authentication".to_string(),
@@ -77,16 +77,6 @@ impl AuthMechanism {
         }
     }
 
-    pub(crate) fn uses_db_as_source(&self) -> bool {
-        match self {
-            AuthMechanism::ScramSha1
-            | AuthMechanism::ScramSha256
-            | AuthMechanism::MongoDbCr
-            | AuthMechanism::Plain => true,
-            _ => false,
-        }
-    }
-
     pub fn as_str(&self) -> &'static str {
         match self {
             AuthMechanism::ScramSha1 => SCRAM_SHA_1_STR,
@@ -95,6 +85,18 @@ impl AuthMechanism {
             AuthMechanism::MongoDbX509 => MONGODB_X509_STR,
             AuthMechanism::Gssapi => GSSAPI_STR,
             AuthMechanism::Plain => PLAIN_STR,
+        }
+    }
+
+    /// Get the default authSource for a given mechanism depending on the database provided in the
+    /// connection string.
+    pub(crate) fn default_source(&self, uri_db: Option<&str>) -> String {
+        // TODO: fill in others as they're implemented
+        match self {
+            AuthMechanism::ScramSha1 | AuthMechanism::ScramSha256 | AuthMechanism::MongoDbCr => {
+                uri_db.unwrap_or("admin").to_string()
+            }
+            _ => String::new(),
         }
     }
 }
@@ -122,7 +124,7 @@ impl FromStr for AuthMechanism {
 ///
 /// Some fields (mechanism and source) may be omitted and will either be negotiated or assigned a
 /// default value, depending on the values of other fields in the credential.
-#[derive(Clone, PartialEq, Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder, PartialEq)]
 pub struct Credential {
     /// The username to authenticate with. This applies to all mechanisms but may be omitted when
     /// authenticating via MONGODB-X509.
@@ -130,7 +132,7 @@ pub struct Credential {
     pub username: Option<String>,
 
     /// The database used to authenticate. This applies to all mechanisms and defaults to "admin"
-    /// in SCRAM authentication mechanisms and "$external" for GSSAPI and MONGODB-X509.
+    /// in SCRAM authentication mechanisms and "$external" for GSSAPI, MONGODB-X509 and PLAIN.
     #[builder(default)]
     pub source: Option<String>,
 

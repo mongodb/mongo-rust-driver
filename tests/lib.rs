@@ -1,11 +1,16 @@
-use lazy_static::lazy_static;
+#![recursion_limit = "128"]
 
-#[allow(dead_code)]
-mod spec;
+mod client;
+mod coll;
+mod db;
+pub(crate) mod spec;
 mod util;
 
-use util::TestClient;
+use lazy_static::lazy_static;
+
+use crate::util::{TestClient, TestLock};
 
 lazy_static! {
     static ref CLIENT: TestClient = TestClient::new();
+    static ref LOCK: TestLock = TestLock::new();
 }

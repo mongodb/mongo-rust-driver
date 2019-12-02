@@ -7,6 +7,7 @@ use mongodb::event::{
 };
 
 use super::TestClient;
+use crate::LOCK;
 
 pub type EventQueue<T> = Arc<RwLock<Vec<T>>>;
 
@@ -50,7 +51,6 @@ impl std::ops::DerefMut for EventClient {
 }
 
 impl EventClient {
-    #[allow(dead_code)]
     pub fn new() -> Self {
         let handler = EventHandler::default();
         let command_started_events = handler.command_started_events.clone();
@@ -65,10 +65,12 @@ impl EventClient {
     }
 }
 
-// TODO: Enable once operations are working.
-// #[test]
+// TODO RUST-185: Enable once command monitoring is implemented.
+//#[test]
 #[allow(dead_code)]
 fn command_started_event_count() {
+    let _guard = LOCK.run_concurrently();
+
     let client = EventClient::new();
     let coll = client.database("foo").collection("bar");
 

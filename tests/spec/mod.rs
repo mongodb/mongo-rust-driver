@@ -1,4 +1,7 @@
+mod auth;
 mod connection_stepdown;
+mod crud;
+mod read_write_concern;
 
 use std::{
     ffi::OsStr,

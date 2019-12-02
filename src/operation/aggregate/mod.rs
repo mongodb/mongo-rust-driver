@@ -119,7 +119,7 @@ impl AggregateTarget {
     fn db_name(&self) -> &str {
         match self {
             AggregateTarget::Database(ref s) => s.as_str(),
-            AggregateTarget::Collection(ref ns) => ns.coll.as_str(),
+            AggregateTarget::Collection(ref ns) => ns.db.as_str(),
         }
     }
 }

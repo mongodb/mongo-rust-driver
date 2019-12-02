@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use bson::{bson, doc, Bson, Document};
+use bson::{bson, doc};
 use serde::{Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
@@ -79,11 +79,6 @@ pub struct WriteConcern {
     #[builder(default)]
     pub w: Option<Acknowledgment>,
 
-    /// Requests acknowledgement that the operation has propagated to the on-disk journal.
-    #[builder(default)]
-    #[serde(rename = "j")]
-    pub journal: Option<bool>,
-
     /// Specifies a time limit for the write concern. If an operation has not propagated to the
     /// requested level within the time limit, an error will return.
     ///
@@ -94,6 +89,11 @@ pub struct WriteConcern {
     #[serde(rename = "wtimeout")]
     #[serde(serialize_with = "bson_util::serialize_duration_as_i64_millis")]
     pub w_timeout: Option<Duration>,
+
+    /// Requests acknowledgement that the operation has propagated to the on-disk journal.
+    #[builder(default)]
+    #[serde(rename = "j")]
+    pub journal: Option<bool>,
 }
 
 /// The type of the `w` field in a write concern.
@@ -137,7 +137,11 @@ impl From<String> for Acknowledgment {
     }
 }
 
+#[cfg(test)]
+use bson::Bson;
+
 impl Acknowledgment {
+    #[cfg(test)]
     pub(crate) fn to_bson(&self) -> Bson {
         match self {
             Acknowledgment::Nodes(i) => Bson::I64(i64::from(*i)),
@@ -177,23 +181,5 @@ impl WriteConcern {
         }
 
         Ok(())
-    }
-
-    pub(crate) fn to_bson(&self) -> Bson {
-        let mut doc = Document::new();
-
-        if let Some(ref w) = self.w {
-            doc.insert("w", w.to_bson());
-        }
-
-        if let Some(j) = self.journal {
-            doc.insert("j", j);
-        }
-
-        if let Some(wtimeout) = self.w_timeout {
-            doc.insert("wtimeout", wtimeout.as_millis() as i64);
-        }
-
-        Bson::Document(doc)
     }
 }

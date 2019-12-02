@@ -111,7 +111,7 @@ fn handle_success() {
     assert!(ok_result.is_ok());
 
     let update_result = ok_result.unwrap();
-    assert_eq!(update_result.matched_count, 3);
+    assert_eq!(update_result.matched_count, 0);
     assert_eq!(update_result.modified_count, 1);
     assert_eq!(update_result.upserted_id, Some(Bson::I32(1)));
 }

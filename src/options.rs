@@ -1,5 +1,5 @@
 pub use crate::{
-    client::auth, client::options::*, coll::options::*, concern::*, db::options::*,
+    client::auth, client::options::*, coll::options::*, collation::*, concern::*, db::options::*,
     selection_criteria::*,
 };
 

@@ -82,12 +82,16 @@ impl Operation for Update {
                 update.insert("hint", hint.to_bson());
             }
 
+            if let Some(ref collation) = options.collation {
+                update.insert("collation", bson::to_bson(collation)?);
+            }
+
             if let Some(bypass_doc_validation) = options.bypass_document_validation {
                 body.insert("bypassDocumentValidation", bypass_doc_validation);
             }
 
             if let Some(ref write_concern) = options.write_concern {
-                body.insert("writeConcern", write_concern.to_bson());
+                body.insert("writeConcern", bson::to_bson(write_concern)?);
             }
         };
 
@@ -108,7 +112,6 @@ impl Operation for Update {
         let body: WriteResponseBody<UpdateBody> = response.body()?;
         body.validate().map_err(convert_bulk_errors)?;
 
-        let matched_count = body.n;
         let modified_count = body.n_modified;
         let upserted_id = body
             .upserted
@@ -116,6 +119,9 @@ impl Operation for Update {
             .and_then(|v| v.first())
             .and_then(|doc| doc.get("_id"))
             .map(Clone::clone);
+
+        let matched_count = if upserted_id.is_some() { 0 } else { body.n };
+
         Ok(UpdateResult {
             matched_count,
             modified_count,

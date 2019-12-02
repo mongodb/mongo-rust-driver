@@ -591,18 +591,16 @@ impl ClientOptionsParser {
             }
         }
 
+        let db_str = db.as_ref().map(String::as_str);
+
         match options.auth_mechanism {
             Some(ref mechanism) => {
                 let mut credential = options.credential.get_or_insert_with(Default::default);
-                // If a source is provided, use that. Otherwise, choose a default based on the
-                // mechanism.
-                credential.source = options.auth_source.take().or_else(|| {
-                    if mechanism.uses_db_as_source() {
-                        db
-                    } else {
-                        None
-                    }
-                });
+
+                credential.source = options
+                    .auth_source
+                    .take()
+                    .or_else(|| Some(mechanism.default_source(db_str)));
 
                 if let Some(mut doc) = options.auth_mechanism_properties.take() {
                     match doc.remove("CANONICALIZE_HOST_NAME") {
@@ -632,7 +630,11 @@ impl ClientOptionsParser {
                     // default source is chosen from the following list in
                     // order (skipping null ones): authSource option, connection string db,
                     // SCRAM default (i.e. "admin").
-                    credential.source = options.auth_source.take().or(db);
+                    credential.source = options
+                        .auth_source
+                        .take()
+                        .or(db)
+                        .or_else(|| Some("admin".into()));
                 } else if authentication_requested {
                     return Err(ErrorKind::ArgumentError {
                         message: "username and mechanism both not provided, but authentication \

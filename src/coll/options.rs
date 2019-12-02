@@ -8,7 +8,8 @@ use typed_builder::TypedBuilder;
 use crate::{
     bson_util::{serialize_batch_size, serialize_duration_as_i64_millis, serialize_u32_as_i32},
     concern::{ReadConcern, WriteConcern},
-    options::SelectionCriteria,
+    options::Collation,
+    selection_criteria::SelectionCriteria,
 };
 
 /// These are the valid options for creating a `Collection` with
@@ -168,10 +169,18 @@ pub struct UpdateOptions {
     #[builder(default)]
     pub upsert: Option<bool>,
 
+    /// The collation to use for the operation.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub collation: Option<Collation>,
+
     /// A document or string that specifies the index to use to support the query predicate.
     ///
     /// Only available in MongoDB 4.2+. See the official MongoDB
     /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#ex-update-command-hint) for examples.
+    #[builder(default)]
     pub hint: Option<Hint>,
 
     /// The write concern for the operation.
@@ -186,6 +195,7 @@ impl UpdateOptions {
             upsert: options.upsert,
             hint: options.hint,
             write_concern: options.write_concern,
+            collation: options.collation,
             ..Default::default()
         }
     }
@@ -202,6 +212,13 @@ pub struct ReplaceOptions {
     #[builder(default)]
     pub upsert: Option<bool>,
 
+    /// The collation to use for the operation.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub collation: Option<Collation>,
+
     /// A document or string that specifies the index to use to support the query predicate.
     ///
     /// Only available in MongoDB 4.2+. See the official MongoDB
@@ -214,9 +231,17 @@ pub struct ReplaceOptions {
 }
 
 /// Specifies the options to a `Collection::delete_one` or `Collection::delete_many` operation.
+#[serde_with::skip_serializing_none]
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeleteOptions {
+    /// The collation to use for the operation.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub collation: Option<Collation>,
+
     /// The write concern for the operation.
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
@@ -243,6 +268,13 @@ pub struct FindOneAndDeleteOptions {
     /// The level of the write concern
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
+
+    /// The collation to use for the operation.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub collation: Option<Collation>,
 }
 
 /// Specifies the options to a `Collection::find_one_and_replace` operation.
@@ -278,6 +310,13 @@ pub struct FindOneAndReplaceOptions {
     /// The level of the write concern
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
+
+    /// The collation to use for the operation.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub collation: Option<Collation>,
 }
 
 /// Specifies the options to a `Collection::find_one_and_update` operation.
@@ -319,6 +358,13 @@ pub struct FindOneAndUpdateOptions {
     /// The level of the write concern
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
+
+    /// The collation to use for the operation.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub collation: Option<Collation>,
 }
 
 /// Specifies the options to a `Collection::aggregate` operation.
@@ -344,6 +390,13 @@ pub struct AggregateOptions {
     /// Opt out of document-level validation.
     #[builder(default)]
     pub bypass_document_validation: Option<bool>,
+
+    /// The collation to use for the operation.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub collation: Option<Collation>,
 
     /// Tags the query with an arbitrary string to help trace the operation through the database
     /// profiler, currentOp and logs.
@@ -417,6 +470,13 @@ pub struct CountOptions {
     /// The number of documents to skip before counting.
     #[builder(default)]
     pub skip: Option<i64>,
+
+    /// The collation to use for the operation.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub collation: Option<Collation>,
 }
 
 /// Specifies the options to a `Collection::estimated_document_count` operation.
@@ -467,6 +527,13 @@ pub struct DistinctOptions {
     /// The level of the read concern
     #[builder(default)]
     pub read_concern: Option<ReadConcern>,
+
+    /// The collation to use for the operation.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub collation: Option<Collation>,
 }
 
 /// Specifies the options to a `Collection::find` operation.
@@ -578,6 +645,13 @@ pub struct FindOptions {
     /// The order of the documents for the purposes of the operation.
     #[builder(default)]
     pub sort: Option<Document>,
+
+    /// The collation to use for the operation.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub collation: Option<Collation>,
 }
 
 impl From<FindOneOptions> for FindOptions {

@@ -134,13 +134,13 @@ impl Client {
         Database::new(self.clone(), name, Some(options))
     }
 
-    pub fn list_databases(&self, filter: Option<Document>) -> Result<Vec<Document>> {
-        let op = ListDatabases::new(filter, false);
+    pub fn list_databases(&self, filter: impl Into<Option<Document>>) -> Result<Vec<Document>> {
+        let op = ListDatabases::new(filter.into(), false);
         self.execute_operation(&op, None)
     }
 
-    pub fn list_database_names(&self, filter: Option<Document>) -> Result<Vec<String>> {
-        let op = ListDatabases::new(filter, true);
+    pub fn list_database_names(&self, filter: impl Into<Option<Document>>) -> Result<Vec<String>> {
+        let op = ListDatabases::new(filter.into(), true);
         match self.execute_operation(&op, None) {
             Ok(databases) => databases
                 .into_iter()

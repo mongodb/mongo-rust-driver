@@ -16,6 +16,7 @@ else
     export MONGODB_URI="${MONGODB_URI}/?"
 fi
 
+
 export MONGODB_URI="${MONGODB_URI}tls=true&tlsCAFile=${CA_FILE}&tlsCertificateKeyFile=${CERT_FILE}&tlsAllowInvalidCertificates=true"
 
 echo "MONGODB_URI: ${MONGODB_URI}"
