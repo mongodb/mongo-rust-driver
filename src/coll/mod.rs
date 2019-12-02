@@ -283,7 +283,7 @@ impl Collection {
             self.namespace(),
             field_name.to_string(),
             filter.into(),
-            options.into(),
+            options,
         );
         self.client().execute_operation(&op, None)
     }
@@ -438,7 +438,7 @@ impl Collection {
 
         resolve_options!(self, options, [write_concern]);
 
-        let update = Update::new(self.namespace(), query, update, true, options.into());
+        let update = Update::new(self.namespace(), query, update, true, options);
         self.client().execute_operation(&update, None)
     }
 
