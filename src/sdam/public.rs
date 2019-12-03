@@ -4,8 +4,10 @@ use bson::UtcDateTime;
 
 pub use crate::sdam::description::server::ServerType;
 use crate::{
-    is_master::IsMasterCommandResponse, options::StreamAddress,
-    sdam::description::server::ServerDescription, selection_criteria::TagSet,
+    is_master::IsMasterCommandResponse,
+    options::StreamAddress,
+    sdam::description::server::ServerDescription,
+    selection_criteria::TagSet,
 };
 
 /// Provides information about a given server in the cluster that a client is connected to. This is

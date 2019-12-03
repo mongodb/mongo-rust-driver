@@ -3,7 +3,9 @@ use serde::de::DeserializeOwned;
 
 use super::wire::Message;
 use crate::{
-    bson_util, error::CommandError, error::ErrorKind, error::Result, options::StreamAddress,
+    bson_util,
+    error::{CommandError, ErrorKind, Result},
+    options::StreamAddress,
     selection_criteria::ReadPreference,
 };
 

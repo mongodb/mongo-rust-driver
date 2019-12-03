@@ -6,8 +6,7 @@ use crate::{
     cmap::{CommandResponse, StreamDescription},
     coll::{options::DistinctOptions, Namespace},
     error::ErrorKind,
-    operation::Operation,
-    operation::{test, Distinct},
+    operation::{test, Distinct, Operation},
 };
 
 #[test]

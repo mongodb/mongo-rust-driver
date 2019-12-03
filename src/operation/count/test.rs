@@ -7,8 +7,7 @@ use crate::{
     coll::{options::EstimatedDocumentCountOptions, Namespace},
     concern::ReadConcern,
     error::ErrorKind,
-    operation::Operation,
-    operation::{test, Count},
+    operation::{test, Count, Operation},
 };
 
 #[test]

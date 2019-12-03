@@ -9,7 +9,8 @@ use bson::{bson, doc, oid::ObjectId, Bson};
 use mongodb::{
     error::{CommandError, ErrorKind, Result},
     options::{auth::AuthMechanism, ClientOptions},
-    Client, Collection,
+    Client,
+    Collection,
 };
 use semver::Version;
 use serde::Deserialize;

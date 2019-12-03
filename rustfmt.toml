@@ -1,8 +1,9 @@
 combine_control_expr = false
 comment_width = 100
 condense_wildcard_suffixes = true
-error_on_line_overflow = false
 format_strings = true
 normalize_comments = true
 use_try_shorthand = true
 wrap_comments = true
+merge_imports = true
+imports_layout = "HorizontalVertical"

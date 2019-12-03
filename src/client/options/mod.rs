@@ -16,7 +16,12 @@ use bson::{Bson, Document};
 use derivative::Derivative;
 use lazy_static::lazy_static;
 use rustls::{
-    internal::pemfile, Certificate, RootCertStore, ServerCertVerified, ServerCertVerifier, TLSError,
+    internal::pemfile,
+    Certificate,
+    RootCertStore,
+    ServerCertVerified,
+    ServerCertVerifier,
+    TLSError,
 };
 use typed_builder::TypedBuilder;
 

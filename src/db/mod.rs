@@ -10,11 +10,17 @@ use crate::{
     error::{ErrorKind, Result},
     operation::{Aggregate, Create, DropDatabase, ListCollections, RunCommand},
     options::{
-        AggregateOptions, CollectionOptions, CreateCollectionOptions, DatabaseOptions,
-        DropDatabaseOptions, ListCollectionsOptions,
+        AggregateOptions,
+        CollectionOptions,
+        CreateCollectionOptions,
+        DatabaseOptions,
+        DropDatabaseOptions,
+        ListCollectionsOptions,
     },
     selection_criteria::SelectionCriteria,
-    Client, Collection, Namespace,
+    Client,
+    Collection,
+    Namespace,
 };
 
 /// `Database` is the client-side abstraction of a MongoDB database. It can be used to perform

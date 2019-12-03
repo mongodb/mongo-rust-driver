@@ -7,7 +7,10 @@ use typed_builder::TypedBuilder;
 use crate::{
     bson_util,
     coll::options::{
-        FindOneAndDeleteOptions, FindOneAndReplaceOptions, FindOneAndUpdateOptions, ReturnDocument,
+        FindOneAndDeleteOptions,
+        FindOneAndReplaceOptions,
+        FindOneAndUpdateOptions,
+        ReturnDocument,
         UpdateModifications,
     },
     collation::Collation,

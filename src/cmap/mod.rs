@@ -10,7 +10,8 @@ mod wait_queue;
 use std::{
     sync::{
         atomic::{AtomicU32, Ordering},
-        Arc, RwLock,
+        Arc,
+        RwLock,
     },
     time::{Duration, Instant},
 };
@@ -21,18 +22,24 @@ pub use self::conn::ConnectionInfo;
 pub(crate) use self::conn::{Command, CommandResponse, Connection, StreamDescription};
 
 use self::{
-    establish::ConnectionEstablisher, options::ConnectionPoolOptions, wait_queue::WaitQueue,
+    establish::ConnectionEstablisher,
+    options::ConnectionPoolOptions,
+    wait_queue::WaitQueue,
 };
 use crate::{
     client::auth::Credential,
     error::{ErrorKind, Result},
     event::cmap::{
-        CmapEventHandler, ConnectionCheckoutFailedEvent, ConnectionCheckoutFailedReason,
-        ConnectionCheckoutStartedEvent, ConnectionClosedReason, PoolClearedEvent, PoolClosedEvent,
+        CmapEventHandler,
+        ConnectionCheckoutFailedEvent,
+        ConnectionCheckoutFailedReason,
+        ConnectionCheckoutStartedEvent,
+        ConnectionClosedReason,
+        PoolClearedEvent,
+        PoolClosedEvent,
         PoolCreatedEvent,
     },
-    options::StreamAddress,
-    options::TlsOptions,
+    options::{StreamAddress, TlsOptions},
 };
 
 const DEFAULT_MAX_POOL_SIZE: u32 = 100;
