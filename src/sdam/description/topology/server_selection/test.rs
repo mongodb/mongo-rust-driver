@@ -4,6 +4,8 @@ use bson::UtcDateTime;
 use chrono::{naive::NaiveDateTime, offset::Utc, DateTime};
 use serde::Deserialize;
 
+use crate::test::run_spec_test;
+
 use crate::{
     is_master::{IsMasterCommandResponse, IsMasterReply, LastWrite},
     options::StreamAddress,
@@ -278,7 +280,7 @@ fn run_test(test_file: TestFile) {
 
 #[test]
 fn server_selection_replica_set_no_primary() {
-    crate::test::run(
+    run_spec_test(
         &[
             "server-selection",
             "server_selection",
@@ -291,7 +293,7 @@ fn server_selection_replica_set_no_primary() {
 
 #[test]
 fn server_selection_replica_set_with_primary() {
-    crate::test::run(
+    run_spec_test(
         &[
             "server-selection",
             "server_selection",
@@ -304,7 +306,7 @@ fn server_selection_replica_set_with_primary() {
 
 #[test]
 fn server_selection_sharded() {
-    crate::test::run(
+    run_spec_test(
         &["server-selection", "server_selection", "Sharded", "read"],
         run_test,
     );
@@ -312,7 +314,7 @@ fn server_selection_sharded() {
 
 #[test]
 fn server_selection_single() {
-    crate::test::run(
+    run_spec_test(
         &["server-selection", "server_selection", "Single", "read"],
         run_test,
     );
@@ -320,7 +322,7 @@ fn server_selection_single() {
 
 #[test]
 fn server_selection_unknown() {
-    crate::test::run(
+    run_spec_test(
         &["server-selection", "server_selection", "Unknown", "read"],
         run_test,
     );
@@ -328,25 +330,25 @@ fn server_selection_unknown() {
 
 #[test]
 fn max_staleness_replica_set_no_primary() {
-    crate::test::run(&["max-staleness", "ReplicaSetNoPrimary"], run_test);
+    run_spec_test(&["max-staleness", "ReplicaSetNoPrimary"], run_test);
 }
 
 #[test]
 fn max_staleness_replica_set_with_primary() {
-    crate::test::run(&["max-staleness", "ReplicaSetWithPrimary"], run_test);
+    run_spec_test(&["max-staleness", "ReplicaSetWithPrimary"], run_test);
 }
 
 #[test]
 fn max_staleness_sharded() {
-    crate::test::run(&["max-staleness", "Sharded"], run_test);
+    run_spec_test(&["max-staleness", "Sharded"], run_test);
 }
 
 #[test]
 fn max_staleness_single() {
-    crate::test::run(&["max-staleness", "Single"], run_test);
+    run_spec_test(&["max-staleness", "Single"], run_test);
 }
 
 #[test]
 fn max_staleness_unknown() {
-    crate::test::run(&["max-staleness", "Unknown"], run_test);
+    run_spec_test(&["max-staleness", "Unknown"], run_test);
 }

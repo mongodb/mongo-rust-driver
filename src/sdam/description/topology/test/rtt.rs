@@ -2,9 +2,12 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
-use crate::sdam::description::{
-    server::ServerDescription,
-    topology::{test::f64_ms_as_duration, TopologyDescription, TopologyType},
+use crate::{
+    sdam::description::{
+        server::ServerDescription,
+        topology::{test::f64_ms_as_duration, TopologyDescription, TopologyType},
+    },
+    test::run_spec_test,
 };
 
 #[derive(Debug, Deserialize)]
@@ -64,5 +67,5 @@ fn run_test(test_file: TestFile) {
 
 #[test]
 fn server_selection_rtt() {
-    crate::test::run(&["server-selection", "rtt"], run_test);
+    run_spec_test(&["server-selection", "rtt"], run_test);
 }
