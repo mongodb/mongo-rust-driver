@@ -2,7 +2,7 @@ mod handshake;
 
 use self::handshake::Handshaker;
 use super::{options::ConnectionPoolOptions, Connection};
-use crate::error::Result;
+use crate::{client::auth::Credential, error::Result};
 
 /// Contains the logic to establish a connection, including handshaking, authenticating, and
 /// potentially more.
@@ -21,10 +21,16 @@ impl ConnectionEstablisher {
     }
 
     /// Establishes a connection.
-    pub(super) fn establish_connection(&self, connection: &mut Connection) -> Result<()> {
-        let _stream_description = self.handshaker.handshake(connection)?;
+    pub(super) fn establish_connection(
+        &self,
+        connection: &mut Connection,
+        credential: Option<&Credential>,
+    ) -> Result<()> {
+        self.handshaker.handshake(connection)?;
 
-        // TODO RUST-204: Authenticate connection if applicable.
+        if let Some(credential) = credential {
+            credential.authenticate_stream(connection)?;
+        }
 
         Ok(())
     }

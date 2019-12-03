@@ -64,15 +64,17 @@ impl Handshaker {
             document.insert("application", doc! { "name": app_name.to_string() });
         }
 
-        // TODO RUST-204: Add "saslSupportedMechs" if applicable.
+        let mut db = "admin";
 
-        // TODO RUST-204: Choose proper database to handshake against.
-        let db = "admin";
-
-        let body = doc! {
-                "isMaster": 1,
-                "client": document,
+        let mut body = doc! {
+            "isMaster": 1,
+            "client": document
         };
+
+        if let Some(credential) = options.as_ref().and_then(|opts| opts.credential.as_ref()) {
+            credential.append_needed_mechanism_negotiation(&mut body);
+            db = credential.resolved_source();
+        }
 
         Self {
             command: Command::new_read("isMaster".to_string(), db.to_string(), None, body),
@@ -80,10 +82,7 @@ impl Handshaker {
     }
 
     /// Handshakes a connection.
-    pub(super) fn handshake<'a>(
-        &'a self,
-        conn: &'a mut Connection,
-    ) -> Result<&'a StreamDescription> {
+    pub(super) fn handshake(&self, conn: &mut Connection) -> Result<()> {
         let response = conn.send_command(self.command.clone())?;
         let command_response = response.body()?;
 
@@ -94,6 +93,6 @@ impl Handshaker {
         };
 
         conn.stream_description = Some(StreamDescription::from_is_master(is_master_reply));
-        Ok(conn.stream_description.as_ref().unwrap())
+        Ok(())
     }
 }

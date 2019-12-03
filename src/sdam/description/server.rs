@@ -23,6 +23,18 @@ pub enum ServerType {
     Unknown,
 }
 
+impl ServerType {
+    pub(crate) fn can_auth(self) -> bool {
+        match self {
+            ServerType::Standalone
+            | ServerType::RSPrimary
+            | ServerType::RSSecondary
+            | ServerType::Mongos => true,
+            _ => false,
+        }
+    }
+}
+
 impl Default for ServerType {
     fn default() -> Self {
         ServerType::Unknown

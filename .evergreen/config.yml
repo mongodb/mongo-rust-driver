@@ -387,26 +387,6 @@ axes:
            AUTH: "noauth"
            SSL: "nossl"
 
-  # This is a temporary axis used to test TLS until we've ported auth from
-  # `unreviewed-impl`, after which point whe should switch the matrix to use
-  # `auth-and-tls` and delete this.
-  #
-  # Note that drivers-evergreen-tools expects `SSL` as the environmental
-  # variable, not `TLS`, so we have to use that for the actual value used in the
-  # script; we use `TLS` for the metadata that isn't used by the actual shell
-  # scripts.
-  - id: "tls"
-    display_name: TLS
-    values:
-      - id: "tls"
-        display_name: TLS
-        variables:
-           SSL: "ssl"
-      - id: "notls"
-        display_name: NoTLS
-        variables:
-           SSL: "nossl"
-
   - id: "os"
     display_name: OS
     values:
@@ -422,8 +402,8 @@ buildvariants:
   matrix_name: "tests"
   matrix_spec:
     os: "*"
-    tls: "*"
-  display_name: "${os} ${tls}"
+    auth-and-tls: "*"
+  display_name: "${os} ${auth-and-tls}"
   tasks:
      - ".latest"
      - ".4.2"

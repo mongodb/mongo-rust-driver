@@ -5,6 +5,7 @@ use serde::{Deserialize, Deserializer};
 use typed_builder::TypedBuilder;
 
 use crate::{
+    client::auth::Credential,
     event::cmap::CmapEventHandler,
     options::{ClientOptions, TlsOptions},
 };
@@ -67,6 +68,11 @@ pub struct ConnectionPoolOptions {
     #[builder(default)]
     #[serde(skip)]
     pub event_handler: Option<Arc<dyn CmapEventHandler>>,
+
+    /// The credential to use for authenticating connections in this pool.
+    #[builder(default)]
+    #[serde(skip)]
+    pub credential: Option<Credential>,
 }
 
 fn deserialize_duration_from_u64_millis<'de, D>(
@@ -82,6 +88,7 @@ where
 impl ConnectionPoolOptions {
     pub(crate) fn from_client_options(options: &ClientOptions) -> Self {
         Self::builder()
+            .credential(options.credential.clone())
             .max_pool_size(options.max_pool_size)
             .min_pool_size(options.min_pool_size)
             .max_idle_time(options.max_idle_time)

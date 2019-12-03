@@ -20,6 +20,27 @@ pub struct Error {
     pub kind: Arc<ErrorKind>,
 }
 
+impl Error {
+    /// Creates an `AuthenticationError` for the given mechanism with the provided reason.
+    pub(crate) fn authentication_error(mechanism_name: &str, reason: &str) -> Self {
+        ErrorKind::AuthenticationError {
+            message: format!("{} failure: {}", mechanism_name, reason),
+        }
+        .into()
+    }
+
+    /// Creates an `AuthenticationError` for the given mechanism with a generic "unknown" message.
+    pub(crate) fn unknown_authentication_error(mechanism_name: &str) -> Error {
+        Error::authentication_error(mechanism_name, "internal error")
+    }
+
+    /// Creates an `AuthenticationError` for the given mechanism when the server response is
+    /// invalid.
+    pub(crate) fn invalid_authentication_response(mechanism_name: &str) -> Error {
+        Error::authentication_error(mechanism_name, "invalid server response")
+    }
+}
+
 impl<E> From<E> for Error
 where
     ErrorKind: From<E>,
@@ -46,6 +67,9 @@ pub enum ErrorKind {
         message
     )]
     ArgumentError { message: String },
+
+    #[error(display = "{}", message)]
+    AuthenticationError { message: String },
 
     #[error(display = "{}", _0)]
     BsonDecode(#[error(source)] bson::DecoderError),
