@@ -47,7 +47,7 @@
 #[macro_use]
 pub mod options;
 
-pub mod bson_util;
+mod bson_util;
 mod client;
 mod cmap;
 mod coll;

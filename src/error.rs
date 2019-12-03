@@ -3,6 +3,7 @@ use std::{fmt, sync::Arc};
 use err_derive::Error;
 use lazy_static::lazy_static;
 use serde::Deserialize;
+use time::OutOfRangeError;
 
 use crate::options::StreamAddress;
 
@@ -108,6 +109,9 @@ pub enum ErrorKind {
         message
     )]
     OperationError { message: String },
+
+    #[error(display = "{}", _0)]
+    OutOfRangeError(#[error(source)] OutOfRangeError),
 
     #[error(display = "Unable to parse {} data from {}", data_type, file_path)]
     ParseError {

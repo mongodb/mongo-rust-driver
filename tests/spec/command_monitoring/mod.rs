@@ -8,8 +8,7 @@ use mongodb::{
     Collection,
 };
 
-use crate::util::EventClient;
-use crate::CLIENT;
+use crate::{util::EventClient, CLIENT};
 
 #[derive(Debug, Deserialize)]
 struct TestFile {

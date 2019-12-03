@@ -107,7 +107,7 @@ impl Client {
         let start_time = PreciseTime::now();
         let response = connection.send_command(cmd.clone(), request_id)?;
         let end_time = PreciseTime::now();
-        let duration = start_time.to(end_time).to_std().unwrap();
+        let duration = start_time.to(end_time).to_std()?;
 
         let result = op.handle_response(response.clone());
 
