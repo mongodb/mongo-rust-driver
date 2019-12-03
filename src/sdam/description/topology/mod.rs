@@ -136,15 +136,19 @@ impl TopologyDescription {
             }
             (TopologyType::Single, ServerType::Standalone) => {}
             (TopologyType::Single, _) => {
-                command.read_pref = Some(
-                    criteria
-                        .and_then(SelectionCriteria::as_read_pref)
-                        .map(Clone::clone)
-                        .unwrap_or(ReadPreference::PrimaryPreferred {
-                            max_staleness: None,
-                            tag_sets: None,
-                        }),
-                );
+                let specified_read_pref = criteria
+                    .and_then(SelectionCriteria::as_read_pref)
+                    .map(Clone::clone);
+
+                let resolved_read_pref = match specified_read_pref {
+                    Some(ReadPreference::Primary) | None => ReadPreference::PrimaryPreferred {
+                        max_staleness: None,
+                        tag_sets: None,
+                    },
+                    Some(other) => other,
+                };
+
+                command.read_pref = Some(resolved_read_pref);
             }
             _ => {}
         }
