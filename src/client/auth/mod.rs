@@ -113,13 +113,13 @@ impl AuthMechanism {
 
     /// Get the default authSource for a given mechanism depending on the database provided in the
     /// connection string.
-    pub(crate) fn default_source(&self, uri_db: Option<&str>) -> String {
+    pub(crate) fn default_source<'a>(&'a self, uri_db: Option<&'a str>) -> &'a str {
         // TODO: fill in others as they're implemented
         match self {
             AuthMechanism::ScramSha1 | AuthMechanism::ScramSha256 | AuthMechanism::MongoDbCr => {
-                uri_db.unwrap_or("admin").to_string()
+                uri_db.unwrap_or("admin")
             }
-            _ => String::new(),
+            _ => "",
         }
     }
 
@@ -218,16 +218,11 @@ impl Credential {
         doc
     }
 
-    fn source_str(&self) -> Option<&str> {
-        self.source.as_ref().map(|s| s.as_str())
-    }
-
     pub(crate) fn resolved_source(&self) -> &str {
-        match self.mechanism {
-            Some(AuthMechanism::Gssapi) | Some(AuthMechanism::MongoDbX509) => "$external",
-            Some(AuthMechanism::Plain) => self.source_str().unwrap_or("$external"),
-            _ => self.source_str().unwrap_or("admin"),
-        }
+        self.mechanism
+            .as_ref()
+            .map(|m| m.default_source(None))
+            .unwrap_or("admin")
     }
 
     /// If the mechanism is missing, append the appropriate mechanism negotiation key-value-pair to

@@ -600,7 +600,7 @@ impl ClientOptionsParser {
                 credential.source = options
                     .auth_source
                     .take()
-                    .or_else(|| Some(mechanism.default_source(db_str)));
+                    .or_else(|| Some(mechanism.default_source(db_str).into()));
 
                 if let Some(mut doc) = options.auth_mechanism_properties.take() {
                     match doc.remove("CANONICALIZE_HOST_NAME") {
