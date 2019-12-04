@@ -69,7 +69,7 @@ impl Executor {
         test_file
             .pool_options
             .get_or_insert_with(Default::default)
-            .tls_options = CLIENT_OPTIONS.tls_options.clone();
+            .tls_options = CLIENT_OPTIONS.tls_options();
 
         test_file
             .pool_options

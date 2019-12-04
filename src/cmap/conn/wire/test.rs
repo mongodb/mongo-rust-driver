@@ -10,7 +10,7 @@ use crate::{
 
 #[test]
 fn basic() {
-    if CLIENT_OPTIONS.tls_options.is_some() {
+    if CLIENT_OPTIONS.tls_options().is_some() {
         return;
     }
 

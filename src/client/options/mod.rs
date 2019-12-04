@@ -117,15 +117,11 @@ impl StreamAddress {
         })
     }
 
-    pub fn hostname(&self) -> &str {
-        &self.hostname
-    }
-
     #[cfg(test)]
     pub(crate) fn into_document(mut self) -> Document {
         let mut doc = Document::new();
 
-        doc.insert("host", self.hostname());
+        doc.insert("host", &self.hostname);
 
         if let Some(i) = self.port.take() {
             doc.insert("port", i64::from(i));
@@ -157,11 +153,14 @@ pub struct ClientOptions {
     }]")]
     pub hosts: Vec<StreamAddress>,
 
+    #[builder(default = false)]
+    pub srv: bool,
+
     #[builder(default)]
     pub app_name: Option<String>,
 
     #[builder(default)]
-    pub tls_options: Option<TlsOptions>,
+    pub tls: Option<Tls>,
 
     #[builder(default)]
     pub heartbeat_freq: Option<Duration>,
@@ -242,8 +241,9 @@ impl Default for ClientOptions {
 #[derive(Debug, Default, PartialEq)]
 struct ClientOptionsParser {
     pub hosts: Vec<StreamAddress>,
+    pub srv: bool,
     pub app_name: Option<String>,
-    pub tls_options: Option<TlsOptions>,
+    pub tls: Option<Tls>,
     pub heartbeat_freq: Option<Duration>,
     pub local_threshold: Option<Duration>,
     pub read_concern: Option<ReadConcern>,
@@ -270,13 +270,29 @@ struct ClientOptionsParser {
     auth_mechanism_properties: Option<Document>,
     read_preference: Option<ReadPreference>,
     read_preference_tags: Option<Vec<TagSet>>,
-    tls_values: Vec<bool>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
+pub enum Tls {
+    Enabled(TlsOptions),
+    Disabled,
+}
+
+impl From<TlsOptions> for Tls {
+    fn from(options: TlsOptions) -> Self {
+        Self::Enabled(options)
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, TypedBuilder)]
 pub struct TlsOptions {
+    #[builder(default)]
     pub allow_invalid_certificates: Option<bool>,
+
+    #[builder(default)]
     pub ca_file_path: Option<String>,
+
+    #[builder(default)]
     pub cert_key_file_path: Option<String>,
 }
 
@@ -352,8 +368,9 @@ impl From<ClientOptionsParser> for ClientOptions {
     fn from(parser: ClientOptionsParser) -> Self {
         Self {
             hosts: parser.hosts,
+            srv: parser.srv,
             app_name: parser.app_name,
-            tls_options: parser.tls_options,
+            tls: parser.tls,
             heartbeat_freq: parser.heartbeat_freq,
             local_threshold: parser.local_threshold,
             read_concern: parser.read_concern,
@@ -383,6 +400,13 @@ impl From<ClientOptionsParser> for ClientOptions {
 impl ClientOptions {
     pub fn parse(s: &str) -> Result<Self> {
         ClientOptionsParser::parse(s).map(Into::into)
+    }
+
+    pub(crate) fn tls_options(&self) -> Option<TlsOptions> {
+        match self.tls {
+            Some(Tls::Enabled(ref opts)) => Some(opts.clone()),
+            _ => None,
+        }
     }
 }
 
@@ -429,12 +453,16 @@ impl ClientOptionsParser {
             }
         };
 
-        if &s[..end_of_scheme] != "mongodb" {
-            return Err(ErrorKind::ArgumentError {
-                message: format!("invalid connection string scheme: {}", &s[..end_of_scheme]),
+        let srv = match &s[..end_of_scheme] {
+            "mongodb" => false,
+            "mongodb+srv" => true,
+            _ => {
+                return Err(ErrorKind::ArgumentError {
+                    message: format!("invalid connection string scheme: {}", &s[..end_of_scheme]),
+                }
+                .into())
             }
-            .into());
-        }
+        };
 
         let after_scheme = &s[end_of_scheme + 3..];
 
@@ -562,8 +590,25 @@ impl ClientOptionsParser {
 
         let hosts = hosts?;
 
+        if srv {
+            if hosts.len() != 1 {
+                return Err(ErrorKind::ArgumentError {
+                    message: "exactly one host must be specified with 'mongodb+srv'".into(),
+                }
+                .into());
+            }
+
+            if hosts[0].port.is_some() {
+                return Err(ErrorKind::ArgumentError {
+                    message: "a port cannot be specified with 'mongodb+srv'".into(),
+                }
+                .into());
+            }
+        }
+
         let mut options = ClientOptionsParser {
             hosts,
+            srv,
             ..Default::default()
         };
 
@@ -658,6 +703,10 @@ impl ClientOptionsParser {
             }
         };
 
+        if options.tls.is_none() && options.srv {
+            options.tls = Some(Tls::Enabled(Default::default()));
+        }
+
         Ok(options)
     }
 
@@ -713,26 +762,6 @@ impl ClientOptionsParser {
                     .into())
                 }
             };
-        }
-
-        if !self.tls_values.is_empty() {
-            let tls_value = self.tls_values[0];
-
-            if self.tls_values.drain(..).any(|val| val != tls_value) {
-                return Err(ErrorKind::ArgumentError {
-                    message: "All instances of `tls` and `ssl` must have the same value"
-                        .to_string(),
-                }
-                .into());
-            }
-
-            if tls_value {
-                if self.tls_options == None {
-                    self.tls_options = Some(Default::default());
-                }
-            } else {
-                self.tls_options = None;
-            }
         }
 
         Ok(())
@@ -901,19 +930,47 @@ impl ClientOptionsParser {
                 self.server_selection_timeout = Some(Duration::from_millis(get_duration!(value, k)))
             }
             k @ "tls" | k @ "ssl" => {
-                self.tls_values.push(get_bool!(value, k));
+                let tls = get_bool!(value, k);
+
+                match (self.tls.as_ref(), tls) {
+                    (Some(Tls::Disabled), true) | (Some(Tls::Enabled(..)), false) => {
+                        return Err(ErrorKind::ArgumentError {
+                            message: "All instances of `tls` and `ssl` must have the same
+ value"
+                                .to_string(),
+                        }
+                        .into());
+                    }
+                    _ => {}
+                };
+
+                if self.tls.is_none() {
+                    let tls = if tls {
+                        Tls::Enabled(Default::default())
+                    } else {
+                        Tls::Disabled
+                    };
+
+                    self.tls = Some(tls);
+                }
             }
             k @ "tlsinsecure" | k @ "tlsallowinvalidcertificates" => {
                 let val = get_bool!(value, k);
 
                 let allow_invalid_certificates = if k == "tlsinsecure" { !val } else { val };
 
-                if let Some(existing_val) = self
-                    .tls_options
-                    .as_ref()
-                    .and_then(|opts| opts.allow_invalid_certificates)
-                {
-                    if allow_invalid_certificates != existing_val {
+                match self.tls {
+                    Some(Tls::Disabled) => {
+                        return Err(ErrorKind::ArgumentError {
+                            message: "'tlsInsecure' can't be set if tls=false".into(),
+                        }
+                        .into())
+                    }
+                    Some(Tls::Enabled(ref options))
+                        if options.allow_invalid_certificates.is_some()
+                            && options.allow_invalid_certificates
+                                != Some(allow_invalid_certificates) =>
+                    {
                         return Err(ErrorKind::ArgumentError {
                             message: "all instances of 'tlsInsecure' and \
                                       'tlsAllowInvalidCertificates' must be consistent (e.g. \
@@ -923,22 +980,54 @@ impl ClientOptionsParser {
                         }
                         .into());
                     }
+                    Some(Tls::Enabled(ref mut options)) => {
+                        options.allow_invalid_certificates = Some(allow_invalid_certificates);
+                    }
+                    None => {
+                        self.tls = Some(Tls::Enabled(
+                            TlsOptions::builder()
+                                .allow_invalid_certificates(allow_invalid_certificates)
+                                .build(),
+                        ))
+                    }
                 }
-
-                self.tls_options
-                    .get_or_insert_with(Default::default)
-                    .allow_invalid_certificates = Some(allow_invalid_certificates);
             }
-            "tlscafile" => {
-                self.tls_options
-                    .get_or_insert_with(Default::default)
-                    .ca_file_path = Some(value.to_string());
-            }
-            "tlscertificatekeyfile" => {
-                self.tls_options
-                    .get_or_insert_with(Default::default)
-                    .cert_key_file_path = Some(value.to_string());
-            }
+            "tlscafile" => match self.tls {
+                Some(Tls::Disabled) => {
+                    return Err(ErrorKind::ArgumentError {
+                        message: "'tlsCAFile' can't be set if tls=false".into(),
+                    }
+                    .into());
+                }
+                Some(Tls::Enabled(ref mut options)) => {
+                    options.ca_file_path = Some(value.to_string());
+                }
+                None => {
+                    self.tls = Some(Tls::Enabled(
+                        TlsOptions::builder()
+                            .ca_file_path(value.to_string())
+                            .build(),
+                    ))
+                }
+            },
+            "tlscertificatekeyfile" => match self.tls {
+                Some(Tls::Disabled) => {
+                    return Err(ErrorKind::ArgumentError {
+                        message: "'tlsCertificateKeyFile' can't be set if tls=false".into(),
+                    }
+                    .into());
+                }
+                Some(Tls::Enabled(ref mut options)) => {
+                    options.cert_key_file_path = Some(value.to_string());
+                }
+                None => {
+                    self.tls = Some(Tls::Enabled(
+                        TlsOptions::builder()
+                            .cert_key_file_path(value.to_string())
+                            .build(),
+                    ))
+                }
+            },
             "w" => {
                 let mut write_concern = self.write_concern.get_or_insert_with(Default::default);
 

@@ -1,6 +1,7 @@
 mod auth;
 mod connection_stepdown;
 mod crud;
+mod initial_dns_seedlist_discovery;
 mod read_write_concern;
 
 use std::{

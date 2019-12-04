@@ -135,7 +135,7 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
         doc.insert("sockettimeoutms", i.as_millis() as i64);
     }
 
-    if let Some(mut opt) = options.tls_options.take() {
+    if let Some(mut opt) = options.tls_options() {
         let ca_file_path = opt.ca_file_path.take();
         let cert_key_file_path = opt.cert_key_file_path.take();
         let allow_invalid_certificates = opt.allow_invalid_certificates.take();
@@ -246,7 +246,7 @@ fn run_test(test_file: TestFile) {
             }
             if !is_unsupported_host_type {
                 // options
-                let options = ClientOptions::parse(&test_case.uri).unwrap();
+                let options = ClientOptions::parse(&test_case.uri).expect(&test_case.description);
                 let mut options_doc = document_from_client_options(options);
                 if let Some(json_options) = test_case.options {
                     let mut json_options: Document = json_options
