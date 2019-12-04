@@ -1,3 +1,5 @@
+use pretty_assertions::assert_eq;
+
 use bson::{bson, doc, Bson};
 
 use crate::{
@@ -50,7 +52,8 @@ fn build() {
         "writeConcern": {
             "w": "majority"
         },
-        "bypassDocumentValidation": true
+        "bypassDocumentValidation": true,
+        "ordered": true,
     };
 
     bson_util::sort_document(&mut cmd.body);
@@ -86,6 +89,7 @@ fn build_many() {
                 "multi": true,
             }
         ],
+        "ordered": true,
     };
 
     bson_util::sort_document(&mut cmd.body);

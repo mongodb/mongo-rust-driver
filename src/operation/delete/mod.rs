@@ -68,7 +68,8 @@ impl Operation for Delete {
 
         let mut body = doc! {
             Self::NAME: self.ns.coll.clone(),
-            "deletes": [delete]
+            "deletes": [delete],
+            "ordered": true, // command monitoring tests expect this (SPEC-1130)
         };
         append_options(&mut body, self.options.as_ref())?;
 

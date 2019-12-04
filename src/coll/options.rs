@@ -40,7 +40,7 @@ pub enum ReturnDocument {
 }
 
 /// Specifies the index to use for an operation.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum Hint {
     /// Specifies the keys of the index to use.
@@ -74,7 +74,7 @@ pub enum CursorType {
 }
 
 /// Specifies the options to a `Collection::insert_one` operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct InsertOneOptions {
     /// Opt out of document-level validation.
     #[builder(default)]
@@ -96,6 +96,8 @@ pub struct InsertManyOptions {
 
     /// If true, when an insert fails, return without performing the remaining writes. If false,
     /// when a write fails, continue with the remaining writes, if any.
+    ///
+    /// Defaults to true.
     #[builder(default)]
     pub ordered: Option<bool>,
 

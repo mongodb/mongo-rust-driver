@@ -23,14 +23,11 @@ use crate::{
         ConnectionCreatedEvent,
         ConnectionReadyEvent,
     },
-    options::StreamAddress,
-    options::TlsOptions,
+    options::{StreamAddress, TlsOptions},
 };
-pub(crate) use {
-    command::{Command, CommandResponse},
-    stream_description::StreamDescription,
-    wire::next_request_id,
-};
+pub(crate) use command::{Command, CommandResponse};
+pub(crate) use stream_description::StreamDescription;
+pub(crate) use wire::next_request_id;
 
 /// User-facing information about a connection to the database.
 #[derive(Clone, Debug)]

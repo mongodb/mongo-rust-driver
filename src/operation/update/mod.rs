@@ -100,6 +100,7 @@ impl Operation for Update {
         }
 
         body.insert("updates", vec![Bson::Document(update)]);
+        body.insert("ordered", true); // command monitoring tests expect this (SPEC-1130)
 
         Ok(Command::new(
             Self::NAME.to_string(),

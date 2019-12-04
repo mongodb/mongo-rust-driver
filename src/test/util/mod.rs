@@ -1,16 +1,20 @@
 mod event;
 mod lock;
 
-pub use self::{event::EventClient, lock::TestLock};
+pub use self::{
+    event::{EventClient, TestEvent},
+    lock::TestLock,
+};
 
-use std::{collections::HashMap, sync::Arc};
+use std::{any::Any, collections::HashMap, fmt::Debug, sync::Arc};
 
-use bson::{bson, doc, oid::ObjectId, Bson};
+use bson::{bson, doc, oid::ObjectId, Bson, Document};
 use semver::Version;
 use serde::Deserialize;
 
 use self::event::EventHandler;
 use crate::{
+    bson_util,
     error::{CommandError, ErrorKind, Result},
     options::{auth::AuthMechanism, ClientOptions},
     Client,
@@ -118,7 +122,6 @@ impl TestClient {
             || (self.server_version.major == major && self.server_version.minor > minor)
     }
 
-    #[allow(dead_code)]
     pub fn server_version_gte(&self, major: u64, minor: u64) -> bool {
         self.server_version.major > major
             || (self.server_version.major == major && self.server_version.minor >= minor)
@@ -148,6 +151,14 @@ pub fn drop_collection(coll: &Collection) {
             e.unwrap();
         }
     };
+}
+
+pub fn parse_version(version: &str) -> (u64, u64) {
+    let parts: Vec<u64> = version.split('.').map(|s| s.parse().unwrap()).collect();
+    if parts.len() != 2 {
+        panic!("not two part version string: {:?}", parts);
+    }
+    (parts[0], parts[1])
 }
 
 #[derive(Debug, Deserialize)]
@@ -180,4 +191,89 @@ pub struct IsMasterCommandResponse {
     pub tags: Option<HashMap<String, String>>,
     pub election_id: Option<ObjectId>,
     pub primary: Option<String>,
+}
+
+pub trait Matchable: Sized + 'static {
+    fn is_placeholder(&self) -> bool {
+        false
+    }
+
+    fn content_matches(&self, expected: &Self) -> bool;
+
+    fn matches<T: Matchable + Any>(&self, expected: &T) -> bool {
+        if expected.is_placeholder() {
+            return true;
+        }
+        if let Some(expected) = Any::downcast_ref::<Self>(expected) {
+            self.content_matches(expected)
+        } else {
+            false
+        }
+    }
+}
+
+impl Matchable for Bson {
+    fn is_placeholder(&self) -> bool {
+        if let Bson::String(string) = self {
+            string.as_str() == "42" || string.as_str() == ""
+        } else {
+            get_int(self) == Some(42)
+        }
+    }
+
+    fn content_matches(&self, expected: &Bson) -> bool {
+        match (self, expected) {
+            (Bson::Document(actual_doc), Bson::Document(expected_doc)) => {
+                actual_doc.matches(expected_doc)
+            }
+            (Bson::Array(actual_array), Bson::Array(expected_array)) => {
+                for (i, expected_element) in expected_array.iter().enumerate() {
+                    if actual_array.len() <= i || !actual_array[i].matches(expected_element) {
+                        return false;
+                    }
+                }
+                true
+            }
+            _ => match (bson_util::get_int(self), get_int(expected)) {
+                (Some(actual_int), Some(expected_int)) => actual_int == expected_int,
+                (None, Some(_)) => false,
+                _ => self == expected,
+            },
+        }
+    }
+}
+
+impl Matchable for Document {
+    fn content_matches(&self, expected: &Document) -> bool {
+        for (k, v) in expected.iter() {
+            if let Some(actual_v) = self.get(k) {
+                if !actual_v.matches(v) {
+                    println!("{} = {} did not MATCH {} = {}", k, actual_v, k, v);
+                    return false;
+                }
+            } else {
+                println!("{} was missing {}", self, k);
+                return false;
+            }
+        }
+        true
+    }
+}
+
+pub fn assert_matches<A: Matchable + Debug, E: Matchable + Debug>(actual: &A, expected: &E) {
+    assert!(
+        actual.matches(expected),
+        "\n{:?}\n did not MATCH \n{:?}",
+        actual,
+        expected
+    );
+}
+
+fn parse_i64_ext_json(doc: &Document) -> Option<i64> {
+    let number_string = doc.get("$numberLong").and_then(Bson::as_str)?;
+    number_string.parse::<i64>().ok()
+}
+
+fn get_int(value: &Bson) -> Option<i64> {
+    bson_util::get_int(value).or_else(|| value.as_document().and_then(parse_i64_ext_json))
 }

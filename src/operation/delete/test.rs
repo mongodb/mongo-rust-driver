@@ -45,6 +45,7 @@ fn build_many() {
         "writeConcern": {
             "w": "majority"
         },
+        "ordered": true,
     };
 
     bson_util::sort_document(&mut cmd.body);
@@ -87,6 +88,7 @@ fn build_one() {
         "writeConcern": {
             "w": "majority"
         },
+        "ordered": true,
     };
 
     bson_util::sort_document(&mut cmd.body);

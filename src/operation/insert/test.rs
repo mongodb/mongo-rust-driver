@@ -106,6 +106,35 @@ fn build() {
 }
 
 #[test]
+fn build_ordered() {
+    let insert = Insert::new(Namespace::empty(), Vec::new(), None);
+    let cmd = insert
+        .build(&StreamDescription::new_testing())
+        .expect("should succeed");
+    assert_eq!(cmd.body.get("ordered"), Some(&Bson::Boolean(true)));
+
+    let insert = Insert::new(
+        Namespace::empty(),
+        Vec::new(),
+        Some(InsertManyOptions::builder().ordered(false).build()),
+    );
+    let cmd = insert
+        .build(&StreamDescription::new_testing())
+        .expect("should succeed");
+    assert_eq!(cmd.body.get("ordered"), Some(&Bson::Boolean(false)));
+
+    let insert = Insert::new(
+        Namespace::empty(),
+        Vec::new(),
+        Some(InsertManyOptions::builder().ordered(true).build()),
+    );
+    let cmd = insert
+        .build(&StreamDescription::new_testing())
+        .expect("should succeed");
+    assert_eq!(cmd.body.get("ordered"), Some(&Bson::Boolean(true)));
+}
+
+#[test]
 fn handle_success() {
     let fixtures = fixtures();
 

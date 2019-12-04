@@ -1,10 +1,11 @@
 use std::{sync::Arc, time::Duration};
 
 use derivative::Derivative;
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 use typed_builder::TypedBuilder;
 
 use crate::{
+    bson_util,
     client::auth::Credential,
     event::cmap::CmapEventHandler,
     options::{ClientOptions, TlsOptions},
@@ -78,18 +79,8 @@ pub struct ConnectionPoolOptions {
     #[builder(default)]
     #[serde(rename = "waitQueueTimeoutMS")]
     #[serde(default)]
-    #[serde(deserialize_with = "self::deserialize_duration_from_u64_millis")]
+    #[serde(deserialize_with = "bson_util::deserialize_duration_from_u64_millis")]
     pub wait_queue_timeout: Option<Duration>,
-}
-
-fn deserialize_duration_from_u64_millis<'de, D>(
-    deserializer: D,
-) -> Result<Option<Duration>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let millis = Option::<u64>::deserialize(deserializer)?;
-    Ok(millis.map(Duration::from_millis))
 }
 
 impl ConnectionPoolOptions {
