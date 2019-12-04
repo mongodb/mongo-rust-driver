@@ -3,13 +3,18 @@ use std::net::TcpStream;
 use bson::{bson, doc, Bson};
 
 use super::message::{Message, MessageFlags, MessageSection};
-use crate::{options::StreamAddress, test::CLIENT_OPTIONS};
+use crate::{
+    options::StreamAddress,
+    test::{CLIENT_OPTIONS, LOCK},
+};
 
 #[test]
 fn basic() {
     if CLIENT_OPTIONS.tls_options.is_some() {
         return;
     }
+
+    let _guard = LOCK.run_concurrently();
 
     let message = Message {
         response_to: 0,

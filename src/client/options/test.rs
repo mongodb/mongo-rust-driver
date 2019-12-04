@@ -5,6 +5,7 @@ use crate::{
     client::options::{ClientOptions, StreamAddress},
     error::ErrorKind,
     selection_criteria::{ReadPreference, SelectionCriteria},
+    test::run_spec_test,
 };
 #[derive(Debug, Deserialize)]
 struct TestFile {
@@ -314,10 +315,10 @@ fn run_test(test_file: TestFile) {
 
 #[test]
 fn run_uri_options_spec_tests() {
-    crate::test::run(&["uri-options"], run_test);
+    run_spec_test(&["uri-options"], run_test);
 }
 
 #[test]
 fn run_connection_string_spec_tests() {
-    crate::test::run(&["connection-string"], run_test);
+    run_spec_test(&["connection-string"], run_test);
 }

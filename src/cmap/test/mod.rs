@@ -18,7 +18,7 @@ use self::{
 use crate::{
     cmap::{Connection, ConnectionPool},
     error::{Error, Result},
-    test::CLIENT_OPTIONS,
+    test::{run_spec_test, CLIENT_OPTIONS, LOCK},
 };
 
 const TEST_DESCRIPTIONS_TO_SKIP: &[&str] = &[
@@ -256,12 +256,14 @@ fn assert_events_match(actual: &Event, expected: &Event) {
 
 #[test]
 fn cmap_spec_tests() {
-    crate::test::run(
+    run_spec_test(
         &["connection-monitoring-and-pooling"],
         |test_file: TestFile| {
             if TEST_DESCRIPTIONS_TO_SKIP.contains(&test_file.description.as_str()) {
                 return;
             }
+
+            let _guard = LOCK.run_concurrently();
 
             let executor = Executor::new(test_file);
             executor.execute_test();

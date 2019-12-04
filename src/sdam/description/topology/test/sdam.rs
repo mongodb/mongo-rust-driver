@@ -11,6 +11,7 @@ use crate::{
         server::{ServerDescription, ServerType},
         topology::{TopologyDescription, TopologyType},
     },
+    test::run_spec_test,
 };
 
 #[derive(Debug, Deserialize)]
@@ -111,7 +112,7 @@ fn run_test(test_file: TestFile) {
             &test_file.description, i,
         );
 
-        // TODO: Test for proper logicalSessionTimeoutMinutes value once sessions spec
+        // TODO RUST-52: Test for proper logicalSessionTimeoutMinutes value once sessions spec
         // is implemented.
 
         if let Some(compatible) = phase.outcome.compatible {
@@ -201,15 +202,15 @@ fn run_test(test_file: TestFile) {
 
 #[test]
 fn single() {
-    crate::test::run(&["server-discovery-and-monitoring", "single"], run_test);
+    run_spec_test(&["server-discovery-and-monitoring", "single"], run_test);
 }
 
 #[test]
 fn rs() {
-    crate::test::run(&["server-discovery-and-monitoring", "rs"], run_test);
+    run_spec_test(&["server-discovery-and-monitoring", "rs"], run_test);
 }
 
 #[test]
 fn sharded() {
-    crate::test::run(&["server-discovery-and-monitoring", "sharded"], run_test);
+    run_spec_test(&["server-discovery-and-monitoring", "sharded"], run_test);
 }
