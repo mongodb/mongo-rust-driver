@@ -11,11 +11,21 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, ErrorKind, Result},
     operation::{
-        Aggregate, Count, Delete, Distinct, DropCollection, Find, FindAndModify, Insert, Update,
+        Aggregate,
+        Count,
+        Delete,
+        Distinct,
+        DropCollection,
+        Find,
+        FindAndModify,
+        Insert,
+        Update,
     },
     results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
     selection_criteria::SelectionCriteria,
-    Client, Cursor, Database,
+    Client,
+    Cursor,
+    Database,
 };
 
 /// `Collection` is the client-side abstraction of a MongoDB Collection. It can be used to

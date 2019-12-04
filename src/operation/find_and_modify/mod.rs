@@ -11,7 +11,9 @@ use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
     coll::{
         options::{
-            FindOneAndDeleteOptions, FindOneAndReplaceOptions, FindOneAndUpdateOptions,
+            FindOneAndDeleteOptions,
+            FindOneAndReplaceOptions,
+            FindOneAndUpdateOptions,
             UpdateModifications,
         },
         Namespace,

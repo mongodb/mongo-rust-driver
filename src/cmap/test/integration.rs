@@ -1,9 +1,9 @@
 use bson::{bson, doc};
 use serde::Deserialize;
 
-use crate::selection_criteria::ReadPreference;
 use crate::{
     cmap::{options::ConnectionPoolOptions, Command, ConnectionPool},
+    selection_criteria::ReadPreference,
     test::CLIENT_OPTIONS,
 };
 

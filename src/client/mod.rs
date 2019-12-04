@@ -17,7 +17,10 @@ use crate::{
     db::Database,
     error::{ErrorKind, Result},
     event::command::{
-        CommandEventHandler, CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent,
+        CommandEventHandler,
+        CommandFailedEvent,
+        CommandStartedEvent,
+        CommandSucceededEvent,
     },
     operation::ListDatabases,
     options::{ClientOptions, DatabaseOptions},

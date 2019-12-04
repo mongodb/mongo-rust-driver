@@ -3,10 +3,15 @@ use bson::{bson, doc};
 use mongodb::{
     error::{CommandError, ErrorKind},
     options::{
-        Acknowledgment, CreateCollectionOptions, DropCollectionOptions, FindOptions,
-        InsertManyOptions, WriteConcern,
+        Acknowledgment,
+        CreateCollectionOptions,
+        DropCollectionOptions,
+        FindOptions,
+        InsertManyOptions,
+        WriteConcern,
     },
-    Collection, Database,
+    Collection,
+    Database,
 };
 
 use crate::{util::EventClient, LOCK};

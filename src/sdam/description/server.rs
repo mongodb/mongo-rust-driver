@@ -4,7 +4,10 @@ use bson::{oid::ObjectId, UtcDateTime};
 use chrono::offset::Utc;
 
 use crate::{
-    error::Result, is_master::IsMasterReply, options::StreamAddress, selection_criteria::TagSet,
+    error::Result,
+    is_master::IsMasterReply,
+    options::StreamAddress,
+    selection_criteria::TagSet,
 };
 
 const DRIVER_MIN_DB_VERSION: &str = "3.6";

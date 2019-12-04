@@ -4,8 +4,7 @@ use crate::{
     bson_util,
     cmap::{CommandResponse, StreamDescription},
     error::ErrorKind,
-    operation::Operation,
-    operation::{test, ListDatabases},
+    operation::{test, ListDatabases, Operation},
     selection_criteria::ReadPreference,
 };
 

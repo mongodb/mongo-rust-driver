@@ -15,17 +15,18 @@ use super::ConnectionPoolInner;
 use crate::{
     error::{ErrorKind, Result},
     event::cmap::{
-        CmapEventHandler, ConnectionCheckedInEvent, ConnectionCheckedOutEvent,
-        ConnectionClosedEvent, ConnectionClosedReason, ConnectionCreatedEvent,
+        CmapEventHandler,
+        ConnectionCheckedInEvent,
+        ConnectionCheckedOutEvent,
+        ConnectionClosedEvent,
+        ConnectionClosedReason,
+        ConnectionCreatedEvent,
         ConnectionReadyEvent,
     },
-    options::StreamAddress,
-    options::TlsOptions,
+    options::{StreamAddress, TlsOptions},
 };
-pub(crate) use {
-    command::{Command, CommandResponse},
-    stream_description::StreamDescription,
-};
+pub(crate) use command::{Command, CommandResponse};
+pub(crate) use stream_description::StreamDescription;
 
 /// User-facing information about a connection to the database.
 #[derive(Clone, Debug)]

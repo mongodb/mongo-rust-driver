@@ -8,7 +8,9 @@ use crate::{
     coll::options::ReturnDocument,
     operation::{test, FindAndModify, Operation},
     options::{
-        FindOneAndDeleteOptions, FindOneAndReplaceOptions, FindOneAndUpdateOptions,
+        FindOneAndDeleteOptions,
+        FindOneAndReplaceOptions,
+        FindOneAndUpdateOptions,
         UpdateModifications,
     },
     Namespace,

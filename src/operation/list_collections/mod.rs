@@ -7,8 +7,7 @@ use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
-    operation::append_options,
-    operation::{CursorBody, Operation},
+    operation::{append_options, CursorBody, Operation},
     options::{ListCollectionsOptions, ReadPreference, SelectionCriteria},
 };
 
