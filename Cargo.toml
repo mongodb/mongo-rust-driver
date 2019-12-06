@@ -26,11 +26,12 @@ sha-1 = "0.8.1"
 sha2 = "0.8.0"
 stringprep = "0.1.2"
 time = "0.1.42"
+trust-dns-proto = "0.8.0"
 trust-dns-resolver = "0.12.0"
 typed-builder = "0.3.0"
 version_check = "0.9.1"
 webpki = "0.21.0"
-trust-dns-proto = "0.8.0"
+webpki-roots = "0.18.0"
 
 [dependencies.rustls]
 version = "0.16.0"

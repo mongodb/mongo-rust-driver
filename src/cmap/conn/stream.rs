@@ -40,8 +40,10 @@ impl Stream {
         match tls_options {
             Some(cfg) => {
                 let name = DNSNameRef::try_from_ascii_str(&host.hostname)?;
-                let session =
-                    rustls::ClientSession::new(&Arc::new(cfg.into_rustls_config()?), name);
+                let mut tls_config = cfg.into_rustls_config()?;
+                tls_config.enable_sni = true;
+
+                let session = rustls::ClientSession::new(&Arc::new(tls_config), name);
 
                 Ok(Stream::Tls(rustls::StreamOwned::new(session, inner)))
             }
