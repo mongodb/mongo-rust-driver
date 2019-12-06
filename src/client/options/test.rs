@@ -1,4 +1,5 @@
 use bson::{Bson, Document};
+use pretty_assertions::assert_eq;
 use serde::Deserialize;
 
 use crate::{
@@ -234,7 +235,7 @@ fn run_test(test_file: TestFile) {
                 });
 
                 if !is_unsupported_host_type {
-                    let options = ClientOptions::parse(&test_case.uri).unwrap();
+                    let options = ClientOptions::parse_uri(&test_case.uri).unwrap();
                     let hosts: Vec<_> = options
                         .hosts
                         .into_iter()
@@ -246,7 +247,8 @@ fn run_test(test_file: TestFile) {
             }
             if !is_unsupported_host_type {
                 // options
-                let options = ClientOptions::parse(&test_case.uri).expect(&test_case.description);
+                let options =
+                    ClientOptions::parse_uri(&test_case.uri).expect(&test_case.description);
                 let mut options_doc = document_from_client_options(options);
                 if let Some(json_options) = test_case.options {
                     let mut json_options: Document = json_options
@@ -288,7 +290,7 @@ fn run_test(test_file: TestFile) {
                         })
                         .collect();
 
-                    let options = ClientOptions::parse(&test_case.uri).unwrap();
+                    let options = ClientOptions::parse_uri(&test_case.uri).unwrap();
                     let mut expected_auth = options.credential.unwrap_or_default().into_document();
                     expected_auth = expected_auth
                         .into_iter()
@@ -301,7 +303,7 @@ fn run_test(test_file: TestFile) {
         } else {
             let expected_type = if warning { "warning" } else { "error" };
 
-            match ClientOptions::parse(&test_case.uri)
+            match ClientOptions::parse_uri(&test_case.uri)
                 .as_ref()
                 .map_err(|e| e.as_ref())
             {

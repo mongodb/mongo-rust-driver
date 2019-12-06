@@ -35,7 +35,7 @@ struct ParsedOptions {
 }
 
 fn parse_and_resolve(resolver: &SrvResolver, uri: &str) -> Result<ClientOptions> {
-    let mut options = ClientOptions::parse(uri)?;
+    let mut options = ClientOptions::parse_uri(uri)?;
     resolver.resolve_and_update_client_opts(&mut options)?;
 
     Ok(options)

@@ -70,7 +70,7 @@ fn server_type_from_str(s: &str) -> Option<ServerType> {
 }
 
 fn run_test(test_file: TestFile) {
-    let mut options = ClientOptions::parse(&test_file.uri).expect(&test_file.description);
+    let mut options = ClientOptions::parse_uri(&test_file.uri).expect(&test_file.description);
 
     if options.hosts.len() == 1 {
         options.direct_connection = Some(true);

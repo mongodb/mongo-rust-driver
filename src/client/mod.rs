@@ -81,7 +81,7 @@ impl Client {
     /// Creates a new `Client` connected to the cluster specified by `uri`. `uri` must be a valid
     /// MongoDB connection string.
     pub fn with_uri_str(uri: &str) -> Result<Self> {
-        let options = ClientOptions::parse(uri)?;
+        let options = ClientOptions::parse_uri(uri)?;
 
         Client::with_options(options)
     }
