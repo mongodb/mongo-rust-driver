@@ -289,6 +289,12 @@ impl From<TlsOptions> for Tls {
     }
 }
 
+impl From<TlsOptions> for Option<Tls> {
+    fn from(options: TlsOptions) -> Self {
+        Some(Tls::Enabled(options))
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, TypedBuilder)]
 pub struct TlsOptions {
     #[builder(default)]
