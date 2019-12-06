@@ -410,10 +410,28 @@ impl From<ClientOptionsParser> for ClientOptions {
 }
 
 impl ClientOptions {
+    /// Parses a MongoDB connection string into a ClientOptions struct. If the string is malformed
+    /// or one of the options has an invalid value, an error will be returned.
+    ///
+    /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will _not_ be done as
+    /// part of this method. To manually update the ClientOptions hosts and options with the SRV
+    /// and TXT records, call `ClientOptions::resolve_srv`. Note that calling
+    /// `Client::with_options` will also automatically call `resolve_srv` if needed.
     pub fn parse_uri(s: &str) -> Result<Self> {
         ClientOptionsParser::parse(s).map(Into::into)
     }
 
+    /// If self.srv is true, then the SRV and TXT records for the host will be looked up, and the
+    /// ClientOptions will be updated with the hosts found in the SRV records and the options found
+    /// in the TXT record. After returning, self.srv will be set to false.
+    ///
+    /// If self.srv is false, this method will not change the ClientOptions.
+    ///
+    /// Note that MongoDB requires that exactly one address is present in an SRV configuration, and
+    /// that address must not have a port. If more a port or more than one address is present, an
+    /// error will be returned.
+    ///
+    /// See [the MongoDB documentation](https://docs.mongodb.com/manual/reference/connection-string/#dns-seedlist-connection-format) for more details.
     pub fn resolve_srv(&mut self) -> Result<()> {
         let resolver = SrvResolver::new()?;
         resolver.resolve_and_update_client_opts(self)?;
