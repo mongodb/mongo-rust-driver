@@ -89,6 +89,11 @@ pub enum ErrorKind {
     #[error(display = "{}", _0)]
     DnsName(#[error(source)] webpki::InvalidDNSNameError),
 
+    // `trust_dns` does not implement the `Error` trait on their errors, so we have to manually
+    // implement `From` rather than using the `source annotation.
+    #[error(display = "{}", _0)]
+    DnsResolve(trust_dns_resolver::error::ResolveError),
+
     #[error(display = "Unable to parse hostname: {}", hostname)]
     InvalidHostname { hostname: String },
 
@@ -125,6 +130,12 @@ pub enum ErrorKind {
     )]
     ServerSelectionError { message: String },
 
+    #[error(display = "An error occurred during SRV record lookup: {}", message)]
+    SrvLookupError { message: String },
+
+    #[error(display = "An error occurred during TXT record lookup: {}", message)]
+    TxtLookupError { message: String },
+
     #[error(
         display = "Timed out while checking out a connection from connection pool with address {}",
         address
@@ -136,6 +147,12 @@ pub enum ErrorKind {
         _0
     )]
     WriteError(WriteFailure),
+}
+
+impl From<trust_dns_resolver::error::ResolveError> for ErrorKind {
+    fn from(error: trust_dns_resolver::error::ResolveError) -> Self {
+        Self::DnsResolve(error)
+    }
 }
 
 impl ErrorKind {

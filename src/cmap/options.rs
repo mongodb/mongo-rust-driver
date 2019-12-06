@@ -93,7 +93,7 @@ impl ConnectionPoolOptions {
             .min_pool_size(options.min_pool_size)
             .max_idle_time(options.max_idle_time)
             .wait_queue_timeout(options.wait_queue_timeout)
-            .tls_options(options.tls_options.clone())
+            .tls_options(options.tls_options())
             .event_handler(options.cmap_event_handler.clone())
             .build()
     }

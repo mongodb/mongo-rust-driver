@@ -139,7 +139,7 @@ impl Topology {
             0,
             server.address.clone(),
             0,
-            options.tls_options.clone(),
+            options.tls_options(),
             options.cmap_event_handler.clone(),
         )?;
 

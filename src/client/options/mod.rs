@@ -31,6 +31,7 @@ use crate::{
     error::{ErrorKind, Result},
     event::{cmap::CmapEventHandler, command::CommandEventHandler},
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
+    srv::SrvResolver,
 };
 
 const DEFAULT_PORT: u16 = 27017;
@@ -117,15 +118,11 @@ impl StreamAddress {
         })
     }
 
-    pub fn hostname(&self) -> &str {
-        &self.hostname
-    }
-
     #[cfg(test)]
     pub(crate) fn into_document(mut self) -> Document {
         let mut doc = Document::new();
 
-        doc.insert("host", self.hostname());
+        doc.insert("host", &self.hostname);
 
         if let Some(i) = self.port.take() {
             doc.insert("port", i64::from(i));
@@ -157,11 +154,14 @@ pub struct ClientOptions {
     }]")]
     pub hosts: Vec<StreamAddress>,
 
+    #[builder(default = false)]
+    pub srv: bool,
+
     #[builder(default)]
     pub app_name: Option<String>,
 
     #[builder(default)]
-    pub tls_options: Option<TlsOptions>,
+    pub tls: Option<Tls>,
 
     #[builder(default)]
     pub heartbeat_freq: Option<Duration>,
@@ -231,6 +231,9 @@ pub struct ClientOptions {
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
     #[builder(default)]
     pub command_event_handler: Option<Arc<dyn CommandEventHandler>>,
+
+    #[builder(default)]
+    original_uri: Option<String>,
 }
 
 impl Default for ClientOptions {
@@ -242,8 +245,9 @@ impl Default for ClientOptions {
 #[derive(Debug, Default, PartialEq)]
 struct ClientOptionsParser {
     pub hosts: Vec<StreamAddress>,
+    pub srv: bool,
     pub app_name: Option<String>,
-    pub tls_options: Option<TlsOptions>,
+    pub tls: Option<Tls>,
     pub heartbeat_freq: Option<Duration>,
     pub local_threshold: Option<Duration>,
     pub read_concern: Option<ReadConcern>,
@@ -270,13 +274,36 @@ struct ClientOptionsParser {
     auth_mechanism_properties: Option<Document>,
     read_preference: Option<ReadPreference>,
     read_preference_tags: Option<Vec<TagSet>>,
-    tls_values: Vec<bool>,
+    original_uri: String,
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
+pub enum Tls {
+    Enabled(TlsOptions),
+    Disabled,
+}
+
+impl From<TlsOptions> for Tls {
+    fn from(options: TlsOptions) -> Self {
+        Self::Enabled(options)
+    }
+}
+
+impl From<TlsOptions> for Option<Tls> {
+    fn from(options: TlsOptions) -> Self {
+        Some(Tls::Enabled(options))
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, TypedBuilder)]
 pub struct TlsOptions {
+    #[builder(default)]
     pub allow_invalid_certificates: Option<bool>,
+
+    #[builder(default)]
     pub ca_file_path: Option<String>,
+
+    #[builder(default)]
     pub cert_key_file_path: Option<String>,
 }
 
@@ -352,8 +379,9 @@ impl From<ClientOptionsParser> for ClientOptions {
     fn from(parser: ClientOptionsParser) -> Self {
         Self {
             hosts: parser.hosts,
+            srv: parser.srv,
             app_name: parser.app_name,
-            tls_options: parser.tls_options,
+            tls: parser.tls,
             heartbeat_freq: parser.heartbeat_freq,
             local_threshold: parser.local_threshold,
             read_concern: parser.read_concern,
@@ -376,13 +404,47 @@ impl From<ClientOptionsParser> for ClientOptions {
             max_staleness: parser.max_staleness,
             cmap_event_handler: None,
             command_event_handler: None,
+            original_uri: Some(parser.original_uri),
         }
     }
 }
 
 impl ClientOptions {
-    pub fn parse(s: &str) -> Result<Self> {
+    /// Parses a MongoDB connection string into a ClientOptions struct. If the string is malformed
+    /// or one of the options has an invalid value, an error will be returned.
+    ///
+    /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will _not_ be done as
+    /// part of this method. To manually update the ClientOptions hosts and options with the SRV
+    /// and TXT records, call `ClientOptions::resolve_srv`. Note that calling
+    /// `Client::with_options` will also automatically call `resolve_srv` if needed.
+    pub fn parse_uri(s: &str) -> Result<Self> {
         ClientOptionsParser::parse(s).map(Into::into)
+    }
+
+    /// If self.srv is true, then the SRV and TXT records for the host will be looked up, and the
+    /// ClientOptions will be updated with the hosts found in the SRV records and the options found
+    /// in the TXT record. After returning, self.srv will be set to false.
+    ///
+    /// If self.srv is false, this method will not change the ClientOptions.
+    ///
+    /// Note that MongoDB requires that exactly one address is present in an SRV configuration, and
+    /// that address must not have a port. If more a port or more than one address is present, an
+    /// error will be returned.
+    ///
+    /// See [the MongoDB documentation](https://docs.mongodb.com/manual/reference/connection-string/#dns-seedlist-connection-format) for more details.
+    pub fn resolve_srv(&mut self) -> Result<()> {
+        let resolver = SrvResolver::new()?;
+        resolver.resolve_and_update_client_opts(self)?;
+        self.srv = false;
+
+        Ok(())
+    }
+
+    pub(crate) fn tls_options(&self) -> Option<TlsOptions> {
+        match self.tls {
+            Some(Tls::Enabled(ref opts)) => Some(opts.clone()),
+            _ => None,
+        }
     }
 }
 
@@ -429,12 +491,16 @@ impl ClientOptionsParser {
             }
         };
 
-        if &s[..end_of_scheme] != "mongodb" {
-            return Err(ErrorKind::ArgumentError {
-                message: format!("invalid connection string scheme: {}", &s[..end_of_scheme]),
+        let srv = match &s[..end_of_scheme] {
+            "mongodb" => false,
+            "mongodb+srv" => true,
+            _ => {
+                return Err(ErrorKind::ArgumentError {
+                    message: format!("invalid connection string scheme: {}", &s[..end_of_scheme]),
+                }
+                .into())
             }
-            .into());
-        }
+        };
 
         let after_scheme = &s[end_of_scheme + 3..];
 
@@ -562,8 +628,26 @@ impl ClientOptionsParser {
 
         let hosts = hosts?;
 
+        if srv {
+            if hosts.len() != 1 {
+                return Err(ErrorKind::ArgumentError {
+                    message: "exactly one host must be specified with 'mongodb+srv'".into(),
+                }
+                .into());
+            }
+
+            if hosts[0].port.is_some() {
+                return Err(ErrorKind::ArgumentError {
+                    message: "a port cannot be specified with 'mongodb+srv'".into(),
+                }
+                .into());
+            }
+        }
+
         let mut options = ClientOptionsParser {
             hosts,
+            srv,
+            original_uri: s.into(),
             ..Default::default()
         };
 
@@ -658,6 +742,10 @@ impl ClientOptionsParser {
             }
         };
 
+        if options.tls.is_none() && options.srv {
+            options.tls = Some(Tls::Enabled(Default::default()));
+        }
+
         Ok(options)
     }
 
@@ -713,26 +801,6 @@ impl ClientOptionsParser {
                     .into())
                 }
             };
-        }
-
-        if !self.tls_values.is_empty() {
-            let tls_value = self.tls_values[0];
-
-            if self.tls_values.drain(..).any(|val| val != tls_value) {
-                return Err(ErrorKind::ArgumentError {
-                    message: "All instances of `tls` and `ssl` must have the same value"
-                        .to_string(),
-                }
-                .into());
-            }
-
-            if tls_value {
-                if self.tls_options == None {
-                    self.tls_options = Some(Default::default());
-                }
-            } else {
-                self.tls_options = None;
-            }
         }
 
         Ok(())
@@ -901,19 +969,47 @@ impl ClientOptionsParser {
                 self.server_selection_timeout = Some(Duration::from_millis(get_duration!(value, k)))
             }
             k @ "tls" | k @ "ssl" => {
-                self.tls_values.push(get_bool!(value, k));
+                let tls = get_bool!(value, k);
+
+                match (self.tls.as_ref(), tls) {
+                    (Some(Tls::Disabled), true) | (Some(Tls::Enabled(..)), false) => {
+                        return Err(ErrorKind::ArgumentError {
+                            message: "All instances of `tls` and `ssl` must have the same
+ value"
+                                .to_string(),
+                        }
+                        .into());
+                    }
+                    _ => {}
+                };
+
+                if self.tls.is_none() {
+                    let tls = if tls {
+                        Tls::Enabled(Default::default())
+                    } else {
+                        Tls::Disabled
+                    };
+
+                    self.tls = Some(tls);
+                }
             }
             k @ "tlsinsecure" | k @ "tlsallowinvalidcertificates" => {
                 let val = get_bool!(value, k);
 
                 let allow_invalid_certificates = if k == "tlsinsecure" { !val } else { val };
 
-                if let Some(existing_val) = self
-                    .tls_options
-                    .as_ref()
-                    .and_then(|opts| opts.allow_invalid_certificates)
-                {
-                    if allow_invalid_certificates != existing_val {
+                match self.tls {
+                    Some(Tls::Disabled) => {
+                        return Err(ErrorKind::ArgumentError {
+                            message: "'tlsInsecure' can't be set if tls=false".into(),
+                        }
+                        .into())
+                    }
+                    Some(Tls::Enabled(ref options))
+                        if options.allow_invalid_certificates.is_some()
+                            && options.allow_invalid_certificates
+                                != Some(allow_invalid_certificates) =>
+                    {
                         return Err(ErrorKind::ArgumentError {
                             message: "all instances of 'tlsInsecure' and \
                                       'tlsAllowInvalidCertificates' must be consistent (e.g. \
@@ -923,22 +1019,54 @@ impl ClientOptionsParser {
                         }
                         .into());
                     }
+                    Some(Tls::Enabled(ref mut options)) => {
+                        options.allow_invalid_certificates = Some(allow_invalid_certificates);
+                    }
+                    None => {
+                        self.tls = Some(Tls::Enabled(
+                            TlsOptions::builder()
+                                .allow_invalid_certificates(allow_invalid_certificates)
+                                .build(),
+                        ))
+                    }
                 }
-
-                self.tls_options
-                    .get_or_insert_with(Default::default)
-                    .allow_invalid_certificates = Some(allow_invalid_certificates);
             }
-            "tlscafile" => {
-                self.tls_options
-                    .get_or_insert_with(Default::default)
-                    .ca_file_path = Some(value.to_string());
-            }
-            "tlscertificatekeyfile" => {
-                self.tls_options
-                    .get_or_insert_with(Default::default)
-                    .cert_key_file_path = Some(value.to_string());
-            }
+            "tlscafile" => match self.tls {
+                Some(Tls::Disabled) => {
+                    return Err(ErrorKind::ArgumentError {
+                        message: "'tlsCAFile' can't be set if tls=false".into(),
+                    }
+                    .into());
+                }
+                Some(Tls::Enabled(ref mut options)) => {
+                    options.ca_file_path = Some(value.to_string());
+                }
+                None => {
+                    self.tls = Some(Tls::Enabled(
+                        TlsOptions::builder()
+                            .ca_file_path(value.to_string())
+                            .build(),
+                    ))
+                }
+            },
+            "tlscertificatekeyfile" => match self.tls {
+                Some(Tls::Disabled) => {
+                    return Err(ErrorKind::ArgumentError {
+                        message: "'tlsCertificateKeyFile' can't be set if tls=false".into(),
+                    }
+                    .into());
+                }
+                Some(Tls::Enabled(ref mut options)) => {
+                    options.cert_key_file_path = Some(value.to_string());
+                }
+                None => {
+                    self.tls = Some(Tls::Enabled(
+                        TlsOptions::builder()
+                            .cert_key_file_path(value.to_string())
+                            .build(),
+                    ))
+                }
+            },
             "w" => {
                 let mut write_concern = self.write_concern.get_or_insert_with(Default::default);
 
@@ -1057,6 +1185,8 @@ impl ClientOptionsParser {
 mod tests {
     use std::time::Duration;
 
+    use pretty_assertions::assert_eq;
+
     use super::{ClientOptions, StreamAddress};
     use crate::{
         concern::{Acknowledgment, ReadConcern, WriteConcern},
@@ -1089,35 +1219,38 @@ mod tests {
 
     #[test]
     fn fails_without_scheme() {
-        assert!(ClientOptions::parse("localhost:27017").is_err());
+        assert!(ClientOptions::parse_uri("localhost:27017").is_err());
     }
 
     #[test]
     fn fails_with_invalid_scheme() {
-        assert!(ClientOptions::parse("mangodb://localhost:27017").is_err());
+        assert!(ClientOptions::parse_uri("mangodb://localhost:27017").is_err());
     }
 
     #[test]
     fn fails_with_nothing_after_scheme() {
-        assert!(ClientOptions::parse("mongodb://").is_err());
+        assert!(ClientOptions::parse_uri("mongodb://").is_err());
     }
 
     #[test]
     fn fails_with_only_slash_after_scheme() {
-        assert!(ClientOptions::parse("mongodb:///").is_err());
+        assert!(ClientOptions::parse_uri("mongodb:///").is_err());
     }
 
     #[test]
     fn fails_with_no_host() {
-        assert!(ClientOptions::parse("mongodb://:27017").is_err());
+        assert!(ClientOptions::parse_uri("mongodb://:27017").is_err());
     }
 
     #[test]
     fn no_port() {
+        let uri = "mongodb://localhost";
+
         assert_eq!(
-            ClientOptions::parse("mongodb://localhost").unwrap(),
+            ClientOptions::parse_uri(uri).unwrap(),
             ClientOptions {
                 hosts: vec![host_without_port("localhost")],
+                original_uri: Some(uri.into()),
                 ..Default::default()
             }
         );
@@ -1125,10 +1258,13 @@ mod tests {
 
     #[test]
     fn no_port_trailing_slash() {
+        let uri = "mongodb://localhost/";
+
         assert_eq!(
-            ClientOptions::parse("mongodb://localhost/").unwrap(),
+            ClientOptions::parse_uri(uri).unwrap(),
             ClientOptions {
                 hosts: vec![host_without_port("localhost")],
+                original_uri: Some(uri.into()),
                 ..Default::default()
             }
         );
@@ -1136,13 +1272,16 @@ mod tests {
 
     #[test]
     fn with_port() {
+        let uri = "mongodb://localhost/";
+
         assert_eq!(
-            ClientOptions::parse("mongodb://localhost:27017").unwrap(),
+            ClientOptions::parse_uri(uri).unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
                 }],
+                original_uri: Some(uri.into()),
                 ..Default::default()
             }
         );
@@ -1150,13 +1289,16 @@ mod tests {
 
     #[test]
     fn with_port_and_trailing_slash() {
+        let uri = "mongodb://localhost:27017/";
+
         assert_eq!(
-            ClientOptions::parse("mongodb://localhost:27017/").unwrap(),
+            ClientOptions::parse_uri(uri).unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
                 }],
+                original_uri: Some(uri.into()),
                 ..Default::default()
             }
         );
@@ -1164,14 +1306,17 @@ mod tests {
 
     #[test]
     fn with_read_concern() {
+        let uri = "mongodb://localhost:27017/?readConcernLevel=foo";
+
         assert_eq!(
-            ClientOptions::parse("mongodb://localhost:27017/?readConcernLevel=foo").unwrap(),
+            ClientOptions::parse_uri(uri).unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
                 }],
                 read_concern: Some(ReadConcern::Custom("foo".to_string())),
+                original_uri: Some(uri.into()),
                 ..Default::default()
             }
         );
@@ -1179,21 +1324,23 @@ mod tests {
 
     #[test]
     fn with_w_negative_int() {
-        assert!(ClientOptions::parse("mongodb://localhost:27017/?w=-1").is_err());
+        assert!(ClientOptions::parse_uri("mongodb://localhost:27017/?w=-1").is_err());
     }
 
     #[test]
     fn with_w_non_negative_int() {
+        let uri = "mongodb://localhost:27017/?w=1";
         let write_concern = WriteConcern::builder().w(Acknowledgment::from(1)).build();
 
         assert_eq!(
-            ClientOptions::parse("mongodb://localhost:27017/?w=1").unwrap(),
+            ClientOptions::parse_uri(uri).unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
                 }],
                 write_concern: Some(write_concern),
+                original_uri: Some(uri.into()),
                 ..Default::default()
             }
         );
@@ -1201,18 +1348,20 @@ mod tests {
 
     #[test]
     fn with_w_string() {
+        let uri = "mongodb://localhost:27017/?w=foo";
         let write_concern = WriteConcern::builder()
             .w(Acknowledgment::from("foo".to_string()))
             .build();
 
         assert_eq!(
-            ClientOptions::parse("mongodb://localhost:27017/?w=foo").unwrap(),
+            ClientOptions::parse_uri(uri).unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
                 }],
                 write_concern: Some(write_concern),
+                original_uri: Some(uri.into()),
                 ..Default::default()
             }
         );
@@ -1220,21 +1369,23 @@ mod tests {
 
     #[test]
     fn with_invalid_j() {
-        assert!(ClientOptions::parse("mongodb://localhost:27017/?journal=foo").is_err());
+        assert!(ClientOptions::parse_uri("mongodb://localhost:27017/?journal=foo").is_err());
     }
 
     #[test]
     fn with_j() {
+        let uri = "mongodb://localhost:27017/?journal=true";
         let write_concern = WriteConcern::builder().journal(true).build();
 
         assert_eq!(
-            ClientOptions::parse("mongodb://localhost:27017/?journal=true").unwrap(),
+            ClientOptions::parse_uri(uri).unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
                 }],
                 write_concern: Some(write_concern),
+                original_uri: Some(uri.into()),
                 ..Default::default()
             }
         );
@@ -1242,28 +1393,30 @@ mod tests {
 
     #[test]
     fn with_wtimeout_non_int() {
-        assert!(ClientOptions::parse("mongodb://localhost:27017/?wtimeoutMS=foo").is_err());
+        assert!(ClientOptions::parse_uri("mongodb://localhost:27017/?wtimeoutMS=foo").is_err());
     }
 
     #[test]
     fn with_wtimeout_negative_int() {
-        assert!(ClientOptions::parse("mongodb://localhost:27017/?wtimeoutMS=-1").is_err());
+        assert!(ClientOptions::parse_uri("mongodb://localhost:27017/?wtimeoutMS=-1").is_err());
     }
 
     #[test]
     fn with_wtimeout() {
+        let uri = "mongodb://localhost:27017/?wtimeoutMS=27";
         let write_concern = WriteConcern::builder()
             .w_timeout(Duration::from_millis(27))
             .build();
 
         assert_eq!(
-            ClientOptions::parse("mongodb://localhost:27017/?wtimeoutMS=27").unwrap(),
+            ClientOptions::parse_uri(uri).unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
                 }],
                 write_concern: Some(write_concern),
+                original_uri: Some(uri.into()),
                 ..Default::default()
             }
         );
@@ -1271,6 +1424,7 @@ mod tests {
 
     #[test]
     fn with_all_write_concern_options() {
+        let uri = "mongodb://localhost:27017/?w=majority&journal=false&wtimeoutMS=27";
         let write_concern = WriteConcern::builder()
             .w(Acknowledgment::Majority)
             .journal(false)
@@ -1278,16 +1432,14 @@ mod tests {
             .build();
 
         assert_eq!(
-            ClientOptions::parse(
-                "mongodb://localhost:27017/?w=majority&journal=false&wtimeoutMS=27"
-            )
-            .unwrap(),
+            ClientOptions::parse_uri(uri).unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
                 }],
                 write_concern: Some(write_concern),
+                original_uri: Some(uri.into()),
                 ..Default::default()
             }
         );
@@ -1298,6 +1450,11 @@ mod tests {
 
     #[test]
     fn with_mixed_options() {
+        let uri = "mongodb://localhost,localhost:27018/?w=majority&readConcernLevel=majority&\
+                   journal=false&wtimeoutMS=27&replicaSet=foo&heartbeatFrequencyMS=1000&\
+                   localThresholdMS=4000&readPreference=secondaryPreferred&readpreferencetags=dc:\
+                   ny,rack:1&serverselectiontimeoutms=2000&readpreferencetags=dc:ny&\
+                   readpreferencetags=";
         let write_concern = WriteConcern::builder()
             .w(Acknowledgment::Majority)
             .journal(false)
@@ -1305,13 +1462,7 @@ mod tests {
             .build();
 
         assert_eq!(
-            ClientOptions::parse(
-                "mongodb://localhost,localhost:27018/?w=majority&readConcernLevel=majority&\
-                 journal=false&wtimeoutMS=27&replicaSet=foo&heartbeatFrequencyMS=1000&\
-                 localThresholdMS=4000&readPreference=secondaryPreferred&readpreferencetags=dc:ny,\
-                 rack:1&serverselectiontimeoutms=2000&readpreferencetags=dc:ny&readpreferencetags="
-            )
-            .unwrap(),
+            ClientOptions::parse_uri(uri).unwrap(),
             ClientOptions {
                 hosts: vec![
                     StreamAddress {
@@ -1345,6 +1496,7 @@ mod tests {
                 heartbeat_freq: Some(Duration::from_millis(1000)),
                 local_threshold: Some(Duration::from_millis(4000)),
                 server_selection_timeout: Some(Duration::from_millis(2000)),
+                original_uri: Some(uri.into()),
                 ..Default::default()
             }
         );

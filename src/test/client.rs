@@ -172,7 +172,7 @@ fn auth_test_options(user: &str, password: &str, mechanism: Option<AuthMechanism
             mechanism,
             ..Default::default()
         })
-        .tls_options(CLIENT.options.tls_options.clone())
+        .tls(CLIENT.options.tls.clone())
         .build();
 
     auth_test(Client::with_options(options).unwrap(), success);
@@ -207,7 +207,7 @@ fn auth_test_uri(
         mechanism_str.as_ref()
     );
 
-    if let Some(ref tls_options) = CLIENT.options.tls_options {
+    if let Some(ref tls_options) = CLIENT.options.tls_options() {
         if let Some(true) = tls_options.allow_invalid_certificates {
             uri.push_str("&tlsAllowInvalidCertificates=true");
         }
