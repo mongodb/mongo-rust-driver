@@ -2,7 +2,7 @@ mod event;
 mod lock;
 
 pub use self::{
-    event::{EventClient, TestEvent},
+    event::{CommandEvent, EventClient},
     lock::TestLock,
 };
 

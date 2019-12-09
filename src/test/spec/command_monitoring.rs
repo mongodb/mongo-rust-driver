@@ -1,4 +1,4 @@
-use std::{ops::Deref, time::Duration};
+use std::{convert::Into, ops::Deref, time::Duration};
 
 use bson::{Bson, Document};
 use serde::{
@@ -11,7 +11,7 @@ use crate::{
     bson_util,
     error::Result,
     options::{FindOptions, Hint, InsertManyOptions, UpdateOptions},
-    test::{assert_matches, parse_version, EventClient, TestEvent, CLIENT, LOCK},
+    test::{assert_matches, parse_version, CommandEvent, EventClient, Matchable, CLIENT, LOCK},
     Collection,
 };
 
@@ -94,18 +94,104 @@ fn run_command_monitoring_test<T: TestOperation + DeserializeOwned>(test_file_na
 
         let client = EventClient::new();
 
-        let events = client.run_operation_with_events(
-            operation.command_names(),
-            &test_file.database_name,
-            &test_file.collection_name,
-            |collection| {
-                let _ = operation.execute(collection);
-            },
-        );
+        let events: Vec<TestEvent> = client
+            .run_operation_with_events(
+                operation.command_names(),
+                &test_file.database_name,
+                &test_file.collection_name,
+                |collection| {
+                    let _ = operation.execute(collection);
+                },
+            )
+            .into_iter()
+            .map(Into::into)
+            .collect();
 
-        for (i, event) in test_case.expectations.iter().enumerate() {
-            assert!(events.len() > i);
-            assert_matches(&events[i], event);
+        assert_eq!(events.len(), test_case.expectations.len());
+        for (actual_event, expected_event) in events.iter().zip(test_case.expectations.iter()) {
+            assert_matches(actual_event, expected_event);
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum TestEvent {
+    CommandStartedEvent {
+        command_name: String,
+        database_name: String,
+        command: Document,
+    },
+
+    CommandSucceededEvent {
+        command_name: String,
+        reply: Document,
+    },
+
+    CommandFailedEvent {
+        command_name: String,
+    },
+}
+
+impl Matchable for TestEvent {
+    fn content_matches(&self, actual: &TestEvent) -> bool {
+        match (self, actual) {
+            (
+                TestEvent::CommandStartedEvent {
+                    command_name: actual_command_name,
+                    database_name: actual_database_name,
+                    command: actual_command,
+                },
+                TestEvent::CommandStartedEvent {
+                    command_name: expected_command_name,
+                    database_name: expected_database_name,
+                    command: expected_command,
+                },
+            ) => {
+                actual_command_name == expected_command_name
+                    && actual_database_name == expected_database_name
+                    && actual_command.matches(expected_command)
+            }
+            (
+                TestEvent::CommandSucceededEvent {
+                    command_name: actual_command_name,
+                    reply: actual_reply,
+                },
+                TestEvent::CommandSucceededEvent {
+                    command_name: expected_command_name,
+                    reply: expected_reply,
+                },
+            ) => {
+                actual_command_name == expected_command_name && actual_reply.matches(expected_reply)
+            }
+            (
+                TestEvent::CommandFailedEvent {
+                    command_name: actual_command_name,
+                },
+                TestEvent::CommandFailedEvent {
+                    command_name: expected_command_name,
+                },
+            ) => actual_command_name == expected_command_name,
+            _ => false,
+        }
+    }
+}
+
+impl From<CommandEvent> for TestEvent {
+    fn from(event: CommandEvent) -> Self {
+        match event {
+            CommandEvent::CommandStartedEvent(event) => TestEvent::CommandStartedEvent {
+                command_name: event.command_name,
+                database_name: event.db,
+                command: event.command,
+            },
+            CommandEvent::CommandFailedEvent(event) => TestEvent::CommandFailedEvent {
+                command_name: event.command_name,
+            },
+            CommandEvent::CommandSucceededEvent(event) => TestEvent::CommandSucceededEvent {
+                command_name: event.command_name,
+                reply: event.reply,
+            },
         }
     }
 }
