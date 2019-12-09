@@ -248,11 +248,9 @@ impl Matchable for Document {
         for (k, v) in expected.iter() {
             if let Some(actual_v) = self.get(k) {
                 if !actual_v.matches(v) {
-                    println!("{} = {} did not MATCH {} = {}", k, actual_v, k, v);
                     return false;
                 }
             } else {
-                println!("{} was missing {}", self, k);
                 return false;
             }
         }
