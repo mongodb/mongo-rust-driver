@@ -4,7 +4,7 @@ use crate::{
     cmap::{CommandResponse, StreamDescription},
     concern::WriteConcern,
     error::{BulkWriteError, ErrorKind, WriteConcernError},
-    operation::{test, Insert, Operation},
+    operation::{Insert, Operation},
     options::InsertManyOptions,
     Namespace,
 };
@@ -156,12 +156,6 @@ fn handle_invalid_response() {
 
     let invalid_response = CommandResponse::with_document(doc! { "ok": 1.0, "asdfadsf": 123123 });
     assert!(fixtures.op.handle_response(invalid_response).is_err());
-}
-
-#[test]
-fn handle_command_error() {
-    let fixtures = fixtures();
-    test::handle_command_error(fixtures.op);
 }
 
 #[test]

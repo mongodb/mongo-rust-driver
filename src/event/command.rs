@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bson::Document;
 
-use crate::{cmap::ConnectionInfo, error::CommandError};
+use crate::{cmap::ConnectionInfo, error::Error};
 
 /// An event that triggers when a database command is initiated.
 #[derive(Clone, Debug)]
@@ -55,7 +55,7 @@ pub struct CommandFailedEvent {
     pub command_name: String,
 
     /// The error that the driver returned due to the event failing.
-    pub failure: CommandError,
+    pub failure: Error,
 
     /// The driver-generated identifier for the request. Applications can use this to identify the
     /// corresponding `CommandStartedEvent` that triggered earlier.

@@ -6,7 +6,7 @@ use crate::{
     bson_util,
     cmap::{CommandResponse, StreamDescription},
     coll::options::ReturnDocument,
-    operation::{test, FindAndModify, Operation},
+    operation::{FindAndModify, Operation},
     options::{
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
@@ -111,11 +111,6 @@ fn handle_no_value_delete() {
     assert!(op.handle_response(no_value).is_err());
 }
 
-#[test]
-fn handle_command_error_delete() {
-    test::handle_command_error(empty_delete())
-}
-
 // replace tests
 
 fn empty_replace() -> FindAndModify {
@@ -217,11 +212,6 @@ fn handle_no_value_replace() {
     assert!(op.handle_response(no_value).is_err());
 }
 
-#[test]
-fn handle_command_error_replace() {
-    test::handle_command_error(empty_replace())
-}
-
 // update tests
 
 fn empty_update() -> FindAndModify {
@@ -318,9 +308,4 @@ fn handle_no_value_update() {
 
     let no_value = CommandResponse::with_document(doc! { "ok": 1.0 });
     assert!(op.handle_response(no_value).is_err());
-}
-
-#[test]
-fn handle_command_error_update() {
-    test::handle_command_error(empty_update())
 }

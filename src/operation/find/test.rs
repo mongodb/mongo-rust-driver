@@ -303,11 +303,6 @@ fn handle_max_await_time() {
 }
 
 #[test]
-fn handle_command_error() {
-    test::handle_command_error(Find::empty())
-}
-
-#[test]
 fn handle_invalid_response() {
     let find = Find::empty();
 

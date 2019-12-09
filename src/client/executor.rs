@@ -4,7 +4,7 @@ use time::PreciseTime;
 
 use crate::{
     cmap::Connection,
-    error::{ErrorKind, Result},
+    error::Result,
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
     operation::Operation,
     sdam::{update_topology, ServerDescription},
@@ -105,24 +105,32 @@ impl Client {
         self.send_command_started_event(command_started_event);
 
         let start_time = PreciseTime::now();
-        let response = connection.send_command(cmd.clone(), request_id)?;
+
+        let response_result =
+            connection
+                .send_command(cmd.clone(), request_id)
+                .and_then(|response| {
+                    response.validate()?;
+                    Ok(response)
+                });
+
         let end_time = PreciseTime::now();
         let duration = start_time.to(end_time).to_std()?;
 
-        let result = op.handle_response(response.clone());
-
-        match result.as_ref().map_err(|e| e.as_ref()) {
-            Err(ErrorKind::CommandError(command_error)) => {
+        match response_result {
+            Err(error) => {
+                println!("got error {:?}", error);
                 let command_failed_event = CommandFailedEvent {
                     duration,
                     command_name: cmd.name.clone(),
-                    failure: command_error.clone(),
+                    failure: error.clone(),
                     request_id,
                     connection: connection_info.clone(),
                 };
                 self.send_command_failed_event(command_failed_event);
+                Err(error)
             }
-            _ => {
+            Ok(response) => {
                 let command_succeeded_event = CommandSucceededEvent {
                     duration,
                     reply: response.raw_response.clone(),
@@ -131,8 +139,8 @@ impl Client {
                     connection: connection_info.clone(),
                 };
                 self.send_command_succeeded_event(command_succeeded_event);
+                op.handle_response(response)
             }
-        };
-        result
+        }
     }
 }

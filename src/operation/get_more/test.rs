@@ -5,7 +5,7 @@ use bson::{bson, doc, Document};
 use crate::{
     bson_util,
     cmap::{CommandResponse, StreamDescription},
-    operation::{test, GetMore, Operation},
+    operation::{GetMore, Operation},
     options::StreamAddress,
     sdam::{ServerDescription, ServerInfo, ServerType},
     Namespace,
@@ -188,9 +188,4 @@ fn handle_success() {
         .expect("handle success case failed");
     assert!(result.exhausted);
     assert_eq!(result.batch, batch);
-}
-
-#[test]
-fn handle_command_error() {
-    test::handle_command_error(GetMore::empty());
 }

@@ -3,7 +3,7 @@ use bson::{bson, doc, Document};
 use crate::{
     bson_util,
     cmap::{CommandResponse, StreamDescription},
-    operation::{test, ListCollections, Operation},
+    operation::{ListCollections, Operation},
     options::{ListCollectionsOptions, StreamAddress},
     Namespace,
 };
@@ -203,11 +203,6 @@ fn handle_success() {
         cursor_spec.buffer.into_iter().collect::<Vec<Document>>(),
         first_batch
     );
-}
-
-#[test]
-fn handle_command_error() {
-    test::handle_command_error(ListCollections::empty())
 }
 
 #[test]
