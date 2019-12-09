@@ -129,6 +129,20 @@ functions:
 
           .evergreen/run-tests.sh
 
+  "run atlas tests":
+    - command: shell.exec
+      type: test
+      params:
+        silent: true
+        shell: bash
+        working_dir: "src"
+        script: |
+          # DO NOT ECHO WITH XTRACE (which PREPARE_SHELL does)
+          export MONGO_ATLAS_TESTS=1 
+          export MONGO_ATLAS_FREE_TIER_REPL_URI='${MONGO_ATLAS_FREE_TIER_REPL_URI}'
+          export MONGO_ATLAS_FREE_TIER_REPL_URI_SRV='${MONGO_ATLAS_FREE_TIER_REPL_URI_SRV}'
+          .evergreen/run-atlas-tests.sh
+
   "check rustfmt":
     - command: shell.exec
       type: test
@@ -323,9 +337,15 @@ tasks:
           TOPOLOGY: "sharded_cluster"
       - func: "run tests"
 
+  - name: "test-atlas-connectivity"
+    tags: ["atlas-connect"]
+    commands:
+      - func: "run atlas tests"
+
   - name: "check-rustfmt"
     commands:
       - func: "check rustfmt"
+
   - name: "check-clippy"
     commands:
       - func: "check clippy"
@@ -409,6 +429,13 @@ buildvariants:
      - ".4.2"
      - ".4.0"
      - ".3.6"
+- matrix_name: "atlas-connect"
+  matrix_spec:
+    os: "*"
+  display_name: "Atlas Connectivity ${os}"
+  tasks:
+    - ".atlas-connect"
+
 -
   name: "lint"
   display_name: "Lint"
@@ -417,3 +444,4 @@ buildvariants:
   tasks:
     - name: "check-clippy"
     - name: "check-rustfmt"
+

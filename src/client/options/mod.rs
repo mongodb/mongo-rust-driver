@@ -235,6 +235,9 @@ pub struct ClientOptions {
 
     #[builder(default)]
     original_uri: Option<String>,
+
+    #[builder(default)]
+    pub(crate) auth_source_present: bool,
 }
 
 impl Default for ClientOptions {
@@ -276,6 +279,7 @@ struct ClientOptionsParser {
     read_preference: Option<ReadPreference>,
     read_preference_tags: Option<Vec<TagSet>>,
     original_uri: String,
+    auth_source_present: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -409,6 +413,7 @@ impl From<ClientOptionsParser> for ClientOptions {
             cmap_event_handler: None,
             command_event_handler: None,
             original_uri: Some(parser.original_uri),
+            auth_source_present: parser.auth_source_present,
         }
     }
 }
@@ -1102,7 +1107,10 @@ impl ClientOptionsParser {
             "authmechanism" => {
                 self.auth_mechanism = Some(AuthMechanism::from_str(value)?);
             }
-            "authsource" => self.auth_source = Some(value.to_string()),
+            "authsource" => {
+                self.auth_source = Some(value.to_string());
+                self.auth_source_present = true;
+            }
             "authmechanismproperties" => {
                 let mut doc = Document::new();
                 let err_func = || {

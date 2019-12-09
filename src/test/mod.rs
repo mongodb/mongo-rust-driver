@@ -1,3 +1,4 @@
+mod atlas_connectivity;
 mod client;
 mod coll;
 mod db;

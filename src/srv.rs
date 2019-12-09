@@ -5,7 +5,7 @@ use trust_dns_resolver::{
 
 use crate::{
     error::{ErrorKind, Result},
-    options::{auth::Credential, ClientOptions, StreamAddress, Tls},
+    options::{ClientOptions, StreamAddress, Tls},
 };
 
 pub(crate) struct SrvResolver {
@@ -165,14 +165,11 @@ impl SrvResolver {
 
             match &parts[0].to_lowercase()[..] {
                 "authsource" => {
-                    if options
-                        .credential
-                        .as_ref()
-                        .and_then(|credential| credential.source.as_ref())
-                        .is_none()
-                    {
-                        options.credential =
-                            Some(Credential::builder().source(parts[1].to_string()).build());
+                    if !options.auth_source_present {
+                        options
+                            .credential
+                            .get_or_insert_with(Default::default)
+                            .source = Some(parts[1].to_string());
                     }
                 }
                 "replicaset" => {

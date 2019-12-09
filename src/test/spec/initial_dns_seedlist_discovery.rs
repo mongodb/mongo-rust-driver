@@ -1,12 +1,7 @@
 use assert_matches::assert_matches;
 use serde::Deserialize;
 
-use crate::{
-    error::Result,
-    options::ClientOptions,
-    srv::SrvResolver,
-    test::{run_spec_test, CLIENT_OPTIONS},
-};
+use crate::{error::Result, options::ClientOptions, srv::SrvResolver, test::run_spec_test};
 
 #[derive(Debug, Deserialize)]
 struct TestFile {
@@ -43,10 +38,6 @@ fn parse_and_resolve(resolver: &SrvResolver, uri: &str) -> Result<ClientOptions>
 
 #[test]
 fn run() {
-    if CLIENT_OPTIONS.repl_set_name.is_none() || CLIENT_OPTIONS.tls.is_none() {
-        return;
-    }
-
     let resolver = SrvResolver::new().unwrap();
 
     let run_test = |mut test_file: TestFile| {
