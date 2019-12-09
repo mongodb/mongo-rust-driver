@@ -24,6 +24,7 @@ use rustls::{
     TLSError,
 };
 use typed_builder::TypedBuilder;
+use webpki_roots::TLS_SERVER_ROOTS;
 
 use crate::{
     client::auth::{AuthMechanism, Credential},
@@ -331,16 +332,19 @@ impl TlsOptions {
                 .set_certificate_verifier(Arc::new(NoCertVerifier {}));
         }
 
+        let mut store = RootCertStore::empty();
         if let Some(path) = self.ca_file_path {
-            let mut store = RootCertStore::empty();
             store
                 .add_pem_file(&mut BufReader::new(File::open(&path)?))
                 .map_err(|_| ErrorKind::ParseError {
                     data_type: "PEM-encoded root certificate".to_string(),
                     file_path: path,
                 })?;
-            config.root_store = store;
+        } else {
+            store.add_server_trust_anchors(&TLS_SERVER_ROOTS);
         }
+
+        config.root_store = store;
 
         if let Some(path) = self.cert_key_file_path {
             let mut file = BufReader::new(File::open(&path)?);
