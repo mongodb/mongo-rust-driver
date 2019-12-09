@@ -1,5 +1,9 @@
 use super::Client;
 
+use std::collections::HashSet;
+
+use bson::Document;
+use lazy_static::lazy_static;
 use time::PreciseTime;
 
 use crate::{
@@ -9,6 +13,22 @@ use crate::{
     operation::Operation,
     sdam::{update_topology, ServerDescription},
 };
+
+lazy_static! {
+    static ref REDACTED_COMMANDS: HashSet<&'static str> = {
+        let mut hash_set = HashSet::new();
+        hash_set.insert("authenticate");
+        hash_set.insert("saslStart");
+        hash_set.insert("saslContinue");
+        hash_set.insert("getnonce");
+        hash_set.insert("createUser");
+        hash_set.insert("updateUser");
+        hash_set.insert("copydbgetnonce");
+        hash_set.insert("copydbsaslstart");
+        hash_set.insert("copydb");
+        hash_set
+    };
+}
 
 impl Client {
     /// Executes an operation and returns the connection used to do so along with the result of the
@@ -94,8 +114,14 @@ impl Client {
 
         let connection_info = connection.info();
         let request_id = crate::cmap::conn::next_request_id();
+
+        let command_body = if REDACTED_COMMANDS.contains(cmd.name.as_str()) {
+            Document::new()
+        } else {
+            cmd.body.clone()
+        };
         let command_started_event = CommandStartedEvent {
-            command: cmd.body.clone(),
+            command: command_body,
             db: cmd.target_db.clone(),
             command_name: cmd.name.clone(),
             request_id,
@@ -119,24 +145,29 @@ impl Client {
 
         match response_result {
             Err(error) => {
-                println!("got error {:?}", error);
                 let command_failed_event = CommandFailedEvent {
                     duration,
                     command_name: cmd.name.clone(),
                     failure: error.clone(),
                     request_id,
-                    connection: connection_info.clone(),
+                    connection: connection_info,
                 };
                 self.send_command_failed_event(command_failed_event);
                 Err(error)
             }
             Ok(response) => {
+                let reply = if REDACTED_COMMANDS.contains(cmd.name.as_str()) {
+                    Document::new()
+                } else {
+                    response.raw_response.clone()
+                };
+
                 let command_succeeded_event = CommandSucceededEvent {
                     duration,
-                    reply: response.raw_response.clone(),
+                    reply,
                     command_name: cmd.name.clone(),
                     request_id,
-                    connection: connection_info.clone(),
+                    connection: connection_info,
                 };
                 self.send_command_succeeded_event(command_succeeded_event);
                 op.handle_response(response)
