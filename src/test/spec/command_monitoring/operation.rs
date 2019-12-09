@@ -1,0 +1,248 @@
+use std::{ops::Deref, time::Duration};
+
+use bson::{Bson, Document};
+use serde::{
+    de::{self, Deserializer},
+    Deserialize,
+};
+
+use crate::{
+    bson_util,
+    error::Result,
+    options::{FindOptions, Hint, InsertManyOptions, UpdateOptions},
+    Collection,
+};
+
+pub(super) trait TestOperation {
+    /// The command names to monitor as part of this test.
+    fn command_names(&self) -> &[&str];
+
+    fn execute(&self, collection: Collection) -> Result<()>;
+}
+
+#[derive(Deserialize)]
+pub(super) struct AnyTestOperation<T: TestOperation> {
+    #[serde(rename = "arguments")]
+    operation: T,
+}
+
+impl<T: TestOperation> Deref for AnyTestOperation<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.operation
+    }
+}
+
+#[derive(Deserialize)]
+pub(super) struct DeleteMany {
+    filter: Document,
+}
+
+impl TestOperation for DeleteMany {
+    fn command_names(&self) -> &[&str] {
+        &["delete"]
+    }
+
+    fn execute(&self, collection: Collection) -> Result<()> {
+        collection
+            .delete_many(self.filter.clone(), None)
+            .map(|_| ())
+    }
+}
+
+#[derive(Deserialize)]
+pub(super) struct DeleteOne {
+    filter: Document,
+}
+
+impl TestOperation for DeleteOne {
+    fn command_names(&self) -> &[&str] {
+        &["delete"]
+    }
+
+    fn execute(&self, collection: Collection) -> Result<()> {
+        collection.delete_one(self.filter.clone(), None).map(|_| ())
+    }
+}
+
+fn deserialize_i64_from_ext_json<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<i64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let document = Option::<Document>::deserialize(deserializer)?;
+    match document {
+        Some(document) => {
+            let number_string = document
+                .get("$numberLong")
+                .and_then(Bson::as_str)
+                .ok_or_else(|| de::Error::custom("missing $numberLong field"))?;
+            let parsed = number_string
+                .parse::<i64>()
+                .map_err(|_| de::Error::custom("failed to parse to i64"))?;
+            Ok(Some(parsed))
+        }
+        None => Ok(None),
+    }
+}
+
+// This struct is necessary because the command monitoring tests specify the options in a very old
+// way (SPEC-1519).
+#[derive(Debug, Deserialize, Default)]
+struct FindModifiers {
+    #[serde(rename = "$comment", default)]
+    comment: Option<String>,
+    #[serde(rename = "$hint", default)]
+    hint: Option<Hint>,
+    #[serde(
+        rename = "$maxTimeMS",
+        deserialize_with = "bson_util::deserialize_duration_from_u64_millis",
+        default
+    )]
+    max_time: Option<Duration>,
+    #[serde(rename = "$min", default)]
+    min: Option<Document>,
+    #[serde(rename = "$max", default)]
+    max: Option<Document>,
+    #[serde(rename = "$returnKey", default)]
+    return_key: Option<bool>,
+    #[serde(rename = "$showDiskLoc", default)]
+    show_disk_loc: Option<bool>,
+}
+
+impl FindModifiers {
+    fn update_options(&self, options: &mut FindOptions) {
+        options.comment = self.comment.clone();
+        options.hint = self.hint.clone();
+        options.max_time = self.max_time;
+        options.min = self.min.clone();
+        options.max = self.max.clone();
+        options.return_key = self.return_key;
+        options.show_record_id = self.show_disk_loc;
+    }
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub(super) struct Find {
+    filter: Option<Document>,
+    #[serde(default)]
+    sort: Option<Document>,
+    #[serde(default, deserialize_with = "deserialize_i64_from_ext_json")]
+    skip: Option<i64>,
+    #[serde(
+        default,
+        rename = "batchSize",
+        deserialize_with = "deserialize_i64_from_ext_json"
+    )]
+    batch_size: Option<i64>,
+    #[serde(default, deserialize_with = "deserialize_i64_from_ext_json")]
+    limit: Option<i64>,
+    #[serde(default)]
+    modifiers: Option<FindModifiers>,
+}
+
+impl TestOperation for Find {
+    fn command_names(&self) -> &[&str] {
+        &["find", "getMore"]
+    }
+
+    fn execute(&self, collection: Collection) -> Result<()> {
+        let mut options = FindOptions {
+            sort: self.sort.clone(),
+            skip: self.skip,
+            batch_size: self.batch_size.map(|i| i as u32),
+            limit: self.limit,
+            ..Default::default()
+        };
+
+        if let Some(ref modifiers) = self.modifiers {
+            modifiers.update_options(&mut options);
+        }
+
+        collection.find(self.filter.clone(), options).map(
+            |mut cursor| {
+                while cursor.next().is_some() {}
+            },
+        )
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct InsertMany {
+    documents: Vec<Document>,
+    #[serde(default)]
+    options: Option<InsertManyOptions>,
+}
+
+impl TestOperation for InsertMany {
+    fn command_names(&self) -> &[&str] {
+        &["insert"]
+    }
+
+    fn execute(&self, collection: Collection) -> Result<()> {
+        collection
+            .insert_many(self.documents.clone(), self.options.clone())
+            .map(|_| ())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct InsertOne {
+    document: Document,
+}
+
+impl TestOperation for InsertOne {
+    fn command_names(&self) -> &[&str] {
+        &["insert"]
+    }
+
+    fn execute(&self, collection: Collection) -> Result<()> {
+        collection
+            .insert_one(self.document.clone(), None)
+            .map(|_| ())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct UpdateMany {
+    filter: Document,
+    update: Document,
+}
+
+impl TestOperation for UpdateMany {
+    fn command_names(&self) -> &[&str] {
+        &["update"]
+    }
+
+    fn execute(&self, collection: Collection) -> Result<()> {
+        collection
+            .update_many(self.filter.clone(), self.update.clone(), None)
+            .map(|_| ())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct UpdateOne {
+    filter: Document,
+    update: Document,
+    #[serde(default)]
+    upsert: Option<bool>,
+}
+
+impl TestOperation for UpdateOne {
+    fn command_names(&self) -> &[&str] {
+        &["update"]
+    }
+
+    fn execute(&self, collection: Collection) -> Result<()> {
+        let options = self.upsert.map(|b| UpdateOptions {
+            upsert: Some(b),
+            ..Default::default()
+        });
+        collection
+            .update_one(self.filter.clone(), self.update.clone(), options)
+            .map(|_| ())
+    }
+}
