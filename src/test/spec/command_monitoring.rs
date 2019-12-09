@@ -16,15 +16,15 @@ use crate::{
 };
 
 #[derive(Deserialize)]
-struct CommandMonitoringTestFile {
+struct TestFile {
     data: Vec<Document>,
     collection_name: String,
     database_name: String,
-    tests: Vec<CommandMonitoringTest>,
+    tests: Vec<TestCase>,
 }
 
 #[derive(Deserialize)]
-struct CommandMonitoringTest {
+struct TestCase {
     description: String,
     #[serde(rename = "ignore_if_server_version_greater_than", default)]
     max_version: Option<String>,
@@ -56,8 +56,7 @@ impl<T: TestOperation> Deref for AnyTestOperation<T> {
 }
 
 fn run_command_monitoring_test<T: TestOperation + DeserializeOwned>(test_file_name: &str) {
-    let test_file: CommandMonitoringTestFile =
-        crate::test::spec::load_test(&["command-monitoring", test_file_name]);
+    let test_file: TestFile = crate::test::spec::load_test(&["command-monitoring", test_file_name]);
 
     for test_case in test_file.tests {
         if let Some((major, minor)) = test_case.max_version.map(|s| parse_version(s.as_str())) {
