@@ -60,6 +60,12 @@ pub(crate) trait Operation {
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         None
     }
+
+    /// Whether or not the operation has special handling for command errors, or whether they should
+    /// just be propogated to the user immediately.
+    fn handles_command_errors(&self) -> bool {
+        false
+    }
 }
 
 /// Appends a serializable struct to the input document.

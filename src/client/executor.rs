@@ -136,7 +136,9 @@ impl Client {
             connection
                 .send_command(cmd.clone(), request_id)
                 .and_then(|response| {
-                    response.validate()?;
+                    if !op.handles_command_errors() {
+                        response.validate()?;
+                    }
                     Ok(response)
                 });
 
