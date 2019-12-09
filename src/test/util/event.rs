@@ -209,9 +209,7 @@ impl EventClient {
     }
 }
 
-// TODO RUST-185: Enable once command monitoring is implemented.
-//#[test]
-#[allow(dead_code)]
+#[test]
 fn command_started_event_count() {
     let _guard = LOCK.run_concurrently();
 
