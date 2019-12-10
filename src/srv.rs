@@ -5,11 +5,18 @@ use trust_dns_resolver::{
 
 use crate::{
     error::{ErrorKind, Result},
-    options::{ClientOptions, StreamAddress, Tls},
+    options::StreamAddress,
 };
 
 pub(crate) struct SrvResolver {
     resolver: Resolver,
+}
+
+#[derive(Debug)]
+pub(crate) struct ResolvedConfig {
+    pub(crate) hosts: Vec<StreamAddress>,
+    pub(crate) auth_source: Option<String>,
+    pub(crate) replica_set: Option<String>,
 }
 
 impl SrvResolver {
@@ -19,41 +26,20 @@ impl SrvResolver {
         Ok(Self { resolver })
     }
 
-    pub(crate) fn resolve_and_update_client_opts(&self, options: &mut ClientOptions) -> Result<()> {
-        if !options.srv {
-            return Ok(());
-        }
+    pub(crate) fn resolve_client_options(&self, hostname: &str) -> Result<ResolvedConfig> {
+        let hosts = self.get_srv_hosts(hostname)?;
+        let mut config = ResolvedConfig {
+            hosts,
+            auth_source: None,
+            replica_set: None,
+        };
 
-        // We need to check these invariants here as well as the URI parser since users can
-        // construct ClientOptions manually.
-        if options.hosts.len() != 1 {
-            return Err(ErrorKind::ArgumentError {
-                message: "exactly one host must be specified with 'mongodb+srv'".into(),
-            }
-            .into());
-        }
-        if options.hosts[0].port.is_some() {
-            return Err(ErrorKind::ArgumentError {
-                message: "a port cannot be specified with 'mongodb+srv'".into(),
-            }
-            .into());
-        }
+        self.get_txt_options(&hostname, &mut config)?;
 
-        let hostname = options.hosts[0].hostname.clone();
-
-        self.update_srv_hosts(&hostname, options)?;
-        self.update_from_txt_records(&hostname, options)?;
-
-        // Similar to the error checking, we need to check this here as well as the parser since
-        // users can construct ClientOptions manually.
-        if options.tls.is_none() {
-            options.tls = Some(Tls::Enabled(Default::default()));
-        }
-
-        Ok(())
+        Ok(config)
     }
 
-    fn update_srv_hosts(&self, original_hostname: &str, options: &mut ClientOptions) -> Result<()> {
+    fn get_srv_hosts(&self, original_hostname: &str) -> Result<Vec<StreamAddress>> {
         let hostname_parts: Vec<_> = original_hostname.split('.').collect();
 
         if hostname_parts.len() < 3 {
@@ -111,15 +97,10 @@ impl SrvResolver {
             address.hostname = hostname_parts.join(".");
         }
 
-        options.hosts = srv_addresses;
-        Ok(())
+        Ok(srv_addresses)
     }
 
-    fn update_from_txt_records(
-        &self,
-        original_hostname: &str,
-        options: &mut ClientOptions,
-    ) -> Result<()> {
+    fn get_txt_options(&self, original_hostname: &str, config: &mut ResolvedConfig) -> Result<()> {
         let txt_records_response = match self.resolver.txt_lookup(original_hostname) {
             Ok(response) => response,
             Err(e) => return ignore_no_records(e),
@@ -165,17 +146,10 @@ impl SrvResolver {
 
             match &parts[0].to_lowercase()[..] {
                 "authsource" => {
-                    if !options.auth_source_present {
-                        options
-                            .credential
-                            .get_or_insert_with(Default::default)
-                            .source = Some(parts[1].to_string());
-                    }
+                    config.auth_source = Some(parts[1].to_string());
                 }
                 "replicaset" => {
-                    if options.repl_set_name.is_none() {
-                        options.repl_set_name = Some(parts[1].into());
-                    }
+                    config.replica_set = Some(parts[1].into());
                 }
                 other => {
                     return Err(ErrorKind::TxtLookupError {

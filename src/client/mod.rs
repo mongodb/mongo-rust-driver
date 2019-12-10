@@ -26,7 +26,6 @@ use crate::{
     options::{ClientOptions, DatabaseOptions},
     sdam::{Server, Topology, TopologyUpdateCondvar},
     selection_criteria::{ReadPreference, SelectionCriteria},
-    srv::SrvResolver,
 };
 
 const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
@@ -73,29 +72,24 @@ struct ClientInner {
     options: ClientOptions,
     #[derivative(Debug = "ignore")]
     condvar: TopologyUpdateCondvar,
-    #[derivative(Debug = "ignore")]
-    resolver: SrvResolver,
 }
 
 impl Client {
     /// Creates a new `Client` connected to the cluster specified by `uri`. `uri` must be a valid
     /// MongoDB connection string.
     pub fn with_uri_str(uri: &str) -> Result<Self> {
-        let options = ClientOptions::parse_uri(uri)?;
+        let options = ClientOptions::parse(uri)?;
 
         Client::with_options(options)
     }
 
     /// Creates a new `Client` connected to the cluster specified by `options`.
-    pub fn with_options(mut options: ClientOptions) -> Result<Self> {
+    pub fn with_options(options: ClientOptions) -> Result<Self> {
         let condvar = TopologyUpdateCondvar::new();
-        let resolver = SrvResolver::new()?;
-        resolver.resolve_and_update_client_opts(&mut options)?;
 
         let inner = Arc::new(ClientInner {
             topology: Topology::new(condvar.clone(), options.clone())?,
             condvar,
-            resolver,
             options,
         });
 
