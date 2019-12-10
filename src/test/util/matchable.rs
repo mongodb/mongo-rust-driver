@@ -1,0 +1,88 @@
+use std::{any::Any, fmt::Debug};
+
+use bson::{Bson, Document};
+
+use crate::bson_util;
+
+pub trait Matchable: Sized + 'static {
+    fn is_placeholder(&self) -> bool {
+        false
+    }
+
+    fn content_matches(&self, expected: &Self) -> bool;
+
+    fn matches<T: Matchable + Any>(&self, expected: &T) -> bool {
+        if expected.is_placeholder() {
+            return true;
+        }
+        if let Some(expected) = Any::downcast_ref::<Self>(expected) {
+            self.content_matches(expected)
+        } else {
+            false
+        }
+    }
+}
+
+impl Matchable for Bson {
+    fn is_placeholder(&self) -> bool {
+        if let Bson::String(string) = self {
+            string.as_str() == "42" || string.as_str() == ""
+        } else {
+            get_int(self) == Some(42)
+        }
+    }
+
+    fn content_matches(&self, expected: &Bson) -> bool {
+        match (self, expected) {
+            (Bson::Document(actual_doc), Bson::Document(expected_doc)) => {
+                actual_doc.matches(expected_doc)
+            }
+            (Bson::Array(actual_array), Bson::Array(expected_array)) => {
+                for (i, expected_element) in expected_array.iter().enumerate() {
+                    if actual_array.len() <= i || !actual_array[i].matches(expected_element) {
+                        return false;
+                    }
+                }
+                true
+            }
+            _ => match (bson_util::get_int(self), get_int(expected)) {
+                (Some(actual_int), Some(expected_int)) => actual_int == expected_int,
+                (None, Some(_)) => false,
+                _ => self == expected,
+            },
+        }
+    }
+}
+
+impl Matchable for Document {
+    fn content_matches(&self, expected: &Document) -> bool {
+        for (k, v) in expected.iter() {
+            if let Some(actual_v) = self.get(k) {
+                if !actual_v.matches(v) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+pub fn assert_matches<A: Matchable + Debug, E: Matchable + Debug>(actual: &A, expected: &E) {
+    assert!(
+        actual.matches(expected),
+        "\n{:?}\n did not MATCH \n{:?}",
+        actual,
+        expected
+    );
+}
+
+fn parse_i64_ext_json(doc: &Document) -> Option<i64> {
+    let number_string = doc.get("$numberLong").and_then(Bson::as_str)?;
+    number_string.parse::<i64>().ok()
+}
+
+fn get_int(value: &Bson) -> Option<i64> {
+    bson_util::get_int(value).or_else(|| value.as_document().and_then(parse_i64_ext_json))
+}
