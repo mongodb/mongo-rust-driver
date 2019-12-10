@@ -41,7 +41,7 @@ impl TestClient {
 
     fn with_handler(event_handler: Option<EventHandler>) -> Self {
         let uri = option_env!("MONGODB_URI").unwrap_or("mongodb://localhost:27017");
-        let mut options = ClientOptions::parse_uri(uri).unwrap();
+        let mut options = ClientOptions::parse(uri).unwrap();
         options.max_pool_size = Some(MAX_POOL_SIZE);
 
         if let Some(event_handler) = event_handler {

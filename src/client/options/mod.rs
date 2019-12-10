@@ -155,9 +155,6 @@ pub struct ClientOptions {
     }]")]
     pub hosts: Vec<StreamAddress>,
 
-    #[builder(default = false)]
-    pub srv: bool,
-
     #[builder(default)]
     pub app_name: Option<String>,
 
@@ -383,7 +380,6 @@ impl From<ClientOptionsParser> for ClientOptions {
     fn from(parser: ClientOptionsParser) -> Self {
         Self {
             hosts: parser.hosts,
-            srv: parser.srv,
             app_name: parser.app_name,
             tls: parser.tls,
             heartbeat_freq: parser.heartbeat_freq,
@@ -417,31 +413,48 @@ impl ClientOptions {
     /// Parses a MongoDB connection string into a ClientOptions struct. If the string is malformed
     /// or one of the options has an invalid value, an error will be returned.
     ///
-    /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will _not_ be done as
-    /// part of this method. To manually update the ClientOptions hosts and options with the SRV
-    /// and TXT records, call `ClientOptions::resolve_srv`. Note that calling
-    /// `Client::with_options` will also automatically call `resolve_srv` if needed.
-    pub fn parse_uri(s: &str) -> Result<Self> {
-        ClientOptionsParser::parse(s).map(Into::into)
-    }
+    /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done as
+    /// part of this method.
+    pub fn parse(s: &str) -> Result<Self> {
+        let parser = ClientOptionsParser::parse(s)?;
+        let srv = parser.srv;
+        let auth_source_present = parser.auth_source.is_some();
+        let mut options: Self = parser.into();
 
-    /// If self.srv is true, then the SRV and TXT records for the host will be looked up, and the
-    /// ClientOptions will be updated with the hosts found in the SRV records and the options found
-    /// in the TXT record. After returning, self.srv will be set to false.
-    ///
-    /// If self.srv is false, this method will not change the ClientOptions.
-    ///
-    /// Note that MongoDB requires that exactly one address is present in an SRV configuration, and
-    /// that address must not have a port. If more a port or more than one address is present, an
-    /// error will be returned.
-    ///
-    /// See [the MongoDB documentation](https://docs.mongodb.com/manual/reference/connection-string/#dns-seedlist-connection-format) for more details.
-    pub fn resolve_srv(&mut self) -> Result<()> {
-        let resolver = SrvResolver::new()?;
-        resolver.resolve_and_update_client_opts(self)?;
-        self.srv = false;
+        if srv {
+            let resolver = SrvResolver::new()?;
+            let mut config = resolver.resolve_client_options(&options.hosts[0].hostname)?;
 
-        Ok(())
+            // Set the ClientOptions hosts to those found during the SRV lookup.
+            options.hosts = config.hosts;
+
+            // Enable TLS unless the user explicitly disabled it.
+            if options.tls.is_none() {
+                options.tls = Some(Tls::Enabled(Default::default()));
+            }
+
+            // Set the authSource TXT option found during SRV lookup unless the user already set it.
+            // Note that this _does_ override the default database specified in the URI, since it is
+            // supposed to be overriden by authSource.
+            if !auth_source_present {
+                if let Some(auth_source) = config.auth_source.take() {
+                    options
+                        .credential
+                        .get_or_insert_with(Default::default)
+                        .source = Some(auth_source);
+                }
+            }
+
+            // Set the replica set name TXT option found during SRV lookup unless the user already
+            // set it.
+            if options.repl_set_name.is_none() {
+                if let Some(replica_set) = config.replica_set.take() {
+                    options.repl_set_name = Some(replica_set);
+                }
+            }
+        }
+
+        Ok(options)
     }
 
     pub(crate) fn tls_options(&self) -> Option<TlsOptions> {
@@ -692,7 +705,7 @@ impl ClientOptionsParser {
 
                 credential.source = options
                     .auth_source
-                    .take()
+                    .clone()
                     .or_else(|| Some(mechanism.default_source(db_str).into()));
 
                 if let Some(mut doc) = options.auth_mechanism_properties.take() {
@@ -725,7 +738,7 @@ impl ClientOptionsParser {
                     // SCRAM default (i.e. "admin").
                     credential.source = options
                         .auth_source
-                        .take()
+                        .clone()
                         .or(db)
                         .or_else(|| Some("admin".into()));
                 } else if authentication_requested {
@@ -1102,7 +1115,9 @@ impl ClientOptionsParser {
             "authmechanism" => {
                 self.auth_mechanism = Some(AuthMechanism::from_str(value)?);
             }
-            "authsource" => self.auth_source = Some(value.to_string()),
+            "authsource" => {
+                self.auth_source = Some(value.to_string());
+            }
             "authmechanismproperties" => {
                 let mut doc = Document::new();
                 let err_func = || {
@@ -1223,27 +1238,27 @@ mod tests {
 
     #[test]
     fn fails_without_scheme() {
-        assert!(ClientOptions::parse_uri("localhost:27017").is_err());
+        assert!(ClientOptions::parse("localhost:27017").is_err());
     }
 
     #[test]
     fn fails_with_invalid_scheme() {
-        assert!(ClientOptions::parse_uri("mangodb://localhost:27017").is_err());
+        assert!(ClientOptions::parse("mangodb://localhost:27017").is_err());
     }
 
     #[test]
     fn fails_with_nothing_after_scheme() {
-        assert!(ClientOptions::parse_uri("mongodb://").is_err());
+        assert!(ClientOptions::parse("mongodb://").is_err());
     }
 
     #[test]
     fn fails_with_only_slash_after_scheme() {
-        assert!(ClientOptions::parse_uri("mongodb:///").is_err());
+        assert!(ClientOptions::parse("mongodb:///").is_err());
     }
 
     #[test]
     fn fails_with_no_host() {
-        assert!(ClientOptions::parse_uri("mongodb://:27017").is_err());
+        assert!(ClientOptions::parse("mongodb://:27017").is_err());
     }
 
     #[test]
@@ -1251,7 +1266,7 @@ mod tests {
         let uri = "mongodb://localhost";
 
         assert_eq!(
-            ClientOptions::parse_uri(uri).unwrap(),
+            ClientOptions::parse(uri).unwrap(),
             ClientOptions {
                 hosts: vec![host_without_port("localhost")],
                 original_uri: Some(uri.into()),
@@ -1265,7 +1280,7 @@ mod tests {
         let uri = "mongodb://localhost/";
 
         assert_eq!(
-            ClientOptions::parse_uri(uri).unwrap(),
+            ClientOptions::parse(uri).unwrap(),
             ClientOptions {
                 hosts: vec![host_without_port("localhost")],
                 original_uri: Some(uri.into()),
@@ -1279,7 +1294,7 @@ mod tests {
         let uri = "mongodb://localhost/";
 
         assert_eq!(
-            ClientOptions::parse_uri(uri).unwrap(),
+            ClientOptions::parse(uri).unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
@@ -1296,7 +1311,7 @@ mod tests {
         let uri = "mongodb://localhost:27017/";
 
         assert_eq!(
-            ClientOptions::parse_uri(uri).unwrap(),
+            ClientOptions::parse(uri).unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
@@ -1313,7 +1328,7 @@ mod tests {
         let uri = "mongodb://localhost:27017/?readConcernLevel=foo";
 
         assert_eq!(
-            ClientOptions::parse_uri(uri).unwrap(),
+            ClientOptions::parse(uri).unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
@@ -1328,7 +1343,7 @@ mod tests {
 
     #[test]
     fn with_w_negative_int() {
-        assert!(ClientOptions::parse_uri("mongodb://localhost:27017/?w=-1").is_err());
+        assert!(ClientOptions::parse("mongodb://localhost:27017/?w=-1").is_err());
     }
 
     #[test]
@@ -1337,7 +1352,7 @@ mod tests {
         let write_concern = WriteConcern::builder().w(Acknowledgment::from(1)).build();
 
         assert_eq!(
-            ClientOptions::parse_uri(uri).unwrap(),
+            ClientOptions::parse(uri).unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
@@ -1358,7 +1373,7 @@ mod tests {
             .build();
 
         assert_eq!(
-            ClientOptions::parse_uri(uri).unwrap(),
+            ClientOptions::parse(uri).unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
@@ -1373,7 +1388,7 @@ mod tests {
 
     #[test]
     fn with_invalid_j() {
-        assert!(ClientOptions::parse_uri("mongodb://localhost:27017/?journal=foo").is_err());
+        assert!(ClientOptions::parse("mongodb://localhost:27017/?journal=foo").is_err());
     }
 
     #[test]
@@ -1382,7 +1397,7 @@ mod tests {
         let write_concern = WriteConcern::builder().journal(true).build();
 
         assert_eq!(
-            ClientOptions::parse_uri(uri).unwrap(),
+            ClientOptions::parse(uri).unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
@@ -1397,12 +1412,12 @@ mod tests {
 
     #[test]
     fn with_wtimeout_non_int() {
-        assert!(ClientOptions::parse_uri("mongodb://localhost:27017/?wtimeoutMS=foo").is_err());
+        assert!(ClientOptions::parse("mongodb://localhost:27017/?wtimeoutMS=foo").is_err());
     }
 
     #[test]
     fn with_wtimeout_negative_int() {
-        assert!(ClientOptions::parse_uri("mongodb://localhost:27017/?wtimeoutMS=-1").is_err());
+        assert!(ClientOptions::parse("mongodb://localhost:27017/?wtimeoutMS=-1").is_err());
     }
 
     #[test]
@@ -1413,7 +1428,7 @@ mod tests {
             .build();
 
         assert_eq!(
-            ClientOptions::parse_uri(uri).unwrap(),
+            ClientOptions::parse(uri).unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
@@ -1436,7 +1451,7 @@ mod tests {
             .build();
 
         assert_eq!(
-            ClientOptions::parse_uri(uri).unwrap(),
+            ClientOptions::parse(uri).unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
@@ -1466,7 +1481,7 @@ mod tests {
             .build();
 
         assert_eq!(
-            ClientOptions::parse_uri(uri).unwrap(),
+            ClientOptions::parse(uri).unwrap(),
             ClientOptions {
                 hosts: vec![
                     StreamAddress {
