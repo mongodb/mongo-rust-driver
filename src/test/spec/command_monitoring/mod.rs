@@ -4,7 +4,7 @@ mod operation;
 use std::convert::Into;
 
 use bson::{Bson, Document};
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::Deserialize;
 
 use self::{event::TestEvent, operation::*};
 use crate::test::{assert_matches, parse_version, EventClient, CLIENT, LOCK};
@@ -28,10 +28,25 @@ struct TestCase {
     expectations: Vec<TestEvent>,
 }
 
-fn run_command_monitoring_test<T: TestOperation + DeserializeOwned>(test_file_name: &str) {
-    let test_file: TestFile = crate::test::spec::load_test(&["command-monitoring", test_file_name]);
+fn run_command_monitoring_test(test_file: TestFile) {
+    let skipped_tests = vec![
+        // uses old count
+        "A successful command",
+        "A failed command event",
+        "A successful command with a non-primary read preference",
+        // bulk write not implemented
+        "A successful mixed bulk write",
+        "A successful unordered bulk write with an unacknowledged write concern",
+        // We can't pass this test since it relies on old OP_QUERY behavior (SPEC-1519)
+        "A successful find event with a getmore and the server kills the cursor",
+    ];
 
     for test_case in test_file.tests {
+        if skipped_tests.iter().any(|st| st == &test_case.description) {
+            println!("Skipping {}", test_case.description);
+            continue;
+        }
+
         if let Some((major, minor)) = test_case.max_version.map(|s| parse_version(s.as_str())) {
             if CLIENT.server_version_gt(major, minor) {
                 println!("Skipping {}", test_case.description);
@@ -46,18 +61,11 @@ fn run_command_monitoring_test<T: TestOperation + DeserializeOwned>(test_file_na
             }
         }
 
-        // We can't pass this test since it relies on old OP_QUERY behavior (SPEC-1519)
-        if test_case.description.as_str()
-            == "A successful find event with a getmore and the server kills the cursor"
-        {
-            continue;
-        }
-
         let _guard = LOCK.run_exclusively();
 
         println!("Running {}", test_case.description);
 
-        let operation: AnyTestOperation<T> =
+        let operation: AnyTestOperation =
             bson::from_bson(Bson::Document(test_case.operation)).unwrap();
 
         CLIENT
@@ -88,36 +96,6 @@ fn run_command_monitoring_test<T: TestOperation + DeserializeOwned>(test_file_na
 }
 
 #[test]
-fn delete_many() {
-    run_command_monitoring_test::<DeleteMany>("deleteMany.json")
-}
-
-#[test]
-fn delete_one() {
-    run_command_monitoring_test::<DeleteOne>("deleteOne.json")
-}
-
-#[test]
-fn find() {
-    run_command_monitoring_test::<Find>("find.json")
-}
-
-#[test]
-fn insert_many() {
-    run_command_monitoring_test::<InsertMany>("insertMany.json")
-}
-
-#[test]
-fn insert_one() {
-    run_command_monitoring_test::<InsertOne>("insertOne.json")
-}
-
-#[test]
-fn update_many() {
-    run_command_monitoring_test::<UpdateMany>("updateMany.json")
-}
-
-#[test]
-fn update_one() {
-    run_command_monitoring_test::<UpdateOne>("updateOne.json")
+fn command_monitoring() {
+    crate::test::run_spec_test(&["command-monitoring"], run_command_monitoring_test)
 }

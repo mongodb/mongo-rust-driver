@@ -1,6 +1,6 @@
 use std::{ops::Deref, time::Duration};
 
-use bson::{Bson, Document};
+use bson::{Bson, Decoder, Document};
 use serde::{
     de::{self, Deserializer},
     Deserialize,
@@ -20,16 +20,48 @@ pub(super) trait TestOperation {
     fn execute(&self, collection: Collection) -> Result<()>;
 }
 
-#[derive(Deserialize)]
-pub(super) struct AnyTestOperation<T: TestOperation> {
-    #[serde(rename = "arguments")]
-    operation: T,
+pub(super) struct AnyTestOperation {
+    operation: Box<dyn TestOperation>,
 }
 
-impl<T: TestOperation> Deref for AnyTestOperation<T> {
-    type Target = T;
+impl<'de> Deserialize<'de> for AnyTestOperation {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        struct OperationDefinition {
+            name: String,
+            arguments: Bson,
+        };
 
-    fn deref(&self) -> &T {
+        let definition = OperationDefinition::deserialize(deserializer)?;
+        let boxed_op = match definition.name.as_str() {
+            "insertOne" => InsertOne::deserialize(Decoder::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "insertMany" => InsertMany::deserialize(Decoder::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "updateOne" => UpdateOne::deserialize(Decoder::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "updateMany" => UpdateMany::deserialize(Decoder::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "deleteMany" => DeleteMany::deserialize(Decoder::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "deleteOne" => DeleteOne::deserialize(Decoder::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "find" => Find::deserialize(Decoder::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            _ => unimplemented!(),
+        }
+        .map_err(|e| de::Error::custom(format!("{}", e)))?;
+
+        Ok(AnyTestOperation {
+            operation: boxed_op,
+        })
+    }
+}
+
+impl Deref for AnyTestOperation {
+    type Target = Box<dyn TestOperation>;
+
+    fn deref(&self) -> &Box<dyn TestOperation> {
         &self.operation
     }
 }
