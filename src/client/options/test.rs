@@ -247,8 +247,7 @@ fn run_test(test_file: TestFile) {
             }
             if !is_unsupported_host_type {
                 // options
-                let options =
-                    ClientOptions::parse(&test_case.uri).expect(&test_case.description);
+                let options = ClientOptions::parse(&test_case.uri).expect(&test_case.description);
                 let mut options_doc = document_from_client_options(options);
                 if let Some(json_options) = test_case.options {
                     let mut json_options: Document = json_options
