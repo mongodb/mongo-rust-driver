@@ -18,11 +18,11 @@ lazy_static! {
     static ref REDACTED_COMMANDS: HashSet<&'static str> = {
         let mut hash_set = HashSet::new();
         hash_set.insert("authenticate");
-        hash_set.insert("saslStart");
-        hash_set.insert("saslContinue");
+        hash_set.insert("saslstart");
+        hash_set.insert("saslcontinue");
         hash_set.insert("getnonce");
-        hash_set.insert("createUser");
-        hash_set.insert("updateUser");
+        hash_set.insert("createuser");
+        hash_set.insert("updateuser");
         hash_set.insert("copydbgetnonce");
         hash_set.insert("copydbsaslstart");
         hash_set.insert("copydb");
@@ -115,7 +115,9 @@ impl Client {
         let connection_info = connection.info();
         let request_id = crate::cmap::conn::next_request_id();
 
-        let command_body = if REDACTED_COMMANDS.contains(cmd.name.as_str()) {
+        let should_redact = REDACTED_COMMANDS.contains(cmd.name.to_lowercase().as_str());
+
+        let command_body = if should_redact {
             Document::new()
         } else {
             cmd.body.clone()
@@ -158,7 +160,7 @@ impl Client {
                 Err(error)
             }
             Ok(response) => {
-                let reply = if REDACTED_COMMANDS.contains(cmd.name.as_str()) {
+                let reply = if should_redact {
                     Document::new()
                 } else {
                     response.raw_response.clone()
