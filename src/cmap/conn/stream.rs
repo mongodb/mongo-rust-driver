@@ -1,7 +1,8 @@
 use std::{
     io::{self, Read, Write},
-    net::TcpStream,
+    net::{TcpStream, ToSocketAddrs},
     sync::Arc,
+    time::Duration,
 };
 
 use derivative::Derivative;
@@ -11,6 +12,8 @@ use crate::{
     error::Result,
     options::{StreamAddress, TlsOptions},
 };
+
+const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Stream encapsulates the different socket types that can be used and adds a thin wrapper for I/O.
 #[derive(Derivative)]
@@ -33,8 +36,22 @@ pub(super) enum Stream {
 
 impl Stream {
     /// Creates a new stream connected to `address`.
-    pub(super) fn connect(host: StreamAddress, tls_options: Option<TlsOptions>) -> Result<Self> {
-        let inner = TcpStream::connect(host.to_string())?;
+    pub(super) fn connect(
+        host: StreamAddress,
+        connect_timeout: Option<Duration>,
+        tls_options: Option<TlsOptions>,
+    ) -> Result<Self> {
+        let timeout = connect_timeout.unwrap_or(DEFAULT_CONNECT_TIMEOUT);
+
+        // The URI options spec requires that the default is 10 seconds, but that 0 should indicate
+        // no timeout.
+        let inner = if timeout == Duration::from_secs(0) {
+            TcpStream::connect(&host)?
+        } else {
+            let socket_addrs: Vec<_> = host.to_socket_addrs()?.collect();
+
+            TcpStream::connect_timeout(&socket_addrs[0], timeout)?
+        };
         inner.set_nodelay(true)?;
 
         match tls_options {

@@ -114,10 +114,10 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
 
             doc.insert("readpreferencetags", tags);
         }
-    }
 
-    if let Some(i) = options.max_staleness.take() {
-        doc.insert("maxstalenessseconds", i.as_secs() as i64);
+        if let Some(i) = max_staleness {
+            doc.insert("maxstalenessseconds", i.as_secs() as i64);
+        }
     }
 
     if let Some(b) = options.retry_reads.take() {

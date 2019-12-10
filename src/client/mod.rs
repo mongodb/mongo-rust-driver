@@ -77,6 +77,8 @@ struct ClientInner {
 impl Client {
     /// Creates a new `Client` connected to the cluster specified by `uri`. `uri` must be a valid
     /// MongoDB connection string.
+    ///
+    /// See the documentation on ClientOptions::parse for more details.
     pub fn with_uri_str(uri: &str) -> Result<Self> {
         let options = ClientOptions::parse(uri)?;
 

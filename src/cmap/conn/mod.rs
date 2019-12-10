@@ -70,6 +70,7 @@ impl Connection {
         id: u32,
         address: StreamAddress,
         generation: u32,
+        connect_timeout: Option<Duration>,
         tls_options: Option<TlsOptions>,
         handler: Option<Arc<dyn CmapEventHandler>>,
     ) -> Result<Self> {
@@ -79,7 +80,7 @@ impl Connection {
             pool: None,
             stream_description: None,
             ready_and_available_time: None,
-            stream: Stream::connect(address.clone(), tls_options)?,
+            stream: Stream::connect(address.clone(), connect_timeout, tls_options)?,
             address,
             handler,
         };

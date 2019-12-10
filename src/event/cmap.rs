@@ -177,9 +177,19 @@ pub struct ConnectionCheckedInEvent {
 /// by the driver.
 ///
 /// ```rust
-/// # use mongodb::{Client, event::cmap::{CmapEventHandler, ConnectionCheckoutFailedEvent}};
-///
-/// struct FailedCheckoutLogger {}
+/// # use std::sync::Arc;
+/// #
+/// # use mongodb::{
+/// #     error::Result,
+/// #     event::cmap::{
+/// #         CmapEventHandler,
+/// #         ConnectionCheckoutFailedEvent
+/// #     },
+/// #     options::ClientOptions,
+/// #     Client,
+/// # };
+/// #
+/// struct FailedCheckoutLogger;
 ///
 /// impl CmapEventHandler for FailedCheckoutLogger {
 ///     fn handle_connection_checkout_failed_event(&self, event: ConnectionCheckoutFailedEvent) {
@@ -187,10 +197,15 @@ pub struct ConnectionCheckedInEvent {
 ///     }
 /// }
 ///
-/// # fn main() {
-/// // TODO: Construct client with event handler by using `ClientOptions`.
+/// # fn do_stuff() -> Result<()> {
+/// let handler: Arc<dyn CmapEventHandler> = Arc::new(FailedCheckoutLogger);
+/// let options = ClientOptions::builder()
+///                   .cmap_event_handler(handler)
+///                   .build();
+/// let client = Client::with_options(options)?;
 ///
-/// // Do things with the client, and failed checkout events will be logged to stderr.
+/// // Do things with the client, and failed connection pool checkouts will be logged to stderr.
+/// # Ok(())
 /// # }
 /// ```
 pub trait CmapEventHandler: Send + Sync {

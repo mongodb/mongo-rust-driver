@@ -252,7 +252,6 @@ fn run_test(test_file: TestFile) {
         logical_session_timeout_minutes: None,
         local_threshold: None,
         heartbeat_freq: test_file.heartbeat_frequency_ms.map(Duration::from_millis),
-        max_staleness: None,
         servers: servers
             .into_iter()
             .map(|server| (server.address.clone(), server))
