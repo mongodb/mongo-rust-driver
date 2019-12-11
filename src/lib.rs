@@ -1,7 +1,8 @@
 //! This crate is a pure Rust MongoDB driver. It follows the
 //! [MongoDB driver API and feature specifications](https://github.com/mongodb/specifications).
 //!
-//! To connect to a MongoDB database, pass a MongoDB connection string to `Client::connect`:
+//! To connect to a MongoDB database, pass a MongoDB connection string to
+//! [`Client::with_uri_str`](struct.Client.html#method.with_uri_str):
 //!
 //! ```rust
 //! # use mongodb::{Client, error::Result};
@@ -11,8 +12,33 @@
 //! # Ok(client)
 //! # }
 //! ```
+//! Alternately, create an instance of [`ClientOptions`](options/struct.ClientOptions.html) and pass
+//! it to [`Client::with_options`](struct.Client.html#method.with_options):
 //!
-//! Operations can be performed by obtaining a `Database` or `Collection` from the `Client`:
+//! ```rust
+//! # use mongodb::{
+//! #     error::Result,
+//! #     options::{StreamAddress, ClientOptions},
+//! #     Client,
+//! # };
+//! #
+//! # fn make_client() -> Result<Client> {
+//! let options = ClientOptions::builder()
+//!                   .hosts(vec![
+//!                       StreamAddress {
+//!                           hostname: "localhost".into(),
+//!                           port: Some(27017),
+//!                       }
+//!                   ])
+//!                   .build();
+//!
+//! let client = Client::with_options(options)?;
+//! # Ok(client)
+//! # }
+//! ```
+//!
+//! Operations can be performed by obtaining a [`Database`](struct.Database.html) or
+//! [`Collection`](struct.Collection.html) from the `Client`:
 //!
 //! ```rust
 //! # use bson::{bson, doc};
@@ -20,7 +46,7 @@
 //! #
 //! # fn do_stuff() -> Result<()> {
 //! # let client = Client::with_uri_str("mongodb://localhost:27017")?;
-//!
+//! #
 //! let db = client.database("some_db");
 //! for coll_name in db.list_collection_names(None)? {
 //!     println!("collection: {}", coll_name);

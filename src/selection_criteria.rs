@@ -236,4 +236,5 @@ impl ReadPreference {
     }
 }
 
+/// A read preference tag set. See the documentation [here](https://docs.mongodb.com/manual/tutorial/configure-replica-set-tag-sets/) for more details.
 pub type TagSet = HashMap<String, String>;

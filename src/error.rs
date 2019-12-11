@@ -71,7 +71,7 @@ impl std::ops::Deref for Error {
 /// The types of errors that can occur.
 #[derive(Debug, Error)]
 pub enum ErrorKind {
-    /// Wrapper around `std::net::AddrParseError`.
+    /// Wrapper around [`std::net::AddrParseError`](https://doc.rust-lang.org/std/net/struct.AddrParseError.html).
     #[error(display = "{}", _0)]
     AddrParse(#[error(source)] std::net::AddrParseError),
 
@@ -82,7 +82,8 @@ pub enum ErrorKind {
     )]
     ArgumentError { message: String },
 
-    /// An error occurred while the Client attempted to authenticate a connection.
+    /// An error occurred while the [`Client`](../struct.Client.html) attempted to authenticate a
+    /// connection.
     #[error(display = "{}", message)]
     AuthenticationError { message: String },
 
@@ -119,7 +120,7 @@ pub enum ErrorKind {
     #[error(display = "Unable to parse hostname: {}", hostname)]
     InvalidHostname { hostname: String },
 
-    /// Wrapper around `std::io::Error`.
+    /// Wrapper around [`std::io::Error`](https://doc.rust-lang.org/std/io/struct.Error.html).
     #[error(display = "{}", _0)]
     Io(#[error(source)] std::io::Error),
 

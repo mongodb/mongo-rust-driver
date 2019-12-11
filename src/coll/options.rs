@@ -12,7 +12,7 @@ use crate::{
     selection_criteria::SelectionCriteria,
 };
 
-/// These are the valid options for creating a `Collection` with
+/// These are the valid options for creating a [`Collection`](../struct.Collection.html) with
 /// [`Database::collection_with_options`](../struct.Database.html#method.collection_with_options).
 #[derive(Debug, Default, TypedBuilder)]
 pub struct CollectionOptions {
