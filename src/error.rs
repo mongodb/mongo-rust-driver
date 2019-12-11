@@ -62,6 +62,9 @@ impl std::ops::Deref for Error {
 
 #[derive(Debug, Error)]
 pub enum ErrorKind {
+    #[error(display = "{}", _0)]
+    AddrParse(#[error(source)] std::net::AddrParseError),
+
     #[error(
         display = "An invalid argument was provided to a database operation: {}",
         message

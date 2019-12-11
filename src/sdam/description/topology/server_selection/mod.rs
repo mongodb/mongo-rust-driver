@@ -172,7 +172,9 @@ impl TopologyDescription {
 
         let mut servers = self.servers_with_type(types).collect();
 
-        if let Some(max_staleness) = max_staleness.or(self.max_staleness) {
+        // We don't need to check for the Client's default max_staleness because it would be passed
+        // in as part of the Client's default ReadPreference if none is specified for the operation.
+        if let Some(max_staleness) = max_staleness {
             // According to the spec, max staleness <= 0 is the same as no max staleness.
             if max_staleness > Duration::from_secs(0) {
                 self.filter_servers_by_max_staleness(&mut servers, max_staleness);

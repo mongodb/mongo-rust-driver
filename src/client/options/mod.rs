@@ -7,6 +7,7 @@ use std::{
     fs::File,
     hash::{Hash, Hasher},
     io::{BufReader, Seek, SeekFrom},
+    net::{SocketAddr, ToSocketAddrs},
     str::FromStr,
     sync::Arc,
     time::Duration,
@@ -81,6 +82,14 @@ impl Hash for StreamAddress {
     }
 }
 
+impl ToSocketAddrs for StreamAddress {
+    type Iter = std::vec::IntoIter<SocketAddr>;
+
+    fn to_socket_addrs(&self) -> std::io::Result<Self::Iter> {
+        (self.hostname.as_str(), self.port.unwrap_or(27017)).to_socket_addrs()
+    }
+}
+
 impl StreamAddress {
     pub fn parse(address: &str) -> Result<Self> {
         let mut parts = address.split(':');
@@ -146,59 +155,113 @@ impl fmt::Display for StreamAddress {
     }
 }
 
+/// Contains the options that can be used to create a new Client.
 #[derive(Clone, Derivative, TypedBuilder)]
 #[derivative(Debug, PartialEq)]
 pub struct ClientOptions {
+    /// The initial list of seeds that the Client should connect to.
+    ///
+    /// Note that by default, the driver will autodiscover other nodes in the cluster. To connect
+    /// directly to a single server (rather than autodiscovering the rest of the cluster), set the
+    /// `direct` field to `true.
     #[builder(default_code = "vec![ StreamAddress {
         hostname: \"localhost\".to_string(),
         port: Some(27017),
     }]")]
     pub hosts: Vec<StreamAddress>,
 
+    /// The application name that the Client will send to the server as part of the handshake. This
+    /// can be used in combination with the server logs to determine which Client is connected to a
+    /// server.
     #[builder(default)]
     pub app_name: Option<String>,
 
     #[builder(default)]
-    pub tls: Option<Tls>,
+    pub(crate) compressors: Option<Vec<String>>,
 
+    /// The handler that should process all Connection Monitoring and Pooling events. See the
+    /// CmapEventHandler type documentation for more details.
+    #[derivative(Debug = "ignore", PartialEq = "ignore")]
+    #[builder(default)]
+    pub cmap_event_handler: Option<Arc<dyn CmapEventHandler>>,
+
+    /// The handler that should process all command-related events. See the CommandEventHandler
+    /// type documentation for more details.
+    #[derivative(Debug = "ignore", PartialEq = "ignore")]
+    #[builder(default)]
+    pub command_event_handler: Option<Arc<dyn CommandEventHandler>>,
+
+    /// The connect timeout passed to each underlying TcpStream when attemtping to connect to the
+    /// server.
+    ///
+    /// The default value is 10 seconds.
+    #[builder(default)]
+    pub connect_timeout: Option<Duration>,
+
+    /// The credential to use for authenticating connections made by this client.
+    #[builder(default)]
+    pub credential: Option<Credential>,
+
+    /// Specifies whether the Client should directly connect to a single host rather than
+    /// autodiscover all servers in the cluster.
+    ///
+    /// The default value is false.
+    #[builder(default)]
+    pub direct_connection: Option<bool>,
+
+    /// The amount of time each monitoring thread should wait between sending an isMaster command
+    /// to its respective server.
+    ///
+    /// The default value is 10 seconds.
     #[builder(default)]
     pub heartbeat_freq: Option<Duration>,
 
+    /// When running a read operation with a ReadPreference that allows selecting secondaries,
+    /// `local_threshold` is used to determine how much longer the average round trip time between
+    /// the driver and server is allowed compared to the least round trip time of all the suitable
+    /// servers. For example, if the average round trip times of the suitable servers are 5 ms, 10
+    /// ms, and 15 ms, and the local threshold is 8 ms, then the first two servers are within the
+    /// latency window and could be chosen for the operation, but the last one is not.
+    ///
+    /// A value of zero indicates that there is no latency window, so only the server with the
+    /// lowest average round trip time is eligible.
+    ///
+    /// The default value is 15 ms.
     #[builder(default)]
     pub local_threshold: Option<Duration>,
 
-    #[builder(default)]
-    pub read_concern: Option<ReadConcern>,
-
-    #[builder(default)]
-    pub selection_criteria: Option<SelectionCriteria>,
-
-    #[builder(default)]
-    pub repl_set_name: Option<String>,
-
-    #[builder(default)]
-    pub write_concern: Option<WriteConcern>,
-
-    #[builder(default)]
-    pub server_selection_timeout: Option<Duration>,
-
-    #[builder(default)]
-    pub max_pool_size: Option<u32>,
-
-    #[builder(default)]
-    pub min_pool_size: Option<u32>,
-
+    /// The amount of time that a connection can remain idle in a connection pool before being
+    /// closed. A value of zero indicates that connections should not be closed due to being idle.
+    ///
+    /// By default, connections will not be closed due to being idle.
     #[builder(default)]
     pub max_idle_time: Option<Duration>,
 
+    /// The maximum amount of connections that the Client should allow to be created in a
+    /// connection pool for a given server. If an operation is attempted on a server while
+    /// `max_pool_size` connections are checked out, the operation will block until an in-progress
+    /// operation finishes and its connection is checked back into the pool.
+    ///
+    /// The default value is 100.
     #[builder(default)]
-    pub wait_queue_timeout: Option<Duration>,
+    pub max_pool_size: Option<u32>,
 
+    /// The minimum number of connections that should be available in a server's connection pool at
+    /// a given time. If fewer than `min_pool_size` connections are in the pool, connections will
+    /// be added to the pool in the background until `min_pool_size` is reached.
+    ///
+    /// The default value is 0.
     #[builder(default)]
-    pub(crate) compressors: Option<Vec<String>>,
+    pub min_pool_size: Option<u32>,
 
+    /// Specifies the default read concern for operations performed on the Client. See the
+    /// ReadConcern type documentation for more details.
     #[builder(default)]
-    pub(crate) connect_timeout: Option<Duration>,
+    pub read_concern: Option<ReadConcern>,
+
+    /// The name of the replica set that the Client should connect to.
+    #[builder(default)]
+    pub repl_set_name: Option<String>,
 
     #[builder(default)]
     pub(crate) retry_reads: Option<bool>,
@@ -206,29 +269,42 @@ pub struct ClientOptions {
     #[builder(default)]
     pub(crate) retry_writes: Option<bool>,
 
+    /// The default selection criteria for operations performed on the Client. See the
+    /// SelectionCriteria type documentation for more details.
+    #[builder(default)]
+    pub selection_criteria: Option<SelectionCriteria>,
+
+    /// The amount of time the Client should attempt to select a server for an operation before
+    /// timing outs
+    ///
+    /// The default value is 30 seconds.
+    #[builder(default)]
+    pub server_selection_timeout: Option<Duration>,
+
     #[builder(default)]
     pub(crate) socket_timeout: Option<Duration>,
 
+    /// The TLS configuration for the Client to use in its connections with the server.
+    ///
+    /// By default, TLS is disabled.
+    #[builder(default)]
+    pub tls: Option<Tls>,
+
+    /// The amount of time a thread should block while waiting to check out a connection before
+    /// returning an error. Note that if there are fewer than `max_pool_size` connections checked
+    /// out or if a connection is available in the pool, checking out a connection will not block.
+    ///
+    /// By default, threads will wait indefinitely for a connection to become available.
+    #[builder(default)]
+    pub wait_queue_timeout: Option<Duration>,
+
+    /// Specifies the default write concern for operations performed on the Client. See the
+    /// WriteConcern type documentation for more details.
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
+
     #[builder(default)]
     pub(crate) zlib_compression: Option<i32>,
-
-    #[builder(default)]
-    pub direct_connection: Option<bool>,
-
-    #[builder(default)]
-    pub(crate) max_staleness: Option<Duration>,
-
-    /// The credential to use for authenticating connections made by this client.
-    #[builder(default)]
-    pub credential: Option<Credential>,
-
-    #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    #[builder(default)]
-    pub cmap_event_handler: Option<Arc<dyn CmapEventHandler>>,
-
-    #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    #[builder(default)]
-    pub command_event_handler: Option<Arc<dyn CommandEventHandler>>,
 
     #[builder(default)]
     original_uri: Option<String>,
@@ -263,9 +339,9 @@ struct ClientOptionsParser {
     pub retry_writes: Option<bool>,
     pub socket_timeout: Option<Duration>,
     pub zlib_compression: Option<i32>,
-    pub max_staleness: Option<Duration>,
     pub direct_connection: Option<bool>,
     pub credential: Option<Credential>,
+    max_staleness: Option<Duration>,
     tls_insecure: Option<bool>,
     auth_mechanism: Option<AuthMechanism>,
     auth_source: Option<String>,
@@ -401,7 +477,6 @@ impl From<ClientOptionsParser> for ClientOptions {
             zlib_compression: parser.zlib_compression,
             direct_connection: parser.direct_connection,
             credential: parser.credential,
-            max_staleness: parser.max_staleness,
             cmap_event_handler: None,
             command_event_handler: None,
             original_uri: Some(parser.original_uri),
@@ -415,6 +490,51 @@ impl ClientOptions {
     ///
     /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done as
     /// part of this method.
+    ///
+    /// The format of a MongoDB connection string is described [here](https://docs.mongodb.com/manual/reference/connection-string/#connection-string-formats).
+    ///
+    /// The following options are supported in the options query string:
+    ///
+    ///   * `appName`: maps to the `app_name` field
+    ///   * `authMechanism`: maps to the `mechanism` field of the `credential` field
+    ///   * `authSource`: maps to the `source` field of the `credential` field
+    ///   * `authMechanismProperties`: maps to the `mechanism_properties` field of the `credential`
+    ///     field
+    ///   * `compressors`: not yet implemented
+    ///   * `connectTimeoutMS`: maps to the `connect_timeout` field
+    ///   * `direct`: maps to the `direct` field
+    ///   * `heartbeatFrequencyMS`: maps to the `heartbeat_frequency` field
+    ///   * `journal`: maps to the `journal` field of the `write_concern` field
+    ///   * `localThresholdMS`: maps to the `local_threshold` field
+    ///   * `maxIdleTimeMS`: maps to the `max_idle_time` field
+    ///   * `maxStalenessSeconds`: maps to the `max_staleness` field of the `selection_criteria`
+    ///     field
+    ///   * `maxPoolSize`: maps to the `max_pool_size` field
+    ///   * `minPoolSize`: maps to the `min_pool_size` field
+    ///   * `readConcernLevel`: maps to the `read_concern` field
+    ///   * `readPreferenceField`: maps to the ReadPreference enum variant of the
+    ///     `selection_criteria` field
+    ///   * `readPreferenceTags`: maps to the `tags` field of the `selection_criteria` field. Note
+    ///     that this option can appear more than once; each instance will be mapped to a separate
+    ///     tag set
+    ///   * `replicaSet`: maps to the `repl_set_name` field
+    ///   * `retryWrites`: not yet implemented
+    ///   * `retryReads`: not yet implemented
+    ///   * `serverSelectionTimeoutMS`: maps to the `server_selection_timeout` field
+    ///   * `socketTimeoutMS`: maps to the `socket_timeout` field
+    ///   * `ssl`: an alias of the `tls` option
+    ///   * `tls`: maps to the TLS variant of the `tls` field`.
+    ///   * `tlsInsecure`: relaxes the TLS constraints on connections being made; currently is just
+    ///     an alias of `tlsAllowInvalidCertificates`, but more behavior may be added to this option
+    ///     in the future
+    ///   * `tlsAllowInvalidCertificates`: maps to the `allow_invalidCertificates` field of the
+    ///     `tls` field
+    ///   * `tlsCAFile`: maps to the `ca_file_path` field of the `tls` field
+    ///   * `tlsCertificateKeyFile`: maps to the `cert_key_file_path` field of the `tls` field
+    ///   * `w`: maps to the `w` field of the `write_concern` field
+    ///   * `waitQueueTimeoutMS`: maps to the `wait_queue_timeout` field
+    ///   * `wTimeoutMS`: maps to the `w_timeout` field of the `write_concern` field
+    ///   * `zlibCompressionLevel`: not yet implemented
     pub fn parse(s: &str) -> Result<Self> {
         let parser = ClientOptionsParser::parse(s)?;
         let srv = parser.srv;
@@ -807,8 +927,8 @@ impl ClientOptionsParser {
         }
 
         if let Some(tags) = self.read_preference_tags.take() {
-            self.selection_criteria = match self.read_preference.take() {
-                Some(read_pref) => Some(read_pref.with_tags(tags)?.into()),
+            self.read_preference = match self.read_preference.take() {
+                Some(read_pref) => Some(read_pref.with_tags(tags)?),
                 None => {
                     return Err(ErrorKind::ArgumentError {
                         message: "cannot set read preference tags without also setting read \
@@ -819,6 +939,22 @@ impl ClientOptionsParser {
                 }
             };
         }
+
+        if let Some(max_staleness) = self.max_staleness.take() {
+            self.read_preference = match self.read_preference.take() {
+                Some(read_pref) => Some(read_pref.with_max_staleness(max_staleness)?),
+                None => {
+                    return Err(ErrorKind::ArgumentError {
+                        message: "cannot set max staleness without also setting read preference \
+                                  mode"
+                            .to_string(),
+                    }
+                    .into())
+                }
+            };
+        }
+
+        self.selection_criteria = self.read_preference.take().map(Into::into);
 
         Ok(())
     }
@@ -897,11 +1033,55 @@ impl ClientOptionsParser {
             "appname" => {
                 self.app_name = Some(value.into());
             }
+            "authmechanism" => {
+                self.auth_mechanism = Some(AuthMechanism::from_str(value)?);
+            }
+            "authsource" => self.auth_source = Some(value.to_string()),
+            "authmechanismproperties" => {
+                let mut doc = Document::new();
+                let err_func = || {
+                    ErrorKind::ArgumentError {
+                        message: "improperly formatted authMechanismProperties".to_string(),
+                    }
+                    .into()
+                };
+
+                for kvp in value.split(',') {
+                    match kvp.find(':') {
+                        Some(index) => {
+                            let (k, v) = exclusive_split_at(kvp, index);
+                            let key = k.ok_or_else(err_func)?;
+                            let value = v.ok_or_else(err_func)?;
+                            doc.insert(key, value);
+                        }
+                        None => return Err(err_func()),
+                    };
+                }
+                self.auth_mechanism_properties = Some(doc);
+            }
+            "compressors" => {
+                self.compressors = Some(value.split(',').map(String::from).collect());
+            }
+            k @ "connecttimeoutms" => {
+                self.connect_timeout = Some(Duration::from_millis(get_duration!(value, k)));
+            }
             k @ "direct" => {
                 self.direct_connection = Some(get_bool!(value, k));
             }
             k @ "heartbeatfrequencyms" => {
-                self.heartbeat_freq = Some(Duration::from_millis(get_duration!(value, k)));
+                let duration = get_duration!(value, k);
+
+                if duration < 500 {
+                    return Err(ErrorKind::ArgumentError {
+                        message: format!(
+                            "'heartbeatFrequencyMS' must be at least 500, but {} was given",
+                            duration
+                        ),
+                    }
+                    .into());
+                }
+
+                self.heartbeat_freq = Some(Duration::from_millis(duration));
             }
             k @ "journal" => {
                 let mut write_concern = self.write_concern.get_or_insert_with(Default::default);
@@ -910,17 +1090,31 @@ impl ClientOptionsParser {
             k @ "localthresholdms" => {
                 self.local_threshold = Some(Duration::from_millis(get_duration!(value, k)))
             }
-            "readconcernlevel" => {
-                self.read_concern = Some(ReadConcern::Custom(value.to_string()));
-            }
             k @ "maxidletimems" => {
                 self.max_idle_time = Some(Duration::from_millis(get_duration!(value, k)));
+            }
+            k @ "maxstalenessseconds" => {
+                let max_staleness = Duration::from_secs(get_duration!(value, k));
+
+                if max_staleness > Duration::from_secs(0) && max_staleness < Duration::from_secs(90)
+                {
+                    return Err(ErrorKind::ArgumentError {
+                        message: "'maxStalenessSeconds' cannot be both positive and below 90"
+                            .into(),
+                    }
+                    .into());
+                }
+
+                self.max_staleness = Some(max_staleness);
             }
             k @ "maxpoolsize" => {
                 self.max_pool_size = Some(get_u32!(value, k));
             }
             k @ "minpoolsize" => {
                 self.max_pool_size = Some(get_u32!(value, k));
+            }
+            "readconcernlevel" => {
+                self.read_concern = Some(ReadConcern::Custom(value.to_string()));
             }
             "readpreference" => {
                 self.read_preference = Some(match &value.to_lowercase()[..] {
@@ -982,8 +1176,17 @@ impl ClientOptionsParser {
             "replicaset" => {
                 self.repl_set_name = Some(value.to_string());
             }
+            k @ "retrywrites" => {
+                self.retry_writes = Some(get_bool!(value, k));
+            }
+            k @ "retryreads" => {
+                self.retry_reads = Some(get_bool!(value, k));
+            }
             k @ "serverselectiontimeoutms" => {
                 self.server_selection_timeout = Some(Duration::from_millis(get_duration!(value, k)))
+            }
+            k @ "sockettimeoutms" => {
+                self.socket_timeout = Some(Duration::from_millis(get_duration!(value, k)));
             }
             k @ "tls" | k @ "ssl" => {
                 let tls = get_bool!(value, k);
@@ -1112,49 +1315,6 @@ impl ClientOptionsParser {
                 let write_concern = self.write_concern.get_or_insert_with(Default::default);
                 write_concern.w_timeout = Some(Duration::from_millis(get_duration!(value, k)));
             }
-            "authmechanism" => {
-                self.auth_mechanism = Some(AuthMechanism::from_str(value)?);
-            }
-            "authsource" => {
-                self.auth_source = Some(value.to_string());
-            }
-            "authmechanismproperties" => {
-                let mut doc = Document::new();
-                let err_func = || {
-                    ErrorKind::ArgumentError {
-                        message: "improperly formatted authMechanismProperties".to_string(),
-                    }
-                    .into()
-                };
-
-                for kvp in value.split(',') {
-                    match kvp.find(':') {
-                        Some(index) => {
-                            let (k, v) = exclusive_split_at(kvp, index);
-                            let key = k.ok_or_else(err_func)?;
-                            let value = v.ok_or_else(err_func)?;
-                            doc.insert(key, value);
-                        }
-                        None => return Err(err_func()),
-                    };
-                }
-                self.auth_mechanism_properties = Some(doc);
-            }
-            "compressors" => {
-                self.compressors = Some(value.split(',').map(String::from).collect());
-            }
-            k @ "connecttimeoutms" => {
-                self.connect_timeout = Some(Duration::from_millis(get_duration!(value, k)));
-            }
-            k @ "retrywrites" => {
-                self.retry_writes = Some(get_bool!(value, k));
-            }
-            k @ "retryreads" => {
-                self.retry_reads = Some(get_bool!(value, k));
-            }
-            k @ "sockettimeoutms" => {
-                self.socket_timeout = Some(Duration::from_millis(get_duration!(value, k)));
-            }
             k @ "zlibcompressionlevel" => {
                 let i = get_i32!(value, k);
                 if i < -1 {
@@ -1172,20 +1332,6 @@ impl ClientOptionsParser {
                 }
 
                 self.zlib_compression = Some(i);
-            }
-            k @ "maxstalenessseconds" => {
-                let max_staleness = Duration::from_secs(get_duration!(value, k));
-
-                if max_staleness > Duration::from_secs(0) && max_staleness < Duration::from_secs(90)
-                {
-                    return Err(ErrorKind::ArgumentError {
-                        message: "'maxStalenessSeconds' cannot be both positive and below 90"
-                            .into(),
-                    }
-                    .into());
-                }
-
-                self.max_staleness = Some(max_staleness);
             }
 
             _ => {

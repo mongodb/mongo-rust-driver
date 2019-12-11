@@ -64,9 +64,30 @@ pub(crate) struct ConnectionPoolInner {
     /// The address the pool's connections will connect to.
     address: StreamAddress,
 
-    /// If a checkout operation takes longer than `wait_queue_timeout`, the pool will return an
-    /// error. If `wait_queue_timeout` is `None`, then the checkout operation will not time out.
-    wait_queue_timeout: Option<Duration>,
+    /// The set of available connections in the pool. Because the CMAP spec requires that
+    /// connections are checked out in a FIFO manner, connections are pushed/popped from the back
+    /// of the Vec.
+    connections: Arc<RwLock<Vec<Connection>>>,
+
+    /// The connect timeout passed to each underlying TcpStream when attemtping to connect to the
+    /// server.
+    connect_timeout: Option<Duration>,
+
+    /// The credential to use for authenticating connections in this pool.
+    credential: Option<Credential>,
+
+    /// Contains the logic for "establishing" a connection. This includes handshaking and
+    /// authenticating a connection when it's first created.
+    establisher: ConnectionEstablisher,
+
+    /// The event handler specified by the user to process CMAP events.
+    #[derivative(Debug = "ignore")]
+    event_handler: Option<Arc<dyn CmapEventHandler>>,
+
+    /// The current generation of the pool. The generation is incremented whenever the pool is
+    /// cleared. Connections belonging to a previous generation are considered stale and will be
+    /// closed when checked back in or when popped off of the set of available connections.
+    generation: AtomicU32,
 
     /// Connections that have been ready for usage in the pool for longer than `max_idle_time` will
     /// be closed either by the background thread or when popped off of the set of available
@@ -84,75 +105,66 @@ pub(crate) struct ConnectionPoolInner {
     /// them to the pool.
     min_pool_size: Option<u32>,
 
+    /// The ID of the next connection created by the pool.
+    next_connection_id: AtomicU32,
+
+    /// If a checkout operation takes longer than `wait_queue_timeout`, the pool will return an
+    /// error. If `wait_queue_timeout` is `None`, then the checkout operation will not time out.
+    wait_queue_timeout: Option<Duration>,
+
     /// The TLS options to use for the connections. If `tls_options` is None, then TLS will not be
     /// used to connect to the server.
     tls_options: Option<TlsOptions>,
-
-    /// The credential to use for authenticating connections in this pool.
-    credential: Option<Credential>,
-
-    /// The current generation of the pool. The generation is incremented whenever the pool is
-    /// cleared. Connections belonging to a previous generation are considered stale and will be
-    /// closed when checked back in or when popped off of the set of available connections.
-    generation: AtomicU32,
 
     /// The total number of connections currently in the pool. This includes connections which are
     /// currently checked out of the pool.
     total_connection_count: AtomicU32,
 
-    /// The ID of the next connection created by the pool.
-    next_connection_id: AtomicU32,
-
     /// Connections are checked out by concurrent threads on a first-come, first-server basis. This
     /// is enforced by threads entering the wait queue when they first try to check out a
     /// connection and then blocking until they are at the front of the queue.
     wait_queue: WaitQueue,
-
-    /// The set of available connections in the pool. Because the CMAP spec requires that
-    /// connections are checked out in a FIFO manner, connections are pushed/popped from the back
-    /// of the Vec.
-    connections: Arc<RwLock<Vec<Connection>>>,
-
-    /// Contains the logic for "establishing" a connection. This includes handshaking and
-    /// authenticating a connection when it's first created.
-    establisher: ConnectionEstablisher,
-
-    /// The event handler specified by the user to process CMAP events.
-    #[derivative(Debug = "ignore")]
-    event_handler: Option<Arc<dyn CmapEventHandler>>,
 }
 
 impl ConnectionPool {
     pub(crate) fn new(address: StreamAddress, mut options: Option<ConnectionPoolOptions>) -> Self {
         // Get the individual options from `options`.
-        let max_idle_time = options.as_ref().and_then(|opts| opts.max_idle_time);
-        let wait_queue_timeout = options.as_ref().and_then(|opts| opts.wait_queue_timeout);
+        let connect_timeout = options.as_ref().and_then(|opts| opts.connect_timeout);
+        let credential = options.as_mut().and_then(|opts| opts.credential.clone());
+        let establisher = ConnectionEstablisher::new(options.as_ref());
+        let event_handler = options.as_mut().and_then(|opts| opts.event_handler.take());
+
+        // The CMAP spec indicates that a max idle time of zero means that connections should not be
+        // closed due to idleness.
+        let mut max_idle_time = options.as_ref().and_then(|opts| opts.max_idle_time);
+        if max_idle_time == Some(Duration::from_millis(0)) {
+            max_idle_time = None;
+        }
+
         let max_pool_size = options
             .as_ref()
             .and_then(|opts| opts.max_pool_size)
             .unwrap_or(DEFAULT_MAX_POOL_SIZE);
         let min_pool_size = options.as_ref().and_then(|opts| opts.min_pool_size);
         let tls_options = options.as_mut().and_then(|opts| opts.tls_options.take());
-        let event_handler = options.as_mut().and_then(|opts| opts.event_handler.take());
-
-        let credential = options.as_mut().and_then(|opts| opts.credential.clone());
-        let establisher = ConnectionEstablisher::new(options.as_ref());
+        let wait_queue_timeout = options.as_ref().and_then(|opts| opts.wait_queue_timeout);
 
         let inner = ConnectionPoolInner {
             address: address.clone(),
-            wait_queue_timeout,
+            connect_timeout,
+            credential,
+            establisher,
+            event_handler,
+            generation: AtomicU32::new(0),
             max_idle_time,
             max_pool_size,
             min_pool_size,
-            tls_options,
-            credential,
-            generation: AtomicU32::new(0),
-            total_connection_count: AtomicU32::new(0),
             next_connection_id: AtomicU32::new(1),
+            tls_options,
+            total_connection_count: AtomicU32::new(0),
             wait_queue: WaitQueue::new(address.clone(), wait_queue_timeout),
+            wait_queue_timeout,
             connections: Default::default(),
-            establisher,
-            event_handler,
         };
 
         let pool = Self {
@@ -329,6 +341,7 @@ impl ConnectionPool {
             self.inner.next_connection_id.fetch_add(1, Ordering::SeqCst),
             self.inner.address.clone(),
             self.inner.generation.load(Ordering::SeqCst),
+            self.inner.connect_timeout,
             self.inner.tls_options.clone(),
             self.inner.event_handler.clone(),
         )?;

@@ -69,9 +69,19 @@ pub struct CommandFailedEvent {
 /// by the driver.
 ///
 /// ```rust
-/// # use mongodb::{Client, event::command::{CommandEventHandler, CommandFailedEvent}};
-///
-/// struct FailedCommandLogger {}
+/// # use std::sync::Arc;
+/// #
+/// # use mongodb::{
+/// #     error::Result,
+/// #     event::command::{
+/// #         CommandEventHandler,
+/// #         CommandFailedEvent
+/// #     },
+/// #     options::ClientOptions,
+/// #     Client,
+/// # };
+/// #
+/// struct FailedCommandLogger;
 ///
 /// impl CommandEventHandler for FailedCommandLogger {
 ///     fn handle_command_failed_event(&self, event: CommandFailedEvent) {
@@ -79,10 +89,15 @@ pub struct CommandFailedEvent {
 ///     }
 /// }
 ///
-/// # fn main() {
-/// // TODO: Construct client with event handler by using `ClientOptions`.
+/// # fn do_stuff() -> Result<()> {
+/// let handler: Arc<dyn CommandEventHandler> = Arc::new(FailedCommandLogger);
+/// let options = ClientOptions::builder()
+///                   .command_event_handler(handler)
+///                   .build();
+/// let client = Client::with_options(options)?;
 ///
 /// // Do things with the client, and failed command events will be logged to stderr.
+/// # Ok(())
 /// # }
 /// ```
 pub trait CommandEventHandler: Send + Sync {

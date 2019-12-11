@@ -70,14 +70,16 @@ pub(crate) struct TopologyDescription {
 
     /// The server descriptions of each member of the topology.
     servers: HashMap<StreamAddress, ServerDescription>,
-
-    /// The default max staleness for read operations.
-    max_staleness: Option<Duration>,
 }
 
 impl TopologyDescription {
     pub(crate) fn new(options: ClientOptions) -> Result<Self> {
-        verify_max_staleness(options.max_staleness)?;
+        verify_max_staleness(
+            options
+                .selection_criteria
+                .as_ref()
+                .and_then(|criteria| criteria.max_staleness()),
+        )?;
 
         let topology_type = if options.repl_set_name.is_some() {
             TopologyType::ReplicaSetNoPrimary
@@ -107,7 +109,6 @@ impl TopologyDescription {
             logical_session_timeout_minutes: None,
             local_threshold: options.local_threshold,
             heartbeat_freq: options.heartbeat_freq,
-            max_staleness: options.max_staleness,
             servers,
         })
     }

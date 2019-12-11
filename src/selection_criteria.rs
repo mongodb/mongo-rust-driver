@@ -15,6 +15,8 @@ use crate::{
 pub enum SelectionCriteria {
     /// A read preference that describes the suitable servers based on the server type, max
     /// staleness, and server tags.
+    ///
+    /// See the documentation [here](https://docs.mongodb.com/manual/core/read-preference/) for more details.
     ReadPreference(ReadPreference),
 
     /// A predicate used to filter servers that are considered suitable. A `server` will be
@@ -59,6 +61,10 @@ impl SelectionCriteria {
             Self::ReadPreference(ReadPreference::Primary) => true,
             _ => false,
         }
+    }
+
+    pub(crate) fn max_staleness(&self) -> Option<Duration> {
+        self.as_read_pref().and_then(|pref| pref.max_staleness())
     }
 
     pub(crate) fn from_address(address: StreamAddress) -> Self {
@@ -107,6 +113,16 @@ pub enum ReadPreference {
 }
 
 impl ReadPreference {
+    pub(crate) fn max_staleness(&self) -> Option<Duration> {
+        match self {
+            ReadPreference::Primary => None,
+            ReadPreference::Secondary { max_staleness, .. }
+            | ReadPreference::PrimaryPreferred { max_staleness, .. }
+            | ReadPreference::SecondaryPreferred { max_staleness, .. }
+            | ReadPreference::Nearest { max_staleness, .. } => *max_staleness,
+        }
+    }
+
     pub(crate) fn with_tags(self, tag_sets: Vec<TagSet>) -> Result<Self> {
         let tag_sets = Some(tag_sets);
 
@@ -136,6 +152,41 @@ impl ReadPreference {
                 }
             }
             ReadPreference::Nearest { max_staleness, .. } => ReadPreference::Nearest {
+                tag_sets,
+                max_staleness,
+            },
+        };
+
+        Ok(read_pref)
+    }
+
+    pub(crate) fn with_max_staleness(self, max_staleness: Duration) -> Result<Self> {
+        let max_staleness = Some(max_staleness);
+
+        let read_pref = match self {
+            ReadPreference::Primary => {
+                return Err(ErrorKind::ArgumentError {
+                    message: "max staleness can only be specified when a non-primary mode is \
+                              specified"
+                        .to_string(),
+                }
+                .into());
+            }
+            ReadPreference::Secondary { tag_sets, .. } => ReadPreference::Secondary {
+                tag_sets,
+                max_staleness,
+            },
+            ReadPreference::PrimaryPreferred { tag_sets, .. } => ReadPreference::PrimaryPreferred {
+                tag_sets,
+                max_staleness,
+            },
+            ReadPreference::SecondaryPreferred { tag_sets, .. } => {
+                ReadPreference::SecondaryPreferred {
+                    tag_sets,
+                    max_staleness,
+                }
+            }
+            ReadPreference::Nearest { tag_sets, .. } => ReadPreference::Nearest {
                 tag_sets,
                 max_staleness,
             },
