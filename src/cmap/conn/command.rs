@@ -104,10 +104,7 @@ impl CommandResponse {
     }
 
     /// Deserialize the body of the response.
-    /// If this response corresponds to a command failure, an appropriate CommandError result will
-    /// be returned.
     pub(crate) fn body<T: DeserializeOwned>(&self) -> Result<T> {
-        self.validate()?;
         match bson::from_bson(Bson::Document(self.raw_response.clone())) {
             Ok(body) => Ok(body),
             Err(e) => Err(ErrorKind::ResponseError {

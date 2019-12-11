@@ -83,7 +83,7 @@ impl Handshaker {
 
     /// Handshakes a connection.
     pub(super) fn handshake(&self, conn: &mut Connection) -> Result<()> {
-        let response = conn.send_command(self.command.clone())?;
+        let response = conn.send_command(self.command.clone(), None)?;
         let command_response = response.body()?;
 
         // TODO RUST-192: Calculate round trip time.

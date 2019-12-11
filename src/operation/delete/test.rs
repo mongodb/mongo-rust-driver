@@ -6,7 +6,7 @@ use crate::{
     cmap::{CommandResponse, StreamDescription},
     concern::{Acknowledgment, WriteConcern},
     error::{ErrorKind, WriteConcernError, WriteError, WriteFailure},
-    operation::{test, Delete, Operation},
+    operation::{Delete, Operation},
     options::DeleteOptions,
     Namespace,
 };
@@ -45,6 +45,7 @@ fn build_many() {
         "writeConcern": {
             "w": "majority"
         },
+        "ordered": true,
     };
 
     bson_util::sort_document(&mut cmd.body);
@@ -87,6 +88,7 @@ fn build_one() {
         "writeConcern": {
             "w": "majority"
         },
+        "ordered": true,
     };
 
     bson_util::sort_document(&mut cmd.body);
@@ -117,11 +119,6 @@ fn handle_invalid_response() {
 
     let invalid_response = CommandResponse::with_document(doc! { "ok": 1.0, "asdfadsf": 123123 });
     assert!(op.handle_response(invalid_response).is_err());
-}
-
-#[test]
-fn handle_command_error() {
-    test::handle_command_error(Delete::empty())
 }
 
 #[test]

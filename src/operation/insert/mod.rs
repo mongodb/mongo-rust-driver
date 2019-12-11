@@ -53,6 +53,13 @@ impl Operation for Insert {
         };
         append_options(&mut body, self.options.as_ref())?;
 
+        let ordered = self
+            .options
+            .as_ref()
+            .and_then(|options| options.ordered)
+            .unwrap_or(true);
+        body.insert("ordered", ordered);
+
         Ok(Command::new(
             Self::NAME.to_string(),
             self.ns.db.clone(),

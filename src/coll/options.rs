@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use bson::{doc, Bson, Document};
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
@@ -40,7 +40,7 @@ pub enum ReturnDocument {
 }
 
 /// Specifies the index to use for an operation.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum Hint {
     /// Specifies the keys of the index to use.
@@ -74,7 +74,7 @@ pub enum CursorType {
 }
 
 /// Specifies the options to a `Collection::insert_one` operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct InsertOneOptions {
     /// Opt out of document-level validation.
     #[builder(default)]
@@ -87,7 +87,7 @@ pub struct InsertOneOptions {
 
 /// Specifies the options to a `Collection::insert_many` operation.
 #[skip_serializing_none]
-#[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
+#[derive(Clone, Debug, Default, TypedBuilder, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InsertManyOptions {
     /// Opt out of document-level validation.
@@ -96,11 +96,14 @@ pub struct InsertManyOptions {
 
     /// If true, when an insert fails, return without performing the remaining writes. If false,
     /// when a write fails, continue with the remaining writes, if any.
+    ///
+    /// Defaults to true.
     #[builder(default)]
     pub ordered: Option<bool>,
 
     /// The write concern for the operation.
     #[builder(default)]
+    #[serde(skip_deserializing)]
     pub write_concern: Option<WriteConcern>,
 }
 

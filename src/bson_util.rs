@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use bson::{bson, doc, oid::ObjectId, Bson, Document};
-use serde::{ser, Serialize, Serializer};
+use serde::{ser, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::error::{ErrorKind, Result};
 
@@ -67,6 +67,16 @@ pub(crate) fn serialize_duration_as_i64_millis<S: Serializer>(
         Some(duration) => serializer.serialize_i64(duration.as_millis() as i64),
         None => serializer.serialize_none(),
     }
+}
+
+pub(crate) fn deserialize_duration_from_u64_millis<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<Duration>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let millis = Option::<u64>::deserialize(deserializer)?;
+    Ok(millis.map(Duration::from_millis))
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]

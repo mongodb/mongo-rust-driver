@@ -1,3 +1,5 @@
+use pretty_assertions::assert_eq;
+
 use bson::{bson, doc, Bson};
 
 use crate::{
@@ -5,7 +7,7 @@ use crate::{
     cmap::{CommandResponse, StreamDescription},
     concern::{Acknowledgment, WriteConcern},
     error::{ErrorKind, WriteConcernError, WriteError, WriteFailure},
-    operation::{test, Operation, Update},
+    operation::{Operation, Update},
     options::{UpdateModifications, UpdateOptions},
     Namespace,
 };
@@ -50,7 +52,8 @@ fn build() {
         "writeConcern": {
             "w": "majority"
         },
-        "bypassDocumentValidation": true
+        "bypassDocumentValidation": true,
+        "ordered": true,
     };
 
     bson_util::sort_document(&mut cmd.body);
@@ -86,6 +89,7 @@ fn build_many() {
                 "multi": true,
             }
         ],
+        "ordered": true,
     };
 
     bson_util::sort_document(&mut cmd.body);
@@ -141,11 +145,6 @@ fn handle_invalid_response() {
 
     let invalid_response = CommandResponse::with_document(doc! { "ok": 1.0, "asdfadsf": 123123 });
     assert!(op.handle_response(invalid_response).is_err());
-}
-
-#[test]
-fn handle_command_error() {
-    test::handle_command_error(Update::empty())
 }
 
 #[test]

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bson::Document;
 
-use crate::{cmap::ConnectionInfo, event::Failure};
+use crate::{cmap::ConnectionInfo, error::Error};
 
 /// An event that triggers when a database command is initiated.
 #[derive(Clone, Debug)]
@@ -42,7 +42,7 @@ pub struct CommandSucceededEvent {
     pub request_id: i32,
 
     /// Information about the connect the command will be run on.
-    pub connection_id: ConnectionInfo,
+    pub connection: ConnectionInfo,
 }
 
 /// An event that triggers when a command failed to complete successfully.
@@ -55,14 +55,14 @@ pub struct CommandFailedEvent {
     pub command_name: String,
 
     /// The error that the driver returned due to the event failing.
-    pub failure: Failure,
+    pub failure: Error,
 
     /// The driver-generated identifier for the request. Applications can use this to identify the
     /// corresponding `CommandStartedEvent` that triggered earlier.
     pub request_id: i32,
 
     /// Information about the connect the command will be run on.
-    pub connection_id: ConnectionInfo,
+    pub connection: ConnectionInfo,
 }
 
 /// Applications can implement this trait to specify custom logic to run on each command event sent

@@ -4,7 +4,7 @@ use crate::{
     bson_util,
     cmap::{CommandResponse, StreamDescription},
     error::ErrorKind,
-    operation::{test, ListDatabases, Operation},
+    operation::{ListDatabases, Operation},
     selection_criteria::ReadPreference,
 };
 
@@ -116,44 +116,6 @@ fn handle_response_no_databases() {
         Err(ErrorKind::ResponseError { .. }) => {}
         other => panic!("expected response error, but got {:?}", other),
     }
-}
-
-#[test]
-fn handle_response_no_ok() {
-    let list_databases_op = ListDatabases::empty();
-
-    let response = CommandResponse::with_document(doc! {
-       "databases" :
-       [
-           {
-               "name" : "admin",
-               "sizeOnDisk" : 83886080,
-               "empty" : false
-           },
-           {
-               "name" : "local",
-               "sizeOnDisk" : 83886080,
-               "empty" : false
-           },
-           {
-               "name" : "test",
-               "sizeOnDisk" : 83886080,
-               "empty" : false
-           }
-       ],
-       "totalSize" : 251658240,
-    });
-
-    let result = list_databases_op.handle_response(response);
-    match result.as_ref().map_err(|e| e.as_ref()) {
-        Err(ErrorKind::ResponseError { .. }) => {}
-        other => panic!("expected response error, but got {:?}", other),
-    }
-}
-
-#[test]
-fn handle_command_error() {
-    test::handle_command_error(ListDatabases::empty());
 }
 
 #[test]

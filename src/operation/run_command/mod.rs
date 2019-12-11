@@ -62,4 +62,8 @@ impl Operation for RunCommand {
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         self.selection_criteria.as_ref()
     }
+
+    fn handles_command_errors(&self) -> bool {
+        true
+    }
 }

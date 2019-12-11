@@ -20,13 +20,14 @@ pub(crate) struct Message {
     pub(crate) flags: MessageFlags,
     pub(crate) sections: Vec<MessageSection>,
     pub(crate) checksum: Option<u32>,
+    pub(crate) request_id: Option<i32>,
 }
 
 impl Message {
     /// Creates a `Message` from a given `Command`.
     ///
     /// Note that `response_to` will need to be set manually.
-    pub(crate) fn from_command(mut command: Command) -> Self {
+    pub(crate) fn with_command(mut command: Command, request_id: Option<i32>) -> Self {
         command.body.insert("$db", command.target_db);
 
         if let Some(read_pref) = command.read_pref {
@@ -40,6 +41,7 @@ impl Message {
             flags: MessageFlags::empty(),
             sections: vec![MessageSection::Document(command.body)],
             checksum: None,
+            request_id,
         }
     }
 
@@ -110,6 +112,7 @@ impl Message {
             flags,
             sections,
             checksum,
+            request_id: None,
         })
     }
 
@@ -132,7 +135,7 @@ impl Message {
 
         let header = Header {
             length: total_length as i32,
-            request_id: super::util::next_request_id(),
+            request_id: self.request_id.unwrap_or_else(super::util::next_request_id),
             response_to: self.response_to,
             op_code: OpCode::Message,
         };

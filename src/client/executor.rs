@@ -1,10 +1,34 @@
 use super::Client;
+
+use std::collections::HashSet;
+
+use bson::Document;
+use lazy_static::lazy_static;
+use time::PreciseTime;
+
 use crate::{
     cmap::Connection,
     error::Result,
+    event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
     operation::Operation,
     sdam::{update_topology, ServerDescription},
 };
+
+lazy_static! {
+    static ref REDACTED_COMMANDS: HashSet<&'static str> = {
+        let mut hash_set = HashSet::new();
+        hash_set.insert("authenticate");
+        hash_set.insert("saslstart");
+        hash_set.insert("saslcontinue");
+        hash_set.insert("getnonce");
+        hash_set.insert("createuser");
+        hash_set.insert("updateuser");
+        hash_set.insert("copydbgetnonce");
+        hash_set.insert("copydbsaslstart");
+        hash_set.insert("copydb");
+        hash_set
+    };
+}
 
 impl Client {
     /// Executes an operation and returns the connection used to do so along with the result of the
@@ -83,13 +107,75 @@ impl Client {
         connection: &mut Connection,
     ) -> Result<T::O> {
         let mut cmd = op.build(connection.stream_description()?)?;
-
         self.topology()
             .read()
             .unwrap()
             .update_command_with_read_pref(connection.address(), &mut cmd, op.selection_criteria());
 
-        let response = connection.send_command(cmd)?;
-        op.handle_response(response)
+        let connection_info = connection.info();
+        let request_id = crate::cmap::conn::next_request_id();
+
+        let should_redact = REDACTED_COMMANDS.contains(cmd.name.to_lowercase().as_str());
+
+        let command_body = if should_redact {
+            Document::new()
+        } else {
+            cmd.body.clone()
+        };
+        let command_started_event = CommandStartedEvent {
+            command: command_body,
+            db: cmd.target_db.clone(),
+            command_name: cmd.name.clone(),
+            request_id,
+            connection: connection_info.clone(),
+        };
+
+        self.send_command_started_event(command_started_event);
+
+        let start_time = PreciseTime::now();
+
+        let response_result =
+            connection
+                .send_command(cmd.clone(), request_id)
+                .and_then(|response| {
+                    if !op.handles_command_errors() {
+                        response.validate()?;
+                    }
+                    Ok(response)
+                });
+
+        let end_time = PreciseTime::now();
+        let duration = start_time.to(end_time).to_std()?;
+
+        match response_result {
+            Err(error) => {
+                let command_failed_event = CommandFailedEvent {
+                    duration,
+                    command_name: cmd.name.clone(),
+                    failure: error.clone(),
+                    request_id,
+                    connection: connection_info,
+                };
+                self.send_command_failed_event(command_failed_event);
+                Err(error)
+            }
+            Ok(response) => {
+                let reply = if should_redact {
+                    Document::new()
+                } else {
+                    response.raw_response.clone()
+                };
+
+                let command_succeeded_event = CommandSucceededEvent {
+                    duration,
+                    reply,
+                    command_name: cmd.name.clone(),
+                    request_id,
+                    connection: connection_info,
+                };
+                self.send_command_succeeded_event(command_succeeded_event);
+                op.handle_response(response)
+            }
+        }
     }
 }

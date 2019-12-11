@@ -60,6 +60,12 @@ pub(crate) trait Operation {
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         None
     }
+
+    /// Whether or not the operation has special handling for command errors, or whether they should
+    /// just be propogated to the user immediately.
+    fn handles_command_errors(&self) -> bool {
+        false
+    }
 }
 
 /// Appends a serializable struct to the input document.
@@ -159,31 +165,10 @@ struct CursorInfo {
 mod test {
     use std::sync::Arc;
 
-    use bson::{bson, doc};
-
     use crate::{
-        cmap::CommandResponse,
-        error::ErrorKind,
         operation::Operation,
         options::{ReadPreference, SelectionCriteria},
     };
-
-    pub(crate) fn handle_command_error<T: Operation>(op: T) {
-        let cmd_error = CommandResponse::with_document(
-            doc! { "ok": 0.0, "code": 123, "codeName": "woops", "errmsg": "My error message" },
-        );
-        let cmd_error_result = op.handle_response(cmd_error);
-        assert!(cmd_error_result.is_err());
-
-        match *cmd_error_result.unwrap_err().kind {
-            ErrorKind::CommandError(ref error) => {
-                assert_eq!(error.code, 123);
-                assert_eq!(error.code_name, "woops");
-                assert_eq!(error.message, "My error message")
-            }
-            _ => panic!("expected command error"),
-        };
-    }
 
     pub(crate) fn op_selection_criteria<F, T>(constructor: F)
     where

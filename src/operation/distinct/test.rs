@@ -143,23 +143,3 @@ fn handle_response_no_values() {
         other => panic!("expected response error, but got {:?}", other),
     }
 }
-
-#[test]
-fn handle_response_no_ok() {
-    let distinct_op = Distinct::empty();
-
-    let response = CommandResponse::with_document(doc! {
-       "values" : [ "A", "B" ],
-    });
-
-    let result = distinct_op.handle_response(response);
-    match result.as_ref().map_err(|e| e.as_ref()) {
-        Err(ErrorKind::ResponseError { .. }) => {}
-        other => panic!("expected response error, but got {:?}", other),
-    }
-}
-
-#[test]
-fn handle_command_error() {
-    test::handle_command_error(Distinct::empty());
-}

@@ -1,9 +1,14 @@
 mod event;
 mod lock;
+mod matchable;
 
-pub use self::{event::EventClient, lock::TestLock};
+pub use self::{
+    event::{CommandEvent, EventClient},
+    lock::TestLock,
+    matchable::{assert_matches, Matchable},
+};
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 use bson::{bson, doc, oid::ObjectId, Bson};
 use semver::Version;
@@ -118,7 +123,6 @@ impl TestClient {
             || (self.server_version.major == major && self.server_version.minor > minor)
     }
 
-    #[allow(dead_code)]
     pub fn server_version_gte(&self, major: u64, minor: u64) -> bool {
         self.server_version.major > major
             || (self.server_version.major == major && self.server_version.minor >= minor)
@@ -148,6 +152,14 @@ pub fn drop_collection(coll: &Collection) {
             e.unwrap();
         }
     };
+}
+
+pub fn parse_version(version: &str) -> (u64, u64) {
+    let parts: Vec<u64> = version.split('.').map(|s| s.parse().unwrap()).collect();
+    if parts.len() != 2 {
+        panic!("not two part version string: {:?}", parts);
+    }
+    (parts[0], parts[1])
 }
 
 #[derive(Debug, Deserialize)]

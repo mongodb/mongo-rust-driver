@@ -4,7 +4,7 @@ use crate::{
     cmap::{CommandResponse, StreamDescription},
     concern::WriteConcern,
     error::{ErrorKind, WriteFailure},
-    operation::{test, Create, Operation},
+    operation::{Create, Operation},
     options::{CreateCollectionOptions, ValidationAction, ValidationLevel},
     Namespace,
 };
@@ -52,11 +52,6 @@ fn handle_success() {
     assert!(op.handle_response(ok_response).is_ok());
     let ok_extra = CommandResponse::with_document(doc! { "ok": 1.0, "hello": "world" });
     assert!(op.handle_response(ok_extra).is_ok());
-}
-
-#[test]
-fn handle_command_error() {
-    test::handle_command_error(Create::empty());
 }
 
 #[test]
