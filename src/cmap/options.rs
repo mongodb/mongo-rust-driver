@@ -46,7 +46,7 @@ pub struct ConnectionPoolOptions {
     #[builder(default)]
     #[serde(rename = "maxIdleTimeMS")]
     #[serde(default)]
-    #[serde(deserialize_with = "self::deserialize_duration_from_u64_millis")]
+    #[serde(deserialize_with = "bson_util::deserialize_duration_from_u64_millis")]
     pub max_idle_time: Option<Duration>,
 
     /// The maximum number of connections that the pool can have at a given time. This includes
