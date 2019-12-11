@@ -21,7 +21,6 @@ This repository contains the officially supported MongoDB Rust driver, a client 
  - Rust 1.39+
 - MongoDB 3.6+
 
-For contributors, the nightly version of `rustfmt` is required for formatting the source.
 ### Importing
 The driver is available on [crates.io](https://crates.io/crates/mongodb). To use the driver in your application, simply add it to your project's `Cargo.toml`. You will also want to add [`bson`](https://docs.rs/bson) as well.
 ```toml
@@ -112,7 +111,7 @@ Before filing a ticket, please use the search functionality of Jira to see if a 
 
 ## Contributing
 
-TODO write development guide
+We encourage and would happily accept contributions in the form of GitHub pull requests. Before opening one, be sure to run the tests locally; check out the [testing section](#running-the-tests) for information on how to do that. Once you open a pull request, your branch will be run against the same testing matrix that we use for our [continuous integration](#continuous-integration) system, so it is usually sufficient to only run the integration tests locally against a standalone. Remember to always run the linter tests before opening a pull request.
 
 ## Running the tests
 ### Integration and unit tests
@@ -153,11 +152,18 @@ To run the tests with TLS/SSL enabled, you must enable it on the deployment and 
 export MONGODB_URI="mongodb://localhost:27017/?tls=true&tlsCertificateKeyFile=cert.pem&tlsCAFile=ca.pem"
 cargo test --verbose
 ```
+**Note:** When you open a pull request, your code will be run against a comprehensive testing matrix, so it is usually not necessary run the integration tests against all combinations of topology/auth/TLS locally.
 
 ### Linter Tests
-To ensure the linter tests pass, run the following in the root of the project and verify that it succeeds:
+Our linter tests use the nightly version of `rustfmt` to verify that the source is formatted properly and the stable version of `clippy` to statically detect any common mistakes.
+You can use `rustup` to install them both:
 ```bash
-cargo +nightly fmt --check && bash .evergreen/check-clippy.sh
+rustup component add clippy --toolchain stable
+rustup component add rustfmt --toolchain nightly
+```
+To run the linter tests, run the `check-clippy.sh` and `check-rustfmt.sh` scripts in the `.evergreen` directory:
+```bash
+bash .evergreen/check-clippy.sh && bash .evergreen/check-rustfmt.sh
 ```
 
 ## Continueous Integration
