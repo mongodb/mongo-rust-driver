@@ -166,7 +166,7 @@ To run the linter tests, run the `check-clippy.sh` and `check-rustfmt.sh` script
 bash .evergreen/check-clippy.sh && bash .evergreen/check-rustfmt.sh
 ```
 
-## Continueous Integration
+## Continuous Integration
 Commits to master are run automatically on [evergreen](https://evergreen.mongodb.com/waterfall/mongo-rust-driver-stable).
 
 ## License
