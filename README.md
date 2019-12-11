@@ -31,7 +31,7 @@ bson = "0.14.0"
 ```
 
 ## Example Usage
-Below are simple examples of using the driver. For more specific examples and the API reference, see the driver's [docs.rs page](https://docs.rs/mongodb/0.4.0/mongodb/).
+Below are simple examples of using the driver. For more specific examples and the API reference, see the driver's [docs.rs page](https://docs.rs/mongodb).
 ### Connecting to a MongoDB deployment
 ```rust
 use mongodb::{Client, options::ClientOptions};
@@ -108,10 +108,10 @@ for result in cursor {
 ```
 
 ## Bug Reporting / Feature Requests
-To file a bug report or submit a feature request, please open a ticket on our [Jira project](https://jira.mongodb.org/projects/RUST/summary):
+To file a bug report or submit a feature request, please open a ticket on our [Jira project](https://jira.mongodb.org/browse/RUST):
 - Create an account and login at [jira.mongodb.org](https://jira.mongodb.org)
-- Navigate to the RUST project at [jira.mongorb.org/browse/RUST](jira.mongorb.org/browse/RUST)
-- Click **Create Issue** - If it is a bug report, please include as much detail as possible about the issue and how to reproduce it.
+- Navigate to the RUST project at [jira.mongorb.org/browse/RUST](https://jira.mongodb.org/browse/RUST)
+- Click **Create Issue** - If the ticket you are filing is a bug report, please include as much detail as possible about the issue and how to reproduce it.
 
 Before filing a ticket, please use the search functionality of Jira to see if a similar issue has already been filed.
 
@@ -122,6 +122,7 @@ TODO write development guide
 ## Running the tests
 ### Integration and unit tests
 In order to run the tests (which are mostly integration tests), you must have access to a MongoDB deployment. You may specify a [MongoDB connection string](https://docs.mongodb.com/manual/reference/connection-string/) in the `MONGODB_URI` environment variable, and the the tests will use it to connect to the deployment. If `MONGODB_URI` is unset, the tests will attempt to connect to a local deployment on port 27017.
+
 **Note:** The integration tests will clear out the databases/collections they need to use, but they do not clean up after themselves. 
 
 To actually run the tests, you can use `cargo` like you would in any other crate:
