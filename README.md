@@ -1,7 +1,7 @@
 # MongoDB Rust Driver
 [![Crates.io](https://img.shields.io/crates/v/mongodb.svg)](https://crates.io/crates/mongodb) [![docs.rs](https://docs.rs/mongodb/badge.svg)](https://docs.rs/mongodb) [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-This repository contains the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It depends on the community-supported [`bson`](https://docs.rs/bson/0.14.0/bson/) library for BSON support.
+This repository contains the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It depends on the community-supported [`bson`](https://docs.rs/bson) library for BSON support.
 
 ## Index
 - [Installation](#Installation)
@@ -23,7 +23,7 @@ This repository contains the officially supported MongoDB Rust driver, a client 
 
 For contributors, the nightly version of `rustfmt` is required for formatting the source.
 ### Importing
-The driver is available on [crates.io](https://docs.rs/mongodb/0.4.0/mongodb/). To use the driver in your application, simply add it to your project's `Cargo.toml`. You will also want to add [`bson`](https://docs.rs/bson/0.14.0/bson/) as well.
+The driver is available on [crates.io](https://crates.io/crates/mongodb). To use the driver in your application, simply add it to your project's `Cargo.toml`. You will also want to add [`bson`](https://docs.rs/bson) as well.
 ```toml
 [dependencies]
 mongodb = "0.9.0"
