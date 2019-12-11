@@ -4,7 +4,8 @@ use std::collections::HashMap;
 
 use bson::{Bson, Document};
 
-/// The result of a `Collection::insert_one` operation.
+/// The result of a [`Collection::insert_one`](../struct.Collection.html#method.insert_one)
+/// operation.
 #[derive(Debug)]
 pub struct InsertOneResult {
     /// The `_id` field of the document inserted.
@@ -23,14 +24,16 @@ impl InsertOneResult {
     }
 }
 
-/// The result of a `Collection::insert_many` operation.
+/// The result of a [`Collection::insert_many`](../struct.Collection.html#method.insert_many)
+/// operation.
 #[derive(Debug)]
 pub struct InsertManyResult {
     /// The `_id` field of the documents inserted.
     pub inserted_ids: HashMap<usize, Bson>,
 }
 
-/// The result of a `Collection::update_one` or `Collection::update_many` operation.
+/// The result of a [`Collection::update_one`](../struct.Collection.html#method.update_one) or
+/// [`Collection::update_many`](../struct.Collection.html#method.update_many) operation.
 #[derive(Debug)]
 pub struct UpdateResult {
     /// The number of documents that matched the filter.
@@ -41,7 +44,8 @@ pub struct UpdateResult {
     pub upserted_id: Option<Bson>,
 }
 
-/// The result of a `Collection::delete_one` or `Collection::delete_many` operation.
+/// The result of a [`Collection::delete_one`](../struct.Collection.html#method.delete_one) or
+/// [`Collection::delete_many`](../struct.Collection.html#method.delete_many) operation.
 #[derive(Debug)]
 pub struct DeleteResult {
     /// The number of documents deleted by the operation.

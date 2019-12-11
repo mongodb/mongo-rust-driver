@@ -10,7 +10,8 @@ use crate::{
     selection_criteria::SelectionCriteria,
 };
 
-/// These are the valid options for creating a `Database` with `Client::database_with_options`.
+/// These are the valid options for creating a [`Database`](../struct.Database.html) with
+/// [`Client::database_with_options`](../struct.Client.html#method.database_with_options).
 #[derive(Debug, Default, TypedBuilder)]
 pub struct DatabaseOptions {
     /// The default read preference for operations.
@@ -26,7 +27,8 @@ pub struct DatabaseOptions {
     pub write_concern: Option<WriteConcern>,
 }
 
-/// These are the valid options for creating a collection with `Database::create_collection`.
+/// These are the valid options for creating a collection with
+/// [`Database::create_collection`](../struct.Database.html#method.create_collection).
 #[skip_serializing_none]
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -102,8 +104,8 @@ pub enum ValidationLevel {
     Moderate,
 }
 
-// Specifies whether the database should return an error or simply raise a warning if inserted
-// documents do not pass the validation.
+/// Specifies whether the database should return an error or simply raise a warning if inserted
+/// documents do not pass the validation.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ValidationAction {
@@ -111,7 +113,7 @@ pub enum ValidationAction {
     Warn,
 }
 
-/// Specifies the options to a `Database::drop` operation.
+/// Specifies the options to a [`Database::drop`](../struct.Database.html#method.drop) operation.
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DropDatabaseOptions {
@@ -120,6 +122,8 @@ pub struct DropDatabaseOptions {
     pub write_concern: Option<WriteConcern>,
 }
 
+/// Specifies the options to a
+/// [`Database::list_collections`](../struct.Database.html#method.list_collections) operation.
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 pub struct ListCollectionsOptions {
     /// The number of documents the server should return per cursor batch.

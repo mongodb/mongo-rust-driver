@@ -30,8 +30,9 @@ use crate::{
 
 /// `Collection` is the client-side abstraction of a MongoDB Collection. It can be used to
 /// perform collection-level operations such as CRUD operations. A `Collection` can be obtained
-/// through a `Database` by calling either `Database::collection` or
-/// `Database::collection_with_options`.
+/// through a [`Database`](struct.Database.html) by calling either
+/// [`Database::collection`](struct.Database.html#method.collection) or
+/// [`Database::collection_with_options`](struct.Database.html#method.collection_with_options).
 ///
 /// `Collection` uses [`std::sync::Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html) internally,
 /// so it can safely be shared across threads. For example:
@@ -184,8 +185,8 @@ impl Collection {
 
     /// Gets the number of documents matching `filter`.
     ///
-    /// Note that using `Collection::estimated_document_count` is recommended instead of this method
-    /// is most cases.
+    /// Note that using [`Collection::estimated_document_count`](#method.estimated_document_count)
+    /// is recommended instead of this method is most cases.
     pub fn count_documents(
         &self,
         filter: impl Into<Option<Document>>,

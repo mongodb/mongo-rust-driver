@@ -12,15 +12,16 @@ use crate::{error::Result, operation::GetMore, options::StreamAddress, Client, N
 /// a `Cursor` iterates over `Result<Document>` items rather than simply `Document` items.
 ///
 /// The batch size of the `Cursor` can be configured using the options to the method that returns
-/// it. For example, setting the `batch_size` field of `FindOptions` will set the batch size of the
-/// `Cursor` returned by `Collection::find`.
+/// it. For example, setting the `batch_size` field of
+/// [`FindOptions`](options/struct.FindOptions.html) will set the batch size of the
+/// `Cursor` returned by [`Collection::find`](struct.Collection.html#method.find).
 ///
 /// Note that the batch size determines both the number of documents stored in memory by the
 /// `Cursor` at a given time as well as the total number of network round-trips needed to fetch all
 /// results from the server; both of these factors should be taken into account when choosing the
 /// optimal batch size.
 ///
-/// A cursor can be used like any other `Iterator`. The simplest way is just to iterate over the
+/// A cursor can be used like any other [`Iterator`](https://doc.rust-lang.org/std/iter/trait.Iterator.html). The simplest way is just to iterate over the
 /// documents it yields:
 ///
 /// ```rust
@@ -39,7 +40,7 @@ use crate::{error::Result, operation::GetMore, options::StreamAddress, Client, N
 /// # }
 /// ```
 ///
-/// Additionally, all the other methods that an `Iterator` has are available on `Cursor` as well.
+/// Additionally, all the other methods that an [`Iterator`](https://doc.rust-lang.org/std/iter/trait.Iterator.html) has are available on `Cursor` as well.
 /// For instance, if the number of results from a query is known to be small, it might make sense
 /// to collect them into a vector:
 ///

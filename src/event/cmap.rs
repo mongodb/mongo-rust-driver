@@ -1,6 +1,10 @@
+//! Contains the events and functionality for monitoring behavior of the connection pooling of a
+//! `Client`.
+
 use serde::Deserialize;
 
-pub use crate::{cmap::options::ConnectionPoolOptions, options::StreamAddress};
+pub use crate::cmap::options::ConnectionPoolOptions;
+use crate::options::StreamAddress;
 
 /// We implement `Deserialize` for all of the event types so that we can more easily parse the CMAP
 /// spec tests. However, we have no need to parse the address field from the JSON files (if it's
