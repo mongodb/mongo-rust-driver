@@ -107,15 +107,15 @@ pub struct CommandFailedEvent {
 /// # }
 /// ```
 pub trait CommandEventHandler: Send + Sync {
-    /// A `Client` will call this method on each registered handler whenever a database command is
-    /// initiated.
+    /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
+    /// whenever a database command is initiated.
     fn handle_command_started_event(&self, event: CommandStartedEvent) {}
 
-    /// A `Client` will call this method on each registered handler whenever a database command
-    /// successfully completes.
+    /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
+    /// whenever a database command successfully completes.
     fn handle_command_succeeded_event(&self, event: CommandSucceededEvent) {}
 
-    /// A `Client` will call this method on each registered handler whenever a database command
-    /// fails to complete successfully.
+    /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
+    /// whenever a database command fails to complete successfully.
     fn handle_command_failed_event(&self, event: CommandFailedEvent) {}
 }

@@ -38,7 +38,7 @@
 //! ```
 //!
 //! Operations can be performed by obtaining a [`Database`](struct.Database.html) or
-//! [`Collection`](struct.Collection.html) from the `Client`:
+//! [`Collection`](struct.Collection.html) from the [`Client`](struct.Client.html):
 //!
 //! ```rust
 //! # use bson::{bson, doc};
