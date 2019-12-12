@@ -38,8 +38,6 @@ pub enum AuthMechanism {
     /// The SCRAM-SHA-256 mechanism which extends [RFC 5802](http://tools.ietf.org/html/rfc5802) and is formally defined in [RFC 7677](https://tools.ietf.org/html/rfc7677).
     ///
     /// See the [MongoDB documentation](https://docs.mongodb.com/manual/core/security-scram/) for more information.
-    ///
-    /// Note: This mechanism is not currently supported by this driver but will be in the future.
     ScramSha256,
 
     /// The MONGODB-X509 mechanism based on the usage of X.509 certificates to validate a client
