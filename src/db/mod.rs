@@ -25,8 +25,9 @@ use crate::{
 
 /// `Database` is the client-side abstraction of a MongoDB database. It can be used to perform
 /// database-level operations or to obtain handles to specific collections within the database. A
-/// `Database` can only be obtained through a `Client` by calling either `Client::database` or
-/// `Client::database_with_options`.
+/// `Database` can only be obtained through a [`Client`](struct.Client.html) by calling either
+/// [`Client::database`](struct.Client.html#method.database) or
+/// [`Client::database_with_options`](struct.Client.html#method.database_with_options).
 ///
 /// `Database` uses [`std::sync::Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html) internally,
 /// so it can safely be shared across threads. For example:

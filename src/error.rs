@@ -1,3 +1,5 @@
+//! Contains the `Error` and `Result` types that `mongodb` uses.
+
 use std::{fmt, sync::Arc};
 
 use err_derive::Error;
@@ -13,11 +15,16 @@ lazy_static! {
     static ref SHUTTING_DOWN_CODES: Vec<i32> = vec![11600, 91];
 }
 
+/// The result type for all methods that can return an error in the `mongodb` crate.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// An error that can occur in the `mongodb` crate. The inner
+/// [`ErrorKind`](enum.ErrorKind.html) is wrapped in an `Arc` to allow the errors to be
+/// cloned.
 #[derive(Clone, Debug, Error)]
 #[error(display = "{}", kind)]
 pub struct Error {
+    /// The type of error that occurred.
     pub kind: Arc<ErrorKind>,
 }
 
@@ -61,49 +68,63 @@ impl std::ops::Deref for Error {
     }
 }
 
+/// The types of errors that can occur.
 #[derive(Debug, Error)]
 pub enum ErrorKind {
+    /// Wrapper around [`std::net::AddrParseError`](https://doc.rust-lang.org/std/net/struct.AddrParseError.html).
     #[error(display = "{}", _0)]
     AddrParse(#[error(source)] std::net::AddrParseError),
 
+    /// An invalid argument was provided to a database operation.
     #[error(
         display = "An invalid argument was provided to a database operation: {}",
         message
     )]
     ArgumentError { message: String },
 
+    /// An error occurred while the [`Client`](../struct.Client.html) attempted to authenticate a
+    /// connection.
     #[error(display = "{}", message)]
     AuthenticationError { message: String },
 
+    /// Wrapper around `bson::DecoderError`.
     #[error(display = "{}", _0)]
     BsonDecode(#[error(source)] bson::DecoderError),
 
+    /// Wrapper around `bson::EncoderError`.
     #[error(display = "{}", _0)]
     BsonEncode(#[error(source)] bson::EncoderError),
 
+    /// An error occurred when trying to execute a write operation consisting of multiple writes.
     #[error(
         display = "An error ocurred when trying to execute a write operation: {:?}",
         _0
     )]
     BulkWriteError(BulkWriteFailure),
 
+    /// The server returned an error to an attempted operation.
     #[error(display = "Command failed {}", _0)]
     CommandError(CommandError),
 
+    /// Wrapper around `webpki::InvalidDNSNameError`.
     #[error(display = "{}", _0)]
     DnsName(#[error(source)] webpki::InvalidDNSNameError),
 
     // `trust_dns` does not implement the `Error` trait on their errors, so we have to manually
     // implement `From` rather than using the `source annotation.
+    /// Wrapper around `trust_dns_resolver::error::ResolveError`.
     #[error(display = "{}", _0)]
     DnsResolve(trust_dns_resolver::error::ResolveError),
 
+    /// A hostname could not be parsed.
     #[error(display = "Unable to parse hostname: {}", hostname)]
     InvalidHostname { hostname: String },
 
+    /// Wrapper around [`std::io::Error`](https://doc.rust-lang.org/std/io/struct.Error.html).
     #[error(display = "{}", _0)]
     Io(#[error(source)] std::io::Error),
 
+    /// A database operation failed to send or receive a reply.
     #[error(
         display = "A database operation failed to send or receive a reply: {}",
         message
@@ -113,42 +134,40 @@ pub enum ErrorKind {
     #[error(display = "{}", _0)]
     OutOfRangeError(#[error(source)] OutOfRangeError),
 
+    /// Data from a file could not be parsed.
     #[error(display = "Unable to parse {} data from {}", data_type, file_path)]
     ParseError {
         data_type: String,
         file_path: String,
     },
 
+    /// The server returned an invalid reply to a database operation.
     #[error(
-        display = "Attempted to check out a connection from closed connection pool with address {}",
-        address
-    )]
-    PoolClosedError { address: String },
-
-    #[error(
-        display = "A database operation returned an invalid reply: {}",
+        display = "The server returned an invalid reply to a database operation: {}",
         message
     )]
     ResponseError { message: String },
 
-    #[error(
-        display = "A database operation returned an invalid reply: {}",
-        message
-    )]
+    /// The Client was not able to select a server for the operation.
+    #[error(display = ": {}", message)]
     ServerSelectionError { message: String },
 
+    /// An error occurred during SRV record lookup.
     #[error(display = "An error occurred during SRV record lookup: {}", message)]
     SrvLookupError { message: String },
 
+    /// An error occurred during TXT record lookup
     #[error(display = "An error occurred during TXT record lookup: {}", message)]
     TxtLookupError { message: String },
 
+    /// The Client timed out while checking out a connection from connection pool.
     #[error(
         display = "Timed out while checking out a connection from connection pool with address {}",
         address
     )]
     WaitQueueTimeoutError { address: StreamAddress },
 
+    /// An error occurred when trying to execute a write operation
     #[error(
         display = "An error occurred when trying to execute a write operation: {}",
         _0
@@ -227,14 +246,18 @@ fn is_recovering(code: i32, message: &str) -> bool {
 /// An error that occurred due to a database command failing.
 #[derive(Clone, Debug, Deserialize)]
 pub struct CommandError {
+    /// Identifies the type of error.
     pub code: i32,
 
+    /// The name associated with the error code.
     #[serde(rename = "codeName", default)]
     pub code_name: String,
 
+    /// A description of the error that occurred.
     #[serde(rename = "errmsg")]
     pub message: String,
 
+    /// The error labels that the server returned.
     #[serde(rename = "errorLabels", default)]
     pub labels: Vec<String>,
 }
@@ -264,7 +287,7 @@ pub struct WriteConcernError {
 /// write concern.
 #[derive(Clone, Debug, PartialEq)]
 pub struct WriteError {
-    /// Identifies the type of write concern error.
+    /// Identifies the type of write error.
     pub code: i32,
 
     /// The name associated with the error code.
@@ -277,6 +300,8 @@ pub struct WriteError {
     pub message: String,
 }
 
+/// An error that occurred during a write operation consisting of multiple writes that wasn't due to
+/// being unable to satisfy a write concern.
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 pub struct BulkWriteError {
     /// Index into the list of operations that this error corresponds to.
@@ -297,6 +322,7 @@ pub struct BulkWriteError {
     pub message: String,
 }
 
+/// The set of errors that occurred during a write operation.
 #[derive(Clone, Debug)]
 pub struct BulkWriteFailure {
     /// The error(s) that occured on account of a non write concern failure.

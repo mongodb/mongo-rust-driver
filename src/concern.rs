@@ -96,7 +96,7 @@ pub struct WriteConcern {
     pub journal: Option<bool>,
 }
 
-/// The type of the `w` field in a write concern.
+/// The type of the `w` field in a [`WriteConcern`](struct.WriteConcern.html).
 #[derive(Clone, Debug, PartialEq)]
 pub enum Acknowledgment {
     /// Requires acknowledgement that the write has reached the specified number of nodes.

@@ -51,9 +51,15 @@ lazy_static! {
     };
 }
 
+/// A hostname:port address pair.
 #[derive(Clone, Debug, Eq)]
 pub struct StreamAddress {
+    /// The hostname of the address.
     pub hostname: String,
+
+    /// The port of the address.
+    ///
+    /// The default is 27017.
     pub port: Option<u16>,
 }
 
@@ -155,7 +161,7 @@ impl fmt::Display for StreamAddress {
     }
 }
 
-/// Contains the options that can be used to create a new Client.
+/// Contains the options that can be used to create a new [`Client`](../struct.Client.html).
 #[derive(Clone, Derivative, TypedBuilder)]
 #[derivative(Debug, PartialEq)]
 pub struct ClientOptions {
@@ -351,6 +357,8 @@ struct ClientOptionsParser {
     original_uri: String,
 }
 
+/// Specifies whether TLS configuration should be used with the operations that the
+/// [`Client`](../struct.Client.html) performs.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Tls {
     Enabled(TlsOptions),
@@ -369,14 +377,27 @@ impl From<TlsOptions> for Option<Tls> {
     }
 }
 
+/// Specifies the TLS configuration that the [`Client`](../struct.Client.html) should use.
 #[derive(Clone, Debug, Default, PartialEq, TypedBuilder)]
 pub struct TlsOptions {
+    /// Whether or not the [`Client`](../struct.Client.html) should return an error if the server
+    /// presents an invalid certificate. This setting should _not_ be set to `true` in
+    /// production; it should only be used for testing.
+    ///
+    /// The default value is to error when the server presents an invalid certificate.
     #[builder(default)]
     pub allow_invalid_certificates: Option<bool>,
 
+    /// The path to the CA file that the [`Client`](../struct.Client.html) should use for TLS. If
+    /// none is specified, then the driver will use the Mozilla root certificates from the
+    /// `webpki-roots` crate.
     #[builder(default)]
     pub ca_file_path: Option<String>,
 
+    /// The path to the certificate file that the [`Client`](../struct.Client.html) should present
+    /// to the server to verify its identify. If none is specified, then the
+    /// [`Client`](../struct.Client.html) will not attempt to verify its identity to the
+    /// server.
     #[builder(default)]
     pub cert_key_file_path: Option<String>,
 }

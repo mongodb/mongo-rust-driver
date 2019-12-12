@@ -1,3 +1,6 @@
+//! Contains the events and functionality to monitor the commands and responses that a `Client`
+//! sends and receives from the server.
+
 use std::time::Duration;
 
 use bson::Document;
@@ -18,7 +21,8 @@ pub struct CommandStartedEvent {
 
     /// The driver-generated identifier for the request. Applications can use this to identify the
     /// corresponding event triggered by the completion of this command (i.e. either
-    /// `CommandSucceededEvent` or `CommandFailedEvent`).
+    /// [`CommandSucceededEvent`](struct.CommandSucceededEvent.html) or
+    /// [`CommandFailedEvent`](struct.CommandFailedEvent.html)).
     pub request_id: i32,
 
     /// Information about the connect the command will be run on.
@@ -38,7 +42,8 @@ pub struct CommandSucceededEvent {
     pub command_name: String,
 
     /// The driver-generated identifier for the request. Applications can use this to identify the
-    /// corresponding `CommandStartedEvent` that triggered earlier.
+    /// corresponding [`CommandStartedEvent`](struct.CommandStartedEvent.html) that triggered
+    /// earlier.
     pub request_id: i32,
 
     /// Information about the connect the command will be run on.
@@ -58,7 +63,8 @@ pub struct CommandFailedEvent {
     pub failure: Error,
 
     /// The driver-generated identifier for the request. Applications can use this to identify the
-    /// corresponding `CommandStartedEvent` that triggered earlier.
+    /// corresponding [`CommandStartedEvent`](struct.CommandStartedEvent.html) that triggered
+    /// earlier.
     pub request_id: i32,
 
     /// Information about the connect the command will be run on.
@@ -101,15 +107,15 @@ pub struct CommandFailedEvent {
 /// # }
 /// ```
 pub trait CommandEventHandler: Send + Sync {
-    /// A `Client` will call this method on each registered handler whenever a database command is
-    /// initiated.
+    /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
+    /// whenever a database command is initiated.
     fn handle_command_started_event(&self, event: CommandStartedEvent) {}
 
-    /// A `Client` will call this method on each registered handler whenever a database command
-    /// successfully completes.
+    /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
+    /// whenever a database command successfully completes.
     fn handle_command_succeeded_event(&self, event: CommandSucceededEvent) {}
 
-    /// A `Client` will call this method on each registered handler whenever a database command
-    /// fails to complete successfully.
+    /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
+    /// whenever a database command fails to complete successfully.
     fn handle_command_failed_event(&self, event: CommandFailedEvent) {}
 }

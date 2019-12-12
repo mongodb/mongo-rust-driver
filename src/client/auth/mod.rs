@@ -1,3 +1,6 @@
+//! Contains the types needed to specify the auth configuration for a
+//! [`Client`](struct.Client.html).
+
 mod scram;
 #[cfg(test)]
 mod test;

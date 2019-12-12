@@ -38,9 +38,8 @@ const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 /// so it can safely be shared across threads. For example:
 ///
 /// ```rust
-/// 
 /// # use mongodb::{Client, error::Result};
-///
+/// #
 /// # fn start_workers() -> Result<()> {
 /// let client = Client::with_uri_str("mongodb://example.com")?;
 ///
@@ -78,7 +77,8 @@ impl Client {
     /// Creates a new `Client` connected to the cluster specified by `uri`. `uri` must be a valid
     /// MongoDB connection string.
     ///
-    /// See the documentation on ClientOptions::parse for more details.
+    /// See the documentation on
+    /// [`ClientOptions::parse`](options/struct.ClientOptions.html#method.parse) for more details.
     pub fn with_uri_str(uri: &str) -> Result<Self> {
         let options = ClientOptions::parse(uri)?;
 
@@ -104,17 +104,17 @@ impl Client {
         }
     }
 
-    /// Gets the read preference of the `Client`.
+    /// Gets the default selection criteria the `Client` uses for operations..
     pub fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         self.inner.options.selection_criteria.as_ref()
     }
 
-    /// Gets the read concern of the `Client`.
+    /// Gets the default read concern the `Client` uses for operations.
     pub fn read_concern(&self) -> Option<&ReadConcern> {
         self.inner.options.read_concern.as_ref()
     }
 
-    /// Gets the write concern of the `Client`.
+    /// Gets the default write concern the `Client` uses for operations.
     pub fn write_concern(&self) -> Option<&WriteConcern> {
         self.inner.options.write_concern.as_ref()
     }
@@ -139,11 +139,13 @@ impl Client {
         Database::new(self.clone(), name, Some(options))
     }
 
+    /// Gets information about each database present in the cluster the Client is connected to.
     pub fn list_databases(&self, filter: impl Into<Option<Document>>) -> Result<Vec<Document>> {
         let op = ListDatabases::new(filter.into(), false);
         self.execute_operation(&op, None)
     }
 
+    /// Gets the names of the databases present in the cluster the Client is connected to.
     pub fn list_database_names(&self, filter: impl Into<Option<Document>>) -> Result<Vec<String>> {
         let op = ListDatabases::new(filter.into(), true);
         match self.execute_operation(&op, None) {

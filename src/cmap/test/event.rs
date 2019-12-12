@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 
 use serde::{de::Unexpected, Deserialize, Deserializer};
 
-use crate::event::cmap::*;
+use crate::{event::cmap::*, options::StreamAddress};
 
 #[derive(Clone, Debug)]
 pub struct EventHandler {

@@ -12,8 +12,8 @@ use crate::{
     selection_criteria::SelectionCriteria,
 };
 
-/// These are the valid options for creating a `Collection` with
-/// `Database::collection_with_options`.
+/// These are the valid options for creating a [`Collection`](../struct.Collection.html) with
+/// [`Database::collection_with_options`](../struct.Database.html#method.collection_with_options).
 #[derive(Debug, Default, TypedBuilder)]
 pub struct CollectionOptions {
     /// The default read preference for operations.
@@ -29,7 +29,9 @@ pub struct CollectionOptions {
     pub write_concern: Option<WriteConcern>,
 }
 
-/// Specifies whether a `Collection::find_one_and_replace` and `Collection::find_one_and_update`
+/// Specifies whether a
+/// [`Collection::find_one_and_replace`](../struct.Collection.html#method.find_one_and_replace) and
+/// [`Collection::find_one_and_update`](../struct.Collection.html#method.find_one_and_update)
 /// operation should return the document before or after modification.
 #[derive(Debug)]
 pub enum ReturnDocument {
@@ -73,7 +75,8 @@ pub enum CursorType {
     TailableAwait,
 }
 
-/// Specifies the options to a `Collection::insert_one` operation.
+/// Specifies the options to a
+/// [`Collection::insert_one`](../struct.Collection.html#method.insert_one) operation.
 #[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct InsertOneOptions {
     /// Opt out of document-level validation.
@@ -85,7 +88,8 @@ pub struct InsertOneOptions {
     pub write_concern: Option<WriteConcern>,
 }
 
-/// Specifies the options to a `Collection::insert_many` operation.
+/// Specifies the options to a
+/// [`Collection::insert_many`](../struct.Collection.html#method.insert_many) operation.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Default, TypedBuilder, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -154,7 +158,9 @@ impl From<Vec<Document>> for UpdateModifications {
     }
 }
 
-/// Specifies the options to a `Collection::update_one` or `Collection::update_many` operation.
+/// Specifies the options to a
+/// [`Collection::update_one`](../struct.Collection.html#method.update_one) or
+/// [`Collection::update_many`](../struct.Collection.html#method.update_many) operation.
 #[derive(Debug, Default, TypedBuilder)]
 pub struct UpdateOptions {
     /// A set of filters specifying to which array elements an update should apply.
@@ -204,7 +210,8 @@ impl UpdateOptions {
     }
 }
 
-/// Specifies the options to a `Collection::replace_one` operation.
+/// Specifies the options to a
+/// [`Collection::replace_one`](../struct.Collection.html#method.replace_one) operation.
 #[derive(Debug, Default, TypedBuilder)]
 pub struct ReplaceOptions {
     /// Opt out of document-level validation.
@@ -233,7 +240,9 @@ pub struct ReplaceOptions {
     pub write_concern: Option<WriteConcern>,
 }
 
-/// Specifies the options to a `Collection::delete_one` or `Collection::delete_many` operation.
+/// Specifies the options to a
+/// [`Collection::delete_one`](../struct.Collection.html#method.delete_one) or
+/// [`Collection::delete_many`](../struct.Collection.html#method.delete_many) operation.
 #[serde_with::skip_serializing_none]
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -250,7 +259,9 @@ pub struct DeleteOptions {
     pub write_concern: Option<WriteConcern>,
 }
 
-/// Specifies the options to a `Collection::find_one_and_delete` operation.
+/// Specifies the options to a
+/// [`Collection::find_one_and_delete`](../struct.Collection.html#method.find_one_and_delete)
+/// operation.
 #[derive(Debug, Default, TypedBuilder)]
 pub struct FindOneAndDeleteOptions {
     /// The maximum amount of time to allow the query to run.
@@ -280,7 +291,9 @@ pub struct FindOneAndDeleteOptions {
     pub collation: Option<Collation>,
 }
 
-/// Specifies the options to a `Collection::find_one_and_replace` operation.
+/// Specifies the options to a
+/// [`Collection::find_one_and_replace`](../struct.Collection.html#method.find_one_and_replace)
+/// operation.
 #[derive(Debug, Default, TypedBuilder)]
 pub struct FindOneAndReplaceOptions {
     /// Opt out of document-level validation.
@@ -322,13 +335,16 @@ pub struct FindOneAndReplaceOptions {
     pub collation: Option<Collation>,
 }
 
-/// Specifies the options to a `Collection::find_one_and_update` operation.
+/// Specifies the options to a
+/// [`Collection::find_one_and_update`](../struct.Collection.html#method.find_one_and_update)
+/// operation.
 #[derive(Debug, Default, TypedBuilder)]
 pub struct FindOneAndUpdateOptions {
     /// A set of filters specifying to which array elements an update should apply.
     ///
     /// See the documentation [here](https://docs.mongodb.com/manual/reference/command/update/) for
-    /// more information on array filters.#[builder(default)]
+    /// more information on array filters.
+    #[builder(default)]
     pub array_filters: Option<Vec<Document>>,
 
     /// Opt out of document-level validation.
@@ -370,7 +386,8 @@ pub struct FindOneAndUpdateOptions {
     pub collation: Option<Collation>,
 }
 
-/// Specifies the options to a `Collection::aggregate` operation.
+/// Specifies the options to a [`Collection::aggregate`](../struct.Collection.html#method.aggregate)
+/// operation.
 #[skip_serializing_none]
 #[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
@@ -452,7 +469,8 @@ pub struct AggregateOptions {
     pub write_concern: Option<WriteConcern>,
 }
 
-/// Specifies the options to a `Collection::count_documents` operation.
+/// Specifies the options to a
+/// [`Collection::count_documents`](../struct.Collection.html#method.count_documents) operation.
 #[derive(Debug, Default, TypedBuilder)]
 pub struct CountOptions {
     /// The index to use for the operation.
@@ -482,7 +500,13 @@ pub struct CountOptions {
     pub collation: Option<Collation>,
 }
 
-/// Specifies the options to a `Collection::estimated_document_count` operation.
+// rustfmt tries to split the link up when it's all on one line, which breaks the link, so we wrap
+// the link contents in whitespace to get it to render correctly.
+//
+/// Specifies the options to a
+/// [
+///  `Collection::estimated_document_count`
+/// ](../struct.Collection.html#method.estimated_document_count) operation.
 #[serde_with::skip_serializing_none]
 #[derive(Debug, Default, TypedBuilder, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -498,16 +522,20 @@ pub struct EstimatedDocumentCountOptions {
     )]
     pub max_time: Option<Duration>,
 
+    /// The criteria used to select a server for this operation.
+    ///
+    /// If none specified, the default set on the collection will be used.
     #[builder(default)]
     #[serde(skip_serializing)]
     pub selection_criteria: Option<SelectionCriteria>,
 
-    /// The level of the read concern
+    /// The level of the read concern.
     #[builder(default)]
     pub read_concern: Option<ReadConcern>,
 }
 
-/// Specifies the options to a `Collection::distinct` operation.
+/// Specifies the options to a [`Collection::distinct`](../struct.Collection.html#method.distinct)
+/// operation.
 #[serde_with::skip_serializing_none]
 #[derive(Debug, Default, TypedBuilder, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -523,11 +551,14 @@ pub struct DistinctOptions {
     )]
     pub max_time: Option<Duration>,
 
+    /// The criteria used to select a server for this operation.
+    ///
+    /// If none specified, the default set on the collection will be used.
     #[builder(default)]
     #[serde(skip_serializing)]
     pub selection_criteria: Option<SelectionCriteria>,
 
-    /// The level of the read concern
+    /// The level of the read concern.
     #[builder(default)]
     pub read_concern: Option<ReadConcern>,
 
@@ -539,7 +570,8 @@ pub struct DistinctOptions {
     pub collation: Option<Collation>,
 }
 
-/// Specifies the options to a `Collection::find` operation.
+/// Specifies the options to a [`Collection::find`](../struct.Collection.html#method.find)
+/// operation.
 #[skip_serializing_none]
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -692,7 +724,8 @@ where
     }
 }
 
-/// Specifies the options to a `Collection::find_one` operation.
+/// Specifies the options to a [`Collection::find_one`](../struct.Collection.html#method.find_one)
+/// operation.
 #[derive(Debug, Default, TypedBuilder)]
 pub struct FindOneOptions {
     /// If true, partial results will be returned from a mongos rather than an error being
@@ -771,7 +804,8 @@ pub struct IndexModel {
     pub options: Option<Document>,
 }
 
-/// Specifies the options to a `Collection::drop` operation.
+/// Specifies the options to a [`Collection::drop`](../struct.Collection.html#method.drop)
+/// operation.
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DropCollectionOptions {
