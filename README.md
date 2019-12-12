@@ -93,7 +93,9 @@ for result in cursor {
     match result {
         Ok(document) => {
             if let Some(title) = document.get("title").and_then(Bson::as_str) {
-                println!("{}", title);
+                println!("title: {}", title);
+            }  else {
+                println!("no title found");
             }
         }
         Err(e) => return Err(e.into()),
