@@ -693,6 +693,7 @@ impl From<FindOneOptions> for FindOptions {
     fn from(options: FindOneOptions) -> Self {
         FindOptions {
             allow_partial_results: options.allow_partial_results,
+            collation: options.collation,
             comment: options.comment,
             hint: options.hint,
             max: options.max,
@@ -705,7 +706,12 @@ impl From<FindOneOptions> for FindOptions {
             selection_criteria: options.selection_criteria,
             show_record_id: options.show_record_id,
             skip: options.skip,
-            ..Default::default()
+            batch_size: None,
+            cursor_type: None,
+            limit: None,
+            max_await_time: None,
+            no_cursor_timeout: None,
+            sort: None,
         }
     }
 }
@@ -732,6 +738,13 @@ pub struct FindOneOptions {
     /// returned if one or more shards is down.
     #[builder(default)]
     pub allow_partial_results: Option<bool>,
+
+    /// The collation to use for the operation.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub collation: Option<Collation>,
 
     /// Tags the query with an arbitrary string to help trace the operation through the database
     /// profiler, currentOp and logs.
