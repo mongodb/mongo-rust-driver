@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, time::Duration};
 
-use bson::Document;
+use bson::{bson, doc, Document};
 
 use crate::{error::Result, operation::GetMore, options::StreamAddress, Client, Namespace};
 
@@ -81,6 +81,24 @@ impl Cursor {
             get_more,
             exhausted: spec.id == 0,
         }
+    }
+}
+
+impl Drop for Cursor {
+    fn drop(&mut self) {
+        if self.exhausted {
+            return;
+        }
+
+        let namespace = self.get_more.namespace();
+
+        let _ = self.client.database(&namespace.db).run_command(
+            doc! {
+                "killCursors": &namespace.coll,
+                "cursors": [self.get_more.cursor_id()]
+            },
+            None,
+        );
     }
 }
 
