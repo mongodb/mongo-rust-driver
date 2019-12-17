@@ -32,6 +32,7 @@ use crate::{
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::{ErrorKind, Result},
     event::{cmap::CmapEventHandler, command::CommandEventHandler},
+    sdam::MIN_HEARTBEAT_FREQUENCY,
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
     srv::SrvResolver,
 };
@@ -1092,7 +1093,7 @@ impl ClientOptionsParser {
             k @ "heartbeatfrequencyms" => {
                 let duration = get_duration!(value, k);
 
-                if duration < 500 {
+                if duration < MIN_HEARTBEAT_FREQUENCY.num_milliseconds() as u64 {
                     return Err(ErrorKind::ArgumentError {
                         message: format!(
                             "'heartbeatFrequencyMS' must be at least 500, but {} was given",

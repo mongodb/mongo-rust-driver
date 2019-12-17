@@ -61,11 +61,14 @@ impl Server {
         self.topology.upgrade()
     }
 
-    pub(crate) fn wait_timeout(&self, duration: Duration) {
-        let _ = self
-            .condvar
+    /// Waits until either the server is requested to do a topology check or until `duration` has
+    /// elapsed. Returns `true` if `duration` has elapsed and `false` otherwise.
+    pub(crate) fn wait_timeout(&self, duration: Duration) -> bool {
+        self.condvar
             .wait_timeout(self.condvar_mutex.lock().unwrap(), duration)
-            .unwrap();
+            .unwrap()
+            .1
+            .timed_out()
     }
 
     pub(crate) fn request_topology_check(&self) {
