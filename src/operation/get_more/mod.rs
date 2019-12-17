@@ -57,6 +57,14 @@ impl GetMore {
             max_time,
         }
     }
+
+    pub(crate) fn namespace(&self) -> &Namespace {
+        &self.ns
+    }
+
+    pub(crate) fn cursor_id(&self) -> i64 {
+        self.cursor_id
+    }
 }
 
 impl Operation for GetMore {

@@ -1,8 +1,13 @@
 use bson::{bson, doc, Bson};
 
 use crate::{
-    options::{AggregateOptions, UpdateOptions},
-    test::{util::drop_collection, CLIENT, LOCK},
+    event::command::CommandStartedEvent,
+    options::{AggregateOptions, FindOptions, UpdateOptions},
+    test::{
+        util::{drop_collection, CommandEvent, EventClient},
+        CLIENT,
+        LOCK,
+    },
 };
 
 #[test]
@@ -143,4 +148,74 @@ fn aggregate_out() {
         .unwrap()
         .into_iter()
         .any(|name| name.as_str() == out_coll.name()));
+}
+
+fn kill_cursors_sent(client: &EventClient) -> bool {
+    client
+        .command_events
+        .read()
+        .unwrap()
+        .iter()
+        .any(|event| match event {
+            CommandEvent::CommandStartedEvent(CommandStartedEvent { command_name, .. }) => {
+                command_name == "killCursors"
+            }
+            _ => false,
+        })
+}
+
+#[test]
+#[function_name::named]
+fn kill_cursors_on_drop() {
+    let _guard = LOCK.run_concurrently();
+
+    let db = CLIENT.database(function_name!());
+    let coll = db.collection(function_name!());
+
+    drop_collection(&coll);
+
+    coll.insert_many(vec![doc! { "x": 1 }, doc! { "x": 2 }], None)
+        .unwrap();
+
+    let event_client = EventClient::new();
+    let coll = event_client
+        .database(function_name!())
+        .collection(function_name!());
+
+    let cursor = coll
+        .find(None, FindOptions::builder().batch_size(1).build())
+        .unwrap();
+
+    assert!(!kill_cursors_sent(&event_client));
+
+    std::mem::drop(cursor);
+
+    assert!(kill_cursors_sent(&event_client));
+}
+
+#[test]
+#[function_name::named]
+fn no_kill_cursors_on_exhausted() {
+    let _guard = LOCK.run_concurrently();
+
+    let db = CLIENT.database(function_name!());
+    let coll = db.collection(function_name!());
+
+    drop_collection(&coll);
+
+    coll.insert_many(vec![doc! { "x": 1 }, doc! { "x": 2 }], None)
+        .unwrap();
+
+    let event_client = EventClient::new();
+    let coll = event_client
+        .database(function_name!())
+        .collection(function_name!());
+
+    let cursor = coll.find(None, FindOptions::builder().build()).unwrap();
+
+    assert!(!kill_cursors_sent(&event_client));
+
+    std::mem::drop(cursor);
+
+    assert!(!kill_cursors_sent(&event_client));
 }
