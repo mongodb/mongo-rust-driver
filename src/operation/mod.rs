@@ -70,7 +70,6 @@ pub(crate) trait Operation {
 
 /// Appends a serializable struct to the input document.
 /// The serializable struct MUST serialize to a Document, otherwise an error will be thrown.
-#[allow(dead_code)]
 pub(crate) fn append_options<T: Serialize>(doc: &mut Document, options: Option<&T>) -> Result<()> {
     match options {
         Some(options) => {

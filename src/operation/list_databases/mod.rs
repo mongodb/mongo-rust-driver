@@ -22,7 +22,7 @@ impl ListDatabases {
         ListDatabases { filter, name_only }
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) fn empty() -> Self {
         ListDatabases {
             filter: None,

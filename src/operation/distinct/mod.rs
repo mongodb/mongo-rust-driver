@@ -34,7 +34,7 @@ impl Distinct {
         }
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) fn empty() -> Self {
         Distinct {
             ns: Namespace {

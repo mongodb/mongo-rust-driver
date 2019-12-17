@@ -7,7 +7,7 @@ mod test;
 
 use std::{borrow::Cow, str::FromStr};
 
-use bson::{Bson, Document};
+use bson::Document;
 use rand::Rng;
 use typed_builder::TypedBuilder;
 
@@ -198,8 +198,10 @@ pub struct Credential {
 }
 
 impl Credential {
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) fn into_document(mut self) -> Document {
+        use bson::Bson;
+
         let mut doc = Document::new();
 
         if let Some(s) = self.username.take() {

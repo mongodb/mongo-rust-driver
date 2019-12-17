@@ -166,17 +166,14 @@ impl Client {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn send_command_started_event(&self, event: CommandStartedEvent) {
         self.emit_command_event(|handler| handler.handle_command_started_event(event.clone()));
     }
 
-    #[allow(dead_code)]
     pub(crate) fn send_command_succeeded_event(&self, event: CommandSucceededEvent) {
         self.emit_command_event(|handler| handler.handle_command_succeeded_event(event.clone()));
     }
 
-    #[allow(dead_code)]
     pub(crate) fn send_command_failed_event(&self, event: CommandFailedEvent) {
         self.emit_command_event(|handler| handler.handle_command_failed_event(event.clone()));
     }

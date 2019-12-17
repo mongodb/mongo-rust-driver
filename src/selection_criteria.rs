@@ -48,7 +48,7 @@ impl SelectionCriteria {
         }
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) fn as_predicate(&self) -> Option<&Predicate> {
         match self {
             Self::Predicate(ref p) => Some(p),

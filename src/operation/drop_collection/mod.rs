@@ -22,7 +22,7 @@ impl DropCollection {
         DropCollection { ns, options }
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     fn empty() -> Self {
         Self::new(
             Namespace {
