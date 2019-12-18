@@ -48,7 +48,8 @@ impl Stream {
         let inner = if timeout == Duration::from_secs(0) {
             TcpStream::connect(&host)?
         } else {
-            let socket_addrs: Vec<_> = host.to_socket_addrs()?.collect();
+            let mut socket_addrs: Vec<_> = host.to_socket_addrs()?.collect();
+            socket_addrs.sort_by_key(|addr| if addr.is_ipv4() { 0 } else { 1 });
 
             TcpStream::connect_timeout(&socket_addrs[0], timeout)?
         };
