@@ -1,3 +1,4 @@
+mod batch;
 pub mod options;
 
 use std::{fmt, sync::Arc};
@@ -9,7 +10,7 @@ use self::options::*;
 use crate::{
     bson_util,
     concern::{ReadConcern, WriteConcern},
-    error::{convert_bulk_errors, ErrorKind, Result},
+    error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, ErrorKind, Result},
     operation::{
         Aggregate,
         Count,
@@ -27,6 +28,11 @@ use crate::{
     Cursor,
     Database,
 };
+
+/// Maximum size in bytes of an insert batch.
+/// This is intentionally less than the actual max document size, which is 16*1024*1024 bytes, to
+/// allow for overhead in the command document.
+const MAX_INSERT_DOCS_BYTES: usize = 16 * 1000 * 1000;
 
 /// `Collection` is the client-side abstraction of a MongoDB Collection. It can be used to
 /// perform collection-level operations such as CRUD operations. A `Collection` can be obtained
@@ -382,8 +388,70 @@ impl Collection {
         let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
-        let insert = Insert::new(self.namespace(), docs.into_iter().collect(), options);
-        self.client().execute_operation(&insert, None)
+        let mut docs: Vec<Document> = docs.into_iter().collect();
+
+        let ordered = options.as_ref().and_then(|o| o.ordered).unwrap_or(true);
+
+        let mut cumulative_failure: Option<BulkWriteFailure> = None;
+        let mut cumulative_result: Option<InsertManyResult> = None;
+
+        let mut n_attempted = 0;
+
+        while !docs.is_empty() {
+            let mut remaining_docs =
+                batch::split_off_batch(&mut docs, MAX_INSERT_DOCS_BYTES, bson_util::doc_size_bytes);
+            std::mem::swap(&mut docs, &mut remaining_docs);
+            let current_batch = remaining_docs;
+
+            let current_batch_size = current_batch.len();
+            n_attempted += current_batch_size;
+
+            let insert = Insert::new(self.namespace(), current_batch, options.clone());
+            match self.client().execute_operation(&insert, None) {
+                Ok(result) => {
+                    if cumulative_failure.is_none() {
+                        let cumulative_result =
+                            cumulative_result.get_or_insert_with(InsertManyResult::new);
+                        for (index, id) in result.inserted_ids {
+                            cumulative_result
+                                .inserted_ids
+                                .insert(index + n_attempted - current_batch_size, id);
+                        }
+                    }
+                }
+                Err(e) => match e.kind.as_ref() {
+                    ErrorKind::BulkWriteError(failure) => {
+                        let failure_ref =
+                            cumulative_failure.get_or_insert_with(BulkWriteFailure::new);
+                        if let Some(ref write_errors) = failure.write_errors {
+                            failure_ref
+                                .write_errors
+                                .get_or_insert_with(Default::default)
+                                .extend(write_errors.iter().map(|error| BulkWriteError {
+                                    index: error.index + n_attempted - current_batch_size,
+                                    ..error.clone()
+                                }));
+                        }
+                        if let Some(ref write_concern_error) = failure.write_concern_error {
+                            failure_ref.write_concern_error = Some(write_concern_error.clone());
+                        }
+
+                        if ordered {
+                            return Err(ErrorKind::BulkWriteError(
+                                cumulative_failure.unwrap_or_else(BulkWriteFailure::new),
+                            )
+                            .into());
+                        }
+                    }
+                    _ => return Err(e),
+                },
+            }
+        }
+
+        match cumulative_failure {
+            Some(failure) => Err(ErrorKind::BulkWriteError(failure).into()),
+            None => Ok(cumulative_result.unwrap_or_else(InsertManyResult::new)),
+        }
     }
 
     /// Inserts `doc` into the collection.
