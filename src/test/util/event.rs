@@ -80,7 +80,6 @@ impl CommandEventHandler for EventHandler {
 
 pub struct EventClient {
     client: TestClient,
-    #[allow(dead_code)]
     pub command_events: EventQueue<CommandEvent>,
     pub pool_cleared_events: EventQueue<PoolClearedEvent>,
 }

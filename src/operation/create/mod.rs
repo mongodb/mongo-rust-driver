@@ -18,7 +18,7 @@ pub(crate) struct Create {
 }
 
 impl Create {
-    #[allow(dead_code)]
+    #[cfg(test)]
     fn empty() -> Self {
         Self::new(
             Namespace {

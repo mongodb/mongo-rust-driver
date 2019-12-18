@@ -48,7 +48,6 @@ impl Client {
     /// Execute the given operation, optionally specifying a connection used to do so.
     /// If no connection is provided, server selection will performed using the criteria specified
     /// on the operation, if any.
-    #[allow(dead_code)]
     pub(crate) fn execute_operation<T: Operation>(
         &self,
         op: &T,

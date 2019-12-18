@@ -22,7 +22,7 @@ impl Count {
         Count { ns, options }
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) fn empty() -> Self {
         Count {
             ns: Namespace {

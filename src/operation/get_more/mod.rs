@@ -25,23 +25,6 @@ pub(crate) struct GetMore {
 }
 
 impl GetMore {
-    #[allow(dead_code)]
-    fn empty() -> Self {
-        Self::new(
-            Namespace {
-                db: String::new(),
-                coll: String::new(),
-            },
-            0,
-            StreamAddress {
-                hostname: String::new(),
-                port: None,
-            },
-            None,
-            None,
-        )
-    }
-
     pub(crate) fn new(
         ns: Namespace,
         cursor_id: i64,

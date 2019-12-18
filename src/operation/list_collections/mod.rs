@@ -20,7 +20,7 @@ pub(crate) struct ListCollections {
 }
 
 impl ListCollections {
-    #[allow(dead_code)]
+    #[cfg(test)]
     fn empty() -> Self {
         Self::new(String::new(), None, false, None)
     }

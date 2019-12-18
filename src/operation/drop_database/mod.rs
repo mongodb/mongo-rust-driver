@@ -17,7 +17,7 @@ pub(crate) struct DropDatabase {
 }
 
 impl DropDatabase {
-    #[allow(dead_code)]
+    #[cfg(test)]
     fn empty() -> Self {
         Self::new(String::new(), None)
     }
