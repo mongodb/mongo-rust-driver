@@ -4,9 +4,9 @@ pub(crate) fn split_off_batch<T>(
     all: &mut Vec<T>,
     max_batch_size: usize,
     get_size: impl Fn(&T) -> usize,
-) -> Option<Vec<T>> {
+) -> Vec<T> {
     if all.is_empty() {
-        return None;
+        return Vec::new();
     }
 
     let mut batch_size = get_size(&all[0]);
@@ -15,13 +15,13 @@ pub(crate) fn split_off_batch<T>(
         let elem_size = get_size(&all[i]);
 
         if batch_size + elem_size > max_batch_size {
-            return Some(all.split_off(i));
+            return all.split_off(i);
         }
 
         batch_size += elem_size;
     }
 
-    None
+    Vec::new()
 }
 
 #[cfg(test)]
@@ -32,14 +32,14 @@ mod test {
     fn split_empty_batch() {
         let mut all: Vec<i32> = Vec::new();
 
-        assert!(split_off_batch(&mut all, 10, |_| 1).is_none());
+        assert!(split_off_batch(&mut all, 10, |_| 1).is_empty());
     }
 
     #[test]
     fn split_single_batch() {
         let mut all = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-        assert!(split_off_batch(&mut all, 10, |_| 1).is_none());
+        assert!(split_off_batch(&mut all, 10, |_| 1).is_empty());
     }
 
     #[test]
@@ -48,15 +48,19 @@ mod test {
         let rest = split_off_batch(&mut all, 3, |_| 1);
 
         assert_eq!(all, vec![1, 2, 3]);
-        assert_eq!(rest, Some(vec![4, 5, 6, 7, 8, 9, 10]));
+        assert_eq!(rest, vec![4, 5, 6, 7, 8, 9, 10]);
     }
 
     #[test]
-    fn split_batches_until_none() {
+    fn split_batches_until_empty() {
         let mut batches = Vec::new();
         let mut all = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-        while let Some(batch) = split_off_batch(&mut all, 3, |_| 1) {
+        loop {
+            let batch = split_off_batch(&mut all, 3, |_| 1);
+            if batch.is_empty() {
+                break;
+            }
             batches.push(std::mem::replace(&mut all, batch));
         }
 
@@ -73,6 +77,6 @@ mod test {
         let rest = split_off_batch(&mut all, 3, |_| 5);
 
         assert_eq!(all, vec![1]);
-        assert_eq!(rest, Some(vec![2, 3, 4, 5, 6, 7, 8, 9, 10]));
+        assert_eq!(rest, vec![2, 3, 4, 5, 6, 7, 8, 9, 10]);
     }
 }

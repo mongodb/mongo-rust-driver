@@ -207,7 +207,7 @@ fn num_decimal_digits(n: usize) -> usize {
 
 #[cfg(test)]
 mod test {
-    use bson::{oid::ObjectId, spec::BinarySubtype, Bson};
+    use bson::{bson, doc, oid::ObjectId, spec::BinarySubtype, Bson};
     use chrono::{DateTime, NaiveDateTime, Utc};
 
     use super::doc_size_bytes;
