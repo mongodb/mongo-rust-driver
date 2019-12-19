@@ -164,7 +164,7 @@ impl Collection {
             [read_concern, write_concern, selection_criteria]
         );
 
-        let aggregate = Aggregate::new(self.namespace().clone(), pipeline, options);
+        let aggregate = Aggregate::new(self.namespace(), pipeline, options);
         let client = self.client();
         client
             .execute_operation(&aggregate, None)
@@ -536,7 +536,7 @@ impl<'de> Deserialize<'de> for Namespace {
         match (db, coll) {
             (Some(db), coll) if !coll.is_empty() => Ok(Self {
                 db: db.to_string(),
-                coll: coll.to_string(),
+                coll,
             }),
             _ => Err(D::Error::custom("Missing one or more fields in namespace")),
         }

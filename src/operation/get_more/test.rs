@@ -19,7 +19,7 @@ fn build_test(
     max_time: Option<Duration>,
     mut expected_body: Document,
 ) {
-    let get_more = GetMore::new(ns.clone(), cursor_id, address.clone(), batch_size, max_time);
+    let get_more = GetMore::new(ns.clone(), cursor_id, address, batch_size, max_time);
 
     let build_result = get_more.build(&StreamDescription::new_testing());
     assert!(build_result.is_ok());
@@ -58,7 +58,7 @@ fn build() {
     build_test(
         ns,
         cursor_id,
-        address.clone(),
+        address,
         Some(batch_size),
         Some(max_time),
         expected_body,
@@ -97,7 +97,7 @@ fn build_batch_size() {
         None,
         doc! {
             "getMore": cursor_id,
-            "collection": ns.coll.clone(),
+            "collection": ns.coll,
             "batchSize": 123,
         },
     );

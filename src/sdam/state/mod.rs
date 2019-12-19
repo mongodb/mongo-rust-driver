@@ -133,7 +133,7 @@ impl Topology {
             address.clone(),
             &options,
         ));
-        self.servers.insert(address.clone(), server.clone());
+        self.servers.insert(address, server.clone());
 
         let conn = Connection::new(
             0,

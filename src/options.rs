@@ -9,12 +9,10 @@
 //! ```rust
 //! # use mongodb::options::FindOptions;
 //! #
-//! # fn main() {
-//! let options = FindOptions::builder()
-//!                   .limit(20)
-//!                   .batch_size(5)
-//!                   .build();
-//! # }
+//! # let options = FindOptions::builder()
+//! #                   .limit(20)
+//! #                   .batch_size(5)
+//! #                   .build();
 //! ```
 
 pub use crate::{

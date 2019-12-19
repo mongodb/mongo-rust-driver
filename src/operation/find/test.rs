@@ -110,12 +110,7 @@ fn build_cursor_type() {
         "awaitData": true,
     };
 
-    build_test(
-        ns.clone(),
-        None,
-        Some(tailable_await_options),
-        tailable_await_body,
-    );
+    build_test(ns, None, Some(tailable_await_options), tailable_await_body);
 }
 
 #[test]
@@ -135,7 +130,7 @@ fn build_max_await_time() {
         "maxTimeMS": 10 as i64
     };
 
-    build_test(ns.clone(), None, Some(options), body);
+    build_test(ns, None, Some(options), body);
 }
 
 #[test]
@@ -162,7 +157,7 @@ fn build_limit() {
         "singleBatch": true
     };
 
-    build_test(ns.clone(), None, Some(negative_options), negative_body);
+    build_test(ns, None, Some(negative_options), negative_body);
 }
 
 #[test]
@@ -233,7 +228,7 @@ fn handle_success() {
     );
 
     let find = Find::new(
-        ns.clone(),
+        ns,
         None,
         Some(FindOptions::builder().batch_size(123).build()),
     );

@@ -160,7 +160,7 @@ impl FromStr for AuthMechanism {
             GSSAPI_STR => Ok(AuthMechanism::Gssapi),
             PLAIN_STR => Ok(AuthMechanism::Plain),
             _ => Err(ErrorKind::ArgumentError {
-                message: format!("invalid mechanism string: {}", str).to_string(),
+                message: format!("invalid mechanism string: {}", str),
             }
             .into()),
         }

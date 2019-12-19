@@ -58,7 +58,7 @@ fn build_with_filter() {
         doc! {
             "listDatabases": 1,
             "nameOnly": false,
-            "filter": Bson::Document(filter.clone())
+            "filter": Bson::Document(filter)
         }
     );
     assert_eq!(list_databases_command.target_db, "admin");

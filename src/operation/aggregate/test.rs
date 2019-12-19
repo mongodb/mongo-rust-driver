@@ -21,7 +21,7 @@ fn build_test(
 ) {
     let target = target.into();
 
-    let aggregate = Aggregate::new(target.clone(), pipeline.clone(), options);
+    let aggregate = Aggregate::new(target.clone(), pipeline, options);
 
     let mut cmd = aggregate.build(&StreamDescription::new_testing()).unwrap();
 
@@ -94,7 +94,7 @@ fn build_batch_size() {
     expected_body.insert("cursor", doc! { "batchSize": 5 });
     build_test(
         ns.clone(),
-        pipeline.clone(),
+        pipeline,
         Some(batch_size_options.clone()),
         expected_body.clone(),
     );
@@ -211,7 +211,7 @@ fn handle_success() {
     );
 
     let aggregate = Aggregate::new(
-        ns.clone(),
+        ns,
         Vec::new(),
         Some(
             AggregateOptions::builder()
