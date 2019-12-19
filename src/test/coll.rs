@@ -376,3 +376,22 @@ fn large_insert_ordered_with_errors() {
         e => panic!("expected bulk write error, got {:?} instead", e),
     }
 }
+
+#[test]
+#[function_name::named]
+fn empty_insert() {
+    let _guard = LOCK.run_concurrently();
+
+    let coll = CLIENT
+        .database(function_name!())
+        .collection(function_name!());
+    match coll
+        .insert_many(Vec::new(), None)
+        .expect_err("should get error")
+        .kind
+        .as_ref()
+    {
+        ErrorKind::ArgumentError { .. } => {}
+        e => panic!("expected argument error, got {:?}", e),
+    };
+}

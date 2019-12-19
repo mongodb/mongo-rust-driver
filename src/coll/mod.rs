@@ -390,6 +390,13 @@ impl Collection {
 
         let mut docs: Vec<Document> = docs.into_iter().collect();
 
+        if docs.is_empty() {
+            return Err(ErrorKind::ArgumentError {
+                message: "No documents provided to insert_many".to_string(),
+            }
+            .into());
+        }
+
         let ordered = options.as_ref().and_then(|o| o.ordered).unwrap_or(true);
 
         let mut cumulative_failure: Option<BulkWriteFailure> = None;
