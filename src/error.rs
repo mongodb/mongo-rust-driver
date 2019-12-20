@@ -305,7 +305,7 @@ pub struct WriteError {
 #[derive(Debug, PartialEq, Clone, Deserialize)]
 pub struct BulkWriteError {
     /// Index into the list of operations that this error corresponds to.
-    pub index: i32,
+    pub index: usize,
 
     /// Identifies the type of write concern error.
     pub code: i32,
@@ -330,6 +330,15 @@ pub struct BulkWriteFailure {
 
     /// The error that ocurred on account of write concern failure.
     pub write_concern_error: Option<WriteConcernError>,
+}
+
+impl BulkWriteFailure {
+    pub(crate) fn new() -> Self {
+        BulkWriteFailure {
+            write_errors: None,
+            write_concern_error: None,
+        }
+    }
 }
 
 /// An error that occurred when trying to execute a write operation.

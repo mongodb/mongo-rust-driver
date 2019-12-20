@@ -1,8 +1,10 @@
-use bson::{bson, doc, Bson};
+use bson::{bson, doc, Bson, Document};
+use lazy_static::lazy_static;
 
 use crate::{
+    error::ErrorKind,
     event::command::CommandStartedEvent,
-    options::{AggregateOptions, FindOptions, UpdateOptions},
+    options::{AggregateOptions, FindOptions, InsertManyOptions, UpdateOptions},
     test::{
         util::{drop_collection, CommandEvent, EventClient},
         CLIENT,
@@ -218,4 +220,178 @@ fn no_kill_cursors_on_exhausted() {
     std::mem::drop(cursor);
 
     assert!(!kill_cursors_sent(&event_client));
+}
+
+lazy_static! {
+    #[allow(clippy::unreadable_literal)]
+    static ref LARGE_DOC: Document = doc! {
+        "text": "the quick brown fox jumped over the lazy sheep dog",
+        "in_reply_to_status_id": 22213321312i64,
+        "retweet_count": Bson::Null,
+        "contributors": Bson::Null,
+        "created_at": ";lkasdf;lkasdfl;kasdfl;kasdkl;ffasdkl;fsadkl;fsad;lfk",
+        "geo": Bson::Null,
+        "source": "web",
+        "coordinates": Bson::Null,
+        "in_reply_to_screen_name": "sdafsdafsdaffsdafasdfasdfasdfasdfsadf",
+        "truncated": false,
+        "entities": {
+            "user_mentions": [
+                {
+                    "indices": [
+                        0,
+                        9
+                    ],
+                    "screen_name": "sdafsdaff",
+                    "name": "sadfsdaffsadf",
+                    "id": 1
+                }
+            ],
+            "urls": [],
+            "hashtags": []
+        },
+        "retweeted": false,
+        "place": Bson::Null,
+        "user": {
+            "friends_count": 123,
+            "profile_sidebar_fill_color": "7a7a7a",
+            "location": "sdafffsadfsdaf sdaf asdf asdf sdfsdfsdafsdaf asdfff sadf",
+            "verified": false,
+            "follow_request_sent": Bson::Null,
+            "favourites_count": 0,
+            "profile_sidebar_border_color": "a3a3a3",
+            "profile_image_url": "sadfkljajsdlkffajlksdfjklasdfjlkasdljkf asdjklffjlksadfjlksadfjlksdafjlksdaf",
+            "geo_enabled": false,
+            "created_at": "sadffasdffsdaf",
+            "description": "sdffasdfasdfasdfasdf",
+            "time_zone": "Mountain Time (US & Canada)",
+            "url": "sadfsdafsadf fsdaljk asjdklf lkjasdf lksadklfffsjdklafjlksdfljksadfjlk",
+            "screen_name": "adsfffasdf sdlk;fjjdsakfasljkddfjklasdflkjasdlkfjldskjafjlksadf",
+            "notifications": Bson::Null,
+            "profile_background_color": "303030",
+            "listed_count": 1,
+            "lang": "en"
+        }
+    };
+}
+
+#[test]
+#[function_name::named]
+fn large_insert() {
+    let _guard = LOCK.run_concurrently();
+
+    let docs = vec![LARGE_DOC.clone(); 35000];
+
+    let coll = CLIENT.init_db_and_coll(function_name!(), function_name!());
+    assert_eq!(
+        coll.insert_many(docs, None).unwrap().inserted_ids.len(),
+        35000
+    );
+}
+
+/// Returns a vector of documents that cannot be sent in one batch (35000 documents).
+/// Includes duplicate _id's across different batches.
+fn multibatch_documents_with_duplicate_keys() -> Vec<Document> {
+    let large_doc = LARGE_DOC.clone();
+
+    let mut docs: Vec<Document> = Vec::new();
+    docs.extend(vec![large_doc.clone(); 7498]);
+
+    docs.push(doc! { "_id": 1 });
+    docs.push(doc! { "_id": 1 }); // error in first batch, index 7499
+
+    docs.extend(vec![large_doc.clone(); 14999]);
+    docs.push(doc! { "_id": 1 }); // error in second batch, index 22499
+
+    docs.extend(vec![large_doc.clone(); 9999]);
+    docs.push(doc! { "_id": 1 }); // error in third batch, index 32499
+
+    docs.extend(vec![large_doc; 2500]);
+
+    assert_eq!(docs.len(), 35000);
+    docs
+}
+
+#[test]
+#[function_name::named]
+fn large_insert_unordered_with_errors() {
+    let _guard = LOCK.run_concurrently();
+
+    let docs = multibatch_documents_with_duplicate_keys();
+
+    let coll = CLIENT.init_db_and_coll(function_name!(), function_name!());
+    let options = InsertManyOptions::builder().ordered(false).build();
+
+    match coll
+        .insert_many(docs, options)
+        .expect_err("should get error")
+        .kind
+        .as_ref()
+    {
+        ErrorKind::BulkWriteError(ref failure) => {
+            let mut write_errors = failure
+                .write_errors
+                .clone()
+                .expect("should have write errors");
+            assert_eq!(write_errors.len(), 3);
+            write_errors.sort_by(|lhs, rhs| lhs.index.cmp(&rhs.index));
+
+            assert_eq!(write_errors[0].index, 7499);
+            assert_eq!(write_errors[1].index, 22499);
+            assert_eq!(write_errors[2].index, 32499);
+        }
+        e => panic!("expected bulk write error, got {:?} instead", e),
+    }
+}
+
+#[test]
+#[function_name::named]
+fn large_insert_ordered_with_errors() {
+    let _guard = LOCK.run_concurrently();
+
+    let docs = multibatch_documents_with_duplicate_keys();
+
+    let coll = CLIENT.init_db_and_coll(function_name!(), function_name!());
+    let options = InsertManyOptions::builder().ordered(true).build();
+
+    match coll
+        .insert_many(docs, options)
+        .expect_err("should get error")
+        .kind
+        .as_ref()
+    {
+        ErrorKind::BulkWriteError(ref failure) => {
+            let write_errors = failure
+                .write_errors
+                .clone()
+                .expect("should have write errors");
+            assert_eq!(write_errors.len(), 1);
+            assert_eq!(write_errors[0].index, 7499);
+            assert_eq!(
+                coll.count_documents(None, None)
+                    .expect("count should succeed"),
+                7499
+            );
+        }
+        e => panic!("expected bulk write error, got {:?} instead", e),
+    }
+}
+
+#[test]
+#[function_name::named]
+fn empty_insert() {
+    let _guard = LOCK.run_concurrently();
+
+    let coll = CLIENT
+        .database(function_name!())
+        .collection(function_name!());
+    match coll
+        .insert_many(Vec::new(), None)
+        .expect_err("should get error")
+        .kind
+        .as_ref()
+    {
+        ErrorKind::ArgumentError { .. } => {}
+        e => panic!("expected argument error, got {:?}", e),
+    };
 }
