@@ -150,7 +150,7 @@ impl Client {
             Err(error) => {
                 let command_failed_event = CommandFailedEvent {
                     duration,
-                    command_name: cmd.name.clone(),
+                    command_name: cmd.name,
                     failure: error.clone(),
                     request_id,
                     connection: connection_info,

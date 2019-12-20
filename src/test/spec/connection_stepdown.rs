@@ -41,7 +41,7 @@ fn run_test(name: &str, test: impl Fn(EventClient, Database, Collection)) {
         &name,
         Some(
             CreateCollectionOptions::builder()
-                .write_concern(wc_majority.clone())
+                .write_concern(wc_majority)
                 .build(),
         ),
     )

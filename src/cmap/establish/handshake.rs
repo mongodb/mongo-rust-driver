@@ -60,8 +60,8 @@ impl Handshaker {
     pub(super) fn new(options: Option<&ConnectionPoolOptions>) -> Self {
         let mut document = BASE_HANDSHAKE_DOCUMENT.clone();
 
-        if let Some(ref app_name) = options.as_ref().and_then(|opts| opts.app_name.as_ref()) {
-            document.insert("application", doc! { "name": app_name.to_string() });
+        if let Some(app_name) = options.as_ref().and_then(|opts| opts.app_name.as_ref()) {
+            document.insert("application", doc! { "name": app_name });
         }
 
         let mut db = "admin";

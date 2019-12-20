@@ -91,7 +91,7 @@ fn run() {
         }
 
         if let Some(mut parsed_options) = test_file.parsed_options {
-            parsed_options.db = resolved_db.clone();
+            parsed_options.db = resolved_db;
 
             let actual_options = options
                 .credential

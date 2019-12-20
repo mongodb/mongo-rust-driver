@@ -24,7 +24,7 @@ fn build() {
         distinct_command.body,
         doc! {
             "distinct": "test_coll",
-            "key": field_name.clone()
+            "key": field_name
         }
     );
     assert_eq!(distinct_command.target_db, "test_db");
@@ -47,8 +47,8 @@ fn build_with_query() {
         distinct_command.body,
         doc! {
             "distinct": "test_coll",
-            "key": field_name.clone(),
-            "query": Bson::Document(query.clone())
+            "key": field_name,
+            "query": Bson::Document(query)
         }
     );
     assert_eq!(distinct_command.target_db, "test_db");
@@ -73,7 +73,7 @@ fn build_with_options() {
         distinct_command.body,
         doc! {
             "distinct": "test_coll",
-            "key": field_name.clone(),
+            "key": field_name,
             "maxTimeMS": max_time.as_millis() as i64
         }
     );

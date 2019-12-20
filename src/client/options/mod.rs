@@ -631,7 +631,7 @@ fn percent_decode(s: &str, err_message: &str) -> Result<String> {
 fn validate_userinfo(s: &str, userinfo_type: &str) -> Result<()> {
     if s.chars().any(|c| USERINFO_RESERVED_CHARACTERS.contains(&c)) {
         return Err(ErrorKind::ArgumentError {
-            message: format!("{} must be URL encoded", userinfo_type).to_string(),
+            message: format!("{} must be URL encoded", userinfo_type),
         }
         .into());
     }

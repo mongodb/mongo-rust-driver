@@ -196,7 +196,7 @@ impl ReadPreference {
     }
 
     pub(crate) fn into_document(self) -> Document {
-        let (mode, tag_sets, max_staleness) = match self.clone() {
+        let (mode, tag_sets, max_staleness) = match self {
             ReadPreference::Primary => ("primary", None, None),
             ReadPreference::PrimaryPreferred {
                 tag_sets,

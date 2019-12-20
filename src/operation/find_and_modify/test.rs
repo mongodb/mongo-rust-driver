@@ -24,7 +24,7 @@ fn empty_delete() -> FindAndModify {
         coll: "test_coll".to_string(),
     };
     let filter = doc! {};
-    FindAndModify::with_delete(ns, filter.clone(), None)
+    FindAndModify::with_delete(ns, filter, None)
 }
 
 #[test]
@@ -120,7 +120,7 @@ fn empty_replace() -> FindAndModify {
     };
     let filter = doc! {};
     let replacement = doc! { "x": { "inc": 1 } };
-    FindAndModify::with_replace(ns, filter.clone(), replacement.clone(), None).unwrap()
+    FindAndModify::with_replace(ns, filter, replacement, None).unwrap()
 }
 
 #[test]
@@ -221,7 +221,7 @@ fn empty_update() -> FindAndModify {
     };
     let filter = doc! {};
     let update = UpdateModifications::Document(doc! { "$x": { "$inc": 1 } });
-    FindAndModify::with_update(ns, filter.clone(), update.clone(), None).unwrap()
+    FindAndModify::with_update(ns, filter, update, None).unwrap()
 }
 
 #[test]
