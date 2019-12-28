@@ -12,7 +12,7 @@ use crate::{
 
 /// These are the valid options for creating a [`Database`](../struct.Database.html) with
 /// [`Client::database_with_options`](../struct.Client.html#method.database_with_options).
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct DatabaseOptions {
     /// The default read preference for operations.
     #[builder(default)]
