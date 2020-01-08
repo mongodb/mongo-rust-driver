@@ -103,6 +103,10 @@ for result in cursor {
 }
 ```
 
+## Atlas note
+
+Currently, the driver has issues connecting to Atlas tiers above M2 unless the server version is at least 4.2. We're working on fixing this, but in the meantime, a workaround is to upgrade your cluster to 4.2. The driver has no known issues with either M0 or M2 instances.
+
 ## Bug Reporting / Feature Requests
 To file a bug report or submit a feature request, please open a ticket on our [Jira project](https://jira.mongodb.org/browse/RUST):
 - Create an account and login at [jira.mongodb.org](https://jira.mongodb.org)
