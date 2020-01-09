@@ -5,6 +5,7 @@ use std::{
     time::Duration,
 };
 
+use bufstream::BufStream;
 use derivative::Derivative;
 use webpki::DNSNameRef;
 
@@ -28,10 +29,13 @@ pub(super) enum Stream {
     Null,
 
     /// A basic TCP connection to the server.
-    Tcp(TcpStream),
+    Tcp(BufStream<TcpStream>),
 
     /// A TLS connection over TCP.
-    Tls(#[derivative(Debug = "ignore")] rustls::StreamOwned<rustls::ClientSession, TcpStream>),
+    Tls(
+        #[derivative(Debug = "ignore")]
+        rustls::StreamOwned<rustls::ClientSession, BufStream<TcpStream>>,
+    ),
 }
 
 impl Stream {
@@ -54,6 +58,7 @@ impl Stream {
             TcpStream::connect_timeout(&socket_addrs[0], timeout)?
         };
         inner.set_nodelay(true)?;
+        let inner = BufStream::new(inner);
 
         match tls_options {
             Some(cfg) => {
