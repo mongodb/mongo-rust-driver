@@ -34,7 +34,7 @@ pub(super) enum Stream {
     /// A TLS connection over TCP.
     Tls(
         #[derivative(Debug = "ignore")]
-        rustls::StreamOwned<rustls::ClientSession, BufStream<TcpStream>>,
+        BufStream<rustls::StreamOwned<rustls::ClientSession, TcpStream>>,
     ),
 }
 
@@ -58,7 +58,7 @@ impl Stream {
             TcpStream::connect_timeout(&socket_addrs[0], timeout)?
         };
         inner.set_nodelay(true)?;
-        let inner = BufStream::new(inner);
+        let inner = inner;
 
         match tls_options {
             Some(cfg) => {
@@ -68,9 +68,11 @@ impl Stream {
 
                 let session = rustls::ClientSession::new(&Arc::new(tls_config), name);
 
-                Ok(Stream::Tls(rustls::StreamOwned::new(session, inner)))
+                Ok(Stream::Tls(BufStream::new(rustls::StreamOwned::new(
+                    session, inner,
+                ))))
             }
-            None => Ok(Self::Tcp(inner)),
+            None => Ok(Self::Tcp(BufStream::new(inner))),
         }
     }
 }
