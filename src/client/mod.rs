@@ -16,12 +16,7 @@ use crate::{
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::{ErrorKind, Result},
-    event::command::{
-        CommandEventHandler,
-        CommandFailedEvent,
-        CommandStartedEvent,
-        CommandSucceededEvent,
-    },
+    event::command::CommandEventHandler,
     operation::ListDatabases,
     options::{ClientOptions, DatabaseOptions},
     sdam::{Server, Topology, TopologyUpdateCondvar},
@@ -98,7 +93,7 @@ impl Client {
         Ok(Self { inner })
     }
 
-    fn emit_command_event(&self, emit: impl FnOnce(&Arc<dyn CommandEventHandler>)) {
+    pub(crate) fn emit_command_event(&self, emit: impl FnOnce(&Arc<dyn CommandEventHandler>)) {
         if let Some(ref handler) = self.inner.options.command_event_handler {
             emit(handler);
         }
@@ -164,18 +159,6 @@ impl Client {
                 .collect(),
             Err(e) => Err(e),
         }
-    }
-
-    pub(crate) fn send_command_started_event(&self, event: CommandStartedEvent) {
-        self.emit_command_event(|handler| handler.handle_command_started_event(event.clone()));
-    }
-
-    pub(crate) fn send_command_succeeded_event(&self, event: CommandSucceededEvent) {
-        self.emit_command_event(|handler| handler.handle_command_succeeded_event(event.clone()));
-    }
-
-    pub(crate) fn send_command_failed_event(&self, event: CommandFailedEvent) {
-        self.emit_command_event(|handler| handler.handle_command_failed_event(event.clone()));
     }
 
     fn topology(&self) -> Arc<RwLock<Topology>> {
