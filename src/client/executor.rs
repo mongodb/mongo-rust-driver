@@ -114,22 +114,24 @@ impl Client {
         let connection_info = connection.info();
         let request_id = crate::cmap::conn::next_request_id();
 
-        let should_redact = REDACTED_COMMANDS.contains(cmd.name.to_lowercase().as_str());
+        self.emit_command_event(|handler| {
+            let should_redact = REDACTED_COMMANDS.contains(cmd.name.to_lowercase().as_str());
 
-        let command_body = if should_redact {
-            Document::new()
-        } else {
-            cmd.body.clone()
-        };
-        let command_started_event = CommandStartedEvent {
-            command: command_body,
-            db: cmd.target_db.clone(),
-            command_name: cmd.name.clone(),
-            request_id,
-            connection: connection_info.clone(),
-        };
+            let command_body = if should_redact {
+                Document::new()
+            } else {
+                cmd.body.clone()
+            };
+            let command_started_event = CommandStartedEvent {
+                command: command_body,
+                db: cmd.target_db.clone(),
+                command_name: cmd.name.clone(),
+                request_id,
+                connection: connection_info.clone(),
+            };
 
-        self.send_command_started_event(command_started_event);
+            handler.handle_command_started_event(command_started_event);
+        });
 
         let start_time = PreciseTime::now();
 
@@ -148,31 +150,39 @@ impl Client {
 
         match response_result {
             Err(error) => {
-                let command_failed_event = CommandFailedEvent {
-                    duration,
-                    command_name: cmd.name,
-                    failure: error.clone(),
-                    request_id,
-                    connection: connection_info,
-                };
-                self.send_command_failed_event(command_failed_event);
+                self.emit_command_event(|handler| {
+                    let command_failed_event = CommandFailedEvent {
+                        duration,
+                        command_name: cmd.name,
+                        failure: error.clone(),
+                        request_id,
+                        connection: connection_info,
+                    };
+
+                    handler.handle_command_failed_event(command_failed_event);
+                });
                 Err(error)
             }
             Ok(response) => {
-                let reply = if should_redact {
-                    Document::new()
-                } else {
-                    response.raw_response.clone()
-                };
+                self.emit_command_event(|handler| {
+                    let should_redact =
+                        REDACTED_COMMANDS.contains(cmd.name.to_lowercase().as_str());
 
-                let command_succeeded_event = CommandSucceededEvent {
-                    duration,
-                    reply,
-                    command_name: cmd.name.clone(),
-                    request_id,
-                    connection: connection_info,
-                };
-                self.send_command_succeeded_event(command_succeeded_event);
+                    let reply = if should_redact {
+                        Document::new()
+                    } else {
+                        response.raw_response.clone()
+                    };
+
+                    let command_succeeded_event = CommandSucceededEvent {
+                        duration,
+                        reply,
+                        command_name: cmd.name.clone(),
+                        request_id,
+                        connection: connection_info,
+                    };
+                    handler.handle_command_succeeded_event(command_succeeded_event);
+                });
                 op.handle_response(response)
             }
         }
