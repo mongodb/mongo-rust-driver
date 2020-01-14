@@ -233,6 +233,7 @@ pub struct ReplaceOptions {
     ///
     /// Only available in MongoDB 4.2+. See the official MongoDB
     /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#ex-update-command-hint) for examples.
+    #[builder(default)]
     pub hint: Option<Hint>,
 
     /// The write concern for the operation.
