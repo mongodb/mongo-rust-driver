@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test;
 
-use std::time::Duration;
+use std::{fmt, time::Duration};
 
 use rand::seq::IteratorRandom;
 
@@ -21,6 +21,24 @@ use crate::{
 const DEFAULT_LOCAL_THRESHOLD: Duration = Duration::from_millis(15);
 
 impl TopologyDescription {
+    pub(crate) fn server_selection_timeout_error_message(
+        &self,
+        criteria: &SelectionCriteria,
+    ) -> String {
+        if self.has_available_servers() {
+            format!(
+                "Server selection timeout: No servers suitable for criteria {:?}. Current \
+                 topology: {}",
+                criteria, self
+            )
+        } else {
+            format!(
+                "Server selection timeout: No available servers. Current topology: {}",
+                self
+            )
+        }
+    }
+
     pub(crate) fn select_server<'a>(
         &'a self,
         criteria: &'a SelectionCriteria,
@@ -54,6 +72,10 @@ impl TopologyDescription {
 
         // Choose a random server from the remaining set.
         Ok(suitable_servers.into_iter().choose(&mut rand::thread_rng()))
+    }
+
+    fn has_available_servers(&self) -> bool {
+        self.servers.values().any(|server| server.is_available())
     }
 
     fn suitable_servers<'a>(
@@ -287,6 +309,16 @@ impl TopologyDescription {
 
         let staleness = max_last_write_date - secondary_last_write + heartbeat_frequency;
         Some(staleness)
+    }
+}
+
+impl fmt::Display for TopologyDescription {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{{ Type: {:?}, Servers: [ ", self.topology_type)?;
+        for server in self.servers.values() {
+            write!(f, "{}, ", server)?;
+        }
+        write!(f, "] }}")
     }
 }
 

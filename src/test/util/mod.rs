@@ -112,6 +112,10 @@ impl TestClient {
         self.options.credential.is_some()
     }
 
+    pub fn is_replica_set(&self) -> bool {
+        self.server_info.is_replica_set == Some(true) || self.server_info.hosts.is_some()
+    }
+
     #[allow(dead_code)]
     pub fn server_version_eq(&self, major: u64, minor: u64) -> bool {
         self.server_version.major == major && self.server_version.minor == minor

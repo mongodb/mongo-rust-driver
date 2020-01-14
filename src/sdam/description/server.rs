@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{fmt, time::Duration};
 
 use bson::{oid::ObjectId, UtcDateTime};
 use chrono::offset::Utc;
@@ -83,6 +83,21 @@ impl PartialEq for ServerDescription {
     }
 }
 
+impl fmt::Display for ServerDescription {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{{ Address: {}, Type: {:?}, Average RTT: {:?}, LastError: ",
+            self.address, self.server_type, self.average_round_trip_time
+        )?;
+        match self.reply.as_ref().err() {
+            Some(e) => write!(f, "{}", e)?,
+            None => write!(f, "None")?,
+        }
+        write!(f, " }}")
+    }
+}
+
 impl ServerDescription {
     pub(crate) fn new(
         mut address: StreamAddress,
@@ -153,6 +168,14 @@ impl ServerDescription {
         }
 
         description
+    }
+
+    /// Whether this server is "available" as per the definition in the server selection spec.
+    pub(crate) fn is_available(&self) -> bool {
+        match self.server_type {
+            ServerType::Unknown => false,
+            _ => true,
+        }
     }
 
     pub(crate) fn compatibility_error_message(&self) -> Option<String> {

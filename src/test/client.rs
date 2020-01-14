@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::HashMap, time::Duration};
 
 use bson::{bson, doc, Bson};
 use serde::Deserialize;
@@ -9,6 +9,7 @@ use crate::{
         auth::{AuthMechanism, Credential},
         ClientOptions,
     },
+    selection_criteria::{ReadPreference, SelectionCriteria},
     test::{CLIENT, LOCK},
     Client,
 };
@@ -55,6 +56,40 @@ fn metadata_sent_in_handshake() {
 
     let metadata: Metadata = bson::from_bson(in_prog[0].clone()).unwrap();
     assert_eq!(metadata.client.driver.name, "mrd");
+}
+
+#[test]
+fn server_selection_timeout_message() {
+    let _guard = LOCK.run_concurrently();
+
+    if !CLIENT.is_replica_set() {
+        return;
+    }
+
+    let mut tag_set = HashMap::new();
+    tag_set.insert("asdfasdf".to_string(), "asdfadsf".to_string());
+
+    let unsatisfiable_read_preference = ReadPreference::Secondary {
+        tag_sets: Some(vec![tag_set]),
+        max_staleness: None,
+    };
+
+    let mut options = CLIENT.options.clone();
+    options.server_selection_timeout = Some(Duration::from_millis(500));
+
+    let client = Client::with_options(options).unwrap();
+    let db = client.database("test");
+    let error = db
+        .run_command(
+            doc! { "isMaster": 1 },
+            SelectionCriteria::ReadPreference(unsatisfiable_read_preference),
+        )
+        .expect_err("should fail with server selection timeout error");
+
+    let error_description = format!("{}", error);
+    for host in CLIENT.options.hosts.iter() {
+        assert!(error_description.contains(format!("{}", host).as_str()));
+    }
 }
 
 #[test]
