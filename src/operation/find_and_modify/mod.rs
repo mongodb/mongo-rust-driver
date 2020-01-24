@@ -25,7 +25,7 @@ use crate::{
 pub(crate) struct FindAndModify {
     ns: Namespace,
     query: Document,
-    options: Option<FindAndModifyOptions>,
+    options: FindAndModifyOptions,
 }
 
 impl FindAndModify {
@@ -34,7 +34,8 @@ impl FindAndModify {
         query: Document,
         options: Option<FindOneAndDeleteOptions>,
     ) -> Self {
-        let options = options.map(FindAndModifyOptions::from_find_one_and_delete_options);
+        let options =
+            FindAndModifyOptions::from_find_one_and_delete_options(options.unwrap_or_default());
         FindAndModify { ns, query, options }
     }
 
@@ -45,8 +46,10 @@ impl FindAndModify {
         options: Option<FindOneAndReplaceOptions>,
     ) -> Result<Self> {
         bson_util::replacement_document_check(&replacement)?;
-        let options = options
-            .map(|opts| FindAndModifyOptions::from_find_one_and_replace_options(replacement, opts));
+        let options = FindAndModifyOptions::from_find_one_and_replace_options(
+            replacement,
+            options.unwrap_or_default(),
+        );
         Ok(FindAndModify { ns, query, options })
     }
 
@@ -59,8 +62,10 @@ impl FindAndModify {
         if let UpdateModifications::Document(ref d) = update {
             bson_util::update_document_check(d)?;
         };
-        let options = options
-            .map(|opts| FindAndModifyOptions::from_find_one_and_update_options(update, opts));
+        let options = FindAndModifyOptions::from_find_one_and_update_options(
+            update,
+            options.unwrap_or_default(),
+        );
         Ok(FindAndModify { ns, query, options })
     }
 }
@@ -75,7 +80,7 @@ impl Operation for FindAndModify {
             "query": self.query.clone(),
         };
 
-        append_options(&mut body, self.options.as_ref())?;
+        append_options(&mut body, Some(&self.options))?;
 
         Ok(Command::new(
             Self::NAME.to_string(),

@@ -28,6 +28,36 @@ fn empty_delete() -> FindAndModify {
 }
 
 #[test]
+fn build_with_delete_no_options() {
+    let ns = Namespace {
+        db: "test_db".to_string(),
+        coll: "test_coll".to_string(),
+    };
+    let filter = doc! { "x": { "$gt": 1 } };
+    let max_time = Duration::from_millis(2u64);
+
+    let op = FindAndModify::with_delete(ns, filter.clone(), None);
+
+    let description = StreamDescription::new_testing();
+    let mut cmd = op.build(&description).unwrap();
+
+    assert_eq!(cmd.name.as_str(), "findAndModify");
+    assert_eq!(cmd.target_db.as_str(), "test_db");
+    assert_eq!(cmd.read_pref.as_ref(), None);
+
+    let mut expected_body = doc! {
+        "findAndModify": "test_coll",
+        "query": filter,
+        "remove": true
+    };
+
+    bson_util::sort_document(&mut cmd.body);
+    bson_util::sort_document(&mut expected_body);
+
+    assert_eq!(cmd.body, expected_body);
+}
+
+#[test]
 fn build_with_delete() {
     let ns = Namespace {
         db: "test_db".to_string(),
@@ -121,6 +151,36 @@ fn empty_replace() -> FindAndModify {
     let filter = doc! {};
     let replacement = doc! { "x": { "inc": 1 } };
     FindAndModify::with_replace(ns, filter, replacement, None).unwrap()
+}
+
+#[test]
+fn build_with_replace_no_options() {
+    let ns = Namespace {
+        db: "test_db".to_string(),
+        coll: "test_coll".to_string(),
+    };
+    let filter = doc! { "x": { "$gt": 1 } };
+    let replacement = doc! { "x": { "inc": 1 } };
+
+    let op = FindAndModify::with_replace(ns, filter.clone(), replacement.clone(), None).unwrap();
+
+    let description = StreamDescription::new_testing();
+    let mut cmd = op.build(&description).unwrap();
+
+    assert_eq!(cmd.name.as_str(), "findAndModify");
+    assert_eq!(cmd.target_db.as_str(), "test_db");
+    assert_eq!(cmd.read_pref.as_ref(), None);
+
+    let mut expected_body = doc! {
+        "findAndModify": "test_coll",
+        "query": filter,
+        "update": replacement,
+    };
+
+    bson_util::sort_document(&mut cmd.body);
+    bson_util::sort_document(&mut expected_body);
+
+    assert_eq!(cmd.body, expected_body);
 }
 
 #[test]
@@ -222,6 +282,35 @@ fn empty_update() -> FindAndModify {
     let filter = doc! {};
     let update = UpdateModifications::Document(doc! { "$x": { "$inc": 1 } });
     FindAndModify::with_update(ns, filter, update, None).unwrap()
+}
+
+#[test]
+fn build_with_update_no_options() {
+    let ns = Namespace {
+        db: "test_db".to_string(),
+        coll: "test_coll".to_string(),
+    };
+    let filter = doc! { "x": { "$gt": 1 } };
+    let update = UpdateModifications::Document(doc! { "$x": { "$inc": 1 } });
+    let op = FindAndModify::with_update(ns, filter.clone(), update.clone(), None).unwrap();
+
+    let description = StreamDescription::new_testing();
+    let mut cmd = op.build(&description).unwrap();
+
+    assert_eq!(cmd.name.as_str(), "findAndModify");
+    assert_eq!(cmd.target_db.as_str(), "test_db");
+    assert_eq!(cmd.read_pref.as_ref(), None);
+
+    let mut expected_body = doc! {
+        "findAndModify": "test_coll",
+        "query": filter,
+        "update": update.to_bson(),
+    };
+
+    bson_util::sort_document(&mut cmd.body);
+    bson_util::sort_document(&mut expected_body);
+
+    assert_eq!(cmd.body, expected_body);
 }
 
 #[test]
