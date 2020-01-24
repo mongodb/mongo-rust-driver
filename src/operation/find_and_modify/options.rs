@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use bson::{doc, Document};
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -17,18 +17,27 @@ use crate::{
     concern::WriteConcern,
 };
 
+#[derive(Debug, Serialize)]
+pub(super) enum Modification {
+    #[serde(rename = "remove", serialize_with = "self::serialize_true")]
+    Delete,
+    #[serde(rename = "update")]
+    Update(UpdateModifications),
+}
+
+fn serialize_true<S: Serializer>(s: S) -> std::result::Result<S::Ok, S::Error> {
+    s.serialize_bool(true)
+}
+
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Default, TypedBuilder, Serialize)]
+#[derive(Debug, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct FindAndModifyOptions {
+    #[serde(flatten)]
+    pub(crate) modification: Modification,
+
     #[builder(default)]
     pub(crate) sort: Option<Document>,
-
-    #[builder(default)]
-    pub(crate) remove: Option<bool>,
-
-    #[builder(default)]
-    pub(crate) update: Option<UpdateModifications>,
 
     #[builder(default)]
     pub(crate) new: Option<bool>,
@@ -65,11 +74,11 @@ impl FindAndModifyOptions {
         opts: FindOneAndDeleteOptions,
     ) -> FindAndModifyOptions {
         FindAndModifyOptions::builder()
+            .modification(Modification::Delete)
             .collation(opts.collation)
             .max_time(opts.max_time)
             .projection(opts.projection)
             .sort(opts.sort)
-            .remove(true)
             .write_concern(opts.write_concern)
             .build()
     }
@@ -80,6 +89,7 @@ impl FindAndModifyOptions {
     ) -> FindAndModifyOptions {
         let replacement = UpdateModifications::Document(replacement);
         FindAndModifyOptions::builder()
+            .modification(Modification::Update(replacement))
             .collation(opts.collation)
             .bypass_document_validation(opts.bypass_document_validation)
             .max_time(opts.max_time)
@@ -87,7 +97,6 @@ impl FindAndModifyOptions {
             .new(return_document_to_bool(opts.return_document))
             .sort(opts.sort)
             .upsert(opts.upsert)
-            .update(replacement)
             .write_concern(opts.write_concern)
             .build()
     }
@@ -97,6 +106,7 @@ impl FindAndModifyOptions {
         opts: FindOneAndUpdateOptions,
     ) -> FindAndModifyOptions {
         FindAndModifyOptions::builder()
+            .modification(Modification::Update(update))
             .collation(opts.collation)
             .array_filters(opts.array_filters)
             .bypass_document_validation(opts.bypass_document_validation)
@@ -105,7 +115,6 @@ impl FindAndModifyOptions {
             .new(return_document_to_bool(opts.return_document))
             .sort(opts.sort)
             .upsert(opts.upsert)
-            .update(update)
             .write_concern(opts.write_concern)
             .build()
     }
