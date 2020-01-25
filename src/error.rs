@@ -97,7 +97,7 @@ pub enum ErrorKind {
 
     /// An error occurred when trying to execute a write operation consisting of multiple writes.
     #[error(
-        display = "An error ocurred when trying to execute a write operation: {:?}",
+        display = "An error occurred when trying to execute a write operation: {:?}",
         _0
     )]
     BulkWriteError(BulkWriteFailure),
@@ -325,10 +325,10 @@ pub struct BulkWriteError {
 /// The set of errors that occurred during a write operation.
 #[derive(Clone, Debug)]
 pub struct BulkWriteFailure {
-    /// The error(s) that occured on account of a non write concern failure.
+    /// The error(s) that occurred on account of a non write concern failure.
     pub write_errors: Option<Vec<BulkWriteError>>,
 
-    /// The error that ocurred on account of write concern failure.
+    /// The error that occurred on account of write concern failure.
     pub write_concern_error: Option<WriteConcernError>,
 }
 
