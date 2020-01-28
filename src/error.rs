@@ -189,6 +189,13 @@ impl ErrorKind {
         }
     }
 
+    pub(crate) fn is_network_error(&self) -> bool {
+        match self {
+            ErrorKind::Io(..) => true,
+            _ => false,
+        }
+    }
+
     /// Gets the code/message tuple from this error, if applicable. In the case of write errors, the
     /// code and message are taken from the write concern error, if there is one.
     fn code_and_message(&self) -> Option<(i32, &str)> {

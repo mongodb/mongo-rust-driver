@@ -12,7 +12,7 @@ use self::server::Server;
 use super::TopologyDescription;
 use crate::{
     cmap::{Command, Connection},
-    error::Result,
+    error::{Error, Result},
     options::{ClientOptions, StreamAddress},
     sdam::{
         description::server::{ServerDescription, ServerType},
@@ -173,6 +173,54 @@ impl Topology {
 
         Ok(())
     }
+}
+
+pub(crate) fn handle_pre_handshake_error(
+    error: Error,
+    address: StreamAddress,
+    topology: Arc<RwLock<Topology>>,
+) {
+    if error.is_network_error() {
+        mark_server_as_unknown(error.clone(), address, topology);
+    }
+}
+
+pub(crate) fn handle_post_handshake_error(
+    error: Error,
+    conn: Connection,
+    server: Arc<Server>,
+    topology: Arc<RwLock<Topology>>,
+) {
+    // If we encounter certain errors, we must update the topology as per the
+    // SDAM spec.
+    if error.is_non_timeout_network_error() {
+        mark_server_as_unknown(error, server.address.clone(), topology);
+        server.clear_connection_pool();
+    } else if error.is_recovering() || error.is_not_master() {
+        mark_server_as_unknown(error.clone(), server.address.clone(), topology);
+
+        // For "node is recovering" or "not master" errors, we must request a
+        // topology check.
+        server.request_topology_check();
+
+        let wire_version = conn
+            .stream_description()
+            .map(|sd| sd.max_wire_version)
+            .ok()
+            .and_then(std::convert::identity)
+            .unwrap_or(0);
+
+        // in 4.2+, we only clear connection pool if we've received a
+        // "node is shutting down" error. Otherwise, we always clear the pool.
+        if wire_version < 8 || error.is_shutting_down() {
+            server.clear_connection_pool();
+        }
+    }
+}
+
+fn mark_server_as_unknown(error: Error, address: StreamAddress, topology: Arc<RwLock<Topology>>) {
+    let description = ServerDescription::new(address, Some(Err(error)));
+    update_topology(topology, description);
 }
 
 /// Updates the provided topology in a minimally contentious way by cloning first.
