@@ -181,7 +181,7 @@ pub(crate) fn handle_pre_handshake_error(
     topology: Arc<RwLock<Topology>>,
 ) {
     if error.is_network_error() {
-        mark_server_as_unknown(error.clone(), address, topology);
+        mark_server_as_unknown(error, address, topology);
     }
 }
 
