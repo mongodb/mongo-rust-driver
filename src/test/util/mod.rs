@@ -113,7 +113,7 @@ impl TestClient {
     }
 
     pub fn is_replica_set(&self) -> bool {
-        self.server_info.is_replica_set == Some(true) || self.server_info.hosts.is_some()
+        self.options.repl_set_name.is_some()
     }
 
     #[allow(dead_code)]
