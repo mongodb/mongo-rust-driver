@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{fmt, time::Duration};
 
 use bson::UtcDateTime;
 
@@ -80,5 +80,46 @@ impl<'a> ServerInfo<'a> {
     /// Gets the tags associated with the server.
     pub fn tags(&self) -> Option<&TagSet> {
         self.command_response_getter(|r| r.tags.as_ref())
+    }
+}
+
+impl<'a> fmt::Display for ServerInfo<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::result::Result<(), fmt::Error> {
+        write!(
+            f,
+            "{{ Address: {}, Type: {:?}",
+            self.address(),
+            self.server_type()
+        )?;
+
+        if let Some(avg_rtt) = self.average_round_trip_time() {
+            write!(f, ", Average RTT: {:?}", avg_rtt)?;
+        }
+
+        if let Some(last_update_time) = self.last_update_time() {
+            write!(f, ", Last Update Time: {:?}", last_update_time)?;
+        }
+
+        if let Some(max_wire_version) = self.max_wire_version() {
+            write!(f, ", Max Wire Version: {}", max_wire_version)?;
+        }
+
+        if let Some(min_wire_version) = self.min_wire_version() {
+            write!(f, ", Min Wire Version: {}", min_wire_version)?;
+        }
+
+        if let Some(rs_name) = self.replica_set_name() {
+            write!(f, ", Replica Set Name: {}", rs_name)?;
+        }
+
+        if let Some(rs_version) = self.replica_set_version() {
+            write!(f, ", Replica Set Version: {}", rs_version)?;
+        }
+
+        if let Some(tags) = self.tags() {
+            write!(f, ", Tags: {:?}", tags)?;
+        }
+
+        write!(f, " }}")
     }
 }

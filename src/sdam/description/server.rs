@@ -1,4 +1,4 @@
-use std::{fmt, time::Duration};
+use std::time::Duration;
 
 use bson::{oid::ObjectId, UtcDateTime};
 use chrono::offset::Utc;
@@ -80,21 +80,6 @@ impl PartialEq for ServerDescription {
             }
             _ => false,
         }
-    }
-}
-
-impl fmt::Display for ServerDescription {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{{ Address: {}, Type: {:?}, Average RTT: {:?}, LastError: ",
-            self.address, self.server_type, self.average_round_trip_time
-        )?;
-        match self.reply.as_ref().err() {
-            Some(e) => write!(f, "{}", e)?,
-            None => write!(f, "None")?,
-        }
-        write!(f, " }}")
     }
 }
 

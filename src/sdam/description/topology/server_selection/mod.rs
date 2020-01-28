@@ -27,13 +27,13 @@ impl TopologyDescription {
     ) -> String {
         if self.has_available_servers() {
             format!(
-                "Server selection timeout: No servers suitable for criteria {:?}. Current \
-                 topology: {}",
+                "Server selection timeout: None of the available servers suitable for criteria \
+                 {:?}. Topology: {}",
                 criteria, self
             )
         } else {
             format!(
-                "Server selection timeout: No available servers. Current topology: {}",
+                "Server selection timeout: No available servers. Topology: {}",
                 self
             )
         }
@@ -315,8 +315,8 @@ impl TopologyDescription {
 impl fmt::Display for TopologyDescription {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{{ Type: {:?}, Servers: [ ", self.topology_type)?;
-        for server in self.servers.values() {
-            write!(f, "{}, ", server)?;
+        for server_info in self.servers.values().map(ServerInfo::new) {
+            write!(f, "{}, ", server_info)?;
         }
         write!(f, "] }}")
     }
