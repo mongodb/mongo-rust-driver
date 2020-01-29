@@ -149,7 +149,7 @@ pub enum ErrorKind {
     ResponseError { message: String },
 
     /// The Client was not able to select a server for the operation.
-    #[error(display = ": {}", message)]
+    #[error(display = "{}", message)]
     ServerSelectionError { message: String },
 
     /// An error occurred during SRV record lookup.

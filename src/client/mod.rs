@@ -213,7 +213,13 @@ impl Client {
         }
 
         Err(ErrorKind::ServerSelectionError {
-            message: "timed out while trying to select server".into(),
+            message: self
+                .inner
+                .topology
+                .read()
+                .unwrap()
+                .description
+                .server_selection_timeout_error_message(&criteria),
         }
         .into())
     }

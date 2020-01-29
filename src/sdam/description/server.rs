@@ -155,6 +155,14 @@ impl ServerDescription {
         description
     }
 
+    /// Whether this server is "available" as per the definition in the server selection spec.
+    pub(crate) fn is_available(&self) -> bool {
+        match self.server_type {
+            ServerType::Unknown => false,
+            _ => true,
+        }
+    }
+
     pub(crate) fn compatibility_error_message(&self) -> Option<String> {
         if let Ok(Some(ref reply)) = self.reply {
             let is_master_min_wire_version = reply.command_response.min_wire_version.unwrap_or(0);
