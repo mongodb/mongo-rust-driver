@@ -15,6 +15,7 @@ use crate::{
     cmap::{Command, Connection},
     error::Result,
     is_master::IsMasterReply,
+    options::{ClientOptions, StreamAddress},
     sdam::update_topology,
 };
 
@@ -28,20 +29,33 @@ lazy_static! {
 /// Starts a monitoring thread associated with a given Server. A weak reference is used to ensure
 /// that the monitoring thread doesn't keep the server alive after it's been removed from the
 /// topology or the client has been dropped.
-pub(super) fn monitor_server(
-    mut conn: Connection,
-    server: Weak<Server>,
-    heartbeat_frequency: Option<Duration>,
-) {
+pub(super) fn monitor_server(address: StreamAddress, server: Weak<Server>, options: ClientOptions) {
     std::thread::spawn(move || {
         let mut server_type = ServerType::Unknown;
-        let heartbeat_frequency = heartbeat_frequency.unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
+        let heartbeat_frequency = options
+            .heartbeat_freq
+            .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
+
+        let make_connection = || {
+            Connection::new(
+                0,
+                address.clone(),
+                0,
+                options.connect_timeout,
+                options.tls_options(),
+                options.cmap_event_handler.clone(),
+            )
+            .unwrap()
+        };
+
+        let mut conn = make_connection();
 
         loop {
-            server_type = match monitor_server_check(&mut conn, server_type, &server) {
-                Some(server_type) => server_type,
-                None => return,
-            };
+            server_type =
+                match monitor_server_check(&mut conn, server_type, &server, &make_connection) {
+                    Some(server_type) => server_type,
+                    None => return,
+                };
 
             let last_check = PreciseTime::now();
 
@@ -74,6 +88,7 @@ fn monitor_server_check(
     conn: &mut Connection,
     mut server_type: ServerType,
     server: &Weak<Server>,
+    make_connection: impl Fn() -> Connection,
 ) -> Option<ServerType> {
     // If the server has been dropped, terminate the monitoring thread.
     let server = match server.upgrade() {
@@ -88,7 +103,7 @@ fn monitor_server_check(
     };
 
     // Send an isMaster to the server.
-    let server_description = check_server(conn, server_type, &server);
+    let server_description = check_server(conn, server_type, &server, make_connection);
     server_type = server_description.server_type;
 
     update_topology(topology, server_description);
@@ -100,10 +115,11 @@ fn check_server(
     conn: &mut Connection,
     server_type: ServerType,
     server: &Arc<Server>,
+    make_connection: impl Fn() -> Connection,
 ) -> ServerDescription {
     let address = conn.address().clone();
 
-    match is_master(conn) {
+    match is_master(conn, &make_connection) {
         Ok(reply) => return ServerDescription::new(address, Some(Ok(reply))),
         Err(e) => {
             server.clear_connection_pool();
@@ -114,10 +130,28 @@ fn check_server(
         }
     }
 
-    ServerDescription::new(address, Some(is_master(conn)))
+    ServerDescription::new(address, Some(is_master(conn, make_connection)))
 }
 
-fn is_master(conn: &mut Connection) -> Result<IsMasterReply> {
+fn is_master(
+    conn: &mut Connection,
+    make_connection: impl Fn() -> Connection,
+) -> Result<IsMasterReply> {
+    let result = is_master_inner(conn);
+
+    if result
+        .as_ref()
+        .err()
+        .map(|e| e.kind.is_network_error())
+        .unwrap_or(false)
+    {
+        std::mem::replace(conn, make_connection());
+    }
+
+    result
+}
+
+fn is_master_inner(conn: &mut Connection) -> Result<IsMasterReply> {
     let command = Command::new_read(
         "isMaster".into(),
         "admin".into(),
