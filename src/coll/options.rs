@@ -712,7 +712,7 @@ impl From<FindOneOptions> for FindOptions {
             limit: None,
             max_await_time: None,
             no_cursor_timeout: None,
-            sort: None,
+            sort: options.sort,
         }
     }
 }
@@ -805,6 +805,10 @@ pub struct FindOneOptions {
     /// The number of documents to skip before counting.
     #[builder(default)]
     pub skip: Option<i64>,
+
+    /// The order of the documents for the purposes of the operation.
+    #[builder(default)]
+    pub sort: Option<Document>,
 }
 
 /// Specifies an index to create.
