@@ -1,6 +1,6 @@
 use std::{
     io::{self, Read, Write},
-    net::{TcpStream, ToSocketAddrs},
+    net::{SocketAddr, TcpStream, ToSocketAddrs},
     sync::Arc,
     time::Duration,
 };
@@ -10,7 +10,7 @@ use derivative::Derivative;
 use webpki::DNSNameRef;
 
 use crate::{
-    error::Result,
+    error::{ErrorKind, Result},
     options::{StreamAddress, TlsOptions},
 };
 
@@ -38,6 +38,44 @@ pub(super) enum Stream {
     ),
 }
 
+fn try_connect(address: &SocketAddr, timeout: Duration) -> Result<TcpStream> {
+    // The URI options spec requires that the default connect timeout is 10 seconds, but that 0
+    // should indicate no timeout.
+    let stream = if timeout == Duration::from_secs(0) {
+        TcpStream::connect(address)?
+    } else {
+        TcpStream::connect_timeout(address, timeout)?
+    };
+
+    Ok(stream)
+}
+
+fn connect_stream(address: &StreamAddress, connect_timeout: Option<Duration>) -> Result<TcpStream> {
+    let timeout = connect_timeout.unwrap_or(DEFAULT_CONNECT_TIMEOUT);
+
+    let mut socket_addrs: Vec<_> = address.to_socket_addrs()?.collect();
+
+    if socket_addrs.is_empty() {
+        return Err(ErrorKind::NoDnsResults(address.clone()).into());
+    }
+
+    socket_addrs.sort_by_key(|addr| if addr.is_ipv4() { 0 } else { 1 });
+
+    let mut connect_error = match try_connect(&socket_addrs[0], timeout) {
+        Ok(stream) => return Ok(stream),
+        Err(err) => err,
+    };
+
+    for address in &socket_addrs[1..] {
+        connect_error = match try_connect(&socket_addrs[0], timeout) {
+            Ok(stream) => return Ok(stream),
+            Err(err) => err,
+        };
+    }
+
+    Err(connect_error)
+}
+
 impl Stream {
     /// Creates a new stream connected to `address`.
     pub(super) fn connect(
@@ -45,20 +83,8 @@ impl Stream {
         connect_timeout: Option<Duration>,
         tls_options: Option<TlsOptions>,
     ) -> Result<Self> {
-        let timeout = connect_timeout.unwrap_or(DEFAULT_CONNECT_TIMEOUT);
-
-        // The URI options spec requires that the default is 10 seconds, but that 0 should indicate
-        // no timeout.
-        let inner = if timeout == Duration::from_secs(0) {
-            TcpStream::connect(&host)?
-        } else {
-            let mut socket_addrs: Vec<_> = host.to_socket_addrs()?.collect();
-            socket_addrs.sort_by_key(|addr| if addr.is_ipv4() { 0 } else { 1 });
-
-            TcpStream::connect_timeout(&socket_addrs[0], timeout)?
-        };
+        let inner = connect_stream(&host, connect_timeout)?;
         inner.set_nodelay(true)?;
-        let inner = inner;
 
         match tls_options {
             Some(cfg) => {

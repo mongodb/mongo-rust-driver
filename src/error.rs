@@ -124,6 +124,9 @@ pub enum ErrorKind {
     #[error(display = "{}", _0)]
     Io(#[error(source)] std::io::Error),
 
+    #[error(display = "No DNS results for domain {}", _0)]
+    NoDnsResults(StreamAddress),
+
     /// A database operation failed to send or receive a reply.
     #[error(
         display = "A database operation failed to send or receive a reply: {}",
