@@ -84,6 +84,8 @@ pub(super) fn monitor_server(address: StreamAddress, server: Weak<Server>, optio
     });
 }
 
+/// Checks the the server by running an `isMaster` command on `conn`. If an I/O error occurs, `conn`
+/// will replaced with a new connection created from `make_connection`.
 fn monitor_server_check(
     conn: &mut Connection,
     mut server_type: ServerType,
