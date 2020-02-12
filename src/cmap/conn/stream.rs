@@ -67,7 +67,7 @@ fn connect_stream(address: &StreamAddress, connect_timeout: Option<Duration>) ->
     };
 
     for address in &socket_addrs[1..] {
-        connect_error = match try_connect(&socket_addrs[0], timeout) {
+        connect_error = match try_connect(address, timeout) {
             Ok(stream) => return Ok(stream),
             Err(err) => err,
         };
