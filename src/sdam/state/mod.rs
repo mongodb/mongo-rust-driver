@@ -16,7 +16,7 @@ use crate::{
     options::{ClientOptions, StreamAddress},
     sdam::{
         description::server::{ServerDescription, ServerType},
-        monitor::monitor_server,
+        monitor::Monitor,
     },
     selection_criteria::SelectionCriteria,
 };
@@ -135,7 +135,7 @@ impl Topology {
         ));
         self.servers.insert(address.clone(), server.clone());
 
-        monitor_server(address, Arc::downgrade(&server), options);
+        Monitor::start(address, Arc::downgrade(&server), options)?;
 
         Ok(())
     }

@@ -1,7 +1,4 @@
-use std::{
-    sync::{Arc, Weak},
-    time::Duration,
-};
+use std::{sync::Weak, time::Duration};
 
 use bson::{bson, doc};
 use lazy_static::lazy_static;
@@ -26,40 +23,59 @@ lazy_static! {
     pub(crate) static ref MIN_HEARTBEAT_FREQUENCY: time::Duration = time::Duration::milliseconds(500);
 }
 
-/// Starts a monitoring thread associated with a given Server. A weak reference is used to ensure
-/// that the monitoring thread doesn't keep the server alive after it's been removed from the
-/// topology or the client has been dropped.
-pub(super) fn monitor_server(address: StreamAddress, server: Weak<Server>, options: ClientOptions) {
-    std::thread::spawn(move || {
-        let mut server_type = ServerType::Unknown;
-        let heartbeat_frequency = options
+pub(super) struct Monitor {
+    address: StreamAddress,
+    connection: Connection,
+    server: Weak<Server>,
+    server_type: ServerType,
+    options: ClientOptions,
+}
+
+impl Monitor {
+    /// Starts a monitoring thread associated with a given Server. A weak reference is used to
+    /// ensure that the monitoring thread doesn't keep the server alive after it's been removed
+    /// from the topology or the client has been dropped.
+    pub(super) fn start(
+        address: StreamAddress,
+        server: Weak<Server>,
+        options: ClientOptions,
+    ) -> Result<()> {
+        let connection = Connection::new(
+            0,
+            address.clone(),
+            0,
+            options.connect_timeout,
+            options.tls_options(),
+            options.cmap_event_handler.clone(),
+        )?;
+
+        let mut monitor = Self {
+            address,
+            connection,
+            server,
+            server_type: ServerType::Unknown,
+            options,
+        };
+
+        std::thread::spawn(move || {
+            monitor.execute();
+        });
+
+        Ok(())
+    }
+
+    fn execute(&mut self) {
+        let heartbeat_frequency = self
+            .options
             .heartbeat_freq
             .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
 
-        let make_connection = || {
-            Connection::new(
-                0,
-                address.clone(),
-                0,
-                options.connect_timeout,
-                options.tls_options(),
-                options.cmap_event_handler.clone(),
-            )
-            .unwrap()
-        };
-
-        let mut conn = make_connection();
-
         loop {
-            server_type =
-                match monitor_server_check(&mut conn, server_type, &server, &make_connection) {
-                    Some(server_type) => server_type,
-                    None => return,
-                };
+            self.check_server_and_update_topology();
 
             let last_check = PreciseTime::now();
 
-            let timed_out = match server.upgrade() {
+            let timed_out = match self.server.upgrade() {
                 Some(server) => server.wait_timeout(heartbeat_frequency),
                 None => return,
             };
@@ -70,106 +86,109 @@ pub(super) fn monitor_server(address: StreamAddress, server: Weak<Server>, optio
                 if duration_since_last_check < *MIN_HEARTBEAT_FREQUENCY {
                     let remaining_time = *MIN_HEARTBEAT_FREQUENCY - duration_since_last_check;
 
-                    // Since MIN_HEARTBEAT_FREQUENCY is 500 and `duration_since_last_check` is less
-                    // than it but still positive, we can be sure that the time::Duration can be
-                    // successfully converted to a std::time::Duration. However, in the case of some
-                    // bug causing this not to be true, rather than panicking the monitoring thread,
-                    // we instead just don't sleep and proceed to checking the server a bit early.
+                    // Since MIN_HEARTBEAT_FREQUENCY is 500 and `duration_since_last_check` is
+                    // less than it but still positive, we can be sure
+                    // that the time::Duration can be successfully
+                    // converted to a std::time::Duration. However, in the case of some
+                    // bug causing this not to be true, rather than panicking the monitoring
+                    // thread, we instead just don't sleep and proceed
+                    // to checking the server a bit early.
                     if let Ok(remaining_time) = remaining_time.to_std() {
                         std::thread::sleep(remaining_time);
                     }
                 }
             }
         }
-    });
-}
+    }
 
-/// Checks the the server by running an `isMaster` command on `conn`. If an I/O error occurs, `conn`
-/// will replaced with a new connection created from `make_connection`.
-fn monitor_server_check(
-    conn: &mut Connection,
-    mut server_type: ServerType,
-    server: &Weak<Server>,
-    make_connection: impl Fn() -> Connection,
-) -> Option<ServerType> {
-    // If the server has been dropped, terminate the monitoring thread.
-    let server = match server.upgrade() {
-        Some(server) => server,
-        None => return None,
-    };
+    /// Checks the the server by running an `isMaster` command. If an I/O error occurs, the
+    /// connection will replaced with a new one.
+    fn check_server_and_update_topology(&mut self) {
+        // If the server has been dropped, terminate the monitoring thread.
+        let server = match self.server.upgrade() {
+            Some(server) => server,
+            None => return,
+        };
 
-    // If the topology has been dropped, terminate the monitoring thread.
-    let topology = match server.topology() {
-        Some(topology) => topology,
-        None => return None,
-    };
+        // If the topology has been dropped, terminate the monitoring thread.
+        let topology = match server.topology() {
+            Some(topology) => topology,
+            None => return,
+        };
 
-    // Send an isMaster to the server.
-    let server_description = check_server(conn, server_type, &server, make_connection);
-    server_type = server_description.server_type;
+        // Send an isMaster to the server.
+        let server_description = self.check_server();
+        self.server_type = server_description.server_type;
 
-    update_topology(topology, server_description);
+        update_topology(topology, server_description);
+    }
 
-    Some(server_type)
-}
+    fn check_server(&mut self) -> ServerDescription {
+        let address = self.address.clone();
 
-fn check_server(
-    conn: &mut Connection,
-    server_type: ServerType,
-    server: &Arc<Server>,
-    make_connection: impl Fn() -> Connection,
-) -> ServerDescription {
-    let address = conn.address().clone();
+        match self.is_master() {
+            Ok(reply) => return ServerDescription::new(address, Some(Ok(reply))),
+            Err(e) => {
+                self.clear_connection_pool();
 
-    match is_master(conn, &make_connection) {
-        Ok(reply) => return ServerDescription::new(address, Some(Ok(reply))),
-        Err(e) => {
-            server.clear_connection_pool();
-
-            if server_type == ServerType::Unknown {
-                return ServerDescription::new(address, Some(Err(e)));
+                if self.server_type == ServerType::Unknown {
+                    return ServerDescription::new(address, Some(Err(e)));
+                }
             }
         }
+
+        ServerDescription::new(address, Some(self.is_master()))
     }
 
-    ServerDescription::new(address, Some(is_master(conn, make_connection)))
-}
+    fn is_master(&mut self) -> Result<IsMasterReply> {
+        let result = self.is_master_inner();
 
-fn is_master(
-    conn: &mut Connection,
-    make_connection: impl Fn() -> Connection,
-) -> Result<IsMasterReply> {
-    let result = is_master_inner(conn);
+        if result
+            .as_ref()
+            .err()
+            .map(|e| e.kind.is_network_error())
+            .unwrap_or(false)
+        {
+            self.connection = self.make_new_connection()?;
+        }
 
-    if result
-        .as_ref()
-        .err()
-        .map(|e| e.kind.is_network_error())
-        .unwrap_or(false)
-    {
-        std::mem::replace(conn, make_connection());
+        result
     }
 
-    result
-}
+    fn is_master_inner(&mut self) -> Result<IsMasterReply> {
+        let command = Command::new_read(
+            "isMaster".into(),
+            "admin".into(),
+            None,
+            doc! { "isMaster": 1 },
+        );
 
-fn is_master_inner(conn: &mut Connection) -> Result<IsMasterReply> {
-    let command = Command::new_read(
-        "isMaster".into(),
-        "admin".into(),
-        None,
-        doc! { "isMaster": 1 },
-    );
+        let start_time = PreciseTime::now();
+        let command_response = self.connection.send_command(command, None)?;
+        let end_time = PreciseTime::now();
 
-    let start_time = PreciseTime::now();
-    let command_response = conn.send_command(command, None)?;
-    let end_time = PreciseTime::now();
+        let command_response = command_response.body()?;
 
-    let command_response = command_response.body()?;
+        Ok(IsMasterReply {
+            command_response,
+            round_trip_time: Some(start_time.to(end_time).to_std().unwrap()),
+        })
+    }
 
-    Ok(IsMasterReply {
-        command_response,
-        // TODO RUST-193: Round-trip time
-        round_trip_time: Some(start_time.to(end_time).to_std().unwrap()),
-    })
+    fn make_new_connection(&self) -> Result<Connection> {
+        Connection::new(
+            0,
+            self.address.clone(),
+            0,
+            self.options.connect_timeout,
+            self.options.tls_options(),
+            self.options.cmap_event_handler.clone(),
+        )
+    }
+
+    fn clear_connection_pool(&self) {
+        if let Some(server) = self.server.upgrade() {
+            server.clear_connection_pool();
+        }
+    }
 }
