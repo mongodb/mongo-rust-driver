@@ -118,17 +118,17 @@ impl Monitor {
         let address = self.address.clone();
 
         match self.perform_is_master() {
-            Ok(reply) => return ServerDescription::new(address, Some(Ok(reply))),
+            Ok(reply) => ServerDescription::new(address, Some(Ok(reply))),
             Err(e) => {
                 self.clear_connection_pool();
 
                 if self.server_type == ServerType::Unknown {
                     return ServerDescription::new(address, Some(Err(e)));
                 }
+
+                ServerDescription::new(address, Some(self.perform_is_master()))
             }
         }
-
-        ServerDescription::new(address, Some(self.perform_is_master()))
     }
 
     fn perform_is_master(&mut self) -> Result<IsMasterReply> {
@@ -152,13 +152,10 @@ impl Monitor {
             return Ok(connection);
         }
 
-        let connection = Connection::new(
-            0,
+        let connection = Connection::new_monitoring(
             self.address.clone(),
-            0,
             self.options.connect_timeout,
             self.options.tls_options(),
-            self.options.cmap_event_handler.clone(),
         )?;
 
         // Since the connection was not `Some` above, this will always insert the new connection and

@@ -89,6 +89,14 @@ impl Connection {
         Ok(conn)
     }
 
+    pub(crate) fn new_monitoring(
+        address: StreamAddress,
+        connect_timeout: Option<Duration>,
+        tls_options: Option<TlsOptions>,
+    ) -> Result<Self> {
+        Self::new(0, address, 0, connect_timeout, tls_options, None)
+    }
+
     pub(crate) fn info(&self) -> ConnectionInfo {
         ConnectionInfo {
             id: self.id,
