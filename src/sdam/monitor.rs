@@ -25,7 +25,7 @@ lazy_static! {
 
 pub(super) struct Monitor {
     address: StreamAddress,
-    connection: Connection,
+    connection: Option<Connection>,
     server: Weak<Server>,
     server_type: ServerType,
     options: ClientOptions,
@@ -40,18 +40,9 @@ impl Monitor {
         server: Weak<Server>,
         options: ClientOptions,
     ) -> Result<()> {
-        let connection = Connection::new(
-            0,
-            address.clone(),
-            0,
-            options.connect_timeout,
-            options.tls_options(),
-            options.cmap_event_handler.clone(),
-        )?;
-
         let mut monitor = Self {
             address,
-            connection,
+            connection: None,
             server,
             server_type: ServerType::Unknown,
             options,
@@ -126,7 +117,7 @@ impl Monitor {
     fn check_server(&mut self) -> ServerDescription {
         let address = self.address.clone();
 
-        match self.is_master() {
+        match self.perform_is_master() {
             Ok(reply) => return ServerDescription::new(address, Some(Ok(reply))),
             Err(e) => {
                 self.clear_connection_pool();
@@ -137,11 +128,12 @@ impl Monitor {
             }
         }
 
-        ServerDescription::new(address, Some(self.is_master()))
+        ServerDescription::new(address, Some(self.perform_is_master()))
     }
 
-    fn is_master(&mut self) -> Result<IsMasterReply> {
-        let result = self.is_master_inner();
+    fn perform_is_master(&mut self) -> Result<IsMasterReply> {
+        let connection = self.resolve_connection()?;
+        let result = is_master(connection);
 
         if result
             .as_ref()
@@ -149,41 +141,29 @@ impl Monitor {
             .map(|e| e.kind.is_network_error())
             .unwrap_or(false)
         {
-            self.connection = self.make_new_connection()?;
+            self.connection.take();
         }
 
         result
     }
 
-    fn is_master_inner(&mut self) -> Result<IsMasterReply> {
-        let command = Command::new_read(
-            "isMaster".into(),
-            "admin".into(),
-            None,
-            doc! { "isMaster": 1 },
-        );
+    fn resolve_connection(&mut self) -> Result<&mut Connection> {
+        if let Some(ref mut connection) = self.connection {
+            return Ok(connection);
+        }
 
-        let start_time = PreciseTime::now();
-        let command_response = self.connection.send_command(command, None)?;
-        let end_time = PreciseTime::now();
-
-        let command_response = command_response.body()?;
-
-        Ok(IsMasterReply {
-            command_response,
-            round_trip_time: Some(start_time.to(end_time).to_std().unwrap()),
-        })
-    }
-
-    fn make_new_connection(&self) -> Result<Connection> {
-        Connection::new(
+        let connection = Connection::new(
             0,
             self.address.clone(),
             0,
             self.options.connect_timeout,
             self.options.tls_options(),
             self.options.cmap_event_handler.clone(),
-        )
+        )?;
+
+        // Since the connection was not `Some` above, this will always insert the new connection and
+        // return a reference to it.
+        Ok(self.connection.get_or_insert(connection))
     }
 
     fn clear_connection_pool(&self) {
@@ -191,4 +171,24 @@ impl Monitor {
             server.clear_connection_pool();
         }
     }
+}
+
+fn is_master(connection: &mut Connection) -> Result<IsMasterReply> {
+    let command = Command::new_read(
+        "isMaster".into(),
+        "admin".into(),
+        None,
+        doc! { "isMaster": 1 },
+    );
+
+    let start_time = PreciseTime::now();
+    let command_response = connection.send_command(command, None)?;
+    let end_time = PreciseTime::now();
+
+    let command_response = command_response.body()?;
+
+    Ok(IsMasterReply {
+        command_response,
+        round_trip_time: Some(start_time.to(end_time).to_std().unwrap()),
+    })
 }
