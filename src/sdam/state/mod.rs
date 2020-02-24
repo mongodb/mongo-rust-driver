@@ -16,7 +16,7 @@ use crate::{
     options::{ClientOptions, StreamAddress},
     sdam::{
         description::server::{ServerDescription, ServerType},
-        monitor::monitor_server,
+        monitor::Monitor,
     },
     selection_criteria::SelectionCriteria,
 };
@@ -133,18 +133,9 @@ impl Topology {
             address.clone(),
             &options,
         ));
-        self.servers.insert(address, server.clone());
+        self.servers.insert(address.clone(), server.clone());
 
-        let conn = Connection::new(
-            0,
-            server.address.clone(),
-            0,
-            options.connect_timeout,
-            options.tls_options(),
-            options.cmap_event_handler.clone(),
-        )?;
-
-        monitor_server(conn, Arc::downgrade(&server), options.heartbeat_freq);
+        Monitor::start(address, Arc::downgrade(&server), options)?;
 
         Ok(())
     }
