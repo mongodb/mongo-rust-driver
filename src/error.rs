@@ -172,7 +172,7 @@ pub enum ErrorKind {
 
     /// An error occurred when trying to execute a write operation
     #[error(
-        display = "An error occurred when trying to execute a write operation: {}",
+        display = "An error occurred when trying to execute a write operation: {:?}",
         _0
     )]
     WriteError(WriteFailure),
@@ -375,12 +375,6 @@ impl WriteFailure {
             }
             .into())
         }
-    }
-}
-
-impl fmt::Display for WriteFailure {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        unimplemented!()
     }
 }
 
