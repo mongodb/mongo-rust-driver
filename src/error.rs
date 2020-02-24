@@ -172,7 +172,7 @@ pub enum ErrorKind {
 
     /// An error occurred when trying to execute a write operation
     #[error(
-        display = "An error occurred when trying to execute a write operation: {}",
+        display = "An error occurred when trying to execute a write operation: {:?}",
         _0
     )]
     WriteError(WriteFailure),
