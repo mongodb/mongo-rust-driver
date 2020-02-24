@@ -59,6 +59,8 @@ fn connect_stream(address: &StreamAddress, connect_timeout: Option<Duration>) ->
         return Err(ErrorKind::NoDnsResults(address.clone()).into());
     }
 
+    // After considering various approaches, we decided to do what other drivers do, namely try each
+    // of the addresses in sequence with a preference for IPv4.
     socket_addrs.sort_by_key(|addr| if addr.is_ipv4() { 0 } else { 1 });
 
     let mut connect_error = match try_connect(&socket_addrs[0], timeout) {
