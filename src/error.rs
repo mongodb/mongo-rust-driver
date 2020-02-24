@@ -378,12 +378,6 @@ impl WriteFailure {
     }
 }
 
-impl fmt::Display for WriteFailure {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        unimplemented!()
-    }
-}
-
 /// Translates ErrorKind::BulkWriteError cases to ErrorKind::WriteErrors, leaving all other errors
 /// untouched.
 pub(crate) fn convert_bulk_errors(error: Error) -> Error {
