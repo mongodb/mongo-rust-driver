@@ -63,19 +63,16 @@ fn connect_stream(address: &StreamAddress, connect_timeout: Option<Duration>) ->
     // of the addresses in sequence with a preference for IPv4.
     socket_addrs.sort_by_key(|addr| if addr.is_ipv4() { 0 } else { 1 });
 
-    let mut connect_error = match try_connect(&socket_addrs[0], timeout) {
-        Ok(stream) => return Ok(stream),
-        Err(err) => err,
-    };
+    let mut connect_error = None;
 
-    for address in &socket_addrs[1..] {
+    for address in &socket_addrs {
         connect_error = match try_connect(address, timeout) {
             Ok(stream) => return Ok(stream),
-            Err(err) => err,
+            Err(err) => Some(err),
         };
     }
 
-    Err(connect_error)
+    Err(connect_error.unwrap_or_else(|| ErrorKind::NoDnsResults(address.clone()).into()))
 }
 
 impl Stream {
