@@ -106,15 +106,15 @@ pub enum ErrorKind {
     #[error(display = "Command failed {}", _0)]
     CommandError(CommandError),
 
-    /// Wrapper around `webpki::InvalidDNSNameError`.
-    #[error(display = "{}", _0)]
-    DnsName(#[error(source)] webpki::InvalidDNSNameError),
-
     // `trust_dns` does not implement the `Error` trait on their errors, so we have to manually
     // implement `From` rather than using the `source annotation.
     /// Wrapper around `trust_dns_resolver::error::ResolveError`.
     #[error(display = "{}", _0)]
     DnsResolve(trust_dns_resolver::error::ResolveError),
+
+    /// Wrapper around `webpki::InvalidDNSNameError`.
+    #[error(display = "{}", _0)]
+    InvalidDnsName(#[error(source)] webpki::InvalidDNSNameError),
 
     /// A hostname could not be parsed.
     #[error(display = "Unable to parse hostname: {}", hostname)]
