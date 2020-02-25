@@ -82,6 +82,10 @@ pub enum ErrorKind {
     )]
     ArgumentError { message: String },
 
+    #[cfg(feature = "async-std-runtime")]
+    #[error(display = "{}", _0)]
+    AsyncStdTimeout(#[error(source)] async_std::future::TimeoutError),
+
     /// An error occurred while the [`Client`](../struct.Client.html) attempted to authenticate a
     /// connection.
     #[error(display = "{}", message)]
@@ -158,6 +162,14 @@ pub enum ErrorKind {
     /// An error occurred during SRV record lookup.
     #[error(display = "An error occurred during SRV record lookup: {}", message)]
     SrvLookupError { message: String },
+
+    /// A timeout occurred before a Tokio task could be completed.
+    #[cfg(feature = "tokio-runtime")]
+    #[error(display = "{}", _0)]
+    TokioTimeoutElapsed(#[error(source)] tokio::time::Elapsed),
+
+    #[error(display = "{}", _0)]
+    RustlsConfig(#[error(source)] rustls::TLSError),
 
     /// An error occurred during TXT record lookup
     #[error(display = "An error occurred during TXT record lookup: {}", message)]

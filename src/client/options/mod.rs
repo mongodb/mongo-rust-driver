@@ -467,7 +467,7 @@ impl TlsOptions {
             };
 
             // TODO: Get rid of unwrap
-            config.set_single_client_cert(certs, key.into_iter().next().unwrap());
+            config.set_single_client_cert(certs, key.into_iter().next().unwrap())?;
         }
 
         Ok(config)

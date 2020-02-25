@@ -26,6 +26,8 @@ use crate::{
     options::{StreamAddress, TlsOptions},
 };
 pub(crate) use command::{Command, CommandResponse};
+#[cfg(any(feature = "tokio-runtime", feature = "async-std-runtime"))]
+pub(crate) use stream::StreamOptions;
 pub(crate) use stream_description::StreamDescription;
 pub(crate) use wire::next_request_id;
 

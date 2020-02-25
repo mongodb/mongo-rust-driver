@@ -127,7 +127,7 @@ functions:
           export SSL="${SSL}"
           . .evergreen/generate-uri.sh
 
-          .evergreen/run-tests.sh
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} .evergreen/run-tests.sh
 
   "run atlas tests":
     - command: shell.exec
@@ -141,7 +141,7 @@ functions:
           export MONGO_ATLAS_TESTS=1 
           export MONGO_ATLAS_FREE_TIER_REPL_URI='${MONGO_ATLAS_FREE_TIER_REPL_URI}'
           export MONGO_ATLAS_FREE_TIER_REPL_URI_SRV='${MONGO_ATLAS_FREE_TIER_REPL_URI_SRV}'
-          .evergreen/run-atlas-tests.sh
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} .evergreen/run-atlas-tests.sh
 
   "check rustfmt":
     - command: shell.exec
@@ -389,6 +389,18 @@ axes:
         variables:
            TOPOLOGY: "sharded_cluster"
 
+  - id: "async-runtime"
+    display_name: Async Runtime
+    values:
+      - id: "tokio"
+        display_name: "tokio"
+        variables:
+          ASYNC_RUNTIME: "tokio"
+      - id: "async-std"
+        display_name: "async-std"
+        variables:
+          ASYNC_RUNTIME: "async-std"
+
   # Note that drivers-evergreen-tools expects `SSL` as the environmental
   # variable, not `TLS`, so we have to use that for the actual value used in the
   # script; we use `TLS` for the metadata that isn't used by the actual shell
@@ -423,7 +435,8 @@ buildvariants:
   matrix_spec:
     os: "*"
     auth-and-tls: "*"
-  display_name: "${os} ${auth-and-tls}"
+    async-runtime: "*"
+  display_name: "${os} ${auth-and-tls} with ${async-runtime}"
   tasks:
      - ".latest"
      - ".4.2"
@@ -432,7 +445,8 @@ buildvariants:
 - matrix_name: "atlas-connect"
   matrix_spec:
     os: "*"
-  display_name: "Atlas Connectivity ${os}"
+    async-runtime: "*"
+  display_name: "Atlas Connectivity ${os} with ${async-runtime}"
   tasks:
     - ".atlas-connect"
 
