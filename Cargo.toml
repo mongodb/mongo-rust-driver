@@ -16,6 +16,7 @@ tokio-runtime = ["tokio/dns", "tokio/rt-core", "tokio/tcp"]
 async-std-runtime = ["async-std"]
 
 [dependencies]
+async-trait = "0.1.24"
 base64 = "0.11.0"
 bitflags = "1.1.0"
 bson = "0.14.0"
