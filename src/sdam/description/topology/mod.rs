@@ -209,7 +209,7 @@ impl TopologyDescription {
     /// Check the cluster for a compatibility error, and record the error message if one is found.
     fn check_compatibility(&mut self) {
         self.compatibility_error = None;
-        
+
         for server in self.servers.values() {
             let error_message = server.compatibility_error_message();
 
