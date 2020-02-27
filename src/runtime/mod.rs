@@ -57,12 +57,6 @@ impl AsyncRuntime {
 
     /// Create and connect a new `AsyncStream`.
     pub(crate) async fn connect_stream(self, options: StreamOptions) -> Result<AsyncStream> {
-        match self {
-            #[cfg(feature = "tokio-runtime")]
-            Self::Tokio => AsyncStream::connect_tokio(options).await,
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd => AsyncStream::connect_async_std(options).await,
-        }
+        AsyncStream::connect(options).await
     }
 }

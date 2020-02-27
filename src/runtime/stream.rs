@@ -7,6 +7,8 @@ use std::{
 };
 
 use tokio::io::{AsyncRead, AsyncWrite};
+use tokio_rustls::TlsConnector;
+use webpki::DNSNameRef;
 
 use crate::{
     cmap::conn::StreamOptions,
@@ -21,15 +23,15 @@ const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 #[derive(Debug)]
 pub(crate) enum AsyncStream {
     /// A basic TCP connection to the server.
-    Tcp(AsyncStreamInner),
+    Tcp(AsyncTcpStream),
 
     /// A TLS connection over TCP.
-    Tls(tokio_rustls::client::TlsStream<AsyncStreamInner>),
+    Tls(tokio_rustls::client::TlsStream<AsyncTcpStream>),
 }
 
 /// A runtime-agnostic async stream.
 #[derive(Debug)]
-pub(crate) enum AsyncStreamInner {
+pub(crate) enum AsyncTcpStream {
     /// Wrapper around `tokio::net:TcpStream`.
     #[cfg(feature = "tokio-runtime")]
     Tokio(tokio::net::TcpStream),
@@ -119,47 +121,25 @@ async fn connect_stream<C: AsyncConnect>(
 
 impl AsyncStream {
     /// Creates a new Tokio TCP stream connected to the server as specified by `options`.
-    #[cfg(feature = "tokio-runtime")]
-    pub(super) async fn connect_tokio(options: StreamOptions) -> Result<Self> {
+    pub(super) async fn connect(options: StreamOptions) -> Result<Self> {
         use std::sync::Arc;
 
-        use tokio::net::TcpStream;
-        use tokio_rustls::TlsConnector;
-        use webpki::DNSNameRef;
-
-        let inner: TcpStream = connect_stream(&options.address, options.connect_timeout).await?;
-        inner.set_nodelay(true)?;
-
-        let inner = AsyncStreamInner::Tokio(inner);
-
-        // If there are TLS options, wrap the inner stream with rustls.
-        match options.tls_options {
-            Some(cfg) => {
-                let name = DNSNameRef::try_from_ascii_str(&options.address.hostname)?;
-                let mut tls_config = cfg.into_rustls_config()?;
-                tls_config.enable_sni = true;
-
-                let connector: TlsConnector = Arc::new(tls_config).into();
-                let session = connector.connect(name, inner).await?;
-
-                Ok(Self::Tls(session))
-            }
-            None => Ok(Self::Tcp(inner)),
-        }
-    }
-
-    #[cfg(feature = "async-std-runtime")]
-    pub(super) async fn connect_async_std(options: StreamOptions) -> Result<Self> {
-        use std::sync::Arc;
-
+        #[cfg(feature = "async-std-runtime")]
         use async_std::net::TcpStream;
-        use tokio_rustls::TlsConnector;
-        use webpki::DNSNameRef;
+        #[cfg(feature = "tokio-runtime")]
+        use tokio::net::TcpStream;
 
+        #[cfg(feature = "tokio-runtime")]
         let inner: TcpStream = connect_stream(&options.address, options.connect_timeout).await?;
+        #[cfg(feature = "async-std-runtime")]
+        let inner: TcpStream = connect_stream(&options.address, options.connect_timeout).await?;
+
         inner.set_nodelay(true)?;
 
-        let inner = AsyncStreamInner::AsyncStd(inner);
+        #[cfg(feature = "tokio-runtime")]
+        let inner = AsyncTcpStream::Tokio(inner);
+        #[cfg(feature = "async-std-runtime")]
+        let inner = AsyncTcpStream::AsyncStd(inner);
 
         // If there are TLS options, wrap the inner stream with rustls.
         match options.tls_options {
@@ -221,7 +201,7 @@ impl AsyncWrite for AsyncStream {
     }
 }
 
-impl AsyncRead for AsyncStreamInner {
+impl AsyncRead for AsyncTcpStream {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -241,7 +221,7 @@ impl AsyncRead for AsyncStreamInner {
     }
 }
 
-impl AsyncWrite for AsyncStreamInner {
+impl AsyncWrite for AsyncTcpStream {
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
