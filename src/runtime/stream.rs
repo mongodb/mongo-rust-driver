@@ -2,6 +2,7 @@ use std::{
     net::{SocketAddr, ToSocketAddrs},
     ops::DerefMut,
     pin::Pin,
+    sync::Arc,
     task::{Context, Poll},
     time::Duration,
 };
@@ -41,105 +42,85 @@ pub(crate) enum AsyncTcpStream {
     AsyncStd(async_std::net::TcpStream),
 }
 
-#[async_trait::async_trait]
-trait AsyncConnect
-where
-    Self: Sized,
-{
-    async fn connect(address: &SocketAddr) -> Result<Self>;
-
-    async fn connect_timeout(address: &SocketAddr, timeout: Duration) -> Result<Self>;
-}
-
 #[cfg(feature = "tokio-runtime")]
-#[async_trait::async_trait]
-impl AsyncConnect for tokio::net::TcpStream {
-    async fn connect(address: &SocketAddr) -> Result<Self> {
-        let stream = Self::connect(address).await?;
-        Ok(stream)
-    }
-
-    async fn connect_timeout(address: &SocketAddr, timeout: Duration) -> Result<Self> {
-        let stream = Self::connect_timeout(address, timeout).await?;
-        Ok(stream)
+impl From<tokio::net::TcpStream> for AsyncTcpStream {
+    fn from(stream: tokio::net::TcpStream) -> Self {
+        Self::Tokio(stream)
     }
 }
 
 #[cfg(feature = "async-std-runtime")]
-#[async_trait::async_trait]
-impl AsyncConnect for async_std::net::TcpStream {
-    async fn connect(address: &SocketAddr) -> Result<Self> {
-        let stream = Self::connect(address).await?;
-        Ok(stream)
-    }
-
-    async fn connect_timeout(address: &SocketAddr, timeout: Duration) -> Result<Self> {
-        let stream = Self::connect_timeout(address, timeout).await?;
-        Ok(stream)
+impl From<async_std::net::TcpStream> for AsyncTcpStream {
+    fn from(stream: async_std::net::TcpStream) -> Self {
+        Self::AsyncStd(stream)
     }
 }
 
-async fn try_connect<C: AsyncConnect>(address: &SocketAddr, timeout: Duration) -> Result<C> {
-    // The URI options spec requires that the default connect timeout is 10 seconds, but that 0
-    // should indicate no timeout.
-    let stream = if timeout == Duration::from_secs(0) {
-        C::connect(address).await?
-    } else {
-        C::connect_timeout(address, timeout).await?
-    };
+impl AsyncTcpStream {
+    fn set_nodelay(&self) -> Result<()> {
+        match self {
+            #[cfg(feature = "tokio-runtime")]
+            Self::Tokio(ref stream) => stream.set_nodelay(true)?,
 
-    Ok(stream)
-}
-
-async fn connect_stream<C: AsyncConnect>(
-    address: &StreamAddress,
-    connect_timeout: Option<Duration>,
-) -> Result<C> {
-    let timeout = connect_timeout.unwrap_or(DEFAULT_CONNECT_TIMEOUT);
-
-    let mut socket_addrs: Vec<_> = address.to_socket_addrs()?.collect();
-
-    if socket_addrs.is_empty() {
-        return Err(ErrorKind::NoDnsResults(address.clone()).into());
-    }
-
-    // After considering various approaches, we decided to do what other drivers do, namely try each
-    // of the addresses in sequence with a preference for IPv4.
-    socket_addrs.sort_by_key(|addr| if addr.is_ipv4() { 0 } else { 1 });
-
-    let mut connect_error = None;
-
-    for address in &socket_addrs {
-        connect_error = match try_connect(address, timeout).await {
-            Ok(stream) => return Ok(stream),
-            Err(err) => Some(err),
+            #[cfg(feature = "async-std-runtime")]
+            Self::AsyncStd(ref stream) => stream.set_nodelay(true)?,
         };
+
+        Ok(())
     }
 
-    Err(connect_error.unwrap_or_else(|| ErrorKind::NoDnsResults(address.clone()).into()))
+    async fn try_connect(address: &SocketAddr, connect_timeout: Duration) -> Result<Self> {
+        #[cfg(feature = "tokio-runtime")]
+        use tokio::{net::TcpStream, time::timeout};
+
+        #[cfg(feature = "async-std-runtime")]
+        use async_std::{future::timeout, net::TcpStream};
+
+        let stream_future = TcpStream::connect(address);
+
+        // The URI options spec requires that the default connect timeout is 10 seconds, but that 0
+        // should indicate no timeout.
+        let stream: Self = if connect_timeout == Duration::from_secs(0) {
+            stream_future.await?.into()
+        } else {
+            timeout(connect_timeout, stream_future).await??.into()
+        };
+
+        stream.set_nodelay()?;
+
+        Ok(stream)
+    }
+
+    async fn connect(address: &StreamAddress, connect_timeout: Option<Duration>) -> Result<Self> {
+        let timeout = connect_timeout.unwrap_or(DEFAULT_CONNECT_TIMEOUT);
+
+        let mut socket_addrs: Vec<_> = address.to_socket_addrs()?.collect();
+
+        if socket_addrs.is_empty() {
+            return Err(ErrorKind::NoDnsResults(address.clone()).into());
+        }
+
+        // After considering various approaches, we decided to do what other drivers do, namely try
+        // each of the addresses in sequence with a preference for IPv4.
+        socket_addrs.sort_by_key(|addr| if addr.is_ipv4() { 0 } else { 1 });
+
+        let mut connect_error = None;
+
+        for address in &socket_addrs {
+            connect_error = match Self::try_connect(address, timeout).await {
+                Ok(stream) => return Ok(stream),
+                Err(err) => Some(err),
+            };
+        }
+
+        Err(connect_error.unwrap_or_else(|| ErrorKind::NoDnsResults(address.clone()).into()))
+    }
 }
 
 impl AsyncStream {
     /// Creates a new Tokio TCP stream connected to the server as specified by `options`.
     pub(super) async fn connect(options: StreamOptions) -> Result<Self> {
-        use std::sync::Arc;
-
-        #[cfg(feature = "async-std-runtime")]
-        use async_std::net::TcpStream;
-        #[cfg(feature = "tokio-runtime")]
-        use tokio::net::TcpStream;
-
-        #[cfg(feature = "tokio-runtime")]
-        let inner: TcpStream = connect_stream(&options.address, options.connect_timeout).await?;
-        #[cfg(feature = "async-std-runtime")]
-        let inner: TcpStream = connect_stream(&options.address, options.connect_timeout).await?;
-
-        inner.set_nodelay(true)?;
-
-        #[cfg(feature = "tokio-runtime")]
-        let inner = AsyncTcpStream::Tokio(inner);
-        #[cfg(feature = "async-std-runtime")]
-        let inner = AsyncTcpStream::AsyncStd(inner);
+        let inner = AsyncTcpStream::connect(&options.address, options.connect_timeout).await?;
 
         // If there are TLS options, wrap the inner stream with rustls.
         match options.tls_options {

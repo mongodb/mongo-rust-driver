@@ -86,6 +86,7 @@ pub mod event;
 mod is_master;
 mod operation;
 pub mod results;
+// TODO RUST-212: Remove the annotation to suppress warnings for unused code.
 #[allow(dead_code)]
 #[cfg(any(feature = "tokio-runtime", feature = "async-std-runtime"))]
 pub(crate) mod runtime;

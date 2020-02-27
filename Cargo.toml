@@ -12,7 +12,7 @@ version = "0.9.1"
 
 [features]
 default = ["tokio-runtime"]
-tokio-runtime = ["tokio/dns", "tokio/rt-core", "tokio/tcp"]
+tokio-runtime = ["tokio/dns", "tokio/rt-core", "tokio/tcp", "tokio/time"]
 async-std-runtime = ["async-std"]
 
 [dependencies]
