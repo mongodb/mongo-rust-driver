@@ -39,8 +39,8 @@ impl AsyncRuntime {
     /// Run a future in the foreground, blocking on it completing.
     pub(crate) fn block_on<F, T>(self, fut: F) -> T
     where
-        F: Future<Output = T> + Send + 'static,
-        T: Send + 'static,
+        F: Future<Output = T> + Send,
+        T: Send,
     {
         #[cfg(all(feature = "tokio-runtime", not(feature = "async-std-runtime")))]
         {

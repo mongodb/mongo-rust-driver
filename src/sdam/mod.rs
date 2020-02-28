@@ -1,4 +1,6 @@
 mod description;
+#[allow(dead_code)]
+mod message_manager;
 mod monitor;
 pub mod public;
 mod state;
@@ -9,13 +11,7 @@ pub use self::public::{ServerInfo, ServerType};
 pub(crate) use self::description::server::ServerDescription;
 pub(crate) use self::{
     description::topology::TopologyDescription,
+    message_manager::TopologyMessageManager,
     monitor::MIN_HEARTBEAT_FREQUENCY,
-    state::{
-        handle_post_handshake_error,
-        handle_pre_handshake_error,
-        server::Server,
-        update_topology,
-        Topology,
-        TopologyUpdateCondvar,
-    },
+    state::{server::Server, Topology},
 };
