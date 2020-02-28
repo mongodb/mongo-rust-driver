@@ -86,6 +86,10 @@ pub mod event;
 mod is_master;
 mod operation;
 pub mod results;
+// TODO RUST-212: Remove the annotation to suppress warnings for unused code.
+#[allow(dead_code)]
+#[cfg(any(feature = "tokio-runtime", feature = "async-std-runtime"))]
+pub(crate) mod runtime;
 mod sdam;
 mod selection_criteria;
 mod srv;
@@ -102,3 +106,15 @@ pub use crate::{
     cursor::Cursor,
     db::Database,
 };
+
+#[cfg(all(feature = "tokio-runtime", feature = "async-std-runtime"))]
+compile_error!(
+    "`tokio-runtime` and `async-runtime` can't both be enabled; either disable \
+     `async-std-runtime` or set `default-features = false` in your Cargo.toml"
+);
+
+#[cfg(all(not(feature = "tokio-runtime"), not(feature = "async-std-runtime")))]
+compile_error!(
+    "one of `tokio-runtime` or `async-runtime` must be enabled; either enable `default-features` \
+     or `async-std-runtime` in your Cargo.toml"
+);

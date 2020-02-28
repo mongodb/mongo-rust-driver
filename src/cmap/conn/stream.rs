@@ -16,6 +16,15 @@ use crate::{
 
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
+#[derive(Clone, Debug)]
+pub(crate) struct StreamOptions {
+    pub(crate) address: StreamAddress,
+
+    pub(crate) connect_timeout: Option<Duration>,
+
+    pub(crate) tls_options: Option<TlsOptions>,
+}
+
 /// Stream encapsulates the different socket types that can be used and adds a thin wrapper for I/O.
 #[derive(Derivative)]
 #[derivative(Debug)]
