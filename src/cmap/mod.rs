@@ -8,15 +8,12 @@ pub(crate) mod options;
 mod wait_queue;
 
 use std::{
-    sync::{
-        atomic::{AtomicU32, Ordering},
-        Arc,
-        RwLock,
-    },
-    time::{Duration, Instant},
+    sync::Arc,
+    time::Duration,
 };
 
 use derivative::Derivative;
+use tokio::sync::{Mutex, RwLock};
 
 pub use self::conn::ConnectionInfo;
 pub(crate) use self::conn::{Command, CommandResponse, Connection, StreamDescription};
@@ -39,6 +36,7 @@ use crate::{
         PoolClosedEvent,
         PoolCreatedEvent,
     },
+    runtime::AsyncRuntime,
     options::{StreamAddress, TlsOptions},
 };
 
@@ -67,7 +65,7 @@ pub(crate) struct ConnectionPoolInner {
     /// The set of available connections in the pool. Because the CMAP spec requires that
     /// connections are checked out in a FIFO manner, connections are pushed/popped from the back
     /// of the Vec.
-    connections: Arc<RwLock<Vec<Connection>>>,
+    connections: RwLock<Vec<Connection>>,
 
     /// The connect timeout passed to each underlying TcpStream when attemtping to connect to the
     /// server.
@@ -87,7 +85,7 @@ pub(crate) struct ConnectionPoolInner {
     /// The current generation of the pool. The generation is incremented whenever the pool is
     /// cleared. Connections belonging to a previous generation are considered stale and will be
     /// closed when checked back in or when popped off of the set of available connections.
-    generation: AtomicU32,
+    generation: RwLock<u32>,
 
     /// Connections that have been ready for usage in the pool for longer than `max_idle_time` will
     /// be closed either by the background thread or when popped off of the set of available
@@ -106,11 +104,7 @@ pub(crate) struct ConnectionPoolInner {
     min_pool_size: Option<u32>,
 
     /// The ID of the next connection created by the pool.
-    next_connection_id: AtomicU32,
-
-    /// If a checkout operation takes longer than `wait_queue_timeout`, the pool will return an
-    /// error. If `wait_queue_timeout` is `None`, then the checkout operation will not time out.
-    wait_queue_timeout: Option<Duration>,
+    next_connection_id: Mutex<u32>,
 
     /// The TLS options to use for the connections. If `tls_options` is None, then TLS will not be
     /// used to connect to the server.
@@ -118,16 +112,14 @@ pub(crate) struct ConnectionPoolInner {
 
     /// The total number of connections currently in the pool. This includes connections which are
     /// currently checked out of the pool.
-    total_connection_count: AtomicU32,
+    total_connection_count: RwLock<u32>,
 
-    /// Connections are checked out by concurrent threads on a first-come, first-server basis. This
-    /// is enforced by threads entering the wait queue when they first try to check out a
-    /// connection and then blocking until they are at the front of the queue.
+    /// The queue that operations wait in to check out a connection.
     wait_queue: WaitQueue,
 }
 
 impl ConnectionPool {
-    pub(crate) fn new(address: StreamAddress, mut options: Option<ConnectionPoolOptions>) -> Self {
+    pub(crate) fn new(address: StreamAddress, runtime: AsyncRuntime, mut options: Option<ConnectionPoolOptions>) -> Self {
         // Get the individual options from `options`.
         let connect_timeout = options.as_ref().and_then(|opts| opts.connect_timeout);
         let credential = options.as_mut().and_then(|opts| opts.credential.clone());
@@ -155,16 +147,15 @@ impl ConnectionPool {
             credential,
             establisher,
             event_handler,
-            generation: AtomicU32::new(0),
+            generation: RwLock::new(0),
             max_idle_time,
             max_pool_size,
             min_pool_size,
-            next_connection_id: AtomicU32::new(1),
+            next_connection_id: Mutex::new(1),
             tls_options,
-            total_connection_count: AtomicU32::new(0),
-            wait_queue: WaitQueue::new(address.clone(), wait_queue_timeout),
-            wait_queue_timeout,
+            total_connection_count: RwLock::new(0),
             connections: Default::default(),
+            wait_queue: WaitQueue::new(address.clone(), max_pool_size, wait_queue_timeout),
         };
 
         let pool = Self {
@@ -177,7 +168,7 @@ impl ConnectionPool {
             handler.handle_pool_created_event(event);
         });
 
-        background::start_background_thread(Arc::downgrade(&pool.inner));
+        background::start_background_task(Arc::downgrade(&pool.inner));
 
         pool
     }
@@ -195,7 +186,7 @@ impl ConnectionPool {
     /// front of the wait queue, and then will block again if no available connections are in the
     /// pool and the total number of connections is not less than the max pool size. If the method
     /// blocks for longer than `wait_queue_timeout`, a `WaitQueueTimeoutError` will be returned.
-    pub(crate) fn check_out(&self) -> Result<Connection> {
+    pub(crate) async fn check_out(&self) -> Result<Connection> {
         self.emit_event(|handler| {
             let event = ConnectionCheckoutStartedEvent {
                 address: self.inner.address.clone(),
@@ -204,8 +195,8 @@ impl ConnectionPool {
             handler.handle_connection_checkout_started_event(event);
         });
 
-        let result = self.acquire_or_create_connection();
-
+        let result = self.acquire_or_create_connection().await;
+        
         let mut conn = match result {
             Ok(conn) => conn,
             Err(e) => {
@@ -229,70 +220,35 @@ impl ConnectionPool {
         });
 
         conn.mark_checked_out(Arc::downgrade(&self.inner));
-
+        
         Ok(conn)
     }
 
     /// Waits for the thread to reach the front of the wait queue, then attempts to check out a
-    /// connection.
-    fn acquire_or_create_connection(&self) -> Result<Connection> {
-        let start_time = Instant::now();
-        let mut handle = self.inner.wait_queue.wait_until_at_front()?;
-
-        loop {
-            // Try to get the most recent available connection.
-            while let Some(conn) = self.inner.connections.write().unwrap().pop() {
-                // Close the connection if it's stale.
-                if conn.is_stale(self.inner.generation.load(Ordering::SeqCst)) {
-                    self.close_connection(conn, ConnectionClosedReason::Stale);
-                    continue;
-                }
-
-                // Close the connection if it's idle.
-                if conn.is_idle(self.inner.max_idle_time) {
-                    self.close_connection(conn, ConnectionClosedReason::Idle);
-                    continue;
-                }
-
-                // Otherwise, return the connection.
-                return Ok(conn);
+    /// connection. If none are available in the pool, one is created and checked out instead.
+    async fn acquire_or_create_connection(&self) -> Result<Connection> {
+        self.inner.wait_queue.wait_until_at_front().await?;
+        
+        // Try to get the most recent available connection.
+        while let Some(conn) = self.inner.connections.write().await.pop() {
+            // Close the connection if it's stale.
+            if conn.is_stale(*self.inner.generation.read().await) {
+                self.close_connection(conn, ConnectionClosedReason::Stale).await;
+                continue;
             }
 
-            // Create a new connection if the pool is under max size.
-            if self.inner.total_connection_count.load(Ordering::SeqCst) < self.inner.max_pool_size {
-                return Ok(self.create_connection(true)?);
+            // Close the connection if it's idle.
+            if conn.is_idle(self.inner.max_idle_time) {
+                self.close_connection(conn, ConnectionClosedReason::Idle).await;
+                continue;
             }
 
-            // Check if the pool has a max timeout.
-            if let Some(timeout) = self.inner.wait_queue_timeout {
-                // Check how long since the checkout process began.
-                let time_waiting = Instant::now().duration_since(start_time);
-
-                // If the timeout has been reached, return an error.
-                if time_waiting >= timeout {
-                    self.emit_event(|handler| {
-                        let event = ConnectionCheckoutFailedEvent {
-                            address: self.inner.address.clone(),
-                            reason: ConnectionCheckoutFailedReason::Timeout,
-                        };
-
-                        handler.handle_connection_checkout_failed_event(event);
-                    });
-
-                    return Err(ErrorKind::WaitQueueTimeoutError {
-                        address: self.inner.address.clone(),
-                    }
-                    .into());
-                }
-
-                // Wait until the either the timeout has been reached or a connection is checked
-                // into the pool.
-                handle.wait_for_available_connection(Some(timeout - time_waiting))?;
-            } else {
-                // Wait until a connection has been returned to the pool.
-                handle.wait_for_available_connection(None)?;
-            }
+            // Otherwise, return the connection.
+            return Ok(conn);
         }
+
+        // No connections in the pool, create a new one.
+        return Ok(self.create_connection(true).await?);    
     }
 
     /// Checks a connection back into the pool and notifies the wait queue that a connection is
@@ -306,8 +262,8 @@ impl ConnectionPool {
 
     /// Increments the generation of the pool. Rather than eagerly removing stale connections from
     /// the pool, they are left for the background thread to clean up.
-    pub(crate) fn clear(&self) {
-        self.inner.generation.fetch_add(1, Ordering::SeqCst);
+    pub(crate) async fn clear(&self) {
+        *self.inner.generation.write().await += 1;
 
         self.emit_event(|handler| {
             let event = PoolClearedEvent {
@@ -321,26 +277,28 @@ impl ConnectionPool {
     /// Internal helper to close a connection, emit the event for it being closed, and decrement the
     /// total connection count. Any connection being closed by the pool should be closed by using
     /// this method.
-    fn close_connection(&self, conn: Connection, reason: ConnectionClosedReason) {
+    async fn close_connection(&self, conn: Connection, reason: ConnectionClosedReason) {
         self.emit_event(|handler| {
             handler.handle_connection_closed_event(conn.closed_event(reason));
         });
 
-        self.inner
-            .total_connection_count
-            .fetch_sub(1, Ordering::SeqCst);
+        *self.inner.total_connection_count.write().await -= 1;
     }
 
+    async fn next_connection_id(&self) -> u32 {
+        let mut lock = self.inner.next_connection_id.lock().await;
+        *lock += 1;
+        *lock
+    }
+        
     /// Helper method to create a connection and increment the total connection count.
-    fn create_connection(&self, checking_out: bool) -> Result<Connection> {
-        self.inner
-            .total_connection_count
-            .fetch_add(1, Ordering::SeqCst);
+    async fn create_connection(&self, checking_out: bool) -> Result<Connection> {
+        *self.inner.total_connection_count.write().await += 1;
 
         let mut connection = Connection::new(
-            self.inner.next_connection_id.fetch_add(1, Ordering::SeqCst),
+            self.next_connection_id().await,
             self.inner.address.clone(),
-            self.inner.generation.load(Ordering::SeqCst),
+            *self.inner.generation.read().await,
             self.inner.connect_timeout,
             self.inner.tls_options.clone(),
             self.inner.event_handler.clone(),
@@ -356,7 +314,7 @@ impl ConnectionPool {
             .establish_connection(&mut connection, self.inner.credential.as_ref());
 
         if let Err(e) = establish_result {
-            self.clear();
+            self.clear().await;
 
             if checking_out {
                 self.emit_event(|handler| {
@@ -392,7 +350,7 @@ impl ConnectionPoolInner {
     /// ready. If the connection is stale, it will be closed instead of being added to the set of
     /// available connections. The time that the connection is checked in will be marked to
     /// facilitate detecting if the connection becomes idle.
-    fn check_in(&self, mut conn: Connection) {
+    async fn check_in(&self, mut conn: Connection) {
         self.emit_event(|handler| {
             handler.handle_connection_checked_in_event(conn.checked_in_event());
         });
@@ -400,25 +358,23 @@ impl ConnectionPoolInner {
         conn.mark_checked_in();
 
         // Close the connection if it's stale.
-        if conn.is_stale(self.generation.load(Ordering::SeqCst)) {
-            self.close_connection(conn, ConnectionClosedReason::Stale);
-
+        if conn.is_stale(*self.generation.read().await) {
+            self.close_connection(conn, ConnectionClosedReason::Stale).await;
             return;
         }
 
-        self.connections.write().unwrap().push(conn);
-        self.wait_queue.notify_ready();
+        self.connections.write().await.push(conn);
     }
 
     /// Internal helper to close a connection, emit the event for it being closed, and decrement the
     /// total connection count. Any connection being closed by the pool should be closed by using
     /// this method.
-    fn close_connection(&self, conn: Connection, reason: ConnectionClosedReason) {
+   async fn close_connection(&self, conn: Connection, reason: ConnectionClosedReason) {
         self.emit_event(|handler| {
             handler.handle_connection_closed_event(conn.closed_event(reason));
         });
 
-        self.total_connection_count.fetch_sub(1, Ordering::SeqCst);
+        *self.total_connection_count.write().await -= 1;
     }
 }
 
@@ -427,20 +383,44 @@ impl Drop for ConnectionPoolInner {
     /// than `ConnectionPool` so that it only gets run once all (non-weak) references to the
     /// `ConnectionPoolInner` are dropped.
     fn drop(&mut self) {
-        for mut conn in self.connections.write().unwrap().drain(..) {
-            conn.pool.take();
+        let address = self.address.clone();
+        let connections = self.connections.clone();
+        let event_handler = self.event_handler.clone();
 
-            self.emit_event(|handler| {
-                handler.handle_connection_closed_event(
-                    conn.closed_event(ConnectionClosedReason::PoolClosed),
-                );
-            });
-        }
-
-        self.emit_event(|handler| {
-            handler.handle_pool_closed_event(PoolClosedEvent {
-                address: self.address.clone(),
-            });
+        runtime.execute(async move {
+            for mut conn in connections.write().await.drain(..) {
+                conn.pool.take();
+                
+                if let Some(ref handler) = event_handler {
+                    handler.handle_connection_closed_event(
+                        conn.closed_event(
+                            ConnectionClosedReason::PoolClosed
+                        ),
+                    );
+                }
+            }
+            
+            if let Some(ref handler) = event_handler {
+                handler.handle_pool_closed_event(PoolClosedEvent {
+                    address: address.clone(),
+                });
+            }
         });
+        
+        // for mut conn in self.connections.write().unwrap().drain(..) {
+        //     conn.pool.take();
+
+        //     self.emit_event(|handler| {
+        //         handler.handle_connection_closed_event(
+        //             conn.closed_event(ConnectionClosedReason::PoolClosed),
+        //         );
+        //     });
+        // }
+
+        // self.emit_event(|handler| {
+        //     handler.handle_pool_closed_event(PoolClosedEvent {
+        //         address: self.address.clone(),
+        //     });
+        // });
     }
 }

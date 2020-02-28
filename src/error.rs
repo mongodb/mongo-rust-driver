@@ -116,6 +116,9 @@ pub enum ErrorKind {
     #[error(display = "{}", _0)]
     DnsResolve(trust_dns_resolver::error::ResolveError),
 
+    #[error(display = "Internal error: {}", message)]
+    InternalError { message: String },
+
     /// Wrapper around `webpki::InvalidDNSNameError`.
     #[error(display = "{}", _0)]
     InvalidDnsName(#[error(source)] webpki::InvalidDNSNameError),

@@ -24,6 +24,7 @@ use crate::{
         ConnectionReadyEvent,
     },
     options::{StreamAddress, TlsOptions},
+    runtime::runtime,
 };
 pub(crate) use command::{Command, CommandResponse};
 #[cfg(any(feature = "tokio-runtime", feature = "async-std-runtime"))]
@@ -110,26 +111,21 @@ impl Connection {
         &self.address
     }
 
-    /// In order to check a connection back into the pool when it's dropped, we need to be able to
-    /// replace it with something. The `null` method facilitates this by creating a dummy connection
-    /// which can be passed to `std::mem::replace` to be dropped in place of the original
-    /// connection.
-    fn null() -> Self {
+    /// Nullify the internals of this connection, moving them into the internals of the returned new connection.
+    /// This is used so that the connection can be "moved" into an async task in `Connection`'s `Drop` implementation.
+    fn take(&mut self) -> Self {
         Self {
-            id: 0,
-            address: StreamAddress {
-                hostname: Default::default(),
-                port: None,
-            },
-            generation: 0,
-            pool: None,
-            stream_description: Some(Default::default()),
-            ready_and_available_time: None,
-            stream: Stream::Null,
-            handler: None,
+            id: self.id,
+            address: self.address.clone(),
+            generation: self.generation,
+            stream_description: self.stream_description.take(),
+            ready_and_available_time: self.ready_and_available_time.take(),
+            pool: self.pool.take(),
+            stream: std::mem::replace(&mut self.stream, Stream::Null),
+            handler: self.handler.take(),
         }
     }
-
+    
     /// Helper to mark the time that the connection was checked into the pool for the purpose of
     /// detecting when it becomes idle.
     pub(super) fn mark_checked_in(&mut self) {
@@ -242,7 +238,11 @@ impl Drop for Connection {
         // explicitly, so we don't add it back to the pool or emit any events.
         if let Some(ref weak_pool_ref) = self.pool {
             if let Some(strong_pool_ref) = weak_pool_ref.upgrade() {
-                strong_pool_ref.check_in(std::mem::replace(self, Self::null()));
+                // nullify the current instance, creating a new connection which is moved into the task.
+                let dropped_connection = self.take();
+                runtime().execute(async move {
+                    strong_pool_ref.check_in(dropped_connection).await;
+                });
             } else if let Some(ref handler) = self.handler {
                 handler.handle_connection_closed_event(
                     self.closed_event(ConnectionClosedReason::PoolClosed),

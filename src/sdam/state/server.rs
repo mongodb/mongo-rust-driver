@@ -29,6 +29,7 @@ impl Server {
             topology,
             pool: ConnectionPool::new(
                 address.clone(),
+                AsyncRuntime::Tokio,
                 Some(ConnectionPoolOptions::from_client_options(options)),
             ),
             address,
@@ -38,12 +39,12 @@ impl Server {
     /// Creates a new Server given the `address` and `options`.
     /// Checks out a connection from the server's pool.
     pub(crate) fn checkout_connection(&self) -> Result<Connection> {
-        self.pool.check_out()
+        runtime().block_on(self.pool.check_out())
     }
 
     /// Clears the connection pool associated with the server.
     pub(crate) fn clear_connection_pool(&self) {
-        self.pool.clear();
+        runtime().block_on(self.pool.clear());
     }
 
     /// Attempts to upgrade the weak reference to the topology to a strong reference and return it.

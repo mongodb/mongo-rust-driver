@@ -3,9 +3,18 @@
 mod stream;
 
 use std::future::Future;
+use std::time::Duration;
+
+use async_trait::async_trait;
+use futures_timer::Delay;
+use futures::future::{self, Either};
 
 use self::stream::AsyncStream;
-use crate::{cmap::conn::StreamOptions, error::Result};
+use crate::{cmap::conn::StreamOptions, error::{Error, Result}};
+
+pub(crate) fn runtime() -> AsyncRuntime {
+    AsyncRuntime::Tokio
+}
 
 /// An abstract handle to the async runtime.
 #[derive(Clone, Copy, Debug)]
@@ -62,5 +71,24 @@ impl AsyncRuntime {
     #[allow(dead_code)]
     pub(crate) async fn connect_stream(self, options: StreamOptions) -> Result<AsyncStream> {
         AsyncStream::connect(options).await
+    }
+}
+
+#[async_trait]
+pub(crate) trait Timeoutable {
+    type Output;
+    
+    async fn with_timeout<F: Send + Fn() -> Error>(self, timeout: Duration, error_func: F) -> Result<Self::Output>;
+}
+
+#[async_trait]
+impl<T: Future + Unpin + Send> Timeoutable for T {
+    type Output = T::Output;
+
+    async fn with_timeout<F: Send + Fn() -> Error>(self, timeout: Duration, error_func: F) -> Result<T::Output> {
+        match future::select(self, Delay::new(timeout)).await {
+            Either::Left((result, _)) => Ok(result),
+            Either::Right(_) => Err(error_func())
+        }
     }
 }
