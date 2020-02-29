@@ -70,42 +70,58 @@
     )
 )]
 
-#[macro_use]
-pub mod options;
+macro_rules! define_if_single_runtime_enabled {
+    ( $( $def:item )+ ) => {
+        $(
+            #[cfg(any(
+                all(feature = "tokio-runtime", not(feature = "async-std-runtime")),
+                all(not(feature = "tokio-runtime"), feature = "async-std-runtime")
+            ))]
+            $def
+        )+
+    }
+}
 
-mod bson_util;
-mod client;
-mod cmap;
-mod coll;
-mod collation;
-mod concern;
-mod cursor;
-mod db;
-pub mod error;
-pub mod event;
-mod is_master;
-mod operation;
-pub mod results;
-// TODO RUST-212: Remove the annotation to suppress warnings for unused code.
-#[allow(dead_code)]
-#[cfg(any(feature = "tokio-runtime", feature = "async-std-runtime"))]
-pub(crate) mod runtime;
-mod sdam;
-mod selection_criteria;
-mod srv;
-#[cfg(test)]
-mod test;
+// In the case that neither tokio  or async-std is enabled, we want to disable all compiler errors
+// and warnings other than our custom ones.:w
+define_if_single_runtime_enabled! {
+    #[macro_use]
+    pub mod options;
 
-#[cfg(test)]
-#[macro_use]
-extern crate derive_more;
+    mod bson_util;
+    mod client;
+    mod cmap;
+    mod coll;
+    mod collation;
+    mod concern;
+    mod cursor;
+    mod db;
+    pub mod error;
+    pub mod event;
+    mod is_master;
+    mod operation;
+    pub mod results;
+    // TODO RUST-212: Remove the annotation to suppress warnings for unused code.
+    #[allow(dead_code)]
+    pub(crate) mod runtime;
+    mod sdam;
+    mod selection_criteria;
+    mod srv;
+    #[cfg(test)]
+    mod test;
 
-pub use crate::{
-    client::Client,
-    coll::{Collection, Namespace},
-    cursor::Cursor,
-    db::Database,
-};
+    #[cfg(test)]
+    #[macro_use]
+    extern crate derive_more;
+
+    #[cfg(any(feature = "tokio-runtime", feature = "async-std-runtime"))]
+    pub use crate::{
+        client::Client,
+        coll::{Collection, Namespace},
+        cursor::Cursor,
+        db::Database,
+    };
+}
 
 #[cfg(all(feature = "tokio-runtime", feature = "async-std-runtime"))]
 compile_error!(
@@ -118,3 +134,13 @@ compile_error!(
     "one of `tokio-runtime` or `async-runtime` must be enabled; either enable `default-features` \
      or `async-std-runtime` in your Cargo.toml"
 );
+
+// TODO RUST-212: Remove the annotation to suppress warnings for unused code.
+#[cfg(all(feature = "tokio-runtime", not(feature = "async-std-runtime")))]
+#[allow(dead_code)]
+pub(crate) static RUNTIME: runtime::AsyncRuntime = runtime::AsyncRuntime::Tokio;
+
+// TODO RUST-212: Remove the annotation to suppress warnings for unused code.
+#[cfg(all(not(feature = "tokio-runtime"), feature = "async-std-runtime"))]
+#[allow(dead_code)]
+pub(crate) static RUNTIME: runtime::AsyncRuntime = runtime::AsyncRuntime::AsyncStd;
