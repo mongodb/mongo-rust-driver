@@ -36,7 +36,7 @@ use crate::{
         PoolClosedEvent,
         PoolCreatedEvent,
     },
-    runtime::AsyncRuntime,
+    runtime::{AsyncRuntime, runtime},
     options::{StreamAddress, TlsOptions},
 };
 
@@ -65,7 +65,7 @@ pub(crate) struct ConnectionPoolInner {
     /// The set of available connections in the pool. Because the CMAP spec requires that
     /// connections are checked out in a FIFO manner, connections are pushed/popped from the back
     /// of the Vec.
-    connections: RwLock<Vec<Connection>>,
+    connections: Arc<RwLock<Vec<Connection>>>,
 
     /// The connect timeout passed to each underlying TcpStream when attemtping to connect to the
     /// server.
@@ -247,7 +247,7 @@ impl ConnectionPool {
             return Ok(conn);
         }
 
-        // No connections in the pool, create a new one.
+        // There are no connections in the pool, so create a new one.
         return Ok(self.create_connection(true).await?);    
     }
 
@@ -293,8 +293,6 @@ impl ConnectionPool {
         
     /// Helper method to create a connection and increment the total connection count.
     async fn create_connection(&self, checking_out: bool) -> Result<Connection> {
-        *self.inner.total_connection_count.write().await += 1;
-
         let mut connection = Connection::new(
             self.next_connection_id().await,
             self.inner.address.clone(),
@@ -330,6 +328,7 @@ impl ConnectionPool {
 
         self.emit_event(|handler| handler.handle_connection_ready_event(connection.ready_event()));
 
+        *self.inner.total_connection_count.write().await += 1;
         Ok(connection)
     }
 }
@@ -360,10 +359,11 @@ impl ConnectionPoolInner {
         // Close the connection if it's stale.
         if conn.is_stale(*self.generation.read().await) {
             self.close_connection(conn, ConnectionClosedReason::Stale).await;
-            return;
+        } else {
+            self.connections.write().await.push(conn);
         }
 
-        self.connections.write().await.push(conn);
+        self.wait_queue.wake_front();
     }
 
     /// Internal helper to close a connection, emit the event for it being closed, and decrement the
@@ -387,7 +387,7 @@ impl Drop for ConnectionPoolInner {
         let connections = self.connections.clone();
         let event_handler = self.event_handler.clone();
 
-        runtime.execute(async move {
+        runtime().execute(async move {
             for mut conn in connections.write().await.drain(..) {
                 conn.pool.take();
                 
@@ -406,21 +406,5 @@ impl Drop for ConnectionPoolInner {
                 });
             }
         });
-        
-        // for mut conn in self.connections.write().unwrap().drain(..) {
-        //     conn.pool.take();
-
-        //     self.emit_event(|handler| {
-        //         handler.handle_connection_closed_event(
-        //             conn.closed_event(ConnectionClosedReason::PoolClosed),
-        //         );
-        //     });
-        // }
-
-        // self.emit_event(|handler| {
-        //     handler.handle_pool_closed_event(PoolClosedEvent {
-        //         address: self.address.clone(),
-        //     });
-        // });
     }
 }

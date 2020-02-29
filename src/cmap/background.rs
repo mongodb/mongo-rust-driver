@@ -58,9 +58,8 @@ impl ConnectionPool {
     async fn ensure_min_connections(&self) {
         if let Some(min_pool_size) = self.inner.min_pool_size {
             loop {
-                let mut connections = self.inner.connections.write().await;
-
                 if *self.inner.total_connection_count.read().await < min_pool_size {
+                    let mut connections = self.inner.connections.write().await;
                     match self.create_connection(false).await {
                         Ok(connection) => connections.push(connection),
                         e @ Err(_) => {

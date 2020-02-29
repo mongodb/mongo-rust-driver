@@ -19,7 +19,7 @@ pub(crate) struct WaitQueue {
 }
 
 impl WaitQueue {
-    /// Creates a new `WaitQueue`.
+    /// Creat a new `WaitQueue`.
     pub(super) fn new(address: StreamAddress, max_handles: u32, timeout: Option<Duration>) -> Self {
         let max_handles = max_handles.try_into().unwrap_or(usize::max_value());
 
@@ -30,8 +30,8 @@ impl WaitQueue {
         }
     }
 
-    /// Enters the wait queue and blocks until it either reaches the front of the queue or the
-    /// timeout has elapsed.
+    /// Enter the wait queue and block until either reaching the front of the queue or
+    /// exceeding the timeout.
     pub(super) async fn wait_until_at_front(&self) -> Result<()> {
         let future = self.semaphore.acquire(1);
 
@@ -45,5 +45,10 @@ impl WaitQueue {
         releaser.disarm(); // releasing is handled during connection drop
         
         Ok(())
+    }
+
+    /// Signal that the front of the queue (if there is one) is ready to wake up.
+    pub(super) fn wake_front(&self) {
+        self.semaphore.release(1);
     }
 }
