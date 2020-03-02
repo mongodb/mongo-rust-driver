@@ -12,8 +12,9 @@ use crate::{
     Namespace,
 };
 
-#[test]
-fn build() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -62,8 +63,9 @@ fn build() {
     assert_eq!(cmd.body, expected_body);
 }
 
-#[test]
-fn build_many() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_many() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -98,8 +100,9 @@ fn build_many() {
     assert_eq!(cmd.body, expected_body);
 }
 
-#[test]
-fn handle_success() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_success() {
     let op = Update::empty();
 
     let ok_response = CommandResponse::with_document(doc! {
@@ -120,8 +123,9 @@ fn handle_success() {
     assert_eq!(update_result.upserted_id, Some(Bson::I32(1)));
 }
 
-#[test]
-fn handle_success_no_upsert() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_success_no_upsert() {
     let op = Update::empty();
 
     let ok_response = CommandResponse::with_document(doc! {
@@ -139,16 +143,18 @@ fn handle_success_no_upsert() {
     assert_eq!(update_result.upserted_id, None);
 }
 
-#[test]
-fn handle_invalid_response() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_invalid_response() {
     let op = Update::empty();
 
     let invalid_response = CommandResponse::with_document(doc! { "ok": 1.0, "asdfadsf": 123123 });
     assert!(op.handle_response(invalid_response).is_err());
 }
 
-#[test]
-fn handle_write_failure() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_write_failure() {
     let op = Update::empty();
 
     let write_error_response = CommandResponse::with_document(doc! {
@@ -178,8 +184,9 @@ fn handle_write_failure() {
     };
 }
 
-#[test]
-fn handle_write_concern_failure() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_write_concern_failure() {
     let op = Update::empty();
 
     let wc_error_response = CommandResponse::with_document(doc! {

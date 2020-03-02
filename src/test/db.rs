@@ -44,8 +44,9 @@ fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<CollectionInfo>
     colls
 }
 
-#[test]
-fn is_master() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn is_master() {
     let _guard = LOCK.run_concurrently();
 
     let db = CLIENT.database("test");
@@ -56,9 +57,10 @@ fn is_master() {
     assert_ulps_eq!(is_master_reply.ok, 1.0);
 }
 
-#[test]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-fn list_collections() {
+async fn list_collections() {
     let _guard = LOCK.run_concurrently();
 
     let db = CLIENT.database(function_name!());
@@ -93,9 +95,10 @@ fn list_collections() {
     }
 }
 
-#[test]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-fn list_collections_filter() {
+async fn list_collections_filter() {
     let _guard = LOCK.run_concurrently();
 
     let db = CLIENT.database(function_name!());
@@ -132,9 +135,10 @@ fn list_collections_filter() {
     }
 }
 
-#[test]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-fn list_collection_names() {
+async fn list_collection_names() {
     let _guard = LOCK.run_concurrently();
 
     let db = CLIENT.database(function_name!());
@@ -160,9 +164,10 @@ fn list_collection_names() {
     assert_eq!(&actual_colls, expected_colls);
 }
 
-#[test]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-fn collection_management() {
+async fn collection_management() {
     let _guard = LOCK.run_concurrently();
 
     let db = CLIENT.database(function_name!());
@@ -195,8 +200,9 @@ fn collection_management() {
     assert!(!colls[1].info.read_only);
 }
 
-#[test]
-fn db_aggregate() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn db_aggregate() {
     if CLIENT.server_version_lt(4, 0) {
         return;
     }
@@ -235,8 +241,9 @@ fn db_aggregate() {
     result.unwrap();
 }
 
-#[test]
-fn db_aggregate_disk_use() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn db_aggregate_disk_use() {
     if CLIENT.server_version_lt(4, 0) {
         return;
     }

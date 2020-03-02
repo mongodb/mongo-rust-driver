@@ -93,7 +93,8 @@ fn run_insert_many_test(test_file: TestFile) {
     }
 }
 
-#[test]
-fn run() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn run() {
     run_spec_test(&["crud", "v1", "write"], run_insert_many_test);
 }

@@ -277,8 +277,9 @@ fn run_test(test_file: TestFile) {
     }
 }
 
-#[test]
-fn server_selection_replica_set_no_primary() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn server_selection_replica_set_no_primary() {
     run_spec_test(
         &[
             "server-selection",
@@ -290,8 +291,9 @@ fn server_selection_replica_set_no_primary() {
     );
 }
 
-#[test]
-fn server_selection_replica_set_with_primary() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn server_selection_replica_set_with_primary() {
     run_spec_test(
         &[
             "server-selection",
@@ -303,51 +305,59 @@ fn server_selection_replica_set_with_primary() {
     );
 }
 
-#[test]
-fn server_selection_sharded() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn server_selection_sharded() {
     run_spec_test(
         &["server-selection", "server_selection", "Sharded", "read"],
         run_test,
     );
 }
 
-#[test]
-fn server_selection_single() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn server_selection_single() {
     run_spec_test(
         &["server-selection", "server_selection", "Single", "read"],
         run_test,
     );
 }
 
-#[test]
-fn server_selection_unknown() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn server_selection_unknown() {
     run_spec_test(
         &["server-selection", "server_selection", "Unknown", "read"],
         run_test,
     );
 }
 
-#[test]
-fn max_staleness_replica_set_no_primary() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn max_staleness_replica_set_no_primary() {
     run_spec_test(&["max-staleness", "ReplicaSetNoPrimary"], run_test);
 }
 
-#[test]
-fn max_staleness_replica_set_with_primary() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn max_staleness_replica_set_with_primary() {
     run_spec_test(&["max-staleness", "ReplicaSetWithPrimary"], run_test);
 }
 
-#[test]
-fn max_staleness_sharded() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn max_staleness_sharded() {
     run_spec_test(&["max-staleness", "Sharded"], run_test);
 }
 
-#[test]
-fn max_staleness_single() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn max_staleness_single() {
     run_spec_test(&["max-staleness", "Single"], run_test);
 }
 
-#[test]
-fn max_staleness_unknown() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn max_staleness_unknown() {
     run_spec_test(&["max-staleness", "Unknown"], run_test);
 }

@@ -637,8 +637,9 @@ mod tests {
 
     use crate::options::auth::scram::ServerFirst;
 
-    #[test]
-    fn test_iteration_count() {
+    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    async fn test_iteration_count() {
         let nonce = "mocked";
 
         let invalid_iteration_count = ServerFirst {

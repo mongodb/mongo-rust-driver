@@ -12,8 +12,8 @@ version = "0.9.1"
 
 [features]
 default = ["tokio-runtime"]
-tokio-runtime = ["tokio/dns", "tokio/rt-core", "tokio/tcp", "tokio/time"]
-async-std-runtime = ["async-std"]
+tokio-runtime = ["tokio/dns", "tokio/macros", "tokio/rt-core", "tokio/tcp", "tokio/rt-threaded", "tokio/time"]
+async-std-runtime = ["async-std", "async-std/attributes"]
 
 [dependencies]
 async-trait = "0.1.24"

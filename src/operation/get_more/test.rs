@@ -34,8 +34,9 @@ fn build_test(
     assert_eq!(cmd.body, expected_body);
 }
 
-#[test]
-fn build() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -65,8 +66,9 @@ fn build() {
     );
 }
 
-#[test]
-fn build_batch_size() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_batch_size() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -112,8 +114,9 @@ fn build_batch_size() {
     assert!(op.build(&StreamDescription::new_testing()).is_err())
 }
 
-#[test]
-fn op_selection_criteria() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn op_selection_criteria() {
     let address = StreamAddress {
         hostname: "myhost.com".to_string(),
         port: Some(1234),
@@ -144,8 +147,9 @@ fn op_selection_criteria() {
     assert!(!predicate(&server_info));
 }
 
-#[test]
-fn handle_success() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_success() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),

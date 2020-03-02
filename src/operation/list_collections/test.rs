@@ -22,8 +22,9 @@ fn build_test(db_name: &str, list_collections: ListCollections, mut expected_bod
     assert_eq!(cmd.body, expected_body);
 }
 
-#[test]
-fn build() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build() {
     let list_collections = ListCollections::new("test_db".to_string(), None, false, None);
     let expected_body = doc! {
         "listCollections": 1,
@@ -42,8 +43,9 @@ fn build() {
     build_test("test_db", list_collections, expected_body);
 }
 
-#[test]
-fn build_name_only() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_name_only() {
     let list_collections = ListCollections::new("test_db".to_string(), None, true, None);
     build_test(
         "test_db",
@@ -93,8 +95,9 @@ fn build_name_only() {
     );
 }
 
-#[test]
-fn build_batch_size() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_batch_size() {
     let list_collections = ListCollections::new("test_db".to_string(), None, true, None);
     build_test(
         "test_db",
@@ -120,16 +123,18 @@ fn build_batch_size() {
     );
 }
 
-#[test]
-fn op_selection_criteria() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn op_selection_criteria() {
     assert!(ListCollections::empty()
         .selection_criteria()
         .expect("should have criteria")
         .is_read_pref_primary());
 }
 
-#[test]
-fn handle_success() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_success() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -205,8 +210,9 @@ fn handle_success() {
     );
 }
 
-#[test]
-fn handle_invalid_response() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_invalid_response() {
     let list_collections = ListCollections::empty();
 
     let garbled = doc! { "asdfasf": "ASdfasdf" };

@@ -9,8 +9,9 @@ lazy_static! {
     ];
 }
 
-#[test]
-fn negotiate_both_scram() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn negotiate_both_scram() {
     let description_both = StreamDescription {
         sasl_supported_mechs: Some(MECHS.to_vec()),
         ..Default::default()
@@ -21,8 +22,9 @@ fn negotiate_both_scram() {
     );
 }
 
-#[test]
-fn negotiate_sha1_only() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn negotiate_sha1_only() {
     let description_sha1 = StreamDescription {
         sasl_supported_mechs: Some(MECHS[0..=0].to_vec()),
         ..Default::default()
@@ -33,8 +35,9 @@ fn negotiate_sha1_only() {
     );
 }
 
-#[test]
-fn negotiate_sha256_only() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn negotiate_sha256_only() {
     let description_sha256 = StreamDescription {
         sasl_supported_mechs: Some(MECHS[1..=1].to_vec()),
         ..Default::default()
@@ -45,8 +48,9 @@ fn negotiate_sha256_only() {
     );
 }
 
-#[test]
-fn negotiate_none() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn negotiate_none() {
     let description_none: StreamDescription = Default::default();
     assert_eq!(
         AuthMechanism::from_stream_description(&description_none),
@@ -54,8 +58,9 @@ fn negotiate_none() {
     );
 }
 
-#[test]
-fn negotiate_mangled() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn negotiate_mangled() {
     let description_mangled = StreamDescription {
         sasl_supported_mechs: Some(["NOT A MECHANISM".to_string(), "OTHER".to_string()].to_vec()),
         ..Default::default()

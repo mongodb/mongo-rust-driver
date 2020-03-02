@@ -27,8 +27,9 @@ fn empty_delete() -> FindAndModify {
     FindAndModify::with_delete(ns, filter, None)
 }
 
-#[test]
-fn build_with_delete_no_options() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_with_delete_no_options() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -57,8 +58,9 @@ fn build_with_delete_no_options() {
     assert_eq!(cmd.body, expected_body);
 }
 
-#[test]
-fn build_with_delete() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_with_delete() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -92,8 +94,9 @@ fn build_with_delete() {
     assert_eq!(cmd.body, expected_body);
 }
 
-#[test]
-fn handle_success_delete() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_success_delete() {
     let op = empty_delete();
     let value = doc! {
         "_id" : Bson::ObjectId(ObjectId::new().unwrap()),
@@ -123,8 +126,9 @@ fn handle_success_delete() {
     );
 }
 
-#[test]
-fn handle_null_value_delete() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_null_value_delete() {
     let op = empty_delete();
 
     let null_value = CommandResponse::with_document(doc! { "ok": 1.0, "value": Bson::Null});
@@ -133,8 +137,9 @@ fn handle_null_value_delete() {
     assert_eq!(result.expect("handle failed"), None);
 }
 
-#[test]
-fn handle_no_value_delete() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_no_value_delete() {
     let op = empty_delete();
 
     let no_value = CommandResponse::with_document(doc! { "ok": 1.0 });
@@ -153,8 +158,9 @@ fn empty_replace() -> FindAndModify {
     FindAndModify::with_replace(ns, filter, replacement, None).unwrap()
 }
 
-#[test]
-fn build_with_replace_no_options() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_with_replace_no_options() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -183,8 +189,9 @@ fn build_with_replace_no_options() {
     assert_eq!(cmd.body, expected_body);
 }
 
-#[test]
-fn build_with_replace() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_with_replace() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -223,8 +230,9 @@ fn build_with_replace() {
     assert_eq!(cmd.body, expected_body);
 }
 
-#[test]
-fn handle_success_replace() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_success_replace() {
     let op = empty_replace();
     let value = doc! {
         "_id" : Bson::ObjectId(ObjectId::new().unwrap()),
@@ -254,8 +262,9 @@ fn handle_success_replace() {
     );
 }
 
-#[test]
-fn handle_null_value_replace() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_null_value_replace() {
     let op = empty_replace();
 
     let null_value = CommandResponse::with_document(doc! { "ok": 1.0, "value": Bson::Null});
@@ -264,8 +273,9 @@ fn handle_null_value_replace() {
     assert_eq!(result.expect("handle failed"), None);
 }
 
-#[test]
-fn handle_no_value_replace() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_no_value_replace() {
     let op = empty_replace();
 
     let no_value = CommandResponse::with_document(doc! { "ok": 1.0 });
@@ -284,8 +294,9 @@ fn empty_update() -> FindAndModify {
     FindAndModify::with_update(ns, filter, update, None).unwrap()
 }
 
-#[test]
-fn build_with_update_no_options() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_with_update_no_options() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -313,8 +324,9 @@ fn build_with_update_no_options() {
     assert_eq!(cmd.body, expected_body);
 }
 
-#[test]
-fn build_with_update() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_with_update() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -350,8 +362,9 @@ fn build_with_update() {
     assert_eq!(cmd.body, expected_body);
 }
 
-#[test]
-fn handle_success_update() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_success_update() {
     let op = empty_update();
     let value = doc! {
         "_id" : Bson::ObjectId(ObjectId::new().unwrap()),
@@ -381,8 +394,9 @@ fn handle_success_update() {
     );
 }
 
-#[test]
-fn handle_null_value_update() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_null_value_update() {
     let op = empty_update();
 
     let null_value = CommandResponse::with_document(doc! { "ok": 1.0, "value": Bson::Null});
@@ -391,8 +405,9 @@ fn handle_null_value_update() {
     assert_eq!(result.expect("handle failed"), None);
 }
 
-#[test]
-fn handle_no_value_update() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_no_value_update() {
     let op = empty_update();
 
     let no_value = CommandResponse::with_document(doc! { "ok": 1.0 });
