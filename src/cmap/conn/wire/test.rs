@@ -8,8 +8,9 @@ use crate::{
     test::{CLIENT_OPTIONS, LOCK},
 };
 
-#[test]
-fn basic() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn basic() {
     if CLIENT_OPTIONS.tls_options().is_some() {
         return;
     }

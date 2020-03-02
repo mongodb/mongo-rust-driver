@@ -254,8 +254,9 @@ fn assert_events_match(actual: &Event, expected: &Event) {
     }
 }
 
-#[test]
-fn cmap_spec_tests() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn cmap_spec_tests() {
     run_spec_test(
         &["connection-monitoring-and-pooling"],
         |test_file: TestFile| {

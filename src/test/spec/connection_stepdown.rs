@@ -51,8 +51,9 @@ fn run_test(name: &str, test: impl Fn(EventClient, Database, Collection)) {
 }
 
 #[function_name::named]
-#[test]
-fn get_more() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn get_more() {
     run_test(function_name!(), |client, db, coll| {
         // This test requires server version 4.2 or higher.
         if client.server_version_lt(4, 2) {
@@ -91,8 +92,9 @@ fn get_more() {
 }
 
 #[function_name::named]
-#[test]
-fn not_master_keep_pool() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn not_master_keep_pool() {
     run_test(function_name!(), |client, _, coll| {
         // This test requires server version 4.2 or higher.
         if client.server_version_lt(4, 2) {
@@ -131,8 +133,9 @@ fn not_master_keep_pool() {
 }
 
 #[function_name::named]
-#[test]
-fn not_master_reset_pool() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn not_master_reset_pool() {
     run_test(function_name!(), |client, _, coll| {
         // This test must only run on 4.0 servers.
         if !client.server_version_eq(4, 0) {
@@ -171,8 +174,9 @@ fn not_master_reset_pool() {
 }
 
 #[function_name::named]
-#[test]
-fn shutdown_in_progress() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn shutdown_in_progress() {
     run_test(function_name!(), |client, _, coll| {
         if client.server_version_lt(4, 0) {
             return;
@@ -210,8 +214,9 @@ fn shutdown_in_progress() {
 }
 
 #[function_name::named]
-#[test]
-fn interrupted_at_shutdown() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn interrupted_at_shutdown() {
     run_test(function_name!(), |client, _, coll| {
         if client.server_version_lt(4, 0) {
             return;

@@ -10,8 +10,9 @@ use crate::{
     operation::{test, Count, Operation},
 };
 
-#[test]
-fn build() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -30,8 +31,9 @@ fn build() {
     assert_eq!(count_command.read_pref, None);
 }
 
-#[test]
-fn build_with_options() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_with_options() {
     let read_concern = ReadConcern::Local;
     let max_time = Duration::from_millis(2 as u64);
     let options: EstimatedDocumentCountOptions = EstimatedDocumentCountOptions::builder()
@@ -59,8 +61,9 @@ fn build_with_options() {
     assert_eq!(count_command.read_pref, None);
 }
 
-#[test]
-fn op_selection_criteria() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn op_selection_criteria() {
     test::op_selection_criteria(|selection_criteria| {
         let options = EstimatedDocumentCountOptions {
             selection_criteria,
@@ -70,8 +73,9 @@ fn op_selection_criteria() {
     });
 }
 
-#[test]
-fn handle_success() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_success() {
     let count_op = Count::empty();
 
     let n = 26;
@@ -84,8 +88,9 @@ fn handle_success() {
     assert_eq!(actual_values, n);
 }
 
-#[test]
-fn handle_response_no_n() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_response_no_n() {
     let count_op = Count::empty();
 
     let response = CommandResponse::with_document(doc! { "ok" : 1 });

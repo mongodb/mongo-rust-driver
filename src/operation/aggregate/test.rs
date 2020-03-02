@@ -34,8 +34,9 @@ fn build_test(
     assert_eq!(cmd.body, expected_body);
 }
 
-#[test]
-fn build() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -66,8 +67,9 @@ fn build() {
     build_test(ns, pipeline, Some(options), expected_body);
 }
 
-#[test]
-fn build_batch_size() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_batch_size() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -118,8 +120,9 @@ fn build_batch_size() {
     build_test(ns, merge_pipeline, Some(batch_size_options), expected_body);
 }
 
-#[test]
-fn build_target() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_target() {
     let pipeline = Vec::new();
 
     let ns = Namespace {
@@ -142,8 +145,9 @@ fn build_target() {
     build_test(ns.db, pipeline, None, expected_body);
 }
 
-#[test]
-fn build_max_await_time() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_max_await_time() {
     let options = AggregateOptions::builder()
         .max_await_time(Duration::from_millis(5))
         .max_time(Duration::from_millis(10))
@@ -159,8 +163,9 @@ fn build_max_await_time() {
     build_test("".to_string(), Vec::new(), Some(options), body);
 }
 
-#[test]
-fn op_selection_criteria() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn op_selection_criteria() {
     test::op_selection_criteria(|selection_criteria| {
         let options = AggregateOptions {
             selection_criteria,
@@ -170,8 +175,9 @@ fn op_selection_criteria() {
     });
 }
 
-#[test]
-fn handle_success() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_success() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -237,8 +243,9 @@ fn handle_success() {
     );
 }
 
-#[test]
-fn handle_max_await_time() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_max_await_time() {
     let response = CommandResponse::with_document_and_address(
         StreamAddress::default(),
         doc! {
@@ -269,8 +276,9 @@ fn handle_max_await_time() {
     assert_eq!(spec.max_time, Some(max_await));
 }
 
-#[test]
-fn handle_write_concern_error() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_write_concern_error() {
     let response = CommandResponse::with_document(doc! {
         "cursor" : {
             "firstBatch" : [ ],
@@ -303,8 +311,9 @@ fn handle_write_concern_error() {
     }
 }
 
-#[test]
-fn handle_invalid_response() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_invalid_response() {
     let aggregate = Aggregate::empty();
 
     let garbled = doc! { "asdfasf": "ASdfasdf" };

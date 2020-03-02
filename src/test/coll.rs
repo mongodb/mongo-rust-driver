@@ -12,9 +12,10 @@ use crate::{
     },
 };
 
-#[test]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-fn count() {
+async fn count() {
     let _guard = LOCK.run_concurrently();
 
     let coll = CLIENT.init_db_and_coll(function_name!(), function_name!());
@@ -31,9 +32,10 @@ fn count() {
     assert_eq!(coll.estimated_document_count(None).unwrap(), 4);
 }
 
-#[test]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-fn find() {
+async fn find() {
     let _guard = LOCK.run_concurrently();
 
     let coll = CLIENT.init_db_and_coll(function_name!(), function_name!());
@@ -55,9 +57,10 @@ fn find() {
     }
 }
 
-#[test]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-fn update() {
+async fn update() {
     let _guard = LOCK.run_concurrently();
 
     let coll = CLIENT.init_db_and_coll(function_name!(), function_name!());
@@ -87,9 +90,10 @@ fn update() {
     assert!(upsert_results.upserted_id.is_some());
 }
 
-#[test]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-fn delete() {
+async fn delete() {
     let _guard = LOCK.run_concurrently();
 
     let coll = CLIENT.init_db_and_coll(function_name!(), function_name!());
@@ -108,9 +112,10 @@ fn delete() {
     assert_eq!(coll.count_documents(doc! {"x": 3 }, None).unwrap(), 0);
 }
 
-#[test]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-fn aggregate_out() {
+async fn aggregate_out() {
     let _guard = LOCK.run_concurrently();
 
     let db = CLIENT.database(function_name!());
@@ -166,9 +171,10 @@ fn kill_cursors_sent(client: &EventClient) -> bool {
         })
 }
 
-#[test]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-fn kill_cursors_on_drop() {
+async fn kill_cursors_on_drop() {
     let _guard = LOCK.run_concurrently();
 
     let db = CLIENT.database(function_name!());
@@ -195,9 +201,10 @@ fn kill_cursors_on_drop() {
     assert!(kill_cursors_sent(&event_client));
 }
 
-#[test]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-fn no_kill_cursors_on_exhausted() {
+async fn no_kill_cursors_on_exhausted() {
     let _guard = LOCK.run_concurrently();
 
     let db = CLIENT.database(function_name!());
@@ -275,9 +282,10 @@ lazy_static! {
     };
 }
 
-#[test]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-fn large_insert() {
+async fn large_insert() {
     let _guard = LOCK.run_concurrently();
 
     let docs = vec![LARGE_DOC.clone(); 35000];
@@ -312,9 +320,10 @@ fn multibatch_documents_with_duplicate_keys() -> Vec<Document> {
     docs
 }
 
-#[test]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-fn large_insert_unordered_with_errors() {
+async fn large_insert_unordered_with_errors() {
     let _guard = LOCK.run_concurrently();
 
     let docs = multibatch_documents_with_duplicate_keys();
@@ -344,9 +353,10 @@ fn large_insert_unordered_with_errors() {
     }
 }
 
-#[test]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-fn large_insert_ordered_with_errors() {
+async fn large_insert_ordered_with_errors() {
     let _guard = LOCK.run_concurrently();
 
     let docs = multibatch_documents_with_duplicate_keys();
@@ -377,9 +387,10 @@ fn large_insert_ordered_with_errors() {
     }
 }
 
-#[test]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-fn empty_insert() {
+async fn empty_insert() {
     let _guard = LOCK.run_concurrently();
 
     let coll = CLIENT

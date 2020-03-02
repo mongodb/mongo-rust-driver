@@ -314,12 +314,14 @@ fn run_test(test_file: TestFile) {
     }
 }
 
-#[test]
-fn run_uri_options_spec_tests() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn run_uri_options_spec_tests() {
     run_spec_test(&["uri-options"], run_test);
 }
 
-#[test]
-fn run_connection_string_spec_tests() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn run_connection_string_spec_tests() {
     run_spec_test(&["connection-string"], run_test);
 }

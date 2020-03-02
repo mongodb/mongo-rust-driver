@@ -45,8 +45,9 @@ fn fixtures() -> TestFixtures {
     }
 }
 
-#[test]
-fn build() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build() {
     let fixtures = fixtures();
 
     let description = StreamDescription::new_testing();
@@ -105,8 +106,9 @@ fn build() {
     );
 }
 
-#[test]
-fn build_ordered() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_ordered() {
     let insert = Insert::new(Namespace::empty(), Vec::new(), None);
     let cmd = insert
         .build(&StreamDescription::new_testing())
@@ -134,8 +136,9 @@ fn build_ordered() {
     assert_eq!(cmd.body.get("ordered"), Some(&Bson::Boolean(true)));
 }
 
-#[test]
-fn handle_success() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_success() {
     let fixtures = fixtures();
 
     let ok_response = CommandResponse::with_document(doc! { "ok": 1.0, "n": 3 });
@@ -150,16 +153,18 @@ fn handle_success() {
     );
 }
 
-#[test]
-fn handle_invalid_response() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_invalid_response() {
     let fixtures = fixtures();
 
     let invalid_response = CommandResponse::with_document(doc! { "ok": 1.0, "asdfadsf": 123123 });
     assert!(fixtures.op.handle_response(invalid_response).is_err());
 }
 
-#[test]
-fn handle_write_failure() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_write_failure() {
     let fixtures = fixtures();
 
     let write_error_response = CommandResponse::with_document(doc! {

@@ -43,9 +43,10 @@ struct OsMetadata {
 // `currentOp` sometimes detecting heartbeats between the server. Eventually we can test this using
 // APM or coming up with something more clever, but for now, we're just disabling it.
 //
-// #[test]
+// #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+// #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[allow(unused)]
-fn metadata_sent_in_handshake() {
+async fn metadata_sent_in_handshake() {
     let db = CLIENT.database("admin");
     let result = db.run_command(doc! { "currentOp": 1 }, None).unwrap();
 
@@ -58,8 +59,9 @@ fn metadata_sent_in_handshake() {
     assert_eq!(metadata.client.driver.name, "mrd");
 }
 
-#[test]
-fn server_selection_timeout_message() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn server_selection_timeout_message() {
     let _guard = LOCK.run_concurrently();
 
     if !CLIENT.is_replica_set() {
@@ -92,9 +94,10 @@ fn server_selection_timeout_message() {
     }
 }
 
-#[test]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-fn list_databases() {
+async fn list_databases() {
     let _guard = LOCK.run_concurrently();
 
     let expected_dbs = &[
@@ -141,9 +144,10 @@ fn list_databases() {
     }
 }
 
-#[test]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-fn list_database_names() {
+async fn list_database_names() {
     let _guard = LOCK.run_concurrently();
 
     let expected_dbs = &[
@@ -299,8 +303,9 @@ fn scram_test(username: &str, password: &str, mechanisms: &[AuthMechanism]) {
     }
 }
 
-#[test]
-fn scram_sha1() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn scram_sha1() {
     if !CLIENT.auth_enabled() {
         return;
     }
@@ -311,8 +316,9 @@ fn scram_sha1() {
     scram_test("sha1", "sha1", &[AuthMechanism::ScramSha1]);
 }
 
-#[test]
-fn scram_sha256() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn scram_sha256() {
     if CLIENT.server_version_lt(4, 0) || !CLIENT.auth_enabled() {
         return;
     }
@@ -322,8 +328,9 @@ fn scram_sha256() {
     scram_test("sha256", "sha256", &[AuthMechanism::ScramSha256]);
 }
 
-#[test]
-fn scram_both() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn scram_both() {
     if CLIENT.server_version_lt(4, 0) || !CLIENT.auth_enabled() {
         return;
     }
@@ -342,24 +349,27 @@ fn scram_both() {
     );
 }
 
-#[test]
-fn scram_missing_user_uri() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn scram_missing_user_uri() {
     if !CLIENT.auth_enabled() {
         return;
     }
     auth_test_uri("adsfasdf", "ASsdfsadf", None, false);
 }
 
-#[test]
-fn scram_missing_user_options() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn scram_missing_user_options() {
     if !CLIENT.auth_enabled() {
         return;
     }
     auth_test_options("sadfasdf", "fsdadsfasdf", None, false);
 }
 
-#[test]
-fn saslprep_options() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn saslprep_options() {
     if CLIENT.server_version_lt(4, 0) || !CLIENT.auth_enabled() {
         return;
     }
@@ -382,8 +392,9 @@ fn saslprep_options() {
     auth_test_options("\u{2168}", "I\u{00AD}V", None, true);
 }
 
-#[test]
-fn saslprep_uri() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn saslprep_uri() {
     if CLIENT.server_version_lt(4, 0) || !CLIENT.auth_enabled() {
         return;
     }

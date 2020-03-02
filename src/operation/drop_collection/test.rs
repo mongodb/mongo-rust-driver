@@ -9,8 +9,9 @@ use crate::{
     Namespace,
 };
 
-#[test]
-fn build() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build() {
     let options = DropCollectionOptions {
         write_concern: Some(WriteConcern {
             w: Some(Acknowledgment::Tag("abc".to_string())),
@@ -52,8 +53,9 @@ fn build() {
     );
 }
 
-#[test]
-fn handle_success() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_success() {
     let op = DropCollection::empty();
 
     let ok_response = CommandResponse::with_document(doc! { "ok": 1.0 });
@@ -62,8 +64,9 @@ fn handle_success() {
     assert!(op.handle_response(ok_extra).is_ok());
 }
 
-#[test]
-fn handle_write_concern_error() {
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_write_concern_error() {
     let op = DropCollection::empty();
 
     let response = CommandResponse::with_document(doc! {
