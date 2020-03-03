@@ -1,3 +1,5 @@
+// TODO RUST-212: Remove annotation.
+#[allow(dead_code)]
 mod stream;
 
 use std::future::Future;
@@ -56,6 +58,8 @@ impl AsyncRuntime {
     }
 
     /// Create and connect a new `AsyncStream`.
+    // RUST-212: Remove annotation.
+    #[allow(dead_code)]
     pub(crate) async fn connect_stream(self, options: StreamOptions) -> Result<AsyncStream> {
         AsyncStream::connect(options).await
     }

@@ -89,7 +89,7 @@ impl Topology {
     ) -> Result<Option<Arc<Server>>> {
         let topology_state = self.state.read().await;
 
-        if let Some(ref message) = topology_state.description.compatibility_error() {
+        if let Some(message) = topology_state.description.compatibility_error() {
             return Err(ErrorKind::ServerSelectionError {
                 message: message.to_string(),
             }

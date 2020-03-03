@@ -61,12 +61,7 @@ impl Monitor {
             .heartbeat_freq
             .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
 
-        loop {
-            let server = match self.server.upgrade() {
-                Some(server) => server,
-                None => break,
-            };
-
+        while let Some(server) = self.server.upgrade() {
             let topology = match server.topology() {
                 Some(topology) => topology,
                 None => break,
