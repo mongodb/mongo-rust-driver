@@ -26,7 +26,7 @@ fn run_test(uri_env_var: &str) {
 }
 
 // TODO RUST-300: re-enable these tests once async SRV resolution is implemented.
-// #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+// #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 // #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[allow(dead_code)]
 async fn atlas_repl_set() {
@@ -34,7 +34,7 @@ async fn atlas_repl_set() {
 }
 
 // TODO RUST-300: re-enable these tests once async SRV resolution is implemented.
-// #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+// #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 // #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[allow(dead_code)]
 async fn atlas_repl_set_srv() {

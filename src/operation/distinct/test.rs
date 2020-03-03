@@ -9,7 +9,7 @@ use crate::{
     operation::{test, Distinct, Operation},
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build() {
     let field_name = "field_name".to_string();
@@ -32,7 +32,7 @@ async fn build() {
     assert_eq!(distinct_command.read_pref, None);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_with_query() {
     let field_name = "field_name".to_string();
@@ -57,7 +57,7 @@ async fn build_with_query() {
     assert_eq!(distinct_command.read_pref, None);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_with_options() {
     let field_name = "field_name".to_string();
@@ -84,7 +84,7 @@ async fn build_with_options() {
     assert_eq!(distinct_command.read_pref, None);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn op_selection_criteria() {
     test::op_selection_criteria(|selection_criteria| {
@@ -96,7 +96,7 @@ async fn op_selection_criteria() {
     });
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success() {
     let distinct_op = Distinct::empty();
@@ -116,7 +116,7 @@ async fn handle_success() {
     assert_eq!(actual_values, expected_values);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_response_with_empty_values() {
     let distinct_op = Distinct::empty();
@@ -135,7 +135,7 @@ async fn handle_response_with_empty_values() {
     assert_eq!(actual_values, expected_values);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_response_no_values() {
     let distinct_op = Distinct::empty();

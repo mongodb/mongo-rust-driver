@@ -43,7 +43,7 @@ struct OsMetadata {
 // `currentOp` sometimes detecting heartbeats between the server. Eventually we can test this using
 // APM or coming up with something more clever, but for now, we're just disabling it.
 //
-// #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+// #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 // #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[allow(unused)]
 async fn metadata_sent_in_handshake() {
@@ -59,7 +59,7 @@ async fn metadata_sent_in_handshake() {
     assert_eq!(metadata.client.driver.name, "mrd");
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn server_selection_timeout_message() {
     let _guard = LOCK.run_concurrently();
@@ -94,7 +94,7 @@ async fn server_selection_timeout_message() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn list_databases() {
@@ -144,7 +144,7 @@ async fn list_databases() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn list_database_names() {
@@ -303,7 +303,7 @@ fn scram_test(username: &str, password: &str, mechanisms: &[AuthMechanism]) {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_sha1() {
     if !CLIENT.auth_enabled() {
@@ -316,7 +316,7 @@ async fn scram_sha1() {
     scram_test("sha1", "sha1", &[AuthMechanism::ScramSha1]);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_sha256() {
     if CLIENT.server_version_lt(4, 0) || !CLIENT.auth_enabled() {
@@ -328,7 +328,7 @@ async fn scram_sha256() {
     scram_test("sha256", "sha256", &[AuthMechanism::ScramSha256]);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_both() {
     if CLIENT.server_version_lt(4, 0) || !CLIENT.auth_enabled() {
@@ -349,7 +349,7 @@ async fn scram_both() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_missing_user_uri() {
     if !CLIENT.auth_enabled() {
@@ -358,7 +358,7 @@ async fn scram_missing_user_uri() {
     auth_test_uri("adsfasdf", "ASsdfsadf", None, false);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_missing_user_options() {
     if !CLIENT.auth_enabled() {
@@ -367,7 +367,7 @@ async fn scram_missing_user_options() {
     auth_test_options("sadfasdf", "fsdadsfasdf", None, false);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn saslprep_options() {
     if CLIENT.server_version_lt(4, 0) || !CLIENT.auth_enabled() {
@@ -392,7 +392,7 @@ async fn saslprep_options() {
     auth_test_options("\u{2168}", "I\u{00AD}V", None, true);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn saslprep_uri() {
     if CLIENT.server_version_lt(4, 0) || !CLIENT.auth_enabled() {

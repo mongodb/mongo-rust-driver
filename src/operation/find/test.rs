@@ -29,7 +29,7 @@ fn build_test(
     assert_eq!(cmd.body, expected_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build() {
     let ns = Namespace {
@@ -68,7 +68,7 @@ async fn build() {
     build_test(ns, Some(filter), Some(options), expected_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_cursor_type() {
     let ns = Namespace {
@@ -115,7 +115,7 @@ async fn build_cursor_type() {
     build_test(ns, None, Some(tailable_await_options), tailable_await_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_max_await_time() {
     let ns = Namespace {
@@ -136,7 +136,7 @@ async fn build_max_await_time() {
     build_test(ns, None, Some(options), body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_limit() {
     let ns = Namespace {
@@ -164,7 +164,7 @@ async fn build_limit() {
     build_test(ns, None, Some(negative_options), negative_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_batch_size() {
     let options = FindOptions::builder().batch_size(1).build();
@@ -181,7 +181,7 @@ async fn build_batch_size() {
     assert!(op.build(&StreamDescription::new_testing()).is_err())
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn op_selection_criteria() {
     test::op_selection_criteria(|selection_criteria| {
@@ -193,7 +193,7 @@ async fn op_selection_criteria() {
     });
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success() {
     let ns = Namespace {
@@ -289,7 +289,7 @@ fn verify_max_await_time(max_await_time: Option<Duration>, cursor_type: Option<C
     assert_eq!(spec.max_time, max_await_time);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_max_await_time() {
     verify_max_await_time(None, None);
@@ -305,7 +305,7 @@ async fn handle_max_await_time() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_invalid_response() {
     let find = Find::empty();
