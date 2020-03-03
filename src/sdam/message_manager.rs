@@ -28,13 +28,6 @@ impl TopologyMessageManager {
         }
     }
 
-    /// Gets a receiver which will receive messages whenever a topology check has been requested by
-    /// a server selection operation. This should be called by each SDAM background task when it
-    /// starts up.
-    pub(super) fn subscribe_to_topology_check_requests(&self) -> Receiver<()> {
-        self.topology_check_listener.clone()
-    }
-
     /// Requests that the SDAM background tasks check the topology immediately. This should be
     /// called by each server selection operation when it fails to select a server.
     pub(super) fn request_topology_check(&self) {

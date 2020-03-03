@@ -70,11 +70,11 @@ impl Topology {
             servers: Default::default(),
         }));
 
-        let topology = Topology { common, state };
+        let topology = Topology { state, common };
 
         {
             let mut state = topology.state.write().await;
-
+            
             for address in hosts {
                 state.add_new_server(address, topology.clone())?;
             }
@@ -180,7 +180,7 @@ impl Topology {
                 .stream_description()
                 .map(|sd| sd.max_wire_version)
                 .ok()
-                .and_then(std::convert::identity)
+                .flatten()
                 .unwrap_or(0);
 
             // in 4.2+, we only clear connection pool if we've received a
