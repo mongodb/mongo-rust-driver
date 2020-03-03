@@ -9,7 +9,7 @@ use crate::{
     Namespace,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build() {
     let options = DropCollectionOptions {
@@ -53,7 +53,7 @@ async fn build() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success() {
     let op = DropCollection::empty();
@@ -64,7 +64,7 @@ async fn handle_success() {
     assert!(op.handle_response(ok_extra).is_ok());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_write_concern_error() {
     let op = DropCollection::empty();

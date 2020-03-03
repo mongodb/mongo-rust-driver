@@ -8,7 +8,7 @@ use crate::{
     selection_criteria::ReadPreference,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build() {
     let list_databases_op = ListDatabases::empty();
@@ -26,7 +26,7 @@ async fn build() {
     assert_eq!(list_databases_command.read_pref, None);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_with_name_only() {
     let name_only = true;
@@ -47,7 +47,7 @@ async fn build_with_name_only() {
     assert_eq!(list_databases_command.read_pref, None);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_with_filter() {
     let filter = doc! {"something" : "something else"};
@@ -68,7 +68,7 @@ async fn build_with_filter() {
     assert_eq!(list_databases_command.read_pref, None);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success() {
     let list_databases_op = ListDatabases::empty();
@@ -107,7 +107,7 @@ async fn handle_success() {
     assert_eq!(actual_values, expected_values);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_response_no_databases() {
     let list_databases_op = ListDatabases::empty();
@@ -123,7 +123,7 @@ async fn handle_response_no_databases() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn op_selection_criteria() {
     let list_databases_op = ListDatabases::empty();

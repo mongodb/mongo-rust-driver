@@ -6,7 +6,7 @@ use crate::{
     operation::Operation,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build() {
     let op = RunCommand::new("foo".into(), doc! { "isMaster": 1 }, None);
@@ -26,7 +26,7 @@ async fn build() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn no_error_ok_0() {
     let op = RunCommand::new("foo".into(), doc! { "isMaster": 1 }, None);

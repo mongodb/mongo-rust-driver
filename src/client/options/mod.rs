@@ -1404,37 +1404,37 @@ mod tests {
         }
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn fails_without_scheme() {
         assert!(ClientOptions::parse("localhost:27017").is_err());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn fails_with_invalid_scheme() {
         assert!(ClientOptions::parse("mangodb://localhost:27017").is_err());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn fails_with_nothing_after_scheme() {
         assert!(ClientOptions::parse("mongodb://").is_err());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn fails_with_only_slash_after_scheme() {
         assert!(ClientOptions::parse("mongodb:///").is_err());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn fails_with_no_host() {
         assert!(ClientOptions::parse("mongodb://:27017").is_err());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn no_port() {
         let uri = "mongodb://localhost";
@@ -1449,7 +1449,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn no_port_trailing_slash() {
         let uri = "mongodb://localhost/";
@@ -1464,7 +1464,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn with_port() {
         let uri = "mongodb://localhost/";
@@ -1482,7 +1482,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn with_port_and_trailing_slash() {
         let uri = "mongodb://localhost:27017/";
@@ -1500,7 +1500,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn with_read_concern() {
         let uri = "mongodb://localhost:27017/?readConcernLevel=foo";
@@ -1519,13 +1519,13 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn with_w_negative_int() {
         assert!(ClientOptions::parse("mongodb://localhost:27017/?w=-1").is_err());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn with_w_non_negative_int() {
         let uri = "mongodb://localhost:27017/?w=1";
@@ -1545,7 +1545,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn with_w_string() {
         let uri = "mongodb://localhost:27017/?w=foo";
@@ -1567,13 +1567,13 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn with_invalid_j() {
         assert!(ClientOptions::parse("mongodb://localhost:27017/?journal=foo").is_err());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn with_j() {
         let uri = "mongodb://localhost:27017/?journal=true";
@@ -1593,19 +1593,19 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn with_wtimeout_non_int() {
         assert!(ClientOptions::parse("mongodb://localhost:27017/?wtimeoutMS=foo").is_err());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn with_wtimeout_negative_int() {
         assert!(ClientOptions::parse("mongodb://localhost:27017/?wtimeoutMS=-1").is_err());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn with_wtimeout() {
         let uri = "mongodb://localhost:27017/?wtimeoutMS=27";
@@ -1627,7 +1627,7 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn with_all_write_concern_options() {
         let uri = "mongodb://localhost:27017/?w=majority&journal=false&wtimeoutMS=27";
@@ -1651,11 +1651,11 @@ mod tests {
         );
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn with_invalid_read_preference_mode() {}
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn with_mixed_options() {
         let uri = "mongodb://localhost,localhost:27018/?w=majority&readConcernLevel=majority&\

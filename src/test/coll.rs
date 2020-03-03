@@ -12,7 +12,7 @@ use crate::{
     },
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn count() {
@@ -32,7 +32,7 @@ async fn count() {
     assert_eq!(coll.estimated_document_count(None).unwrap(), 4);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn find() {
@@ -57,7 +57,7 @@ async fn find() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn update() {
@@ -90,7 +90,7 @@ async fn update() {
     assert!(upsert_results.upserted_id.is_some());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn delete() {
@@ -112,7 +112,7 @@ async fn delete() {
     assert_eq!(coll.count_documents(doc! {"x": 3 }, None).unwrap(), 0);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn aggregate_out() {
@@ -171,7 +171,7 @@ fn kill_cursors_sent(client: &EventClient) -> bool {
         })
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn kill_cursors_on_drop() {
@@ -201,7 +201,7 @@ async fn kill_cursors_on_drop() {
     assert!(kill_cursors_sent(&event_client));
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn no_kill_cursors_on_exhausted() {
@@ -282,7 +282,7 @@ lazy_static! {
     };
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn large_insert() {
@@ -320,7 +320,7 @@ fn multibatch_documents_with_duplicate_keys() -> Vec<Document> {
     docs
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn large_insert_unordered_with_errors() {
@@ -353,7 +353,7 @@ async fn large_insert_unordered_with_errors() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn large_insert_ordered_with_errors() {
@@ -387,7 +387,7 @@ async fn large_insert_ordered_with_errors() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn empty_insert() {

@@ -28,7 +28,7 @@ pub(crate) fn split_off_batch<T>(
 mod test {
     use super::split_off_batch;
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn split_empty_batch() {
         let mut all: Vec<i32> = Vec::new();
@@ -36,7 +36,7 @@ mod test {
         assert!(split_off_batch(&mut all, 10, |_| 1).is_empty());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn split_single_batch() {
         let mut all = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -44,7 +44,7 @@ mod test {
         assert!(split_off_batch(&mut all, 10, |_| 1).is_empty());
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn split_multi_batch() {
         let mut all = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -54,7 +54,7 @@ mod test {
         assert_eq!(rest, vec![4, 5, 6, 7, 8, 9, 10]);
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn split_batches_until_empty() {
         let mut batches = Vec::new();
@@ -75,7 +75,7 @@ mod test {
         assert_eq!(batches[2], vec![7, 8, 9]);
     }
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn split_batch_with_too_large_element() {
         let mut all = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];

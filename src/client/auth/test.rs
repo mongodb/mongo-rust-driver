@@ -9,7 +9,7 @@ lazy_static! {
     ];
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn negotiate_both_scram() {
     let description_both = StreamDescription {
@@ -22,7 +22,7 @@ async fn negotiate_both_scram() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn negotiate_sha1_only() {
     let description_sha1 = StreamDescription {
@@ -35,7 +35,7 @@ async fn negotiate_sha1_only() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn negotiate_sha256_only() {
     let description_sha256 = StreamDescription {
@@ -48,7 +48,7 @@ async fn negotiate_sha256_only() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn negotiate_none() {
     let description_none: StreamDescription = Default::default();
@@ -58,7 +58,7 @@ async fn negotiate_none() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn negotiate_mangled() {
     let description_mangled = StreamDescription {

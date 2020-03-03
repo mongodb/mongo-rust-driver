@@ -200,19 +200,19 @@ fn run_test(test_file: TestFile) {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn single() {
     run_spec_test(&["server-discovery-and-monitoring", "single"], run_test);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn rs() {
     run_spec_test(&["server-discovery-and-monitoring", "rs"], run_test);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn sharded() {
     run_spec_test(&["server-discovery-and-monitoring", "sharded"], run_test);
