@@ -79,7 +79,7 @@ collection.insert_many(docs, None)?;
 ```
 ### Finding documents in a collection
 ```rust
-use bson::{doc, bson};
+use bson::{doc, bson, Bson};
 use mongodb::options::FindOptions;
 ```
 ```rust
