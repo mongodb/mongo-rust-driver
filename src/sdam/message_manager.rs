@@ -9,11 +9,8 @@ use tokio::sync::watch::{self, Receiver, Sender};
 #[derive(Clone, Debug)]
 pub(crate) struct TopologyMessageManager {
     topology_check_requester: Arc<Sender<()>>,
-
     topology_check_listener: Receiver<()>,
-
     topology_change_notifier: Arc<Sender<()>>,
-
     topology_change_listener: Receiver<()>,
 }
 
