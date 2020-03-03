@@ -24,7 +24,7 @@ use crate::{
         ConnectionReadyEvent,
     },
     options::{StreamAddress, TlsOptions},
-    runtime::runtime,
+    RUNTIME,
 };
 pub(crate) use command::{Command, CommandResponse};
 #[cfg(any(feature = "tokio-runtime", feature = "async-std-runtime"))]
@@ -240,7 +240,7 @@ impl Drop for Connection {
             if let Some(strong_pool_ref) = weak_pool_ref.upgrade() {
                 // nullify the current instance, creating a new connection which is moved into the task.
                 let dropped_connection = self.take();
-                runtime().execute(async move {
+                RUNTIME.execute(async move {
                     strong_pool_ref.check_in(dropped_connection).await;
                 });
             } else if let Some(ref handler) = self.handler {

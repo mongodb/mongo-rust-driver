@@ -3,7 +3,7 @@ use crate::{
     cmap::{options::ConnectionPoolOptions, Connection, ConnectionPool},
     error::Result,
     options::{ClientOptions, StreamAddress},
-    sdam::Topology,
+    RUNTIME,
 };
 
 /// Contains the state for a given server in the topology.
@@ -29,7 +29,6 @@ impl Server {
             topology,
             pool: ConnectionPool::new(
                 address.clone(),
-                AsyncRuntime::Tokio,
                 Some(ConnectionPoolOptions::from_client_options(options)),
             ),
             address,
@@ -39,12 +38,12 @@ impl Server {
     /// Creates a new Server given the `address` and `options`.
     /// Checks out a connection from the server's pool.
     pub(crate) fn checkout_connection(&self) -> Result<Connection> {
-        runtime().block_on(self.pool.check_out())
+        RUNTIME.block_on(self.pool.check_out())
     }
 
     /// Clears the connection pool associated with the server.
     pub(crate) fn clear_connection_pool(&self) {
-        runtime().block_on(self.pool.clear());
+        RUNTIME.block_on(self.pool.clear());
     }
 
     /// Attempts to upgrade the weak reference to the topology to a strong reference and return it.

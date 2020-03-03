@@ -12,10 +12,6 @@ use futures::future::{self, Either};
 use self::stream::AsyncStream;
 use crate::{cmap::conn::StreamOptions, error::{Error, Result}};
 
-pub(crate) fn runtime() -> AsyncRuntime {
-    AsyncRuntime::Tokio
-}
-
 /// An abstract handle to the async runtime.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum AsyncRuntime {
