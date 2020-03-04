@@ -5,6 +5,7 @@ use crate::{
     cmap::{options::ConnectionPoolOptions, Command, ConnectionPool},
     selection_criteria::ReadPreference,
     test::{CLIENT, LOCK},
+    RUNTIME,
 };
 
 #[derive(Debug, Deserialize)]
@@ -26,7 +27,7 @@ async fn acquire_connection_and_send_command() {
     let pool_options = ConnectionPoolOptions::from_client_options(&client_options);
 
     let pool = ConnectionPool::new(client_options.hosts[0].clone(), Some(pool_options));
-    let mut connection = pool.check_out().unwrap();
+    let mut connection = RUNTIME.block_on(pool.check_out()).unwrap();
 
     let body = doc! { "listDatabases": 1 };
     let read_pref = ReadPreference::PrimaryPreferred {

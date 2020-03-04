@@ -5,10 +5,14 @@ mod integration;
 use std::{
     collections::HashMap,
     ops::Deref,
-    sync::{Arc, RwLock},
-    thread::JoinHandle,
+    sync::Arc,
     time::Duration,
 };
+
+use futures::future::{BoxFuture, FutureExt};
+use futures_timer::Delay;
+
+use tokio::sync::RwLock;
 
 use self::{
     event::{Event, EventHandler},
@@ -18,6 +22,8 @@ use self::{
 use crate::{
     cmap::{Connection, ConnectionPool},
     error::{Error, Result},
+    runtime::AsyncJoinHandle,
+    RUNTIME,
     test::{run_spec_test, CLIENT_OPTIONS, LOCK},
 };
 
@@ -38,7 +44,7 @@ struct Executor {
 struct State {
     handler: Arc<EventHandler>,
     connections: RwLock<HashMap<String, Connection>>,
-    threads: RwLock<HashMap<String, JoinHandle<Result<()>>>>,
+    threads: RwLock<HashMap<String, AsyncJoinHandle<Result<()>>>>,
 
     // In order to drop the pool when performing a `close` operation, we use an `Option` so that we
     // can replace it with `None`. Since none of the tests should use the pool after its closed
@@ -85,6 +91,8 @@ impl Executor {
             threads: Default::default(),
         };
 
+        println!("Running {}", test_file.description);
+        
         Self {
             error,
             events: test_file.events,
@@ -93,13 +101,12 @@ impl Executor {
         }
     }
 
-    fn execute_test(self) {
+    async fn execute_test(self) {
         let mut error: Option<Error> = None;
         let operations = self.operations;
 
         for operation in operations {
-            let err = operation.execute(self.state.clone()).err();
-
+            let err = operation.execute(self.state.clone()).await.err();
             if error.is_none() {
                 error = err;
             }
@@ -108,12 +115,12 @@ impl Executor {
             // order that concurrent threads check out connections from the pool. The solution to
             // this is to sleep for a small amount of time between each operation, which in practice
             // allows threads to enter the wait queue in the order that they were started.
-            std::thread::sleep(Duration::from_millis(1));
+            Delay::new(Duration::from_millis(1)).await;
         }
 
         match (self.error, error) {
             (Some(ref expected), Some(ref actual)) => expected.assert_matches(actual),
-            (Some(ref expected), None) => {
+            (Some(ref expected), None) => {   
                 panic!("Expected {}, but no error occurred", expected.type_)
             }
             (None, Some(ref actual)) => panic!(
@@ -134,76 +141,81 @@ impl Executor {
 }
 
 impl Operation {
-    fn execute(self, state: Arc<State>) -> Result<()> {
-        match self {
-            Operation::StartHelper { target, operations } => {
-                let state_ref = state.clone();
+    fn execute(self, state: Arc<State>) -> BoxFuture<'static, Result<()>> {
+        println!("executing {:?}", &self);
 
-                let thread = std::thread::spawn(move || {
-                    for operation in operations {
-                        // If any error occurs during an operation, we halt the thread and yield
-                        // that value when `join` is called on the thread.
-                        operation.execute(state_ref.clone())?;
-                    }
-
-                    Ok(())
-                });
-
-                state.threads.write().unwrap().insert(target, thread);
-            }
-            Operation::Wait { ms } => std::thread::sleep(Duration::from_millis(ms)),
-            Operation::WaitForThread { target } => state
-                .threads
-                .write()
-                .unwrap()
-                .remove(&target)
-                .unwrap()
-                .join()
-                .unwrap()?,
-            Operation::WaitForEvent { event, count } => {
-                while state.count_events(&event) < count {
-                    std::thread::sleep(Duration::from_millis(100));
+        async move {
+            match self {
+                Operation::StartHelper { target, operations } => {
+                    let state_ref = state.clone();
+                    let task = RUNTIME.execute(async move {
+                        for operation in operations {
+                            // If any error occurs during an operation, we halt the thread and yield
+                            // that value when `join` is called on the thread.
+                            operation.execute(state_ref.clone()).await?;
+                        }
+                        Ok(())
+                    });
+                    
+                    state.threads.write().await.insert(target, task);
+                },
+                Operation::Wait { ms } => Delay::new(Duration::from_millis(ms)).await,
+                Operation::WaitForThread { target } => {
+                    state
+                        .threads
+                        .write()
+                        .await
+                        .remove(&target)
+                        .unwrap()
+                        .await
+                        .unwrap()?
                 }
-            }
-            Operation::CheckOut { label } => {
-                if let Some(pool) = state.pool.read().unwrap().deref() {
-                    let mut conn = pool.check_out()?;
-
-                    if let Some(label) = label {
-                        state.connections.write().unwrap().insert(label, conn);
-                    } else {
-                        conn.pool.take();
+                Operation::WaitForEvent { event, count } => {
+                    while state.count_events(&event) < count {
+                        println!("Didn't get enough events waiting for {:?}", &event);
+                        Delay::new(Duration::from_millis(100)).await;
                     }
                 }
-            }
-            Operation::CheckIn { connection } => {
-                let conn = state
-                    .connections
-                    .write()
-                    .unwrap()
-                    .remove(&connection)
-                    .unwrap();
+                Operation::CheckOut { label } => {
+                    if let Some(pool) = state.pool.read().await.deref() {
+                        let mut conn = pool.check_out().await?;
 
-                if let Some(pool) = state.pool.read().unwrap().deref() {
-                    pool.check_in(conn);
+                        if let Some(label) = label {
+                            state.connections.write().await.insert(label, conn);
+                        } else {
+                            conn.pool.take();
+                        }
+                    }
                 }
-            }
-            Operation::Clear => {
-                if let Some(pool) = state.pool.write().unwrap().deref() {
-                    pool.clear();
+                Operation::CheckIn { connection } => {
+                    let conn = state
+                        .connections
+                        .write()
+                        .await
+                        .remove(&connection)
+                        .unwrap();
+
+                    if let Some(pool) = state.pool.read().await.deref() {
+                        pool.check_in(conn).await;
+                    }
                 }
-            }
-            Operation::Close => {
-                state.connections.write().unwrap().clear();
-                state.pool.write().unwrap().take();
-            }
+                Operation::Clear => {
+                    if let Some(pool) = state.pool.write().await.deref() {
+                        pool.clear().await;
+                    }
+                }
+                Operation::Close => {
+                    state.connections.write().await.clear();
+                    state.pool.write().await.take();
+                }
 
-            // We replace all instances of `Start` with `StartHelper` when we preprocess the events,
-            // so this should never actually be found.
-            Operation::Start { .. } => unreachable!(),
-        }
-
-        Ok(())
+                // We replace all instances of `Start` with `StartHelper` when we preprocess the events,
+                // so this should never actually be found.
+                Operation::Start { .. } => unreachable!(),
+            }
+            
+            Ok(())
+        }.boxed()
     }
 }
 
@@ -267,7 +279,7 @@ async fn cmap_spec_tests() {
             let _guard = LOCK.run_concurrently();
 
             let executor = Executor::new(test_file);
-            executor.execute_test();
+            RUNTIME.block_on(executor.execute_test());
         },
     );
 }

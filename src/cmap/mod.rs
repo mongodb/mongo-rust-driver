@@ -8,6 +8,7 @@ pub(crate) mod options;
 mod wait_queue;
 
 use std::{
+    ops::DerefMut,
     sync::Arc,
     time::Duration,
 };
@@ -247,13 +248,13 @@ impl ConnectionPool {
         while let Some(conn) = connections.checked_in_connections.pop() {
             // Close the connection if it's stale.
             if conn.is_stale(*self.inner.generation.read().await) {
-                self.inner.close_connection(conn, ConnectionClosedReason::Stale).await;
+                self.inner.close_connection(conn, connections.deref_mut(), ConnectionClosedReason::Stale).await;
                 continue;
             }
 
             // Close the connection if it's idle.
             if conn.is_idle(self.inner.max_idle_time) {
-                self.inner.close_connection(conn, ConnectionClosedReason::Idle).await;
+                self.inner.close_connection(conn, connections.deref_mut(), ConnectionClosedReason::Idle).await;
                 continue;
             }
 
@@ -270,8 +271,8 @@ impl ConnectionPool {
     /// available connections. The time that the connection is checked in will be marked to
     /// facilitate detecting if the connection becomes idle.
     #[cfg(test)]
-    pub(crate) fn check_in(&self, conn: Connection) {
-        self.inner.check_in(conn);
+    pub(crate) async fn check_in(&self, conn: Connection) {
+        self.inner.check_in(conn).await;
     }
 
     /// Increments the generation of the pool. Rather than eagerly removing stale connections from
@@ -354,11 +355,12 @@ impl ConnectionPoolInner {
 
         conn.mark_checked_in();
 
+        let mut connections = self.connections.lock().await;
         // Close the connection if it's stale.
         if conn.is_stale(*self.generation.read().await) {
-            self.close_connection(conn, ConnectionClosedReason::Stale).await;
+            self.close_connection(conn, connections.deref_mut(), ConnectionClosedReason::Stale).await;
         } else {
-            self.connections.lock().await.checked_in_connections.push(conn);
+            connections.checked_in_connections.push(conn);
         }
 
         self.wait_queue.wake_front();
@@ -367,12 +369,12 @@ impl ConnectionPoolInner {
     /// Internal helper to close a connection, emit the event for it being closed, and decrement the
     /// total connection count. Any connection being closed by the pool should be closed by using
     /// this method.
-   async fn close_connection(&self, conn: Connection, reason: ConnectionClosedReason) {
+   async fn close_connection(&self, conn: Connection, connections: &mut Connections, reason: ConnectionClosedReason) {
         self.emit_event(|handler| {
             handler.handle_connection_closed_event(conn.closed_event(reason));
         });
 
-        self.connections.lock().await.total_connection_count -= 1;
+        connections.total_connection_count -= 1;
     }
 }
 

@@ -1,4 +1,5 @@
 use std::{
+    ops::DerefMut,
     time::Duration,
     sync::Weak,
 };
@@ -37,15 +38,22 @@ impl ConnectionPool {
     /// Iterate over the connections and remove any that are stale or idle.
     async fn remove_perished_connections(&self) {
         let mut connections = self.inner.connections.lock().await;
-        let checked_in_connections = &mut connections.checked_in_connections;
         let generation = *self.inner.generation.read().await;
         let mut i = 0;
         
-        while i < checked_in_connections.len() {
-            if checked_in_connections[i].is_stale(generation) {
-                self.inner.close_connection(checked_in_connections.remove(i), ConnectionClosedReason::Stale).await;
-            } else if checked_in_connections[i].is_idle(self.inner.max_idle_time) {
-                self.inner.close_connection(checked_in_connections.remove(i), ConnectionClosedReason::Idle).await;
+        while i < connections.checked_in_connections.len() {
+            if connections.checked_in_connections[i].is_stale(generation) {
+                self.inner.close_connection(
+                    connections.checked_in_connections.remove(i),
+                    connections.deref_mut(),
+                    ConnectionClosedReason::Stale
+                ).await;
+            } else if connections.checked_in_connections[i].is_idle(self.inner.max_idle_time) {
+                self.inner.close_connection(
+                    connections.checked_in_connections.remove(i),
+                    connections.deref_mut(),
+                    ConnectionClosedReason::Idle
+                ).await;
             } else {
                 i += 1;
             }

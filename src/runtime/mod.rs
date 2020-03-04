@@ -1,6 +1,7 @@
 // TODO RUST-212: Remove annotation.
 #[allow(dead_code)]
 mod stream;
+mod join_handle;
 
 use std::future::Future;
 use std::time::Duration;
@@ -11,6 +12,7 @@ use futures::future::{self, Either};
 
 use self::stream::AsyncStream;
 use crate::{cmap::conn::StreamOptions, error::{Error, Result}};
+pub(crate) use self::join_handle::AsyncJoinHandle;
 
 /// An abstract handle to the async runtime.
 #[derive(Clone, Copy, Debug)]
@@ -26,20 +28,21 @@ pub(crate) enum AsyncRuntime {
 
 impl AsyncRuntime {
     /// Spawn a task in the background to run a future.
-    pub(crate) fn execute<F>(self, fut: F)
+    pub(crate) fn execute<F, O>(self, fut: F) -> AsyncJoinHandle<O>
     where
-        F: Future<Output = ()> + Send + 'static,
+        F: Future<Output = O> + Send + 'static,
+        O: Send + 'static
     {
         match self {
             #[cfg(feature = "tokio-runtime")]
             Self::Tokio => {
-                tokio::task::spawn(fut);
+                AsyncJoinHandle::Tokio(tokio::task::spawn(fut))
             }
 
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd => {
-                async_std::task::spawn(fut);
-            }
+            // #[cfg(feature = "async-std-runtime")]
+            // Self::AsyncStd => {
+            //     async_std::task::spawn(fut)
+            // }
         }
     }
 
@@ -68,6 +71,13 @@ impl AsyncRuntime {
     pub(crate) async fn connect_stream(self, options: StreamOptions) -> Result<AsyncStream> {
         AsyncStream::connect(options).await
     }
+}
+
+#[async_trait]
+pub(crate) trait JoinHandle {
+    type Output;
+
+    
 }
 
 #[async_trait]
