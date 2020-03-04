@@ -72,6 +72,15 @@ pub(crate) struct TopologyDescription {
     servers: HashMap<StreamAddress, ServerDescription>,
 }
 
+impl PartialEq for TopologyDescription {
+    fn eq(&self, other: &Self) -> bool {
+        // Since we only use TopologyDescription equality to determine whether to wake up server
+        // selection operations to try to select again, the only fields we care about are the ones
+        // checked by the server selection algorithm.
+        self.compatibility_error == other.compatibility_error && self.servers == other.servers
+    }
+}
+
 impl TopologyDescription {
     pub(crate) fn new(options: ClientOptions) -> Result<Self> {
         verify_max_staleness(
