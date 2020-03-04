@@ -4,6 +4,7 @@ use crate::{
     error::Result,
     options::{ClientOptions, StreamAddress},
     RUNTIME,
+    sdam::Topology,
 };
 
 /// Contains the state for a given server in the topology.
@@ -37,13 +38,13 @@ impl Server {
 
     /// Creates a new Server given the `address` and `options`.
     /// Checks out a connection from the server's pool.
-    pub(crate) fn checkout_connection(&self) -> Result<Connection> {
-        RUNTIME.block_on(self.pool.check_out())
+    pub(crate) async fn checkout_connection(&self) -> Result<Connection> {
+        self.pool.check_out().await
     }
 
     /// Clears the connection pool associated with the server.
-    pub(crate) fn clear_connection_pool(&self) {
-        RUNTIME.block_on(self.pool.clear());
+    pub(crate) async fn clear_connection_pool(&self) {
+        self.pool.clear().await;
     }
 
     /// Attempts to upgrade the weak reference to the topology to a strong reference and return it.

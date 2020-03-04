@@ -47,7 +47,6 @@ typed-builder = "0.3.0"
 version_check = "0.9.1"
 webpki = "0.21.0"
 webpki-roots = "0.18.0"
-futures-timer = "3.0.2"
 
 [dependencies.async-std]
 version = "1.5.0"
