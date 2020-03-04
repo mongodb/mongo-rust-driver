@@ -2,10 +2,7 @@ pub mod auth;
 mod executor;
 pub mod options;
 
-use std::{
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 
 use time::PreciseTime;
 
@@ -18,9 +15,9 @@ use crate::{
     error::{ErrorKind, Result},
     event::command::CommandEventHandler,
     operation::ListDatabases,
-    options::{ClientOptions, DatabaseOptions},
-    sdam::{Server, Topology, TopologyUpdateCondvar},
-    selection_criteria::{ReadPreference, SelectionCriteria},
+    options::{ClientOptions, DatabaseOptions, ReadPreference, SelectionCriteria},
+    sdam::{Server, Topology},
+    RUNTIME,
 };
 
 const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
@@ -62,10 +59,8 @@ pub struct Client {
 #[derive(Derivative)]
 #[derivative(Debug)]
 struct ClientInner {
-    topology: Arc<RwLock<Topology>>,
+    topology: Topology,
     options: ClientOptions,
-    #[derivative(Debug = "ignore")]
-    condvar: TopologyUpdateCondvar,
 }
 
 impl Client {
@@ -82,11 +77,8 @@ impl Client {
 
     /// Creates a new `Client` connected to the cluster specified by `options`.
     pub fn with_options(options: ClientOptions) -> Result<Self> {
-        let condvar = TopologyUpdateCondvar::new();
-
         let inner = Arc::new(ClientInner {
-            topology: Topology::new(condvar.clone(), options.clone())?,
-            condvar,
+            topology: RUNTIME.block_on(Topology::new(options.clone()))?,
             options,
         });
 
@@ -161,66 +153,62 @@ impl Client {
         }
     }
 
-    fn topology(&self) -> Arc<RwLock<Topology>> {
-        self.inner.topology.clone()
-    }
-
     /// Select a server using the provided criteria. If none is provided, a primary read preference
     /// will be used instead.
-    fn select_server(&self, criteria: Option<&SelectionCriteria>) -> Result<Arc<Server>> {
+    async fn select_server(&self, criteria: Option<&SelectionCriteria>) -> Result<Arc<Server>> {
         let criteria =
             criteria.unwrap_or_else(|| &SelectionCriteria::ReadPreference(ReadPreference::Primary));
+
         let start_time = PreciseTime::now();
-        let timeout = self
+        let timeout = time::Duration::from_std(
+            self.inner
+                .options
+                .server_selection_timeout
+                .unwrap_or(DEFAULT_SERVER_SELECTION_TIMEOUT),
+        )?;
+
+        let selected_server = self
             .inner
-            .options
-            .server_selection_timeout
-            .unwrap_or(DEFAULT_SERVER_SELECTION_TIMEOUT);
+            .topology
+            .attempt_to_select_server(criteria)
+            .await?;
 
-        while start_time.to(PreciseTime::now()).to_std().unwrap() < timeout {
-            // Because we're calling clone on the lock guard, we're actually copying the
-            // Topology itself, not just making a new reference to it. The
-            // `servers` field will contain references to the same instances
-            // though, since each is wrapped in an `Arc`.
-            let topology = self.inner.topology.read().unwrap().clone();
+        if let Some(server) = selected_server {
+            return Ok(server);
+        }
 
-            // Return error if the wire version is invalid.
-            if let Some(error_msg) = topology.description.compatibility_error() {
+        loop {
+            self.inner.topology.request_topology_check();
+
+            let time_passed = start_time.to(PreciseTime::now());
+            let time_remaining = std::cmp::max(time::Duration::zero(), timeout - time_passed);
+
+            let message_received = self
+                .inner
+                .topology
+                .wait_for_topology_change(time_remaining.to_std()?)
+                .await;
+
+            if !message_received {
                 return Err(ErrorKind::ServerSelectionError {
-                    message: error_msg.into(),
+                    message: self
+                        .inner
+                        .topology
+                        .server_selection_timeout_error_message(&criteria)
+                        .await,
                 }
                 .into());
             }
 
-            let server = topology
-                .description
-                .select_server(&criteria)?
-                .and_then(|server| topology.servers.get(&server.address));
-
-            if let Some(server) = server {
-                return Ok(server.clone());
-            }
-
-            // Because the servers in the copied Topology are Arc aliases of the servers in the
-            // original Topology, requesting a check on the copy will in turn request a check from
-            // each of the original servers, so the monitoring threads will be woken the same way
-            // they would if `request_topology_check` were called on the original Topology.
-            topology.request_topology_check();
-
-            self.inner
-                .condvar
-                .wait_timeout(timeout - start_time.to(PreciseTime::now()).to_std().unwrap());
-        }
-
-        Err(ErrorKind::ServerSelectionError {
-            message: self
+            let selected_server = self
                 .inner
                 .topology
-                .read()
-                .unwrap()
-                .description
-                .server_selection_timeout_error_message(&criteria),
+                .attempt_to_select_server(criteria)
+                .await?;
+
+            if let Some(server) = selected_server {
+                return Ok(server);
+            }
         }
-        .into())
     }
 }

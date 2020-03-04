@@ -101,8 +101,6 @@ define_if_single_runtime_enabled! {
     mod is_master;
     mod operation;
     pub mod results;
-    // TODO RUST-212: Remove the annotation to suppress warnings for unused code.
-    #[allow(dead_code)]
     pub(crate) mod runtime;
     mod sdam;
     mod selection_criteria;
@@ -135,12 +133,8 @@ compile_error!(
      or `async-std-runtime` in your Cargo.toml"
 );
 
-// TODO RUST-212: Remove the annotation to suppress warnings for unused code.
 #[cfg(all(feature = "tokio-runtime", not(feature = "async-std-runtime")))]
-#[allow(dead_code)]
 pub(crate) static RUNTIME: runtime::AsyncRuntime = runtime::AsyncRuntime::Tokio;
 
-// TODO RUST-212: Remove the annotation to suppress warnings for unused code.
 #[cfg(all(not(feature = "tokio-runtime"), feature = "async-std-runtime"))]
-#[allow(dead_code)]
 pub(crate) static RUNTIME: runtime::AsyncRuntime = runtime::AsyncRuntime::AsyncStd;

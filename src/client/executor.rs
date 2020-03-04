@@ -11,7 +11,7 @@ use crate::{
     error::Result,
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
     operation::Operation,
-    sdam::{handle_post_handshake_error, handle_pre_handshake_error},
+    RUNTIME,
 };
 
 lazy_static! {
@@ -38,8 +38,8 @@ impl Client {
         &self,
         op: &T,
     ) -> Result<(T::O, Connection)> {
-        let mut conn = self
-            .select_server(op.selection_criteria())?
+        let mut conn = RUNTIME
+            .block_on(self.select_server(op.selection_criteria()))?
             .checkout_connection()?;
         self.execute_operation_on_connection(op, &mut conn)
             .map(|r| (r, conn))
@@ -57,15 +57,15 @@ impl Client {
         match connection {
             Some(conn) => self.execute_operation_on_connection(op, conn),
             None => {
-                let server = self.select_server(op.selection_criteria())?;
+                let server = RUNTIME.block_on(self.select_server(op.selection_criteria()))?;
 
                 let mut conn = match server.checkout_connection() {
                     Ok(conn) => conn,
                     Err(err) => {
-                        handle_pre_handshake_error(
-                            err.clone(),
-                            server.address.clone(),
-                            self.topology(),
+                        RUNTIME.block_on(
+                            self.inner
+                                .topology
+                                .handle_pre_handshake_error(err.clone(), server.address.clone()),
                         );
                         return Err(err);
                     }
@@ -74,7 +74,11 @@ impl Client {
                 match self.execute_operation_on_connection(op, &mut conn) {
                     Ok(result) => Ok(result),
                     Err(err) => {
-                        handle_post_handshake_error(err.clone(), conn, server, self.topology());
+                        RUNTIME.block_on(self.inner.topology.handle_post_handshake_error(
+                            err.clone(),
+                            conn,
+                            server,
+                        ));
                         Err(err)
                     }
                 }
@@ -89,10 +93,11 @@ impl Client {
         connection: &mut Connection,
     ) -> Result<T::O> {
         let mut cmd = op.build(connection.stream_description()?)?;
-        self.topology()
-            .read()
-            .unwrap()
-            .update_command_with_read_pref(connection.address(), &mut cmd, op.selection_criteria());
+        RUNTIME.block_on(self.inner.topology.update_command_with_read_pref(
+            connection.address(),
+            &mut cmd,
+            op.selection_criteria(),
+        ));
 
         let connection_info = connection.info();
         let request_id = crate::cmap::conn::next_request_id();

@@ -1,3 +1,5 @@
+// TODO RUST-212: Remove annotation.
+#[allow(dead_code)]
 mod stream;
 
 use std::future::Future;
@@ -39,8 +41,8 @@ impl AsyncRuntime {
     /// Run a future in the foreground, blocking on it completing.
     pub(crate) fn block_on<F, T>(self, fut: F) -> T
     where
-        F: Future<Output = T> + Send + 'static,
-        T: Send + 'static,
+        F: Future<Output = T> + Send,
+        T: Send,
     {
         #[cfg(all(feature = "tokio-runtime", not(feature = "async-std-runtime")))]
         {
@@ -56,6 +58,8 @@ impl AsyncRuntime {
     }
 
     /// Create and connect a new `AsyncStream`.
+    // RUST-212: Remove annotation.
+    #[allow(dead_code)]
     pub(crate) async fn connect_stream(self, options: StreamOptions) -> Result<AsyncStream> {
         AsyncStream::connect(options).await
     }
