@@ -90,8 +90,6 @@ impl Executor {
             connections: Default::default(),
             threads: Default::default(),
         };
-
-        println!("Running {}", test_file.description);
         
         Self {
             error,
@@ -141,9 +139,10 @@ impl Executor {
 }
 
 impl Operation {
+    /// Execute this operation.
+    /// async fns currently cannot be recursive, so instead we manually return a BoxFuture here.
+    /// See: https://rust-lang.github.io/async-book/07_workarounds/05_recursion.html
     fn execute(self, state: Arc<State>) -> BoxFuture<'static, Result<()>> {
-        println!("executing {:?}", &self);
-
         async move {
             match self {
                 Operation::StartHelper { target, operations } => {
@@ -168,11 +167,10 @@ impl Operation {
                         .remove(&target)
                         .unwrap()
                         .await
-                        .unwrap()?
+                        .expect("polling the future should not fail")?
                 }
                 Operation::WaitForEvent { event, count } => {
                     while state.count_events(&event) < count {
-                        println!("Didn't get enough events waiting for {:?}", &event);
                         Delay::new(Duration::from_millis(100)).await;
                     }
                 }

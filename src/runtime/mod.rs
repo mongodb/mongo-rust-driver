@@ -39,10 +39,10 @@ impl AsyncRuntime {
                 AsyncJoinHandle::Tokio(tokio::task::spawn(fut))
             }
 
-            // #[cfg(feature = "async-std-runtime")]
-            // Self::AsyncStd => {
-            //     async_std::task::spawn(fut)
-            // }
+            #[cfg(feature = "async-std-runtime")]
+            Self::AsyncStd => {
+                AsyncJoinHandle::AsyncStd(async_std::task::spawn(fut))
+            }
         }
     }
 

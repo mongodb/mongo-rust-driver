@@ -3,7 +3,6 @@ use crate::{
     cmap::{options::ConnectionPoolOptions, Connection, ConnectionPool},
     error::Result,
     options::{ClientOptions, StreamAddress},
-    RUNTIME,
     sdam::Topology,
 };
 
