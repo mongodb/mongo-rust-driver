@@ -3,15 +3,16 @@
 mod stream;
 mod join_handle;
 
-use std::future::Future;
-use std::time::Duration;
+use std::{
+    future::Future,
+    time::Duration,
+};
 
-use async_trait::async_trait;
 use futures_timer::Delay;
 use futures::future::{self, Either};
 
 use self::stream::AsyncStream;
-use crate::{cmap::conn::StreamOptions, error::{Error, Result}};
+use crate::{cmap::conn::StreamOptions, error::{ErrorKind, Result}};
 pub(crate) use self::join_handle::AsyncJoinHandle;
 
 /// An abstract handle to the async runtime.
@@ -71,30 +72,16 @@ impl AsyncRuntime {
     pub(crate) async fn connect_stream(self, options: StreamOptions) -> Result<AsyncStream> {
         AsyncStream::connect(options).await
     }
-}
 
-#[async_trait]
-pub(crate) trait JoinHandle {
-    type Output;
-
-    
-}
-
-#[async_trait]
-pub(crate) trait Timeoutable {
-    type Output;
-    
-    async fn with_timeout<F: Send + Fn() -> Error>(self, timeout: Duration, error_func: F) -> Result<Self::Output>;
-}
-
-#[async_trait]
-impl<T: Future + Unpin + Send> Timeoutable for T {
-    type Output = T::Output;
-
-    async fn with_timeout<F: Send + Fn() -> Error>(self, timeout: Duration, error_func: F) -> Result<T::Output> {
-        match future::select(self, Delay::new(timeout)).await {
+    /// Await on a future for a maximum amount of time before returning an error.
+    pub(crate) async fn await_with_timeout<F>(self, future: F, timeout: Duration) -> Result<F::Output>
+    where F: Future + Send + Unpin
+    {
+        match future::select(future, Delay::new(timeout)).await {
             Either::Left((result, _)) => Ok(result),
-            Either::Right(_) => Err(error_func())
+            Either::Right(_) => Err(ErrorKind::InternalError {
+                message: "Timed out waiting on future".to_string()
+            }.into())
         }
     }
 }

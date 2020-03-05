@@ -90,7 +90,7 @@ impl Executor {
             connections: Default::default(),
             threads: Default::default(),
         };
-        
+
         Self {
             error,
             events: test_file.events,
@@ -118,7 +118,7 @@ impl Executor {
 
         match (self.error, error) {
             (Some(ref expected), Some(ref actual)) => expected.assert_matches(actual),
-            (Some(ref expected), None) => {   
+            (Some(ref expected), None) => {
                 panic!("Expected {}, but no error occurred", expected.type_)
             }
             (None, Some(ref actual)) => panic!(
@@ -155,7 +155,7 @@ impl Operation {
                         }
                         Ok(())
                     });
-                    
+
                     state.threads.write().await.insert(target, task);
                 },
                 Operation::Wait { ms } => Delay::new(Duration::from_millis(ms)).await,
@@ -211,7 +211,6 @@ impl Operation {
                 // so this should never actually be found.
                 Operation::Start { .. } => unreachable!(),
             }
-            
             Ok(())
         }.boxed()
     }

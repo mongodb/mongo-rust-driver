@@ -10,6 +10,7 @@ use crate::{client::auth::Credential, error::Result};
 pub(super) struct ConnectionEstablisher {
     /// Contains the logic for handshaking a connection.
     handshaker: Handshaker,
+    credential: Option<Credential>,
 }
 
 impl ConnectionEstablisher {
@@ -17,18 +18,20 @@ impl ConnectionEstablisher {
     pub(super) fn new(options: Option<&ConnectionPoolOptions>) -> Self {
         let handshaker = Handshaker::new(options);
 
-        Self { handshaker }
+        Self {
+            handshaker,
+            credential: options.and_then(|options| options.credential.clone())
+        }
     }
 
     /// Establishes a connection.
     pub(super) fn establish_connection(
         &self,
-        connection: &mut Connection,
-        credential: Option<&Credential>,
+        connection: &mut Connection
     ) -> Result<()> {
         self.handshaker.handshake(connection)?;
 
-        if let Some(credential) = credential {
+        if let Some(ref credential) = self.credential {
             credential.authenticate_stream(connection)?;
         }
 

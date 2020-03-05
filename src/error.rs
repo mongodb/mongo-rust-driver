@@ -130,7 +130,7 @@ pub enum ErrorKind {
     /// Wrapper around [`std::io::Error`](https://doc.rust-lang.org/std/io/struct.Error.html).
     #[error(display = "{}", _0)]
     Io(#[error(source)] std::io::Error),
-    
+
     #[error(display = "No DNS results for domain {}", _0)]
     NoDnsResults(StreamAddress),
 

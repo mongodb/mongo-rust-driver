@@ -1,5 +1,4 @@
 use std::{
-    ops::DerefMut,
     time::Duration,
     sync::Weak,
 };
@@ -19,7 +18,7 @@ pub(crate) fn start_background_task(pool: Weak<ConnectionPoolInner>) {
                 Some(pool) => perform_checks(pool.into()).await,
                 None => return,
             };
-            
+
             Delay::new(Duration::from_millis(10)).await;
         }
     });
@@ -37,23 +36,16 @@ async fn perform_checks(pool: ConnectionPool) {
 impl ConnectionPool {
     /// Iterate over the connections and remove any that are stale or idle.
     async fn remove_perished_connections(&self) {
-        let mut connections = self.inner.connections.lock().await;
-        let generation = *self.inner.generation.read().await;
+        let mut connection_manager = self.inner.connection_manager.lock().await;
+
         let mut i = 0;
-        
-        while i < connections.checked_in_connections.len() {
-            if connections.checked_in_connections[i].is_stale(generation) {
-                self.inner.close_connection(
-                    connections.checked_in_connections.remove(i),
-                    connections.deref_mut(),
-                    ConnectionClosedReason::Stale
-                ).await;
-            } else if connections.checked_in_connections[i].is_idle(self.inner.max_idle_time) {
-                self.inner.close_connection(
-                    connections.checked_in_connections.remove(i),
-                    connections.deref_mut(),
-                    ConnectionClosedReason::Idle
-                ).await;
+        while i < connection_manager.checked_in_connections.len() {
+            if connection_manager.checked_in_connections[i].is_stale(connection_manager.generation) {
+                let connection = connection_manager.checked_in_connections.remove(i);
+                connection_manager.close_connection(connection, ConnectionClosedReason::Stale);
+            } else if connection_manager.checked_in_connections[i].is_idle(self.inner.max_idle_time) {
+                let connection = connection_manager.checked_in_connections.remove(i);
+                connection_manager.close_connection(connection, ConnectionClosedReason::Idle);
             } else {
                 i += 1;
             }
@@ -66,10 +58,10 @@ impl ConnectionPool {
     async fn ensure_min_connections(&self) {
         if let Some(min_pool_size) = self.inner.min_pool_size {
             loop {
-                let mut connections = self.inner.connections.lock().await;
-                if connections.total_connection_count < min_pool_size {
-                    match self.create_connection(&mut connections).await {
-                        Ok(connection) => connections.checked_in_connections.push(connection),
+                let mut connection_manager = self.inner.connection_manager.lock().await;
+                if connection_manager.total_connection_count < min_pool_size {
+                    match connection_manager.create_connection() {
+                        Ok(connection) => connection_manager.checked_in_connections.push(connection),
                         e @ Err(_) => {
                             // Since we encountered an error, we return early from this function and
                             // put the background thread back to sleep. Next time it wakes up, any
