@@ -62,9 +62,11 @@ impl WaitQueue {
 
     /// Signal that the front of the queue (if there is one) is ready to wake up.
     pub(super) fn wake_front(&self) {
-        let permits = self.semaphore.permits();
-        if self.semaphore.permits() > self.max_handles {
-            panic!("wake_front called too many times: {} > {}", permits, self.max_handles);
+        if self.semaphore.permits() >= self.max_handles {
+            panic!("greater than {} connections checked back into pool with address {}",
+                   self.max_handles,
+                   self.address.clone()
+            );
         }
         self.semaphore.release(1);
     }
