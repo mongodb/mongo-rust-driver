@@ -20,11 +20,12 @@ use self::{
 };
 
 use crate::{
-    cmap::{Connection, ConnectionPool},
+    cmap::{options::ConnectionPoolOptions, Connection, ConnectionPool},
     error::{Error, Result},
+    options::TlsOptions,
     runtime::AsyncJoinHandle,
     RUNTIME,
-    test::{run_spec_test, CLIENT_OPTIONS, LOCK},
+    test::{run_spec_test, CLIENT_OPTIONS, LOCK, Matchable, assert_matches},
 };
 
 const TEST_DESCRIPTIONS_TO_SKIP: &[&str] = &[
@@ -133,7 +134,7 @@ impl Executor {
         assert_eq!(actual_events.len(), self.events.len());
 
         for i in 0..actual_events.len() {
-            assert_events_match(&actual_events[i], &self.events[i]);
+            assert_matches(&actual_events[i], &self.events[i]);
         }
     }
 }
@@ -216,50 +217,60 @@ impl Operation {
     }
 }
 
-fn assert_events_match(actual: &Event, expected: &Event) {
-    match (actual, expected) {
-        (Event::ConnectionPoolCreated(actual), Event::ConnectionPoolCreated(ref expected)) => {
-            if let Some(ref expected_options) = expected.options {
-                assert_eq!(actual.options.as_ref(), Some(expected_options));
-            }
-        }
-        (Event::ConnectionCreated(actual), Event::ConnectionCreated(ref expected)) => {
-            if expected.connection_id != 42 {
-                assert_eq!(actual.connection_id, expected.connection_id);
-            }
-        }
-        (Event::ConnectionReady(actual), Event::ConnectionReady(ref expected)) => {
-            if expected.connection_id != 42 {
-                assert_eq!(actual.connection_id, expected.connection_id);
-            }
-        }
-        (Event::ConnectionClosed(actual), Event::ConnectionClosed(ref expected)) => {
-            assert_eq!(actual.reason, expected.reason);
+impl Matchable for TlsOptions {
+    fn content_matches(&self, expected: &TlsOptions) -> bool {
+        self.allow_invalid_certificates.matches(&expected.allow_invalid_certificates) &&
+            self.ca_file_path.matches(&expected.ca_file_path) &&
+            self.cert_key_file_path.matches(&expected.cert_key_file_path)
+    }
+}
 
-            if expected.connection_id != 42 {
-                assert_eq!(actual.connection_id, expected.connection_id);
+impl Matchable for ConnectionPoolOptions {
+    fn content_matches(&self, expected: &ConnectionPoolOptions) -> bool {
+        self.app_name.matches(&expected.app_name) &&
+            self.connect_timeout.matches(&expected.connect_timeout) &&
+            self.credential.matches(&expected.credential) &&
+            self.max_idle_time.matches(&expected.max_idle_time) &&
+            self.max_pool_size.matches(&expected.max_pool_size) &&
+            self.min_pool_size.matches(&expected.min_pool_size) &&
+            self.tls_options.matches(&expected.tls_options) &&
+            self.wait_queue_timeout.matches(&expected.wait_queue_timeout)
+    }
+}
+
+impl Matchable for Event {
+    fn content_matches(&self, expected: &Event) -> bool {
+        match (self, expected) {
+            (Event::ConnectionPoolCreated(actual), Event::ConnectionPoolCreated(ref expected)) => {
+                actual.options.matches(&expected.options)
             }
-        }
-        (Event::ConnectionCheckedOut(actual), Event::ConnectionCheckedOut(ref expected)) => {
-            if expected.connection_id != 42 {
-                assert_eq!(actual.connection_id, expected.connection_id);
+            (Event::ConnectionCreated(actual), Event::ConnectionCreated(ref expected)) => {
+                actual.connection_id.matches(&expected.connection_id)
             }
-        }
-        (Event::ConnectionCheckedIn(actual), Event::ConnectionCheckedIn(ref expected)) => {
-            if expected.connection_id != 42 {
-                assert_eq!(actual.connection_id, expected.connection_id);
+            (Event::ConnectionReady(actual), Event::ConnectionReady(ref expected)) => {
+                actual.connection_id.matches(&expected.connection_id)
             }
+            (Event::ConnectionClosed(actual), Event::ConnectionClosed(ref expected)) => {
+                actual.reason == expected.reason &&
+                    actual.connection_id.matches(&expected.connection_id)
+            }
+            (Event::ConnectionCheckedOut(actual), Event::ConnectionCheckedOut(ref expected)) => {
+                actual.connection_id.matches(&expected.connection_id)
+            }
+            (Event::ConnectionCheckedIn(actual), Event::ConnectionCheckedIn(ref expected)) => {
+                actual.connection_id.matches(&expected.connection_id)
+            }
+            (
+                Event::ConnectionCheckOutFailed(actual),
+                Event::ConnectionCheckOutFailed(ref expected),
+            ) => {
+                actual.reason == expected.reason
+            }
+            (Event::ConnectionCheckOutStarted(_), Event::ConnectionCheckOutStarted(_)) => true,
+            (Event::ConnectionPoolCleared(_), Event::ConnectionPoolCleared(_)) => true,
+            (Event::ConnectionPoolClosed(_), Event::ConnectionPoolClosed(_)) => true,
+            _ => false
         }
-        (
-            Event::ConnectionCheckOutFailed(actual),
-            Event::ConnectionCheckOutFailed(ref expected),
-        ) => {
-            assert_eq!(actual.reason, expected.reason);
-        }
-        (Event::ConnectionCheckOutStarted(_), Event::ConnectionCheckOutStarted(_)) => {}
-        (Event::ConnectionPoolCleared(_), Event::ConnectionPoolCleared(_)) => {}
-        (Event::ConnectionPoolClosed(_), Event::ConnectionPoolClosed(_)) => {}
-        (actual, expected) => assert_eq!(actual, expected),
     }
 }
 

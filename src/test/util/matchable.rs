@@ -1,8 +1,8 @@
-use std::{any::Any, fmt::Debug};
+use std::{any::Any, fmt::Debug, time::Duration};
 
 use bson::{Bson, Document};
 
-use crate::bson_util;
+use crate::{bson_util, options::auth::{AuthMechanism, Credential}};
 
 pub trait Matchable: Sized + 'static {
     fn is_placeholder(&self) -> bool {
@@ -64,6 +64,74 @@ impl Matchable for Document {
             } else {
                 return false;
             }
+        }
+        true
+    }
+}
+
+impl Matchable for Credential {
+    fn content_matches(&self, expected: &Credential) -> bool {
+        self.username.content_matches(&expected.username) &&
+            self.source.content_matches(&expected.source) &&
+            self.password.content_matches(&expected.password) &&
+            self.mechanism.content_matches(&expected.mechanism) &&
+            self.mechanism_properties.content_matches(&expected.mechanism_properties)
+    }
+}
+
+impl Matchable for AuthMechanism {
+    fn content_matches(&self, expected: &AuthMechanism) -> bool {
+        self == expected
+    }
+}
+
+impl Matchable for bool {
+    fn content_matches(&self, expected: &bool) -> bool {
+        self == expected
+    }
+}
+
+impl Matchable for u32 {
+    fn is_placeholder(&self) -> bool {
+        self == &42
+    }
+
+    fn content_matches(&self, expected: &u32) -> bool {
+        self == expected
+    }
+}
+
+impl Matchable for String {
+    fn is_placeholder(&self) -> bool {
+        self.as_str() == "42"
+    }
+
+    fn content_matches(&self, expected: &String) -> bool {
+        self == expected
+    }
+}
+
+impl Matchable for Duration {
+    fn content_matches(&self, expected: &Duration) -> bool {
+        self == expected
+    }
+}
+
+impl<T: Matchable> Matchable for Option<T> {
+    fn is_placeholder(&self) -> bool {
+        match self {
+            Some(ref v) => v.is_placeholder(),
+            None => true
+        }
+    }
+
+    fn content_matches(&self, expected: &Option<T>) -> bool {
+        // this if should always succeed given that "None" counts as a placeholder value.
+        if let Some(expected_value) = expected {
+            return match self {
+                Some(actual_value) => actual_value.content_matches(expected_value),
+                None => false
+            };
         }
         true
     }

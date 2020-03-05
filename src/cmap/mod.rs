@@ -211,13 +211,13 @@ pub(crate) struct ConnectionPoolInner {
 }
 
 impl ConnectionPool {
-    pub(crate) fn new(address: StreamAddress, mut options: Option<ConnectionPoolOptions>) -> Self {
+    pub(crate) fn new(address: StreamAddress, options: Option<ConnectionPoolOptions>) -> Self {
         let connection_manager = ConnectionManager::new(
             address.clone(),
             options.clone(),
         );
 
-        let event_handler = options.as_mut().and_then(|opts| opts.event_handler.take());
+        let event_handler = options.as_ref().and_then(|opts| opts.event_handler.clone());
 
         // The CMAP spec indicates that a max idle time of zero means that connections should not be
         // closed due to idleness.
