@@ -1,3 +1,6 @@
+pub(crate) mod async_decode;
+pub(crate) mod async_encode;
+
 use std::time::Duration;
 
 use bson::{bson, doc, oid::ObjectId, Bson, Document};

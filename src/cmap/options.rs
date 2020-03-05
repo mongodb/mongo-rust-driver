@@ -8,7 +8,7 @@ use crate::{
     bson_util,
     client::auth::Credential,
     event::cmap::CmapEventHandler,
-    options::{ClientOptions, TlsOptions},
+    options::{ClientOptions, StreamAddress, TlsOptions},
 };
 
 /// Contains the options for creating a connection pool. While these options are specified at the
@@ -97,4 +97,38 @@ impl ConnectionPoolOptions {
             .wait_queue_timeout(options.wait_queue_timeout)
             .build()
     }
+}
+
+/// Options used for constructing a `Connection`.
+#[derive(Derivative)]
+#[derivative(Debug)]
+#[derive(Clone)]
+pub(crate) struct ConnectionOptions {
+    pub(crate) connect_timeout: Option<Duration>,
+
+    pub(crate) tls_options: Option<TlsOptions>,
+
+    #[derivative(Debug = "ignore")]
+    pub(crate) event_handler: Option<Arc<dyn CmapEventHandler>>,
+}
+
+impl From<ConnectionPoolOptions> for ConnectionOptions {
+    fn from(pool_options: ConnectionPoolOptions) -> Self {
+        Self {
+            connect_timeout: pool_options.connect_timeout,
+            tls_options: pool_options.tls_options,
+            event_handler: pool_options.event_handler,
+        }
+    }
+}
+
+#[derive(Clone, Debug, TypedBuilder)]
+pub(crate) struct StreamOptions {
+    pub(crate) address: StreamAddress,
+
+    #[builder(default)]
+    pub(crate) connect_timeout: Option<Duration>,
+
+    #[builder(default)]
+    pub(crate) tls_options: Option<TlsOptions>,
 }

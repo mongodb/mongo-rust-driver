@@ -13,17 +13,10 @@ use derivative::Derivative;
 use tokio::sync::Mutex;
 
 pub use self::conn::ConnectionInfo;
-pub(crate) use self::conn::{
-    Command,
-    CommandResponse,
-    Connection,
-    ConnectionOptions,
-    StreamDescription,
-};
-
+pub(crate) use self::conn::{Command, CommandResponse, Connection, StreamDescription};
 use self::{
     establish::ConnectionEstablisher,
-    options::ConnectionPoolOptions,
+    options::{ConnectionOptions, ConnectionPoolOptions},
     wait_queue::WaitQueue,
 };
 use crate::{
@@ -144,19 +137,20 @@ impl ConnectionManager {
 
     /// Create a connection, incrementing the total connection count and emitting the appropriate
     /// monitoring events.
-    fn create_connection(&mut self) -> Result<Connection> {
+    async fn create_connection(&mut self) -> Result<Connection> {
         let mut connection = Connection::new(
             self.next_connection_id(),
             self.address.clone(),
             self.generation,
             self.connection_options.clone(),
-        )?;
+        )
+        .await?;
 
         self.emit_event(|handler| {
             handler.handle_connection_created_event(connection.created_event())
         });
 
-        let establish_result = self.establisher.establish_connection(&mut connection);
+        let establish_result = self.establisher.establish_connection(&mut connection).await;
 
         if let Err(e) = establish_result {
             if e.is_authentication_error() {
@@ -383,7 +377,7 @@ impl ConnectionPoolInner {
         }
 
         // There are no connections in the pool, so open a new one.
-        let connection = connection_manager.create_connection()?;
+        let connection = connection_manager.create_connection().await?;
         wait_queue_handle.disarm();
         Ok(connection)
     }

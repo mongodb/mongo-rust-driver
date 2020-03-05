@@ -1,8 +1,8 @@
-use std::io::{Read, Write};
-
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-
-use crate::error::{ErrorKind, Result};
+use crate::{
+    bson_util::{async_decode, async_encode},
+    error::{ErrorKind, Result},
+    runtime::AsyncStream,
+};
 
 /// The wire protocol op codes.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -40,22 +40,22 @@ impl Header {
     pub(crate) const LENGTH: usize = 4 * std::mem::size_of::<i32>();
 
     /// Serializes the Header and writes the bytes to `w`.
-    pub(crate) fn write_to<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_i32::<LittleEndian>(self.length)?;
-        writer.write_i32::<LittleEndian>(self.request_id)?;
-        writer.write_i32::<LittleEndian>(self.response_to)?;
-        writer.write_i32::<LittleEndian>(self.op_code as i32)?;
+    pub(crate) async fn write_to(&self, stream: &mut AsyncStream) -> Result<()> {
+        async_encode::write_i32(stream, self.length).await?;
+        async_encode::write_i32(stream, self.request_id).await?;
+        async_encode::write_i32(stream, self.response_to).await?;
+        async_encode::write_i32(stream, self.op_code as i32).await?;
 
         Ok(())
     }
 
     /// Reads bytes from `r` and deserializes them into a header.
-    pub(crate) fn read_from<R: Read>(reader: &mut R) -> Result<Self> {
+    pub(crate) async fn read_from(stream: &mut AsyncStream) -> Result<Self> {
         Ok(Self {
-            length: reader.read_i32::<LittleEndian>()?,
-            request_id: reader.read_i32::<LittleEndian>()?,
-            response_to: reader.read_i32::<LittleEndian>()?,
-            op_code: OpCode::from_i32(reader.read_i32::<LittleEndian>()?)?,
+            length: async_decode::read_i32(stream).await?,
+            request_id: async_decode::read_i32(stream).await?,
+            response_to: async_decode::read_i32(stream).await?,
+            op_code: OpCode::from_i32(async_decode::read_i32(stream).await?)?,
         })
     }
 }

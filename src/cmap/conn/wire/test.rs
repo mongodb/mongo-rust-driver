@@ -1,10 +1,9 @@
-use std::net::TcpStream;
-
 use bson::{bson, doc, Bson};
 
 use super::message::{Message, MessageFlags, MessageSection};
 use crate::{
-    options::StreamAddress,
+    cmap::options::StreamOptions,
+    runtime::AsyncStream,
     test::{CLIENT_OPTIONS, LOCK},
 };
 
@@ -27,12 +26,16 @@ async fn basic() {
         request_id: None,
     };
 
-    let StreamAddress { ref hostname, port } = CLIENT_OPTIONS.hosts[0];
+    let options = StreamOptions {
+        address: CLIENT_OPTIONS.hosts[0].clone(),
+        connect_timeout: None,
+        tls_options: None,
+    };
 
-    let mut stream = TcpStream::connect((&hostname[..], port.unwrap_or(27017))).unwrap();
-    message.write_to(&mut stream).unwrap();
+    let mut stream = AsyncStream::connect(options).await.unwrap();
+    message.write_to(&mut stream).await.unwrap();
 
-    let reply = Message::read_from(&mut stream).unwrap();
+    let reply = Message::read_from(&mut stream).await.unwrap();
 
     let response_doc = match reply.sections.into_iter().next().unwrap() {
         MessageSection::Document(doc) => doc,

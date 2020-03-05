@@ -1,6 +1,4 @@
 mod join_handle;
-// TODO RUST-212: Remove annotation.
-#[allow(dead_code)]
 mod stream;
 
 use std::{future::Future, time::Duration};
@@ -8,12 +6,8 @@ use std::{future::Future, time::Duration};
 use futures::future::{self, Either};
 use futures_timer::Delay;
 
-pub(crate) use self::join_handle::AsyncJoinHandle;
-use self::stream::AsyncStream;
-use crate::{
-    cmap::conn::StreamOptions,
-    error::{ErrorKind, Result},
-};
+pub(crate) use self::{join_handle::AsyncJoinHandle, stream::AsyncStream};
+use crate::error::{ErrorKind, Result};
 
 /// An abstract handle to the async runtime.
 #[derive(Clone, Copy, Debug)]
@@ -78,13 +72,6 @@ impl AsyncRuntime {
         {
             async_std::task::block_on(fut)
         }
-    }
-
-    /// Create and connect a new `AsyncStream`.
-    // RUST-212: Remove annotation.
-    #[allow(dead_code)]
-    pub(crate) async fn connect_stream(self, options: StreamOptions) -> Result<AsyncStream> {
-        AsyncStream::connect(options).await
     }
 
     /// Await on a future for a maximum amount of time before returning an error.

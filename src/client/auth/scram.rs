@@ -61,7 +61,7 @@ pub(crate) enum ScramVersion {
 
 impl ScramVersion {
     /// Perform SCRAM authentication for a given stream.
-    pub(crate) fn authenticate_stream(
+    pub(crate) async fn authenticate_stream(
         &self,
         conn: &mut Connection,
         credential: &Credential,
@@ -98,7 +98,7 @@ impl ScramVersion {
             client_first.to_command(self),
         );
 
-        let server_first_response = conn.send_command(command, None)?;
+        let server_first_response = conn.send_command(command, None).await?;
         let server_first = ServerFirst::parse(server_first_response.raw_response)?;
         server_first.validate(nonce.as_str())?;
 
@@ -135,7 +135,7 @@ impl ScramVersion {
             client_final.to_command(),
         );
 
-        let server_final_response = conn.send_command(command, None)?;
+        let server_final_response = conn.send_command(command, None).await?;
         let server_final = ServerFinal::parse(server_final_response.raw_response)?;
         server_final.validate(salted_password.as_slice(), &client_final, self)?;
 
@@ -149,7 +149,7 @@ impl ScramVersion {
         };
         let command = Command::new("saslContinue".into(), source.into(), noop);
 
-        let server_noop_response = conn.send_command(command, None)?;
+        let server_noop_response = conn.send_command(command, None).await?;
 
         if server_noop_response
             .raw_response

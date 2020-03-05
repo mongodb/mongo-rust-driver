@@ -1,7 +1,10 @@
 use std::{
-    io::{self, Read, Write},
+    pin::Pin,
     sync::atomic::{AtomicI32, Ordering},
+    task::{Context, Poll},
 };
+
+use tokio::io::{self, AsyncRead, AsyncWrite, AsyncWriteExt};
 
 use crate::error::Result;
 
@@ -17,23 +20,26 @@ pub(crate) fn next_request_id() -> i32 {
 }
 
 /// Serializes `string` to bytes and writes them to `writer` with a null terminator appended.
-pub(super) fn write_cstring<W: Write>(writer: &mut W, string: &str) -> Result<()> {
+pub(super) async fn write_cstring<W: AsyncWrite + Unpin>(
+    writer: &mut W,
+    string: &str,
+) -> Result<()> {
     // Write the string's UTF-8 bytes.
-    writer.write_all(string.as_bytes())?;
+    writer.write_all(string.as_bytes()).await?;
 
     // Write the null terminator.
-    writer.write_all(&[0])?;
+    writer.write_all(&[0]).await?;
 
     Ok(())
 }
 
-/// A wrapper a `std::io::Read` that keeps track of the number of bytes it has read.
-pub(super) struct CountReader<'a, R: 'a + Read> {
+/// A wrapper around `tokio::io::AsyncRead` that keeps track of the number of bytes it has read.
+pub(super) struct CountReader<'a, R: AsyncRead + Unpin + Send + 'a> {
     reader: &'a mut R,
     bytes_read: usize,
 }
 
-impl<'a, R: 'a + Read> CountReader<'a, R> {
+impl<'a, R: AsyncRead + Unpin + Send + 'a> CountReader<'a, R> {
     /// Constructs a new CountReader that wraps `reader`.
     pub(super) fn new(reader: &'a mut R) -> Self {
         CountReader {
@@ -48,11 +54,18 @@ impl<'a, R: 'a + Read> CountReader<'a, R> {
     }
 }
 
-impl<'a, R: 'a + Read> Read for CountReader<'a, R> {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let size = self.reader.read(buf)?;
-        self.bytes_read += size;
+impl<'a, R: AsyncRead + Unpin + Send + 'a> AsyncRead for CountReader<'a, R> {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
+        let result = Pin::new(&mut self.reader).poll_read(cx, buf);
 
-        Ok(size)
+        if let Poll::Ready(Ok(count)) = result {
+            self.bytes_read += count;
+        }
+
+        result
     }
 }
