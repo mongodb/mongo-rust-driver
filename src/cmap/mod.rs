@@ -249,7 +249,6 @@ impl ConnectionPool {
 
         pool.inner.emit_event(move |handler| {
             let event = PoolCreatedEvent { address, options };
-
             handler.handle_pool_created_event(event);
         });
 
@@ -263,79 +262,9 @@ impl ConnectionPool {
     /// pool and the total number of connections is not less than the max pool size. If the method
     /// blocks for longer than `wait_queue_timeout`, a `WaitQueueTimeoutError` will be returned.
     pub(crate) async fn check_out(&self) -> Result<Connection> {
-        self.inner.emit_event(|handler| {
-            let event = ConnectionCheckoutStartedEvent {
-                address: self.inner.address.clone(),
-            };
-
-            handler.handle_connection_checkout_started_event(event);
-        });
-
-        let result = self.acquire_or_create_connection().await;
-
-        let mut conn = match result {
-            Ok(conn) => conn,
-            Err(e) => {
-                let failure_reason = if let ErrorKind::WaitQueueTimeoutError { .. } = e.kind.as_ref() {
-                    ConnectionCheckoutFailedReason::Timeout
-                } else {
-                    ConnectionCheckoutFailedReason::ConnectionError
-                };
-
-                self.inner.emit_event(|handler| {
-                    handler.handle_connection_checkout_failed_event(
-                        ConnectionCheckoutFailedEvent {
-                            address: self.inner.address.clone(),
-                            reason: failure_reason,
-                        },
-                    )
-                });
-
-                return Err(e);
-            }
-        };
-
-        self.inner.emit_event(|handler| {
-            handler.handle_connection_checked_out_event(conn.checked_out_event());
-        });
-
+        let mut conn = self.inner.check_out().await?;
         conn.mark_checked_out(Arc::downgrade(&self.inner));
-
         Ok(conn)
-    }
-
-    /// Waits for the thread to reach the front of the wait queue, then attempts to check out a
-    /// connection. If none are available in the pool, one is created and checked out instead.
-    async fn acquire_or_create_connection(&self) -> Result<Connection> {
-        // Handle that will wake up the front of the queue when dropped.
-        // Before returning a valid connection, this handle must be disarmed to prevent the front
-        // from waking up early.
-        let mut wait_queue_handle = self.inner.wait_queue.wait_until_at_front().await?;
-
-        // Try to get the most recent available connection.
-        let mut connection_manager = self.inner.connection_manager.lock().await;
-        while let Some(conn) = connection_manager.checked_in_connections.pop() {
-            // Close the connection if it's stale.
-            if conn.is_stale(connection_manager.generation) {
-                connection_manager.close_connection(conn, ConnectionClosedReason::Stale);
-                continue;
-            }
-
-            // Close the connection if it's idle.
-            if conn.is_idle(self.inner.max_idle_time) {
-                connection_manager.close_connection(conn, ConnectionClosedReason::Idle);
-                continue;
-            }
-
-            // Otherwise, return the connection.
-            wait_queue_handle.disarm();
-            return Ok(conn);
-        }
-
-        // There are no connections in the pool, so open a new one.
-        let connection = connection_manager.create_connection()?;
-        wait_queue_handle.disarm();
-        Ok(connection)
     }
 
     /// Checks a connection back into the pool and notifies the wait queue that a connection is
@@ -350,7 +279,7 @@ impl ConnectionPool {
     /// Increments the generation of the pool. Rather than eagerly removing stale connections from
     /// the pool, they are left for the background thread to clean up.
     pub(crate) async fn clear(&self) {
-        self.inner.connection_manager.lock().await.clear();
+        self.inner.clear().await;
     }
 }
 
@@ -366,10 +295,6 @@ impl ConnectionPoolInner {
         }
     }
 
-    /// Checks a connection back into the pool and notifies the wait queue that a connection is
-    /// ready. If the connection is stale, it will be closed instead of being added to the set of
-    /// available connections. The time that the connection is checked in will be marked to
-    /// facilitate detecting if the connection becomes idle.
     async fn check_in(&self, mut conn: Connection) {
         self.emit_event(|handler| {
             handler.handle_connection_checked_in_event(conn.checked_in_event());
@@ -387,6 +312,84 @@ impl ConnectionPoolInner {
         }
 
         self.wait_queue.wake_front();
+    }
+
+    async fn check_out(&self) -> Result<Connection> {
+        self.emit_event(|handler| {
+            let event = ConnectionCheckoutStartedEvent {
+                address: self.address.clone(),
+            };
+
+            handler.handle_connection_checkout_started_event(event);
+        });
+
+        let result = self.acquire_or_create_connection().await;
+
+        let conn = match result {
+            Ok(conn) => conn,
+            Err(e) => {
+                let failure_reason = if let ErrorKind::WaitQueueTimeoutError { .. } = e.kind.as_ref() {
+                    ConnectionCheckoutFailedReason::Timeout
+                } else {
+                    ConnectionCheckoutFailedReason::ConnectionError
+                };
+
+                self.emit_event(|handler| {
+                    handler.handle_connection_checkout_failed_event(
+                        ConnectionCheckoutFailedEvent {
+                            address: self.address.clone(),
+                            reason: failure_reason,
+                        },
+                    )
+                });
+
+                return Err(e);
+            }
+        };
+
+        self.emit_event(|handler| {
+            handler.handle_connection_checked_out_event(conn.checked_out_event());
+        });
+
+        Ok(conn)
+    }
+
+    /// Waits for the thread to reach the front of the wait queue, then attempts to check out a
+    /// connection. If none are available in the pool, one is created and checked out instead.
+    async fn acquire_or_create_connection(&self) -> Result<Connection> {
+        // Handle that will wake up the front of the queue when dropped.
+        // Before returning a valid connection, this handle must be disarmed to prevent the front
+        // from waking up early.
+        let mut wait_queue_handle = self.wait_queue.wait_until_at_front().await?;
+
+        // Try to get the most recent available connection.
+        let mut connection_manager = self.connection_manager.lock().await;
+        while let Some(conn) = connection_manager.checked_in_connections.pop() {
+            // Close the connection if it's stale.
+            if conn.is_stale(connection_manager.generation) {
+                connection_manager.close_connection(conn, ConnectionClosedReason::Stale);
+                continue;
+            }
+
+            // Close the connection if it's idle.
+            if conn.is_idle(self.max_idle_time) {
+                connection_manager.close_connection(conn, ConnectionClosedReason::Idle);
+                continue;
+            }
+
+            // Otherwise, return the connection.
+            wait_queue_handle.disarm();
+            return Ok(conn);
+        }
+
+        // There are no connections in the pool, so open a new one.
+        let connection = connection_manager.create_connection()?;
+        wait_queue_handle.disarm();
+        Ok(connection)
+    }
+
+    async fn clear(&self) {
+        self.connection_manager.lock().await.clear();
     }
 }
 
