@@ -117,7 +117,7 @@ impl Connection {
     /// Helper to mark the time that the connection was checked into the pool for the purpose of
     /// detecting when it becomes idle.
     pub(super) fn mark_checked_in(&mut self) {
-        self.detatch_from_pool();
+        self.pool.take();
         self.ready_and_available_time = Some(Instant::now());
     }
 
@@ -220,22 +220,16 @@ impl Connection {
 
     /// Close this connection, emitting a `ConnectionClosedEvent` with the supplied reason.
     fn close(&mut self, reason: ConnectionClosedReason) {
-        self.detatch_from_pool();
+        self.pool.take();
         if let Some(ref handler) = self.handler {
             handler.handle_connection_closed_event(self.closed_event(reason));
         }
     }
 
-    /// Removes the weak reference to the parent pool from this connection.
-    /// If this connection is dropped, it will not emit any events.
-    fn detatch_from_pool(&mut self) {
-        self.pool.take();
-    }
-
     /// Nullify the inner state and return it in a `DroppedConnectionState` for checking back in to the pool
     /// in a background task.
     fn take(&mut self) -> DroppedConnectionState {
-        self.detatch_from_pool();
+        self.pool.take();
         DroppedConnectionState {
             id: self.id,
             address: self.address.clone(),
