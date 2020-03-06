@@ -32,7 +32,7 @@ pub(crate) struct WaitQueue {
 }
 
 impl WaitQueue {
-    /// Creat a new `WaitQueue`.
+    /// Create a new `WaitQueue`.
     pub(super) fn new(address: StreamAddress, max_handles: u32, timeout: Option<Duration>) -> Self {
         let max_handles = max_handles.try_into().unwrap_or(usize::max_value());
 
