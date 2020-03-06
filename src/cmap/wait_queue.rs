@@ -17,7 +17,7 @@ use crate::{
 pub(crate) struct WaitQueue {
     /// The maximum number of threads that can hold a permit to the semaphore.
     /// This will be the `max_pool_size` for a given connection pool.
-    max_handles: usize,
+    max_permits: usize,
 
     /// A fair counting semaphore whose count corresponds to the number of connections available.
     semaphore: Semaphore,
@@ -33,14 +33,18 @@ pub(crate) struct WaitQueue {
 
 impl WaitQueue {
     /// Create a new `WaitQueue`.
-    pub(super) fn new(address: StreamAddress, max_handles: u32, timeout: Option<Duration>) -> Self {
-        let max_handles = max_handles.try_into().unwrap_or(usize::max_value());
+    pub(super) fn new(address: StreamAddress, max_connections: u32, timeout: Option<Duration>) -> Self {
+        let max_permits = if max_connections == 0 {
+            usize::max_value()
+        } else {
+            max_connections.try_into().unwrap_or(usize::max_value())
+        };
 
         Self {
-            semaphore: Semaphore::new(true, max_handles),
+            semaphore: Semaphore::new(true, max_permits),
             address,
             timeout,
-            max_handles,
+            max_permits,
         }
     }
 
@@ -66,9 +70,9 @@ impl WaitQueue {
 
     /// Signal that the front of the queue (if there is one) is ready to wake up.
     pub(super) fn wake_front(&self) {
-        if self.semaphore.permits() >= self.max_handles {
+        if self.semaphore.permits() >= self.max_permits {
             panic!("greater than {} connections checked back into pool with address {}",
-                   self.max_handles,
+                   self.max_permits,
                    self.address.clone()
             );
         }

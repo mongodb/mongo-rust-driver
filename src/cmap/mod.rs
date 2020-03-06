@@ -193,10 +193,6 @@ pub(crate) struct ConnectionPoolInner {
     /// idle.
     max_idle_time: Option<Duration>,
 
-    /// The maximum number of connections that the pool can have at a given time. This includes
-    /// connections which are currently checked out of the pool.
-    max_pool_size: u32,
-
     /// The minimum number of connections that the pool can have at a given time. This includes
     /// connections which are currently checked out of the pool. If fewer than `min_pool_size`
     /// connections are in the pool, the background thread will create more connections and add
@@ -230,6 +226,7 @@ impl ConnectionPool {
             .as_ref()
             .and_then(|opts| opts.max_pool_size)
             .unwrap_or(DEFAULT_MAX_POOL_SIZE);
+
         let min_pool_size = options.as_ref().and_then(|opts| opts.min_pool_size);
         let wait_queue_timeout = options.as_ref().and_then(|opts| opts.wait_queue_timeout);
 
@@ -237,7 +234,6 @@ impl ConnectionPool {
             address: address.clone(),
             event_handler,
             max_idle_time,
-            max_pool_size,
             min_pool_size,
             connection_manager: Arc::new(Mutex::new(connection_manager)),
             wait_queue: WaitQueue::new(address.clone(), max_pool_size, wait_queue_timeout),
