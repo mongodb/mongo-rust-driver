@@ -77,7 +77,9 @@ impl PartialEq for TopologyDescription {
         // Since we only use TopologyDescription equality to determine whether to wake up server
         // selection operations to try to select again, the only fields we care about are the ones
         // checked by the server selection algorithm.
-        self.compatibility_error == other.compatibility_error && self.servers == other.servers
+        self.compatibility_error == other.compatibility_error
+            && self.servers == other.servers
+            && self.topology_type == other.topology_type
     }
 }
 
