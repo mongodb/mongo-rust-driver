@@ -15,15 +15,19 @@ use crate::{
 /// order.
 #[derive(Debug)]
 pub(crate) struct WaitQueue {
+    /// The maximum number of threads that can hold a permit to the semaphore.
+    /// This will be the `max_pool_size` for a given connection pool.
     max_handles: usize,
 
     /// A fair counting semaphore whose count corresponds to the number of connections available.
     semaphore: Semaphore,
 
-    /// The address of the server whose pool this `WaitQueue` belongs to.
+    /// The address that the connection pool's connections will connect to. This is needed to
+    /// return a WaitQueueTimeoutError when the timeout has elapsed.
     address: StreamAddress,
 
-    /// How long a thread is allowed to be waiting in the queue before timing out.
+    /// The timeout signifying how long a thread should wait in the queue before returning an
+    /// error. This will be the `wait_queue_timeout` for a given connection pool.
     timeout: Option<Duration>,
 }
 
