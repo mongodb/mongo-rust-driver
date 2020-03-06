@@ -137,10 +137,11 @@ impl<T: Matchable> Matchable for Option<T> {
     }
 }
 
-pub fn assert_matches<A: Matchable + Debug, E: Matchable + Debug>(actual: &A, expected: &E) {
+pub fn assert_matches<A: Matchable + Debug, E: Matchable + Debug>(actual: &A, expected: &E, description: Option<&str>) {
     assert!(
         actual.matches(expected),
-        "\n{:?}\n did not MATCH \n{:?}",
+        "{}\n{:?}\n did not MATCH \n{:?}",
+        description.unwrap_or(""),
         actual,
         expected
     );

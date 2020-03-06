@@ -35,6 +35,7 @@ const TEST_DESCRIPTIONS_TO_SKIP: &[&str] = &[
 
 #[derive(Debug)]
 struct Executor {
+    description: String,
     operations: Vec<Operation>,
     error: Option<self::file::Error>,
     events: Vec<Event>,
@@ -93,6 +94,7 @@ impl Executor {
         };
 
         Self {
+            description: test_file.description,
             error,
             events: test_file.events,
             operations,
@@ -118,7 +120,7 @@ impl Executor {
         }
 
         match (self.error, error) {
-            (Some(ref expected), Some(ref actual)) => expected.assert_matches(actual),
+            (Some(ref expected), Some(ref actual)) => expected.assert_matches(actual, self.description.as_str()),
             (Some(ref expected), None) => {
                 panic!("Expected {}, but no error occurred", expected.type_)
             }
@@ -131,10 +133,9 @@ impl Executor {
 
         let actual_events = self.state.handler.events.read().unwrap();
 
-        assert_eq!(actual_events.len(), self.events.len());
-
-        for i in 0..actual_events.len() {
-            assert_matches(&actual_events[i], &self.events[i]);
+        assert!(actual_events.len() >= self.events.len(), self.description);
+        for i in 0..self.events.len() {
+            assert_matches(&actual_events[i], &self.events[i], Some(self.description.as_str()));
         }
     }
 }
