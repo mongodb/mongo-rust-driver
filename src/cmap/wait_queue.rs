@@ -32,7 +32,7 @@ pub(crate) struct WaitQueue {
 }
 
 impl WaitQueue {
-    /// Create a new `WaitQueue`.
+    /// Creates a new `WaitQueue`.
     pub(super) fn new(address: StreamAddress, max_connections: u32, timeout: Option<Duration>) -> Self {
         let max_permits = if max_connections == 0 {
             usize::max_value()
@@ -48,7 +48,7 @@ impl WaitQueue {
         }
     }
 
-    /// Enter the wait queue and block until either reaching the front of the queue or
+    /// Enters the wait queue and block until either reaching the front of the queue or
     /// exceeding the timeout.
     pub(super) async fn wait_until_at_front(&self) -> Result<WaitQueueHandle<'_>> {
         let future = self.semaphore.acquire(1);
@@ -68,7 +68,7 @@ impl WaitQueue {
         })
     }
 
-    /// Signal that the front of the queue (if there is one) is ready to wake up.
+    /// Signals that the front of the queue (if there is one) is ready to wake up.
     pub(super) fn wake_front(&self) {
         if self.semaphore.permits() >= self.max_permits {
             panic!("greater than {} connections checked back into pool with address {}",
