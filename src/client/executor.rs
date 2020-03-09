@@ -38,9 +38,8 @@ impl Client {
         &self,
         op: &T,
     ) -> Result<(T::O, Connection)> {
-        let mut conn = RUNTIME
-            .block_on(self.select_server(op.selection_criteria()))?
-            .checkout_connection()?;
+        let server = RUNTIME.block_on(self.select_server(op.selection_criteria()))?;
+        let mut conn = RUNTIME.block_on(server.checkout_connection())?;
         self.execute_operation_on_connection(op, &mut conn)
             .map(|r| (r, conn))
     }
@@ -59,7 +58,7 @@ impl Client {
             None => {
                 let server = RUNTIME.block_on(self.select_server(op.selection_criteria()))?;
 
-                let mut conn = match server.checkout_connection() {
+                let mut conn = match RUNTIME.block_on(server.checkout_connection()) {
                     Ok(conn) => conn,
                     Err(err) => {
                         RUNTIME.block_on(

@@ -72,10 +72,10 @@ pub struct Error {
 }
 
 impl Error {
-    pub fn assert_matches(&self, error: &crate::error::Error) {
+    pub fn assert_matches(&self, error: &crate::error::Error, description: &str) {
         match error.kind.as_ref() {
             ErrorKind::WaitQueueTimeoutError { .. } => {
-                assert_eq!(self.type_, "WaitQueueTimeoutError");
+                assert_eq!(self.type_, "WaitQueueTimeoutError", "{}", description);
             }
             _ => {
                 panic!("Expected {}, but got {:?}", self.type_, error);

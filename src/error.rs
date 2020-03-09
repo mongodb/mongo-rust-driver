@@ -116,6 +116,9 @@ pub enum ErrorKind {
     #[error(display = "{}", _0)]
     DnsResolve(trust_dns_resolver::error::ResolveError),
 
+    #[error(display = "Internal error: {}", message)]
+    InternalError { message: String },
+
     /// Wrapper around `webpki::InvalidDNSNameError`.
     #[error(display = "{}", _0)]
     InvalidDnsName(#[error(source)] webpki::InvalidDNSNameError),
@@ -207,6 +210,13 @@ impl ErrorKind {
     pub(crate) fn is_network_error(&self) -> bool {
         match self {
             ErrorKind::Io(..) => true,
+            _ => false,
+        }
+    }
+
+    pub(crate) fn is_authentication_error(&self) -> bool {
+        match self {
+            ErrorKind::AuthenticationError { .. } => true,
             _ => false,
         }
     }

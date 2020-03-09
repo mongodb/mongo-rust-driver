@@ -13,7 +13,7 @@ use crate::{
 
 /// Contains the options for creating a connection pool. While these options are specified at the
 /// client-level, `ConnectionPoolOptions` is exposed for the purpose of CMAP event handling.
-#[derive(Default, Deserialize, TypedBuilder, Derivative)]
+#[derive(Clone, Default, Deserialize, TypedBuilder, Derivative)]
 #[derivative(Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionPoolOptions {

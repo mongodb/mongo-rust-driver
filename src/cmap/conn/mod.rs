@@ -13,6 +13,7 @@ use derivative::Derivative;
 use self::{stream::Stream, wire::Message};
 use super::ConnectionPoolInner;
 use crate::{
+    cmap::options::ConnectionPoolOptions,
     error::{ErrorKind, Result},
     event::cmap::{
         CmapEventHandler,
@@ -24,6 +25,7 @@ use crate::{
         ConnectionReadyEvent,
     },
     options::{StreamAddress, TlsOptions},
+    RUNTIME,
 };
 pub(crate) use command::{Command, CommandResponse};
 #[cfg(any(feature = "tokio-runtime", feature = "async-std-runtime"))]
@@ -52,7 +54,7 @@ pub(crate) struct Connection {
     /// The cached StreamDescription from the connection's handshake.
     pub(super) stream_description: Option<StreamDescription>,
 
-    /// Marks the time when the connection was checked into the pool and established. This is used
+    /// Marks the time when the connection was last checked into the pool. This is used
     /// to detect if the connection is idle.
     ready_and_available_time: Option<Instant>,
 
@@ -73,19 +75,21 @@ impl Connection {
         id: u32,
         address: StreamAddress,
         generation: u32,
-        connect_timeout: Option<Duration>,
-        tls_options: Option<TlsOptions>,
-        handler: Option<Arc<dyn CmapEventHandler>>,
+        mut options: Option<ConnectionOptions>,
     ) -> Result<Self> {
         let conn = Self {
             id,
             generation,
             pool: None,
-            stream_description: None,
             ready_and_available_time: None,
-            stream: Stream::connect(address.clone(), connect_timeout, tls_options)?,
+            stream: Stream::connect(
+                address.clone(),
+                options.as_mut().and_then(|options| options.connect_timeout.take()),
+                options.as_mut().and_then(|options| options.tls_options.take())
+            )?,
             address,
-            handler,
+            handler: options.and_then(|options| options.event_handler),
+            stream_description: None,
         };
 
         Ok(conn)
@@ -96,7 +100,7 @@ impl Connection {
         connect_timeout: Option<Duration>,
         tls_options: Option<TlsOptions>,
     ) -> Result<Self> {
-        Self::new(0, address, 0, connect_timeout, tls_options, None)
+        Self::new(0, address, 0, Some(ConnectionOptions { connect_timeout, tls_options, event_handler: None }))
     }
 
     pub(crate) fn info(&self) -> ConnectionInfo {
@@ -108,26 +112,6 @@ impl Connection {
 
     pub(crate) fn address(&self) -> &StreamAddress {
         &self.address
-    }
-
-    /// In order to check a connection back into the pool when it's dropped, we need to be able to
-    /// replace it with something. The `null` method facilitates this by creating a dummy connection
-    /// which can be passed to `std::mem::replace` to be dropped in place of the original
-    /// connection.
-    fn null() -> Self {
-        Self {
-            id: 0,
-            address: StreamAddress {
-                hostname: Default::default(),
-                port: None,
-            },
-            generation: 0,
-            pool: None,
-            stream_description: Some(Default::default()),
-            ready_and_available_time: None,
-            stream: Stream::Null,
-            handler: None,
-        }
     }
 
     /// Helper to mark the time that the connection was checked into the pool for the purpose of
@@ -228,6 +212,33 @@ impl Connection {
             .into()
         })
     }
+
+    /// Close this connection, emitting a `ConnectionClosedEvent` with the supplied reason.
+    pub(super) fn close_and_drop(mut self, reason: ConnectionClosedReason) {
+        self.close(reason);
+    }
+
+    /// Close this connection, emitting a `ConnectionClosedEvent` with the supplied reason.
+    fn close(&mut self, reason: ConnectionClosedReason) {
+        self.pool.take();
+        if let Some(ref handler) = self.handler {
+            handler.handle_connection_closed_event(self.closed_event(reason));
+        }
+    }
+
+    /// Nullify the inner state and return it in a `DroppedConnectionState` for checking back in to the pool
+    /// in a background task.
+    fn take(&mut self) -> DroppedConnectionState {
+        self.pool.take();
+        DroppedConnectionState {
+            id: self.id,
+            address: self.address.clone(),
+            generation: self.generation,
+            stream: std::mem::replace(&mut self.stream, Stream::Null),
+            handler: self.handler.take(),
+            stream_description: self.stream_description.take(),
+        }
+    }
 }
 
 impl Drop for Connection {
@@ -235,19 +246,90 @@ impl Drop for Connection {
         // If the connection has a weak reference to a pool, that means that the connection is being
         // dropped when it's checked out. If the pool is still alive, it should check itself back
         // in. Otherwise, the connection should close itself and emit a ConnectionClosed event
-        // (because the `close` helper was not called explicitly).
+        // (because the `close_and_drop` helper was not called explicitly).
         //
         // If the connection does not have a weak reference to a pool, then the connection is being
-        // dropped while it's not checked out. This means that the pool called the close helper
+        // dropped while it's not checked out. This means that the pool called the `close_and_drop` helper
         // explicitly, so we don't add it back to the pool or emit any events.
         if let Some(ref weak_pool_ref) = self.pool {
             if let Some(strong_pool_ref) = weak_pool_ref.upgrade() {
-                strong_pool_ref.check_in(std::mem::replace(self, Self::null()));
-            } else if let Some(ref handler) = self.handler {
-                handler.handle_connection_closed_event(
-                    self.closed_event(ConnectionClosedReason::PoolClosed),
-                );
+                let dropped_connection_state = self.take();
+                RUNTIME.execute(async move {
+                    strong_pool_ref.check_in(dropped_connection_state.into()).await;
+                });
+            } else {
+                self.close(ConnectionClosedReason::PoolClosed);
             }
+        }
+    }
+}
+
+/// Options used for constructing a `Connection`.
+#[derive(Derivative)]
+#[derivative(Debug)]
+#[derive(Clone)]
+pub(crate) struct ConnectionOptions {
+    pub(crate) connect_timeout: Option<Duration>,
+    pub(crate) tls_options: Option<TlsOptions>,
+    #[derivative(Debug = "ignore")]
+    pub(crate) event_handler: Option<Arc<dyn CmapEventHandler>>,
+}
+
+impl From<ConnectionPoolOptions> for ConnectionOptions {
+    fn from(pool_options: ConnectionPoolOptions) -> Self {
+        Self {
+            connect_timeout: pool_options.connect_timeout,
+            tls_options: pool_options.tls_options,
+            event_handler: pool_options.event_handler,
+        }
+    }
+}
+
+/// Struct encapsulating the state of a connection that has been dropped.
+///
+/// Because `Drop::drop` cannot be async, we package the internal state of a dropped connection into this
+/// struct, and move it into an async task that will attempt to check the reconstructed connection back into the pool.
+///
+/// If the async runtime has been dropped, that task will not execute, and this state will be dropped. From there,
+/// we simply emit a connection closed event and do not attempt to reconstruct the `Connection`.
+#[derive(Derivative)]
+#[derivative(Debug)]
+struct DroppedConnectionState {
+    pub(super) id: u32,
+    pub(super) address: StreamAddress,
+    pub(super) generation: u32,
+    stream: Stream,
+    #[derivative(Debug = "ignore")]
+    handler: Option<Arc<dyn CmapEventHandler>>,
+    stream_description: Option<StreamDescription>,
+}
+
+impl Drop for DroppedConnectionState {
+    /// If this drop is called, that means the async runtime itself was dropped before the connection could be
+    /// checked back in to the pool. Instead of checking back into the pool again, we just close the connection
+    /// directly.
+    fn drop(&mut self) {
+        if let Some(ref handler) = self.handler {
+            handler.handle_connection_closed_event(ConnectionClosedEvent {
+                address: self.address.clone(),
+                connection_id: self.id,
+                reason: ConnectionClosedReason::PoolClosed,
+            });
+        }
+    }
+}
+
+impl From<DroppedConnectionState> for Connection {
+    fn from(mut state: DroppedConnectionState) -> Self {
+        Self {
+            id: state.id,
+            address: state.address.clone(),
+            generation: state.generation,
+            stream: std::mem::replace(&mut state.stream, Stream::Null),
+            handler: state.handler.take(),
+            stream_description: state.stream_description.take(),
+            ready_and_available_time: None,
+            pool: None,
         }
     }
 }

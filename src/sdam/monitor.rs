@@ -89,19 +89,19 @@ impl Monitor {
         topology: &Topology,
     ) -> bool {
         // Send an isMaster to the server.
-        let server_description = self.check_server();
+        let server_description = self.check_server().await;
         self.server_type = server_description.server_type;
 
         topology.update(server_description).await
     }
 
-    fn check_server(&mut self) -> ServerDescription {
+    async fn check_server(&mut self) -> ServerDescription {
         let address = self.address.clone();
 
         match self.perform_is_master() {
             Ok(reply) => ServerDescription::new(address, Some(Ok(reply))),
             Err(e) => {
-                self.clear_connection_pool();
+                self.clear_connection_pool().await;
 
                 if self.server_type == ServerType::Unknown {
                     return ServerDescription::new(address, Some(Err(e)));
@@ -144,9 +144,9 @@ impl Monitor {
         Ok(self.connection.get_or_insert(connection))
     }
 
-    fn clear_connection_pool(&self) {
+    async fn clear_connection_pool(&self) {
         if let Some(server) = self.server.upgrade() {
-            server.clear_connection_pool();
+            server.clear_connection_pool().await;
         }
     }
 }

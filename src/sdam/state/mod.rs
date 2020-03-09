@@ -169,7 +169,7 @@ impl Topology {
         if error.is_non_timeout_network_error() {
             self.mark_server_as_unknown(error, server.address.clone())
                 .await;
-            server.clear_connection_pool();
+            server.clear_connection_pool().await;
         } else if error.is_recovering() || error.is_not_master() {
             self.mark_server_as_unknown(error.clone(), server.address.clone())
                 .await;
@@ -186,7 +186,7 @@ impl Topology {
             // in 4.2+, we only clear connection pool if we've received a
             // "node is shutting down" error. Otherwise, we always clear the pool.
             if wire_version < 8 || error.is_shutting_down() {
-                server.clear_connection_pool();
+                server.clear_connection_pool().await;
             }
         }
     }

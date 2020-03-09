@@ -90,7 +90,7 @@ fn run_command_monitoring_test(test_file: TestFile) {
 
         assert_eq!(events.len(), test_case.expectations.len());
         for (actual_event, expected_event) in events.iter().zip(test_case.expectations.iter()) {
-            assert_matches(actual_event, expected_event);
+            assert_matches(actual_event, expected_event, None);
         }
     }
 }
