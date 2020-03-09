@@ -12,11 +12,19 @@ pub(crate) use self::{
 
 use lazy_static::lazy_static;
 
-use self::util::{TestClient, TestLock};
+use self::util::TestLock;
 use crate::options::ClientOptions;
 
+const MAX_POOL_SIZE: u32 = 100;
+
 lazy_static! {
-    pub(crate) static ref CLIENT: TestClient = TestClient::new();
-    pub(crate) static ref CLIENT_OPTIONS: ClientOptions = CLIENT.options.clone();
+    pub(crate) static ref CLIENT_OPTIONS: ClientOptions = {
+        let uri = std::env::var("MONGODB_URI")
+            .unwrap_or_else(|_| "mongodb://localhost:27017".to_string());
+        let mut options = ClientOptions::parse(&uri).unwrap();
+        options.max_pool_size = Some(MAX_POOL_SIZE);
+
+        options
+    };
     pub(crate) static ref LOCK: TestLock = TestLock::new();
 }

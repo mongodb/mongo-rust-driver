@@ -4,7 +4,7 @@ use serde::Deserialize;
 use crate::{
     cmap::{options::ConnectionPoolOptions, Command, ConnectionPool},
     selection_criteria::ReadPreference,
-    test::{CLIENT, LOCK},
+    test::{CLIENT_OPTIONS, LOCK},
 };
 
 #[derive(Debug, Deserialize)]
@@ -22,7 +22,7 @@ struct DatabaseEntry {
 async fn acquire_connection_and_send_command() {
     let _guard = LOCK.run_concurrently();
 
-    let client_options = CLIENT.options.clone();
+    let client_options = CLIENT_OPTIONS.clone();
     let pool_options = ConnectionPoolOptions::from_client_options(&client_options);
 
     let pool = ConnectionPool::new(client_options.hosts[0].clone(), Some(pool_options));

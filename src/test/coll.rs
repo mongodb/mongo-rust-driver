@@ -6,8 +6,7 @@ use crate::{
     event::command::CommandStartedEvent,
     options::{AggregateOptions, FindOptions, InsertManyOptions, UpdateOptions},
     test::{
-        util::{drop_collection, CommandEvent, EventClient},
-        CLIENT,
+        util::{drop_collection, CommandEvent, EventClient, TestClient},
         LOCK,
     },
 };
@@ -18,7 +17,8 @@ use crate::{
 async fn count() {
     let _guard = LOCK.run_concurrently();
 
-    let coll = CLIENT.init_db_and_coll(function_name!(), function_name!());
+    let client = TestClient::new();
+    let coll = client.init_db_and_coll(function_name!(), function_name!());
 
     assert_eq!(coll.estimated_document_count(None).unwrap(), 0);
 
@@ -38,7 +38,8 @@ async fn count() {
 async fn find() {
     let _guard = LOCK.run_concurrently();
 
-    let coll = CLIENT.init_db_and_coll(function_name!(), function_name!());
+    let client = TestClient::new();
+    let coll = client.init_db_and_coll(function_name!(), function_name!());
 
     let result = coll
         .insert_many((0i32..5).map(|i| doc! { "x": i }).collect::<Vec<_>>(), None)
@@ -63,7 +64,8 @@ async fn find() {
 async fn update() {
     let _guard = LOCK.run_concurrently();
 
-    let coll = CLIENT.init_db_and_coll(function_name!(), function_name!());
+    let client = TestClient::new();
+    let coll = client.init_db_and_coll(function_name!(), function_name!());
 
     let result = coll
         .insert_many((0i32..5).map(|_| doc! { "x": 3 }).collect::<Vec<_>>(), None)
@@ -96,7 +98,8 @@ async fn update() {
 async fn delete() {
     let _guard = LOCK.run_concurrently();
 
-    let coll = CLIENT.init_db_and_coll(function_name!(), function_name!());
+    let client = TestClient::new();
+    let coll = client.init_db_and_coll(function_name!(), function_name!());
 
     let result = coll
         .insert_many((0i32..5).map(|_| doc! { "x": 3 }).collect::<Vec<_>>(), None)
@@ -118,7 +121,8 @@ async fn delete() {
 async fn aggregate_out() {
     let _guard = LOCK.run_concurrently();
 
-    let db = CLIENT.database(function_name!());
+    let client = TestClient::new();
+    let db = client.database(function_name!());
     let coll = db.collection(function_name!());
 
     drop_collection(&coll);
@@ -177,7 +181,8 @@ fn kill_cursors_sent(client: &EventClient) -> bool {
 async fn kill_cursors_on_drop() {
     let _guard = LOCK.run_concurrently();
 
-    let db = CLIENT.database(function_name!());
+    let client = TestClient::new();
+    let db = client.database(function_name!());
     let coll = db.collection(function_name!());
 
     drop_collection(&coll);
@@ -207,7 +212,8 @@ async fn kill_cursors_on_drop() {
 async fn no_kill_cursors_on_exhausted() {
     let _guard = LOCK.run_concurrently();
 
-    let db = CLIENT.database(function_name!());
+    let client = TestClient::new();
+    let db = client.database(function_name!());
     let coll = db.collection(function_name!());
 
     drop_collection(&coll);
@@ -290,7 +296,8 @@ async fn large_insert() {
 
     let docs = vec![LARGE_DOC.clone(); 35000];
 
-    let coll = CLIENT.init_db_and_coll(function_name!(), function_name!());
+    let client = TestClient::new();
+    let coll = client.init_db_and_coll(function_name!(), function_name!());
     assert_eq!(
         coll.insert_many(docs, None).unwrap().inserted_ids.len(),
         35000
@@ -328,7 +335,8 @@ async fn large_insert_unordered_with_errors() {
 
     let docs = multibatch_documents_with_duplicate_keys();
 
-    let coll = CLIENT.init_db_and_coll(function_name!(), function_name!());
+    let client = TestClient::new();
+    let coll = client.init_db_and_coll(function_name!(), function_name!());
     let options = InsertManyOptions::builder().ordered(false).build();
 
     match coll
@@ -361,7 +369,8 @@ async fn large_insert_ordered_with_errors() {
 
     let docs = multibatch_documents_with_duplicate_keys();
 
-    let coll = CLIENT.init_db_and_coll(function_name!(), function_name!());
+    let client = TestClient::new();
+    let coll = client.init_db_and_coll(function_name!(), function_name!());
     let options = InsertManyOptions::builder().ordered(true).build();
 
     match coll
@@ -393,7 +402,8 @@ async fn large_insert_ordered_with_errors() {
 async fn empty_insert() {
     let _guard = LOCK.run_concurrently();
 
-    let coll = CLIENT
+    let client = TestClient::new();
+    let coll = client
         .database(function_name!())
         .collection(function_name!());
     match coll

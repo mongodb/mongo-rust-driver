@@ -4,7 +4,7 @@ use serde::Deserialize;
 use super::{Outcome, TestFile};
 use crate::{
     options::{Collation, CountOptions},
-    test::{run_spec_test, CLIENT, LOCK},
+    test::{util::TestClient, run_spec_test, LOCK},
 };
 
 #[derive(Debug, Deserialize)]
@@ -17,6 +17,7 @@ struct Arguments {
 
 #[function_name::named]
 fn run_count_test(test_file: TestFile) {
+    let client = TestClient::new();
     let data = test_file.data;
 
     for mut test_case in test_file.tests {
@@ -31,7 +32,7 @@ fn run_count_test(test_file: TestFile) {
 
         test_case.description = test_case.description.replace('$', "%");
 
-        let coll = CLIENT.init_db_and_coll(function_name!(), &test_case.description);
+        let coll = client.init_db_and_coll(function_name!(), &test_case.description);
 
         if !data.is_empty() {
             coll.insert_many(data.clone(), None)
@@ -45,7 +46,7 @@ fn run_count_test(test_file: TestFile) {
 
         if let Some(ref c) = outcome.collection {
             if let Some(ref name) = c.name {
-                CLIENT.drop_collection(function_name!(), name);
+                client.drop_collection(function_name!(), name);
             }
         }
 
