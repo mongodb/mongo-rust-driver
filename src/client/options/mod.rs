@@ -596,6 +596,7 @@ impl ClientOptions {
             }
         }
 
+        options.validate()?;
         Ok(options)
     }
 
@@ -604,6 +605,23 @@ impl ClientOptions {
             Some(Tls::Enabled(ref opts)) => Some(opts.clone()),
             _ => None,
         }
+    }
+
+    /// Ensure the options set are valid, returning an error descirbing the problem if they are not.
+    pub(crate) fn validate(&self) -> Result<()> {
+        if let Some(true) = self.direct_connection {
+            if self.hosts.len() > 1 {
+                return Err(ErrorKind::ArgumentError {
+                    message: "cannot specify multiple seeds with directConnection=true".to_string(),
+                }
+                .into());
+            }
+        }
+
+        if let Some(ref write_concern) = self.write_concern {
+            write_concern.validate()?;
+        }
+        Ok(())
     }
 }
 
@@ -814,10 +832,6 @@ impl ClientOptionsParser {
             options.parse_options(opts)?;
         }
 
-        if let Some(ref write_concern) = options.write_concern {
-            write_concern.validate()?;
-        }
-
         // Set username and password.
         if let Some(u) = username {
             let mut credential = options.credential.get_or_insert_with(Default::default);
@@ -978,6 +992,15 @@ impl ClientOptionsParser {
 
         self.selection_criteria = self.read_preference.take().map(Into::into);
 
+        if let Some(true) = self.direct_connection {
+            if self.srv {
+                return Err(ErrorKind::ArgumentError {
+                    message: "cannot use SRV-style URI with directConnection=true".to_string(),
+                }
+                .into());
+            }
+        }
+
         Ok(())
     }
 
@@ -1087,7 +1110,7 @@ impl ClientOptionsParser {
             k @ "connecttimeoutms" => {
                 self.connect_timeout = Some(Duration::from_millis(get_duration!(value, k)));
             }
-            k @ "direct" => {
+            k @ "directconnection" => {
                 self.direct_connection = Some(get_bool!(value, k));
             }
             k @ "heartbeatfrequencyms" => {

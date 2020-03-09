@@ -9,6 +9,8 @@ use time::PreciseTime;
 use bson::{Bson, Document};
 use derivative::Derivative;
 
+#[cfg(test)]
+use crate::options::StreamAddress;
 use crate::{
     concern::{ReadConcern, WriteConcern},
     db::Database,
@@ -77,6 +79,8 @@ impl Client {
 
     /// Creates a new `Client` connected to the cluster specified by `options`.
     pub fn with_options(options: ClientOptions) -> Result<Self> {
+        options.validate()?;
+
         let inner = Arc::new(ClientInner {
             topology: RUNTIME.block_on(Topology::new(options.clone()))?,
             options,
@@ -151,6 +155,17 @@ impl Client {
                 .collect(),
             Err(e) => Err(e),
         }
+    }
+
+    /// Get the address of the server selected according to the given criteria.
+    /// This method is only used in tests.
+    #[cfg(test)]
+    pub(crate) async fn test_select_server(
+        &self,
+        criteria: Option<&SelectionCriteria>,
+    ) -> Result<StreamAddress> {
+        let server = self.select_server(criteria).await?;
+        Ok(server.address.clone())
     }
 
     /// Select a server using the provided criteria. If none is provided, a primary read preference
