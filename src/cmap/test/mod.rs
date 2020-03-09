@@ -56,6 +56,10 @@ struct State {
 }
 
 impl State {
+    fn count_all_events(&self) -> usize {
+        self.handler.events.read().unwrap().len()
+    }
+
     // Counts the number of events of the given type that have occurred so far.
     fn count_events(&self, event_type: &str) -> usize {
         self.handler
@@ -131,6 +135,12 @@ impl Executor {
             (None, None) => {}
         }
 
+        // The `Drop` implementation for `Connection` and `ConnectionPool` spawn background async tasks that emit
+        // certain events. If the tasks haven't been scheduled yet, we may not see the events here. To account for this,
+        // we wait for a small amount of time before checking again.
+        if self.state.count_all_events() < self.events.len() {
+            Delay::new(Duration::from_millis(250)).await;
+        }
         let actual_events = self.state.handler.events.read().unwrap();
 
         assert!(actual_events.len() >= self.events.len(), self.description);
