@@ -80,7 +80,7 @@ async fn server_selection_timeout_message() {
     let mut options = CLIENT_OPTIONS.clone();
     options.server_selection_timeout = Some(Duration::from_millis(500));
 
-    let client = TestClient::new();
+    let client = Client::with_options(options.clone()).unwrap();
     let db = client.database("test");
     let error = db
         .run_command(
@@ -90,7 +90,7 @@ async fn server_selection_timeout_message() {
         .expect_err("should fail with server selection timeout error");
 
     let error_description = format!("{}", error);
-    for host in client.options.hosts.iter() {
+    for host in options.hosts.iter() {
         assert!(error_description.contains(format!("{}", host).as_str()));
     }
 }
