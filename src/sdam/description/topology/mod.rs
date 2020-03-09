@@ -92,10 +92,10 @@ impl TopologyDescription {
                 .and_then(|criteria| criteria.max_staleness()),
         )?;
 
-        let topology_type = if options.repl_set_name.is_some() {
-            TopologyType::ReplicaSetNoPrimary
-        } else if let Some(true) = options.direct_connection {
+        let topology_type = if let Some(true) = options.direct_connection {
             TopologyType::Single
+        } else if options.repl_set_name.is_some() {
+            TopologyType::ReplicaSetNoPrimary
         } else {
             TopologyType::Unknown
         };
@@ -295,9 +295,11 @@ impl TopologyDescription {
             }
             ServerType::Mongos => self.topology_type = TopologyType::Sharded,
             ServerType::RSPrimary => {
+                self.topology_type = TopologyType::ReplicaSetWithPrimary;
                 self.update_rs_from_primary_server(server_description)?;
             }
             ServerType::RSSecondary | ServerType::RSArbiter | ServerType::RSOther => {
+                self.topology_type = TopologyType::ReplicaSetNoPrimary;
                 self.update_rs_without_primary_server(server_description)?;
             }
         }
@@ -325,7 +327,10 @@ impl TopologyDescription {
             ServerType::Standalone | ServerType::Mongos => {
                 self.servers.remove(&server_description.address);
             }
-            ServerType::RSPrimary => self.update_rs_from_primary_server(server_description)?,
+            ServerType::RSPrimary => {
+                self.topology_type = TopologyType::ReplicaSetWithPrimary;
+                self.update_rs_from_primary_server(server_description)?
+            }
             ServerType::RSSecondary | ServerType::RSArbiter | ServerType::RSOther => {
                 self.update_rs_without_primary_server(server_description)?;
             }

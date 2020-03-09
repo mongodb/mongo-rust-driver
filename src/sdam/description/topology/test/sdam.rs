@@ -1,17 +1,18 @@
 use std::{collections::HashMap, time::Duration};
 
-use bson::oid::ObjectId;
+use bson::{doc, oid::ObjectId};
 use serde::Deserialize;
 
 use crate::{
+    client::Client,
     error::ErrorKind,
     is_master::{IsMasterCommandResponse, IsMasterReply},
-    options::{ClientOptions, StreamAddress},
+    options::{ClientOptions, ReadPreference, SelectionCriteria, StreamAddress},
     sdam::description::{
         server::{ServerDescription, ServerType},
         topology::{TopologyDescription, TopologyType},
     },
-    test::run_spec_test,
+    test::{run_spec_test, TestClient, CLIENT_OPTIONS},
 };
 
 #[derive(Debug, Deserialize)]
@@ -70,13 +71,10 @@ fn server_type_from_str(s: &str) -> Option<ServerType> {
 }
 
 fn run_test(test_file: TestFile) {
-    let mut options = ClientOptions::parse(&test_file.uri).expect(&test_file.description);
+    let options = ClientOptions::parse(&test_file.uri).expect(&test_file.description);
 
-    if options.hosts.len() == 1 {
-        options.direct_connection = Some(true);
-    }
-
-    let mut topology_description = TopologyDescription::new(options).unwrap();
+    let test_description = &test_file.description;
+    let mut topology_description = TopologyDescription::new(options).expect(test_description);
 
     for (i, phase) in test_file.phases.into_iter().enumerate() {
         for Response(address, command_response) in phase.responses {
@@ -92,12 +90,19 @@ fn run_test(test_file: TestFile) {
                 })
             };
 
+            let address = StreamAddress::parse(&address).unwrap_or_else(|_| {
+                panic!(
+                    "{}: couldn't parse address \"{:?}\"",
+                    test_description.as_str(),
+                    address
+                )
+            });
             topology_description
                 .update(ServerDescription::new(
-                    StreamAddress::parse(&address).unwrap(),
+                    address.clone(),
                     Some(is_master_reply),
                 ))
-                .unwrap();
+                .expect(&test_file.description);
         }
 
         assert_eq!(
@@ -133,16 +138,20 @@ fn run_test(test_file: TestFile) {
             i
         );
 
-        let description = &test_file.description;
-
         for (address, server) in phase.outcome.servers {
+            let address = StreamAddress::parse(&address).unwrap_or_else(|_| {
+                panic!(
+                    "{}: couldn't parse address \"{:?}\"",
+                    test_description, address
+                )
+            });
             let actual_server = &topology_description
                 .servers
-                .get(&StreamAddress::parse(&address).unwrap())
-                .unwrap_or_else(|| panic!("{} (phase {})", description, i));
+                .get(&address)
+                .unwrap_or_else(|| panic!("{} (phase {})", test_description, i));
 
             let server_type = server_type_from_str(&server.server_type)
-                .unwrap_or_else(|| panic!("{} (phase {})", description, i));
+                .unwrap_or_else(|| panic!("{} (phase {})", test_description, i));
 
             assert_eq!(
                 actual_server.server_type, server_type,
@@ -216,4 +225,56 @@ async fn rs() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn sharded() {
     run_spec_test(&["server-discovery-and-monitoring", "sharded"], run_test);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn direct_connection() {
+    let test_client = TestClient::new();
+    if !test_client.is_replica_set() {
+        println!("Skipping due to non-replica set topology");
+        return;
+    }
+
+    let criteria = SelectionCriteria::ReadPreference(ReadPreference::Secondary {
+        max_staleness: None,
+        tag_sets: None,
+    });
+    let secondary_address = test_client
+        .test_select_server(Some(&criteria))
+        .await
+        .expect("failed to select secondary");
+
+    let mut secondary_options = CLIENT_OPTIONS.clone();
+    secondary_options.hosts = vec![secondary_address];
+
+    let mut direct_false_options = secondary_options.clone();
+    direct_false_options.direct_connection = Some(false);
+    let direct_false_client =
+        Client::with_options(direct_false_options).expect("client construction should succeed");
+    direct_false_client
+        .database(function_name!())
+        .collection(function_name!())
+        .insert_one(doc! {}, None)
+        .expect("write should succeed");
+
+    let mut direct_true_options = secondary_options.clone();
+    direct_true_options.direct_connection = Some(true);
+    let direct_true_client =
+        Client::with_options(direct_true_options).expect("client construction should succeed");
+    let error = direct_true_client
+        .database(function_name!())
+        .collection(function_name!())
+        .insert_one(doc! {}, None)
+        .expect_err("write should fail");
+    assert!(error.is_not_master());
+
+    let client =
+        Client::with_options(secondary_options).expect("client construction should succeed");
+    client
+        .database(function_name!())
+        .collection(function_name!())
+        .insert_one(doc! {}, None)
+        .expect("write should succeed");
 }

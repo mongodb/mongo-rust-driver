@@ -63,6 +63,10 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
         doc.insert("connecttimeoutms", i.as_millis() as i64);
     }
 
+    if let Some(b) = options.direct_connection.take() {
+        doc.insert("directconnection", b);
+    }
+
     if let Some(i) = options.heartbeat_freq.take() {
         doc.insert("heartbeatfrequencyms", i.as_millis() as i64);
     }
