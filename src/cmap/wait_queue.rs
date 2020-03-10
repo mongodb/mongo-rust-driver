@@ -1,9 +1,6 @@
-use std::{
-    time::Duration,
-    convert::TryInto,
-};
+use std::{convert::TryInto, time::Duration};
 
-use futures_intrusive::sync::{SemaphoreReleaser, Semaphore};
+use futures_intrusive::sync::{Semaphore, SemaphoreReleaser};
 
 use crate::{
     error::{ErrorKind, Result},
@@ -33,7 +30,11 @@ pub(crate) struct WaitQueue {
 
 impl WaitQueue {
     /// Creates a new `WaitQueue`.
-    pub(super) fn new(address: StreamAddress, max_connections: u32, timeout: Option<Duration>) -> Self {
+    pub(super) fn new(
+        address: StreamAddress,
+        max_connections: u32,
+        timeout: Option<Duration>,
+    ) -> Self {
         let max_permits = if max_connections == 0 {
             usize::max_value()
         } else {
@@ -54,26 +55,28 @@ impl WaitQueue {
         let future = self.semaphore.acquire(1);
 
         let releaser = if let Some(timeout) = self.timeout {
-            RUNTIME.await_with_timeout(Box::pin(future), timeout).await.map_err(|_| {
-                ErrorKind::WaitQueueTimeoutError {
+            RUNTIME
+                .await_with_timeout(Box::pin(future), timeout)
+                .await
+                .map_err(|_| ErrorKind::WaitQueueTimeoutError {
                     address: self.address.clone(),
-                }
-            })?
+                })?
         } else {
             future.await
         };
 
         Ok(WaitQueueHandle {
-            semaphore_releaser: releaser
+            semaphore_releaser: releaser,
         })
     }
 
     /// Signals that the front of the queue (if there is one) is ready to wake up.
     pub(super) fn wake_front(&self) {
         if self.semaphore.permits() >= self.max_permits {
-            panic!("greater than {} connections checked back into pool with address {}",
-                   self.max_permits,
-                   self.address.clone()
+            panic!(
+                "greater than {} connections checked back into pool with address {}",
+                self.max_permits,
+                self.address.clone()
             );
         }
         self.semaphore.release(1);
@@ -83,7 +86,7 @@ impl WaitQueue {
 /// A handle to a `WaitQueue` that will wake up the front of the queue when dropped.
 /// To disable this behavior, call `WaitQueueHandle::disarm`.
 pub(super) struct WaitQueueHandle<'a> {
-    semaphore_releaser: SemaphoreReleaser<'a>
+    semaphore_releaser: SemaphoreReleaser<'a>,
 }
 
 impl<'a> WaitQueueHandle<'a> {

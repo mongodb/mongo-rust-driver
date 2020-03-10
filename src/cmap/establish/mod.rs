@@ -20,15 +20,12 @@ impl ConnectionEstablisher {
 
         Self {
             handshaker,
-            credential: options.and_then(|options| options.credential.clone())
+            credential: options.and_then(|options| options.credential.clone()),
         }
     }
 
     /// Establishes a connection.
-    pub(super) fn establish_connection(
-        &self,
-        connection: &mut Connection
-    ) -> Result<()> {
+    pub(super) fn establish_connection(&self, connection: &mut Connection) -> Result<()> {
         self.handshaker.handshake(connection)?;
 
         if let Some(ref credential) = self.credential {

@@ -2,12 +2,7 @@ mod event;
 mod file;
 mod integration;
 
-use std::{
-    collections::HashMap,
-    ops::Deref,
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 
 use futures::future::{BoxFuture, FutureExt};
 use futures_timer::Delay;
@@ -24,8 +19,8 @@ use crate::{
     error::{Error, Result},
     options::TlsOptions,
     runtime::AsyncJoinHandle,
+    test::{assert_matches, run_spec_test, Matchable, CLIENT_OPTIONS, LOCK},
     RUNTIME,
-    test::{run_spec_test, CLIENT_OPTIONS, LOCK, Matchable, assert_matches},
 };
 
 const TEST_DESCRIPTIONS_TO_SKIP: &[&str] = &[
@@ -120,7 +115,9 @@ impl Executor {
         }
 
         match (self.error, error) {
-            (Some(ref expected), Some(ref actual)) => expected.assert_matches(actual, self.description.as_str()),
+            (Some(ref expected), Some(ref actual)) => {
+                expected.assert_matches(actual, self.description.as_str())
+            }
             (Some(ref expected), None) => {
                 panic!("Expected {}, but no error occurred", expected.type_)
             }
@@ -135,7 +132,11 @@ impl Executor {
 
         assert!(actual_events.len() >= self.events.len(), self.description);
         for i in 0..self.events.len() {
-            assert_matches(&actual_events[i], &self.events[i], Some(self.description.as_str()));
+            assert_matches(
+                &actual_events[i],
+                &self.events[i],
+                Some(self.description.as_str()),
+            );
         }
     }
 }
@@ -159,18 +160,16 @@ impl Operation {
                     });
 
                     state.threads.write().await.insert(target, task);
-                },
-                Operation::Wait { ms } => Delay::new(Duration::from_millis(ms)).await,
-                Operation::WaitForThread { target } => {
-                    state
-                        .threads
-                        .write()
-                        .await
-                        .remove(&target)
-                        .unwrap()
-                        .await
-                        .expect("polling the future should not fail")?
                 }
+                Operation::Wait { ms } => Delay::new(Duration::from_millis(ms)).await,
+                Operation::WaitForThread { target } => state
+                    .threads
+                    .write()
+                    .await
+                    .remove(&target)
+                    .unwrap()
+                    .await
+                    .expect("polling the future should not fail")?,
                 Operation::WaitForEvent { event, count } => {
                     while state.count_events(&event) < count {
                         Delay::new(Duration::from_millis(100)).await;
@@ -188,12 +187,7 @@ impl Operation {
                     }
                 }
                 Operation::CheckIn { connection } => {
-                    let conn = state
-                        .connections
-                        .write()
-                        .await
-                        .remove(&connection)
-                        .unwrap();
+                    let conn = state.connections.write().await.remove(&connection).unwrap();
 
                     if let Some(pool) = state.pool.read().await.deref() {
                         pool.check_in(conn).await;
@@ -209,33 +203,39 @@ impl Operation {
                     state.pool.write().await.take();
                 }
 
-                // We replace all instances of `Start` with `StartHelper` when we preprocess the events,
-                // so this should never actually be found.
+                // We replace all instances of `Start` with `StartHelper` when we preprocess the
+                // events, so this should never actually be found.
                 Operation::Start { .. } => unreachable!(),
             }
             Ok(())
-        }.boxed()
+        }
+        .boxed()
     }
 }
 
 impl Matchable for TlsOptions {
     fn content_matches(&self, expected: &TlsOptions) -> bool {
-        self.allow_invalid_certificates.matches(&expected.allow_invalid_certificates) &&
-            self.ca_file_path.matches(&expected.ca_file_path) &&
-            self.cert_key_file_path.matches(&expected.cert_key_file_path)
+        self.allow_invalid_certificates
+            .matches(&expected.allow_invalid_certificates)
+            && self.ca_file_path.matches(&expected.ca_file_path)
+            && self
+                .cert_key_file_path
+                .matches(&expected.cert_key_file_path)
     }
 }
 
 impl Matchable for ConnectionPoolOptions {
     fn content_matches(&self, expected: &ConnectionPoolOptions) -> bool {
-        self.app_name.matches(&expected.app_name) &&
-            self.connect_timeout.matches(&expected.connect_timeout) &&
-            self.credential.matches(&expected.credential) &&
-            self.max_idle_time.matches(&expected.max_idle_time) &&
-            self.max_pool_size.matches(&expected.max_pool_size) &&
-            self.min_pool_size.matches(&expected.min_pool_size) &&
-            self.tls_options.matches(&expected.tls_options) &&
-            self.wait_queue_timeout.matches(&expected.wait_queue_timeout)
+        self.app_name.matches(&expected.app_name)
+            && self.connect_timeout.matches(&expected.connect_timeout)
+            && self.credential.matches(&expected.credential)
+            && self.max_idle_time.matches(&expected.max_idle_time)
+            && self.max_pool_size.matches(&expected.max_pool_size)
+            && self.min_pool_size.matches(&expected.min_pool_size)
+            && self.tls_options.matches(&expected.tls_options)
+            && self
+                .wait_queue_timeout
+                .matches(&expected.wait_queue_timeout)
     }
 }
 
@@ -252,8 +252,8 @@ impl Matchable for Event {
                 actual.connection_id.matches(&expected.connection_id)
             }
             (Event::ConnectionClosed(actual), Event::ConnectionClosed(ref expected)) => {
-                actual.reason == expected.reason &&
-                    actual.connection_id.matches(&expected.connection_id)
+                actual.reason == expected.reason
+                    && actual.connection_id.matches(&expected.connection_id)
             }
             (Event::ConnectionCheckedOut(actual), Event::ConnectionCheckedOut(ref expected)) => {
                 actual.connection_id.matches(&expected.connection_id)
@@ -264,13 +264,11 @@ impl Matchable for Event {
             (
                 Event::ConnectionCheckOutFailed(actual),
                 Event::ConnectionCheckOutFailed(ref expected),
-            ) => {
-                actual.reason == expected.reason
-            }
+            ) => actual.reason == expected.reason,
             (Event::ConnectionCheckOutStarted(_), Event::ConnectionCheckOutStarted(_)) => true,
             (Event::ConnectionPoolCleared(_), Event::ConnectionPoolCleared(_)) => true,
             (Event::ConnectionPoolClosed(_), Event::ConnectionPoolClosed(_)) => true,
-            _ => false
+            _ => false,
         }
     }
 }

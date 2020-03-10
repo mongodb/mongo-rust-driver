@@ -4,7 +4,7 @@ use serde::Deserialize;
 use super::{Outcome, TestFile};
 use crate::{
     options::{Collation, FindOneAndDeleteOptions},
-    test::{util::TestClient, run_spec_test, LOCK},
+    test::{run_spec_test, util::TestClient, LOCK},
 };
 
 #[derive(Debug, Deserialize)]

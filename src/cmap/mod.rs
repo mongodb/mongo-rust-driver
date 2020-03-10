@@ -7,16 +7,19 @@ mod establish;
 pub(crate) mod options;
 mod wait_queue;
 
-use std::{
-    sync::Arc,
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 
 use derivative::Derivative;
 use tokio::sync::Mutex;
 
 pub use self::conn::ConnectionInfo;
-pub(crate) use self::conn::{Command, CommandResponse, Connection, StreamDescription, ConnectionOptions};
+pub(crate) use self::conn::{
+    Command,
+    CommandResponse,
+    Connection,
+    ConnectionOptions,
+    StreamDescription,
+};
 
 use self::{
     establish::ConnectionEstablisher,
@@ -35,8 +38,8 @@ use crate::{
         PoolClosedEvent,
         PoolCreatedEvent,
     },
-    RUNTIME,
     options::StreamAddress,
+    RUNTIME,
 };
 
 const DEFAULT_MAX_POOL_SIZE: u32 = 100;
@@ -54,7 +57,8 @@ impl From<Arc<ConnectionPoolInner>> for ConnectionPool {
     }
 }
 
-/// A struct used to manage the creation, closing, and storage of connections for a `ConnectionPool`.
+/// A struct used to manage the creation, closing, and storage of connections for a
+/// `ConnectionPool`.
 #[derive(Debug)]
 struct ConnectionManager {
     /// The set of available connections in the pool. Because the CMAP spec requires that
@@ -87,8 +91,9 @@ struct ConnectionManager {
 
 impl ConnectionManager {
     fn new(address: StreamAddress, options: Option<ConnectionPoolOptions>) -> Self {
-        let connection_options: Option<ConnectionOptions> =
-            options.as_ref().map(|pool_options| ConnectionOptions::from(pool_options.clone()));
+        let connection_options: Option<ConnectionOptions> = options
+            .as_ref()
+            .map(|pool_options| ConnectionOptions::from(pool_options.clone()));
 
         Self {
             checked_in_connections: Vec::new(),
@@ -107,7 +112,11 @@ impl ConnectionManager {
     where
         F: FnOnce(&Arc<dyn CmapEventHandler>),
     {
-        if let Some(handler) = self.connection_options.as_ref().and_then(|options| options.event_handler.as_ref()) {
+        if let Some(handler) = self
+            .connection_options
+            .as_ref()
+            .and_then(|options| options.event_handler.as_ref())
+        {
             emit(handler);
         }
     }
@@ -147,13 +156,12 @@ impl ConnectionManager {
             handler.handle_connection_created_event(connection.created_event())
         });
 
-        let establish_result = self
-            .establisher
-            .establish_connection(&mut connection);
+        let establish_result = self.establisher.establish_connection(&mut connection);
 
         if let Err(e) = establish_result {
             if e.is_authentication_error() {
-                // auth spec requires that the pool be cleared when encountering an auth error during establishment.
+                // auth spec requires that the pool be cleared when encountering an auth error
+                // during establishment.
                 self.clear();
             }
             return Err(e);
@@ -201,17 +209,14 @@ pub(crate) struct ConnectionPoolInner {
 
     /// The queue that operations wait in to check out a connection.
     ///
-    /// A thread will only reach the front of the queue if a connection is available to be checked out
-    /// or if one could be created without going over `max_pool_size`.
+    /// A thread will only reach the front of the queue if a connection is available to be checked
+    /// out or if one could be created without going over `max_pool_size`.
     wait_queue: WaitQueue,
 }
 
 impl ConnectionPool {
     pub(crate) fn new(address: StreamAddress, options: Option<ConnectionPoolOptions>) -> Self {
-        let connection_manager = ConnectionManager::new(
-            address.clone(),
-            options.clone(),
-        );
+        let connection_manager = ConnectionManager::new(address.clone(), options.clone());
 
         let event_handler = options.as_ref().and_then(|opts| opts.event_handler.clone());
 
@@ -324,19 +329,18 @@ impl ConnectionPoolInner {
         let conn = match result {
             Ok(conn) => conn,
             Err(e) => {
-                let failure_reason = if let ErrorKind::WaitQueueTimeoutError { .. } = e.kind.as_ref() {
-                    ConnectionCheckoutFailedReason::Timeout
-                } else {
-                    ConnectionCheckoutFailedReason::ConnectionError
-                };
+                let failure_reason =
+                    if let ErrorKind::WaitQueueTimeoutError { .. } = e.kind.as_ref() {
+                        ConnectionCheckoutFailedReason::Timeout
+                    } else {
+                        ConnectionCheckoutFailedReason::ConnectionError
+                    };
 
                 self.emit_event(|handler| {
-                    handler.handle_connection_checkout_failed_event(
-                        ConnectionCheckoutFailedEvent {
-                            address: self.address.clone(),
-                            reason: failure_reason,
-                        },
-                    )
+                    handler.handle_connection_checkout_failed_event(ConnectionCheckoutFailedEvent {
+                        address: self.address.clone(),
+                        reason: failure_reason,
+                    })
                 });
 
                 return Err(e);

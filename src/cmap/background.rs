@@ -1,12 +1,9 @@
-use std::{
-    time::Duration,
-    sync::Weak,
-};
+use std::{sync::Weak, time::Duration};
 
 use futures_timer::Delay;
 
 use super::{ConnectionPool, ConnectionPoolInner};
-use crate::{RUNTIME, event::cmap::ConnectionClosedReason};
+use crate::{event::cmap::ConnectionClosedReason, RUNTIME};
 
 /// Initializes the background thread for a connection pool. A weak reference is used to ensure that
 /// the connection pool is not kept alive by the background thread; the background thread will
@@ -40,10 +37,12 @@ impl ConnectionPool {
 
         let mut i = 0;
         while i < connection_manager.checked_in_connections.len() {
-            if connection_manager.checked_in_connections[i].is_stale(connection_manager.generation) {
+            if connection_manager.checked_in_connections[i].is_stale(connection_manager.generation)
+            {
                 let connection = connection_manager.checked_in_connections.remove(i);
                 connection_manager.close_connection(connection, ConnectionClosedReason::Stale);
-            } else if connection_manager.checked_in_connections[i].is_idle(self.inner.max_idle_time) {
+            } else if connection_manager.checked_in_connections[i].is_idle(self.inner.max_idle_time)
+            {
                 let connection = connection_manager.checked_in_connections.remove(i);
                 connection_manager.close_connection(connection, ConnectionClosedReason::Idle);
             } else {
@@ -53,20 +52,22 @@ impl ConnectionPool {
     }
 
     /// Add connections until the min pool size it met. We explicitly release the lock at the end of
-    /// each iteration and acquire it again during the next one to ensure that the this method doesn't
-    /// block other threads from acquiring connections.
+    /// each iteration and acquire it again during the next one to ensure that the this method
+    /// doesn't block other threads from acquiring connections.
     async fn ensure_min_connections(&self) {
         if let Some(min_pool_size) = self.inner.min_pool_size {
             loop {
                 let mut connection_manager = self.inner.connection_manager.lock().await;
                 if connection_manager.total_connection_count < min_pool_size {
                     match connection_manager.create_connection() {
-                        Ok(connection) => connection_manager.checked_in_connections.push(connection),
+                        Ok(connection) => {
+                            connection_manager.checked_in_connections.push(connection)
+                        }
                         e @ Err(_) => {
                             // Since we encountered an error, we return early from this function and
                             // put the background thread back to sleep. Next time it wakes up, any
-                            // stale connections will be closed, and the thread can try to create new
-                            // ones after that.
+                            // stale connections will be closed, and the thread can try to create
+                            // new ones after that.
                             return;
                         }
                     }
