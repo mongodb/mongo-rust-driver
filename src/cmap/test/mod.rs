@@ -132,9 +132,10 @@ impl Executor {
             (None, None) => {}
         }
 
-        // The `Drop` implementation for `Connection` and `ConnectionPool` spawn background async tasks that emit
-        // certain events. If the tasks haven't been scheduled yet, we may not see the events here. To account for this,
-        // we wait for a small amount of time before checking again.
+        // The `Drop` implementation for `Connection` and `ConnectionPool` spawn background async
+        // tasks that emit certain events. If the tasks haven't been scheduled yet, we may
+        // not see the events here. To account for this, we wait for a small amount of time
+        // before checking again.
         if self.state.count_all_events() < self.events.len() {
             Delay::new(Duration::from_millis(250)).await;
         }
