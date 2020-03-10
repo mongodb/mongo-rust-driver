@@ -7,7 +7,7 @@ use bson::{Bson, Document};
 use serde::Deserialize;
 
 use self::{event::TestEvent, operation::*};
-use crate::test::{assert_matches, parse_version, EventClient, CLIENT, LOCK};
+use crate::test::{assert_matches, parse_version, util::TestClient, EventClient, LOCK};
 
 #[derive(Deserialize)]
 struct TestFile {
@@ -29,6 +29,8 @@ struct TestCase {
 }
 
 fn run_command_monitoring_test(test_file: TestFile) {
+    let client = TestClient::new();
+
     let skipped_tests = vec![
         // uses old count
         "A successful command",
@@ -48,14 +50,14 @@ fn run_command_monitoring_test(test_file: TestFile) {
         }
 
         if let Some((major, minor)) = test_case.max_version.map(|s| parse_version(s.as_str())) {
-            if CLIENT.server_version_gt(major, minor) {
+            if client.server_version_gt(major, minor) {
                 println!("Skipping {}", test_case.description);
                 continue;
             }
         }
 
         if let Some((major, minor)) = test_case.min_version.map(|s| parse_version(s.as_str())) {
-            if CLIENT.server_version_lt(major, minor) {
+            if client.server_version_lt(major, minor) {
                 println!("Skipping {}", test_case.description);
                 continue;
             }
@@ -68,7 +70,7 @@ fn run_command_monitoring_test(test_file: TestFile) {
         let operation: AnyTestOperation =
             bson::from_bson(Bson::Document(test_case.operation)).unwrap();
 
-        CLIENT
+        client
             .init_db_and_coll(&test_file.database_name, &test_file.collection_name)
             .insert_many(test_file.data.clone(), None)
             .expect("insert many error");

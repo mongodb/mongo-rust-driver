@@ -10,7 +10,7 @@ use crate::{
         ClientOptions,
     },
     selection_criteria::{ReadPreference, SelectionCriteria},
-    test::{CLIENT, LOCK},
+    test::{util::TestClient, CLIENT_OPTIONS, LOCK},
     Client,
 };
 
@@ -47,7 +47,8 @@ struct OsMetadata {
 // #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[allow(unused)]
 async fn metadata_sent_in_handshake() {
-    let db = CLIENT.database("admin");
+    let client = TestClient::new();
+    let db = client.database("admin");
     let result = db.run_command(doc! { "currentOp": 1 }, None).unwrap();
 
     let in_prog = match result.get("inprog") {
@@ -64,7 +65,7 @@ async fn metadata_sent_in_handshake() {
 async fn server_selection_timeout_message() {
     let _guard = LOCK.run_concurrently();
 
-    if !CLIENT.is_replica_set() {
+    if !CLIENT_OPTIONS.repl_set_name.is_some() {
         return;
     }
 
@@ -76,10 +77,10 @@ async fn server_selection_timeout_message() {
         max_staleness: None,
     };
 
-    let mut options = CLIENT.options.clone();
+    let mut options = CLIENT_OPTIONS.clone();
     options.server_selection_timeout = Some(Duration::from_millis(500));
 
-    let client = Client::with_options(options).unwrap();
+    let client = Client::with_options(options.clone()).unwrap();
     let db = client.database("test");
     let error = db
         .run_command(
@@ -89,7 +90,7 @@ async fn server_selection_timeout_message() {
         .expect_err("should fail with server selection timeout error");
 
     let error_description = format!("{}", error);
-    for host in CLIENT.options.hosts.iter() {
+    for host in options.hosts.iter() {
         assert!(error_description.contains(format!("{}", host).as_str()));
     }
 }
@@ -106,25 +107,27 @@ async fn list_databases() {
         format!("{}3", function_name!()),
     ];
 
+    let client = TestClient::new();
+
     for name in expected_dbs {
-        CLIENT.database(name).drop(None).unwrap();
+        client.database(name).drop(None).unwrap();
     }
 
-    let prev_dbs = CLIENT.list_databases(None).unwrap();
+    let prev_dbs = client.list_databases(None).unwrap();
 
     for name in expected_dbs {
         assert!(!prev_dbs
             .iter()
             .any(|doc| doc.get("name") == Some(&Bson::String(name.to_string()))));
 
-        let db = CLIENT.database(name);
+        let db = client.database(name);
 
         db.collection("foo")
             .insert_one(doc! { "x": 1 }, None)
             .unwrap();
     }
 
-    let new_dbs = CLIENT.list_databases(None).unwrap();
+    let new_dbs = client.list_databases(None).unwrap();
     let new_dbs: Vec<_> = new_dbs
         .into_iter()
         .filter(|doc| match doc.get("name") {
@@ -150,6 +153,8 @@ async fn list_databases() {
 async fn list_database_names() {
     let _guard = LOCK.run_concurrently();
 
+    let client = TestClient::new();
+
     let expected_dbs = &[
         format!("{}1", function_name!()),
         format!("{}2", function_name!()),
@@ -157,22 +162,22 @@ async fn list_database_names() {
     ];
 
     for name in expected_dbs {
-        CLIENT.database(name).drop(None).unwrap();
+        client.database(name).drop(None).unwrap();
     }
 
-    let prev_dbs = CLIENT.list_database_names(None).unwrap();
+    let prev_dbs = client.list_database_names(None).unwrap();
 
     for name in expected_dbs {
         assert!(!prev_dbs.iter().any(|db_name| db_name == name));
 
-        let db = CLIENT.database(name);
+        let db = client.database(name);
 
         db.collection("foo")
             .insert_one(doc! { "x": 1 }, None)
             .unwrap();
     }
 
-    let new_dbs = CLIENT.list_database_names(None).unwrap();
+    let new_dbs = client.list_database_names(None).unwrap();
 
     for name in expected_dbs {
         assert_eq!(new_dbs.iter().filter(|db_name| db_name == &name).count(), 1);
@@ -203,7 +208,7 @@ fn auth_test(client: Client, should_succeed: bool) {
 /// Asserts that the authentication's success matches the provided parameter.
 fn auth_test_options(user: &str, password: &str, mechanism: Option<AuthMechanism>, success: bool) {
     let options = ClientOptions::builder()
-        .hosts(CLIENT.options.hosts.clone())
+        .hosts(CLIENT_OPTIONS.hosts.clone())
         .max_pool_size(1)
         .credential(Credential {
             username: Some(user.to_string()),
@@ -211,7 +216,7 @@ fn auth_test_options(user: &str, password: &str, mechanism: Option<AuthMechanism
             mechanism,
             ..Default::default()
         })
-        .tls(CLIENT.options.tls.clone())
+        .tls(CLIENT_OPTIONS.tls.clone())
         .build();
 
     auth_test(Client::with_options(options).unwrap(), success);
@@ -227,8 +232,7 @@ fn auth_test_uri(
     mechanism: Option<AuthMechanism>,
     should_succeed: bool,
 ) {
-    let host = CLIENT
-        .options
+    let host = CLIENT_OPTIONS
         .hosts
         .iter()
         .map(ToString::to_string)
@@ -246,7 +250,7 @@ fn auth_test_uri(
         mechanism_str.as_ref()
     );
 
-    if let Some(ref tls_options) = CLIENT.options.tls_options() {
+    if let Some(ref tls_options) = CLIENT_OPTIONS.tls_options() {
         if let Some(true) = tls_options.allow_invalid_certificates {
             uri.push_str("&tlsAllowInvalidCertificates=true");
         }
@@ -282,7 +286,7 @@ fn auth_test_uri(
 ///
 /// If only one mechanism is supplied, this will also test that using the other SCRAM mechanism will
 /// fail.
-fn scram_test(username: &str, password: &str, mechanisms: &[AuthMechanism]) {
+fn scram_test(client: &TestClient, username: &str, password: &str, mechanisms: &[AuthMechanism]) {
     let _guard = LOCK.run_concurrently();
 
     for mechanism in mechanisms {
@@ -293,7 +297,7 @@ fn scram_test(username: &str, password: &str, mechanisms: &[AuthMechanism]) {
     }
 
     // If only one scram mechanism is specified, verify the other doesn't work.
-    if mechanisms.len() == 1 && CLIENT.server_version_gte(4, 0) {
+    if mechanisms.len() == 1 && client.server_version_gte(4, 0) {
         let other = match mechanisms[0] {
             AuthMechanism::ScramSha1 => AuthMechanism::ScramSha256,
             _ => AuthMechanism::ScramSha1,
@@ -306,35 +310,38 @@ fn scram_test(username: &str, password: &str, mechanisms: &[AuthMechanism]) {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_sha1() {
-    if !CLIENT.auth_enabled() {
+    let client = TestClient::new();
+    if !client.auth_enabled() {
         return;
     }
 
-    CLIENT
+    client
         .create_user("sha1", "sha1", &["root"], &[AuthMechanism::ScramSha1])
         .unwrap();
-    scram_test("sha1", "sha1", &[AuthMechanism::ScramSha1]);
+    scram_test(&client, "sha1", "sha1", &[AuthMechanism::ScramSha1]);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_sha256() {
-    if CLIENT.server_version_lt(4, 0) || !CLIENT.auth_enabled() {
+    let client = TestClient::new();
+    if client.server_version_lt(4, 0) || !client.auth_enabled() {
         return;
     }
-    CLIENT
+    client
         .create_user("sha256", "sha256", &["root"], &[AuthMechanism::ScramSha256])
         .unwrap();
-    scram_test("sha256", "sha256", &[AuthMechanism::ScramSha256]);
+    scram_test(&client, "sha256", "sha256", &[AuthMechanism::ScramSha256]);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_both() {
-    if CLIENT.server_version_lt(4, 0) || !CLIENT.auth_enabled() {
+    let client = TestClient::new();
+    if client.server_version_lt(4, 0) || !client.auth_enabled() {
         return;
     }
-    CLIENT
+    client
         .create_user(
             "both",
             "both",
@@ -343,6 +350,7 @@ async fn scram_both() {
         )
         .unwrap();
     scram_test(
+        &client,
         "both",
         "both",
         &[AuthMechanism::ScramSha1, AuthMechanism::ScramSha256],
@@ -352,7 +360,8 @@ async fn scram_both() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_missing_user_uri() {
-    if !CLIENT.auth_enabled() {
+    let client = TestClient::new();
+    if !client.auth_enabled() {
         return;
     }
     auth_test_uri("adsfasdf", "ASsdfsadf", None, false);
@@ -361,7 +370,8 @@ async fn scram_missing_user_uri() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_missing_user_options() {
-    if !CLIENT.auth_enabled() {
+    let client = TestClient::new();
+    if !client.auth_enabled() {
         return;
     }
     auth_test_options("sadfasdf", "fsdadsfasdf", None, false);
@@ -370,14 +380,16 @@ async fn scram_missing_user_options() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn saslprep_options() {
-    if CLIENT.server_version_lt(4, 0) || !CLIENT.auth_enabled() {
+    let client = TestClient::new();
+
+    if client.server_version_lt(4, 0) || !client.auth_enabled() {
         return;
     }
 
-    CLIENT
+    client
         .create_user("IX", "IX", &["root"], &[AuthMechanism::ScramSha256])
         .unwrap();
-    CLIENT
+    client
         .create_user(
             "\u{2168}",
             "\u{2163}",
@@ -395,14 +407,16 @@ async fn saslprep_options() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn saslprep_uri() {
-    if CLIENT.server_version_lt(4, 0) || !CLIENT.auth_enabled() {
+    let client = TestClient::new();
+
+    if client.server_version_lt(4, 0) || !client.auth_enabled() {
         return;
     }
 
-    CLIENT
+    client
         .create_user("IX", "IX", &["root"], &[AuthMechanism::ScramSha256])
         .unwrap();
-    CLIENT
+    client
         .create_user(
             "\u{2168}",
             "\u{2163}",

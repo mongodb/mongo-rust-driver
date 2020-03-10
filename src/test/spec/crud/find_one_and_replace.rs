@@ -6,7 +6,7 @@ use serde::Deserialize;
 use super::{Outcome, TestFile};
 use crate::{
     options::{Collation, FindOneAndReplaceOptions, ReturnDocument},
-    test::{run_spec_test, CLIENT, LOCK},
+    test::{util::TestClient, run_spec_test, LOCK},
 };
 
 #[derive(Debug, Deserialize)]
@@ -24,6 +24,7 @@ struct Arguments {
 
 #[function_name::named]
 fn run_find_one_and_replace_test(test_file: TestFile) {
+    let client = TestClient::new();
     let data = test_file.data;
 
     for mut test_case in test_file.tests {
@@ -35,7 +36,7 @@ fn run_find_one_and_replace_test(test_file: TestFile) {
 
         test_case.description = test_case.description.replace('$', "%");
         let sub = cmp::min(test_case.description.len(), 50);
-        let coll = CLIENT.init_db_and_coll(function_name!(), &test_case.description[..sub]);
+        let coll = client.init_db_and_coll(function_name!(), &test_case.description[..sub]);
         coll.insert_many(data.clone(), None)
             .expect(&test_case.description);
 
@@ -46,7 +47,7 @@ fn run_find_one_and_replace_test(test_file: TestFile) {
 
         if let Some(ref c) = outcome.collection {
             if let Some(ref name) = c.name {
-                CLIENT.drop_collection(function_name!(), name);
+                client.drop_collection(function_name!(), name);
             }
         }
         let new = match arguments.return_document.as_ref() {
@@ -77,7 +78,7 @@ fn run_find_one_and_replace_test(test_file: TestFile) {
 
         if let Some(c) = outcome.collection {
             let outcome_coll = match c.name {
-                Some(ref name) => CLIENT.get_coll(function_name!(), name),
+                Some(ref name) => client.get_coll(function_name!(), name),
                 None => coll,
             };
 

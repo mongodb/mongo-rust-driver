@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use crate::{
     options::{AggregateOptions, CreateCollectionOptions},
-    test::{CLIENT, LOCK},
+    test::{util::TestClient, LOCK},
     Database,
 };
 
@@ -49,7 +49,8 @@ fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<CollectionInfo>
 async fn is_master() {
     let _guard = LOCK.run_concurrently();
 
-    let db = CLIENT.database("test");
+    let client = TestClient::new();
+    let db = client.database("test");
     let doc = db.run_command(doc! { "ismaster": 1 }, None).unwrap();
     let is_master_reply: IsMasterReply = bson::from_bson(Bson::Document(doc)).unwrap();
 
@@ -63,7 +64,8 @@ async fn is_master() {
 async fn list_collections() {
     let _guard = LOCK.run_concurrently();
 
-    let db = CLIENT.database(function_name!());
+    let client = TestClient::new();
+    let db = client.database(function_name!());
     db.drop(None).unwrap();
 
     assert_eq!(db.list_collections(None, None).unwrap().count(), 0);
@@ -101,7 +103,8 @@ async fn list_collections() {
 async fn list_collections_filter() {
     let _guard = LOCK.run_concurrently();
 
-    let db = CLIENT.database(function_name!());
+    let client = TestClient::new();
+    let db = client.database(function_name!());
     db.drop(None).unwrap();
 
     assert_eq!(db.list_collections(None, None).unwrap().count(), 0);
@@ -141,7 +144,8 @@ async fn list_collections_filter() {
 async fn list_collection_names() {
     let _guard = LOCK.run_concurrently();
 
-    let db = CLIENT.database(function_name!());
+    let client = TestClient::new();
+    let db = client.database(function_name!());
     db.drop(None).unwrap();
 
     assert!(db.list_collection_names(None).unwrap().is_empty());
@@ -170,7 +174,8 @@ async fn list_collection_names() {
 async fn collection_management() {
     let _guard = LOCK.run_concurrently();
 
-    let db = CLIENT.database(function_name!());
+    let client = TestClient::new();
+    let db = client.database(function_name!());
     db.drop(None).unwrap();
 
     assert!(db.list_collection_names(None).unwrap().is_empty());
@@ -203,13 +208,15 @@ async fn collection_management() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn db_aggregate() {
-    if CLIENT.server_version_lt(4, 0) {
+    let client = TestClient::new();
+
+    if client.server_version_lt(4, 0) {
         return;
     }
 
     let _guard = LOCK.run_concurrently();
 
-    let db = CLIENT.database("admin");
+    let db = client.database("admin");
 
     let pipeline = vec![
         doc! {
@@ -244,13 +251,15 @@ async fn db_aggregate() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn db_aggregate_disk_use() {
-    if CLIENT.server_version_lt(4, 0) {
+    let client = TestClient::new();
+
+    if client.server_version_lt(4, 0) {
         return;
     }
 
     let _guard = LOCK.run_concurrently();
 
-    let db = CLIENT.database("admin");
+    let db = client.database("admin");
 
     let pipeline = vec![
         doc! {
