@@ -6,7 +6,7 @@ use serde::Deserialize;
 use super::{Outcome, TestFile};
 use crate::{
     options::{Collation, FindOneAndReplaceOptions, ReturnDocument},
-    test::{util::TestClient, run_spec_test, LOCK},
+    test::{run_spec_test, util::TestClient, LOCK},
 };
 
 #[derive(Debug, Deserialize)]

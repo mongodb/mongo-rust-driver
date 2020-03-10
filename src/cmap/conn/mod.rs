@@ -84,8 +84,12 @@ impl Connection {
             ready_and_available_time: None,
             stream: Stream::connect(
                 address.clone(),
-                options.as_mut().and_then(|options| options.connect_timeout.take()),
-                options.as_mut().and_then(|options| options.tls_options.take())
+                options
+                    .as_mut()
+                    .and_then(|options| options.connect_timeout.take()),
+                options
+                    .as_mut()
+                    .and_then(|options| options.tls_options.take()),
             )?,
             address,
             handler: options.and_then(|options| options.event_handler),
@@ -100,7 +104,16 @@ impl Connection {
         connect_timeout: Option<Duration>,
         tls_options: Option<TlsOptions>,
     ) -> Result<Self> {
-        Self::new(0, address, 0, Some(ConnectionOptions { connect_timeout, tls_options, event_handler: None }))
+        Self::new(
+            0,
+            address,
+            0,
+            Some(ConnectionOptions {
+                connect_timeout,
+                tls_options,
+                event_handler: None,
+            }),
+        )
     }
 
     pub(crate) fn info(&self) -> ConnectionInfo {
@@ -226,8 +239,8 @@ impl Connection {
         }
     }
 
-    /// Nullify the inner state and return it in a `DroppedConnectionState` for checking back in to the pool
-    /// in a background task.
+    /// Nullify the inner state and return it in a `DroppedConnectionState` for checking back in to
+    /// the pool in a background task.
     fn take(&mut self) -> DroppedConnectionState {
         self.pool.take();
         DroppedConnectionState {
@@ -249,13 +262,15 @@ impl Drop for Connection {
         // (because the `close_and_drop` helper was not called explicitly).
         //
         // If the connection does not have a weak reference to a pool, then the connection is being
-        // dropped while it's not checked out. This means that the pool called the `close_and_drop` helper
-        // explicitly, so we don't add it back to the pool or emit any events.
+        // dropped while it's not checked out. This means that the pool called the `close_and_drop`
+        // helper explicitly, so we don't add it back to the pool or emit any events.
         if let Some(ref weak_pool_ref) = self.pool {
             if let Some(strong_pool_ref) = weak_pool_ref.upgrade() {
                 let dropped_connection_state = self.take();
                 RUNTIME.execute(async move {
-                    strong_pool_ref.check_in(dropped_connection_state.into()).await;
+                    strong_pool_ref
+                        .check_in(dropped_connection_state.into())
+                        .await;
                 });
             } else {
                 self.close(ConnectionClosedReason::PoolClosed);
@@ -287,11 +302,13 @@ impl From<ConnectionPoolOptions> for ConnectionOptions {
 
 /// Struct encapsulating the state of a connection that has been dropped.
 ///
-/// Because `Drop::drop` cannot be async, we package the internal state of a dropped connection into this
-/// struct, and move it into an async task that will attempt to check the reconstructed connection back into the pool.
+/// Because `Drop::drop` cannot be async, we package the internal state of a dropped connection into
+/// this struct, and move it into an async task that will attempt to check the reconstructed
+/// connection back into the pool.
 ///
-/// If the async runtime has been dropped, that task will not execute, and this state will be dropped. From there,
-/// we simply emit a connection closed event and do not attempt to reconstruct the `Connection`.
+/// If the async runtime has been dropped, that task will not execute, and this state will be
+/// dropped. From there, we simply emit a connection closed event and do not attempt to reconstruct
+/// the `Connection`.
 #[derive(Derivative)]
 #[derivative(Debug)]
 struct DroppedConnectionState {
@@ -305,9 +322,9 @@ struct DroppedConnectionState {
 }
 
 impl Drop for DroppedConnectionState {
-    /// If this drop is called, that means the async runtime itself was dropped before the connection could be
-    /// checked back in to the pool. Instead of checking back into the pool again, we just close the connection
-    /// directly.
+    /// If this drop is called, that means the async runtime itself was dropped before the
+    /// connection could be checked back in to the pool. Instead of checking back into the pool
+    /// again, we just close the connection directly.
     fn drop(&mut self) {
         if let Some(ref handler) = self.handler {
             handler.handle_connection_closed_event(ConnectionClosedEvent {

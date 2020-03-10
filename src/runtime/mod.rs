@@ -1,19 +1,19 @@
 // TODO RUST-212: Remove annotation.
+mod join_handle;
 #[allow(dead_code)]
 mod stream;
-mod join_handle;
 
-use std::{
-    future::Future,
-    time::Duration,
-};
+use std::{future::Future, time::Duration};
 
-use futures_timer::Delay;
 use futures::future::{self, Either};
+use futures_timer::Delay;
 
-use self::stream::AsyncStream;
-use crate::{cmap::conn::StreamOptions, error::{ErrorKind, Result}};
 pub(crate) use self::join_handle::AsyncJoinHandle;
+use self::stream::AsyncStream;
+use crate::{
+    cmap::conn::StreamOptions,
+    error::{ErrorKind, Result},
+};
 
 /// An abstract handle to the async runtime.
 #[derive(Clone, Copy, Debug)]
@@ -32,18 +32,14 @@ impl AsyncRuntime {
     pub(crate) fn execute<F, O>(self, fut: F) -> AsyncJoinHandle<O>
     where
         F: Future<Output = O> + Send + 'static,
-        O: Send + 'static
+        O: Send + 'static,
     {
         match self {
             #[cfg(feature = "tokio-runtime")]
-            Self::Tokio => {
-                AsyncJoinHandle::Tokio(tokio::task::spawn(fut))
-            }
+            Self::Tokio => AsyncJoinHandle::Tokio(tokio::task::spawn(fut)),
 
             #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd => {
-                AsyncJoinHandle::AsyncStd(async_std::task::spawn(fut))
-            }
+            Self::AsyncStd => AsyncJoinHandle::AsyncStd(async_std::task::spawn(fut)),
         }
     }
 
@@ -74,14 +70,20 @@ impl AsyncRuntime {
     }
 
     /// Await on a future for a maximum amount of time before returning an error.
-    pub(crate) async fn await_with_timeout<F>(self, future: F, timeout: Duration) -> Result<F::Output>
-    where F: Future + Send + Unpin
+    pub(crate) async fn await_with_timeout<F>(
+        self,
+        future: F,
+        timeout: Duration,
+    ) -> Result<F::Output>
+    where
+        F: Future + Send + Unpin,
     {
         match future::select(future, Delay::new(timeout)).await {
             Either::Left((result, _)) => Ok(result),
             Either::Right(_) => Err(ErrorKind::InternalError {
-                message: "Timed out waiting on future".to_string()
-            }.into())
+                message: "Timed out waiting on future".to_string(),
+            }
+            .into()),
         }
     }
 }

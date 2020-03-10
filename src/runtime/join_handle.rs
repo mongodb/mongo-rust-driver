@@ -1,6 +1,6 @@
 use std::{
-    ops::DerefMut,
     future::Future,
+    ops::DerefMut,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -33,16 +33,18 @@ impl<T> Future for AsyncJoinHandle<T> {
             Self::Tokio(ref mut handle) => {
                 use crate::error::ErrorKind;
 
-                Pin::new(handle).poll(cx)
-                    .map(|result| {
-                        result.map_err(|e| ErrorKind::InternalError { message: format!("{}", e) }.into())
+                Pin::new(handle).poll(cx).map(|result| {
+                    result.map_err(|e| {
+                        ErrorKind::InternalError {
+                            message: format!("{}", e),
+                        }
+                        .into()
                     })
-            },
+                })
+            }
 
             #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd(ref mut handle) => {
-                Pin::new(handle).poll(cx).map(Ok)
-            }
+            Self::AsyncStd(ref mut handle) => Pin::new(handle).poll(cx).map(Ok),
         }
     }
 }

@@ -1,6 +1,6 @@
-#!/bin/sh
+#!/bin/bash
 
 set -o errexit
 
 . ~/.cargo/env
-cargo +nightly fmt -- --check
+rustfmt +nightly --unstable-features --check src/**/*.rs

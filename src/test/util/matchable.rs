@@ -2,7 +2,10 @@ use std::{any::Any, fmt::Debug, time::Duration};
 
 use bson::{Bson, Document};
 
-use crate::{bson_util, options::auth::{AuthMechanism, Credential}};
+use crate::{
+    bson_util,
+    options::auth::{AuthMechanism, Credential},
+};
 
 pub trait Matchable: Sized + 'static {
     fn is_placeholder(&self) -> bool {
@@ -71,11 +74,13 @@ impl Matchable for Document {
 
 impl Matchable for Credential {
     fn content_matches(&self, expected: &Credential) -> bool {
-        self.username.content_matches(&expected.username) &&
-            self.source.content_matches(&expected.source) &&
-            self.password.content_matches(&expected.password) &&
-            self.mechanism.content_matches(&expected.mechanism) &&
-            self.mechanism_properties.content_matches(&expected.mechanism_properties)
+        self.username.content_matches(&expected.username)
+            && self.source.content_matches(&expected.source)
+            && self.password.content_matches(&expected.password)
+            && self.mechanism.content_matches(&expected.mechanism)
+            && self
+                .mechanism_properties
+                .content_matches(&expected.mechanism_properties)
     }
 }
 
@@ -121,7 +126,7 @@ impl<T: Matchable> Matchable for Option<T> {
     fn is_placeholder(&self) -> bool {
         match self {
             Some(ref v) => v.is_placeholder(),
-            None => true
+            None => true,
         }
     }
 
@@ -130,14 +135,18 @@ impl<T: Matchable> Matchable for Option<T> {
         if let Some(expected_value) = expected {
             return match self {
                 Some(actual_value) => actual_value.content_matches(expected_value),
-                None => false
+                None => false,
             };
         }
         true
     }
 }
 
-pub fn assert_matches<A: Matchable + Debug, E: Matchable + Debug>(actual: &A, expected: &E, description: Option<&str>) {
+pub fn assert_matches<A: Matchable + Debug, E: Matchable + Debug>(
+    actual: &A,
+    expected: &E,
+    description: Option<&str>,
+) {
     assert!(
         actual.matches(expected),
         "{}\n{:?}\n did not MATCH \n{:?}",
