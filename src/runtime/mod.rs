@@ -1,5 +1,5 @@
-// TODO RUST-212: Remove annotation.
 mod join_handle;
+// TODO RUST-212: Remove annotation.
 #[allow(dead_code)]
 mod stream;
 
@@ -29,18 +29,36 @@ pub(crate) enum AsyncRuntime {
 
 impl AsyncRuntime {
     /// Spawn a task in the background to run a future.
-    pub(crate) fn execute<F, O>(self, fut: F) -> AsyncJoinHandle<O>
+    ///
+    /// If the runtime is still running, this will return a handle to the background task.
+    /// Otherwise, it will return `None`.
+    pub(crate) fn spawn<F, O>(self, fut: F) -> Option<AsyncJoinHandle<O>>
     where
         F: Future<Output = O> + Send + 'static,
         O: Send + 'static,
     {
         match self {
             #[cfg(feature = "tokio-runtime")]
-            Self::Tokio => AsyncJoinHandle::Tokio(tokio::task::spawn(fut)),
+            Self::Tokio => {
+                use tokio::runtime::Handle;
+
+                let handle = Handle::try_current().ok()?;
+
+                Some(AsyncJoinHandle::Tokio(handle.spawn(fut)))
+            }
 
             #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd => AsyncJoinHandle::AsyncStd(async_std::task::spawn(fut)),
+            Self::AsyncStd => Some(AsyncJoinHandle::AsyncStd(async_std::task::spawn(fut))),
         }
+    }
+
+    /// Spawn a task in the background to run a future.
+    pub(crate) fn execute<F, O>(self, fut: F)
+    where
+        F: Future<Output = O> + Send + 'static,
+        O: Send + 'static,
+    {
+        self.spawn(fut);
     }
 
     /// Run a future in the foreground, blocking on it completing.

@@ -161,7 +161,7 @@ impl Operation {
             match self {
                 Operation::StartHelper { target, operations } => {
                     let state_ref = state.clone();
-                    let task = RUNTIME.execute(async move {
+                    let task = RUNTIME.spawn(async move {
                         for operation in operations {
                             // If any error occurs during an operation, we halt the thread and yield
                             // that value when `join` is called on the thread.
@@ -170,7 +170,7 @@ impl Operation {
                         Ok(())
                     });
 
-                    state.threads.write().await.insert(target, task);
+                    state.threads.write().await.insert(target, task.unwrap());
                 }
                 Operation::Wait { ms } => Delay::new(Duration::from_millis(ms)).await,
                 Operation::WaitForThread { target } => state
