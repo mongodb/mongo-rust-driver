@@ -1,3 +1,4 @@
+edition = "2018"
 combine_control_expr = false
 comment_width = 100
 condense_wildcard_suffixes = true
