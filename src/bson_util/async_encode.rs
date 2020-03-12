@@ -134,8 +134,6 @@ fn encode_bson<'a, W: AsyncWrite + Unpin + Send>(
             }
             Bson::Null => Ok(()),
             Bson::Symbol(ref v) => write_string(writer, &v).await,
-            #[cfg(feature = "decimal128")]
-            Bson::Decimal128(ref v) => write_f128(writer, v.clone()).await,
         }
     })
 }
