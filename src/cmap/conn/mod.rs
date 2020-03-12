@@ -1,5 +1,4 @@
 mod command;
-mod stream;
 mod stream_description;
 mod wire;
 
@@ -10,10 +9,10 @@ use std::{
 
 use derivative::Derivative;
 
-use self::{stream::Stream, wire::Message};
+use self::wire::Message;
 use super::ConnectionPoolInner;
 use crate::{
-    cmap::options::ConnectionPoolOptions,
+    cmap::options::{ConnectionOptions, StreamOptions},
     error::{ErrorKind, Result},
     event::cmap::{
         CmapEventHandler,
@@ -25,11 +24,10 @@ use crate::{
         ConnectionReadyEvent,
     },
     options::{StreamAddress, TlsOptions},
+    runtime::AsyncStream,
     RUNTIME,
 };
 pub(crate) use command::{Command, CommandResponse};
-#[cfg(any(feature = "tokio-runtime", feature = "async-std-runtime"))]
-pub(crate) use stream::StreamOptions;
 pub(crate) use stream_description::StreamDescription;
 pub(crate) use wire::next_request_id;
 
@@ -63,7 +61,7 @@ pub(crate) struct Connection {
     /// currently checked into the pool, this will be None.
     pub(super) pool: Option<Weak<ConnectionPoolInner>>,
 
-    stream: Stream,
+    stream: AsyncStream,
 
     #[derivative(Debug = "ignore")]
     handler: Option<Arc<dyn CmapEventHandler>>,
@@ -71,26 +69,24 @@ pub(crate) struct Connection {
 
 impl Connection {
     /// Constructs a new connection.
-    pub(crate) fn new(
+    pub(crate) async fn new(
         id: u32,
         address: StreamAddress,
         generation: u32,
-        mut options: Option<ConnectionOptions>,
+        options: Option<ConnectionOptions>,
     ) -> Result<Self> {
+        let stream_options = StreamOptions {
+            address: address.clone(),
+            connect_timeout: options.as_ref().and_then(|opts| opts.connect_timeout),
+            tls_options: options.as_ref().and_then(|opts| opts.tls_options.clone()),
+        };
+
         let conn = Self {
             id,
             generation,
             pool: None,
             ready_and_available_time: None,
-            stream: Stream::connect(
-                address.clone(),
-                options
-                    .as_mut()
-                    .and_then(|options| options.connect_timeout.take()),
-                options
-                    .as_mut()
-                    .and_then(|options| options.tls_options.take()),
-            )?,
+            stream: AsyncStream::connect(stream_options).await?,
             address,
             handler: options.and_then(|options| options.event_handler),
             stream_description: None,
@@ -99,7 +95,7 @@ impl Connection {
         Ok(conn)
     }
 
-    pub(crate) fn new_monitoring(
+    pub(crate) async fn new_monitoring(
         address: StreamAddress,
         connect_timeout: Option<Duration>,
         tls_options: Option<TlsOptions>,
@@ -114,6 +110,7 @@ impl Connection {
                 event_handler: None,
             }),
         )
+        .await
     }
 
     pub(crate) fn info(&self) -> ConnectionInfo {
@@ -204,15 +201,15 @@ impl Connection {
     /// An `Ok(...)` result simply means the server received the command and that the driver
     /// driver received the response; it does not imply anything about the success of the command
     /// itself.
-    pub(crate) fn send_command(
+    pub(crate) async fn send_command(
         &mut self,
         command: Command,
         request_id: impl Into<Option<i32>>,
     ) -> Result<CommandResponse> {
         let message = Message::with_command(command, request_id.into());
-        message.write_to(&mut self.stream)?;
+        message.write_to(&mut self.stream).await?;
 
-        let response_message = Message::read_from(&mut self.stream)?;
+        let response_message = Message::read_from(&mut self.stream).await?;
         CommandResponse::new(self.address.clone(), response_message)
     }
 
@@ -247,7 +244,7 @@ impl Connection {
             id: self.id,
             address: self.address.clone(),
             generation: self.generation,
-            stream: std::mem::replace(&mut self.stream, Stream::Null),
+            stream: std::mem::replace(&mut self.stream, AsyncStream::Null),
             handler: self.handler.take(),
             stream_description: self.stream_description.take(),
         }
@@ -279,27 +276,6 @@ impl Drop for Connection {
     }
 }
 
-/// Options used for constructing a `Connection`.
-#[derive(Derivative)]
-#[derivative(Debug)]
-#[derive(Clone)]
-pub(crate) struct ConnectionOptions {
-    pub(crate) connect_timeout: Option<Duration>,
-    pub(crate) tls_options: Option<TlsOptions>,
-    #[derivative(Debug = "ignore")]
-    pub(crate) event_handler: Option<Arc<dyn CmapEventHandler>>,
-}
-
-impl From<ConnectionPoolOptions> for ConnectionOptions {
-    fn from(pool_options: ConnectionPoolOptions) -> Self {
-        Self {
-            connect_timeout: pool_options.connect_timeout,
-            tls_options: pool_options.tls_options,
-            event_handler: pool_options.event_handler,
-        }
-    }
-}
-
 /// Struct encapsulating the state of a connection that has been dropped.
 ///
 /// Because `Drop::drop` cannot be async, we package the internal state of a dropped connection into
@@ -315,7 +291,7 @@ struct DroppedConnectionState {
     pub(super) id: u32,
     pub(super) address: StreamAddress,
     pub(super) generation: u32,
-    stream: Stream,
+    stream: AsyncStream,
     #[derivative(Debug = "ignore")]
     handler: Option<Arc<dyn CmapEventHandler>>,
     stream_description: Option<StreamDescription>,
@@ -342,7 +318,7 @@ impl From<DroppedConnectionState> for Connection {
             id: state.id,
             address: state.address.clone(),
             generation: state.generation,
-            stream: std::mem::replace(&mut state.stream, Stream::Null),
+            stream: std::mem::replace(&mut state.stream, AsyncStream::Null),
             handler: state.handler.take(),
             stream_description: state.stream_description.take(),
             ready_and_available_time: None,

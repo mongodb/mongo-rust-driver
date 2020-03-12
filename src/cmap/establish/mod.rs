@@ -25,11 +25,11 @@ impl ConnectionEstablisher {
     }
 
     /// Establishes a connection.
-    pub(super) fn establish_connection(&self, connection: &mut Connection) -> Result<()> {
-        self.handshaker.handshake(connection)?;
+    pub(super) async fn establish_connection(&self, connection: &mut Connection) -> Result<()> {
+        self.handshaker.handshake(connection).await?;
 
         if let Some(ref credential) = self.credential {
-            credential.authenticate_stream(connection)?;
+            credential.authenticate_stream(connection).await?;
         }
 
         Ok(())

@@ -122,15 +122,14 @@ impl Client {
 
         let start_time = PreciseTime::now();
 
-        let response_result =
-            connection
-                .send_command(cmd.clone(), request_id)
-                .and_then(|response| {
-                    if !op.handles_command_errors() {
-                        response.validate()?;
-                    }
-                    Ok(response)
-                });
+        let response_result = RUNTIME
+            .block_on(connection.send_command(cmd.clone(), request_id))
+            .and_then(|response| {
+                if !op.handles_command_errors() {
+                    response.validate()?;
+                }
+                Ok(response)
+            });
 
         let end_time = PreciseTime::now();
         let duration = start_time.to(end_time).to_std()?;

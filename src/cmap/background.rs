@@ -59,7 +59,7 @@ impl ConnectionPool {
             loop {
                 let mut connection_manager = self.inner.connection_manager.lock().await;
                 if connection_manager.total_connection_count < min_pool_size {
-                    match connection_manager.create_connection() {
+                    match connection_manager.create_connection().await {
                         Ok(connection) => {
                             connection_manager.checked_in_connections.push(connection)
                         }

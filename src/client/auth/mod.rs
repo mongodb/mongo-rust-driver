@@ -124,15 +124,21 @@ impl AuthMechanism {
         }
     }
 
-    pub(crate) fn authenticate_stream(
+    pub(crate) async fn authenticate_stream(
         &self,
         stream: &mut Connection,
         credential: &Credential,
     ) -> Result<()> {
         match self {
-            AuthMechanism::ScramSha1 => ScramVersion::Sha1.authenticate_stream(stream, credential),
+            AuthMechanism::ScramSha1 => {
+                ScramVersion::Sha1
+                    .authenticate_stream(stream, credential)
+                    .await
+            }
             AuthMechanism::ScramSha256 => {
-                ScramVersion::Sha256.authenticate_stream(stream, credential)
+                ScramVersion::Sha256
+                    .authenticate_stream(stream, credential)
+                    .await
             }
             AuthMechanism::MongoDbCr => Err(ErrorKind::AuthenticationError {
                 message: "MONGODB-CR is deprecated and not supported by this driver. Use SCRAM \
@@ -242,7 +248,7 @@ impl Credential {
     /// Attempts to authenticate a stream according this credential, returning an error
     /// result on failure. A mechanism may be negotiated if one is not provided as part of the
     /// credential.
-    pub(crate) fn authenticate_stream(&self, conn: &mut Connection) -> Result<()> {
+    pub(crate) async fn authenticate_stream(&self, conn: &mut Connection) -> Result<()> {
         let stream_description = conn.stream_description()?;
 
         // Verify server can authenticate.
@@ -256,7 +262,7 @@ impl Credential {
         };
 
         // Authenticate according to the chosen mechanism.
-        mechanism.authenticate_stream(conn, self)
+        mechanism.authenticate_stream(conn, self).await
     }
 }
 

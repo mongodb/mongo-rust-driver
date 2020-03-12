@@ -1,8 +1,9 @@
-use std::io::{Read, Write};
+use tokio_byteorder::{AsyncReadBytesExt, AsyncWriteBytesExt, LittleEndian};
 
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-
-use crate::error::{ErrorKind, Result};
+use crate::{
+    error::{ErrorKind, Result},
+    runtime::AsyncStream,
+};
 
 /// The wire protocol op codes.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -40,22 +41,24 @@ impl Header {
     pub(crate) const LENGTH: usize = 4 * std::mem::size_of::<i32>();
 
     /// Serializes the Header and writes the bytes to `w`.
-    pub(crate) fn write_to<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_i32::<LittleEndian>(self.length)?;
-        writer.write_i32::<LittleEndian>(self.request_id)?;
-        writer.write_i32::<LittleEndian>(self.response_to)?;
-        writer.write_i32::<LittleEndian>(self.op_code as i32)?;
+    pub(crate) async fn write_to(&self, stream: &mut AsyncStream) -> Result<()> {
+        stream.write_i32::<LittleEndian>(self.length).await?;
+        stream.write_i32::<LittleEndian>(self.request_id).await?;
+        stream.write_i32::<LittleEndian>(self.response_to).await?;
+        stream
+            .write_i32::<LittleEndian>(self.op_code as i32)
+            .await?;
 
         Ok(())
     }
 
     /// Reads bytes from `r` and deserializes them into a header.
-    pub(crate) fn read_from<R: Read>(reader: &mut R) -> Result<Self> {
+    pub(crate) async fn read_from(stream: &mut AsyncStream) -> Result<Self> {
         Ok(Self {
-            length: reader.read_i32::<LittleEndian>()?,
-            request_id: reader.read_i32::<LittleEndian>()?,
-            response_to: reader.read_i32::<LittleEndian>()?,
-            op_code: OpCode::from_i32(reader.read_i32::<LittleEndian>()?)?,
+            length: stream.read_i32::<LittleEndian>().await?,
+            request_id: stream.read_i32::<LittleEndian>().await?,
+            response_to: stream.read_i32::<LittleEndian>().await?,
+            op_code: OpCode::from_i32(stream.read_i32::<LittleEndian>().await?)?,
         })
     }
 }

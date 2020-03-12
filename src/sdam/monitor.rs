@@ -98,7 +98,7 @@ impl Monitor {
     async fn check_server(&mut self) -> ServerDescription {
         let address = self.address.clone();
 
-        match self.perform_is_master() {
+        match self.perform_is_master().await {
             Ok(reply) => ServerDescription::new(address, Some(Ok(reply))),
             Err(e) => {
                 self.clear_connection_pool().await;
@@ -107,14 +107,14 @@ impl Monitor {
                     return ServerDescription::new(address, Some(Err(e)));
                 }
 
-                ServerDescription::new(address, Some(self.perform_is_master()))
+                ServerDescription::new(address, Some(self.perform_is_master().await))
             }
         }
     }
 
-    fn perform_is_master(&mut self) -> Result<IsMasterReply> {
-        let connection = self.resolve_connection()?;
-        let result = is_master(connection);
+    async fn perform_is_master(&mut self) -> Result<IsMasterReply> {
+        let connection = self.resolve_connection().await?;
+        let result = is_master(connection).await;
 
         if result
             .as_ref()
@@ -128,7 +128,7 @@ impl Monitor {
         result
     }
 
-    fn resolve_connection(&mut self) -> Result<&mut Connection> {
+    async fn resolve_connection(&mut self) -> Result<&mut Connection> {
         if let Some(ref mut connection) = self.connection {
             return Ok(connection);
         }
@@ -137,7 +137,8 @@ impl Monitor {
             self.address.clone(),
             self.options.connect_timeout,
             self.options.tls_options(),
-        )?;
+        )
+        .await?;
 
         // Since the connection was not `Some` above, this will always insert the new connection and
         // return a reference to it.
@@ -151,7 +152,7 @@ impl Monitor {
     }
 }
 
-fn is_master(connection: &mut Connection) -> Result<IsMasterReply> {
+async fn is_master(connection: &mut Connection) -> Result<IsMasterReply> {
     let command = Command::new_read(
         "isMaster".into(),
         "admin".into(),
@@ -160,7 +161,7 @@ fn is_master(connection: &mut Connection) -> Result<IsMasterReply> {
     );
 
     let start_time = PreciseTime::now();
-    let command_response = connection.send_command(command, None)?;
+    let command_response = connection.send_command(command, None).await?;
     let end_time = PreciseTime::now();
 
     let command_response = command_response.body()?;

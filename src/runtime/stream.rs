@@ -12,7 +12,7 @@ use tokio_rustls::TlsConnector;
 use webpki::DNSNameRef;
 
 use crate::{
-    cmap::conn::StreamOptions,
+    cmap::options::StreamOptions,
     error::{ErrorKind, Result},
     options::StreamAddress,
 };
@@ -23,6 +23,8 @@ const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub(crate) enum AsyncStream {
+    Null,
+
     /// A basic TCP connection to the server.
     Tcp(AsyncTcpStream),
 
@@ -119,7 +121,7 @@ impl AsyncTcpStream {
 
 impl AsyncStream {
     /// Creates a new Tokio TCP stream connected to the server as specified by `options`.
-    pub(super) async fn connect(options: StreamOptions) -> Result<Self> {
+    pub(crate) async fn connect(options: StreamOptions) -> Result<Self> {
         let inner = AsyncTcpStream::connect(&options.address, options.connect_timeout).await?;
 
         // If there are TLS options, wrap the inner stream with rustls.
@@ -146,6 +148,7 @@ impl AsyncRead for AsyncStream {
         buf: &mut [u8],
     ) -> Poll<tokio::io::Result<usize>> {
         match self.deref_mut() {
+            Self::Null => Poll::Ready(Ok(0)),
             Self::Tcp(ref mut inner) => Pin::new(inner).poll_read(cx, buf),
             Self::Tls(ref mut inner) => Pin::new(inner).poll_read(cx, buf),
         }
@@ -159,6 +162,7 @@ impl AsyncWrite for AsyncStream {
         buf: &[u8],
     ) -> Poll<tokio::io::Result<usize>> {
         match self.deref_mut() {
+            Self::Null => Poll::Ready(Ok(0)),
             Self::Tcp(ref mut inner) => Pin::new(inner).poll_write(cx, buf),
             Self::Tls(ref mut inner) => Pin::new(inner).poll_write(cx, buf),
         }
@@ -166,6 +170,7 @@ impl AsyncWrite for AsyncStream {
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<tokio::io::Result<()>> {
         match self.deref_mut() {
+            Self::Null => Poll::Ready(Ok(())),
             Self::Tcp(ref mut inner) => Pin::new(inner).poll_flush(cx),
             Self::Tls(ref mut inner) => Pin::new(inner).poll_flush(cx),
         }
@@ -176,6 +181,7 @@ impl AsyncWrite for AsyncStream {
         cx: &mut Context<'_>,
     ) -> Poll<tokio::io::Result<()>> {
         match self.deref_mut() {
+            Self::Null => Poll::Ready(Ok(())),
             Self::Tcp(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
             Self::Tls(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
         }

@@ -39,7 +39,7 @@ async fn acquire_connection_and_send_command() {
         Some(read_pref),
         body,
     );
-    let response = connection.send_command(cmd, None).unwrap();
+    let response = connection.send_command(cmd, None).await.unwrap();
 
     assert!(response.is_success());
 
