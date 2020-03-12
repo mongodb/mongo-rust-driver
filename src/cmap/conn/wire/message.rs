@@ -7,7 +7,7 @@ use super::{
     util::CountReader,
 };
 use crate::{
-    bson_util::{async_decode, async_encode},
+    bson_util::async_encoding,
     cmap::conn::command::Command,
     error::{ErrorKind, Result},
     runtime::AsyncStream,
@@ -79,7 +79,7 @@ impl Message {
         let header = Header::read_from(reader).await?;
         let mut length_remaining = header.length - Header::LENGTH as i32;
 
-        let flags = MessageFlags::from_bits_truncate(async_decode::read_u32(reader).await?);
+        let flags = MessageFlags::from_bits_truncate(reader.read_u32().await?);
         length_remaining -= std::mem::size_of::<u32>() as i32;
 
         let mut count_reader = CountReader::new(reader);
@@ -94,7 +94,7 @@ impl Message {
         let mut checksum = None;
 
         if length_remaining == 4 && flags.contains(MessageFlags::CHECKSUM_PRESENT) {
-            checksum = Some(async_decode::read_u32(reader).await?);
+            checksum = Some(reader.read_u32().await?);
         } else if length_remaining != 0 {
             return Err(ErrorKind::OperationError {
                 message: format!(
@@ -181,11 +181,11 @@ impl MessageSection {
 
         if payload_type == 0 {
             return Ok(MessageSection::Document(
-                async_decode::decode_document(reader).await?,
+                async_encoding::decode_document(reader).await?,
             ));
         }
 
-        let size = async_decode::read_i32(reader).await?;
+        let size = reader.read_i32().await?;
         let mut length_remaining = size - std::mem::size_of::<i32>() as i32;
 
         let mut identifier = String::new();
@@ -195,7 +195,7 @@ impl MessageSection {
         let mut count_reader = CountReader::new(reader);
 
         while length_remaining > count_reader.bytes_read() as i32 {
-            documents.push(async_decode::decode_document(&mut count_reader).await?);
+            documents.push(async_encoding::decode_document(&mut count_reader).await?);
         }
 
         if length_remaining != count_reader.bytes_read() as i32 {
@@ -222,8 +222,8 @@ impl MessageSection {
         match self {
             Self::Document(doc) => {
                 // Write payload type.
-                async_encode::write_u8(writer, 0).await?;
-                async_encode::encode_document(writer, doc).await?;
+                writer.write_u8(0).await?;
+                async_encoding::encode_document(writer, doc).await?;
             }
             Self::Sequence {
                 size,
@@ -231,13 +231,13 @@ impl MessageSection {
                 documents,
             } => {
                 // Write payload type.
-                async_encode::write_u8(writer, 1).await?;
+                writer.write_u8(1).await?;
 
-                async_encode::write_i32(writer, *size).await?;
+                writer.write_i32(*size).await?;
                 super::util::write_cstring(writer, identifier).await?;
 
                 for doc in documents {
-                    async_encode::encode_document(writer, doc).await?;
+                    async_encoding::encode_document(writer, doc).await?;
                 }
             }
         }

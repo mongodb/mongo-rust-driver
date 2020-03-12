@@ -1,5 +1,6 @@
+use tokio_byteorder::{AsyncReadBytesExt, AsyncWriteBytesExt, LittleEndian};
+
 use crate::{
-    bson_util::{async_decode, async_encode},
     error::{ErrorKind, Result},
     runtime::AsyncStream,
 };
@@ -41,10 +42,12 @@ impl Header {
 
     /// Serializes the Header and writes the bytes to `w`.
     pub(crate) async fn write_to(&self, stream: &mut AsyncStream) -> Result<()> {
-        async_encode::write_i32(stream, self.length).await?;
-        async_encode::write_i32(stream, self.request_id).await?;
-        async_encode::write_i32(stream, self.response_to).await?;
-        async_encode::write_i32(stream, self.op_code as i32).await?;
+        stream.write_i32::<LittleEndian>(self.length).await?;
+        stream.write_i32::<LittleEndian>(self.request_id).await?;
+        stream.write_i32::<LittleEndian>(self.response_to).await?;
+        stream
+            .write_i32::<LittleEndian>(self.op_code as i32)
+            .await?;
 
         Ok(())
     }
@@ -52,10 +55,10 @@ impl Header {
     /// Reads bytes from `r` and deserializes them into a header.
     pub(crate) async fn read_from(stream: &mut AsyncStream) -> Result<Self> {
         Ok(Self {
-            length: async_decode::read_i32(stream).await?,
-            request_id: async_decode::read_i32(stream).await?,
-            response_to: async_decode::read_i32(stream).await?,
-            op_code: OpCode::from_i32(async_decode::read_i32(stream).await?)?,
+            length: stream.read_i32::<LittleEndian>().await?,
+            request_id: stream.read_i32::<LittleEndian>().await?,
+            response_to: stream.read_i32::<LittleEndian>().await?,
+            op_code: OpCode::from_i32(stream.read_i32::<LittleEndian>().await?)?,
         })
     }
 }

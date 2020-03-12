@@ -1,5 +1,4 @@
-pub(crate) mod async_decode;
-pub(crate) mod async_encode;
+pub(crate) mod async_encoding;
 
 use std::time::Duration;
 
