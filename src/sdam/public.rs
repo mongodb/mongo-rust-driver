@@ -64,7 +64,7 @@ impl<'a> ServerInfo<'a> {
 
     /// Gets the name of the replica set that the server is part of.
     pub fn replica_set_name(&self) -> Option<&str> {
-        self.command_response_getter(|r| r.set_name.as_ref().map(String::as_str))
+        self.command_response_getter(|r| r.set_name.as_deref())
     }
 
     /// Gets the version of the replica set that the server is part of.
