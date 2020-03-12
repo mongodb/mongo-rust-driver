@@ -61,7 +61,7 @@ impl IsMasterCommandResponse {
     pub(crate) fn server_type(&self) -> ServerType {
         if self.ok != Some(1.0) {
             ServerType::Unknown
-        } else if self.msg.as_ref().map(String::as_str) == Some("isdbgrid") {
+        } else if self.msg.as_deref() == Some("isdbgrid") {
             ServerType::Mongos
         } else if self.set_name.is_some() {
             if let Some(true) = self.hidden {

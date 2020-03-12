@@ -839,7 +839,7 @@ impl ClientOptionsParser {
             }
         }
 
-        let db_str = db.as_ref().map(String::as_str);
+        let db_str = db.as_deref();
 
         match options.auth_mechanism {
             Some(ref mechanism) => {

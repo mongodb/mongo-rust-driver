@@ -27,7 +27,7 @@ pub(crate) fn to_bson_array(docs: &[Document]) -> Bson {
 
 #[cfg(test)]
 pub(crate) fn sort_document(document: &mut Document) {
-    let temp = std::mem::replace(document, Default::default());
+    let temp = std::mem::take(document);
 
     let mut elements: Vec<_> = temp.into_iter().collect();
     elements.sort_by(|e1, e2| e1.0.cmp(&e2.0));
