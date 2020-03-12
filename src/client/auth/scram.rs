@@ -299,7 +299,7 @@ fn h_i<M: Mac + Sync>(str: &str, salt: &[u8], iterations: usize, output_size: us
 
 /// Parses a string slice of the form "<expected_key>=<body>" into "<body>", if possible.
 fn parse_kvp(str: &str, expected_key: char) -> Result<String> {
-    if str.chars().nth(0) != Some(expected_key) || str.chars().nth(1) != Some('=') {
+    if !str.starts_with(expected_key) || str.chars().nth(1) != Some('=') {
         Err(Error::invalid_authentication_response("SCRAM"))
     } else {
         Ok(str.chars().skip(2).collect())
@@ -569,7 +569,7 @@ impl ServerFinal {
 
         let first = message
             .chars()
-            .nth(0)
+            .next()
             .ok_or_else(|| Error::invalid_authentication_response("SCRAM"))?;
         let body = if first == ERROR_KEY {
             let error = parse_kvp(message, ERROR_KEY)?;
