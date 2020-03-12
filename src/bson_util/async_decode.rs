@@ -14,7 +14,7 @@ pub(crate) async fn decode_document<R: AsyncRead + Unpin + Send>(
 ) -> DecoderResult<Document> {
     let mut doc = Document::new();
 
-    // disregard the length: using Read::take causes infinite type recursion
+    // disregard the length
     read_i32(reader).await?;
 
     loop {
@@ -103,7 +103,7 @@ async fn decode_array<R: AsyncRead + Unpin + Send>(
 ) -> DecoderResult<Array> {
     let mut arr = Array::new();
 
-    // disregard the length: using Read::take causes infinite type recursion
+    // disregard the length
     read_i32(reader).await?;
 
     loop {
@@ -176,8 +176,7 @@ fn decode_bson<R: AsyncRead + Unpin + Send>(
                 .await
                 .map(Bson::JavaScriptCode),
             Some(JavaScriptCodeWithScope) => {
-                // disregard the length:
-                //     using Read::take causes infinite type recursion
+                // disregard the length
                 read_i32(reader).await?;
 
                 let code = read_string(reader, utf8_lossy).await?;
