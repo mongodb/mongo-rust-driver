@@ -55,12 +55,11 @@ impl WaitQueue {
         let future = self.semaphore.acquire(1);
 
         let releaser = if let Some(timeout) = self.timeout {
-            RUNTIME
-                .await_with_timeout(Box::pin(future), timeout)
-                .await
-                .map_err(|_| ErrorKind::WaitQueueTimeoutError {
+            RUNTIME.timeout(timeout, future).await.map_err(|_| {
+                ErrorKind::WaitQueueTimeoutError {
                     address: self.address.clone(),
-                })?
+                }
+            })?
         } else {
             future.await
         };

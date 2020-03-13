@@ -1,12 +1,18 @@
+mod async_read_ext;
+mod async_write_ext;
 mod join_handle;
+mod resolver;
 mod stream;
 
 use std::{future::Future, time::Duration};
 
-use futures::future::{self, Either};
-use futures_timer::Delay;
-
-pub(crate) use self::{join_handle::AsyncJoinHandle, stream::AsyncStream};
+pub(crate) use self::{
+    async_read_ext::AsyncLittleEndianRead,
+    async_write_ext::AsyncLittleEndianWrite,
+    join_handle::AsyncJoinHandle,
+    resolver::AsyncResolver,
+    stream::AsyncStream,
+};
 use crate::error::{ErrorKind, Result};
 
 /// An abstract handle to the async runtime.
@@ -75,20 +81,23 @@ impl AsyncRuntime {
     }
 
     /// Await on a future for a maximum amount of time before returning an error.
-    pub(crate) async fn await_with_timeout<F>(
+    pub(crate) async fn timeout<F: Future>(
         self,
-        future: F,
         timeout: Duration,
-    ) -> Result<F::Output>
-    where
-        F: Future + Send + Unpin,
-    {
-        match future::select(future, Delay::new(timeout)).await {
-            Either::Left((result, _)) => Ok(result),
-            Either::Right(_) => Err(ErrorKind::InternalError {
-                message: "Timed out waiting on future".to_string(),
-            }
-            .into()),
+        future: F,
+    ) -> Result<F::Output> {
+        #[cfg(feature = "tokio-runtime")]
+        {
+            tokio::time::timeout(timeout, future)
+                .await
+                .map_err(|e| ErrorKind::Io(e.into()).into())
+        }
+
+        #[cfg(feature = "async-std-runtime")]
+        {
+            async_std::future::timeout(timeout, future)
+                .await
+                .map_err(|_| ErrorKind::Io(std::io::ErrorKind::TimedOut.into()).into())
         }
     }
 }

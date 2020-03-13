@@ -1,27 +1,32 @@
-use bson::{DecoderResult, Document, EncoderResult};
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use tokio_byteorder::{AsyncReadBytesExt, AsyncWriteBytesExt, LittleEndian};
+use bson::Document;
+use futures::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+
+use crate::{
+    error::Result,
+    runtime::{AsyncLittleEndianRead, AsyncLittleEndianWrite},
+};
 
 pub(crate) async fn decode_document<R: AsyncRead + Unpin + Send>(
     reader: &mut R,
-) -> DecoderResult<Document> {
-    let length = AsyncReadBytesExt::read_i32::<LittleEndian>(reader).await?;
+) -> Result<Document> {
+    let length = reader.read_i32().await?;
 
     let mut bytes = Vec::new();
-    AsyncWriteBytesExt::write_i32::<LittleEndian>(&mut bytes, length).await?;
+    bytes.write_i32(length).await?;
 
     reader
         .take(length as u64 - 4)
         .read_to_end(&mut bytes)
         .await?;
 
-    bson::decode_document(&mut bytes.as_slice())
+    let document = bson::decode_document(&mut bytes.as_slice())?;
+    Ok(document)
 }
 
 pub(crate) async fn encode_document<W: AsyncWrite + Unpin + Send>(
     writer: &mut W,
     document: &Document,
-) -> EncoderResult<()> {
+) -> Result<()> {
     let mut bytes = Vec::new();
 
     bson::encode_document(&mut bytes, document)?;

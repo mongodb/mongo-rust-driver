@@ -47,6 +47,20 @@ impl Error {
     pub(crate) fn invalid_authentication_response(mechanism_name: &str) -> Error {
         Error::authentication_error(mechanism_name, "invalid server response")
     }
+
+    /// Attempts to get the `std::io::Error` from this `Error`.
+    /// If there are other references to the underlying `Arc`, or if the `ErrorKind` is not `Io`, then
+    /// the original error is returned as a custom `std::io::Error`.
+    pub(crate) fn into_io_error(self) -> std::io::Error {
+        match Arc::try_unwrap(self.kind) {
+            Ok(ErrorKind::Io(io_error)) => io_error,
+            Ok(other_error_kind) => {
+                let error: Error = other_error_kind.into();
+                std::io::Error::new(std::io::ErrorKind::Other, Box::new(error))
+            }
+            Err(e) => std::io::Error::new(std::io::ErrorKind::Other, Box::new(Error { kind: e }))
+        }
+    }
 }
 
 impl<E> From<E> for Error
