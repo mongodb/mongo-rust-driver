@@ -110,7 +110,7 @@ Currently, the driver has issues connecting to Atlas tiers above M2 unless the s
 ## Bug Reporting / Feature Requests
 To file a bug report or submit a feature request, please open a ticket on our [Jira project](https://jira.mongodb.org/browse/RUST):
 - Create an account and login at [jira.mongodb.org](https://jira.mongodb.org)
-- Navigate to the RUST project at [jira.mongorb.org/browse/RUST](https://jira.mongodb.org/browse/RUST)
+- Navigate to the RUST project at [jira.mongodb.org/browse/RUST](https://jira.mongodb.org/browse/RUST)
 - Click **Create Issue** - If the ticket you are filing is a bug report, please include as much detail as possible about the issue and how to reproduce it.
 
 Before filing a ticket, please use the search functionality of Jira to see if a similar issue has already been filed.
@@ -121,7 +121,7 @@ We encourage and would happily accept contributions in the form of GitHub pull r
 
 ## Running the tests
 ### Integration and unit tests
-In order to run the tests (which are mostly integration tests), you must have access to a MongoDB deployment. You may specify a [MongoDB connection string](https://docs.mongodb.com/manual/reference/connection-string/) in the `MONGODB_URI` environment variable, and the the tests will use it to connect to the deployment. If `MONGODB_URI` is unset, the tests will attempt to connect to a local deployment on port 27017.
+In order to run the tests (which are mostly integration tests), you must have access to a MongoDB deployment. You may specify a [MongoDB connection string](https://docs.mongodb.com/manual/reference/connection-string/) in the `MONGODB_URI` environment variable, and the tests will use it to connect to the deployment. If `MONGODB_URI` is unset, the tests will attempt to connect to a local deployment on port 27017.
 
 **Note:** The integration tests will clear out the databases/collections they need to use, but they do not clean up after themselves. 
 
@@ -136,7 +136,7 @@ cargo test --verbose # runs against localhost:123
 The authentication tests will only be included in the test run if certain requirements are met: 
 - The deployment must have `--auth` enabled
 - Credentials must be specified in `MONGODB_URI`
-- The credentials specified in `MONGODB_URI` must be valid and have root privledges on the deployment
+- The credentials specified in `MONGODB_URI` must be valid and have root privileges on the deployment
 ```bash
 export MONGODB_URI="mongodb://user:pass@localhost:27017"
 cargo test --verbose # auth tests included
