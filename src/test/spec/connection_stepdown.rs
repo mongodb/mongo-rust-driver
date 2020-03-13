@@ -1,4 +1,3 @@
-use assert_matches::assert_matches;
 use bson::{bson, doc};
 
 use crate::{
@@ -119,9 +118,11 @@ async fn not_master_keep_pool() {
             .unwrap();
 
         let result = coll.insert_one(doc! { "test": 1 }, None);
-        assert_matches!(
-            result.as_ref().map_err(|e| e.as_ref()),
-            Err(ErrorKind::CommandError(CommandError { code: 10107, .. })),
+        assert!(
+            matches!(
+                result.as_ref().map_err(|e| e.as_ref()),
+                Err(ErrorKind::CommandError(CommandError { code: 10107, .. }))
+            ),
             "insert should have failed"
         );
 
@@ -160,9 +161,11 @@ async fn not_master_reset_pool() {
             .unwrap();
 
         let result = coll.insert_one(doc! { "test": 1 }, None);
-        assert_matches!(
-            result.as_ref().map_err(|e| e.as_ref()),
-            Err(ErrorKind::CommandError(CommandError { code: 10107, .. })),
+        assert!(
+            matches!(
+                result.as_ref().map_err(|e| e.as_ref()),
+                Err(ErrorKind::CommandError(CommandError { code: 10107, .. }))
+            ),
             "insert should have failed"
         );
 
@@ -200,9 +203,11 @@ async fn shutdown_in_progress() {
             .unwrap();
 
         let result = coll.insert_one(doc! { "test": 1 }, None);
-        assert_matches!(
-            result.as_ref().map_err(|e| e.as_ref()),
-            Err(ErrorKind::CommandError(CommandError { code: 91, .. })),
+        assert!(
+            matches!(
+                result.as_ref().map_err(|e| e.as_ref()),
+                Err(ErrorKind::CommandError(CommandError { code: 91, .. }))
+            ),
             "insert should have failed"
         );
 
@@ -240,9 +245,11 @@ async fn interrupted_at_shutdown() {
             .unwrap();
 
         let result = coll.insert_one(doc! { "test": 1 }, None);
-        assert_matches!(
-            result.as_ref().map_err(|e| e.as_ref()),
-            Err(ErrorKind::CommandError(CommandError { code: 11600, .. })),
+        assert!(
+            matches!(
+                result.as_ref().map_err(|e| e.as_ref()),
+                Err(ErrorKind::CommandError(CommandError { code: 11600, .. }))
+            ),
             "insert should have failed"
         );
 

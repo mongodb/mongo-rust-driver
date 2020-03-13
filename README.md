@@ -18,7 +18,7 @@ This repository contains the officially supported MongoDB Rust driver, a client 
 
 ## Installation
 ### Requirements
- - Rust 1.39+
+ - Rust 1.42+
 - MongoDB 3.6+
 
 ### Importing
