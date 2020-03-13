@@ -1,15 +1,15 @@
 use trust_dns_resolver::{
-    error::{ResolveError, ResolveErrorKind},
-    Resolver,
+    error::ResolveErrorKind
 };
 
 use crate::{
-    error::{ErrorKind, Result},
+    error::{ErrorKind, Error, Result},
     options::StreamAddress,
+    runtime::AsyncResolver,
 };
 
 pub(crate) struct SrvResolver {
-    resolver: Resolver,
+    resolver: AsyncResolver,
 }
 
 #[derive(Debug)]
@@ -20,26 +20,26 @@ pub(crate) struct ResolvedConfig {
 }
 
 impl SrvResolver {
-    pub(crate) fn new() -> Result<Self> {
-        let resolver = Resolver::new(Default::default(), Default::default())?;
+    pub(crate) async fn new() -> Result<Self> {
+        let resolver = AsyncResolver::new().await?;
 
         Ok(Self { resolver })
     }
 
-    pub(crate) fn resolve_client_options(&self, hostname: &str) -> Result<ResolvedConfig> {
-        let hosts = self.get_srv_hosts(hostname)?;
+    pub(crate) async fn resolve_client_options(&self, hostname: &str) -> Result<ResolvedConfig> {
+        let hosts = self.get_srv_hosts(hostname).await?;
         let mut config = ResolvedConfig {
             hosts,
             auth_source: None,
             replica_set: None,
         };
 
-        self.get_txt_options(&hostname, &mut config)?;
+        self.get_txt_options(&hostname, &mut config).await?;
 
         Ok(config)
     }
 
-    fn get_srv_hosts(&self, original_hostname: &str) -> Result<Vec<StreamAddress>> {
+    async fn get_srv_hosts(&self, original_hostname: &str) -> Result<Vec<StreamAddress>> {
         let hostname_parts: Vec<_> = original_hostname.split('.').collect();
 
         if hostname_parts.len() < 3 {
@@ -56,7 +56,8 @@ impl SrvResolver {
 
         let mut srv_addresses: Vec<_> = self
             .resolver
-            .srv_lookup(&lookup_hostname)?
+            .srv_lookup(lookup_hostname.as_str())
+            .await?
             .iter()
             .map(|record| {
                 let hostname = record.target().to_utf8();
@@ -100,8 +101,8 @@ impl SrvResolver {
         Ok(srv_addresses)
     }
 
-    fn get_txt_options(&self, original_hostname: &str, config: &mut ResolvedConfig) -> Result<()> {
-        let txt_records_response = match self.resolver.txt_lookup(original_hostname) {
+    async fn get_txt_options(&self, original_hostname: &str, config: &mut ResolvedConfig) -> Result<()> {
+        let txt_records_response = match self.resolver.txt_lookup(original_hostname).await {
             Ok(response) => response,
             Err(e) => return ignore_no_records(e),
         };
@@ -168,9 +169,9 @@ impl SrvResolver {
     }
 }
 
-fn ignore_no_records(error: ResolveError) -> Result<()> {
-    match error.kind() {
-        ResolveErrorKind::NoRecordsFound { .. } => Ok(()),
-        _ => Err(error.into()),
+fn ignore_no_records(error: Error) -> Result<()> {
+    match error.kind.as_ref() {
+        ErrorKind::DnsResolve(resolve_error) if matches!(resolve_error.kind(), ResolveErrorKind::NoRecordsFound { .. }) => Ok(()),
+        _ => Err(error),
     }
 }

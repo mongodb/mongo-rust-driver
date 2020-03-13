@@ -35,6 +35,7 @@ use crate::{
     sdam::MIN_HEARTBEAT_FREQUENCY,
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
     srv::SrvResolver,
+    RUNTIME,
 };
 
 const DEFAULT_PORT: u16 = 27017;
@@ -466,7 +467,7 @@ impl TlsOptions {
                 }
             };
 
-            // TODO: Get rid of unwrap
+            // TODO: Get rid of unwrap.
             config.set_single_client_cert(certs, key.into_iter().next().unwrap())?;
         }
 
@@ -564,8 +565,9 @@ impl ClientOptions {
         let mut options: Self = parser.into();
 
         if srv {
-            let resolver = SrvResolver::new()?;
-            let mut config = resolver.resolve_client_options(&options.hosts[0].hostname)?;
+            let resolver = RUNTIME.block_on(SrvResolver::new())?;
+            let mut config =
+                RUNTIME.block_on(resolver.resolve_client_options(&options.hosts[0].hostname))?;
 
             // Set the ClientOptions hosts to those found during the SRV lookup.
             options.hosts = config.hosts;

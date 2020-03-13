@@ -4,7 +4,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use tokio::io::{self, AsyncRead, AsyncWrite, AsyncWriteExt};
+use futures::io::{self, AsyncRead, AsyncWrite, AsyncWriteExt};
 
 use crate::error::Result;
 
@@ -33,7 +33,7 @@ pub(super) async fn write_cstring<W: AsyncWrite + Unpin>(
     Ok(())
 }
 
-/// A wrapper around `tokio::io::AsyncRead` that keeps track of the number of bytes it has read.
+/// A wrapper around `futures::io::AsyncRead` that keeps track of the number of bytes it has read.
 pub(super) struct CountReader<'a, R: AsyncRead + Unpin + Send + 'a> {
     reader: &'a mut R,
     bytes_read: usize,
