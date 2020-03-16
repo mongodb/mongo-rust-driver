@@ -20,5 +20,5 @@ tmpdir=`perl -MFile::Temp=tempdir -wle 'print tempdir(TMPDIR => 1, CLEANUP => 0)
 curl -sL https://github.com/mongodb/specifications/archive/master.zip -o "$tmpdir/specs.zip"
 unzip -d "$tmpdir" "$tmpdir/specs.zip" > /dev/null
 mkdir -p "src/test/spec/json/$1"
-rsync -ah "$tmpdir/specifications-master/source/$1/tests/" "src/test/spec/json/$1"
+rsync -ah "$tmpdir/specifications-master/source/$1/tests/" "src/test/spec/json/$1" --delete
 rm -rf "$tmpdir"
