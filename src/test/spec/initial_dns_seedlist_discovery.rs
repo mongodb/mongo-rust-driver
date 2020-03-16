@@ -1,4 +1,3 @@
-use assert_matches::assert_matches;
 use serde::Deserialize;
 
 use crate::{options::ClientOptions, test::run_spec_test};
@@ -38,11 +37,11 @@ async fn run() {
         let result = ClientOptions::parse(&test_file.uri);
 
         if let Some(true) = test_file.error {
-            assert_matches!(result, Err(_));
+            assert!(matches!(result, Err(_)));
             return;
         }
 
-        assert_matches!(result, Ok(_));
+        assert!(matches!(result, Ok(_)));
 
         let options = result.unwrap();
 
