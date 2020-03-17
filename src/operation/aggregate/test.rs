@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::{bson, doc, Document};
+use bson::{doc, Document};
 
 use super::AggregateTarget;
 use crate::{

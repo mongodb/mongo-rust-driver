@@ -1,4 +1,4 @@
-use bson::{bson, doc};
+use bson::doc;
 use pretty_assertions::assert_eq;
 
 use crate::{

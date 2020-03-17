@@ -1,7 +1,7 @@
 use std::cmp::Ord;
 
 use approx::assert_ulps_eq;
-use bson::{bson, doc, Bson, Document};
+use bson::{doc, Bson, Document};
 use serde::Deserialize;
 
 use crate::{

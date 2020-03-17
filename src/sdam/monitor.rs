@@ -1,6 +1,6 @@
 use std::{sync::Weak, time::Duration};
 
-use bson::{bson, doc};
+use bson::doc;
 use lazy_static::lazy_static;
 use time::PreciseTime;
 

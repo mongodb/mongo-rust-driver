@@ -3,7 +3,7 @@ pub mod options;
 
 use std::{fmt, sync::Arc};
 
-use bson::{bson, doc, Bson, Document};
+use bson::{doc, Bson, Document};
 use serde::{de::Error, Deserialize, Deserializer};
 
 use self::options::*;

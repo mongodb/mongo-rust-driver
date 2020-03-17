@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, time::Duration};
 
-use bson::{bson, doc, Document};
+use bson::{doc, Document};
 
 use crate::{error::Result, operation::GetMore, options::StreamAddress, Client, Namespace};
 

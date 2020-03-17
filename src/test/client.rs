@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::HashMap, time::Duration};
 
-use bson::{bson, doc, Bson};
+use bson::{doc, Bson};
 use serde::Deserialize;
 
 use crate::{
