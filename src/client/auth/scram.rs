@@ -594,13 +594,6 @@ impl ServerFinal {
         client_final: &ClientFinal,
         scram: &ScramVersion,
     ) -> Result<()> {
-        if self.done {
-            return Err(Error::authentication_error(
-                "SCRAM",
-                "handshake terminated early",
-            ));
-        };
-
         if self.conversation_id != client_final.conversation_id {
             return Err(Error::authentication_error(
                 "SCRAM",
