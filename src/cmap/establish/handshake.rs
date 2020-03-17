@@ -1,4 +1,4 @@
-use bson::{bson, doc, Document};
+use bson::{doc, Document};
 use lazy_static::lazy_static;
 use os_info::{Type, Version};
 

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::{bson, doc, oid::ObjectId, Bson, Document};
+use bson::{doc, oid::ObjectId, Bson, Document};
 use serde::{ser, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::error::{ErrorKind, Result};
@@ -207,7 +207,7 @@ fn num_decimal_digits(n: usize) -> usize {
 
 #[cfg(test)]
 mod test {
-    use bson::{bson, doc, oid::ObjectId, spec::BinarySubtype, Bson};
+    use bson::{doc, oid::ObjectId, spec::BinarySubtype, Bson};
     use chrono::{DateTime, NaiveDateTime, Utc};
 
     use super::doc_size_bytes;

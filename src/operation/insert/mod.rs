@@ -3,7 +3,7 @@ mod test;
 
 use std::collections::HashMap;
 
-use bson::{bson, doc, Document};
+use bson::{doc, Document};
 
 use crate::{
     bson_util,

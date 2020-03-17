@@ -1,5 +1,5 @@
 use assert_matches::assert_matches;
-use bson::{bson, doc};
+use bson::doc;
 
 use crate::{
     error::{CommandError, ErrorKind},

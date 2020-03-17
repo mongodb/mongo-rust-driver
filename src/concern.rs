@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use bson::{bson, doc};
+use bson::doc;
 use serde::{Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
