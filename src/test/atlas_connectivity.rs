@@ -1,4 +1,4 @@
-use bson::{bson, doc};
+use bson::doc;
 
 use crate::Client;
 

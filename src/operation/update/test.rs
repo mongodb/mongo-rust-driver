@@ -1,6 +1,6 @@
 use pretty_assertions::assert_eq;
 
-use bson::{bson, doc, Bson};
+use bson::{doc, Bson};
 
 use crate::{
     bson_util,

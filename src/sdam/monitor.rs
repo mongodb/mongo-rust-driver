@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use bson::{bson, doc};
+use bson::doc;
 use futures_timer::Delay;
 use time::PreciseTime;
 

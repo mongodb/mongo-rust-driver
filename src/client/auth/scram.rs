@@ -7,7 +7,7 @@ use std::{
     sync::RwLock,
 };
 
-use bson::{bson, doc, spec::BinarySubtype, Bson, Document};
+use bson::{doc, spec::BinarySubtype, Bson, Document};
 use hmac::{Hmac, Mac};
 use lazy_static::lazy_static;
 use md5::Md5;

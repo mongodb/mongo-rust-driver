@@ -3,7 +3,7 @@ mod test;
 
 use std::time::Duration;
 
-use bson::{bson, doc, Document};
+use bson::{doc, Document};
 use serde::Deserialize;
 
 use crate::{

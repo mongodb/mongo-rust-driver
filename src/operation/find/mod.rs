@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test;
 
-use bson::{bson, doc, Document};
+use bson::{doc, Document};
 
 use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
