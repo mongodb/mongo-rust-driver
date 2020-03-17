@@ -363,10 +363,14 @@ impl ClientFirst {
     }
 
     fn to_command(&self, scram: &ScramVersion) -> Document {
+        let options = doc! {
+            "skipEmptyExchange": true
+        };
         doc! {
             "saslStart": 1,
             "mechanism": scram.to_string(),
-            "payload": Bson::Binary(BinarySubtype::Generic, self.message().as_bytes().to_vec())
+            "payload": Bson::Binary(BinarySubtype::Generic, self.message().as_bytes().to_vec()),
+            "options": options
         }
     }
 }
