@@ -1,4 +1,4 @@
-use bson::{bson, doc, Bson};
+use bson::{doc, Bson};
 
 use super::message::{Message, MessageFlags, MessageSection};
 use crate::{

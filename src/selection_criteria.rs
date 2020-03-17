@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use bson::{bson, doc, Bson, Document};
+use bson::{doc, Bson, Document};
 use derivative::Derivative;
 
 use crate::{

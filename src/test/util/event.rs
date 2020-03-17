@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 
-use bson::{bson, doc};
+use bson::doc;
 
 use super::TestClient;
 use crate::{

@@ -10,7 +10,7 @@ pub use self::{
 
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
-use bson::{bson, doc, oid::ObjectId, Bson};
+use bson::{doc, oid::ObjectId, Bson};
 use semver::Version;
 use serde::Deserialize;
 

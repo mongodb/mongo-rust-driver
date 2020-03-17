@@ -1,4 +1,4 @@
-use bson::{bson, doc, Bson, Document};
+use bson::{doc, Bson, Document};
 use lazy_static::lazy_static;
 
 use crate::{

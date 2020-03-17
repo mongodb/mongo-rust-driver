@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::{bson, doc, oid::ObjectId, Bson};
+use bson::{doc, oid::ObjectId, Bson};
 
 use crate::{
     bson_util,
