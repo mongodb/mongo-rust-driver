@@ -7,7 +7,6 @@ use std::{
     fs::File,
     hash::{Hash, Hasher},
     io::{BufReader, Seek, SeekFrom},
-    net::{SocketAddr, ToSocketAddrs},
     str::FromStr,
     sync::Arc,
     time::Duration,
@@ -87,14 +86,6 @@ impl Hash for StreamAddress {
     {
         self.hostname.hash(state);
         self.port.unwrap_or(27017).hash(state);
-    }
-}
-
-impl ToSocketAddrs for StreamAddress {
-    type Iter = std::vec::IntoIter<SocketAddr>;
-
-    fn to_socket_addrs(&self) -> std::io::Result<Self::Iter> {
-        (self.hostname.as_str(), self.port.unwrap_or(27017)).to_socket_addrs()
     }
 }
 
