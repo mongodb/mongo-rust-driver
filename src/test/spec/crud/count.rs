@@ -33,10 +33,12 @@ fn run_count_test(test_file: TestFile) {
 
         test_case.description = test_case.description.replace('$', "%");
 
-        let coll = client.init_db_and_coll(function_name!(), &test_case.description);
+        let coll =
+            RUNTIME.block_on(client.init_db_and_coll(function_name!(), &test_case.description));
 
         if !data.is_empty() {
-            coll.insert_many(data.clone(), None)
+            RUNTIME
+                .block_on(coll.insert_many(data.clone(), None))
                 .expect(&test_case.description);
         }
 
@@ -47,7 +49,7 @@ fn run_count_test(test_file: TestFile) {
 
         if let Some(ref c) = outcome.collection {
             if let Some(ref name) = c.name {
-                client.drop_collection(function_name!(), name);
+                RUNTIME.block_on(client.drop_collection(function_name!(), name));
             }
         }
 
@@ -60,7 +62,7 @@ fn run_count_test(test_file: TestFile) {
                     .build();
                 coll.count_documents(arguments.filter.unwrap_or_default(), options)
             }
-            "estimatedDocumentCount" => coll.estimated_document_count(None),
+            "estimatedDocumentCount" => RUNTIME.block_on(coll.estimated_document_count(None)),
             other => panic!("unexpected count operation: {}", other),
         }
         .expect(&test_case.description);

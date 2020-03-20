@@ -37,8 +37,10 @@ fn run_insert_many_test(test_file: TestFile) {
 
         let _guard = LOCK.run_concurrently();
 
-        let coll = client.init_db_and_coll(function_name!(), &test_case.description);
-        coll.insert_many(data.clone(), None)
+        let coll =
+            RUNTIME.block_on(client.init_db_and_coll(function_name!(), &test_case.description));
+        RUNTIME
+            .block_on(coll.insert_many(data.clone(), None))
             .expect(&test_case.description);
 
         let arguments: Arguments = bson::from_bson(Bson::Document(test_case.operation.arguments))

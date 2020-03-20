@@ -37,8 +37,10 @@ fn run_find_one_and_replace_test(test_file: TestFile) {
 
         test_case.description = test_case.description.replace('$', "%");
         let sub = cmp::min(test_case.description.len(), 50);
-        let coll = client.init_db_and_coll(function_name!(), &test_case.description[..sub]);
-        coll.insert_many(data.clone(), None)
+        let coll = RUNTIME
+            .block_on(client.init_db_and_coll(function_name!(), &test_case.description[..sub]));
+        RUNTIME
+            .block_on(coll.insert_many(data.clone(), None))
             .expect(&test_case.description);
 
         let arguments: Arguments = bson::from_bson(Bson::Document(test_case.operation.arguments))
@@ -48,7 +50,7 @@ fn run_find_one_and_replace_test(test_file: TestFile) {
 
         if let Some(ref c) = outcome.collection {
             if let Some(ref name) = c.name {
-                client.drop_collection(function_name!(), name);
+                RUNTIME.block_on(client.drop_collection(function_name!(), name));
             }
         }
         let new = match arguments.return_document.as_ref() {

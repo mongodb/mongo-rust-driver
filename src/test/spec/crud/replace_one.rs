@@ -42,7 +42,8 @@ fn run_replace_one_test(test_file: TestFile) {
             function_name!(),
             &test_case.description.replace('$', "%").replace(' ', "_"),
         );
-        coll.insert_many(data.clone(), None)
+        RUNTIME
+            .block_on(coll.insert_many(data.clone(), None))
             .expect(&test_case.description);
 
         let arguments: Arguments = bson::from_bson(Bson::Document(test_case.operation.arguments))
@@ -52,7 +53,7 @@ fn run_replace_one_test(test_file: TestFile) {
 
         if let Some(ref c) = outcome.collection {
             if let Some(ref name) = c.name {
-                client.drop_collection(function_name!(), name);
+                RUNTIME.block_on(client.drop_collection(function_name!(), name));
             }
         }
 

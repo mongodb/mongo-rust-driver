@@ -23,18 +23,21 @@ async fn count() {
     let _guard = LOCK.run_concurrently();
 
     let client = TestClient::new().await;
-    let coll = client.init_db_and_coll(function_name!(), function_name!());
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
 
-    assert_eq!(coll.estimated_document_count(None).unwrap(), 0);
+    assert_eq!(coll.estimated_document_count(None).await.unwrap(), 0);
 
-    let _ = coll.insert_one(doc! { "x": 1 }, None).unwrap();
-    assert_eq!(coll.estimated_document_count(None).unwrap(), 1);
+    let _ = coll.insert_one(doc! { "x": 1 }, None).await.unwrap();
+    assert_eq!(coll.estimated_document_count(None).await.unwrap(), 1);
 
     let result = coll
         .insert_many((1..4).map(|i| doc! { "x": i }).collect::<Vec<_>>(), None)
+        .await
         .unwrap();
     assert_eq!(result.inserted_ids.len(), 3);
-    assert_eq!(coll.estimated_document_count(None).unwrap(), 4);
+    assert_eq!(coll.estimated_document_count(None).await.unwrap(), 4);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
@@ -44,16 +47,19 @@ async fn find() {
     let _guard = LOCK.run_concurrently();
 
     let client = TestClient::new().await;
-    let coll = client.init_db_and_coll(function_name!(), function_name!());
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
 
     let result = coll
         .insert_many((0i32..5).map(|i| doc! { "x": i }).collect::<Vec<_>>(), None)
+        .await
         .unwrap();
     assert_eq!(result.inserted_ids.len(), 5);
 
-    let mut cursor = coll.find(None, None).unwrap().enumerate();
+    let mut cursor = coll.find(None, None).await.unwrap().enumerate();
 
-    while let Some((i, result)) = RUNTIME.block_on(cursor.next()) {
+    while let Some((i, result)) = cursor.next().await {
         let doc = result.unwrap();
         if i > 4 {
             panic!("expected 4 result, got {}", i);
@@ -72,21 +78,26 @@ async fn update() {
     let _guard = LOCK.run_concurrently();
 
     let client = TestClient::new().await;
-    let coll = client.init_db_and_coll(function_name!(), function_name!());
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
 
     let result = coll
         .insert_many((0i32..5).map(|_| doc! { "x": 3 }).collect::<Vec<_>>(), None)
+        .await
         .unwrap();
     assert_eq!(result.inserted_ids.len(), 5);
 
     let update_one_results = coll
         .update_one(doc! {"x": 3}, doc! {"$set": { "x": 5 }}, None)
+        .await
         .unwrap();
     assert_eq!(update_one_results.modified_count, 1);
     assert!(update_one_results.upserted_id.is_none());
 
     let update_many_results = coll
         .update_many(doc! {"x": 3}, doc! {"$set": { "x": 4}}, None)
+        .await
         .unwrap();
     assert_eq!(update_many_results.modified_count, 4);
     assert!(update_many_results.upserted_id.is_none());
@@ -94,6 +105,7 @@ async fn update() {
     let options = UpdateOptions::builder().upsert(true).build();
     let upsert_results = coll
         .update_one(doc! {"b": 7}, doc! {"$set": { "b": 7 }}, options)
+        .await
         .unwrap();
     assert_eq!(upsert_results.modified_count, 0);
     assert!(upsert_results.upserted_id.is_some());
@@ -106,18 +118,21 @@ async fn delete() {
     let _guard = LOCK.run_concurrently();
 
     let client = TestClient::new().await;
-    let coll = client.init_db_and_coll(function_name!(), function_name!());
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
 
     let result = coll
         .insert_many((0i32..5).map(|_| doc! { "x": 3 }).collect::<Vec<_>>(), None)
+        .await
         .unwrap();
     assert_eq!(result.inserted_ids.len(), 5);
 
-    let delete_one_result = coll.delete_one(doc! {"x": 3}, None).unwrap();
+    let delete_one_result = coll.delete_one(doc! {"x": 3}, None).await.unwrap();
     assert_eq!(delete_one_result.deleted_count, 1);
 
     assert_eq!(coll.count_documents(doc! {"x": 3}, None).unwrap(), 4);
-    let delete_many_result = coll.delete_many(doc! {"x": 3}, None).unwrap();
+    let delete_many_result = coll.delete_many(doc! {"x": 3}, None).await.unwrap();
     assert_eq!(delete_many_result.deleted_count, 4);
     assert_eq!(coll.count_documents(doc! {"x": 3 }, None).unwrap(), 0);
 }
@@ -132,10 +147,11 @@ async fn aggregate_out() {
     let db = client.database(function_name!());
     let coll = db.collection(function_name!());
 
-    drop_collection(&coll);
+    drop_collection(&coll).await;
 
     let result = coll
         .insert_many((0i32..5).map(|n| doc! { "x": n }).collect::<Vec<_>>(), None)
+        .await
         .unwrap();
     assert_eq!(result.inserted_ids.len(), 5);
 
@@ -148,19 +164,20 @@ async fn aggregate_out() {
         },
         doc! {"$out": out_coll.name()},
     ];
-    drop_collection(&out_coll);
+    drop_collection(&out_coll).await;
 
-    coll.aggregate(pipeline.clone(), None).unwrap();
+    coll.aggregate(pipeline.clone(), None).await.unwrap();
     assert!(db
         .list_collection_names(None)
         .await
         .unwrap()
         .into_iter()
         .any(|name| name.as_str() == out_coll.name()));
-    drop_collection(&out_coll);
+    drop_collection(&out_coll).await;
 
     // check that even with a batch size of 0, a new collection is created.
     coll.aggregate(pipeline, AggregateOptions::builder().batch_size(0).build())
+        .await
         .unwrap();
     assert!(db
         .list_collection_names(None)
@@ -194,9 +211,10 @@ async fn kill_cursors_on_drop() {
     let db = client.database(function_name!());
     let coll = db.collection(function_name!());
 
-    drop_collection(&coll);
+    drop_collection(&coll).await;
 
     coll.insert_many(vec![doc! { "x": 1 }, doc! { "x": 2 }], None)
+        .await
         .unwrap();
 
     let event_client = EventClient::new().await;
@@ -206,6 +224,7 @@ async fn kill_cursors_on_drop() {
 
     let cursor = coll
         .find(None, FindOptions::builder().batch_size(1).build())
+        .await
         .unwrap();
 
     assert!(!kill_cursors_sent(&event_client));
@@ -230,9 +249,10 @@ async fn no_kill_cursors_on_exhausted() {
     let db = client.database(function_name!());
     let coll = db.collection(function_name!());
 
-    drop_collection(&coll);
+    drop_collection(&coll).await;
 
     coll.insert_many(vec![doc! { "x": 1 }, doc! { "x": 2 }], None)
+        .await
         .unwrap();
 
     let event_client = EventClient::new().await;
@@ -240,7 +260,10 @@ async fn no_kill_cursors_on_exhausted() {
         .database(function_name!())
         .collection(function_name!());
 
-    let cursor = coll.find(None, FindOptions::builder().build()).unwrap();
+    let cursor = coll
+        .find(None, FindOptions::builder().build())
+        .await
+        .unwrap();
 
     assert!(!kill_cursors_sent(&event_client));
 
@@ -311,9 +334,15 @@ async fn large_insert() {
     let docs = vec![LARGE_DOC.clone(); 35000];
 
     let client = TestClient::new().await;
-    let coll = client.init_db_and_coll(function_name!(), function_name!());
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
     assert_eq!(
-        coll.insert_many(docs, None).unwrap().inserted_ids.len(),
+        coll.insert_many(docs, None)
+            .await
+            .unwrap()
+            .inserted_ids
+            .len(),
         35000
     );
 }
@@ -350,11 +379,14 @@ async fn large_insert_unordered_with_errors() {
     let docs = multibatch_documents_with_duplicate_keys();
 
     let client = TestClient::new().await;
-    let coll = client.init_db_and_coll(function_name!(), function_name!());
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
     let options = InsertManyOptions::builder().ordered(false).build();
 
     match coll
         .insert_many(docs, options)
+        .await
         .expect_err("should get error")
         .kind
         .as_ref()
@@ -384,11 +416,14 @@ async fn large_insert_ordered_with_errors() {
     let docs = multibatch_documents_with_duplicate_keys();
 
     let client = TestClient::new().await;
-    let coll = client.init_db_and_coll(function_name!(), function_name!());
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
     let options = InsertManyOptions::builder().ordered(true).build();
 
     match coll
         .insert_many(docs, options)
+        .await
         .expect_err("should get error")
         .kind
         .as_ref()
@@ -422,6 +457,7 @@ async fn empty_insert() {
         .collection(function_name!());
     match coll
         .insert_many(Vec::new(), None)
+        .await
         .expect_err("should get error")
         .kind
         .as_ref()

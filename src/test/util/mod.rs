@@ -101,9 +101,9 @@ impl TestClient {
         self.database(db_name).collection(coll_name)
     }
 
-    pub fn init_db_and_coll(&self, db_name: &str, coll_name: &str) -> Collection {
+    pub async fn init_db_and_coll(&self, db_name: &str, coll_name: &str) -> Collection {
         let coll = self.get_coll(db_name, coll_name);
-        drop_collection(&coll);
+        drop_collection(&coll).await;
         coll
     }
 
@@ -143,14 +143,14 @@ impl TestClient {
             || (self.server_version.major == major && self.server_version.minor <= minor)
     }
 
-    pub fn drop_collection(&self, db_name: &str, coll_name: &str) {
+    pub async fn drop_collection(&self, db_name: &str, coll_name: &str) {
         let coll = self.get_coll(db_name, coll_name);
-        drop_collection(&coll);
+        drop_collection(&coll).await;
     }
 }
 
-pub fn drop_collection(coll: &Collection) {
-    match coll.drop(None).as_ref().map_err(|e| e.as_ref()) {
+pub async fn drop_collection(coll: &Collection) {
+    match coll.drop(None).await.as_ref().map_err(|e| e.as_ref()) {
         Err(ErrorKind::CommandError(CommandError { code: 26, .. })) | Ok(_) => {}
         e @ Err(_) => {
             e.unwrap();

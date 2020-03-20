@@ -73,9 +73,15 @@ fn run_command_monitoring_test(test_file: TestFile) {
         let operation: AnyTestOperation =
             bson::from_bson(Bson::Document(test_case.operation)).unwrap();
 
-        client
-            .init_db_and_coll(&test_file.database_name, &test_file.collection_name)
-            .insert_many(test_file.data.clone(), None)
+        RUNTIME
+            .block_on(
+                RUNTIME
+                    .block_on(
+                        client
+                            .init_db_and_coll(&test_file.database_name, &test_file.collection_name),
+                    )
+                    .insert_many(test_file.data.clone(), None),
+            )
             .expect("insert many error");
 
         let client = RUNTIME.block_on(EventClient::new());
@@ -86,7 +92,7 @@ fn run_command_monitoring_test(test_file: TestFile) {
                 &test_file.database_name,
                 &test_file.collection_name,
                 |collection| {
-                    let _ = operation.execute(collection);
+                    let _ = RUNTIME.block_on(operation.execute(collection));
                 },
             )
             .into_iter()

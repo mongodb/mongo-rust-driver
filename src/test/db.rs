@@ -92,6 +92,7 @@ async fn list_collections() {
     for coll_name in coll_names {
         db.collection(coll_name)
             .insert_one(doc! { "x": 1 }, None)
+            .await
             .unwrap();
     }
 
@@ -132,6 +133,7 @@ async fn list_collections_filter() {
     for coll_name in coll_names {
         db.collection(coll_name)
             .insert_one(doc! { "x": 1 }, None)
+            .await
             .unwrap();
     }
 
@@ -178,6 +180,7 @@ async fn list_collection_names() {
     for coll in expected_colls {
         db.collection(coll)
             .insert_one(doc! { "x": 1 }, None)
+            .await
             .unwrap();
     }
 

@@ -1,5 +1,6 @@
 use std::{ops::Deref, time::Duration};
 
+use async_trait::async_trait;
 use bson::{Bson, Decoder, Document};
 use futures::stream::StreamExt;
 use serde::{
@@ -15,11 +16,12 @@ use crate::{
     RUNTIME,
 };
 
+#[async_trait]
 pub(super) trait TestOperation {
     /// The command names to monitor as part of this test.
     fn command_names(&self) -> &[&str];
 
-    fn execute(&self, collection: Collection) -> Result<()>;
+    async fn execute(&self, collection: Collection) -> Result<()>;
 }
 
 pub(super) struct AnyTestOperation {
@@ -73,14 +75,16 @@ pub(super) struct DeleteMany {
     filter: Document,
 }
 
+#[async_trait]
 impl TestOperation for DeleteMany {
     fn command_names(&self) -> &[&str] {
         &["delete"]
     }
 
-    fn execute(&self, collection: Collection) -> Result<()> {
+    async fn execute(&self, collection: Collection) -> Result<()> {
         collection
             .delete_many(self.filter.clone(), None)
+            .await
             .map(|_| ())
     }
 }
@@ -90,13 +94,17 @@ pub(super) struct DeleteOne {
     filter: Document,
 }
 
+#[async_trait]
 impl TestOperation for DeleteOne {
     fn command_names(&self) -> &[&str] {
         &["delete"]
     }
 
-    fn execute(&self, collection: Collection) -> Result<()> {
-        collection.delete_one(self.filter.clone(), None).map(|_| ())
+    async fn execute(&self, collection: Collection) -> Result<()> {
+        collection
+            .delete_one(self.filter.clone(), None)
+            .await
+            .map(|_| ())
     }
 }
 
@@ -177,6 +185,7 @@ pub(super) struct Find {
     modifiers: Option<FindModifiers>,
 }
 
+#[async_trait]
 impl TestOperation for Find {
     fn command_names(&self) -> &[&str] {
         &["find", "getMore"]
@@ -212,14 +221,16 @@ pub(super) struct InsertMany {
     options: Option<InsertManyOptions>,
 }
 
+#[async_trait]
 impl TestOperation for InsertMany {
     fn command_names(&self) -> &[&str] {
         &["insert"]
     }
 
-    fn execute(&self, collection: Collection) -> Result<()> {
+    async fn execute(&self, collection: Collection) -> Result<()> {
         collection
             .insert_many(self.documents.clone(), self.options.clone())
+            .await
             .map(|_| ())
     }
 }
@@ -229,14 +240,16 @@ pub(super) struct InsertOne {
     document: Document,
 }
 
+#[async_trait]
 impl TestOperation for InsertOne {
     fn command_names(&self) -> &[&str] {
         &["insert"]
     }
 
-    fn execute(&self, collection: Collection) -> Result<()> {
+    async fn execute(&self, collection: Collection) -> Result<()> {
         collection
             .insert_one(self.document.clone(), None)
+            .await
             .map(|_| ())
     }
 }
@@ -247,14 +260,16 @@ pub(super) struct UpdateMany {
     update: Document,
 }
 
+#[async_trait]
 impl TestOperation for UpdateMany {
     fn command_names(&self) -> &[&str] {
         &["update"]
     }
 
-    fn execute(&self, collection: Collection) -> Result<()> {
+    async fn execute(&self, collection: Collection) -> Result<()> {
         collection
             .update_many(self.filter.clone(), self.update.clone(), None)
+            .await
             .map(|_| ())
     }
 }
@@ -267,18 +282,20 @@ pub(super) struct UpdateOne {
     upsert: Option<bool>,
 }
 
+#[async_trait]
 impl TestOperation for UpdateOne {
     fn command_names(&self) -> &[&str] {
         &["update"]
     }
 
-    fn execute(&self, collection: Collection) -> Result<()> {
+    async fn execute(&self, collection: Collection) -> Result<()> {
         let options = self.upsert.map(|b| UpdateOptions {
             upsert: Some(b),
             ..Default::default()
         });
         collection
             .update_one(self.filter.clone(), self.update.clone(), options)
+            .await
             .map(|_| ())
     }
 }

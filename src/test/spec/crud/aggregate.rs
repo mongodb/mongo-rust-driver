@@ -34,7 +34,8 @@ fn run_aggregate_test(test_file: TestFile) {
             function_name!(),
             &test_case.description.replace('$', "%").replace(' ', "_"),
         );
-        coll.insert_many(data.clone(), None)
+        RUNTIME
+            .block_on(coll.insert_many(data.clone(), None))
             .expect(&test_case.description);
 
         let arguments: Arguments = bson::from_bson(Bson::Document(test_case.operation.arguments))
@@ -44,7 +45,7 @@ fn run_aggregate_test(test_file: TestFile) {
 
         if let Some(ref c) = outcome.collection {
             if let Some(ref name) = c.name {
-                client.drop_collection(function_name!(), name);
+                RUNTIME.block_on(client.drop_collection(function_name!(), name));
             }
         }
 
@@ -55,8 +56,8 @@ fn run_aggregate_test(test_file: TestFile) {
         };
 
         {
-            let cursor = coll
-                .aggregate(arguments.pipeline, options)
+            let cursor = RUNTIME
+                .block_on(coll.aggregate(arguments.pipeline, options))
                 .expect(&test_case.description);
 
             assert_eq!(

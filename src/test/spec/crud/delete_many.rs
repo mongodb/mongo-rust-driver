@@ -35,8 +35,10 @@ fn run_delete_many_test(test_file: TestFile) {
 
         test_case.description = test_case.description.replace('$', "%");
 
-        let coll = client.init_db_and_coll(function_name!(), &test_case.description);
-        coll.insert_many(data.clone(), None)
+        let coll =
+            RUNTIME.block_on(client.init_db_and_coll(function_name!(), &test_case.description));
+        RUNTIME
+            .block_on(coll.insert_many(data.clone(), None))
             .expect(&test_case.description);
 
         let arguments: Arguments = bson::from_bson(Bson::Document(test_case.operation.arguments))
@@ -46,7 +48,7 @@ fn run_delete_many_test(test_file: TestFile) {
 
         if let Some(ref c) = outcome.collection {
             if let Some(ref name) = c.name {
-                client.drop_collection(function_name!(), name);
+                RUNTIME.block_on(client.drop_collection(function_name!(), name));
             }
         }
 
@@ -55,8 +57,8 @@ fn run_delete_many_test(test_file: TestFile) {
             ..Default::default()
         };
 
-        let result = coll
-            .delete_many(arguments.filter, options)
+        let result = RUNTIME
+            .block_on(coll.delete_many(arguments.filter, options))
             .expect(&test_case.description);
 
         assert_eq!(
