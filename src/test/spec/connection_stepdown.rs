@@ -1,4 +1,5 @@
 use bson::doc;
+use futures::stream::StreamExt;
 
 use crate::{
     error::{CommandError, ErrorKind},
@@ -85,8 +86,8 @@ async fn get_more() {
             .expect("stepdown should have succeeded");
 
         for _ in 0..5 {
-            cursor
-                .next()
+            RUNTIME
+                .block_on(cursor.next())
                 .unwrap()
                 .expect("cursor iteration should have succeeded");
         }

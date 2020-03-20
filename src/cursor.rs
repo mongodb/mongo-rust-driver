@@ -1,8 +1,24 @@
-use std::{collections::VecDeque, time::Duration};
+use std::{
+    collections::VecDeque,
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
 
 use bson::{doc, Document};
+use derivative::Derivative;
+use futures::{future::BoxFuture, stream::Stream};
 
-use crate::{error::Result, operation::GetMore, options::StreamAddress, Client, Namespace, RUNTIME};
+use crate::{
+    error::Result,
+    operation::GetMore,
+    options::StreamAddress,
+    results::GetMoreResult,
+    Client,
+    Namespace,
+    RUNTIME,
+};
 
 /// A `Cursor` streams the result of a query. When a query is made, a `Cursor` will be returned with
 /// the first batch of results from the server; the documents will be returned as the `Cursor` is
@@ -21,18 +37,19 @@ use crate::{error::Result, operation::GetMore, options::StreamAddress, Client, N
 /// results from the server; both of these factors should be taken into account when choosing the
 /// optimal batch size.
 ///
-/// A cursor can be used like any other [`Iterator`](https://doc.rust-lang.org/std/iter/trait.Iterator.html). The simplest way is just to iterate over the
+/// A cursor can be used like any other [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html). The simplest way is just to iterate over the
 /// documents it yields:
 ///
 /// ```rust
+/// # use futures::stream::StreamExt;
 /// # use mongodb::{Client, error::Result};
 /// #
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// # let coll = client.database("foo").collection("bar");
-/// # let cursor = coll.find(None, None)?;
+/// # let mut cursor = coll.find(None, None)?;
 /// #
-/// for doc in cursor {
+/// while let Some(doc) = cursor.next().await {
 ///   println!("{}", doc?)
 /// }
 /// #
@@ -40,12 +57,14 @@ use crate::{error::Result, operation::GetMore, options::StreamAddress, Client, N
 /// # }
 /// ```
 ///
-/// Additionally, all the other methods that an [`Iterator`](https://doc.rust-lang.org/std/iter/trait.Iterator.html) has are available on `Cursor` as well.
+/// Additionally, all the other methods that an [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html) has are available on `Cursor` as well.
+/// This includes all of the functionality provided by [`StreamExt`](https://docs.rs/futures/0.3.4/futures/stream/trait.StreamExt.html), which provides similar functionality to the standard library `Iterator` trait.
 /// For instance, if the number of results from a query is known to be small, it might make sense
 /// to collect them into a vector:
 ///
 /// ```rust
 /// # use bson::{doc, bson, Document};
+/// # use futures::stream::StreamExt;
 /// # use mongodb::{Client, error::Result};
 /// #
 /// # async fn do_stuff() -> Result<()> {
@@ -53,16 +72,28 @@ use crate::{error::Result, operation::GetMore, options::StreamAddress, Client, N
 /// # let coll = client.database("foo").collection("bar");
 /// # let cursor = coll.find(Some(doc! { "x": 1 }), None)?;
 /// #
-/// let results: Vec<Result<Document>> = cursor.collect();
+/// let results: Vec<Result<Document>> = cursor.collect().await;
 /// # Ok(())
 /// # }
 /// ```
 #[derive(Debug)]
 pub struct Cursor {
     client: Client,
-    buffer: VecDeque<Document>,
     get_more: GetMore,
     exhausted: bool,
+
+    /// This will be None when the cursor is exhausted.
+    state: Option<PollState>,
+}
+
+/// Describes the current state of the Cursor. If the state is Executing, then a getMore operation
+/// is in progress. If the state is Buffer, then there are documents available from the current
+/// batch.
+#[derive(Derivative)]
+#[derivative(Debug)]
+enum PollState {
+    Executing(#[derivative(Debug = "ignore")] BoxFuture<'static, Result<GetMoreResult>>),
+    Buffer(VecDeque<Document>),
 }
 
 impl Cursor {
@@ -77,9 +108,9 @@ impl Cursor {
 
         Self {
             client,
-            buffer: spec.buffer,
             get_more,
             exhausted: spec.id == 0,
+            state: Some(PollState::Buffer(spec.buffer)),
         }
     }
 }
@@ -90,32 +121,95 @@ impl Drop for Cursor {
             return;
         }
 
-        let namespace = self.get_more.namespace();
+        let namespace = self.get_more.namespace().clone();
+        let client = self.client.clone();
+        let cursor_id = self.get_more.cursor_id();
 
-        let _ = RUNTIME.block_on(self.client.database(&namespace.db).run_command(
-            doc! {
-                "killCursors": &namespace.coll,
-                "cursors": [self.get_more.cursor_id()]
-            },
-            None,
-        ));
+        RUNTIME.execute(async move {
+            let _: Result<_> = client
+                .database(&namespace.db)
+                .run_command(
+                    doc! {
+                        "killCursors": &namespace.coll,
+                        "cursors": [cursor_id]
+                    },
+                    None,
+                )
+                .await;
+        })
     }
 }
 
-impl Iterator for Cursor {
+impl Stream for Cursor {
     type Item = Result<Document>;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.buffer.is_empty() && !self.exhausted {
-            match RUNTIME.block_on(self.client.execute_operation(&self.get_more, None)) {
-                Ok(get_more_result) => {
-                    self.buffer.extend(get_more_result.batch);
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
+        match self.state.take() {
+            // If the current state is Executing, then we check the progress of the getMore
+            // operation.
+            Some(PollState::Executing(mut future)) => match Pin::new(&mut future).poll(cx) {
+                // If the getMore is finished and successful, then we pop off the first document
+                // from the batch, set the poll state to Buffer, record whether the cursor is
+                // exhausted, and return the popped document.
+                Poll::Ready(Ok(get_more_result)) => {
+                    let mut buffer: VecDeque<_> = get_more_result.batch.into_iter().collect();
+                    let next_doc = buffer.pop_front();
+
+                    self.state = Some(PollState::Buffer(buffer));
                     self.exhausted = get_more_result.exhausted;
+                    Poll::Ready(next_doc.map(Ok))
                 }
-                Err(e) => return Some(Err(e)),
-            };
+
+                // If the getMore finished with an error, return that error.
+                Poll::Ready(Err(e)) => Poll::Ready(Some(Err(e))),
+
+                // If the getMore has not finished, keep the state as Executing and return.
+                Poll::Pending => {
+                    self.state = Some(PollState::Executing(future));
+                    Poll::Pending
+                }
+            },
+
+            Some(PollState::Buffer(mut buffer)) => {
+                // If there is a document ready, return it.
+                let poll = if let Some(doc) = buffer.pop_front() {
+                    Poll::Ready(Some(Ok(doc)))
+                // If the cursor is exhausted, return None.
+                } else if self.exhausted {
+                    Poll::Ready(None)
+                // Since no document is ready and the cursor isn't exhausted, we need to start a new
+                // getMore operation, so return that the operation is pending.
+                } else {
+                    Poll::Pending
+                };
+
+                // If no documents are left and the batch and the cursor is exhausted, set the state
+                // to None.
+                self.state = if buffer.is_empty() && self.exhausted {
+                    None
+                // If the batch is empty and the cursor is not exhausted, start a new operation and
+                // set the state to Executing.
+                } else if buffer.is_empty() {
+                    let future = Box::pin(
+                        self.client
+                            .clone()
+                            .execute_operation_owned(self.get_more.clone()),
+                    );
+
+                    Some(PollState::Executing(future))
+                // Otherwise, there are documents left in the batch, so save the buffer as the
+                // state.
+                } else {
+                    Some(PollState::Buffer(buffer))
+                };
+
+                poll
+            }
+
+            // If the state is None, then the cursor has already exhausted all its results, so do
+            // nothing.
+            None => Poll::Ready(None),
         }
-        self.buffer.pop_front().map(Ok)
     }
 }
 

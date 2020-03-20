@@ -14,9 +14,10 @@ mod update_many;
 mod update_one;
 
 use bson::Document;
+use futures::stream::TryStreamExt;
 use serde::Deserialize;
 
-use crate::Collection;
+use crate::{Collection, RUNTIME};
 
 #[derive(Debug, Deserialize)]
 pub struct TestFile {
@@ -51,5 +52,7 @@ pub struct CollectionOutcome {
 }
 
 pub fn find_all(coll: &Collection) -> Vec<Document> {
-    coll.find(None, None).unwrap().map(Result::unwrap).collect()
+    RUNTIME
+        .block_on(coll.find(None, None).unwrap().try_collect())
+        .unwrap()
 }

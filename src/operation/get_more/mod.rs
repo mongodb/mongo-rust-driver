@@ -15,7 +15,7 @@ use crate::{
     Namespace,
 };
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct GetMore {
     ns: Namespace,
     cursor_id: i64,

@@ -2,9 +2,11 @@ use std::cmp::Ord;
 
 use approx::assert_ulps_eq;
 use bson::{doc, Bson, Document};
+use futures::stream::TryStreamExt;
 use serde::Deserialize;
 
 use crate::{
+    error::Result,
     options::{AggregateOptions, CreateCollectionOptions},
     test::{util::TestClient, LOCK},
     Database,
@@ -33,13 +35,17 @@ struct IsMasterReply {
 }
 
 async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<CollectionInfo> {
-    let colls: Result<Vec<Document>, _> =
-        db.list_collections(filter, None).await.unwrap().collect();
-    let mut colls: Vec<CollectionInfo> = colls
+    let mut colls: Vec<CollectionInfo> = db
+        .list_collections(filter, None)
+        .await
         .unwrap()
-        .into_iter()
-        .map(|doc| bson::from_bson(Bson::Document(doc)).unwrap())
-        .collect();
+        .and_then(|doc| match bson::from_bson(Bson::Document(doc)) {
+            Ok(info) => futures::future::ok(info),
+            Err(e) => futures::future::err(e.into()),
+        })
+        .try_collect()
+        .await
+        .unwrap();
     colls.sort_by(|c1, c2| c1.name.cmp(&c2.name));
 
     colls
@@ -69,7 +75,13 @@ async fn list_collections() {
     let db = client.database(function_name!());
     db.drop(None).await.unwrap();
 
-    assert_eq!(db.list_collections(None, None).await.unwrap().count(), 0);
+    let colls: Result<Vec<_>> = db
+        .list_collections(None, None)
+        .await
+        .unwrap()
+        .try_collect()
+        .await;
+    assert_eq!(colls.unwrap().len(), 0);
 
     let coll_names = &[
         format!("{}1", function_name!()),
@@ -108,7 +120,13 @@ async fn list_collections_filter() {
     let db = client.database(function_name!());
     db.drop(None).await.unwrap();
 
-    assert_eq!(db.list_collections(None, None).await.unwrap().count(), 0);
+    let colls: Result<Vec<_>> = db
+        .list_collections(None, None)
+        .await
+        .unwrap()
+        .try_collect()
+        .await;
+    assert_eq!(colls.unwrap().len(), 0);
 
     let coll_names = &["bar", "baz", "foo"];
     for coll_name in coll_names {

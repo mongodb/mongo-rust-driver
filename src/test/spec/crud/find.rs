@@ -1,4 +1,5 @@
 use bson::{Bson, Document};
+use futures::stream::TryStreamExt;
 use serde::Deserialize;
 
 use super::{Outcome, TestFile};
@@ -60,7 +61,9 @@ fn run_find_test(test_file: TestFile) {
             .expect(&test_case.description);
         assert_eq!(
             outcome.result,
-            cursor.map(Result::unwrap).collect::<Vec<Document>>(),
+            RUNTIME
+                .block_on(cursor.try_collect::<Vec<Document>>())
+                .unwrap(),
             "{}",
             test_case.description,
         );

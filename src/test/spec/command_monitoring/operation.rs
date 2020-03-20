@@ -1,6 +1,7 @@
 use std::{ops::Deref, time::Duration};
 
 use bson::{Bson, Decoder, Document};
+use futures::stream::StreamExt;
 use serde::{
     de::{self, Deserializer},
     Deserialize,
@@ -11,6 +12,7 @@ use crate::{
     error::Result,
     options::{FindOptions, Hint, InsertManyOptions, UpdateOptions},
     Collection,
+    RUNTIME,
 };
 
 pub(super) trait TestOperation {
@@ -193,11 +195,13 @@ impl TestOperation for Find {
             modifiers.update_options(&mut options);
         }
 
-        collection.find(self.filter.clone(), options).map(
-            |mut cursor| {
-                while cursor.next().is_some() {}
-            },
-        )
+        collection
+            .find(self.filter.clone(), options)
+            .map(
+                |mut cursor| {
+                    while RUNTIME.block_on(cursor.next()).is_some() {}
+                },
+            )
     }
 }
 
