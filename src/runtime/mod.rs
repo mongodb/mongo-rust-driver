@@ -4,7 +4,7 @@ mod join_handle;
 mod resolver;
 mod stream;
 
-use std::{future::Future, time::Duration};
+use std::{future::Future, net::SocketAddr, time::Duration};
 
 pub(crate) use self::{
     async_read_ext::AsyncLittleEndianRead,
@@ -13,7 +13,10 @@ pub(crate) use self::{
     resolver::AsyncResolver,
     stream::AsyncStream,
 };
-use crate::error::{ErrorKind, Result};
+use crate::{
+    error::{ErrorKind, Result},
+    options::StreamAddress,
+};
 
 /// An abstract handle to the async runtime.
 #[derive(Clone, Copy, Debug)]
@@ -98,6 +101,26 @@ impl AsyncRuntime {
             async_std::future::timeout(timeout, future)
                 .await
                 .map_err(|_| ErrorKind::Io(std::io::ErrorKind::TimedOut.into()).into())
+        }
+    }
+
+    pub(crate) async fn resolve_address(
+        self,
+        address: &StreamAddress,
+    ) -> Result<impl Iterator<Item = SocketAddr>> {
+        match self {
+            #[cfg(feature = "tokio-runtime")]
+            Self::Tokio => {
+                let socket_addrs = tokio::net::lookup_host(format!("{}", address)).await?;
+                Ok(socket_addrs)
+            }
+
+            #[cfg(feature = "async-std-runtime")]
+            Self::AsyncStd => {
+                let host = (address.hostname.as_str(), address.port.unwrap_or(27017));
+                let socket_addrs = async_std::net::ToSocketAddrs::to_socket_addrs(&host).await?;
+                Ok(socket_addrs)
+            }
         }
     }
 }

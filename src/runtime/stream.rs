@@ -1,5 +1,5 @@
 use std::{
-    net::{SocketAddr, ToSocketAddrs},
+    net::SocketAddr,
     ops::DerefMut,
     pin::Pin,
     sync::Arc,
@@ -16,6 +16,7 @@ use crate::{
     cmap::options::StreamOptions,
     error::{ErrorKind, Result},
     options::StreamAddress,
+    RUNTIME,
 };
 
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -105,7 +106,7 @@ impl AsyncTcpStream {
     async fn connect(address: &StreamAddress, connect_timeout: Option<Duration>) -> Result<Self> {
         let timeout = connect_timeout.unwrap_or(DEFAULT_CONNECT_TIMEOUT);
 
-        let mut socket_addrs: Vec<_> = address.to_socket_addrs()?.collect();
+        let mut socket_addrs: Vec<_> = RUNTIME.resolve_address(address).await?.collect();
 
         if socket_addrs.is_empty() {
             return Err(ErrorKind::NoDnsResults(address.clone()).into());
