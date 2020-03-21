@@ -13,11 +13,12 @@ use crate::{
     test::{util::EventClient, LOCK},
     Collection,
     Database,
+    RUNTIME,
 };
 
 fn run_test(name: &str, test: impl Fn(EventClient, Database, Collection)) {
     // TODO RUST-51: Disable retryable writes once they're implemented.
-    let client = EventClient::new();
+    let client = RUNTIME.block_on(EventClient::new());
 
     if client.options.repl_set_name.is_none() {
         return;
@@ -36,15 +37,18 @@ fn run_test(name: &str, test: impl Fn(EventClient, Database, Collection)) {
             .build(),
     ));
 
-    db.create_collection(
-        &name,
-        Some(
-            CreateCollectionOptions::builder()
-                .write_concern(wc_majority)
-                .build(),
-        ),
-    )
-    .unwrap();
+    RUNTIME
+        .block_on(
+            db.create_collection(
+                &name,
+                Some(
+                    CreateCollectionOptions::builder()
+                        .write_concern(wc_majority)
+                        .build(),
+                ),
+            ),
+        )
+        .unwrap();
 
     test(client, db, coll);
 }
@@ -76,7 +80,8 @@ async fn get_more() {
             .find(None, Some(FindOptions::builder().batch_size(2).build()))
             .unwrap();
 
-        db.run_command(doc! { "replSetStepDown": 5, "force": true }, None)
+        RUNTIME
+            .block_on(db.run_command(doc! { "replSetStepDown": 5, "force": true }, None))
             .expect("stepdown should have succeeded");
 
         for _ in 0..5 {
@@ -102,9 +107,8 @@ async fn not_master_keep_pool() {
 
         let _guard = LOCK.run_exclusively();
 
-        client
-            .database("admin")
-            .run_command(
+        RUNTIME
+            .block_on(client.database("admin").run_command(
                 doc! {
                     "configureFailPoint": "failCommand",
                     "mode": { "times": 1 },
@@ -114,7 +118,7 @@ async fn not_master_keep_pool() {
                     }
                 },
                 None,
-            )
+            ))
             .unwrap();
 
         let result = coll.insert_one(doc! { "test": 1 }, None);
@@ -145,9 +149,8 @@ async fn not_master_reset_pool() {
 
         let _guard = LOCK.run_exclusively();
 
-        client
-            .database("admin")
-            .run_command(
+        RUNTIME
+            .block_on(client.database("admin").run_command(
                 doc! {
                     "configureFailPoint": "failCommand",
                     "mode": { "times": 1 },
@@ -157,7 +160,7 @@ async fn not_master_reset_pool() {
                     }
                 },
                 None,
-            )
+            ))
             .unwrap();
 
         let result = coll.insert_one(doc! { "test": 1 }, None);
@@ -187,9 +190,8 @@ async fn shutdown_in_progress() {
 
         let _guard = LOCK.run_exclusively();
 
-        client
-            .database("admin")
-            .run_command(
+        RUNTIME
+            .block_on(client.database("admin").run_command(
                 doc! {
                     "configureFailPoint": "failCommand",
                     "mode": { "times": 1 },
@@ -199,7 +201,7 @@ async fn shutdown_in_progress() {
                     }
                 },
                 None,
-            )
+            ))
             .unwrap();
 
         let result = coll.insert_one(doc! { "test": 1 }, None);
@@ -229,9 +231,8 @@ async fn interrupted_at_shutdown() {
 
         let _guard = LOCK.run_exclusively();
 
-        client
-            .database("admin")
-            .run_command(
+        RUNTIME
+            .block_on(client.database("admin").run_command(
                 doc! {
                     "configureFailPoint": "failCommand",
                     "mode": { "times": 1 },
@@ -241,7 +242,7 @@ async fn interrupted_at_shutdown() {
                     }
                 },
                 None,
-            )
+            ))
             .unwrap();
 
         let result = coll.insert_one(doc! { "test": 1 }, None);

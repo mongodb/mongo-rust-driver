@@ -7,7 +7,10 @@ use bson::{Bson, Document};
 use serde::Deserialize;
 
 use self::{event::TestEvent, operation::*};
-use crate::test::{assert_matches, parse_version, util::TestClient, EventClient, LOCK};
+use crate::{
+    test::{assert_matches, parse_version, util::TestClient, EventClient, LOCK},
+    RUNTIME,
+};
 
 #[derive(Deserialize)]
 struct TestFile {
@@ -29,7 +32,7 @@ struct TestCase {
 }
 
 fn run_command_monitoring_test(test_file: TestFile) {
-    let client = TestClient::new();
+    let client = RUNTIME.block_on(TestClient::new());
 
     let skipped_tests = vec![
         // uses old count
@@ -75,7 +78,7 @@ fn run_command_monitoring_test(test_file: TestFile) {
             .insert_many(test_file.data.clone(), None)
             .expect("insert many error");
 
-        let client = EventClient::new();
+        let client = RUNTIME.block_on(EventClient::new());
 
         let events: Vec<TestEvent> = client
             .run_operation_with_events(

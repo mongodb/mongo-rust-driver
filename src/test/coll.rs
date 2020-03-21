@@ -17,7 +17,7 @@ use crate::{
 async fn count() {
     let _guard = LOCK.run_concurrently();
 
-    let client = TestClient::new();
+    let client = TestClient::new().await;
     let coll = client.init_db_and_coll(function_name!(), function_name!());
 
     assert_eq!(coll.estimated_document_count(None).unwrap(), 0);
@@ -38,7 +38,7 @@ async fn count() {
 async fn find() {
     let _guard = LOCK.run_concurrently();
 
-    let client = TestClient::new();
+    let client = TestClient::new().await;
     let coll = client.init_db_and_coll(function_name!(), function_name!());
 
     let result = coll
@@ -64,7 +64,7 @@ async fn find() {
 async fn update() {
     let _guard = LOCK.run_concurrently();
 
-    let client = TestClient::new();
+    let client = TestClient::new().await;
     let coll = client.init_db_and_coll(function_name!(), function_name!());
 
     let result = coll
@@ -98,7 +98,7 @@ async fn update() {
 async fn delete() {
     let _guard = LOCK.run_concurrently();
 
-    let client = TestClient::new();
+    let client = TestClient::new().await;
     let coll = client.init_db_and_coll(function_name!(), function_name!());
 
     let result = coll
@@ -121,7 +121,7 @@ async fn delete() {
 async fn aggregate_out() {
     let _guard = LOCK.run_concurrently();
 
-    let client = TestClient::new();
+    let client = TestClient::new().await;
     let db = client.database(function_name!());
     let coll = db.collection(function_name!());
 
@@ -146,6 +146,7 @@ async fn aggregate_out() {
     coll.aggregate(pipeline.clone(), None).unwrap();
     assert!(db
         .list_collection_names(None)
+        .await
         .unwrap()
         .into_iter()
         .any(|name| name.as_str() == out_coll.name()));
@@ -156,6 +157,7 @@ async fn aggregate_out() {
         .unwrap();
     assert!(db
         .list_collection_names(None)
+        .await
         .unwrap()
         .into_iter()
         .any(|name| name.as_str() == out_coll.name()));
@@ -181,7 +183,7 @@ fn kill_cursors_sent(client: &EventClient) -> bool {
 async fn kill_cursors_on_drop() {
     let _guard = LOCK.run_concurrently();
 
-    let client = TestClient::new();
+    let client = TestClient::new().await;
     let db = client.database(function_name!());
     let coll = db.collection(function_name!());
 
@@ -190,7 +192,7 @@ async fn kill_cursors_on_drop() {
     coll.insert_many(vec![doc! { "x": 1 }, doc! { "x": 2 }], None)
         .unwrap();
 
-    let event_client = EventClient::new();
+    let event_client = EventClient::new().await;
     let coll = event_client
         .database(function_name!())
         .collection(function_name!());
@@ -212,7 +214,7 @@ async fn kill_cursors_on_drop() {
 async fn no_kill_cursors_on_exhausted() {
     let _guard = LOCK.run_concurrently();
 
-    let client = TestClient::new();
+    let client = TestClient::new().await;
     let db = client.database(function_name!());
     let coll = db.collection(function_name!());
 
@@ -221,7 +223,7 @@ async fn no_kill_cursors_on_exhausted() {
     coll.insert_many(vec![doc! { "x": 1 }, doc! { "x": 2 }], None)
         .unwrap();
 
-    let event_client = EventClient::new();
+    let event_client = EventClient::new().await;
     let coll = event_client
         .database(function_name!())
         .collection(function_name!());
@@ -296,7 +298,7 @@ async fn large_insert() {
 
     let docs = vec![LARGE_DOC.clone(); 35000];
 
-    let client = TestClient::new();
+    let client = TestClient::new().await;
     let coll = client.init_db_and_coll(function_name!(), function_name!());
     assert_eq!(
         coll.insert_many(docs, None).unwrap().inserted_ids.len(),
@@ -335,7 +337,7 @@ async fn large_insert_unordered_with_errors() {
 
     let docs = multibatch_documents_with_duplicate_keys();
 
-    let client = TestClient::new();
+    let client = TestClient::new().await;
     let coll = client.init_db_and_coll(function_name!(), function_name!());
     let options = InsertManyOptions::builder().ordered(false).build();
 
@@ -369,7 +371,7 @@ async fn large_insert_ordered_with_errors() {
 
     let docs = multibatch_documents_with_duplicate_keys();
 
-    let client = TestClient::new();
+    let client = TestClient::new().await;
     let coll = client.init_db_and_coll(function_name!(), function_name!());
     let options = InsertManyOptions::builder().ordered(true).build();
 
@@ -402,7 +404,7 @@ async fn large_insert_ordered_with_errors() {
 async fn empty_insert() {
     let _guard = LOCK.run_concurrently();
 
-    let client = TestClient::new();
+    let client = TestClient::new().await;
     let coll = client
         .database(function_name!())
         .collection(function_name!());

@@ -13,6 +13,7 @@ use crate::{
         topology::{TopologyDescription, TopologyType},
     },
     test::{run_spec_test, TestClient, CLIENT_OPTIONS},
+    RUNTIME,
 };
 
 #[derive(Debug, Deserialize)]
@@ -71,7 +72,9 @@ fn server_type_from_str(s: &str) -> Option<ServerType> {
 }
 
 fn run_test(test_file: TestFile) {
-    let options = ClientOptions::parse(&test_file.uri).expect(&test_file.description);
+    let options = RUNTIME
+        .block_on(ClientOptions::parse(&test_file.uri))
+        .expect(&test_file.description);
 
     let test_description = &test_file.description;
     let mut topology_description = TopologyDescription::new(options).expect(test_description);
@@ -231,7 +234,7 @@ async fn sharded() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn direct_connection() {
-    let test_client = TestClient::new();
+    let test_client = TestClient::new().await;
     if !test_client.is_replica_set() {
         println!("Skipping due to non-replica set topology");
         return;
@@ -257,7 +260,7 @@ async fn direct_connection() {
         .database(function_name!())
         .collection(function_name!())
         .insert_one(doc! {}, None)
-        .expect("write should succeed");
+        .expect("write should succeed with directConnection=false on secondary");
 
     let mut direct_true_options = secondary_options.clone();
     direct_true_options.direct_connection = Some(true);
@@ -267,7 +270,7 @@ async fn direct_connection() {
         .database(function_name!())
         .collection(function_name!())
         .insert_one(doc! {}, None)
-        .expect_err("write should fail");
+        .expect_err("write should fail with directConnection=true on secondary");
     assert!(error.is_not_master());
 
     let client =
@@ -276,5 +279,5 @@ async fn direct_connection() {
         .database(function_name!())
         .collection(function_name!())
         .insert_one(doc! {}, None)
-        .expect("write should succeed");
+        .expect("write should succeed with directConnection unspecified");
 }

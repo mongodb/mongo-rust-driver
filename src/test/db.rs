@@ -32,8 +32,9 @@ struct IsMasterReply {
     ok: f64,
 }
 
-fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<CollectionInfo> {
-    let colls: Result<Vec<Document>, _> = db.list_collections(filter, None).unwrap().collect();
+async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<CollectionInfo> {
+    let colls: Result<Vec<Document>, _> =
+        db.list_collections(filter, None).await.unwrap().collect();
     let mut colls: Vec<CollectionInfo> = colls
         .unwrap()
         .into_iter()
@@ -49,9 +50,9 @@ fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<CollectionInfo>
 async fn is_master() {
     let _guard = LOCK.run_concurrently();
 
-    let client = TestClient::new();
+    let client = TestClient::new().await;
     let db = client.database("test");
-    let doc = db.run_command(doc! { "ismaster": 1 }, None).unwrap();
+    let doc = db.run_command(doc! { "ismaster": 1 }, None).await.unwrap();
     let is_master_reply: IsMasterReply = bson::from_bson(Bson::Document(doc)).unwrap();
 
     assert!(is_master_reply.ismaster);
@@ -64,11 +65,11 @@ async fn is_master() {
 async fn list_collections() {
     let _guard = LOCK.run_concurrently();
 
-    let client = TestClient::new();
+    let client = TestClient::new().await;
     let db = client.database(function_name!());
-    db.drop(None).unwrap();
+    db.drop(None).await.unwrap();
 
-    assert_eq!(db.list_collections(None, None).unwrap().count(), 0);
+    assert_eq!(db.list_collections(None, None).await.unwrap().count(), 0);
 
     let coll_names = &[
         format!("{}1", function_name!()),
@@ -82,7 +83,7 @@ async fn list_collections() {
             .unwrap();
     }
 
-    let colls = get_coll_info(&db, None);
+    let colls = get_coll_info(&db, None).await;
     assert_eq!(colls.len(), coll_names.len());
 
     for (i, coll) in colls.into_iter().enumerate() {
@@ -103,11 +104,11 @@ async fn list_collections() {
 async fn list_collections_filter() {
     let _guard = LOCK.run_concurrently();
 
-    let client = TestClient::new();
+    let client = TestClient::new().await;
     let db = client.database(function_name!());
-    db.drop(None).unwrap();
+    db.drop(None).await.unwrap();
 
-    assert_eq!(db.list_collections(None, None).unwrap().count(), 0);
+    assert_eq!(db.list_collections(None, None).await.unwrap().count(), 0);
 
     let coll_names = &["bar", "baz", "foo"];
     for coll_name in coll_names {
@@ -123,7 +124,7 @@ async fn list_collections_filter() {
     };
     let coll_names = &coll_names[..coll_names.len() - 1];
 
-    let colls = get_coll_info(&db, Some(filter));
+    let colls = get_coll_info(&db, Some(filter)).await;
     assert_eq!(colls.len(), coll_names.len());
 
     for (i, coll) in colls.into_iter().enumerate() {
@@ -144,11 +145,11 @@ async fn list_collections_filter() {
 async fn list_collection_names() {
     let _guard = LOCK.run_concurrently();
 
-    let client = TestClient::new();
+    let client = TestClient::new().await;
     let db = client.database(function_name!());
-    db.drop(None).unwrap();
+    db.drop(None).await.unwrap();
 
-    assert!(db.list_collection_names(None).unwrap().is_empty());
+    assert!(db.list_collection_names(None).await.unwrap().is_empty());
 
     let expected_colls = &[
         format!("{}1", function_name!()),
@@ -162,7 +163,7 @@ async fn list_collection_names() {
             .unwrap();
     }
 
-    let mut actual_colls = db.list_collection_names(None).unwrap();
+    let mut actual_colls = db.list_collection_names(None).await.unwrap();
     actual_colls.sort();
 
     assert_eq!(&actual_colls, expected_colls);
@@ -174,13 +175,14 @@ async fn list_collection_names() {
 async fn collection_management() {
     let _guard = LOCK.run_concurrently();
 
-    let client = TestClient::new();
+    let client = TestClient::new().await;
     let db = client.database(function_name!());
-    db.drop(None).unwrap();
+    db.drop(None).await.unwrap();
 
-    assert!(db.list_collection_names(None).unwrap().is_empty());
+    assert!(db.list_collection_names(None).await.unwrap().is_empty());
 
     db.create_collection(&format!("{}{}", function_name!(), 1), None)
+        .await
         .unwrap();
 
     let options = CreateCollectionOptions::builder()
@@ -188,9 +190,10 @@ async fn collection_management() {
         .size(512)
         .build();
     db.create_collection(&format!("{}{}", function_name!(), 2), Some(options))
+        .await
         .unwrap();
 
-    let colls = get_coll_info(&db, None);
+    let colls = get_coll_info(&db, None).await;
     assert_eq!(colls.len(), 2);
 
     assert_eq!(colls[0].name, format!("{}1", function_name!()));
@@ -208,7 +211,7 @@ async fn collection_management() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn db_aggregate() {
-    let client = TestClient::new();
+    let client = TestClient::new().await;
 
     if client.server_version_lt(4, 0) {
         return;
@@ -244,14 +247,15 @@ async fn db_aggregate() {
         },
     ];
 
-    let result = db.aggregate(pipeline, None);
-    result.unwrap();
+    db.aggregate(pipeline, None)
+        .await
+        .expect("aggregate should succeed");
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn db_aggregate_disk_use() {
-    let client = TestClient::new();
+    let client = TestClient::new().await;
 
     if client.server_version_lt(4, 0) {
         return;
@@ -289,6 +293,7 @@ async fn db_aggregate_disk_use() {
 
     let options = AggregateOptions::builder().allow_disk_use(true).build();
 
-    let result = db.aggregate(pipeline, Some(options));
-    result.unwrap();
+    db.aggregate(pipeline, Some(options))
+        .await
+        .expect("aggregate with disk use should succeed");
 }

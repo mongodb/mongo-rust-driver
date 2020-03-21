@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::{options::ClientOptions, test::run_spec_test};
+use crate::{options::ClientOptions, test::run_spec_test, RUNTIME};
 
 #[derive(Debug, Deserialize)]
 struct TestFile {
@@ -37,7 +37,7 @@ async fn run() {
             return;
         }
 
-        let result = ClientOptions::parse(&test_file.uri);
+        let result = RUNTIME.block_on(ClientOptions::parse(&test_file.uri));
 
         if let Some(true) = test_file.error {
             assert!(matches!(result, Err(_)), test_file.comment.unwrap());
