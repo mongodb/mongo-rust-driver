@@ -220,10 +220,6 @@ impl Topology {
         match old_description.diff(&state_clone.description) {
             None => false,
             Some(diff) => {
-                // println!("old: {:?}", old_description);
-                // println!("new: {:?}", state_clone.description);
-                // println!("diff: {:?}", diff);
-
                 // Now that we have the proper state in the copy, acquire a lock on the proper
                 // topology and move the info over.
                 let mut state_lock = self.state.write().await;
