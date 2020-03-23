@@ -1,13 +1,22 @@
+mod async_read_ext;
+mod async_write_ext;
 mod join_handle;
+mod resolver;
 mod stream;
 
-use std::{future::Future, time::Duration};
+use std::{future::Future, net::SocketAddr, time::Duration};
 
-use futures::future::{self, Either};
-use futures_timer::Delay;
-
-pub(crate) use self::{join_handle::AsyncJoinHandle, stream::AsyncStream};
-use crate::error::{ErrorKind, Result};
+pub(crate) use self::{
+    async_read_ext::AsyncLittleEndianRead,
+    async_write_ext::AsyncLittleEndianWrite,
+    join_handle::AsyncJoinHandle,
+    resolver::AsyncResolver,
+    stream::AsyncStream,
+};
+use crate::{
+    error::{ErrorKind, Result},
+    options::StreamAddress,
+};
 
 /// An abstract handle to the async runtime.
 #[derive(Clone, Copy, Debug)]
@@ -75,20 +84,43 @@ impl AsyncRuntime {
     }
 
     /// Await on a future for a maximum amount of time before returning an error.
-    pub(crate) async fn await_with_timeout<F>(
+    pub(crate) async fn timeout<F: Future>(
         self,
-        future: F,
         timeout: Duration,
-    ) -> Result<F::Output>
-    where
-        F: Future + Send + Unpin,
-    {
-        match future::select(future, Delay::new(timeout)).await {
-            Either::Left((result, _)) => Ok(result),
-            Either::Right(_) => Err(ErrorKind::InternalError {
-                message: "Timed out waiting on future".to_string(),
+        future: F,
+    ) -> Result<F::Output> {
+        #[cfg(feature = "tokio-runtime")]
+        {
+            tokio::time::timeout(timeout, future)
+                .await
+                .map_err(|e| ErrorKind::Io(e.into()).into())
+        }
+
+        #[cfg(feature = "async-std-runtime")]
+        {
+            async_std::future::timeout(timeout, future)
+                .await
+                .map_err(|_| ErrorKind::Io(std::io::ErrorKind::TimedOut.into()).into())
+        }
+    }
+
+    pub(crate) async fn resolve_address(
+        self,
+        address: &StreamAddress,
+    ) -> Result<impl Iterator<Item = SocketAddr>> {
+        match self {
+            #[cfg(feature = "tokio-runtime")]
+            Self::Tokio => {
+                let socket_addrs = tokio::net::lookup_host(format!("{}", address)).await?;
+                Ok(socket_addrs)
             }
-            .into()),
+
+            #[cfg(feature = "async-std-runtime")]
+            Self::AsyncStd => {
+                let host = (address.hostname.as_str(), address.port.unwrap_or(27017));
+                let socket_addrs = async_std::net::ToSocketAddrs::to_socket_addrs(&host).await?;
+                Ok(socket_addrs)
+            }
         }
     }
 }

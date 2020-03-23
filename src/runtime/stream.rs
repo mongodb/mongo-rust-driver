@@ -1,5 +1,5 @@
 use std::{
-    net::{SocketAddr, ToSocketAddrs},
+    net::SocketAddr,
     ops::DerefMut,
     pin::Pin,
     sync::Arc,
@@ -7,7 +7,8 @@ use std::{
     time::Duration,
 };
 
-use tokio::io::{AsyncRead, AsyncWrite};
+use futures::io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite};
 use tokio_rustls::TlsConnector;
 use webpki::DNSNameRef;
 
@@ -15,6 +16,7 @@ use crate::{
     cmap::options::StreamOptions,
     error::{ErrorKind, Result},
     options::StreamAddress,
+    RUNTIME,
 };
 
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -93,10 +95,18 @@ impl AsyncTcpStream {
         Ok(stream)
     }
 
+    pub(crate) async fn connect_socket_addr(
+        address: &SocketAddr,
+        connect_timeout: Option<Duration>,
+    ) -> Result<Self> {
+        let timeout = connect_timeout.unwrap_or(DEFAULT_CONNECT_TIMEOUT);
+        Self::try_connect(address, timeout).await
+    }
+
     async fn connect(address: &StreamAddress, connect_timeout: Option<Duration>) -> Result<Self> {
         let timeout = connect_timeout.unwrap_or(DEFAULT_CONNECT_TIMEOUT);
 
-        let mut socket_addrs: Vec<_> = address.to_socket_addrs()?.collect();
+        let mut socket_addrs: Vec<_> = RUNTIME.resolve_address(address).await?.collect();
 
         if socket_addrs.is_empty() {
             return Err(ErrorKind::NoDnsResults(address.clone()).into());
@@ -146,10 +156,10 @@ impl AsyncRead for AsyncStream {
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut [u8],
-    ) -> Poll<tokio::io::Result<usize>> {
+    ) -> Poll<std::io::Result<usize>> {
         match self.deref_mut() {
             Self::Null => Poll::Ready(Ok(0)),
-            Self::Tcp(ref mut inner) => Pin::new(inner).poll_read(cx, buf),
+            Self::Tcp(ref mut inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
             Self::Tls(ref mut inner) => Pin::new(inner).poll_read(cx, buf),
         }
     }
@@ -160,29 +170,26 @@ impl AsyncWrite for AsyncStream {
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
-    ) -> Poll<tokio::io::Result<usize>> {
+    ) -> Poll<std::io::Result<usize>> {
         match self.deref_mut() {
             Self::Null => Poll::Ready(Ok(0)),
-            Self::Tcp(ref mut inner) => Pin::new(inner).poll_write(cx, buf),
+            Self::Tcp(ref mut inner) => AsyncWrite::poll_write(Pin::new(inner), cx, buf),
             Self::Tls(ref mut inner) => Pin::new(inner).poll_write(cx, buf),
         }
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<tokio::io::Result<()>> {
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         match self.deref_mut() {
             Self::Null => Poll::Ready(Ok(())),
-            Self::Tcp(ref mut inner) => Pin::new(inner).poll_flush(cx),
+            Self::Tcp(ref mut inner) => AsyncWrite::poll_flush(Pin::new(inner), cx),
             Self::Tls(ref mut inner) => Pin::new(inner).poll_flush(cx),
         }
     }
 
-    fn poll_shutdown(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<tokio::io::Result<()>> {
+    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         match self.deref_mut() {
             Self::Null => Poll::Ready(Ok(())),
-            Self::Tcp(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
+            Self::Tcp(ref mut inner) => Pin::new(inner).poll_close(cx),
             Self::Tls(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
         }
     }
@@ -193,17 +200,17 @@ impl AsyncRead for AsyncTcpStream {
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut [u8],
-    ) -> Poll<tokio::io::Result<usize>> {
+    ) -> Poll<std::io::Result<usize>> {
         match self.deref_mut() {
             #[cfg(feature = "tokio-runtime")]
-            Self::Tokio(ref mut stream) => Pin::new(stream).poll_read(cx, buf),
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd(ref mut stream) => {
-                use async_std::io::Read;
+            Self::Tokio(ref mut stream) => {
+                use tokio::io::AsyncRead;
 
                 Pin::new(stream).poll_read(cx, buf)
             }
+
+            #[cfg(feature = "async-std-runtime")]
+            Self::AsyncStd(ref mut stream) => Pin::new(stream).poll_read(cx, buf),
         }
     }
 }
@@ -213,48 +220,75 @@ impl AsyncWrite for AsyncTcpStream {
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
-    ) -> Poll<tokio::io::Result<usize>> {
+    ) -> Poll<std::io::Result<usize>> {
         match self.deref_mut() {
             #[cfg(feature = "tokio-runtime")]
-            Self::Tokio(ref mut stream) => Pin::new(stream).poll_write(cx, buf),
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd(ref mut stream) => {
-                use async_std::io::Write;
+            Self::Tokio(ref mut stream) => {
+                use tokio::io::AsyncWrite;
 
                 Pin::new(stream).poll_write(cx, buf)
             }
+
+            #[cfg(feature = "async-std-runtime")]
+            Self::AsyncStd(ref mut stream) => Pin::new(stream).poll_write(cx, buf),
         }
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<tokio::io::Result<()>> {
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         match self.deref_mut() {
             #[cfg(feature = "tokio-runtime")]
-            Self::Tokio(ref mut stream) => Pin::new(stream).poll_flush(cx),
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd(ref mut stream) => {
-                use async_std::io::Write;
+            Self::Tokio(ref mut stream) => {
+                use tokio::io::AsyncWrite;
 
                 Pin::new(stream).poll_flush(cx)
             }
+
+            #[cfg(feature = "async-std-runtime")]
+            Self::AsyncStd(ref mut stream) => Pin::new(stream).poll_flush(cx),
         }
     }
 
-    fn poll_shutdown(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<tokio::io::Result<()>> {
+    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         match self.deref_mut() {
             #[cfg(feature = "tokio-runtime")]
-            Self::Tokio(ref mut stream) => Pin::new(stream).poll_shutdown(cx),
+            Self::Tokio(ref mut stream) => {
+                use tokio::io::AsyncWrite;
+
+                Pin::new(stream).poll_shutdown(cx)
+            }
 
             #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd(ref mut stream) => {
-                use async_std::io::Write;
-
-                Pin::new(stream).poll_close(cx)
-            }
+            Self::AsyncStd(ref mut stream) => Pin::new(stream).poll_close(cx),
         }
+    }
+}
+
+// These trait implementations are required to interface with tokio-rustls.
+
+impl TokioAsyncRead for AsyncTcpStream {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<tokio::io::Result<usize>> {
+        AsyncRead::poll_read(self, cx, buf)
+    }
+}
+
+impl TokioAsyncWrite for AsyncTcpStream {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<tokio::io::Result<usize>> {
+        AsyncWrite::poll_write(self, cx, buf)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context) -> Poll<tokio::io::Result<()>> {
+        AsyncWrite::poll_flush(self, cx)
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context) -> Poll<tokio::io::Result<()>> {
+        AsyncWrite::poll_close(self, cx)
     }
 }

@@ -7,7 +7,6 @@ use std::{
     fs::File,
     hash::{Hash, Hasher},
     io::{BufReader, Seek, SeekFrom},
-    net::{SocketAddr, ToSocketAddrs},
     str::FromStr,
     sync::Arc,
     time::Duration,
@@ -86,14 +85,6 @@ impl Hash for StreamAddress {
     {
         self.hostname.hash(state);
         self.port.unwrap_or(27017).hash(state);
-    }
-}
-
-impl ToSocketAddrs for StreamAddress {
-    type Iter = std::vec::IntoIter<SocketAddr>;
-
-    fn to_socket_addrs(&self) -> std::io::Result<Self::Iter> {
-        (self.hostname.as_str(), self.port.unwrap_or(27017)).to_socket_addrs()
     }
 }
 
@@ -466,7 +457,7 @@ impl TlsOptions {
                 }
             };
 
-            // TODO: Get rid of unwrap
+            // TODO: Get rid of unwrap.
             config.set_single_client_cert(certs, key.into_iter().next().unwrap())?;
         }
 
@@ -557,15 +548,17 @@ impl ClientOptions {
     ///   * `waitQueueTimeoutMS`: maps to the `wait_queue_timeout` field
     ///   * `wTimeoutMS`: maps to the `w_timeout` field of the `write_concern` field
     ///   * `zlibCompressionLevel`: not yet implemented
-    pub fn parse(s: &str) -> Result<Self> {
+    pub async fn parse(s: &str) -> Result<Self> {
         let parser = ClientOptionsParser::parse(s)?;
         let srv = parser.srv;
         let auth_source_present = parser.auth_source.is_some();
         let mut options: Self = parser.into();
 
         if srv {
-            let resolver = SrvResolver::new()?;
-            let mut config = resolver.resolve_client_options(&options.hosts[0].hostname)?;
+            let resolver = SrvResolver::new().await?;
+            let mut config = resolver
+                .resolve_client_options(&options.hosts[0].hostname)
+                .await?;
 
             // Set the ClientOptions hosts to those found during the SRV lookup.
             options.hosts = config.hosts;
@@ -1430,31 +1423,33 @@ mod tests {
     #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn fails_without_scheme() {
-        assert!(ClientOptions::parse("localhost:27017").is_err());
+        assert!(ClientOptions::parse("localhost:27017").await.is_err());
     }
 
     #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn fails_with_invalid_scheme() {
-        assert!(ClientOptions::parse("mangodb://localhost:27017").is_err());
+        assert!(ClientOptions::parse("mangodb://localhost:27017")
+            .await
+            .is_err());
     }
 
     #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn fails_with_nothing_after_scheme() {
-        assert!(ClientOptions::parse("mongodb://").is_err());
+        assert!(ClientOptions::parse("mongodb://").await.is_err());
     }
 
     #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn fails_with_only_slash_after_scheme() {
-        assert!(ClientOptions::parse("mongodb:///").is_err());
+        assert!(ClientOptions::parse("mongodb:///").await.is_err());
     }
 
     #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn fails_with_no_host() {
-        assert!(ClientOptions::parse("mongodb://:27017").is_err());
+        assert!(ClientOptions::parse("mongodb://:27017").await.is_err());
     }
 
     #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
@@ -1463,7 +1458,7 @@ mod tests {
         let uri = "mongodb://localhost";
 
         assert_eq!(
-            ClientOptions::parse(uri).unwrap(),
+            ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
                 hosts: vec![host_without_port("localhost")],
                 original_uri: Some(uri.into()),
@@ -1478,7 +1473,7 @@ mod tests {
         let uri = "mongodb://localhost/";
 
         assert_eq!(
-            ClientOptions::parse(uri).unwrap(),
+            ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
                 hosts: vec![host_without_port("localhost")],
                 original_uri: Some(uri.into()),
@@ -1493,7 +1488,7 @@ mod tests {
         let uri = "mongodb://localhost/";
 
         assert_eq!(
-            ClientOptions::parse(uri).unwrap(),
+            ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
@@ -1511,7 +1506,7 @@ mod tests {
         let uri = "mongodb://localhost:27017/";
 
         assert_eq!(
-            ClientOptions::parse(uri).unwrap(),
+            ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
@@ -1529,7 +1524,7 @@ mod tests {
         let uri = "mongodb://localhost:27017/?readConcernLevel=foo";
 
         assert_eq!(
-            ClientOptions::parse(uri).unwrap(),
+            ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
@@ -1545,7 +1540,9 @@ mod tests {
     #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn with_w_negative_int() {
-        assert!(ClientOptions::parse("mongodb://localhost:27017/?w=-1").is_err());
+        assert!(ClientOptions::parse("mongodb://localhost:27017/?w=-1")
+            .await
+            .is_err());
     }
 
     #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
@@ -1555,7 +1552,7 @@ mod tests {
         let write_concern = WriteConcern::builder().w(Acknowledgment::from(1)).build();
 
         assert_eq!(
-            ClientOptions::parse(uri).unwrap(),
+            ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
@@ -1577,7 +1574,7 @@ mod tests {
             .build();
 
         assert_eq!(
-            ClientOptions::parse(uri).unwrap(),
+            ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
@@ -1593,7 +1590,11 @@ mod tests {
     #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn with_invalid_j() {
-        assert!(ClientOptions::parse("mongodb://localhost:27017/?journal=foo").is_err());
+        assert!(
+            ClientOptions::parse("mongodb://localhost:27017/?journal=foo")
+                .await
+                .is_err()
+        );
     }
 
     #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
@@ -1603,7 +1604,7 @@ mod tests {
         let write_concern = WriteConcern::builder().journal(true).build();
 
         assert_eq!(
-            ClientOptions::parse(uri).unwrap(),
+            ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
@@ -1619,13 +1620,21 @@ mod tests {
     #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn with_wtimeout_non_int() {
-        assert!(ClientOptions::parse("mongodb://localhost:27017/?wtimeoutMS=foo").is_err());
+        assert!(
+            ClientOptions::parse("mongodb://localhost:27017/?wtimeoutMS=foo")
+                .await
+                .is_err()
+        );
     }
 
     #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn with_wtimeout_negative_int() {
-        assert!(ClientOptions::parse("mongodb://localhost:27017/?wtimeoutMS=-1").is_err());
+        assert!(
+            ClientOptions::parse("mongodb://localhost:27017/?wtimeoutMS=-1")
+                .await
+                .is_err()
+        );
     }
 
     #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
@@ -1637,7 +1646,7 @@ mod tests {
             .build();
 
         assert_eq!(
-            ClientOptions::parse(uri).unwrap(),
+            ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
@@ -1661,7 +1670,7 @@ mod tests {
             .build();
 
         assert_eq!(
-            ClientOptions::parse(uri).unwrap(),
+            ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
                 hosts: vec![StreamAddress {
                     hostname: "localhost".to_string(),
@@ -1693,7 +1702,7 @@ mod tests {
             .build();
 
         assert_eq!(
-            ClientOptions::parse(uri).unwrap(),
+            ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
                 hosts: vec![
                     StreamAddress {

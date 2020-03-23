@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::{options::ClientOptions, test::run_spec_test};
+use crate::{options::ClientOptions, test::run_spec_test, RUNTIME};
 
 #[derive(Debug, Deserialize)]
 struct TestFile {
@@ -28,16 +28,19 @@ struct ParsedOptions {
     db: Option<String>,
 }
 
-// TODO RUST-300: re-enable these tests once async SRV resolution is implemented.
-// #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
-// #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-#[allow(dead_code)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
     let run_test = |mut test_file: TestFile| {
-        let result = ClientOptions::parse(&test_file.uri);
+        // TODO DRIVERS-796: unskip this test
+        if test_file.uri == "mongodb+srv://test5.test.build.10gen.cc/?authSource=otherDB" {
+            return;
+        }
+
+        let result = RUNTIME.block_on(ClientOptions::parse(&test_file.uri));
 
         if let Some(true) = test_file.error {
-            assert!(matches!(result, Err(_)));
+            assert!(matches!(result, Err(_)), test_file.comment.unwrap());
             return;
         }
 
@@ -89,7 +92,7 @@ async fn run() {
                 ssl: options.tls_options().is_some(),
             };
 
-            assert_eq!(&*resolved_options, &actual_options);
+            assert_eq!(&actual_options, resolved_options);
         }
 
         if let Some(mut parsed_options) = test_file.parsed_options {

@@ -3,19 +3,19 @@ use std::{
     time::Duration,
 };
 
-use bson::{bson, doc};
+use bson::doc;
 use futures_timer::Delay;
 use time::PreciseTime;
 
 use super::{
     description::server::{ServerDescription, ServerType},
-    state::{server::Server, Topology},
+    state::{server::Server, Topology, WeakTopology},
 };
 use crate::{
     cmap::{Command, Connection},
     error::Result,
     is_master::IsMasterReply,
-    options::{ClientOptions, StreamAddress},
+    options::StreamAddress,
     RUNTIME,
 };
 
@@ -28,41 +28,36 @@ pub(super) struct Monitor {
     connection: Option<Connection>,
     server: Weak<Server>,
     server_type: ServerType,
-    options: ClientOptions,
+    topology: WeakTopology,
 }
 
 impl Monitor {
     /// Starts a monitoring thread associated with a given Server. A weak reference is used to
     /// ensure that the monitoring thread doesn't keep the server alive after it's been removed
     /// from the topology or the client has been dropped.
-    pub(super) fn start(
-        address: StreamAddress,
-        server: Weak<Server>,
-        options: ClientOptions,
-    ) -> Result<()> {
+    pub(super) fn start(address: StreamAddress, server: Weak<Server>, topology: WeakTopology) {
         let mut monitor = Self {
             address,
             connection: None,
             server,
             server_type: ServerType::Unknown,
-            options,
+            topology,
         };
 
         RUNTIME.execute(async move {
             monitor.execute().await;
         });
-
-        Ok(())
     }
 
     async fn execute(&mut self) {
         let heartbeat_frequency = self
-            .options
+            .topology
+            .client_options()
             .heartbeat_freq
             .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
 
         while let Some(server) = self.server.upgrade() {
-            let topology = match server.topology() {
+            let topology = match self.topology.upgrade() {
                 Some(topology) => topology,
                 None => break,
             };
@@ -135,8 +130,8 @@ impl Monitor {
 
         let connection = Connection::new_monitoring(
             self.address.clone(),
-            self.options.connect_timeout,
-            self.options.tls_options(),
+            self.topology.client_options().connect_timeout,
+            self.topology.client_options().tls_options(),
         )
         .await?;
 

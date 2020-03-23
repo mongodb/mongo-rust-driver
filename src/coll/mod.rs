@@ -3,7 +3,7 @@ pub mod options;
 
 use std::{fmt, sync::Arc};
 
-use bson::{bson, doc, Bson, Document};
+use bson::{doc, Bson, Document};
 use serde::{de::Error, Deserialize, Deserializer};
 
 use self::options::*;
@@ -27,6 +27,7 @@ use crate::{
     Client,
     Cursor,
     Database,
+    RUNTIME,
 };
 
 /// Maximum size in bytes of an insert batch.
@@ -47,8 +48,8 @@ const MAX_INSERT_DOCS_BYTES: usize = 16 * 1000 * 1000;
 /// # use bson::{bson, doc};
 /// # use mongodb::{Client, error::Result};
 /// #
-/// # fn start_workers() -> Result<()> {
-/// # let client = Client::with_uri_str("mongodb://example.com")?;
+/// # async fn start_workers() -> Result<()> {
+/// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// let coll = client.database("items").collection("in_stock");
 ///
 /// for i in 0..5 {
@@ -151,7 +152,7 @@ impl Collection {
         resolve_options!(self, options, [write_concern]);
 
         let drop = DropCollection::new(self.namespace(), options);
-        self.client().execute_operation(&drop, None)
+        RUNTIME.block_on(self.client().execute_operation(&drop, None))
     }
 
     /// Runs an aggregation operation.
@@ -172,8 +173,8 @@ impl Collection {
 
         let aggregate = Aggregate::new(self.namespace(), pipeline, options);
         let client = self.client();
-        client
-            .execute_operation(&aggregate, None)
+        RUNTIME
+            .block_on(client.execute_operation(&aggregate, None))
             .map(|spec| Cursor::new(client.clone(), spec))
     }
 
@@ -186,7 +187,7 @@ impl Collection {
         resolve_options!(self, options, [read_concern, selection_criteria]);
 
         let op = Count::new(self.namespace(), options);
-        self.client().execute_operation(&op, None)
+        RUNTIME.block_on(self.client().execute_operation(&op, None))
     }
 
     /// Gets the number of documents matching `filter`.
@@ -270,7 +271,7 @@ impl Collection {
         resolve_options!(self, options, [write_concern]);
 
         let delete = Delete::new(self.namespace(), query, None, options);
-        self.client().execute_operation(&delete, None)
+        RUNTIME.block_on(self.client().execute_operation(&delete, None))
     }
 
     /// Deletes up to one document found matching `query`.
@@ -283,7 +284,7 @@ impl Collection {
         resolve_options!(self, options, [write_concern]);
 
         let delete = Delete::new(self.namespace(), query, Some(1), options);
-        self.client().execute_operation(&delete, None)
+        RUNTIME.block_on(self.client().execute_operation(&delete, None))
     }
 
     /// Finds the distinct values of the field specified by `field_name` across the collection.
@@ -302,7 +303,7 @@ impl Collection {
             filter.into(),
             options,
         );
-        self.client().execute_operation(&op, None)
+        RUNTIME.block_on(self.client().execute_operation(&op, None))
     }
 
     /// Finds the documents in the collection matching `filter`.
@@ -313,8 +314,8 @@ impl Collection {
     ) -> Result<Cursor> {
         let find = Find::new(self.namespace(), filter.into(), options.into());
         let client = self.client();
-        client
-            .execute_operation(&find, None)
+        RUNTIME
+            .block_on(client.execute_operation(&find, None))
             .map(|spec| Cursor::new(client.clone(), spec))
     }
 
@@ -343,7 +344,7 @@ impl Collection {
         resolve_options!(self, options, [write_concern]);
 
         let op = FindAndModify::with_delete(self.namespace(), filter, options);
-        self.client().execute_operation(&op, None)
+        RUNTIME.block_on(self.client().execute_operation(&op, None))
     }
 
     /// Atomically finds up to one document in the collection matching `filter` and replaces it with
@@ -358,7 +359,7 @@ impl Collection {
         resolve_options!(self, options, [write_concern]);
 
         let op = FindAndModify::with_replace(self.namespace(), filter, replacement, options)?;
-        self.client().execute_operation(&op, None)
+        RUNTIME.block_on(self.client().execute_operation(&op, None))
     }
 
     /// Atomically finds up to one document in the collection matching `filter` and updates it.
@@ -376,7 +377,7 @@ impl Collection {
         resolve_options!(self, options, [write_concern]);
 
         let op = FindAndModify::with_update(self.namespace(), filter, update, options)?;
-        self.client().execute_operation(&op, None)
+        RUNTIME.block_on(self.client().execute_operation(&op, None))
     }
 
     /// Inserts the documents in `docs` into the collection.
@@ -414,7 +415,7 @@ impl Collection {
             n_attempted += current_batch_size;
 
             let insert = Insert::new(self.namespace(), current_batch, options.clone());
-            match self.client().execute_operation(&insert, None) {
+            match RUNTIME.block_on(self.client().execute_operation(&insert, None)) {
                 Ok(result) => {
                     if cumulative_failure.is_none() {
                         let cumulative_result =
@@ -475,8 +476,8 @@ impl Collection {
             vec![doc],
             options.map(InsertManyOptions::from_insert_one_options),
         );
-        self.client()
-            .execute_operation(&insert, None)
+        RUNTIME
+            .block_on(self.client().execute_operation(&insert, None))
             .map(InsertOneResult::from_insert_many_result)
             .map_err(convert_bulk_errors)
     }
@@ -500,7 +501,7 @@ impl Collection {
             false,
             options.map(UpdateOptions::from_replace_options),
         );
-        self.client().execute_operation(&update, None)
+        RUNTIME.block_on(self.client().execute_operation(&update, None))
     }
 
     /// Updates all documents matching `query` in the collection.
@@ -525,7 +526,7 @@ impl Collection {
         resolve_options!(self, options, [write_concern]);
 
         let update = Update::new(self.namespace(), query, update, true, options);
-        self.client().execute_operation(&update, None)
+        RUNTIME.block_on(self.client().execute_operation(&update, None))
     }
 
     /// Updates up to one document matching `query` in the collection.
@@ -544,7 +545,7 @@ impl Collection {
         resolve_options!(self, options, [write_concern]);
 
         let update = Update::new(self.namespace(), query, update.into(), false, options);
-        self.client().execute_operation(&update, None)
+        RUNTIME.block_on(self.client().execute_operation(&update, None))
     }
 
     /// Creates the indexes specified by `models`.

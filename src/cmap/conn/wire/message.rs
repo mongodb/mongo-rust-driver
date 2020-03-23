@@ -1,6 +1,6 @@
 use bitflags::bitflags;
 use bson::Document;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use futures::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use super::{
     header::{Header, OpCode},
@@ -10,7 +10,7 @@ use crate::{
     bson_util::async_encoding,
     cmap::conn::command::Command,
     error::{ErrorKind, Result},
-    runtime::AsyncStream,
+    runtime::{AsyncLittleEndianRead, AsyncLittleEndianWrite, AsyncStream},
 };
 
 /// Represents an OP_MSG wire protocol operation.

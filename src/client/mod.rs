@@ -19,7 +19,6 @@ use crate::{
     operation::ListDatabases,
     options::{ClientOptions, DatabaseOptions, ReadPreference, SelectionCriteria},
     sdam::{Server, Topology},
-    RUNTIME,
 };
 
 const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
@@ -34,8 +33,8 @@ const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 /// ```rust
 /// # use mongodb::{Client, error::Result};
 /// #
-/// # fn start_workers() -> Result<()> {
-/// let client = Client::with_uri_str("mongodb://example.com")?;
+/// # async fn start_workers() -> Result<()> {
+/// let client = Client::with_uri_str("mongodb://example.com").await?;
 ///
 /// for i in 0..5 {
 ///     let client_ref = client.clone();
@@ -71,8 +70,8 @@ impl Client {
     ///
     /// See the documentation on
     /// [`ClientOptions::parse`](options/struct.ClientOptions.html#method.parse) for more details.
-    pub fn with_uri_str(uri: &str) -> Result<Self> {
-        let options = ClientOptions::parse(uri)?;
+    pub async fn with_uri_str(uri: &str) -> Result<Self> {
+        let options = ClientOptions::parse(uri).await?;
 
         Client::with_options(options)
     }
@@ -82,7 +81,7 @@ impl Client {
         options.validate()?;
 
         let inner = Arc::new(ClientInner {
-            topology: RUNTIME.block_on(Topology::new(options.clone()))?,
+            topology: Topology::new(options.clone())?,
             options,
         });
 
@@ -131,15 +130,21 @@ impl Client {
     }
 
     /// Gets information about each database present in the cluster the Client is connected to.
-    pub fn list_databases(&self, filter: impl Into<Option<Document>>) -> Result<Vec<Document>> {
+    pub async fn list_databases(
+        &self,
+        filter: impl Into<Option<Document>>,
+    ) -> Result<Vec<Document>> {
         let op = ListDatabases::new(filter.into(), false);
-        self.execute_operation(&op, None)
+        self.execute_operation(&op, None).await
     }
 
     /// Gets the names of the databases present in the cluster the Client is connected to.
-    pub fn list_database_names(&self, filter: impl Into<Option<Document>>) -> Result<Vec<String>> {
+    pub async fn list_database_names(
+        &self,
+        filter: impl Into<Option<Document>>,
+    ) -> Result<Vec<String>> {
         let op = ListDatabases::new(filter.into(), true);
-        match self.execute_operation(&op, None) {
+        match self.execute_operation(&op, None).await {
             Ok(databases) => databases
                 .into_iter()
                 .map(|doc| {

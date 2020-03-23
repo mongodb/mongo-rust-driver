@@ -2,7 +2,10 @@ use bson::{Bson, Document};
 use serde::Deserialize;
 
 use super::{Outcome, TestFile};
-use crate::test::{run_spec_test, util::TestClient, LOCK};
+use crate::{
+    test::{run_spec_test, util::TestClient, LOCK},
+    RUNTIME,
+};
 
 #[derive(Debug, Deserialize)]
 struct Arguments {
@@ -17,7 +20,7 @@ struct ResultDoc {
 
 #[function_name::named]
 fn run_insert_one_test(test_file: TestFile) {
-    let client = TestClient::new();
+    let client = RUNTIME.block_on(TestClient::new());
     let data = test_file.data;
 
     for mut test_case in test_file.tests {

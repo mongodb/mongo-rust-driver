@@ -1,4 +1,4 @@
-use bson::{bson, doc};
+use bson::doc;
 
 use super::RunCommand;
 use crate::{

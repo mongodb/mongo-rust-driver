@@ -9,6 +9,7 @@ use crate::{
         ClientOptions,
     },
     test::run_spec_test,
+    RUNTIME,
 };
 
 #[derive(Debug, Deserialize)]
@@ -65,7 +66,7 @@ fn run_auth_test(test_file: TestFile) {
             continue;
         }
 
-        match ClientOptions::parse(test_case.uri.as_str()) {
+        match RUNTIME.block_on(ClientOptions::parse(test_case.uri.as_str())) {
             Ok(options) => {
                 assert!(test_case.valid, "{}", test_case.description);
                 match test_case.credential {

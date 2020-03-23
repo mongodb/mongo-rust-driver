@@ -1,4 +1,4 @@
-use bson::{bson, doc, Bson, Document};
+use bson::{doc, Bson, Document};
 
 use crate::{
     cmap::{CommandResponse, StreamDescription},

@@ -1,8 +1,8 @@
 use std::{collections::VecDeque, time::Duration};
 
-use bson::{bson, doc, Document};
+use bson::{doc, Document};
 
-use crate::{error::Result, operation::GetMore, options::StreamAddress, Client, Namespace};
+use crate::{error::Result, operation::GetMore, options::StreamAddress, Client, Namespace, RUNTIME};
 
 /// A `Cursor` streams the result of a query. When a query is made, a `Cursor` will be returned with
 /// the first batch of results from the server; the documents will be returned as the `Cursor` is
@@ -27,8 +27,8 @@ use crate::{error::Result, operation::GetMore, options::StreamAddress, Client, N
 /// ```rust
 /// # use mongodb::{Client, error::Result};
 /// #
-/// # fn do_stuff() -> Result<()> {
-/// # let client = Client::with_uri_str("mongodb://example.com")?;
+/// # async fn do_stuff() -> Result<()> {
+/// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// # let coll = client.database("foo").collection("bar");
 /// # let cursor = coll.find(None, None)?;
 /// #
@@ -48,8 +48,8 @@ use crate::{error::Result, operation::GetMore, options::StreamAddress, Client, N
 /// # use bson::{doc, bson, Document};
 /// # use mongodb::{Client, error::Result};
 /// #
-/// # fn do_stuff() -> Result<()> {
-/// # let client = Client::with_uri_str("mongodb://example.com")?;
+/// # async fn do_stuff() -> Result<()> {
+/// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// # let coll = client.database("foo").collection("bar");
 /// # let cursor = coll.find(Some(doc! { "x": 1 }), None)?;
 /// #
@@ -92,13 +92,13 @@ impl Drop for Cursor {
 
         let namespace = self.get_more.namespace();
 
-        let _ = self.client.database(&namespace.db).run_command(
+        let _ = RUNTIME.block_on(self.client.database(&namespace.db).run_command(
             doc! {
                 "killCursors": &namespace.coll,
                 "cursors": [self.get_more.cursor_id()]
             },
             None,
-        );
+        ));
     }
 }
 
@@ -107,7 +107,7 @@ impl Iterator for Cursor {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.buffer.is_empty() && !self.exhausted {
-            match self.client.execute_operation(&self.get_more, None) {
+            match RUNTIME.block_on(self.client.execute_operation(&self.get_more, None)) {
                 Ok(get_more_result) => {
                     self.buffer.extend(get_more_result.batch);
                     self.exhausted = get_more_result.exhausted;

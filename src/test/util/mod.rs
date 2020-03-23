@@ -10,7 +10,7 @@ pub use self::{
 
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
-use bson::{bson, doc, oid::ObjectId, Bson};
+use bson::{doc, oid::ObjectId, Bson};
 use semver::Version;
 use serde::Deserialize;
 
@@ -39,11 +39,11 @@ impl std::ops::Deref for TestClient {
 }
 
 impl TestClient {
-    pub fn new() -> Self {
-        Self::with_handler(None)
+    pub async fn new() -> Self {
+        Self::with_handler(None).await
     }
 
-    fn with_handler(event_handler: Option<EventHandler>) -> Self {
+    async fn with_handler(event_handler: Option<EventHandler>) -> Self {
         let mut options = CLIENT_OPTIONS.clone();
 
         if let Some(event_handler) = event_handler {
@@ -58,6 +58,7 @@ impl TestClient {
             client
                 .database("admin")
                 .run_command(doc! { "isMaster":  1 }, None)
+                .await
                 .unwrap(),
         ))
         .unwrap();
@@ -65,6 +66,7 @@ impl TestClient {
         let response = client
             .database("test")
             .run_command(doc! { "buildInfo": 1 }, None)
+            .await
             .unwrap();
 
         let info: BuildInfo = bson::from_bson(Bson::Document(response)).unwrap();
@@ -78,7 +80,7 @@ impl TestClient {
         }
     }
 
-    pub fn create_user(
+    pub async fn create_user(
         &self,
         user: &str,
         pwd: &str,
@@ -91,7 +93,7 @@ impl TestClient {
             let ms: bson::Array = mechanisms.iter().map(|s| Bson::from(s.as_str())).collect();
             cmd.insert("mechanisms", ms);
         }
-        self.database("admin").run_command(cmd, None)?;
+        self.database("admin").run_command(cmd, None).await?;
         Ok(())
     }
 
