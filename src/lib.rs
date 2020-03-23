@@ -7,8 +7,8 @@
 //! ```rust
 //! # use mongodb::{Client, error::Result};
 //! #
-//! # fn make_client() -> Result<Client> {
-//! let client = Client::with_uri_str("mongodb://localhost:27017/")?;
+//! # async fn make_client() -> Result<Client> {
+//! let client = Client::with_uri_str("mongodb://localhost:27017/").await?;
 //! # Ok(client)
 //! # }
 //! ```
@@ -44,11 +44,11 @@
 //! # use bson::{bson, doc};
 //! # use mongodb::{Client, error::Result};
 //! #
-//! # fn do_stuff() -> Result<()> {
-//! # let client = Client::with_uri_str("mongodb://localhost:27017")?;
+//! # async fn do_stuff() -> Result<()> {
+//! # let client = Client::with_uri_str("mongodb://localhost:27017").await?;
 //! #
 //! let db = client.database("some_db");
-//! for coll_name in db.list_collection_names(None)? {
+//! for coll_name in db.list_collection_names(None).await? {
 //!     println!("collection: {}", coll_name);
 //! }
 //!

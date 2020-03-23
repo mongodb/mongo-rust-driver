@@ -5,6 +5,7 @@ use super::{Outcome, TestFile};
 use crate::{
     options::{Collation, ReplaceOptions},
     test::{run_spec_test, util::TestClient, LOCK},
+    RUNTIME,
 };
 
 #[derive(Debug, Deserialize)]
@@ -27,7 +28,7 @@ struct ResultDoc {
 
 #[function_name::named]
 fn run_replace_one_test(test_file: TestFile) {
-    let client = TestClient::new();
+    let client = RUNTIME.block_on(TestClient::new());
     let data = test_file.data;
 
     for test_case in test_file.tests {

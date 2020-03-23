@@ -249,6 +249,29 @@ impl TopologyDescription {
         }
     }
 
+    /// Returns the diff between this topology description and the provided one, or `None` if
+    /// they are equal.
+    ///
+    /// The returned `TopologyDescriptionDiff` refers to the changes reflected in the provided
+    /// description. For example, if the provided description has a server in it that this
+    /// description does not, it will be returned in the `new_servers` field.
+    pub(crate) fn diff(&self, other: &TopologyDescription) -> Option<TopologyDescriptionDiff> {
+        if self == other {
+            return None;
+        }
+
+        let addresses: HashSet<&StreamAddress> = self.server_addresses().collect();
+        let other_addresses: HashSet<&StreamAddress> = other.server_addresses().collect();
+
+        Some(TopologyDescriptionDiff {
+            new_addresses: other_addresses
+                .difference(&addresses)
+                .cloned()
+                .cloned()
+                .collect(),
+        })
+    }
+
     /// Update the topology based on the new information about the topology contained by the
     /// ServerDescription.
     pub(crate) fn update(&mut self, mut server_description: ServerDescription) -> Result<()> {
@@ -521,6 +544,13 @@ impl TopologyDescription {
 
         Ok(())
     }
+}
+
+/// A struct representing the diff between two `TopologyDescription`s.
+/// Returned from `TopologyDescription::diff`.
+#[derive(Debug)]
+pub(crate) struct TopologyDescriptionDiff {
+    pub(crate) new_addresses: HashSet<StreamAddress>,
 }
 
 fn verify_max_staleness(max_staleness: Option<Duration>) -> Result<()> {

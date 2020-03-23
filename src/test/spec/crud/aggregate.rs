@@ -5,6 +5,7 @@ use super::{Outcome, TestFile};
 use crate::{
     options::{AggregateOptions, Collation},
     test::{run_spec_test, util::TestClient, LOCK},
+    RUNTIME,
 };
 
 #[derive(Debug, Deserialize)]
@@ -17,7 +18,7 @@ struct Arguments {
 
 #[function_name::named]
 fn run_aggregate_test(test_file: TestFile) {
-    let client = TestClient::new();
+    let client = RUNTIME.block_on(TestClient::new());
 
     let data = test_file.data;
 

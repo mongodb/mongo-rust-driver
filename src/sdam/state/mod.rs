@@ -55,7 +55,7 @@ pub(crate) struct TopologyState {
 
 impl Topology {
     /// Creates a new Topology given the `options`.
-    pub(crate) async fn new(mut options: ClientOptions) -> Result<Self> {
+    pub(crate) fn new(mut options: ClientOptions) -> Result<Self> {
         let description = TopologyDescription::new(options.clone())?;
 
         let hosts: Vec<_> = options.hosts.drain(..).collect();
@@ -65,19 +65,20 @@ impl Topology {
             options: options.clone(),
         };
 
-        let state = Arc::new(RwLock::new(TopologyState {
+        let mut topology_state = TopologyState {
             description,
             servers: Default::default(),
-        }));
+        };
 
+        for address in hosts.iter() {
+            topology_state.add_new_server(address.clone(), options.clone());
+        }
+
+        let state = Arc::new(RwLock::new(topology_state.clone()));
         let topology = Topology { state, common };
 
-        {
-            let mut state = topology.state.write().await;
-
-            for address in hosts {
-                state.add_new_server(address, topology.clone())?;
-            }
+        for address in hosts {
+            topology_state.start_monitoring_server(address.clone(), topology.downgrade());
         }
 
         Ok(topology)
@@ -214,21 +215,26 @@ impl Topology {
         // doesn't check the fields of an Unknown server, and we only return Unknown server
         // descriptions when errors occur. Once we implement SDAM monitoring, we can
         // properly inform users of errors that occur here.
-        let _ = state_clone.update(server_description, self.clone());
+        let _ = state_clone.update(server_description, self.common.options.clone());
 
-        if old_description == state_clone.description {
-            return false;
+        match old_description.diff(&state_clone.description) {
+            None => false,
+            Some(diff) => {
+                // Now that we have the proper state in the copy, acquire a lock on the proper
+                // topology and move the info over.
+                let mut state_lock = self.state.write().await;
+                state_lock.description = state_clone.description;
+                state_lock.servers = state_clone.servers;
+
+                for new_address in diff.new_addresses {
+                    state_lock.start_monitoring_server(new_address, self.downgrade());
+                }
+
+                self.common.message_manager.notify_topology_changed();
+
+                true
+            }
         }
-
-        // Now that we have the proper state in the copy, acquire a lock on the proper topology and
-        // move the info over.
-        let mut state_lock = self.state.write().await;
-        state_lock.description = state_clone.description;
-        state_lock.servers = state_clone.servers;
-
-        self.common.message_manager.notify_topology_changed();
-
-        true
     }
 
     /// Updates the given `command` as needed based on the `critiera`.
@@ -253,25 +259,23 @@ impl WeakTopology {
             common: self.common.clone(),
         })
     }
+
+    pub(crate) fn client_options(&self) -> &ClientOptions {
+        &self.common.options
+    }
 }
 
 impl TopologyState {
     /// Adds a new server to the cluster.
     ///
     /// A reference to the containing Topology is needed in order to start the monitoring task.
-    fn add_new_server(&mut self, address: StreamAddress, topology: Topology) -> Result<()> {
+    fn add_new_server(&mut self, address: StreamAddress, options: ClientOptions) {
         if self.servers.contains_key(&address) {
-            return Ok(());
+            return;
         }
 
-        let options = topology.common.options.clone();
-
-        let server = Arc::new(Server::new(topology.downgrade(), address.clone(), &options));
-        self.servers.insert(address.clone(), server.clone());
-
-        Monitor::start(address, Arc::downgrade(&server), options)?;
-
-        Ok(())
+        let server = Arc::new(Server::new(address.clone(), &options));
+        self.servers.insert(address, server);
     }
 
     /// Updates the given `command` as needed based on the `critiera`.
@@ -297,18 +301,28 @@ impl TopologyState {
     /// This must **ONLY** be called on a copy of a TopologyState, not one that is stored in a
     /// client. The `topology` parameter should contain a reference to the Topology that
     /// is actually stored in a client.
-    pub(crate) fn update(&mut self, server: ServerDescription, topology: Topology) -> Result<()> {
+    pub(crate) fn update(
+        &mut self,
+        server: ServerDescription,
+        options: ClientOptions,
+    ) -> Result<()> {
         self.description.update(server)?;
-
         let addresses: HashSet<_> = self.description.server_addresses().cloned().collect();
 
         for address in addresses.iter() {
-            self.add_new_server(address.clone(), topology.clone())?;
+            self.add_new_server(address.clone(), options.clone());
         }
 
         self.servers
             .retain(|address, _| addresses.contains(address));
 
         Ok(())
+    }
+
+    /// Start a monitor for the server at the given address if it is part of the topology.
+    fn start_monitoring_server(&self, address: StreamAddress, topology: WeakTopology) {
+        if let Some(server) = self.servers.get(&address) {
+            Monitor::start(address, Arc::downgrade(&server), topology);
+        }
     }
 }

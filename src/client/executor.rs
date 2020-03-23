@@ -34,50 +34,49 @@ impl Client {
     /// Executes an operation and returns the connection used to do so along with the result of the
     /// operation. This will be used primarily for the opening of exhaust cursors.
     #[allow(dead_code)]
-    pub(crate) fn execute_exhaust_operation<T: Operation>(
+    pub(crate) async fn execute_exhaust_operation<T: Operation>(
         &self,
         op: &T,
     ) -> Result<(T::O, Connection)> {
         let server = RUNTIME.block_on(self.select_server(op.selection_criteria()))?;
         let mut conn = RUNTIME.block_on(server.checkout_connection())?;
         self.execute_operation_on_connection(op, &mut conn)
+            .await
             .map(|r| (r, conn))
     }
 
     /// Execute the given operation, optionally specifying a connection used to do so.
     /// If no connection is provided, server selection will performed using the criteria specified
     /// on the operation, if any.
-    pub(crate) fn execute_operation<T: Operation>(
+    pub(crate) async fn execute_operation<T: Operation>(
         &self,
         op: &T,
         connection: Option<&mut Connection>,
     ) -> Result<T::O> {
         // if no connection provided, select one.
         match connection {
-            Some(conn) => self.execute_operation_on_connection(op, conn),
+            Some(conn) => self.execute_operation_on_connection(op, conn).await,
             None => {
-                let server = RUNTIME.block_on(self.select_server(op.selection_criteria()))?;
+                let server = self.select_server(op.selection_criteria()).await?;
 
-                let mut conn = match RUNTIME.block_on(server.checkout_connection()) {
+                let mut conn = match server.checkout_connection().await {
                     Ok(conn) => conn,
                     Err(err) => {
-                        RUNTIME.block_on(
-                            self.inner
-                                .topology
-                                .handle_pre_handshake_error(err.clone(), server.address.clone()),
-                        );
+                        self.inner
+                            .topology
+                            .handle_pre_handshake_error(err.clone(), server.address.clone())
+                            .await;
                         return Err(err);
                     }
                 };
 
-                match self.execute_operation_on_connection(op, &mut conn) {
+                match self.execute_operation_on_connection(op, &mut conn).await {
                     Ok(result) => Ok(result),
                     Err(err) => {
-                        RUNTIME.block_on(self.inner.topology.handle_post_handshake_error(
-                            err.clone(),
-                            conn,
-                            server,
-                        ));
+                        self.inner
+                            .topology
+                            .handle_post_handshake_error(err.clone(), conn, server)
+                            .await;
                         Err(err)
                     }
                 }
@@ -86,17 +85,16 @@ impl Client {
     }
 
     /// Executes an operation on a given connection.
-    fn execute_operation_on_connection<T: Operation>(
+    async fn execute_operation_on_connection<T: Operation>(
         &self,
         op: &T,
         connection: &mut Connection,
     ) -> Result<T::O> {
         let mut cmd = op.build(connection.stream_description()?)?;
-        RUNTIME.block_on(self.inner.topology.update_command_with_read_pref(
-            connection.address(),
-            &mut cmd,
-            op.selection_criteria(),
-        ));
+        self.inner
+            .topology
+            .update_command_with_read_pref(connection.address(), &mut cmd, op.selection_criteria())
+            .await;
 
         let connection_info = connection.info();
         let request_id = crate::cmap::conn::next_request_id();
@@ -122,8 +120,9 @@ impl Client {
 
         let start_time = PreciseTime::now();
 
-        let response_result = RUNTIME
-            .block_on(connection.send_command(cmd.clone(), request_id))
+        let response_result = connection
+            .send_command(cmd.clone(), request_id)
+            .await
             .and_then(|response| {
                 if !op.handles_command_errors() {
                     response.validate()?;
