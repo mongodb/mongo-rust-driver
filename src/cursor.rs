@@ -81,9 +81,7 @@ pub struct Cursor {
     client: Client,
     get_more: GetMore,
     exhausted: bool,
-
-    /// This will be None when the cursor is exhausted.
-    state: Option<PollState>,
+    state: State,
 }
 
 /// Describes the current state of the Cursor. If the state is Executing, then a getMore operation
@@ -91,9 +89,10 @@ pub struct Cursor {
 /// batch.
 #[derive(Derivative)]
 #[derivative(Debug)]
-enum PollState {
+enum State {
     Executing(#[derivative(Debug = "ignore")] BoxFuture<'static, Result<GetMoreResult>>),
     Buffer(VecDeque<Document>),
+    Exhausted,
 }
 
 impl Cursor {
@@ -110,7 +109,7 @@ impl Cursor {
             client,
             get_more,
             exhausted: spec.id == 0,
-            state: Some(PollState::Buffer(spec.buffer)),
+            state: State::Buffer(spec.buffer),
         }
     }
 }
@@ -144,10 +143,12 @@ impl Stream for Cursor {
     type Item = Result<Document>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        match self.state.take() {
+        let exhausted = self.exhausted;
+
+        match self.state {
             // If the current state is Executing, then we check the progress of the getMore
             // operation.
-            Some(PollState::Executing(mut future)) => match Pin::new(&mut future).poll(cx) {
+            State::Executing(ref mut future) => match Pin::new(future).poll(cx) {
                 // If the getMore is finished and successful, then we pop off the first document
                 // from the batch, set the poll state to Buffer, record whether the cursor is
                 // exhausted, and return the popped document.
@@ -155,7 +156,7 @@ impl Stream for Cursor {
                     let mut buffer: VecDeque<_> = get_more_result.batch.into_iter().collect();
                     let next_doc = buffer.pop_front();
 
-                    self.state = Some(PollState::Buffer(buffer));
+                    self.state = State::Buffer(buffer);
                     self.exhausted = get_more_result.exhausted;
                     Poll::Ready(next_doc.map(Ok))
                 }
@@ -164,18 +165,15 @@ impl Stream for Cursor {
                 Poll::Ready(Err(e)) => Poll::Ready(Some(Err(e))),
 
                 // If the getMore has not finished, keep the state as Executing and return.
-                Poll::Pending => {
-                    self.state = Some(PollState::Executing(future));
-                    Poll::Pending
-                }
+                Poll::Pending => Poll::Pending,
             },
 
-            Some(PollState::Buffer(mut buffer)) => {
+            State::Buffer(ref mut buffer) => {
                 // If there is a document ready, return it.
                 let poll = if let Some(doc) = buffer.pop_front() {
                     Poll::Ready(Some(Ok(doc)))
                 // If the cursor is exhausted, return None.
-                } else if self.exhausted {
+                } else if exhausted {
                     Poll::Ready(None)
                 // Since no document is ready and the cursor isn't exhausted, we need to start a new
                 // getMore operation, so return that the operation is pending.
@@ -185,8 +183,8 @@ impl Stream for Cursor {
 
                 // If no documents are left and the batch and the cursor is exhausted, set the state
                 // to None.
-                self.state = if buffer.is_empty() && self.exhausted {
-                    None
+                if buffer.is_empty() && exhausted {
+                    self.state = State::Exhausted;
                 // If the batch is empty and the cursor is not exhausted, start a new operation and
                 // set the state to Executing.
                 } else if buffer.is_empty() {
@@ -196,11 +194,7 @@ impl Stream for Cursor {
                             .execute_operation_owned(self.get_more.clone()),
                     );
 
-                    Some(PollState::Executing(future))
-                // Otherwise, there are documents left in the batch, so save the buffer as the
-                // state.
-                } else {
-                    Some(PollState::Buffer(buffer))
+                    self.state = State::Executing(future);
                 };
 
                 poll
@@ -208,7 +202,7 @@ impl Stream for Cursor {
 
             // If the state is None, then the cursor has already exhausted all its results, so do
             // nothing.
-            None => Poll::Ready(None),
+            State::Exhausted => Poll::Ready(None),
         }
     }
 }
