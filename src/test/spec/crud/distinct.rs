@@ -5,7 +5,6 @@ use super::{Outcome, TestFile};
 use crate::{
     options::{Collation, DistinctOptions},
     test::{run_spec_test, util::TestClient, LOCK},
-    RUNTIME,
 };
 
 #[derive(Debug, Deserialize)]
@@ -17,8 +16,8 @@ struct Arguments {
 }
 
 #[function_name::named]
-fn run_distinct_test(test_file: TestFile) {
-    let client = RUNTIME.block_on(TestClient::new());
+async fn run_distinct_test(test_file: TestFile) {
+    let client = TestClient::new().await;
     let data = test_file.data;
 
     for mut test_case in test_file.tests {
@@ -30,10 +29,11 @@ fn run_distinct_test(test_file: TestFile) {
 
         test_case.description = test_case.description.replace('$', "%");
 
-        let coll =
-            RUNTIME.block_on(client.init_db_and_coll(function_name!(), &test_case.description));
-        RUNTIME
-            .block_on(coll.insert_many(data.clone(), None))
+        let coll = client
+            .init_db_and_coll(function_name!(), &test_case.description)
+            .await;
+        coll.insert_many(data.clone(), None)
+            .await
             .expect(&test_case.description);
 
         let arguments: Arguments = bson::from_bson(Bson::Document(test_case.operation.arguments))
@@ -43,7 +43,7 @@ fn run_distinct_test(test_file: TestFile) {
 
         if let Some(ref c) = outcome.collection {
             if let Some(ref name) = c.name {
-                RUNTIME.block_on(client.drop_collection(function_name!(), name));
+                client.drop_collection(function_name!(), name).await;
             }
         }
 
@@ -52,8 +52,9 @@ fn run_distinct_test(test_file: TestFile) {
             ..Default::default()
         };
 
-        let result = RUNTIME
-            .block_on(coll.distinct(&arguments.field_name, arguments.filter, opts))
+        let result = coll
+            .distinct(&arguments.field_name, arguments.filter, opts)
+            .await
             .expect(&test_case.description);
         assert_eq!(result, outcome.result, "{}", test_case.description);
     }
@@ -62,5 +63,5 @@ fn run_distinct_test(test_file: TestFile) {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
-    run_spec_test(&["crud", "v1", "read"], run_distinct_test);
+    run_spec_test(&["crud", "v1", "read"], run_distinct_test).await;
 }

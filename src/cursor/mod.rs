@@ -40,7 +40,7 @@ pub use impatient::ImpatientCursor;
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// # let coll = client.database("foo").collection("bar");
-/// # let mut cursor = coll.find(None, None)?;
+/// # let cursor = coll.find(None, None).await?;
 /// #
 /// while let Some(doc) = cursor.next().await {
 ///   println!("{}", doc?)
@@ -63,7 +63,7 @@ pub use impatient::ImpatientCursor;
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// # let coll = client.database("foo").collection("bar");
-/// # let cursor = coll.find(Some(doc! { "x": 1 }), None)?;
+/// # let cursor = coll.find(Some(doc! { "x": 1 }), None).await?;
 /// #
 /// let results: Vec<Result<Document>> = cursor.collect().await;
 /// # Ok(())

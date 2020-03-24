@@ -5,7 +5,6 @@ use super::{Outcome, TestFile};
 use crate::{
     options::{Collation, CountOptions},
     test::{run_spec_test, util::TestClient, LOCK},
-    RUNTIME,
 };
 
 #[derive(Debug, Deserialize)]
@@ -17,8 +16,8 @@ struct Arguments {
 }
 
 #[function_name::named]
-fn run_count_test(test_file: TestFile) {
-    let client = RUNTIME.block_on(TestClient::new());
+async fn run_count_test(test_file: TestFile) {
+    let client = TestClient::new().await;
     let data = test_file.data;
 
     for mut test_case in test_file.tests {
@@ -33,12 +32,13 @@ fn run_count_test(test_file: TestFile) {
 
         test_case.description = test_case.description.replace('$', "%");
 
-        let coll =
-            RUNTIME.block_on(client.init_db_and_coll(function_name!(), &test_case.description));
+        let coll = client
+            .init_db_and_coll(function_name!(), &test_case.description)
+            .await;
 
         if !data.is_empty() {
-            RUNTIME
-                .block_on(coll.insert_many(data.clone(), None))
+            coll.insert_many(data.clone(), None)
+                .await
                 .expect(&test_case.description);
         }
 
@@ -49,7 +49,7 @@ fn run_count_test(test_file: TestFile) {
 
         if let Some(ref c) = outcome.collection {
             if let Some(ref name) = c.name {
-                RUNTIME.block_on(client.drop_collection(function_name!(), name));
+                client.drop_collection(function_name!(), name).await;
             }
         }
 
@@ -62,7 +62,7 @@ fn run_count_test(test_file: TestFile) {
                     .build();
                 coll.count_documents(arguments.filter.unwrap_or_default(), options)
             }
-            "estimatedDocumentCount" => RUNTIME.block_on(coll.estimated_document_count(None)),
+            "estimatedDocumentCount" => coll.estimated_document_count(None).await,
             other => panic!("unexpected count operation: {}", other),
         }
         .expect(&test_case.description);
@@ -74,5 +74,5 @@ fn run_count_test(test_file: TestFile) {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
-    run_spec_test(&["crud", "v1", "read"], run_count_test);
+    run_spec_test(&["crud", "v1", "read"], run_count_test).await;
 }

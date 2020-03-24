@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::{options::ClientOptions, test::run_spec_test, RUNTIME};
+use crate::{options::ClientOptions, test::run_spec_test};
 
 #[derive(Debug, Deserialize)]
 struct TestFile {
@@ -31,13 +31,13 @@ struct ParsedOptions {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
-    let run_test = |mut test_file: TestFile| {
+    async fn run_test(mut test_file: TestFile) {
         // TODO DRIVERS-796: unskip this test
         if test_file.uri == "mongodb+srv://test5.test.build.10gen.cc/?authSource=otherDB" {
             return;
         }
 
-        let result = RUNTIME.block_on(ClientOptions::parse(&test_file.uri));
+        let result = ClientOptions::parse(&test_file.uri).await;
 
         if let Some(true) = test_file.error {
             assert!(matches!(result, Err(_)), test_file.comment.unwrap());
@@ -114,7 +114,7 @@ async fn run() {
 
             assert_eq!(parsed_options, actual_options);
         }
-    };
+    }
 
-    run_spec_test(&["initial-dns-seedlist-discovery"], run_test);
+    run_spec_test(&["initial-dns-seedlist-discovery"], run_test).await;
 }

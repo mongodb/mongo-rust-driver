@@ -5,7 +5,6 @@ use super::{Outcome, TestFile};
 use crate::{
     options::{Collation, ReplaceOptions},
     test::{run_spec_test, util::TestClient, LOCK},
-    RUNTIME,
 };
 
 #[derive(Debug, Deserialize)]
@@ -27,8 +26,8 @@ struct ResultDoc {
 }
 
 #[function_name::named]
-fn run_replace_one_test(test_file: TestFile) {
-    let client = RUNTIME.block_on(TestClient::new());
+async fn run_replace_one_test(test_file: TestFile) {
+    let client = TestClient::new().await;
     let data = test_file.data;
 
     for test_case in test_file.tests {
@@ -38,12 +37,14 @@ fn run_replace_one_test(test_file: TestFile) {
 
         let _guard = LOCK.run_concurrently();
 
-        let coll = client.init_db_and_coll(
-            function_name!(),
-            &test_case.description.replace('$', "%").replace(' ', "_"),
-        );
-        RUNTIME
-            .block_on(coll.insert_many(data.clone(), None))
+        let coll = client
+            .init_db_and_coll(
+                function_name!(),
+                &test_case.description.replace('$', "%").replace(' ', "_"),
+            )
+            .await;
+        coll.insert_many(data.clone(), None)
+            .await
             .expect(&test_case.description);
 
         let arguments: Arguments = bson::from_bson(Bson::Document(test_case.operation.arguments))
@@ -53,7 +54,7 @@ fn run_replace_one_test(test_file: TestFile) {
 
         if let Some(ref c) = outcome.collection {
             if let Some(ref name) = c.name {
-                RUNTIME.block_on(client.drop_collection(function_name!(), name));
+                client.drop_collection(function_name!(), name).await;
             }
         }
 
@@ -65,6 +66,7 @@ fn run_replace_one_test(test_file: TestFile) {
 
         let result = coll
             .replace_one(arguments.filter, arguments.replacement, options)
+            .await
             .expect(&test_case.description);
         assert_eq!(
             outcome.result.matched_count, result.matched_count,
@@ -97,7 +99,7 @@ fn run_replace_one_test(test_file: TestFile) {
 
             assert_eq!(
                 c.data,
-                super::find_all(&outcome_coll),
+                super::find_all(&outcome_coll).await,
                 "{}",
                 test_case.description
             );
@@ -108,5 +110,5 @@ fn run_replace_one_test(test_file: TestFile) {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
-    run_spec_test(&["crud", "v1", "write"], run_replace_one_test);
+    run_spec_test(&["crud", "v1", "write"], run_replace_one_test).await;
 }

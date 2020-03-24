@@ -12,6 +12,7 @@ use crate::{
     bson_util,
     error::Result,
     options::{FindOptions, Hint, InsertManyOptions, UpdateOptions},
+    test::util::{CommandEvent, EventClient},
     Collection,
     RUNTIME,
 };
@@ -191,7 +192,7 @@ impl TestOperation for Find {
         &["find", "getMore"]
     }
 
-    fn execute(&self, collection: Collection) -> Result<()> {
+    async fn execute(&self, collection: Collection) -> Result<()> {
         let mut options = FindOptions {
             sort: self.sort.clone(),
             skip: self.skip,
@@ -204,13 +205,11 @@ impl TestOperation for Find {
             modifiers.update_options(&mut options);
         }
 
-        collection
-            .find(self.filter.clone(), options)
-            .map(
-                |mut cursor| {
-                    while RUNTIME.block_on(cursor.next()).is_some() {}
-                },
-            )
+        collection.find(self.filter.clone(), options).await.map(
+            |mut cursor| {
+                while RUNTIME.block_on(cursor.next()).is_some() {}
+            },
+        )
     }
 }
 
@@ -297,5 +296,24 @@ impl TestOperation for UpdateOne {
             .update_one(self.filter.clone(), self.update.clone(), options)
             .await
             .map(|_| ())
+    }
+}
+
+impl EventClient {
+    pub(super) async fn run_operation_with_events(
+        &self,
+        operation: AnyTestOperation,
+        database_name: &str,
+        collection_name: &str,
+    ) -> Vec<CommandEvent> {
+        let _: Result<_> = operation
+            .execute(self.database(database_name).collection(collection_name))
+            .await;
+        self.command_events
+            .write()
+            .unwrap()
+            .drain(..)
+            .filter(|event| operation.command_names().contains(&event.command_name()))
+            .collect()
     }
 }

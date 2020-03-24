@@ -143,7 +143,6 @@ async fn list_databases() {
         let db_doc = new_dbs
             .iter()
             .find(|doc| doc.get("name") == Some(&Bson::String(name.to_string())))
-            .await
             .unwrap();
         assert!(db_doc.contains_key("sizeOnDisk"));
         assert!(db_doc.contains_key("empty"));

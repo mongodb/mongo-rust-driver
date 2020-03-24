@@ -8,6 +8,7 @@ mod read_write_concern;
 use std::{
     ffi::OsStr,
     fs::{self, File},
+    future::Future,
     path::PathBuf,
 };
 
@@ -15,9 +16,10 @@ use bson::Bson;
 use serde::Deserialize;
 use serde_json::Value;
 
-pub(crate) fn run_spec_test<'a, T, F>(spec: &[&str], run_test_file: F)
+pub(crate) async fn run_spec_test<'a, T, F, G>(spec: &[&str], run_test_file: F)
 where
-    F: Fn(T),
+    F: Fn(T) -> G,
+    G: Future<Output = ()>,
     T: Deserialize<'a>,
 {
     let base_path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "src", "test", "spec", "json"]
@@ -41,6 +43,6 @@ where
         let json: Value =
             serde_json::from_reader(File::open(test_file_full_path.as_path()).unwrap()).unwrap();
 
-        run_test_file(bson::from_bson(Bson::from(json)).unwrap())
+        run_test_file(bson::from_bson(Bson::from(json)).unwrap()).await
     }
 }

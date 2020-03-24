@@ -2,10 +2,7 @@ use bson::{Bson, Document};
 use serde::Deserialize;
 
 use super::{Outcome, TestFile};
-use crate::{
-    test::{run_spec_test, util::TestClient, LOCK},
-    RUNTIME,
-};
+use crate::test::{run_spec_test, util::TestClient, LOCK};
 
 #[derive(Debug, Deserialize)]
 struct Arguments {
@@ -19,8 +16,8 @@ struct ResultDoc {
 }
 
 #[function_name::named]
-fn run_insert_one_test(test_file: TestFile) {
-    let client = RUNTIME.block_on(TestClient::new());
+async fn run_insert_one_test(test_file: TestFile) {
+    let client = TestClient::new().await;
     let data = test_file.data;
 
     for mut test_case in test_file.tests {
@@ -32,10 +29,11 @@ fn run_insert_one_test(test_file: TestFile) {
 
         test_case.description = test_case.description.replace('$', "%");
 
-        let coll =
-            RUNTIME.block_on(client.init_db_and_coll(function_name!(), &test_case.description));
-        RUNTIME
-            .block_on(coll.insert_many(data.clone(), None))
+        let coll = client
+            .init_db_and_coll(function_name!(), &test_case.description)
+            .await;
+        coll.insert_many(data.clone(), None)
+            .await
             .expect(&test_case.description);
 
         let arguments: Arguments = bson::from_bson(Bson::Document(test_case.operation.arguments))
@@ -45,12 +43,13 @@ fn run_insert_one_test(test_file: TestFile) {
 
         if let Some(ref c) = outcome.collection {
             if let Some(ref name) = c.name {
-                RUNTIME.block_on(client.drop_collection(function_name!(), name));
+                client.drop_collection(function_name!(), name).await;
             }
         }
 
         let result = coll
             .insert_one(arguments.document, None)
+            .await
             .expect(&test_case.description);
         assert_eq!(
             outcome.result.inserted_id, result.inserted_id,
@@ -66,7 +65,7 @@ fn run_insert_one_test(test_file: TestFile) {
 
             assert_eq!(
                 c.data,
-                super::find_all(&outcome_coll),
+                super::find_all(&outcome_coll).await,
                 "{}",
                 test_case.description
             );
@@ -77,5 +76,5 @@ fn run_insert_one_test(test_file: TestFile) {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
-    run_spec_test(&["crud", "v1", "write"], run_insert_one_test);
+    run_spec_test(&["crud", "v1", "write"], run_insert_one_test).await;
 }

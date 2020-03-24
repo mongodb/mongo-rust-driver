@@ -1,7 +1,7 @@
 use bson::{Bson, Document};
 use serde::Deserialize;
 
-use crate::{options::ClientOptions, test::run_spec_test, RUNTIME};
+use crate::{options::ClientOptions, test::run_spec_test};
 
 #[derive(Debug, Deserialize)]
 struct TestFile {
@@ -34,9 +34,9 @@ fn normalize_write_concern_doc(mut write_concern_doc: Document) -> Document {
     write_concern_doc
 }
 
-fn run_connection_string_test(test_file: TestFile) {
+async fn run_connection_string_test(test_file: TestFile) {
     for test_case in test_file.tests {
-        match RUNTIME.block_on(ClientOptions::parse(&test_case.uri)) {
+        match ClientOptions::parse(&test_case.uri).await {
             Ok(options) => {
                 assert!(test_case.valid);
 
@@ -82,5 +82,6 @@ async fn run() {
     run_spec_test(
         &["read-write-concern", "connection-string"],
         run_connection_string_test,
-    );
+    )
+    .await;
 }

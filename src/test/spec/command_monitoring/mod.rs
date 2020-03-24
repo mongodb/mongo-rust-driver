@@ -7,10 +7,7 @@ use bson::{Bson, Document};
 use serde::Deserialize;
 
 use self::{event::TestEvent, operation::*};
-use crate::{
-    test::{assert_matches, parse_version, util::TestClient, EventClient, LOCK},
-    RUNTIME,
-};
+use crate::test::{assert_matches, parse_version, util::TestClient, EventClient, LOCK};
 
 #[derive(Deserialize)]
 struct TestFile {
@@ -31,8 +28,8 @@ struct TestCase {
     expectations: Vec<TestEvent>,
 }
 
-fn run_command_monitoring_test(test_file: TestFile) {
-    let client = RUNTIME.block_on(TestClient::new());
+async fn run_command_monitoring_test(test_file: TestFile) {
+    let client = TestClient::new().await;
 
     let skipped_tests = vec![
         // uses old count
@@ -73,28 +70,22 @@ fn run_command_monitoring_test(test_file: TestFile) {
         let operation: AnyTestOperation =
             bson::from_bson(Bson::Document(test_case.operation)).unwrap();
 
-        RUNTIME
-            .block_on(
-                RUNTIME
-                    .block_on(
-                        client
-                            .init_db_and_coll(&test_file.database_name, &test_file.collection_name),
-                    )
-                    .insert_many(test_file.data.clone(), None),
-            )
+        client
+            .init_db_and_coll(&test_file.database_name, &test_file.collection_name)
+            .await
+            .insert_many(test_file.data.clone(), None)
+            .await
             .expect("insert many error");
 
-        let client = RUNTIME.block_on(EventClient::new());
+        let client = EventClient::new().await;
 
         let events: Vec<TestEvent> = client
             .run_operation_with_events(
-                operation.command_names(),
+                operation,
                 &test_file.database_name,
                 &test_file.collection_name,
-                |collection| {
-                    let _ = RUNTIME.block_on(operation.execute(collection));
-                },
             )
+            .await
             .into_iter()
             .map(Into::into)
             .collect();
@@ -109,5 +100,5 @@ fn run_command_monitoring_test(test_file: TestFile) {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn command_monitoring() {
-    crate::test::run_spec_test(&["command-monitoring"], run_command_monitoring_test)
+    crate::test::run_spec_test(&["command-monitoring"], run_command_monitoring_test).await;
 }

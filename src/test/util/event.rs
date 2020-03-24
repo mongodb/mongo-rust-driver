@@ -14,7 +14,6 @@ use crate::{
         },
     },
     test::LOCK,
-    Collection,
 };
 
 pub type EventQueue<T> = Arc<RwLock<Vec<T>>>;
@@ -27,7 +26,7 @@ pub enum CommandEvent {
 }
 
 impl CommandEvent {
-    fn command_name(&self) -> &str {
+    pub fn command_name(&self) -> &str {
         match self {
             CommandEvent::CommandStartedEvent(event) => event.command_name.as_str(),
             CommandEvent::CommandFailedEvent(event) => event.command_name.as_str(),
@@ -110,22 +109,6 @@ impl EventClient {
             command_events,
             pool_cleared_events,
         }
-    }
-
-    pub fn run_operation_with_events(
-        &self,
-        command_names: &[&str],
-        database_name: &str,
-        collection_name: &str,
-        function: impl FnOnce(Collection),
-    ) -> Vec<CommandEvent> {
-        function(self.database(database_name).collection(collection_name));
-        self.command_events
-            .write()
-            .unwrap()
-            .drain(..)
-            .filter(|event| command_names.contains(&event.command_name()))
-            .collect()
     }
 }
 

@@ -13,7 +13,6 @@ use crate::{
         topology::{TopologyDescription, TopologyType},
     },
     test::{run_spec_test, TestClient, CLIENT_OPTIONS},
-    RUNTIME,
 };
 
 #[derive(Debug, Deserialize)]
@@ -71,9 +70,9 @@ fn server_type_from_str(s: &str) -> Option<ServerType> {
     Some(t)
 }
 
-fn run_test(test_file: TestFile) {
-    let options = RUNTIME
-        .block_on(ClientOptions::parse(&test_file.uri))
+async fn run_test(test_file: TestFile) {
+    let options = ClientOptions::parse(&test_file.uri)
+        .await
         .expect(&test_file.description);
 
     let test_description = &test_file.description;
@@ -215,19 +214,19 @@ fn run_test(test_file: TestFile) {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn single() {
-    run_spec_test(&["server-discovery-and-monitoring", "single"], run_test);
+    run_spec_test(&["server-discovery-and-monitoring", "single"], run_test).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn rs() {
-    run_spec_test(&["server-discovery-and-monitoring", "rs"], run_test);
+    run_spec_test(&["server-discovery-and-monitoring", "rs"], run_test).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn sharded() {
-    run_spec_test(&["server-discovery-and-monitoring", "sharded"], run_test);
+    run_spec_test(&["server-discovery-and-monitoring", "sharded"], run_test).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
@@ -260,6 +259,7 @@ async fn direct_connection() {
         .database(function_name!())
         .collection(function_name!())
         .insert_one(doc! {}, None)
+        .await
         .expect("write should succeed with directConnection=false on secondary");
 
     let mut direct_true_options = secondary_options.clone();
@@ -270,6 +270,7 @@ async fn direct_connection() {
         .database(function_name!())
         .collection(function_name!())
         .insert_one(doc! {}, None)
+        .await
         .expect_err("write should fail with directConnection=true on secondary");
     assert!(error.is_not_master());
 
@@ -279,5 +280,6 @@ async fn direct_connection() {
         .database(function_name!())
         .collection(function_name!())
         .insert_one(doc! {}, None)
+        .await
         .expect("write should succeed with directConnection unspecified");
 }

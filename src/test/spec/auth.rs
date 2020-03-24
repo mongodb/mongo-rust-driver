@@ -9,7 +9,6 @@ use crate::{
         ClientOptions,
     },
     test::run_spec_test,
-    RUNTIME,
 };
 
 #[derive(Debug, Deserialize)]
@@ -50,7 +49,7 @@ struct TestCase {
 }
 
 /// Tests connection string parsing of authentication options.
-fn run_auth_test(test_file: TestFile) {
+async fn run_auth_test(test_file: TestFile) {
     for mut test_case in test_file.tests {
         test_case.description = test_case.description.replace('$', "%");
 
@@ -66,7 +65,7 @@ fn run_auth_test(test_file: TestFile) {
             continue;
         }
 
-        match RUNTIME.block_on(ClientOptions::parse(test_case.uri.as_str())) {
+        match ClientOptions::parse(test_case.uri.as_str()).await {
             Ok(options) => {
                 assert!(test_case.valid, "{}", test_case.description);
                 match test_case.credential {
@@ -90,5 +89,5 @@ fn run_auth_test(test_file: TestFile) {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
-    run_spec_test(&["auth"], run_auth_test);
+    run_spec_test(&["auth"], run_auth_test).await;
 }
