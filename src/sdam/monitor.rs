@@ -4,7 +4,6 @@ use std::{
 };
 
 use bson::doc;
-use futures_timer::Delay;
 use time::PreciseTime;
 
 use super::{
@@ -66,7 +65,7 @@ impl Monitor {
                 topology.notify_topology_changed();
             }
 
-            Delay::new(MIN_HEARTBEAT_FREQUENCY).await;
+            RUNTIME.delay_for(MIN_HEARTBEAT_FREQUENCY).await;
 
             topology
                 .wait_for_topology_check_request(heartbeat_frequency - MIN_HEARTBEAT_FREQUENCY)

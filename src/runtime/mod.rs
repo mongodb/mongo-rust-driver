@@ -6,6 +6,8 @@ mod stream;
 
 use std::{future::Future, net::SocketAddr, time::Duration};
 
+use futures::future::BoxFuture;
+
 pub(crate) use self::{
     async_read_ext::AsyncLittleEndianRead,
     async_write_ext::AsyncLittleEndianWrite,
@@ -80,6 +82,19 @@ impl AsyncRuntime {
         #[cfg(feature = "async-std-runtime")]
         {
             async_std::task::block_on(fut)
+        }
+    }
+
+    /// Delay for the specified duration.
+    pub(crate) fn delay_for(self, delay: Duration) -> BoxFuture<'static, ()> {
+        #[cfg(feature = "tokio-runtime")]
+        {
+            Box::pin(tokio::time::delay_for(delay))
+        }
+
+        #[cfg(feature = "async-std-runtime")]
+        {
+            Box::pin(async_std::task::sleep(delay))
         }
     }
 

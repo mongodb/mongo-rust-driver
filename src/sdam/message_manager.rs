@@ -1,8 +1,9 @@
 use std::{sync::Arc, time::Duration};
 
 use futures::future::Either;
-use futures_timer::Delay;
 use tokio::sync::watch::{self, Receiver, Sender};
+
+use crate::RUNTIME;
 
 /// Provides functionality for message passing between server selection operations and SDAM
 /// background tasks.
@@ -65,7 +66,7 @@ impl TopologyMessageManager {
 }
 
 async fn wait_for_notification(receiver: &mut Receiver<()>, timeout: Duration) -> bool {
-    let timeout = Delay::new(timeout);
+    let timeout = RUNTIME.delay_for(timeout);
     let message_received = Box::pin(receiver.recv());
 
     match futures::future::select(timeout, message_received).await {

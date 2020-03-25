@@ -1,7 +1,5 @@
 use std::{sync::Weak, time::Duration};
 
-use futures_timer::Delay;
-
 use super::{ConnectionPool, ConnectionPoolInner};
 use crate::{event::cmap::ConnectionClosedReason, RUNTIME};
 
@@ -16,7 +14,7 @@ pub(crate) fn start_background_task(pool: Weak<ConnectionPoolInner>) {
                 None => return,
             };
 
-            Delay::new(Duration::from_millis(10)).await;
+            RUNTIME.delay_for(Duration::from_millis(10)).await;
         }
     });
 }
