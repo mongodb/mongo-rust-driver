@@ -28,7 +28,6 @@ use crate::{
     Client,
     Cursor,
     Database,
-    RUNTIME,
 };
 
 /// Maximum size in bytes of an insert batch.
@@ -196,7 +195,7 @@ impl Collection {
     ///
     /// Note that using [`Collection::estimated_document_count`](#method.estimated_document_count)
     /// is recommended instead of this method is most cases.
-    pub fn count_documents(
+    pub async fn count_documents(
         &self,
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<CountOptions>>,
@@ -234,7 +233,7 @@ impl Collection {
                 .build()
         });
 
-        let result = match RUNTIME.block_on(RUNTIME.block_on(self.aggregate(pipeline, aggregate_options))?.next()) {
+        let result = match self.aggregate(pipeline, aggregate_options).await?.next().await {
             Some(doc) => doc?,
             None => return Ok(0),
         };

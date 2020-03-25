@@ -131,10 +131,10 @@ async fn delete() {
     let delete_one_result = coll.delete_one(doc! {"x": 3}, None).await.unwrap();
     assert_eq!(delete_one_result.deleted_count, 1);
 
-    assert_eq!(coll.count_documents(doc! {"x": 3}, None).unwrap(), 4);
+    assert_eq!(coll.count_documents(doc! {"x": 3}, None).await.unwrap(), 4);
     let delete_many_result = coll.delete_many(doc! {"x": 3}, None).await.unwrap();
     assert_eq!(delete_many_result.deleted_count, 4);
-    assert_eq!(coll.count_documents(doc! {"x": 3 }, None).unwrap(), 0);
+    assert_eq!(coll.count_documents(doc! {"x": 3 }, None).await.unwrap(), 0);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
@@ -437,6 +437,7 @@ async fn large_insert_ordered_with_errors() {
             assert_eq!(write_errors[0].index, 7499);
             assert_eq!(
                 coll.count_documents(None, None)
+                    .await
                     .expect("count should succeed"),
                 7499
             );
