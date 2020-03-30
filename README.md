@@ -28,7 +28,7 @@ This repository contains the officially supported MongoDB Rust driver, a client 
 The driver is available on [crates.io](https://crates.io/crates/mongodb). To use the driver in your application, simply add it to your project's `Cargo.toml`. You will also want to add [`bson`](https://docs.rs/bson) as well.
 ```toml
 [dependencies]
-mongodb = "0.9.1"
+mongodb = "0.9.2"
 bson = "0.14.0"
 ```
 
