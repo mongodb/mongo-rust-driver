@@ -1,6 +1,5 @@
 use std::{sync::Arc, time::Duration};
 
-use futures::future::Either;
 use tokio::sync::watch::{self, Receiver, Sender};
 
 use crate::RUNTIME;
@@ -66,11 +65,5 @@ impl TopologyMessageManager {
 }
 
 async fn wait_for_notification(receiver: &mut Receiver<()>, timeout: Duration) -> bool {
-    let timeout = RUNTIME.delay_for(timeout);
-    let message_received = Box::pin(receiver.recv());
-
-    match futures::future::select(timeout, message_received).await {
-        Either::Left(..) => false,
-        Either::Right(..) => true,
-    }
+    RUNTIME.timeout(timeout, receiver.recv()).await.is_ok()
 }
