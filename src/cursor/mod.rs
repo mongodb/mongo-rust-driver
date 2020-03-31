@@ -72,14 +72,12 @@ pub use impatient::ImpatientCursor;
 #[derive(Debug)]
 pub struct Cursor {
     inner: ImpatientCursor,
-    tailable: bool,
 }
 
 impl Cursor {
-    pub(crate) fn new(client: Client, spec: CursorSpecification, tailable: bool) -> Self {
+    pub(crate) fn new(client: Client, spec: CursorSpecification) -> Self {
         Self {
             inner: ImpatientCursor::new(client, spec),
-            tailable,
         }
     }
 }
@@ -88,15 +86,16 @@ impl Stream for Cursor {
     type Item = Result<Document>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        if self.tailable {
-            loop {
-                if let Poll::Ready(Some(result)) = Pin::new(&mut self.inner).poll_next(cx) {
-                    return Poll::Ready(Some(result));
-                }
+        loop {
+            match Pin::new(&mut self.inner).poll_next(cx) {
+                Poll::Ready(Some(result)) => return Poll::Ready(Some(result)),
+                Poll::Ready(None) if self.inner.exhausted() => break,
+                Poll::Ready(None) => {}
+                Poll::Pending => return Poll::Pending,
             }
-        } else {
-            Pin::new(&mut self.inner).poll_next(cx)
         }
+
+        Poll::Ready(None)
     }
 }
 

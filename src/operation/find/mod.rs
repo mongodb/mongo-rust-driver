@@ -43,16 +43,6 @@ impl Find {
             options,
         }
     }
-
-    pub(crate) fn tailable(&self) -> bool {
-        let cursor_type = self
-            .options
-            .as_ref()
-            .and_then(|opts| opts.cursor_type)
-            .unwrap_or(CursorType::NonTailable);
-
-        cursor_type != CursorType::NonTailable
-    }
 }
 
 impl Operation for Find {

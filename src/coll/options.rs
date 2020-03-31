@@ -61,7 +61,7 @@ impl Hint {
 }
 
 /// Specifies the type of cursor to return from a find operation.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy)]
 pub enum CursorType {
     /// Default; close the cursor after the last document is received from the server.
     NonTailable,

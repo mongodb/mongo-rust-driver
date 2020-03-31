@@ -48,6 +48,10 @@ impl ImpatientCursor {
             state: State::Buffer(spec.buffer),
         }
     }
+
+    pub(super) fn exhausted(&self) -> bool {
+        self.exhausted
+    }
 }
 
 impl Drop for ImpatientCursor {

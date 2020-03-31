@@ -176,7 +176,7 @@ impl Collection {
         let client = self.client();
         RUNTIME
             .block_on(client.execute_operation(&aggregate, None))
-            .map(|spec| Cursor::new(client.clone(), spec, false))
+            .map(|spec| Cursor::new(client.clone(), spec))
     }
 
     /// Estimates the number of documents in the collection using collection metadata.
@@ -317,7 +317,7 @@ impl Collection {
         let client = self.client();
         RUNTIME
             .block_on(client.execute_operation(&find, None))
-            .map(|spec| Cursor::new(client.clone(), spec, find.tailable()))
+            .map(|spec| Cursor::new(client.clone(), spec))
     }
 
     /// Finds a single document in the collection matching `filter`.
