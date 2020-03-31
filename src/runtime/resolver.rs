@@ -1,7 +1,6 @@
 use std::{future::Future, net::SocketAddr, time::Duration};
 
 use async_trait::async_trait;
-use futures_timer::Delay;
 use trust_dns_proto::error::ProtoError;
 use trust_dns_resolver::{
     lookup::{SrvLookup, TxtLookup},
@@ -62,7 +61,7 @@ impl trust_dns_resolver::name_server::RuntimeProvider for AsyncRuntimeProvider {
 #[async_trait]
 impl trust_dns_proto::Time for AsyncRuntime {
     async fn delay_for(duration: Duration) {
-        Delay::new(duration).await
+        RUNTIME.delay_for(duration).await
     }
 
     async fn timeout<F: 'static + Future + Send>(

@@ -5,7 +5,6 @@ mod integration;
 use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 
 use futures::future::{BoxFuture, FutureExt};
-use futures_timer::Delay;
 
 use tokio::sync::RwLock;
 
@@ -115,7 +114,7 @@ impl Executor {
             // order that concurrent threads check out connections from the pool. The solution to
             // this is to sleep for a small amount of time between each operation, which in practice
             // allows threads to enter the wait queue in the order that they were started.
-            Delay::new(Duration::from_millis(1)).await;
+            RUNTIME.delay_for(Duration::from_millis(1)).await;
         }
 
         match (self.error, error) {
@@ -137,7 +136,7 @@ impl Executor {
         // not see the events here. To account for this, we wait for a small amount of time
         // before checking again.
         if self.state.count_all_events() < self.events.len() {
-            Delay::new(Duration::from_millis(250)).await;
+            RUNTIME.delay_for(Duration::from_millis(250)).await;
         }
         let actual_events = self.state.handler.events.read().unwrap();
 
@@ -172,7 +171,7 @@ impl Operation {
 
                     state.threads.write().await.insert(target, task.unwrap());
                 }
-                Operation::Wait { ms } => Delay::new(Duration::from_millis(ms)).await,
+                Operation::Wait { ms } => RUNTIME.delay_for(Duration::from_millis(ms)).await,
                 Operation::WaitForThread { target } => state
                     .threads
                     .write()
@@ -183,7 +182,7 @@ impl Operation {
                     .expect("polling the future should not fail")?,
                 Operation::WaitForEvent { event, count } => {
                     while state.count_events(&event) < count {
-                        Delay::new(Duration::from_millis(100)).await;
+                        RUNTIME.delay_for(Duration::from_millis(100)).await;
                     }
                 }
                 Operation::CheckOut { label } => {

@@ -83,6 +83,19 @@ impl AsyncRuntime {
         }
     }
 
+    /// Delay for the specified duration.
+    pub(crate) async fn delay_for(self, delay: Duration) {
+        #[cfg(feature = "tokio-runtime")]
+        {
+            tokio::time::delay_for(delay).await
+        }
+
+        #[cfg(feature = "async-std-runtime")]
+        {
+            async_std::task::sleep(delay).await
+        }
+    }
+
     /// Await on a future for a maximum amount of time before returning an error.
     pub(crate) async fn timeout<F: Future>(
         self,
