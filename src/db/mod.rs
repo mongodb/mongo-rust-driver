@@ -166,7 +166,7 @@ impl Database {
         self.client()
             .execute_operation(&list_collections, None)
             .await
-            .map(|spec| Cursor::new(self.client().clone(), spec))
+            .map(|spec| Cursor::new(self.client().clone(), spec, false))
     }
 
     /// Gets the names of the collections in the database.
@@ -180,7 +180,7 @@ impl Database {
             .client()
             .execute_operation(&list_collections, None)
             .await
-            .map(|spec| Cursor::new(self.client().clone(), spec))?;
+            .map(|spec| Cursor::new(self.client().clone(), spec, false))?;
 
         cursor
             .and_then(|doc| match doc.get("name").and_then(Bson::as_str) {
@@ -254,6 +254,6 @@ impl Database {
         client
             .execute_operation(&aggregate, None)
             .await
-            .map(|spec| Cursor::new(client.clone(), spec))
+            .map(|spec| Cursor::new(client.clone(), spec, false))
     }
 }
