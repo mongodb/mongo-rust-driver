@@ -65,6 +65,7 @@ impl AsyncRuntime {
     }
 
     /// Run a future in the foreground, blocking on it completing.
+    #[cfg(test)]
     pub(crate) fn block_on<F, T>(self, fut: F) -> T
     where
         F: Future<Output = T> + Send,

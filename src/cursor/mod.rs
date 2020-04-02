@@ -40,7 +40,7 @@ pub use impatient::ImpatientCursor;
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// # let coll = client.database("foo").collection("bar");
-/// # let cursor = coll.find(None, None).await?;
+/// # let mut cursor = coll.find(None, None).await?;
 /// #
 /// while let Some(doc) = cursor.next().await {
 ///   println!("{}", doc?)

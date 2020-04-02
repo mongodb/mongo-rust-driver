@@ -64,7 +64,7 @@ async fn run_aggregate_test(test_file: TestFile) {
 
             assert_eq!(
                 outcome.result.unwrap_or_default(),
-                RUNTIME.block_on(cursor.try_collect::<Vec<_>>()).unwrap(),
+                cursor.try_collect::<Vec<_>>().await.unwrap(),
                 "{}",
                 test_case.description,
             );

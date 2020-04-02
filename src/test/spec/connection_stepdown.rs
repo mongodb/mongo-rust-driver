@@ -89,8 +89,9 @@ async fn get_more() {
             .expect("stepdown should have succeeded");
 
         for _ in 0..5 {
-            RUNTIME
-                .block_on(cursor.next())
+            cursor
+                .next()
+                .await
                 .unwrap()
                 .expect("cursor iteration should have succeeded");
         }

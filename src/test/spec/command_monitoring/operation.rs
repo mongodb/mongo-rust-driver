@@ -14,7 +14,6 @@ use crate::{
     options::{FindOptions, Hint, InsertManyOptions, UpdateOptions},
     test::util::{CommandEvent, EventClient},
     Collection,
-    RUNTIME,
 };
 
 #[async_trait]
@@ -205,11 +204,14 @@ impl TestOperation for Find {
             modifiers.update_options(&mut options);
         }
 
-        collection.find(self.filter.clone(), options).await.map(
-            |mut cursor| {
-                while RUNTIME.block_on(cursor.next()).is_some() {}
-            },
-        )
+        let mut cursor = collection
+            .find(self.filter.clone(), options)
+            .await?;
+
+        while let Some(result) = cursor.next().await {
+            result?;
+        }
+        Ok(())
     }
 }
 

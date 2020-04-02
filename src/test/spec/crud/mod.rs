@@ -52,5 +52,10 @@ pub struct CollectionOutcome {
 }
 
 pub async fn find_all(coll: &Collection) -> Vec<Document> {
-    coll.find(None, None).await.unwrap().try_collect().await.unwrap()
+    coll.find(None, None)
+        .await
+        .unwrap()
+        .try_collect()
+        .await
+        .unwrap()
 }

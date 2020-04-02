@@ -64,9 +64,7 @@ async fn run_find_test(test_file: TestFile) {
             .expect(&test_case.description);
         assert_eq!(
             outcome.result,
-            RUNTIME
-                .block_on(cursor.try_collect::<Vec<Document>>())
-                .unwrap(),
+            cursor.try_collect::<Vec<Document>>().await.unwrap(),
             "{}",
             test_case.description,
         );

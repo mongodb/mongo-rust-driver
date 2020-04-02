@@ -233,7 +233,12 @@ impl Collection {
                 .build()
         });
 
-        let result = match self.aggregate(pipeline, aggregate_options).await?.next().await {
+        let result = match self
+            .aggregate(pipeline, aggregate_options)
+            .await?
+            .next()
+            .await
+        {
             Some(doc) => doc?,
             None => return Ok(0),
         };
