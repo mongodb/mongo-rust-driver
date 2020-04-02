@@ -80,6 +80,10 @@ impl Cursor {
             inner: ImpatientCursor::new(client, spec),
         }
     }
+
+    pub fn into_impatent(self) -> ImpatientCursor {
+        self.inner
+    }
 }
 
 impl Stream for Cursor {
