@@ -33,7 +33,7 @@ async fn run_test<F: Future>(name: &str, test: impl Fn(EventClient, Database, Co
 
     let wc_majority = WriteConcern::builder().w(Acknowledgment::Majority).build();
 
-    let _ = coll
+    let _: Result<_, _> = coll
         .drop(Some(
             DropCollectionOptions::builder()
                 .write_concern(wc_majority.clone())
