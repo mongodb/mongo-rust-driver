@@ -555,29 +555,6 @@ impl Collection {
         let update = Update::new(self.namespace(), query, update.into(), false, options);
         self.client().execute_operation(&update, None).await
     }
-
-    /// Creates the indexes specified by `models`.
-    pub async fn create_indexes(
-        &self,
-        models: impl IntoIterator<Item = IndexModel>,
-    ) -> Result<Vec<String>> {
-        unimplemented!()
-    }
-
-    /// Drops the index specified by `name`.
-    pub async fn drop_index(&self, name: &str) -> Result<Document> {
-        unimplemented!()
-    }
-
-    /// Drops the index with the given `keys`.
-    pub async fn drop_index_with_keys(&self, keys: Document) -> Result<Document> {
-        unimplemented!()
-    }
-
-    /// Drops all indexes in the collection.
-    pub async fn drop_indexes(&self) -> Result<Document> {
-        unimplemented!()
-    }
 }
 
 /// A struct modeling the canonical name for a collection in MongoDB.
