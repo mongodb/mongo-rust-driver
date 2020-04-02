@@ -20,7 +20,7 @@ struct DatabaseEntry {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn acquire_connection_and_send_command() {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let client_options = CLIENT_OPTIONS.clone();
     let pool_options = ConnectionPoolOptions::from_client_options(&client_options);

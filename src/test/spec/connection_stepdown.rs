@@ -65,7 +65,7 @@ async fn get_more() {
             return;
         }
 
-        let _guard = LOCK.run_concurrently();
+        let _guard = LOCK.run_concurrently().await;
 
         let docs = vec![doc! { "x": 1 }; 5];
         coll.insert_many(
@@ -112,7 +112,7 @@ async fn not_master_keep_pool() {
             return;
         }
 
-        let _guard = LOCK.run_exclusively();
+        let _guard = LOCK.run_exclusively().await;
 
         client
             .database("admin")
@@ -159,7 +159,7 @@ async fn not_master_reset_pool() {
             return;
         }
 
-        let _guard = LOCK.run_exclusively();
+        let _guard = LOCK.run_exclusively().await;
 
         client
             .database("admin")
@@ -205,7 +205,7 @@ async fn shutdown_in_progress() {
             return;
         }
 
-        let _guard = LOCK.run_exclusively();
+        let _guard = LOCK.run_exclusively().await;
 
         client
             .database("admin")
@@ -251,7 +251,7 @@ async fn interrupted_at_shutdown() {
             return;
         }
 
-        let _guard = LOCK.run_exclusively();
+        let _guard = LOCK.run_exclusively().await;
 
         client
             .database("admin")

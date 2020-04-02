@@ -291,7 +291,7 @@ async fn cmap_spec_tests() {
             return;
         }
 
-        let _guard = LOCK.run_concurrently();
+        let _guard = LOCK.run_concurrently().await;
 
         let executor = Executor::new(test_file);
         executor.execute_test().await;

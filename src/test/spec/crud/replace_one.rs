@@ -35,7 +35,7 @@ async fn run_replace_one_test(test_file: TestFile) {
             continue;
         }
 
-        let _guard = LOCK.run_concurrently();
+        let _guard = LOCK.run_concurrently().await;
 
         let coll = client
             .init_db_and_coll(

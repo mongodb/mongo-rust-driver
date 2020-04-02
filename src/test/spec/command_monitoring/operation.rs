@@ -204,9 +204,7 @@ impl TestOperation for Find {
             modifiers.update_options(&mut options);
         }
 
-        let mut cursor = collection
-            .find(self.filter.clone(), options)
-            .await?;
+        let mut cursor = collection.find(self.filter.clone(), options).await?;
 
         while let Some(result) = cursor.next().await {
             result?;

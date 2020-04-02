@@ -63,7 +63,7 @@ async fn run_command_monitoring_test(test_file: TestFile) {
             }
         }
 
-        let _guard = LOCK.run_exclusively();
+        let _guard = LOCK.run_exclusively().await;
 
         println!("Running {}", test_case.description);
 

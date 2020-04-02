@@ -30,7 +30,7 @@ async fn run_delete_many_test(test_file: TestFile) {
             continue;
         }
 
-        let _guard = LOCK.run_concurrently();
+        let _guard = LOCK.run_concurrently().await;
 
         test_case.description = test_case.description.replace('$', "%");
 

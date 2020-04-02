@@ -19,7 +19,7 @@ use crate::{
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn count() {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let coll = client
@@ -43,7 +43,7 @@ async fn count() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn find() {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let coll = client
@@ -74,7 +74,7 @@ async fn find() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn update() {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let coll = client
@@ -114,7 +114,7 @@ async fn update() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn delete() {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let coll = client
@@ -140,7 +140,7 @@ async fn delete() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn aggregate_out() {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let db = client.database(function_name!());
@@ -204,7 +204,7 @@ fn kill_cursors_sent(client: &EventClient) -> bool {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn kill_cursors_on_drop() {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let db = client.database(function_name!());
@@ -242,7 +242,7 @@ async fn kill_cursors_on_drop() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn no_kill_cursors_on_exhausted() {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let db = client.database(function_name!());
@@ -328,7 +328,7 @@ lazy_static! {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn large_insert() {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let docs = vec![LARGE_DOC.clone(); 35000];
 
@@ -373,7 +373,7 @@ fn multibatch_documents_with_duplicate_keys() -> Vec<Document> {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn large_insert_unordered_with_errors() {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let docs = multibatch_documents_with_duplicate_keys();
 
@@ -410,7 +410,7 @@ async fn large_insert_unordered_with_errors() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn large_insert_ordered_with_errors() {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let docs = multibatch_documents_with_duplicate_keys();
 
@@ -449,7 +449,7 @@ async fn large_insert_ordered_with_errors() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn empty_insert() {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let coll = client

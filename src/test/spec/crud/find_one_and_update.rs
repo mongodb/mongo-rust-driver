@@ -33,7 +33,7 @@ async fn run_find_one_and_update_test(test_file: TestFile) {
             continue;
         }
 
-        let _guard = LOCK.run_concurrently();
+        let _guard = LOCK.run_concurrently().await;
 
         test_case.description = test_case.description.replace('$', "%");
         let sub = cmp::min(test_case.description.len(), 50);

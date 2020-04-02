@@ -14,7 +14,7 @@ async fn basic() {
         return;
     }
 
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let message = Message {
         response_to: 0,

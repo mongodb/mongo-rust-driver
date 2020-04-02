@@ -34,7 +34,7 @@ async fn run_insert_many_test(test_file: TestFile) {
             continue;
         }
 
-        let _guard = LOCK.run_concurrently();
+        let _guard = LOCK.run_concurrently().await;
 
         let coll = client
             .init_db_and_coll(function_name!(), &test_case.description)

@@ -63,7 +63,7 @@ async fn metadata_sent_in_handshake() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn server_selection_timeout_message() {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     if !CLIENT_OPTIONS.repl_set_name.is_some() {
         return;
@@ -100,7 +100,7 @@ async fn server_selection_timeout_message() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn list_databases() {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let expected_dbs = &[
         format!("{}1", function_name!()),
@@ -153,7 +153,7 @@ async fn list_databases() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn list_database_names() {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
 
@@ -304,7 +304,7 @@ async fn scram_test(
     password: &str,
     mechanisms: &[AuthMechanism],
 ) {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     for mechanism in mechanisms {
         auth_test_uri(username, password, Some(mechanism.clone()), true).await;
