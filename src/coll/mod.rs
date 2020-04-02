@@ -4,6 +4,7 @@ pub mod options;
 use std::{fmt, sync::Arc};
 
 use bson::{doc, Bson, Document};
+use futures::StreamExt;
 use serde::{de::Error, Deserialize, Deserializer};
 
 use self::options::*;
@@ -232,7 +233,7 @@ impl Collection {
                 .build()
         });
 
-        let result = match self.aggregate(pipeline, aggregate_options)?.next() {
+        let result = match RUNTIME.block_on(self.aggregate(pipeline, aggregate_options)?.next()) {
             Some(doc) => doc?,
             None => return Ok(0),
         };
@@ -331,7 +332,7 @@ impl Collection {
             .unwrap_or_else(Default::default);
         options.limit = Some(-1);
         let mut cursor = self.find(filter, Some(options))?;
-        cursor.next().transpose()
+        RUNTIME.block_on(cursor.next()).transpose()
     }
 
     /// Atomically finds up to one document in the collection matching `filter` and deletes it.

@@ -11,7 +11,6 @@ use crate::{
     error::Result,
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
     operation::Operation,
-    RUNTIME,
 };
 
 lazy_static! {
@@ -38,11 +37,15 @@ impl Client {
         &self,
         op: &T,
     ) -> Result<(T::O, Connection)> {
-        let server = RUNTIME.block_on(self.select_server(op.selection_criteria()))?;
-        let mut conn = RUNTIME.block_on(server.checkout_connection())?;
+        let server = self.select_server(op.selection_criteria()).await?;
+        let mut conn = server.checkout_connection().await?;
         self.execute_operation_on_connection(op, &mut conn)
             .await
             .map(|r| (r, conn))
+    }
+
+    pub(crate) async fn execute_operation_owned<T: Operation>(self, op: T) -> Result<T::O> {
+        self.execute_operation(&op, None).await
     }
 
     /// Execute the given operation, optionally specifying a connection used to do so.
@@ -152,7 +155,6 @@ impl Client {
                 self.emit_command_event(|handler| {
                     let should_redact =
                         REDACTED_COMMANDS.contains(cmd.name.to_lowercase().as_str());
-
                     let reply = if should_redact {
                         Document::new()
                     } else {

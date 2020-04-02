@@ -1,4 +1,8 @@
+use std::time::Duration;
+
 use bson::{doc, Bson, Document};
+use futures::stream::StreamExt;
+use futures_timer::Delay;
 use lazy_static::lazy_static;
 
 use crate::{
@@ -9,6 +13,7 @@ use crate::{
         util::{drop_collection, CommandEvent, EventClient, TestClient},
         LOCK,
     },
+    RUNTIME,
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
@@ -46,7 +51,9 @@ async fn find() {
         .unwrap();
     assert_eq!(result.inserted_ids.len(), 5);
 
-    for (i, result) in coll.find(None, None).unwrap().enumerate() {
+    let mut cursor = coll.find(None, None).unwrap().enumerate();
+
+    while let Some((i, result)) = RUNTIME.block_on(cursor.next()) {
         let doc = result.unwrap();
         if i > 4 {
             panic!("expected 4 result, got {}", i);
@@ -204,6 +211,11 @@ async fn kill_cursors_on_drop() {
     assert!(!kill_cursors_sent(&event_client));
 
     std::mem::drop(cursor);
+
+    // The `Drop` implementation for `Cursor' spawns a back tasks that emits certain events. If the
+    // task hasn't been scheduled yet, we may not see the event here. To account for this, we wait
+    // for a small amount of time before checking.
+    Delay::new(Duration::from_millis(250)).await;
 
     assert!(kill_cursors_sent(&event_client));
 }

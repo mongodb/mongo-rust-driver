@@ -1,8 +1,17 @@
-use std::{collections::VecDeque, time::Duration};
+mod impatient;
 
-use bson::{doc, Document};
+use std::{
+    collections::VecDeque,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
 
-use crate::{error::Result, operation::GetMore, options::StreamAddress, Client, Namespace, RUNTIME};
+use bson::Document;
+use futures::stream::Stream;
+
+use crate::{error::Result, options::StreamAddress, Client, Namespace};
+pub use impatient::ImpatientCursor;
 
 /// A `Cursor` streams the result of a query. When a query is made, a `Cursor` will be returned with
 /// the first batch of results from the server; the documents will be returned as the `Cursor` is
@@ -21,18 +30,19 @@ use crate::{error::Result, operation::GetMore, options::StreamAddress, Client, N
 /// results from the server; both of these factors should be taken into account when choosing the
 /// optimal batch size.
 ///
-/// A cursor can be used like any other [`Iterator`](https://doc.rust-lang.org/std/iter/trait.Iterator.html). The simplest way is just to iterate over the
+/// A cursor can be used like any other [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html). The simplest way is just to iterate over the
 /// documents it yields:
 ///
 /// ```rust
+/// # use futures::stream::StreamExt;
 /// # use mongodb::{Client, error::Result};
 /// #
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// # let coll = client.database("foo").collection("bar");
-/// # let cursor = coll.find(None, None)?;
+/// # let mut cursor = coll.find(None, None)?;
 /// #
-/// for doc in cursor {
+/// while let Some(doc) = cursor.next().await {
 ///   println!("{}", doc?)
 /// }
 /// #
@@ -40,12 +50,14 @@ use crate::{error::Result, operation::GetMore, options::StreamAddress, Client, N
 /// # }
 /// ```
 ///
-/// Additionally, all the other methods that an [`Iterator`](https://doc.rust-lang.org/std/iter/trait.Iterator.html) has are available on `Cursor` as well.
+/// Additionally, all the other methods that an [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html) has are available on `Cursor` as well.
+/// This includes all of the functionality provided by [`StreamExt`](https://docs.rs/futures/0.3.4/futures/stream/trait.StreamExt.html), which provides similar functionality to the standard library `Iterator` trait.
 /// For instance, if the number of results from a query is known to be small, it might make sense
 /// to collect them into a vector:
 ///
 /// ```rust
 /// # use bson::{doc, bson, Document};
+/// # use futures::stream::StreamExt;
 /// # use mongodb::{Client, error::Result};
 /// #
 /// # async fn do_stuff() -> Result<()> {
@@ -53,69 +65,41 @@ use crate::{error::Result, operation::GetMore, options::StreamAddress, Client, N
 /// # let coll = client.database("foo").collection("bar");
 /// # let cursor = coll.find(Some(doc! { "x": 1 }), None)?;
 /// #
-/// let results: Vec<Result<Document>> = cursor.collect();
+/// let results: Vec<Result<Document>> = cursor.collect().await;
 /// # Ok(())
 /// # }
 /// ```
 #[derive(Debug)]
 pub struct Cursor {
-    client: Client,
-    buffer: VecDeque<Document>,
-    get_more: GetMore,
-    exhausted: bool,
+    inner: ImpatientCursor,
 }
 
 impl Cursor {
     pub(crate) fn new(client: Client, spec: CursorSpecification) -> Self {
-        let get_more = GetMore::new(
-            spec.ns,
-            spec.id,
-            spec.address,
-            spec.batch_size,
-            spec.max_time,
-        );
-
         Self {
-            client,
-            buffer: spec.buffer,
-            get_more,
-            exhausted: spec.id == 0,
+            inner: ImpatientCursor::new(client, spec),
         }
+    }
+
+    pub fn into_impatent(self) -> ImpatientCursor {
+        self.inner
     }
 }
 
-impl Drop for Cursor {
-    fn drop(&mut self) {
-        if self.exhausted {
-            return;
-        }
-
-        let namespace = self.get_more.namespace();
-
-        let _ = RUNTIME.block_on(self.client.database(&namespace.db).run_command(
-            doc! {
-                "killCursors": &namespace.coll,
-                "cursors": [self.get_more.cursor_id()]
-            },
-            None,
-        ));
-    }
-}
-
-impl Iterator for Cursor {
+impl Stream for Cursor {
     type Item = Result<Document>;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.buffer.is_empty() && !self.exhausted {
-            match RUNTIME.block_on(self.client.execute_operation(&self.get_more, None)) {
-                Ok(get_more_result) => {
-                    self.buffer.extend(get_more_result.batch);
-                    self.exhausted = get_more_result.exhausted;
-                }
-                Err(e) => return Some(Err(e)),
-            };
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
+        loop {
+            match Pin::new(&mut self.inner).poll_next(cx) {
+                Poll::Ready(Some(result)) => return Poll::Ready(Some(result)),
+                Poll::Ready(None) if self.inner.exhausted() => break,
+                Poll::Ready(None) => {}
+                Poll::Pending => return Poll::Pending,
+            }
         }
-        self.buffer.pop_front().map(Ok)
+
+        Poll::Ready(None)
     }
 }
 

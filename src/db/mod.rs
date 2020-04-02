@@ -3,6 +3,7 @@ pub mod options;
 use std::sync::Arc;
 
 use bson::{Bson, Document};
+use futures::stream::TryStreamExt;
 
 use crate::{
     concern::{ReadConcern, WriteConcern},
@@ -182,18 +183,18 @@ impl Database {
             .map(|spec| Cursor::new(self.client().clone(), spec))?;
 
         cursor
-            .map(|doc| {
-                let name = doc?
-                    .get("name")
-                    .and_then(Bson::as_str)
-                    .ok_or_else(|| ErrorKind::ResponseError {
+            .and_then(|doc| match doc.get("name").and_then(Bson::as_str) {
+                Some(name) => futures::future::ok(name.into()),
+                None => futures::future::err(
+                    ErrorKind::ResponseError {
                         message: "Expected name field in server response, but there was none."
                             .to_string(),
-                    })?
-                    .to_string();
-                Ok(name)
+                    }
+                    .into(),
+                ),
             })
-            .collect()
+            .try_collect()
+            .await
     }
 
     /// Creates a new collection in the database with the given `name` and `options`.

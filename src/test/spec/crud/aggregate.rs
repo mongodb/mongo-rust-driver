@@ -1,4 +1,5 @@
 use bson::{Bson, Document};
+use futures::stream::TryStreamExt;
 use serde::Deserialize;
 
 use super::{Outcome, TestFile};
@@ -60,7 +61,7 @@ fn run_aggregate_test(test_file: TestFile) {
 
             assert_eq!(
                 outcome.result.unwrap_or_default(),
-                cursor.map(Result::unwrap).collect::<Vec<_>>(),
+                RUNTIME.block_on(cursor.try_collect::<Vec<_>>()).unwrap(),
                 "{}",
                 test_case.description,
             );
