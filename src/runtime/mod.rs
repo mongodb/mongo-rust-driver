@@ -4,7 +4,8 @@ mod join_handle;
 mod resolver;
 mod stream;
 
-use std::{future::Future, net::SocketAddr, time::Duration};
+use lazy_static::lazy_static;
+use std::{future::Future, net::SocketAddr, sync::Mutex, time::Duration};
 
 pub(crate) use self::{
     async_read_ext::AsyncLittleEndianRead,
@@ -17,6 +18,20 @@ use crate::{
     error::{ErrorKind, Result},
     options::StreamAddress,
 };
+
+#[cfg(feature = "tokio-runtime")]
+lazy_static! {
+    static ref HANDLE: Mutex<tokio::runtime::Runtime> = {
+        use tokio::runtime::Builder;
+
+        let runtime = Builder::new()
+            .threaded_scheduler()
+            .enable_all()
+            .build()
+            .unwrap();
+        Mutex::new(runtime)
+    };
+}
 
 /// An abstract handle to the async runtime.
 #[derive(Clone, Copy, Debug)]
@@ -34,7 +49,8 @@ impl AsyncRuntime {
     /// Spawn a task in the background to run a future.
     ///
     /// If the runtime is still running, this will return a handle to the background task.
-    /// Otherwise, it will return `None`.
+    /// Otherwise, it will return `None`. As a result, this must be called from an async block
+    /// or function running on a runtime.
     pub(crate) fn spawn<F, O>(self, fut: F) -> Option<AsyncJoinHandle<O>>
     where
         F: Future<Output = O> + Send + 'static,
@@ -42,13 +58,12 @@ impl AsyncRuntime {
     {
         match self {
             #[cfg(feature = "tokio-runtime")]
-            Self::Tokio => {
-                use tokio::runtime::Handle;
-
-                let handle = Handle::try_current().ok()?;
-
-                Some(AsyncJoinHandle::Tokio(handle.spawn(fut)))
-            }
+            Self::Tokio => match TokioCallingContext::current() {
+                TokioCallingContext::Async(handle) => {
+                    Some(AsyncJoinHandle::Tokio(handle.spawn(fut)))
+                }
+                TokioCallingContext::Sync => None,
+            },
 
             #[cfg(feature = "async-std-runtime")]
             Self::AsyncStd => Some(AsyncJoinHandle::AsyncStd(async_std::task::spawn(fut))),
@@ -56,6 +71,8 @@ impl AsyncRuntime {
     }
 
     /// Spawn a task in the background to run a future.
+    ///
+    /// Note: this must only be called from an async block or function running on a runtime.
     pub(crate) fn execute<F, O>(self, fut: F)
     where
         F: Future<Output = O> + Send + 'static,
@@ -65,7 +82,9 @@ impl AsyncRuntime {
     }
 
     /// Run a future in the foreground, blocking on it completing.
-    #[cfg(test)]
+    ///
+    /// If this is called from a synchronous context, a static runtime will be used
+    /// to execute the future. If the static runtime has not been started yet, it will be.
     pub(crate) fn block_on<F, T>(self, fut: F) -> T
     where
         F: Future<Output = T> + Send,
@@ -73,9 +92,12 @@ impl AsyncRuntime {
     {
         #[cfg(all(feature = "tokio-runtime", not(feature = "async-std-runtime")))]
         {
-            use tokio::runtime::Handle;
-
-            Handle::current().enter(|| futures::executor::block_on(fut))
+            match TokioCallingContext::current() {
+                TokioCallingContext::Async(handle) => {
+                    handle.enter(|| futures::executor::block_on(fut))
+                }
+                TokioCallingContext::Sync => HANDLE.lock().unwrap().block_on(fut),
+            }
         }
 
         #[cfg(feature = "async-std-runtime")]
@@ -135,6 +157,28 @@ impl AsyncRuntime {
                 let socket_addrs = async_std::net::ToSocketAddrs::to_socket_addrs(&host).await?;
                 Ok(socket_addrs)
             }
+        }
+    }
+}
+
+/// Represents the context in which a given runtime method is being called from.
+#[cfg(feature = "tokio-runtime")]
+enum TokioCallingContext {
+    /// From a syncronous setting (i.e. not from a runtime thread).
+    Sync,
+
+    /// From an asyncronous setting (i.e. from an async block or function being run on a runtime).
+    /// Includes a handle to the current runtime.
+    Async(tokio::runtime::Handle),
+}
+
+#[cfg(feature = "tokio-runtime")]
+impl TokioCallingContext {
+    /// Get the current calling context.
+    fn current() -> Self {
+        match tokio::runtime::Handle::try_current() {
+            Ok(handle) => TokioCallingContext::Async(handle),
+            Err(_) => TokioCallingContext::Sync,
         }
     }
 }

@@ -82,8 +82,8 @@ macro_rules! define_if_single_runtime_enabled {
     }
 }
 
-// In the case that neither tokio  or async-std is enabled, we want to disable all compiler errors
-// and warnings other than our custom ones.:w
+// In the case that neither tokio nor async-std is enabled, we want to disable all compiler errors
+// and warnings other than our custom ones.
 define_if_single_runtime_enabled! {
     #[macro_use]
     pub mod options;
@@ -105,6 +105,7 @@ define_if_single_runtime_enabled! {
     mod sdam;
     mod selection_criteria;
     mod srv;
+    pub mod sync;
     #[cfg(test)]
     mod test;
 
