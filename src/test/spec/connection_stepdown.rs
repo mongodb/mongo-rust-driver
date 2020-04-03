@@ -1,3 +1,5 @@
+use std::future::Future;
+
 use bson::doc;
 use futures::stream::StreamExt;
 
@@ -14,12 +16,11 @@ use crate::{
     test::{util::EventClient, LOCK},
     Collection,
     Database,
-    RUNTIME,
 };
 
-fn run_test(name: &str, test: impl Fn(EventClient, Database, Collection)) {
+async fn run_test<F: Future>(name: &str, test: impl Fn(EventClient, Database, Collection) -> F) {
     // TODO RUST-51: Disable retryable writes once they're implemented.
-    let client = RUNTIME.block_on(EventClient::new());
+    let client = EventClient::new().await;
 
     if client.options.repl_set_name.is_none() {
         return;
@@ -32,39 +33,39 @@ fn run_test(name: &str, test: impl Fn(EventClient, Database, Collection)) {
 
     let wc_majority = WriteConcern::builder().w(Acknowledgment::Majority).build();
 
-    let _ = coll.drop(Some(
-        DropCollectionOptions::builder()
-            .write_concern(wc_majority.clone())
-            .build(),
-    ));
+    let _: Result<_, _> = coll
+        .drop(Some(
+            DropCollectionOptions::builder()
+                .write_concern(wc_majority.clone())
+                .build(),
+        ))
+        .await;
 
-    RUNTIME
-        .block_on(
-            db.create_collection(
-                &name,
-                Some(
-                    CreateCollectionOptions::builder()
-                        .write_concern(wc_majority)
-                        .build(),
-                ),
-            ),
-        )
-        .unwrap();
+    db.create_collection(
+        &name,
+        Some(
+            CreateCollectionOptions::builder()
+                .write_concern(wc_majority)
+                .build(),
+        ),
+    )
+    .await
+    .unwrap();
 
-    test(client, db, coll);
+    test(client, db, coll).await;
 }
 
 #[function_name::named]
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn get_more() {
-    run_test(function_name!(), |client, db, coll| {
+    async fn get_more_test(client: EventClient, db: Database, coll: Collection) {
         // This test requires server version 4.2 or higher.
         if client.server_version_lt(4, 2) {
             return;
         }
 
-        let _guard = LOCK.run_concurrently();
+        let _guard = LOCK.run_concurrently().await;
 
         let docs = vec![doc! { "x": 1 }; 5];
         coll.insert_many(
@@ -75,41 +76,47 @@ async fn get_more() {
                     .build(),
             ),
         )
+        .await
         .unwrap();
 
         let mut cursor = coll
             .find(None, Some(FindOptions::builder().batch_size(2).build()))
+            .await
             .unwrap();
 
-        RUNTIME
-            .block_on(db.run_command(doc! { "replSetStepDown": 5, "force": true }, None))
+        db.run_command(doc! { "replSetStepDown": 5, "force": true }, None)
+            .await
             .expect("stepdown should have succeeded");
 
         for _ in 0..5 {
-            RUNTIME
-                .block_on(cursor.next())
+            cursor
+                .next()
+                .await
                 .unwrap()
                 .expect("cursor iteration should have succeeded");
         }
 
         assert!(client.pool_cleared_events.read().unwrap().is_empty());
-    });
+    }
+
+    run_test(function_name!(), get_more_test).await;
 }
 
 #[function_name::named]
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn not_master_keep_pool() {
-    run_test(function_name!(), |client, _, coll| {
+    async fn not_master_keep_pool_test(client: EventClient, db: Database, coll: Collection) {
         // This test requires server version 4.2 or higher.
         if client.server_version_lt(4, 2) {
             return;
         }
 
-        let _guard = LOCK.run_exclusively();
+        let _guard = LOCK.run_exclusively().await;
 
-        RUNTIME
-            .block_on(client.database("admin").run_command(
+        client
+            .database("admin")
+            .run_command(
                 doc! {
                     "configureFailPoint": "failCommand",
                     "mode": { "times": 1 },
@@ -119,10 +126,11 @@ async fn not_master_keep_pool() {
                     }
                 },
                 None,
-            ))
+            )
+            .await
             .unwrap();
 
-        let result = coll.insert_one(doc! { "test": 1 }, None);
+        let result = coll.insert_one(doc! { "test": 1 }, None).await;
         assert!(
             matches!(
                 result.as_ref().map_err(|e| e.as_ref()),
@@ -132,26 +140,30 @@ async fn not_master_keep_pool() {
         );
 
         coll.insert_one(doc! { "test": 1 }, None)
+            .await
             .expect("insert should have succeeded");
 
         assert!(client.pool_cleared_events.read().unwrap().is_empty());
-    });
+    }
+
+    run_test(function_name!(), not_master_keep_pool_test).await;
 }
 
 #[function_name::named]
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn not_master_reset_pool() {
-    run_test(function_name!(), |client, _, coll| {
+    async fn not_master_reset_pool_test(client: EventClient, db: Database, coll: Collection) {
         // This test must only run on 4.0 servers.
         if !client.server_version_eq(4, 0) {
             return;
         }
 
-        let _guard = LOCK.run_exclusively();
+        let _guard = LOCK.run_exclusively().await;
 
-        RUNTIME
-            .block_on(client.database("admin").run_command(
+        client
+            .database("admin")
+            .run_command(
                 doc! {
                     "configureFailPoint": "failCommand",
                     "mode": { "times": 1 },
@@ -161,10 +173,11 @@ async fn not_master_reset_pool() {
                     }
                 },
                 None,
-            ))
+            )
+            .await
             .unwrap();
 
-        let result = coll.insert_one(doc! { "test": 1 }, None);
+        let result = coll.insert_one(doc! { "test": 1 }, None).await;
         assert!(
             matches!(
                 result.as_ref().map_err(|e| e.as_ref()),
@@ -176,23 +189,27 @@ async fn not_master_reset_pool() {
         assert!(client.pool_cleared_events.read().unwrap().len() == 1);
 
         coll.insert_one(doc! { "test": 1 }, None)
+            .await
             .expect("insert should have succeeded");
-    });
+    }
+
+    run_test(function_name!(), not_master_reset_pool_test).await;
 }
 
 #[function_name::named]
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn shutdown_in_progress() {
-    run_test(function_name!(), |client, _, coll| {
+    async fn shutdown_in_progress_test(client: EventClient, db: Database, coll: Collection) {
         if client.server_version_lt(4, 0) {
             return;
         }
 
-        let _guard = LOCK.run_exclusively();
+        let _guard = LOCK.run_exclusively().await;
 
-        RUNTIME
-            .block_on(client.database("admin").run_command(
+        client
+            .database("admin")
+            .run_command(
                 doc! {
                     "configureFailPoint": "failCommand",
                     "mode": { "times": 1 },
@@ -202,10 +219,11 @@ async fn shutdown_in_progress() {
                     }
                 },
                 None,
-            ))
+            )
+            .await
             .unwrap();
 
-        let result = coll.insert_one(doc! { "test": 1 }, None);
+        let result = coll.insert_one(doc! { "test": 1 }, None).await;
         assert!(
             matches!(
                 result.as_ref().map_err(|e| e.as_ref()),
@@ -217,23 +235,27 @@ async fn shutdown_in_progress() {
         assert!(client.pool_cleared_events.read().unwrap().len() == 1);
 
         coll.insert_one(doc! { "test": 1 }, None)
+            .await
             .expect("insert should have succeeded");
-    })
+    }
+
+    run_test(function_name!(), shutdown_in_progress_test).await;
 }
 
 #[function_name::named]
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn interrupted_at_shutdown() {
-    run_test(function_name!(), |client, _, coll| {
+    async fn interrupted_at_shutdown_test(client: EventClient, db: Database, coll: Collection) {
         if client.server_version_lt(4, 0) {
             return;
         }
 
-        let _guard = LOCK.run_exclusively();
+        let _guard = LOCK.run_exclusively().await;
 
-        RUNTIME
-            .block_on(client.database("admin").run_command(
+        client
+            .database("admin")
+            .run_command(
                 doc! {
                     "configureFailPoint": "failCommand",
                     "mode": { "times": 1 },
@@ -243,10 +265,11 @@ async fn interrupted_at_shutdown() {
                     }
                 },
                 None,
-            ))
+            )
+            .await
             .unwrap();
 
-        let result = coll.insert_one(doc! { "test": 1 }, None);
+        let result = coll.insert_one(doc! { "test": 1 }, None).await;
         assert!(
             matches!(
                 result.as_ref().map_err(|e| e.as_ref()),
@@ -258,6 +281,9 @@ async fn interrupted_at_shutdown() {
         assert!(client.pool_cleared_events.read().unwrap().len() == 1);
 
         coll.insert_one(doc! { "test": 1 }, None)
+            .await
             .expect("insert should have succeeded");
-    })
+    }
+
+    run_test(function_name!(), interrupted_at_shutdown_test).await;
 }

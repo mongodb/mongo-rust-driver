@@ -23,16 +23,18 @@ async fn run_test(uri_env_var: &str) {
         .expect("isMaster should succeed");
 
     let coll = db.collection("test");
-    coll.find_one(None, None).expect("findOne should succeed");
+    coll.find_one(None, None)
+        .await
+        .expect("findOne should succeed");
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn atlas_repl_set() {
     run_test("MONGO_ATLAS_FREE_TIER_REPL_URI").await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn atlas_repl_set_srv() {
     run_test("MONGO_ATLAS_FREE_TIER_REPL_URI_SRV").await;

@@ -10,7 +10,7 @@ use crate::{
     operation::{test, Count, Operation},
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build() {
     let ns = Namespace {
@@ -31,7 +31,7 @@ async fn build() {
     assert_eq!(count_command.read_pref, None);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_with_options() {
     let read_concern = ReadConcern::Local;
@@ -61,7 +61,7 @@ async fn build_with_options() {
     assert_eq!(count_command.read_pref, None);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn op_selection_criteria() {
     test::op_selection_criteria(|selection_criteria| {
@@ -73,7 +73,7 @@ async fn op_selection_criteria() {
     });
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success() {
     let count_op = Count::empty();
@@ -88,7 +88,7 @@ async fn handle_success() {
     assert_eq!(actual_values, n);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_response_no_n() {
     let count_op = Count::empty();

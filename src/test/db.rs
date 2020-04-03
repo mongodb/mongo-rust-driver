@@ -51,10 +51,10 @@ async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<Collectio
     colls
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn is_master() {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let db = client.database("test");
@@ -65,11 +65,11 @@ async fn is_master() {
     assert_ulps_eq!(is_master_reply.ok, 1.0);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn list_collections() {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let db = client.database(function_name!());
@@ -92,6 +92,7 @@ async fn list_collections() {
     for coll_name in coll_names {
         db.collection(coll_name)
             .insert_one(doc! { "x": 1 }, None)
+            .await
             .unwrap();
     }
 
@@ -110,11 +111,11 @@ async fn list_collections() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn list_collections_filter() {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let db = client.database(function_name!());
@@ -132,6 +133,7 @@ async fn list_collections_filter() {
     for coll_name in coll_names {
         db.collection(coll_name)
             .insert_one(doc! { "x": 1 }, None)
+            .await
             .unwrap();
     }
 
@@ -157,11 +159,11 @@ async fn list_collections_filter() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn list_collection_names() {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let db = client.database(function_name!());
@@ -178,6 +180,7 @@ async fn list_collection_names() {
     for coll in expected_colls {
         db.collection(coll)
             .insert_one(doc! { "x": 1 }, None)
+            .await
             .unwrap();
     }
 
@@ -187,11 +190,11 @@ async fn list_collection_names() {
     assert_eq!(&actual_colls, expected_colls);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn collection_management() {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let db = client.database(function_name!());
@@ -226,7 +229,7 @@ async fn collection_management() {
     assert!(!colls[1].info.read_only);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn db_aggregate() {
     let client = TestClient::new().await;
@@ -235,7 +238,7 @@ async fn db_aggregate() {
         return;
     }
 
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let db = client.database("admin");
 
@@ -270,7 +273,7 @@ async fn db_aggregate() {
         .expect("aggregate should succeed");
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn db_aggregate_disk_use() {
     let client = TestClient::new().await;
@@ -279,7 +282,7 @@ async fn db_aggregate_disk_use() {
         return;
     }
 
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let db = client.database("admin");
 

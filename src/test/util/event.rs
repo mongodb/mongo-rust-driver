@@ -14,7 +14,6 @@ use crate::{
         },
     },
     test::LOCK,
-    Collection,
 };
 
 pub type EventQueue<T> = Arc<RwLock<Vec<T>>>;
@@ -27,7 +26,7 @@ pub enum CommandEvent {
 }
 
 impl CommandEvent {
-    fn command_name(&self) -> &str {
+    pub fn command_name(&self) -> &str {
         match self {
             CommandEvent::CommandStartedEvent(event) => event.command_name.as_str(),
             CommandEvent::CommandFailedEvent(event) => event.command_name.as_str(),
@@ -111,34 +110,18 @@ impl EventClient {
             pool_cleared_events,
         }
     }
-
-    pub fn run_operation_with_events(
-        &self,
-        command_names: &[&str],
-        database_name: &str,
-        collection_name: &str,
-        function: impl FnOnce(Collection),
-    ) -> Vec<CommandEvent> {
-        function(self.database(database_name).collection(collection_name));
-        self.command_events
-            .write()
-            .unwrap()
-            .drain(..)
-            .filter(|event| command_names.contains(&event.command_name()))
-            .collect()
-    }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn command_started_event_count() {
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let client = EventClient::new().await;
     let coll = client.database("foo").collection("bar");
 
     for i in 0..10 {
-        coll.insert_one(doc! { "x": i }, None).unwrap();
+        coll.insert_one(doc! { "x": i }, None).await.unwrap();
     }
 
     assert_eq!(

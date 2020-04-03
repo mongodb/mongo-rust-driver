@@ -53,7 +53,7 @@
 //! }
 //!
 //! let coll = db.collection("some-coll");
-//! let result = coll.insert_one(doc! { "x": 1 }, None)?;
+//! let result = coll.insert_one(doc! { "x": 1 }, None).await?;
 //! println!("{:#?}", result);
 //!
 //! # Ok(())

@@ -27,7 +27,7 @@ fn empty_delete() -> FindAndModify {
     FindAndModify::with_delete(ns, filter, None)
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_with_delete_no_options() {
     let ns = Namespace {
@@ -58,7 +58,7 @@ async fn build_with_delete_no_options() {
     assert_eq!(cmd.body, expected_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_with_delete() {
     let ns = Namespace {
@@ -94,7 +94,7 @@ async fn build_with_delete() {
     assert_eq!(cmd.body, expected_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success_delete() {
     let op = empty_delete();
@@ -126,7 +126,7 @@ async fn handle_success_delete() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_null_value_delete() {
     let op = empty_delete();
@@ -137,7 +137,7 @@ async fn handle_null_value_delete() {
     assert_eq!(result.expect("handle failed"), None);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_no_value_delete() {
     let op = empty_delete();
@@ -158,7 +158,7 @@ fn empty_replace() -> FindAndModify {
     FindAndModify::with_replace(ns, filter, replacement, None).unwrap()
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_with_replace_no_options() {
     let ns = Namespace {
@@ -189,7 +189,7 @@ async fn build_with_replace_no_options() {
     assert_eq!(cmd.body, expected_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_with_replace() {
     let ns = Namespace {
@@ -230,7 +230,7 @@ async fn build_with_replace() {
     assert_eq!(cmd.body, expected_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success_replace() {
     let op = empty_replace();
@@ -262,7 +262,7 @@ async fn handle_success_replace() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_null_value_replace() {
     let op = empty_replace();
@@ -273,7 +273,7 @@ async fn handle_null_value_replace() {
     assert_eq!(result.expect("handle failed"), None);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_no_value_replace() {
     let op = empty_replace();
@@ -294,7 +294,7 @@ fn empty_update() -> FindAndModify {
     FindAndModify::with_update(ns, filter, update, None).unwrap()
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_with_update_no_options() {
     let ns = Namespace {
@@ -324,7 +324,7 @@ async fn build_with_update_no_options() {
     assert_eq!(cmd.body, expected_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_with_update() {
     let ns = Namespace {
@@ -362,7 +362,7 @@ async fn build_with_update() {
     assert_eq!(cmd.body, expected_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success_update() {
     let op = empty_update();
@@ -394,7 +394,7 @@ async fn handle_success_update() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_null_value_update() {
     let op = empty_update();
@@ -405,7 +405,7 @@ async fn handle_null_value_update() {
     assert_eq!(result.expect("handle failed"), None);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_no_value_update() {
     let op = empty_update();

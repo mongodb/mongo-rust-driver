@@ -17,7 +17,7 @@ use bson::Document;
 use futures::stream::TryStreamExt;
 use serde::Deserialize;
 
-use crate::{Collection, RUNTIME};
+use crate::Collection;
 
 #[derive(Debug, Deserialize)]
 pub struct TestFile {
@@ -51,8 +51,11 @@ pub struct CollectionOutcome {
     pub data: Vec<Document>,
 }
 
-pub fn find_all(coll: &Collection) -> Vec<Document> {
-    RUNTIME
-        .block_on(coll.find(None, None).unwrap().try_collect())
+pub async fn find_all(coll: &Collection) -> Vec<Document> {
+    coll.find(None, None)
+        .await
+        .unwrap()
+        .try_collect()
+        .await
         .unwrap()
 }

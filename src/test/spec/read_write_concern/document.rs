@@ -70,7 +70,7 @@ fn normalize_write_concern_doc(write_concern_doc: Document) -> Document {
         .collect()
 }
 
-fn run_document_test(test_file: TestFile) {
+async fn run_document_test(test_file: TestFile) {
     for test_case in test_file.tests {
         if let Some(specified_write_concern) = test_case.write_concern {
             let wc = write_concern_from_document(specified_write_concern).map(|write_concern| {
@@ -108,8 +108,8 @@ fn run_document_test(test_file: TestFile) {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
-    run_spec_test(&["read-write-concern", "document"], run_document_test);
+    run_spec_test(&["read-write-concern", "document"], run_document_test).await;
 }

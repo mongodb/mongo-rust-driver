@@ -283,20 +283,19 @@ impl Matchable for Event {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn cmap_spec_tests() {
-    run_spec_test(
-        &["connection-monitoring-and-pooling"],
-        |test_file: TestFile| {
-            if TEST_DESCRIPTIONS_TO_SKIP.contains(&test_file.description.as_str()) {
-                return;
-            }
+    async fn run_cmap_spec_tests(test_file: TestFile) {
+        if TEST_DESCRIPTIONS_TO_SKIP.contains(&test_file.description.as_str()) {
+            return;
+        }
 
-            let _guard = LOCK.run_concurrently();
+        let _guard = LOCK.run_concurrently().await;
 
-            let executor = Executor::new(test_file);
-            RUNTIME.block_on(executor.execute_test());
-        },
-    );
+        let executor = Executor::new(test_file);
+        executor.execute_test().await;
+    }
+
+    run_spec_test(&["connection-monitoring-and-pooling"], run_cmap_spec_tests).await;
 }

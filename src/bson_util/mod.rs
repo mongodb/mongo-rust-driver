@@ -214,7 +214,7 @@ mod test {
 
     use super::doc_size_bytes;
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn doc_size_bytes_eq_serialized_size_bytes() {
         let doc = doc! {

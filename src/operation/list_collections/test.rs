@@ -22,7 +22,7 @@ fn build_test(db_name: &str, list_collections: ListCollections, mut expected_bod
     assert_eq!(cmd.body, expected_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build() {
     let list_collections = ListCollections::new("test_db".to_string(), None, false, None);
@@ -43,7 +43,7 @@ async fn build() {
     build_test("test_db", list_collections, expected_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_name_only() {
     let list_collections = ListCollections::new("test_db".to_string(), None, true, None);
@@ -95,7 +95,7 @@ async fn build_name_only() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_batch_size() {
     let list_collections = ListCollections::new("test_db".to_string(), None, true, None);
@@ -123,7 +123,7 @@ async fn build_batch_size() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn op_selection_criteria() {
     assert!(ListCollections::empty()
@@ -132,7 +132,7 @@ async fn op_selection_criteria() {
         .is_read_pref_primary());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success() {
     let ns = Namespace {
@@ -210,7 +210,7 @@ async fn handle_success() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_invalid_response() {
     let list_collections = ListCollections::empty();

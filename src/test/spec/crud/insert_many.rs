@@ -5,7 +5,6 @@ use super::{Outcome, TestFile};
 use crate::{
     options::InsertManyOptions,
     test::{run_spec_test, util::TestClient, LOCK},
-    RUNTIME,
 };
 
 #[derive(Debug, Deserialize)]
@@ -26,8 +25,8 @@ struct ResultDoc {
 }
 
 #[function_name::named]
-fn run_insert_many_test(test_file: TestFile) {
-    let client = RUNTIME.block_on(TestClient::new());
+async fn run_insert_many_test(test_file: TestFile) {
+    let client = TestClient::new().await;
     let data = test_file.data;
 
     for test_case in test_file.tests {
@@ -35,10 +34,13 @@ fn run_insert_many_test(test_file: TestFile) {
             continue;
         }
 
-        let _guard = LOCK.run_concurrently();
+        let _guard = LOCK.run_concurrently().await;
 
-        let coll = client.init_db_and_coll(function_name!(), &test_case.description);
+        let coll = client
+            .init_db_and_coll(function_name!(), &test_case.description)
+            .await;
         coll.insert_many(data.clone(), None)
+            .await
             .expect(&test_case.description);
 
         let arguments: Arguments = bson::from_bson(Bson::Document(test_case.operation.arguments))
@@ -50,7 +52,7 @@ fn run_insert_many_test(test_file: TestFile) {
             .ordered(arguments.options.ordered)
             .build();
 
-        let result = match coll.insert_many(arguments.documents, options) {
+        let result = match coll.insert_many(arguments.documents, options).await {
             Ok(result) => {
                 assert_ne!(outcome.error, Some(true), "{}", test_case.description);
                 result.inserted_ids
@@ -87,7 +89,7 @@ fn run_insert_many_test(test_file: TestFile) {
 
             assert_eq!(
                 c.data,
-                super::find_all(&outcome_coll),
+                super::find_all(&outcome_coll).await,
                 "{}",
                 test_case.description
             );
@@ -95,8 +97,8 @@ fn run_insert_many_test(test_file: TestFile) {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
-    run_spec_test(&["crud", "v1", "write"], run_insert_many_test);
+    run_spec_test(&["crud", "v1", "write"], run_insert_many_test).await;
 }

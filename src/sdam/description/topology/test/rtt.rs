@@ -24,7 +24,7 @@ pub enum AverageRtt {
     S(String),
 }
 
-fn run_test(test_file: TestFile) {
+async fn run_test(test_file: TestFile) {
     let avg_rtt_ms = match test_file.avg_rtt_ms {
         AverageRtt::F(f) => Some(f),
         AverageRtt::S(ref s) if s == "NULL" => None,
@@ -64,8 +64,8 @@ fn run_test(test_file: TestFile) {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn server_selection_rtt() {
-    run_spec_test(&["server-selection", "rtt"], run_test);
+    run_spec_test(&["server-selection", "rtt"], run_test).await;
 }

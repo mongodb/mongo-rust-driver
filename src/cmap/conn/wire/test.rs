@@ -7,14 +7,14 @@ use crate::{
     test::{CLIENT_OPTIONS, LOCK},
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn basic() {
     if CLIENT_OPTIONS.tls_options().is_some() {
         return;
     }
 
-    let _guard = LOCK.run_concurrently();
+    let _guard = LOCK.run_concurrently().await;
 
     let message = Message {
         response_to: 0,
