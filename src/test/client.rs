@@ -43,7 +43,7 @@ struct OsMetadata {
 // `currentOp` sometimes detecting heartbeats between the server. Eventually we can test this using
 // APM or coming up with something more clever, but for now, we're just disabling it.
 //
-// #[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+// #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 // #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[allow(unused)]
 async fn metadata_sent_in_handshake() {
@@ -60,7 +60,7 @@ async fn metadata_sent_in_handshake() {
     assert_eq!(metadata.client.driver.name, "mrd");
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn server_selection_timeout_message() {
     let _guard = LOCK.run_concurrently().await;
@@ -96,7 +96,7 @@ async fn server_selection_timeout_message() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn list_databases() {
@@ -149,7 +149,7 @@ async fn list_databases() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn list_database_names() {
@@ -324,7 +324,7 @@ async fn scram_test(
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_sha1() {
     let client = TestClient::new().await;
@@ -339,7 +339,7 @@ async fn scram_sha1() {
     scram_test(&client, "sha1", "sha1", &[AuthMechanism::ScramSha1]).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_sha256() {
     let client = TestClient::new().await;
@@ -353,7 +353,7 @@ async fn scram_sha256() {
     scram_test(&client, "sha256", "sha256", &[AuthMechanism::ScramSha256]).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_both() {
     let client = TestClient::new().await;
@@ -378,7 +378,7 @@ async fn scram_both() {
     .await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_missing_user_uri() {
     let client = TestClient::new().await;
@@ -388,7 +388,7 @@ async fn scram_missing_user_uri() {
     auth_test_uri("adsfasdf", "ASsdfsadf", None, false).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_missing_user_options() {
     let client = TestClient::new().await;
@@ -398,7 +398,7 @@ async fn scram_missing_user_options() {
     auth_test_options("sadfasdf", "fsdadsfasdf", None, false).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn saslprep_options() {
     let client = TestClient::new().await;
@@ -427,7 +427,7 @@ async fn saslprep_options() {
     auth_test_options("\u{2168}", "I\u{00AD}V", None, true).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn saslprep_uri() {
     let client = TestClient::new().await;

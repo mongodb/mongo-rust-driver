@@ -283,7 +283,7 @@ impl Matchable for Event {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn cmap_spec_tests() {
     async fn run_cmap_spec_tests(test_file: TestFile) {

@@ -11,7 +11,7 @@ use crate::{
     Namespace,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_many() {
     let ns = Namespace {
@@ -55,7 +55,7 @@ async fn build_many() {
     assert_eq!(cmd.body, expected_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_one() {
     let ns = Namespace {
@@ -99,7 +99,7 @@ async fn build_one() {
     assert_eq!(cmd.body, expected_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success() {
     let op = Delete::empty();
@@ -116,7 +116,7 @@ async fn handle_success() {
     assert_eq!(delete_result.deleted_count, 3);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_invalid_response() {
     let op = Delete::empty();
@@ -125,7 +125,7 @@ async fn handle_invalid_response() {
     assert!(op.handle_response(invalid_response).is_err());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_write_failure() {
     let op = Delete::empty();
@@ -156,7 +156,7 @@ async fn handle_write_failure() {
     };
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_write_concern_failure() {
     let op = Delete::empty();

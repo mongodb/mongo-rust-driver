@@ -112,7 +112,7 @@ impl EventClient {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn command_started_event_count() {
     let _guard = LOCK.run_concurrently().await;

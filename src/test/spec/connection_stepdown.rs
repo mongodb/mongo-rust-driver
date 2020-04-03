@@ -56,7 +56,7 @@ async fn run_test<F: Future>(name: &str, test: impl Fn(EventClient, Database, Co
 }
 
 #[function_name::named]
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn get_more() {
     async fn get_more_test(client: EventClient, db: Database, coll: Collection) {
@@ -103,7 +103,7 @@ async fn get_more() {
 }
 
 #[function_name::named]
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn not_master_keep_pool() {
     async fn not_master_keep_pool_test(client: EventClient, db: Database, coll: Collection) {
@@ -150,7 +150,7 @@ async fn not_master_keep_pool() {
 }
 
 #[function_name::named]
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn not_master_reset_pool() {
     async fn not_master_reset_pool_test(client: EventClient, db: Database, coll: Collection) {
@@ -197,7 +197,7 @@ async fn not_master_reset_pool() {
 }
 
 #[function_name::named]
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn shutdown_in_progress() {
     async fn shutdown_in_progress_test(client: EventClient, db: Database, coll: Collection) {
@@ -243,7 +243,7 @@ async fn shutdown_in_progress() {
 }
 
 #[function_name::named]
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn interrupted_at_shutdown() {
     async fn interrupted_at_shutdown_test(client: EventClient, db: Database, coll: Collection) {

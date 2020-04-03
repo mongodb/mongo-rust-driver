@@ -45,7 +45,7 @@ fn fixtures() -> TestFixtures {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build() {
     let fixtures = fixtures();
@@ -106,7 +106,7 @@ async fn build() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_ordered() {
     let insert = Insert::new(Namespace::empty(), Vec::new(), None);
@@ -136,7 +136,7 @@ async fn build_ordered() {
     assert_eq!(cmd.body.get("ordered"), Some(&Bson::Boolean(true)));
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success() {
     let fixtures = fixtures();
@@ -153,7 +153,7 @@ async fn handle_success() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_invalid_response() {
     let fixtures = fixtures();
@@ -162,7 +162,7 @@ async fn handle_invalid_response() {
     assert!(fixtures.op.handle_response(invalid_response).is_err());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(core_threads = 2))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_write_failure() {
     let fixtures = fixtures();
