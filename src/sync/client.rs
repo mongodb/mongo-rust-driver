@@ -9,9 +9,14 @@ use crate::{
     RUNTIME,
 };
 
-/// This is the main entry point for the API. A `Client` is used to connect to a MongoDB cluster.
+/// This is the main entry point for the synchronous API. A `Client` is used to connect to a MongoDB cluster.
 /// By default, it will monitor the topology of the cluster, keeping track of any changes, such
-/// as servers being added or removed
+/// as servers being added or removed.
+///
+/// `Client` is a wrapper around the asynchronous `mongodb::Client`, so it starts up an async runtime
+/// internally to run that wrapped client on. This runtime is shared by all instances of `Client` and
+/// is accessed through a `Mutex`. This may cause performance to degrade in multithreaded scenarios compared to
+/// the async `mongodb::Client`, which has no such sharing.
 ///
 /// `Client` uses [`std::sync::Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html) internally,
 /// so it can safely be shared across threads. For example:
