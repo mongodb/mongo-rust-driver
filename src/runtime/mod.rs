@@ -4,8 +4,7 @@ mod join_handle;
 mod resolver;
 mod stream;
 
-use lazy_static::lazy_static;
-use std::{future::Future, net::SocketAddr, sync::Mutex, time::Duration};
+use std::{future::Future, net::SocketAddr, time::Duration};
 
 pub(crate) use self::{
     async_read_ext::AsyncLittleEndianRead,
@@ -20,16 +19,14 @@ use crate::{
 };
 
 #[cfg(feature = "tokio-runtime")]
-lazy_static! {
-    static ref HANDLE: Mutex<tokio::runtime::Runtime> = {
-        use tokio::runtime::Builder;
-
-        let runtime = Builder::new()
+lazy_static::lazy_static! {
+    static ref HANDLE: std::sync::Mutex<tokio::runtime::Runtime> = {
+        let runtime = tokio::runtime::Builder::new()
             .threaded_scheduler()
             .enable_all()
             .build()
             .unwrap();
-        Mutex::new(runtime)
+        std::sync::Mutex::new(runtime)
     };
 }
 
