@@ -1,3 +1,5 @@
+use bson::Document;
+
 use super::{Collection, Cursor};
 use crate::{
     error::Result,
@@ -14,8 +16,41 @@ use crate::{
     Database as AsyncDatabase,
     RUNTIME,
 };
-use bson::Document;
 
+/// `Database` is the client-side abstraction of a MongoDB database. It can be used to perform
+/// database-level operations or to obtain handles to specific collections within the database. A
+/// `Database` can only be obtained through a [`Client`](struct.Client.html) by calling either
+/// [`Client::database`](struct.Client.html#method.database) or
+/// [`Client::database_with_options`](struct.Client.html#method.database_with_options).
+///
+/// `Database` uses [`std::sync::Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html) internally,
+/// so it can safely be shared across threads. For example:
+///
+/// ```rust
+///
+/// # use mongodb::{Client, error::Result};
+///
+/// # fn start_workers() -> Result<()> {
+/// # let client = Client::with_uri_str("mongodb://example.com")?;
+/// let db = client.database("items");
+///
+/// for i in 0..5 {
+///     let db_ref = db.clone();
+///
+///     std::thread::spawn(move || {
+///         let collection = db_ref.collection(&format!("coll{}", i));
+///
+///         // Do something with the collection
+///     });
+/// }
+/// #
+/// # // Technically we should join the threads here, but for the purpose of the example, we'll just
+/// # // sleep for a bit.
+/// # std::thread::sleep(std::time::Duration::from_secs(3));
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Debug, Clone)]
 pub struct Database {
     async_database: AsyncDatabase,
 }

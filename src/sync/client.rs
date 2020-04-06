@@ -13,10 +13,12 @@ use crate::{
 /// By default, it will monitor the topology of the cluster, keeping track of any changes, such
 /// as servers being added or removed.
 ///
-/// `Client` is a wrapper around the asynchronous `mongodb::Client`, so it starts up an async runtime
-/// internally to run that wrapped client on. This runtime is shared by all instances of `Client` and
-/// is accessed through a `Mutex`. This may cause performance to degrade in multithreaded scenarios compared to
-/// the async `mongodb::Client`, which has no such sharing.
+/// `Client` is a wrapper around the asynchronous [`mongodb::Client`](../struct.Client.html), so it
+/// starts up an async runtime internally to run that wrapped client on. This runtime is shared by
+/// all instances of `Client` and is accessed through a
+/// [`std::sync::Mutex`](https://doc.rust-lang.org/std/sync/struct.Mutex.html). Users who are
+/// concerned about the `Mutex` blocking during concurrent usage are recommended to use the async
+/// [`mongodb::Client`](../struct.Client.html), which has no such sharing.
 ///
 /// `Client` uses [`std::sync::Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html) internally,
 /// so it can safely be shared across threads. For example:
@@ -53,7 +55,7 @@ impl Client {
     /// MongoDB connection string.
     ///
     /// See the documentation on
-    /// [`ClientOptions::parse`](options/struct.ClientOptions.html#method.parse) for more details.
+    /// [`ClientOptions::parse`](../options/struct.ClientOptions.html#method.parse) for more details.
     pub fn with_uri_str(uri: &str) -> Result<Self> {
         let async_client = RUNTIME.block_on(AsyncClient::with_uri_str(uri))?;
         Ok(Self { async_client })
