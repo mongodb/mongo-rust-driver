@@ -29,7 +29,7 @@ use crate::{
 /// documents it yields:
 ///
 /// ```rust
-/// # use mongodb::{Client, error::Result};
+/// # use mongodb::{sync::Client, error::Result};
 /// #
 /// # fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com")?;
@@ -51,7 +51,7 @@ use crate::{
 ///
 /// ```rust
 /// # use bson::{doc, bson, Document};
-/// # use mongodb::{Client, error::Result};
+/// # use mongodb::{sync::Client, error::Result};
 /// #
 /// # fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com")?;

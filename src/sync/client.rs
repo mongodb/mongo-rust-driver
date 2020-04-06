@@ -17,7 +17,7 @@ use crate::{
 /// so it can safely be shared across threads. For example:
 ///
 /// ```rust
-/// # use mongodb::{Client, error::Result};
+/// # use mongodb::{sync::Client, error::Result};
 /// #
 /// # fn start_workers() -> Result<()> {
 /// let client = Client::with_uri_str("mongodb://example.com")?;

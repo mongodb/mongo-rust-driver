@@ -40,7 +40,7 @@ use bson::{Bson, Document};
 ///
 /// ```rust
 /// # use bson::{bson, doc};
-/// # use mongodb::{Client, error::Result};
+/// # use mongodb::{sync::Client, error::Result};
 /// #
 /// # fn start_workers() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com")?;
