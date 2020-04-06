@@ -20,7 +20,7 @@ use crate::{
 
 #[cfg(feature = "tokio-runtime")]
 lazy_static::lazy_static! {
-    static ref SYNC_RUNTIME: std::sync::Mutex<tokio::runtime::Runtime> = {
+    static ref GLOBAL_TOKIO_RUNTIME: std::sync::Mutex<tokio::runtime::Runtime> = {
         let runtime = tokio::runtime::Builder::new()
             .threaded_scheduler()
             .enable_all()
@@ -93,7 +93,7 @@ impl AsyncRuntime {
                 TokioCallingContext::Async(handle) => {
                     handle.enter(|| futures::executor::block_on(fut))
                 }
-                TokioCallingContext::Sync => SYNC_RUNTIME.lock().unwrap().block_on(fut),
+                TokioCallingContext::Sync => GLOBAL_TOKIO_RUNTIME.lock().unwrap().block_on(fut),
             }
         }
 
