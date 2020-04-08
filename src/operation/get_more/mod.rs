@@ -1,21 +1,22 @@
 #[cfg(test)]
 mod test;
 
-use std::time::Duration;
+use std::{collections::VecDeque, time::Duration};
 
 use bson::{doc, Document};
 use serde::Deserialize;
 
 use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
+    cursor::CursorInformation,
     error::{ErrorKind, Result},
     operation::Operation,
-    options::{SelectionCriteria, StreamAddress},
+    options::SelectionCriteria,
     results::GetMoreResult,
     Namespace,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct GetMore {
     ns: Namespace,
     cursor_id: i64,
@@ -25,28 +26,14 @@ pub(crate) struct GetMore {
 }
 
 impl GetMore {
-    pub(crate) fn new(
-        ns: Namespace,
-        cursor_id: i64,
-        address: StreamAddress,
-        batch_size: Option<u32>,
-        max_time: Option<Duration>,
-    ) -> Self {
+    pub(crate) fn new(info: CursorInformation) -> Self {
         Self {
-            ns,
-            cursor_id,
-            selection_criteria: SelectionCriteria::from_address(address),
-            batch_size,
-            max_time,
+            ns: info.ns,
+            cursor_id: info.id,
+            selection_criteria: SelectionCriteria::from_address(info.address),
+            batch_size: info.batch_size,
+            max_time: info.max_time,
         }
-    }
-
-    pub(crate) fn namespace(&self) -> &Namespace {
-        &self.ns
-    }
-
-    pub(crate) fn cursor_id(&self) -> i64 {
-        self.cursor_id
     }
 }
 
@@ -104,5 +91,5 @@ struct GetMoreResponseBody {
 #[serde(rename_all = "camelCase")]
 struct NextBatchBody {
     id: i64,
-    next_batch: Vec<Document>,
+    next_batch: VecDeque<Document>,
 }

@@ -29,6 +29,8 @@ struct TestCase {
 }
 
 async fn run_command_monitoring_test(test_file: TestFile) {
+    let _guard = LOCK.run_exclusively().await;
+
     let client = TestClient::new().await;
 
     let skipped_tests = vec![
@@ -62,8 +64,6 @@ async fn run_command_monitoring_test(test_file: TestFile) {
                 continue;
             }
         }
-
-        let _guard = LOCK.run_exclusively().await;
 
         println!("Running {}", test_case.description);
 

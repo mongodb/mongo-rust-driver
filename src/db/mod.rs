@@ -11,17 +11,11 @@ use crate::{
     error::{ErrorKind, Result},
     operation::{Aggregate, Create, DropDatabase, ListCollections, RunCommand},
     options::{
-        AggregateOptions,
-        CollectionOptions,
-        CreateCollectionOptions,
-        DatabaseOptions,
-        DropDatabaseOptions,
-        ListCollectionsOptions,
+        AggregateOptions, CollectionOptions, CreateCollectionOptions, DatabaseOptions,
+        DropDatabaseOptions, ListCollectionsOptions,
     },
     selection_criteria::SelectionCriteria,
-    Client,
-    Collection,
-    Namespace,
+    Client, Collection, Namespace,
 };
 
 /// `Database` is the client-side abstraction of a MongoDB database. It can be used to perform
@@ -34,7 +28,7 @@ use crate::{
 /// so it can safely be shared across threads. For example:
 ///
 /// ```rust
-/// 
+///
 /// # #[cfg(not(feature = "sync"))]
 /// # use mongodb::{Client, error::Result};
 /// #
@@ -149,7 +143,7 @@ impl Database {
         resolve_options!(self, options, [write_concern]);
 
         let drop_database = DropDatabase::new(self.name().to_string(), options);
-        self.client().execute_operation(&drop_database, None).await
+        self.client().execute_operation(drop_database).await
     }
 
     /// Gets information about each of the collections in the database. The cursor will yield a
@@ -166,9 +160,9 @@ impl Database {
             options.into(),
         );
         self.client()
-            .execute_operation(&list_collections, None)
+            .execute_operation_with_implicit_session(list_collections)
             .await
-            .map(|spec| Cursor::new(self.client().clone(), spec))
+            .map(|(spec, session)| Cursor::new(self.client().clone(), spec, session))
     }
 
     /// Gets the names of the collections in the database.
@@ -180,9 +174,9 @@ impl Database {
             ListCollections::new(self.name().to_string(), filter.into(), true, None);
         let cursor = self
             .client()
-            .execute_operation(&list_collections, None)
+            .execute_operation_with_implicit_session(list_collections)
             .await
-            .map(|spec| Cursor::new(self.client().clone(), spec))?;
+            .map(|(spec, session)| Cursor::new(self.client().clone(), spec, session))?;
 
         cursor
             .and_then(|doc| match doc.get("name").and_then(Bson::as_str) {
@@ -218,7 +212,7 @@ impl Database {
             },
             options,
         );
-        self.client().execute_operation(&create, None).await
+        self.client().execute_operation(create).await
     }
 
     /// Runs a database-level command.
@@ -232,7 +226,7 @@ impl Database {
         selection_criteria: impl Into<Option<SelectionCriteria>>,
     ) -> Result<Document> {
         let operation = RunCommand::new(self.name().into(), command, selection_criteria.into())?;
-        self.client().execute_operation(&operation, None).await
+        self.client().execute_operation(operation).await
     }
 
     /// Runs an aggregation operation.
@@ -254,8 +248,8 @@ impl Database {
         let aggregate = Aggregate::new(self.name().to_string(), pipeline, options);
         let client = self.client();
         client
-            .execute_operation(&aggregate, None)
+            .execute_operation_with_implicit_session(aggregate)
             .await
-            .map(|spec| Cursor::new(client.clone(), spec))
+            .map(|(spec, session)| Cursor::new(client.clone(), spec, session))
     }
 }

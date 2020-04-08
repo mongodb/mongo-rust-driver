@@ -45,7 +45,8 @@ async fn run_test(test_file: TestFile) {
         max_set_version: None,
         max_election_id: None,
         compatibility_error: None,
-        logical_session_timeout_minutes: None,
+        session_support_status: Default::default(),
+        cluster_time: None,
         local_threshold: None,
         heartbeat_freq: None,
         servers: {

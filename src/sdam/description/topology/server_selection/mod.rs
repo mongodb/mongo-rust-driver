@@ -7,7 +7,7 @@ use rand::seq::IteratorRandom;
 
 use super::TopologyDescription;
 use crate::{
-    error::Result,
+    error::{ErrorKind, Result},
     sdam::{
         description::{
             server::{ServerDescription, ServerType},
@@ -43,6 +43,13 @@ impl TopologyDescription {
         &'a self,
         criteria: &'a SelectionCriteria,
     ) -> Result<Option<&'a ServerDescription>> {
+        if let Some(message) = self.compatibility_error() {
+            return Err(ErrorKind::ServerSelectionError {
+                message: message.to_string(),
+            }
+            .into());
+        }
+
         // Although `suitable_servers` has to handle the Unknown case for testing, we skip calling
         // it here to avoid an allocation.
         if let TopologyType::Unknown = self.topology_type {

@@ -208,11 +208,14 @@ async fn handle_success() {
     assert!(result.is_ok());
 
     let cursor_spec = result.unwrap();
-    assert_eq!(cursor_spec.address, address);
-    assert_eq!(cursor_spec.id, 123);
-    assert_eq!(cursor_spec.batch_size, None);
+    assert_eq!(cursor_spec.address(), &address);
+    assert_eq!(cursor_spec.id(), 123);
+    assert_eq!(cursor_spec.batch_size(), None);
     assert_eq!(
-        cursor_spec.buffer.into_iter().collect::<Vec<Document>>(),
+        cursor_spec
+            .initial_buffer
+            .into_iter()
+            .collect::<Vec<Document>>(),
         first_batch
     );
 
@@ -233,12 +236,15 @@ async fn handle_success() {
     assert!(result.is_ok());
 
     let cursor_spec = result.unwrap();
-    assert_eq!(cursor_spec.address, address);
-    assert_eq!(cursor_spec.id, 123);
-    assert_eq!(cursor_spec.batch_size, Some(123));
-    assert_eq!(cursor_spec.max_time, Some(Duration::from_millis(5)));
+    assert_eq!(cursor_spec.address(), &address);
+    assert_eq!(cursor_spec.id(), 123);
+    assert_eq!(cursor_spec.batch_size(), Some(123));
+    assert_eq!(cursor_spec.max_time(), Some(Duration::from_millis(5)));
     assert_eq!(
-        cursor_spec.buffer.into_iter().collect::<Vec<Document>>(),
+        cursor_spec
+            .initial_buffer
+            .into_iter()
+            .collect::<Vec<Document>>(),
         first_batch
     );
 }
@@ -263,7 +269,7 @@ async fn handle_max_await_time() {
     let spec = aggregate
         .handle_response(response.clone())
         .expect("handle should succeed");
-    assert!(spec.max_time.is_none());
+    assert!(spec.max_time().is_none());
 
     let max_await = Duration::from_millis(123);
     let options = AggregateOptions::builder()
@@ -273,7 +279,7 @@ async fn handle_max_await_time() {
     let spec = aggregate
         .handle_response(response)
         .expect("handle_should_succeed");
-    assert_eq!(spec.max_time, Some(max_await));
+    assert_eq!(spec.max_time(), Some(max_await));
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

@@ -1,13 +1,13 @@
 pub mod auth;
 mod executor;
 pub mod options;
+mod session;
 
 use std::{sync::Arc, time::Duration};
 
-use time::PreciseTime;
-
 use bson::{Bson, Document};
 use derivative::Derivative;
+use time::PreciseTime;
 
 #[cfg(test)]
 use crate::options::StreamAddress;
@@ -24,8 +24,10 @@ use crate::{
         ReadPreference,
         SelectionCriteria,
     },
-    sdam::{Server, Topology},
+    sdam::{Server, SessionSupportStatus, Topology},
 };
+pub(crate) use session::{ClientSession, ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS};
+use session::{ServerSession, ServerSessionPool};
 
 const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -70,6 +72,7 @@ pub struct Client {
 struct ClientInner {
     topology: Topology,
     options: ClientOptions,
+    session_pool: ServerSessionPool,
 }
 
 impl Client {
@@ -90,6 +93,7 @@ impl Client {
 
         let inner = Arc::new(ClientInner {
             topology: Topology::new(options.clone())?,
+            session_pool: ServerSessionPool::new(),
             options,
         });
 
@@ -144,7 +148,7 @@ impl Client {
         options: impl Into<Option<ListDatabasesOptions>>,
     ) -> Result<Vec<Document>> {
         let op = ListDatabases::new(filter.into(), false, options.into());
-        self.execute_operation(&op, None).await
+        self.execute_operation(op).await
     }
 
     /// Gets the names of the databases present in the cluster the Client is connected to.
@@ -154,7 +158,7 @@ impl Client {
         options: impl Into<Option<ListDatabasesOptions>>,
     ) -> Result<Vec<String>> {
         let op = ListDatabases::new(filter.into(), true, options.into());
-        match self.execute_operation(&op, None).await {
+        match self.execute_operation(op).await {
             Ok(databases) => databases
                 .into_iter()
                 .map(|doc| {
@@ -170,6 +174,50 @@ impl Client {
                 .collect(),
             Err(e) => Err(e),
         }
+    }
+
+    /// Check in a server session to the server session pool.
+    /// If the session is expired or dirty, or the topology no longer supports sessions, the session
+    /// will be discarded.
+    pub(crate) async fn check_in_server_session(&self, session: ServerSession) {
+        let session_support_status = self.inner.topology.session_support_status().await;
+        if let SessionSupportStatus::Supported {
+            logical_session_timeout,
+        } = session_support_status
+        {
+            self.inner
+                .session_pool
+                .check_in(session, logical_session_timeout)
+                .await;
+        }
+    }
+
+    /// Starts a `ClientSession`.
+    ///
+    /// This method will attempt to re-use server sessions from the pool which are not about to
+    /// expire according to the provided logical session timeout. If no such sessions are
+    /// available, a new one will be created.
+    pub(crate) async fn start_session_with_timeout(
+        &self,
+        logical_session_timeout: Duration,
+    ) -> ClientSession {
+        ClientSession::new(
+            self.inner
+                .session_pool
+                .check_out(logical_session_timeout)
+                .await,
+            self.clone(),
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn clear_session_pool(&self) {
+        self.inner.session_pool.clear().await;
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn is_session_checked_in(&self, id: &Document) -> bool {
+        self.inner.session_pool.contains(id).await
     }
 
     /// Get the address of the server selected according to the given criteria.
@@ -197,17 +245,17 @@ impl Client {
                 .unwrap_or(DEFAULT_SERVER_SELECTION_TIMEOUT),
         )?;
 
-        let selected_server = self
-            .inner
-            .topology
-            .attempt_to_select_server(criteria)
-            .await?;
-
-        if let Some(server) = selected_server {
-            return Ok(server);
-        }
-
         loop {
+            let selected_server = self
+                .inner
+                .topology
+                .attempt_to_select_server(criteria)
+                .await?;
+
+            if let Some(server) = selected_server {
+                return Ok(server);
+            }
+
             self.inner.topology.request_topology_check();
 
             let time_passed = start_time.to(PreciseTime::now());
@@ -228,16 +276,6 @@ impl Client {
                         .await,
                 }
                 .into());
-            }
-
-            let selected_server = self
-                .inner
-                .topology
-                .attempt_to_select_server(criteria)
-                .await?;
-
-            if let Some(server) = selected_server {
-                return Ok(server);
             }
         }
     }

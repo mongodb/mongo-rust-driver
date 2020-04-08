@@ -1,4 +1,7 @@
-use std::sync::{Arc, RwLock};
+use std::{
+    collections::VecDeque,
+    sync::{Arc, RwLock},
+};
 
 use bson::doc;
 
@@ -13,10 +16,11 @@ use crate::{
             CommandSucceededEvent,
         },
     },
+    options::ClientOptions,
     test::LOCK,
 };
 
-pub type EventQueue<T> = Arc<RwLock<Vec<T>>>;
+pub type EventQueue<T> = Arc<RwLock<VecDeque<T>>>;
 
 #[derive(Debug)]
 pub enum CommandEvent {
@@ -40,6 +44,28 @@ impl CommandEvent {
             _ => false,
         }
     }
+
+    fn request_id(&self) -> i32 {
+        match self {
+            CommandEvent::CommandStartedEvent(event) => event.request_id,
+            CommandEvent::CommandFailedEvent(event) => event.request_id,
+            CommandEvent::CommandSucceededEvent(event) => event.request_id,
+        }
+    }
+
+    fn as_command_started(&self) -> Option<&CommandStartedEvent> {
+        match self {
+            CommandEvent::CommandStartedEvent(e) => Some(e),
+            _ => None,
+        }
+    }
+
+    fn as_command_succeeded(&self) -> Option<&CommandSucceededEvent> {
+        match self {
+            CommandEvent::CommandSucceededEvent(e) => Some(e),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -50,7 +76,7 @@ pub struct EventHandler {
 
 impl CmapEventHandler for EventHandler {
     fn handle_pool_cleared_event(&self, event: PoolClearedEvent) {
-        self.pool_cleared_events.write().unwrap().push(event)
+        self.pool_cleared_events.write().unwrap().push_back(event)
     }
 }
 
@@ -59,21 +85,21 @@ impl CommandEventHandler for EventHandler {
         self.command_events
             .write()
             .unwrap()
-            .push(CommandEvent::CommandStartedEvent(event))
+            .push_back(CommandEvent::CommandStartedEvent(event))
     }
 
     fn handle_command_failed_event(&self, event: CommandFailedEvent) {
         self.command_events
             .write()
             .unwrap()
-            .push(CommandEvent::CommandFailedEvent(event))
+            .push_back(CommandEvent::CommandFailedEvent(event))
     }
 
     fn handle_command_succeeded_event(&self, event: CommandSucceededEvent) {
         self.command_events
             .write()
             .unwrap()
-            .push(CommandEvent::CommandSucceededEvent(event))
+            .push_back(CommandEvent::CommandSucceededEvent(event))
     }
 }
 
@@ -99,16 +125,63 @@ impl std::ops::DerefMut for EventClient {
 
 impl EventClient {
     pub async fn new() -> Self {
+        EventClient::with_options(None).await
+    }
+
+    pub async fn with_options(options: impl Into<Option<ClientOptions>>) -> Self {
         let handler = EventHandler::default();
         let command_events = handler.command_events.clone();
         let pool_cleared_events = handler.pool_cleared_events.clone();
-        let client = TestClient::with_handler(Some(handler)).await;
+        let client = TestClient::with_handler(Some(handler), options).await;
+
+        // clear events from commands used to set up client.
+        command_events.write().unwrap().clear();
 
         Self {
             client,
             command_events,
             pool_cleared_events,
         }
+    }
+
+    /// Gets the first started/succeeded pair of events for the given command name, popping off all
+    /// events before and between them.
+    ///
+    /// Panics if the command failed or could not be found in the events.
+    pub fn get_successful_command_execution(
+        &self,
+        command_name: &str,
+    ) -> (CommandStartedEvent, CommandSucceededEvent) {
+        let mut command_events = self.command_events.write().unwrap();
+
+        let mut started: Option<CommandStartedEvent> = None;
+
+        while let Some(event) = command_events.pop_front() {
+            if event.command_name() == command_name {
+                match started {
+                    None => {
+                        let event = event
+                            .as_command_started()
+                            .unwrap_or_else(|| {
+                                panic!("first event not a command started event {:?}", event)
+                            })
+                            .clone();
+                        started = Some(event);
+                        continue;
+                    }
+                    Some(started) if event.request_id() == started.request_id => {
+                        let succeeded = event
+                            .as_command_succeeded()
+                            .expect("second event not a command succeeded event")
+                            .clone();
+
+                        return (started, succeeded);
+                    }
+                    _ => continue,
+                }
+            }
+        }
+        panic!("could not find event for {} command", command_name);
     }
 }
 

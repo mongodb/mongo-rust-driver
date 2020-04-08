@@ -155,7 +155,7 @@ impl Collection {
         resolve_options!(self, options, [write_concern]);
 
         let drop = DropCollection::new(self.namespace(), options);
-        self.client().execute_operation(&drop, None).await
+        self.client().execute_operation(drop).await
     }
 
     /// Runs an aggregation operation.
@@ -177,9 +177,9 @@ impl Collection {
         let aggregate = Aggregate::new(self.namespace(), pipeline, options);
         let client = self.client();
         client
-            .execute_operation(&aggregate, None)
+            .execute_operation_with_implicit_session(aggregate)
             .await
-            .map(|spec| Cursor::new(client.clone(), spec))
+            .map(|(spec, session)| Cursor::new(client.clone(), spec, session))
     }
 
     /// Estimates the number of documents in the collection using collection metadata.
@@ -191,7 +191,7 @@ impl Collection {
         resolve_options!(self, options, [read_concern, selection_criteria]);
 
         let op = Count::new(self.namespace(), options);
-        self.client().execute_operation(&op, None).await
+        self.client().execute_operation(op).await
     }
 
     /// Gets the number of documents matching `filter`.
@@ -280,7 +280,7 @@ impl Collection {
         resolve_options!(self, options, [write_concern]);
 
         let delete = Delete::new(self.namespace(), query, None, options);
-        self.client().execute_operation(&delete, None).await
+        self.client().execute_operation(delete).await
     }
 
     /// Deletes up to one document found matching `query`.
@@ -293,7 +293,7 @@ impl Collection {
         resolve_options!(self, options, [write_concern]);
 
         let delete = Delete::new(self.namespace(), query, Some(1), options);
-        self.client().execute_operation(&delete, None).await
+        self.client().execute_operation(delete).await
     }
 
     /// Finds the distinct values of the field specified by `field_name` across the collection.
@@ -312,7 +312,7 @@ impl Collection {
             filter.into(),
             options,
         );
-        self.client().execute_operation(&op, None).await
+        self.client().execute_operation(op).await
     }
 
     /// Finds the documents in the collection matching `filter`.
@@ -323,10 +323,11 @@ impl Collection {
     ) -> Result<Cursor> {
         let find = Find::new(self.namespace(), filter.into(), options.into());
         let client = self.client();
+
         client
-            .execute_operation(&find, None)
+            .execute_operation_with_implicit_session(find)
             .await
-            .map(|spec| Cursor::new(client.clone(), spec))
+            .map(|(result, session)| Cursor::new(client.clone(), result, session))
     }
 
     /// Finds a single document in the collection matching `filter`.
@@ -354,7 +355,7 @@ impl Collection {
         resolve_options!(self, options, [write_concern]);
 
         let op = FindAndModify::with_delete(self.namespace(), filter, options);
-        self.client().execute_operation(&op, None).await
+        self.client().execute_operation(op).await
     }
 
     /// Atomically finds up to one document in the collection matching `filter` and replaces it with
@@ -369,7 +370,7 @@ impl Collection {
         resolve_options!(self, options, [write_concern]);
 
         let op = FindAndModify::with_replace(self.namespace(), filter, replacement, options)?;
-        self.client().execute_operation(&op, None).await
+        self.client().execute_operation(op).await
     }
 
     /// Atomically finds up to one document in the collection matching `filter` and updates it.
@@ -387,7 +388,7 @@ impl Collection {
         resolve_options!(self, options, [write_concern]);
 
         let op = FindAndModify::with_update(self.namespace(), filter, update, options)?;
-        self.client().execute_operation(&op, None).await
+        self.client().execute_operation(op).await
     }
 
     /// Inserts the documents in `docs` into the collection.
@@ -425,7 +426,7 @@ impl Collection {
             n_attempted += current_batch_size;
 
             let insert = Insert::new(self.namespace(), current_batch, options.clone());
-            match self.client().execute_operation(&insert, None).await {
+            match self.client().execute_operation(insert).await {
                 Ok(result) => {
                     if cumulative_failure.is_none() {
                         let cumulative_result =
@@ -487,7 +488,7 @@ impl Collection {
             options.map(InsertManyOptions::from_insert_one_options),
         );
         self.client()
-            .execute_operation(&insert, None)
+            .execute_operation(insert)
             .await
             .map(InsertOneResult::from_insert_many_result)
             .map_err(convert_bulk_errors)
@@ -512,7 +513,7 @@ impl Collection {
             false,
             options.map(UpdateOptions::from_replace_options),
         );
-        self.client().execute_operation(&update, None).await
+        self.client().execute_operation(update).await
     }
 
     /// Updates all documents matching `query` in the collection.
@@ -537,7 +538,7 @@ impl Collection {
         resolve_options!(self, options, [write_concern]);
 
         let update = Update::new(self.namespace(), query, update, true, options);
-        self.client().execute_operation(&update, None).await
+        self.client().execute_operation(update).await
     }
 
     /// Updates up to one document matching `query` in the collection.
@@ -556,7 +557,24 @@ impl Collection {
         resolve_options!(self, options, [write_concern]);
 
         let update = Update::new(self.namespace(), query, update.into(), false, options);
-        self.client().execute_operation(&update, None).await
+        self.client().execute_operation(update).await
+    }
+
+    /// Kill the server side cursor that id corresponds to.
+    pub(super) async fn kill_cursor(&self, cursor_id: i64) -> Result<()> {
+        let ns = self.namespace();
+
+        self.client()
+            .database(ns.db.as_str())
+            .run_command(
+                doc! {
+                    "killCursors": ns.coll.as_str(),
+                    "cursors": [cursor_id]
+                },
+                None,
+            )
+            .await?;
+        Ok(())
     }
 }
 

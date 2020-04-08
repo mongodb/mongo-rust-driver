@@ -40,11 +40,18 @@ impl std::ops::Deref for TestClient {
 
 impl TestClient {
     pub async fn new() -> Self {
-        Self::with_handler(None).await
+        Self::with_options(None).await
     }
 
-    async fn with_handler(event_handler: Option<EventHandler>) -> Self {
-        let mut options = CLIENT_OPTIONS.clone();
+    pub async fn with_options(options: Option<ClientOptions>) -> Self {
+        Self::with_handler(None, options).await
+    }
+
+    async fn with_handler(
+        event_handler: Option<EventHandler>,
+        options: impl Into<Option<ClientOptions>>,
+    ) -> Self {
+        let mut options = options.into().unwrap_or_else(|| CLIENT_OPTIONS.clone());
 
         if let Some(event_handler) = event_handler {
             let handler = Arc::new(event_handler);
@@ -125,9 +132,16 @@ impl TestClient {
         self.options.credential.is_some()
     }
 
-    #[allow(dead_code)]
+    pub fn is_standalone(&self) -> bool {
+        !self.is_replica_set() && !self.is_sharded()
+    }
+
     pub fn is_replica_set(&self) -> bool {
         self.options.repl_set_name.is_some()
+    }
+
+    pub fn is_sharded(&self) -> bool {
+        self.server_info.msg.as_deref() == Some("isdbgrid")
     }
 
     #[allow(dead_code)]

@@ -1,9 +1,12 @@
+use std::ops::Deref;
+
 use bson::{Bson, Document};
 use serde::de::DeserializeOwned;
 
 use super::wire::Message;
 use crate::{
     bson_util,
+    client::{ClientSession, ClusterTime},
     error::{CommandError, ErrorKind, Result},
     options::StreamAddress,
     selection_criteria::ReadPreference,
@@ -44,12 +47,24 @@ impl Command {
             body,
         }
     }
+
+    pub(crate) fn set_session(&mut self, session: &ClientSession) {
+        self.body.insert("lsid", session.id().deref());
+    }
+
+    pub(crate) fn set_cluster_time(&mut self, cluster_time: &ClusterTime) {
+        // this should never fail.
+        if let Ok(doc) = bson::to_bson(cluster_time) {
+            self.body.insert("$clusterTime", doc);
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct CommandResponse {
     source: StreamAddress,
     pub(crate) raw_response: Document,
+    cluster_time: Option<ClusterTime>,
 }
 
 impl CommandResponse {
@@ -58,6 +73,7 @@ impl CommandResponse {
         Self {
             source,
             raw_response: doc,
+            cluster_time: None,
         }
     }
 
@@ -74,9 +90,15 @@ impl CommandResponse {
     }
 
     pub(crate) fn new(source: StreamAddress, message: Message) -> Result<Self> {
+        let raw_response = message.single_document_response()?;
+        let cluster_time = raw_response
+            .get("$clusterTime")
+            .and_then(|subdoc| bson::from_bson(subdoc.clone()).ok());
+
         Ok(Self {
             source,
-            raw_response: message.single_document_response()?,
+            raw_response,
+            cluster_time,
         })
     }
 
@@ -112,6 +134,11 @@ impl CommandResponse {
             }
             .into()),
         }
+    }
+
+    /// Gets the cluster time from the response, if any.
+    pub(crate) fn cluster_time(&self) -> Option<&ClusterTime> {
+        self.cluster_time.as_ref()
     }
 
     /// The address of the server that sent this response.

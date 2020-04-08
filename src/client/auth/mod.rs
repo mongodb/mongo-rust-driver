@@ -252,7 +252,7 @@ impl Credential {
         let stream_description = conn.stream_description()?;
 
         // Verify server can authenticate.
-        if !stream_description.server_type.can_auth() {
+        if !stream_description.initial_server_type.can_auth() {
             return Ok(());
         };
 

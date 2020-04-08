@@ -158,10 +158,10 @@ async fn is_master(connection: &mut Connection) -> Result<IsMasterReply> {
     let command_response = connection.send_command(command, None).await?;
     let end_time = PreciseTime::now();
 
-    let command_response = command_response.body()?;
-
+    let is_master_response = command_response.body()?;
     Ok(IsMasterReply {
-        command_response,
+        command_response: is_master_response,
         round_trip_time: Some(start_time.to(end_time).to_std().unwrap()),
+        cluster_time: command_response.cluster_time().cloned(),
     })
 }

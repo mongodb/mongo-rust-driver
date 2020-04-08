@@ -4,6 +4,7 @@ use bson::{oid::ObjectId, UtcDateTime};
 use chrono::offset::Utc;
 
 use crate::{
+    client::ClusterTime,
     error::Result,
     is_master::IsMasterReply,
     options::StreamAddress,
@@ -35,6 +36,16 @@ impl ServerType {
             | ServerType::Mongos => true,
             _ => false,
         }
+    }
+
+    pub(crate) fn is_data_bearing(self) -> bool {
+        matches!(
+            self,
+            ServerType::Standalone
+                | ServerType::RSPrimary
+                | ServerType::RSSecondary
+                | ServerType::Mongos
+        )
     }
 }
 
@@ -283,6 +294,25 @@ impl ServerDescription {
                 .last_write
                 .as_ref()
                 .map(|write| write.last_write_date)),
+            Err(ref e) => Err(e.clone()),
+        }
+    }
+
+    pub(crate) fn logical_session_timeout(&self) -> Result<Option<Duration>> {
+        match self.reply {
+            Ok(None) => Ok(None),
+            Ok(Some(ref reply)) => Ok(reply
+                .command_response
+                .logical_session_timeout_minutes
+                .map(|timeout| Duration::from_secs(timeout as u64 * 60))),
+            Err(ref e) => Err(e.clone()),
+        }
+    }
+
+    pub(crate) fn cluster_time(&self) -> Result<Option<ClusterTime>> {
+        match self.reply {
+            Ok(None) => Ok(None),
+            Ok(Some(ref reply)) => Ok(reply.cluster_time.clone()),
             Err(ref e) => Err(e.clone()),
         }
     }
