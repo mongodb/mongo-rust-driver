@@ -124,6 +124,10 @@ impl TopologyDescription {
         })
     }
 
+    pub(crate) fn topology_type(&self) -> TopologyType {
+        self.topology_type
+    }
+
     pub(crate) fn server_addresses(&self) -> impl Iterator<Item = &StreamAddress> {
         self.servers.keys()
     }
@@ -270,6 +274,11 @@ impl TopologyDescription {
                 .cloned()
                 .collect(),
         })
+    }
+
+    pub(crate) fn sync_hosts(&mut self, hosts: &HashSet<StreamAddress>) {
+        self.add_new_servers_from_addresses(hosts.iter());
+        self.servers.retain(|host, _| hosts.contains(host));
     }
 
     /// Update the topology based on the new information about the topology contained by the
@@ -532,17 +541,23 @@ impl TopologyDescription {
     }
 
     /// Create a new ServerDescription for each address and add it to the topology.
-    fn add_new_servers<'a>(&'a mut self, servers: impl Iterator<Item = &'a String>) -> Result<()> {
-        for server in servers {
-            let server = StreamAddress::parse(&server)?;
+    fn add_new_servers<'a>(&mut self, servers: impl Iterator<Item = &'a String>) -> Result<()> {
+        let servers: Result<Vec<_>> = servers.map(|server| StreamAddress::parse(server)).collect();
 
+        self.add_new_servers_from_addresses(servers?.iter());
+        Ok(())
+    }
+
+    fn add_new_servers_from_addresses<'a>(
+        &mut self,
+        servers: impl Iterator<Item = &'a StreamAddress>,
+    ) {
+        for server in servers {
             if !self.servers.contains_key(&server) {
                 self.servers
-                    .insert(server.clone(), ServerDescription::new(server, None));
+                    .insert(server.clone(), ServerDescription::new(server.clone(), None));
             }
         }
-
-        Ok(())
     }
 }
 

@@ -3,6 +3,8 @@ mod description;
 mod message_manager;
 mod monitor;
 pub mod public;
+#[allow(dead_code)]
+mod srv_polling;
 mod state;
 
 pub use self::public::{ServerInfo, ServerType};

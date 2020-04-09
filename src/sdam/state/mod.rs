@@ -15,8 +15,12 @@ use crate::{
     error::{Error, ErrorKind, Result},
     options::{ClientOptions, SelectionCriteria, StreamAddress},
     sdam::{
-        description::server::{ServerDescription, ServerType},
+        description::{
+            server::{ServerDescription, ServerType},
+            topology::{TopologyDescriptionDiff, TopologyType},
+        },
         monitor::Monitor,
+        srv_polling::SrvPollingMonitor,
         TopologyMessageManager,
     },
 };
@@ -81,6 +85,8 @@ impl Topology {
             topology_state.start_monitoring_server(address.clone(), topology.downgrade());
         }
 
+        SrvPollingMonitor::start(topology.downgrade());
+
         Ok(topology)
     }
 
@@ -90,6 +96,10 @@ impl Topology {
             state: Arc::downgrade(&self.state),
             common: self.common.clone(),
         }
+    }
+
+    pub(super) async fn clone_state(&self) -> TopologyState {
+        self.state.read().await.clone()
     }
 
     /// Attempts to select a server with the given `criteria`, returning an error if the topology is
@@ -215,16 +225,26 @@ impl Topology {
         // doesn't check the fields of an Unknown server, and we only return Unknown server
         // descriptions when errors occur. Once we implement SDAM monitoring, we can
         // properly inform users of errors that occur here.
-        let _ = state_clone.update(server_description, self.common.options.clone());
+        if let Ok(diff) = state_clone.update(server_description, &self.common.options) {
+            self.update_state(diff, state_clone).await
+        } else {
+            false
+        }
+    }
 
-        match old_description.diff(&state_clone.description) {
+    pub(crate) async fn update_state(
+        &self,
+        diff: Option<TopologyDescriptionDiff>,
+        new_state: TopologyState,
+    ) -> bool {
+        match diff {
             None => false,
             Some(diff) => {
                 // Now that we have the proper state in the copy, acquire a lock on the proper
                 // topology and move the info over.
                 let mut state_lock = self.state.write().await;
-                state_lock.description = state_clone.description;
-                state_lock.servers = state_clone.servers;
+                state_lock.description = new_state.description;
+                state_lock.servers = new_state.servers;
 
                 for new_address in diff.new_addresses {
                     state_lock.start_monitoring_server(new_address, self.downgrade());
@@ -266,6 +286,14 @@ impl WeakTopology {
 }
 
 impl TopologyState {
+    pub(super) fn is_sharded(&self) -> bool {
+        self.description.topology_type() == TopologyType::Sharded
+    }
+
+    pub(super) fn is_unknown(&self) -> bool {
+        self.description.topology_type() == TopologyType::Unknown
+    }
+
     /// Adds a new server to the cluster.
     ///
     /// A reference to the containing Topology is needed in order to start the monitoring task.
@@ -304,19 +332,36 @@ impl TopologyState {
     pub(crate) fn update(
         &mut self,
         server: ServerDescription,
-        options: ClientOptions,
-    ) -> Result<()> {
+        options: &ClientOptions,
+    ) -> Result<Option<TopologyDescriptionDiff>> {
+        let old_description = self.description.clone();
         self.description.update(server)?;
-        let addresses: HashSet<_> = self.description.server_addresses().cloned().collect();
 
-        for address in addresses.iter() {
+        let hosts: HashSet<_> = self.description.server_addresses().cloned().collect();
+        self.sync_hosts(&hosts, options);
+
+        Ok(old_description.diff(&self.description))
+    }
+
+    pub(crate) fn update_hosts(
+        &mut self,
+        hosts: &HashSet<StreamAddress>,
+        options: &ClientOptions,
+    ) -> Option<TopologyDescriptionDiff> {
+        let old_description = self.description.clone();
+        self.description.sync_hosts(&hosts);
+
+        self.sync_hosts(&hosts, options);
+
+        old_description.diff(&self.description)
+    }
+
+    pub(crate) fn sync_hosts(&mut self, hosts: &HashSet<StreamAddress>, options: &ClientOptions) {
+        for address in hosts.iter() {
             self.add_new_server(address.clone(), options.clone());
         }
 
-        self.servers
-            .retain(|address, _| addresses.contains(address));
-
-        Ok(())
+        self.servers.retain(|host, _| hosts.contains(host));
     }
 
     /// Start a monitor for the server at the given address if it is part of the topology.
