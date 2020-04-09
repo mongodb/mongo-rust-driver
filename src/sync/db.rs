@@ -27,7 +27,6 @@ use crate::{
 /// so it can safely be shared across threads. For example:
 ///
 /// ```rust
-///
 /// # use mongodb::{Client, error::Result};
 ///
 /// # fn start_workers() -> Result<()> {

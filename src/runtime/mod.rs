@@ -81,7 +81,9 @@ impl AsyncRuntime {
                 TokioCallingContext::Async(handle) => {
                     handle.enter(|| futures::executor::block_on(fut))
                 }
-                TokioCallingContext::Sync => panic!("block_on called from tokio outside of async context"),
+                TokioCallingContext::Sync => {
+                    panic!("block_on called from tokio outside of async context")
+                }
             }
         }
 

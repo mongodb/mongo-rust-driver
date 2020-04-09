@@ -9,9 +9,9 @@ use crate::{
     RUNTIME,
 };
 
-/// This is the main entry point for the synchronous API. A `Client` is used to connect to a MongoDB cluster.
-/// By default, it will monitor the topology of the cluster, keeping track of any changes, such
-/// as servers being added or removed.
+/// This is the main entry point for the synchronous API. A `Client` is used to connect to a MongoDB
+/// cluster. By default, it will monitor the topology of the cluster, keeping track of any changes,
+/// such as servers being added or removed.
 ///
 /// `Client` is a wrapper around the asynchronous [`mongodb::Client`](../struct.Client.html), and it
 /// starts up an async-std runtime internally to run that wrapped client on.
@@ -51,7 +51,8 @@ impl Client {
     /// MongoDB connection string.
     ///
     /// See the documentation on
-    /// [`ClientOptions::parse`](../options/struct.ClientOptions.html#method.parse) for more details.
+    /// [`ClientOptions::parse`](../options/struct.ClientOptions.html#method.parse) for more
+    /// details.
     pub fn with_uri_str(uri: &str) -> Result<Self> {
         let async_client = RUNTIME.block_on(AsyncClient::with_uri_str(uri))?;
         Ok(Self { async_client })
