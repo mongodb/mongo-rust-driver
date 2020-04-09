@@ -60,9 +60,7 @@ impl Client {
 
     /// Creates a new `Client` connected to the cluster specified by `options`.
     pub fn with_options(options: ClientOptions) -> Result<Self> {
-        // This needs to be run in the async runtime so that the monitoring tasks
-        // get scheduled properly.
-        let async_client = RUNTIME.block_on(async { AsyncClient::with_options(options) })?;
+        let async_client = AsyncClient::with_options(options)?;
         Ok(Self { async_client })
     }
 
