@@ -58,6 +58,37 @@ pub(crate) struct TopologyState {
 }
 
 impl Topology {
+    #[cfg(test)]
+    pub(super) fn new_from_hosts<'a>(hosts: impl Iterator<Item = &'a StreamAddress>) -> Self {
+        let hosts: Vec<_> = hosts.cloned().collect();
+
+        let description = TopologyDescription::new_from_hosts(hosts.clone());
+        let servers = hosts
+            .into_iter()
+            .map(|address| {
+                (
+                    address.clone(),
+                    Server::new(address.clone(), &Default::default()).into(),
+                )
+            })
+            .collect();
+
+        let state = TopologyState {
+            description,
+            servers,
+        };
+
+        let common = Common {
+            message_manager: TopologyMessageManager::new(),
+            options: ClientOptions::new_srv(),
+        };
+
+        Self {
+            state: Arc::new(RwLock::new(state)),
+            common,
+        }
+    }
+
     /// Creates a new Topology given the `options`.
     pub(crate) fn new(mut options: ClientOptions) -> Result<Self> {
         let description = TopologyDescription::new(options.clone())?;
@@ -90,8 +121,13 @@ impl Topology {
         Ok(topology)
     }
 
+    #[cfg(test)]
+    pub(super) async fn servers(&self) -> HashSet<StreamAddress> {
+        self.state.read().await.servers.keys().cloned().collect()
+    }
+
     /// Creates and returns a weak reference to the topology.
-    fn downgrade(&self) -> WeakTopology {
+    pub(super) fn downgrade(&self) -> WeakTopology {
         WeakTopology {
             state: Arc::downgrade(&self.state),
             common: self.common.clone(),

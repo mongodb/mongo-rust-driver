@@ -84,6 +84,25 @@ impl PartialEq for TopologyDescription {
 }
 
 impl TopologyDescription {
+    #[cfg(test)]
+    pub(crate) fn new_from_hosts(hosts: Vec<StreamAddress>) -> Self {
+        Self {
+            single_seed: false,
+            topology_type: TopologyType::Unknown,
+            set_name: None,
+            max_set_version: None,
+            max_election_id: None,
+            compatibility_error: None,
+            logical_session_timeout_minutes: None,
+            local_threshold: None,
+            heartbeat_freq: None,
+            servers: hosts
+                .into_iter()
+                .map(|address| (address.clone(), ServerDescription::new(address, None)))
+                .collect(),
+        }
+    }
+
     pub(crate) fn new(options: ClientOptions) -> Result<Self> {
         verify_max_staleness(
             options

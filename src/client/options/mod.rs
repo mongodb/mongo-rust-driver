@@ -502,6 +502,13 @@ impl From<ClientOptionsParser> for ClientOptions {
 }
 
 impl ClientOptions {
+    #[cfg(test)]
+    pub(crate) fn new_srv() -> Self {
+        let mut options = Self::default();
+        options.original_srv_hostname = Some("localhost.test.test.build.10gen.cc".into());
+        options
+    }
+
     /// Parses a MongoDB connection string into a ClientOptions struct. If the string is malformed
     /// or one of the options has an invalid value, an error will be returned.
     ///

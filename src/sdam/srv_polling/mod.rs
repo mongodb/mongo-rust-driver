@@ -1,9 +1,11 @@
+#[cfg(test)]
+mod test;
+
 use std::time::Duration;
 
 use super::{
-    description::topology::TopologyDescriptionDiff,
     monitor::DEFAULT_HEARTBEAT_FREQUENCY,
-    state::{TopologyState, WeakTopology},
+    state::{Topology, TopologyState, WeakTopology},
 };
 use crate::{
     error::{Error, Result},
@@ -14,7 +16,7 @@ use crate::{
 
 const DEFAULT_RESCAN_SRV_INTERVAL: Duration = Duration::from_secs(60);
 
-pub(super) struct SrvPollingMonitor {
+pub(crate) struct SrvPollingMonitor {
     initial_hostname: String,
     resolver: Option<SrvResolver>,
     topology: WeakTopology,
@@ -23,34 +25,38 @@ pub(super) struct SrvPollingMonitor {
 }
 
 impl SrvPollingMonitor {
-    pub(super) fn start(topology: WeakTopology) {
+    pub(crate) fn new(topology: WeakTopology) -> Option<Self> {
         let client_options = topology.client_options().clone();
 
         let initial_hostname = match client_options.original_srv_hostname() {
             Some(hostname) => hostname.clone(),
-            None => return,
+            None => return None,
         };
 
-        RUNTIME.execute(async move {
-            let mut monitor = Self {
-                initial_hostname,
-                resolver: None,
-                topology,
-                rescan_interval: None,
-                client_options,
-            };
+        Some(Self {
+            initial_hostname,
+            resolver: None,
+            topology,
+            rescan_interval: None,
+            client_options,
+        })
+    }
 
-            monitor.execute().await;
+    pub(super) fn start(topology: WeakTopology) {
+        RUNTIME.execute(async move {
+            if let Some(mut monitor) = Self::new(topology) {
+                monitor.execute().await;
+            }
         });
     }
 
     async fn execute(&mut self) {
         while let Some(topology) = self.topology.upgrade() {
-            let mut state = topology.clone_state().await;
+            let state = topology.clone_state().await;
 
             if state.is_sharded() || state.is_unknown() {
-                let diff = self.update_hosts(&mut state).await;
-                topology.update_state(diff, state).await;
+                let hosts = self.lookup_hosts().await;
+                self.update_hosts(hosts, topology, state).await;
             }
 
             RUNTIME
@@ -59,21 +65,23 @@ impl SrvPollingMonitor {
         }
     }
 
-    async fn update_hosts(
+    pub(crate) async fn update_hosts(
         &mut self,
-        topology_state: &mut TopologyState,
-    ) -> Option<TopologyDescriptionDiff> {
-        let hosts = match self.lookup_hosts().await {
+        hosts: Result<Vec<StreamAddress>>,
+        topology: Topology,
+        mut topology_state: TopologyState,
+    ) {
+        let hosts = match hosts {
             Ok(hosts) if hosts.is_empty() => {
                 self.no_valid_hosts(None);
 
-                return None;
+                return;
             }
             Ok(hosts) => hosts,
             Err(err) => {
                 self.no_valid_hosts(Some(err));
 
-                return None;
+                return;
             }
         };
 
@@ -81,7 +89,8 @@ impl SrvPollingMonitor {
         // releases again.
         self.rescan_interval = None;
 
-        topology_state.update_hosts(&hosts.into_iter().collect(), &self.client_options)
+        let diff = topology_state.update_hosts(&hosts.into_iter().collect(), &self.client_options);
+        topology.update_state(diff, topology_state).await;
     }
 
     async fn lookup_hosts(&mut self) -> Result<Vec<StreamAddress>> {
