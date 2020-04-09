@@ -105,6 +105,7 @@ define_if_single_runtime_enabled! {
     mod sdam;
     mod selection_criteria;
     mod srv;
+    #[cfg(feature = "sync")]
     pub mod sync;
     #[cfg(test)]
     mod test;
@@ -113,25 +114,41 @@ define_if_single_runtime_enabled! {
     #[macro_use]
     extern crate derive_more;
 
-    #[cfg(any(feature = "tokio-runtime", feature = "async-std-runtime"))]
+    #[cfg(not(feature = "sync"))]
     pub use crate::{
         client::Client,
-        coll::{Collection, Namespace},
+        coll::Collection,
         cursor::Cursor,
         db::Database,
     };
+
+    #[cfg(feature = "sync")]
+    pub(crate) use crate::{
+        client::Client,
+        coll::Collection,
+        cursor::Cursor,
+        db::Database,
+    };
+
+    pub use coll::Namespace;
 }
 
-#[cfg(all(feature = "tokio-runtime", feature = "async-std-runtime"))]
+#[cfg(all(feature = "tokio-runtime", feature = "async-std-runtime", not(feature = "sync")))]
 compile_error!(
     "`tokio-runtime` and `async-runtime` can't both be enabled; either disable \
      `async-std-runtime` or set `default-features = false` in your Cargo.toml"
 );
 
+#[cfg(all(feature = "tokio-runtime", feature = "sync"))]
+compile_error!(
+    "`tokio-runtime` and `sync` can't both be enabled; either disable \
+     `tokio-runtime` or set `default-features = false` in your Cargo.toml"
+);
+
 #[cfg(all(not(feature = "tokio-runtime"), not(feature = "async-std-runtime")))]
 compile_error!(
-    "one of `tokio-runtime` or `async-runtime` must be enabled; either enable `default-features` \
-     or `async-std-runtime` in your Cargo.toml"
+    "one of `tokio-runtime`, `async-runtime`, or `sync` must be enabled; either enable \
+     `default-features`, or enable one of those features specifically in your Cargo.toml"
 );
 
 #[cfg(all(feature = "tokio-runtime", not(feature = "async-std-runtime")))]

@@ -18,18 +18,6 @@ use crate::{
     options::StreamAddress,
 };
 
-#[cfg(feature = "tokio-runtime")]
-lazy_static::lazy_static! {
-    static ref GLOBAL_TOKIO_RUNTIME: std::sync::Mutex<tokio::runtime::Runtime> = {
-        let runtime = tokio::runtime::Builder::new()
-            .threaded_scheduler()
-            .enable_all()
-            .build()
-            .unwrap();
-        std::sync::Mutex::new(runtime)
-    };
-}
-
 /// An abstract handle to the async runtime.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum AsyncRuntime {
@@ -80,8 +68,8 @@ impl AsyncRuntime {
 
     /// Run a future in the foreground, blocking on it completing.
     ///
-    /// If this is called from a synchronous context, a static runtime will be used
-    /// to execute the future. If the static runtime has not been started yet, it will be.
+    /// This will panic if called from a sychronous context when tokio is being used.
+    #[cfg_attr(not(feature = "sync"), cfg(test))]
     pub(crate) fn block_on<F, T>(self, fut: F) -> T
     where
         F: Future<Output = T> + Send,
@@ -93,7 +81,7 @@ impl AsyncRuntime {
                 TokioCallingContext::Async(handle) => {
                     handle.enter(|| futures::executor::block_on(fut))
                 }
-                TokioCallingContext::Sync => GLOBAL_TOKIO_RUNTIME.lock().unwrap().block_on(fut),
+                TokioCallingContext::Sync => panic!("block_on called from tokio outside of async context"),
             }
         }
 
