@@ -71,7 +71,7 @@ impl Topology {
             .map(|address| {
                 (
                     address.clone(),
-                    Server::new(address.clone(), &Default::default()).into(),
+                    Server::new(address, &Default::default()).into(),
                 )
             })
             .collect();

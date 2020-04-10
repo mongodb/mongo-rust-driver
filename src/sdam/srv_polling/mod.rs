@@ -102,6 +102,7 @@ impl SrvPollingMonitor {
         let mut new_hosts = Vec::new();
 
         for host in resolver.get_srv_hosts(&initial_hostname).await? {
+            #[allow(clippy::single_match)]
             match host {
                 Ok(host) => new_hosts.push(host),
                 Err(_) => {
