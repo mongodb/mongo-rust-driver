@@ -58,6 +58,9 @@ pub(crate) struct TopologyState {
 }
 
 impl Topology {
+    /// Creates a new TopologyDescription with the set of servers initialized to the addresses
+    /// specified in `hosts` and each other field set to its default value. No monitoring threads
+    /// will be started for the servers in the topology that's returned.
     #[cfg(test)]
     pub(super) fn new_from_hosts<'a>(hosts: impl Iterator<Item = &'a StreamAddress>) -> Self {
         let hosts: Vec<_> = hosts.cloned().collect();
@@ -121,6 +124,7 @@ impl Topology {
         Ok(topology)
     }
 
+    /// Gets the addresses of the servers in the cluster.
     #[cfg(test)]
     pub(super) async fn servers(&self) -> HashSet<StreamAddress> {
         self.state.read().await.servers.keys().cloned().collect()
@@ -134,6 +138,9 @@ impl Topology {
         }
     }
 
+    /// Clones the underlying TopologyState. This will return a separate TopologyState than the one
+    /// contained by this `Topology`, but it will share references to the same Servers (and by
+    /// extension the connection pools).
     pub(super) async fn clone_state(&self) -> TopologyState {
         self.state.read().await.clone()
     }
@@ -268,6 +275,10 @@ impl Topology {
         }
     }
 
+    /// Sets the underlying TopologyState to `new_state` if `diff` indicates the topology has
+    /// changed. Monitoring theads will be started for any new servers added, and the monitoring
+    /// threads for servers removed will stop the next time they wake up due to the strong
+    /// references in the TopologyState having been dropped.
     pub(crate) async fn update_state(
         &self,
         diff: Option<TopologyDescriptionDiff>,
@@ -379,6 +390,12 @@ impl TopologyState {
         Ok(old_description.diff(&self.description))
     }
 
+    /// Start/stop monitoring tasks and create/destroy connection pools based on the new and
+    /// removed servers in the topology description.
+    ///
+    /// This must **ONLY** be called on a copy of a TopologyState, not one that is stored in a
+    /// client. The `topology` parameter should contain a reference to the Topology that
+    /// is actually stored in a client.
     pub(crate) fn update_hosts(
         &mut self,
         hosts: &HashSet<StreamAddress>,

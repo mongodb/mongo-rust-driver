@@ -42,6 +42,9 @@ impl SrvPollingMonitor {
         })
     }
 
+    /// Starts a monitoring task that periodically performs SRV record lookups to determine if the
+    /// set of mongos in the cluster have changed. A weak reference is used to ensure that the
+    /// monitoring task doesn't keep the topology alive after the client has been dropped.
     pub(super) fn start(topology: WeakTopology) {
         RUNTIME.execute(async move {
             if let Some(mut monitor) = Self::new(topology) {

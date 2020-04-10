@@ -502,6 +502,8 @@ impl From<ClientOptionsParser> for ClientOptions {
 }
 
 impl ClientOptions {
+    /// Creates a new ClientOptions with the `original_srv_hostname` field set to the testing value
+    /// used in the SRV tests.
     #[cfg(test)]
     pub(crate) fn new_srv() -> Self {
         let mut options = Self::default();
@@ -607,6 +609,7 @@ impl ClientOptions {
         Ok(options)
     }
 
+    /// Gets the original SRV hostname specified when this ClientOptions was parsed from a URI.
     pub(crate) fn original_srv_hostname(&self) -> Option<&String> {
         self.original_srv_hostname.as_ref()
     }

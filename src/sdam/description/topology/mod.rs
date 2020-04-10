@@ -84,6 +84,8 @@ impl PartialEq for TopologyDescription {
 }
 
 impl TopologyDescription {
+    /// Creates a new TopologyDescription with the set of servers initialized to the addresses
+    /// specified in `hosts` and each other field set to its default value.
     #[cfg(test)]
     pub(crate) fn new_from_hosts(hosts: Vec<StreamAddress>) -> Self {
         Self {
@@ -143,6 +145,7 @@ impl TopologyDescription {
         })
     }
 
+    /// Gets the topology type of the cluster.
     pub(crate) fn topology_type(&self) -> TopologyType {
         self.topology_type
     }
@@ -295,6 +298,9 @@ impl TopologyDescription {
         })
     }
 
+    /// Syncs the set of servers in the description to those in `hosts`. Servers in the set not
+    /// already present in the cluster will be added, and servers in the cluster not present in the
+    /// set will be removed.
     pub(crate) fn sync_hosts(&mut self, hosts: &HashSet<StreamAddress>) {
         self.add_new_servers_from_addresses(hosts.iter());
         self.servers.retain(|host, _| hosts.contains(host));
@@ -567,6 +573,7 @@ impl TopologyDescription {
         Ok(())
     }
 
+    /// Create a new ServerDescription for each address and add it to the topology.
     fn add_new_servers_from_addresses<'a>(
         &mut self,
         servers: impl Iterator<Item = &'a StreamAddress>,
