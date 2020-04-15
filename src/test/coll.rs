@@ -466,3 +466,100 @@ async fn empty_insert() {
         e => panic!("expected argument error, got {:?}", e),
     };
 }
+
+fn get_allow_disk_use(event_client: &EventClient) -> bool {
+    event_client
+        .command_events
+        .read()
+        .unwrap()
+        .iter()
+        .any(|event| match event {
+            CommandEvent::CommandStartedEvent(CommandStartedEvent {
+                command_name,
+                command,
+                ..
+            }) => {
+                if command_name == "find" {
+                    match command.get_bool("allowDiskUse") {
+                        Ok(b) => b,
+                        _ => false,
+                    }
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        })
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn find_allow_disk_use() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let event_client = EventClient::new().await;
+    let coll = event_client
+        .database(function_name!())
+        .collection(function_name!());
+
+    let find_opts = FindOptions::builder().allow_disk_use(true).build();
+    coll.find(None, find_opts).await.unwrap();
+
+    assert!(get_allow_disk_use(&event_client));
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn find_do_not_allow_disk_use() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let event_client = EventClient::new().await;
+    let coll = event_client
+        .database(function_name!())
+        .collection(function_name!());
+
+    let find_opts = FindOptions::builder().allow_disk_use(false).build();
+    coll.find(None, find_opts).await.unwrap();
+
+    assert!(!get_allow_disk_use(&event_client));
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn find_allow_disk_use_not_specified() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let event_client = EventClient::new().await;
+    let coll = event_client
+        .database(function_name!())
+        .collection(function_name!());
+
+    let find_opts = FindOptions::builder().build();
+    coll.find(None, find_opts).await.unwrap();
+
+    assert!(event_client
+        .command_events
+        .read()
+        .unwrap()
+        .iter()
+        .all(|event| match event {
+            CommandEvent::CommandStartedEvent(CommandStartedEvent {
+                command_name,
+                command,
+                ..
+            }) => {
+                if command_name == "find" {
+                    match command.get_bool("allowDiskUse") {
+                        Ok(_) => false,
+                        _ => true,
+                    }
+                } else {
+                    true
+                }
+            }
+            _ => true,
+        }));
+}

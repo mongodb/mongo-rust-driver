@@ -577,6 +577,11 @@ pub struct DistinctOptions {
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FindOptions {
+    /// Enables writing to temporary files. When set to true, the find operation can write data to
+    /// the _tmp subdirectory in the dbPath directory.
+    #[builder(default)]
+    pub allow_disk_use: Option<bool>,
+
     /// If true, partial results will be returned from a mongos rather than an error being
     /// returned if one or more shards is down.
     #[builder(default)]
@@ -693,6 +698,7 @@ pub struct FindOptions {
 impl From<FindOneOptions> for FindOptions {
     fn from(options: FindOneOptions) -> Self {
         FindOptions {
+            allow_disk_use: None,
             allow_partial_results: options.allow_partial_results,
             collation: options.collation,
             comment: options.comment,
