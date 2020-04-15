@@ -499,6 +499,9 @@ async fn find_allow_disk_use() {
     let _guard = LOCK.run_concurrently().await;
 
     let event_client = EventClient::new().await;
+    if event_client.server_version_lt(4, 3) {
+        return;
+    }
     let coll = event_client
         .database(function_name!())
         .collection(function_name!());
@@ -516,6 +519,9 @@ async fn find_do_not_allow_disk_use() {
     let _guard = LOCK.run_concurrently().await;
 
     let event_client = EventClient::new().await;
+    if event_client.server_version_lt(4, 3) {
+        return;
+    }
     let coll = event_client
         .database(function_name!())
         .collection(function_name!());
@@ -533,6 +539,9 @@ async fn find_allow_disk_use_not_specified() {
     let _guard = LOCK.run_concurrently().await;
 
     let event_client = EventClient::new().await;
+    if event_client.server_version_lt(4, 3) {
+        return;
+    }
     let coll = event_client
         .database(function_name!())
         .collection(function_name!());
