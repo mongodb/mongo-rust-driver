@@ -42,6 +42,7 @@ async fn run_test(new_hosts: Result<Vec<StreamAddress>>, expected_hosts: HashSet
     assert_eq!(expected_hosts, topology.servers().await);
 }
 
+// If a new DNS record is returned, it should be reflected in the topology.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn add_new_dns_record() {
@@ -54,6 +55,7 @@ async fn add_new_dns_record() {
     run_test(Ok(hosts.clone()), hosts.into_iter().collect()).await;
 }
 
+// If a DNS record is no longer returned, it should be reflected in the topology.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn remove_dns_record() {
@@ -62,6 +64,7 @@ async fn remove_dns_record() {
     run_test(Ok(hosts.clone()), hosts.into_iter().collect()).await;
 }
 
+// If a single DNS record is replaced, it should be reflected in the topology.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn replace_single_dns_record() {
@@ -73,6 +76,7 @@ async fn replace_single_dns_record() {
     run_test(Ok(hosts.clone()), hosts.into_iter().collect()).await;
 }
 
+// If all DNS records are replaced, it should be reflected in the topology.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn replace_all_dns_records() {
@@ -81,6 +85,7 @@ async fn replace_all_dns_records() {
     run_test(Ok(hosts.clone()), hosts.into_iter().collect()).await;
 }
 
+// If a timeout error occurs, the topology should be unchanged.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn timeout_error() {
@@ -91,6 +96,7 @@ async fn timeout_error() {
     .await;
 }
 
+// If no results are returned, the topology should be unchanged.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn no_results() {
