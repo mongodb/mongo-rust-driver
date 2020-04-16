@@ -577,8 +577,9 @@ pub struct DistinctOptions {
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FindOptions {
-    /// Enables writing to temporary files. When set to true, the find operation can write data to
-    /// the _tmp subdirectory in the dbPath directory.
+    /// Enables writing to temporary files by the server. When set to true, the find operation can
+    /// write data to the _tmp subdirectory in the dbPath directory. Only supported in server
+    /// versions 4.4+.
     #[builder(default)]
     pub allow_disk_use: Option<bool>,
 
