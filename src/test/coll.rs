@@ -469,7 +469,6 @@ async fn empty_insert() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-#[function_name::named]
 async fn find_allow_disk_use() {
     let find_opts = FindOptions::builder().allow_disk_use(true).build();
     allow_disk_use_test(find_opts, Some(true)).await;
@@ -477,7 +476,6 @@ async fn find_allow_disk_use() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-#[function_name::named]
 async fn find_do_not_allow_disk_use() {
     let find_opts = FindOptions::builder().allow_disk_use(false).build();
     allow_disk_use_test(find_opts, Some(false)).await;
@@ -485,7 +483,6 @@ async fn find_do_not_allow_disk_use() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-#[function_name::named]
 async fn find_allow_disk_use_not_specified() {
     let find_opts = FindOptions::builder().build();
     allow_disk_use_test(find_opts, None).await;
@@ -515,10 +512,7 @@ async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>)
     let event = iter.next().unwrap();
     let allow_disk_use = match event {
         CommandEvent::CommandStartedEvent(CommandStartedEvent { command, .. }) => {
-            match command.get_bool("allowDiskUse") {
-                Ok(b) => Some(b),
-                Err(_) => None,
-            }
+            command.get_bool("allowDiskUse").ok()
         }
         _ => None,
     };
