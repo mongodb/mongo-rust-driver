@@ -100,8 +100,6 @@ impl Stream for Cursor {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
         loop {
-            let exhausted = self.exhausted;
-
             match self.state {
                 // If the current state is Executing, then we check the progress of the getMore
                 // operation.
@@ -141,7 +139,7 @@ impl Stream for Cursor {
 
                     // If no documents are left and the batch and the cursor is exhausted, set the
                     // state to None.
-                    if exhausted {
+                    if self.exhausted {
                         self.state = State::Exhausted;
                         return Poll::Ready(None);
                     // If the batch is empty and the cursor is not exhausted, start a new operation
