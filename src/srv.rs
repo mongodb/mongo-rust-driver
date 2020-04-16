@@ -8,6 +8,7 @@ use crate::{
 
 pub(crate) struct SrvResolver {
     resolver: AsyncResolver,
+    min_ttl: Option<u32>,
 }
 
 #[derive(Debug)]
@@ -21,10 +22,16 @@ impl SrvResolver {
     pub(crate) async fn new() -> Result<Self> {
         let resolver = AsyncResolver::new().await?;
 
-        Ok(Self { resolver })
+        Ok(Self {
+            resolver,
+            min_ttl: None,
+        })
     }
 
-    pub(crate) async fn resolve_client_options(&self, hostname: &str) -> Result<ResolvedConfig> {
+    pub(crate) async fn resolve_client_options(
+        &mut self,
+        hostname: &str,
+    ) -> Result<ResolvedConfig> {
         let hosts = self.get_srv_hosts(hostname).await?.collect::<Result<_>>()?;
         let mut config = ResolvedConfig {
             hosts,
@@ -37,8 +44,12 @@ impl SrvResolver {
         Ok(config)
     }
 
+    pub(crate) fn min_ttl(&self) -> Option<u32> {
+        self.min_ttl
+    }
+
     pub(crate) async fn get_srv_hosts<'a>(
-        &'a self,
+        &'a mut self,
         original_hostname: &'a str,
     ) -> Result<impl Iterator<Item = Result<StreamAddress>> + 'a> {
         let hostname_parts: Vec<_> = original_hostname.split('.').collect();
@@ -53,10 +64,15 @@ impl SrvResolver {
 
         let lookup_hostname = format!("_mongodb._tcp.{}", original_hostname);
 
-        let srv_addresses: Vec<_> = self
-            .resolver
-            .srv_lookup(lookup_hostname.as_str())
-            .await?
+        let srv_lookup = self.resolver.srv_lookup(lookup_hostname.as_str()).await?;
+
+        self.min_ttl = srv_lookup
+            .as_lookup()
+            .record_iter()
+            .map(|record| record.ttl())
+            .min();
+
+        let srv_addresses: Vec<_> = srv_lookup
             .iter()
             .map(|record| {
                 let hostname = record.target().to_utf8();

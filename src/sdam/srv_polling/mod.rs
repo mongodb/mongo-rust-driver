@@ -24,6 +24,11 @@ pub(crate) struct SrvPollingMonitor {
     client_options: ClientOptions,
 }
 
+struct LookupHosts {
+    hosts: Vec<StreamAddress>,
+    min_ttl: Option<Duration>,
+}
+
 impl SrvPollingMonitor {
     pub(crate) fn new(topology: WeakTopology) -> Option<Self> {
         let client_options = topology.client_options().clone();
@@ -68,19 +73,19 @@ impl SrvPollingMonitor {
         }
     }
 
-    pub(crate) async fn update_hosts(
+    async fn update_hosts(
         &mut self,
-        hosts: Result<Vec<StreamAddress>>,
+        lookup: Result<LookupHosts>,
         topology: Topology,
         mut topology_state: TopologyState,
     ) {
-        let hosts = match hosts {
-            Ok(hosts) if hosts.is_empty() => {
+        let lookup = match lookup {
+            Ok(LookupHosts { hosts, .. }) if hosts.is_empty() => {
                 self.no_valid_hosts(None);
 
                 return;
             }
-            Ok(hosts) => hosts,
+            Ok(lookup) => lookup,
             Err(err) => {
                 self.no_valid_hosts(Some(err));
 
@@ -88,15 +93,14 @@ impl SrvPollingMonitor {
             }
         };
 
-        // TODO: Use TTL values to determine delay duration once `trust-dns-resolver`
-        // releases again.
-        self.rescan_interval = None;
+        self.rescan_interval = lookup.min_ttl;
 
-        let diff = topology_state.update_hosts(&hosts.into_iter().collect(), &self.client_options);
+        let diff =
+            topology_state.update_hosts(&lookup.hosts.into_iter().collect(), &self.client_options);
         topology.update_state(diff, topology_state).await;
     }
 
-    async fn lookup_hosts(&mut self) -> Result<Vec<StreamAddress>> {
+    async fn lookup_hosts(&mut self) -> Result<LookupHosts> {
         let initial_hostname = self.initial_hostname.clone();
         let resolver = self.get_or_create_srv_resolver().await?;
         let mut new_hosts = Vec::new();
@@ -111,7 +115,12 @@ impl SrvPollingMonitor {
             }
         }
 
-        Ok(new_hosts)
+        Ok(LookupHosts {
+            hosts: new_hosts,
+            min_ttl: resolver
+                .min_ttl()
+                .map(|ttl| Duration::from_secs(ttl as u64)),
+        })
     }
 
     async fn get_or_create_srv_resolver(&mut self) -> Result<&mut SrvResolver> {

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use pretty_assertions::assert_eq;
 
-use super::SrvPollingMonitor;
+use super::{LookupHosts, SrvPollingMonitor};
 use crate::{
     error::{ErrorKind, Result},
     options::StreamAddress,
@@ -29,7 +29,14 @@ async fn run_test(new_hosts: Result<Vec<StreamAddress>>, expected_hosts: HashSet
     let mut monitor = SrvPollingMonitor::new(topology.downgrade()).unwrap();
 
     monitor
-        .update_hosts(new_hosts, topology.clone(), state)
+        .update_hosts(
+            new_hosts.map(|hosts| LookupHosts {
+                hosts,
+                min_ttl: None,
+            }),
+            topology.clone(),
+            state,
+        )
         .await;
 
     assert_eq!(expected_hosts, topology.servers().await);

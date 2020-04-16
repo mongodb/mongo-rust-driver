@@ -568,7 +568,7 @@ impl ClientOptions {
         let mut options: Self = parser.into();
 
         if srv {
-            let resolver = SrvResolver::new().await?;
+            let mut resolver = SrvResolver::new().await?;
             let mut config = resolver
                 .resolve_client_options(&options.hosts[0].hostname)
                 .await?;
