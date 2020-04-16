@@ -466,3 +466,56 @@ async fn empty_insert() {
         e => panic!("expected argument error, got {:?}", e),
     };
 }
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn find_allow_disk_use() {
+    let find_opts = FindOptions::builder().allow_disk_use(true).build();
+    allow_disk_use_test(find_opts, Some(true)).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn find_do_not_allow_disk_use() {
+    let find_opts = FindOptions::builder().allow_disk_use(false).build();
+    allow_disk_use_test(find_opts, Some(false)).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn find_allow_disk_use_not_specified() {
+    let find_opts = FindOptions::builder().build();
+    allow_disk_use_test(find_opts, None).await;
+}
+
+#[function_name::named]
+async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>) {
+    let _guard = LOCK.run_concurrently().await;
+
+    let event_client = EventClient::new().await;
+    if event_client.server_version_lt(4, 3) {
+        return;
+    }
+    let coll = event_client
+        .database(function_name!())
+        .collection(function_name!());
+    coll.find(None, options).await.unwrap();
+
+    let events = event_client.command_events.read().unwrap();
+    let mut iter = events.iter().filter(|event| match event {
+        CommandEvent::CommandStartedEvent(CommandStartedEvent { command_name, .. }) => {
+            command_name == "find"
+        }
+        _ => false,
+    });
+
+    let event = iter.next().unwrap();
+    let allow_disk_use = match event {
+        CommandEvent::CommandStartedEvent(CommandStartedEvent { command, .. }) => {
+            command.get_bool("allowDiskUse").ok()
+        }
+        _ => None,
+    };
+    assert_eq!(allow_disk_use, expected_value);
+    assert_eq!(iter.count(), 0);
+}
