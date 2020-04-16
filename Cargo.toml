@@ -62,7 +62,7 @@ version = "1.0.98"
 features = ["derive"]
 
 [dependencies.tokio]
-version = "0.2.15"
+version = "0.2.18"
 features = ["io-util", "sync"]
 
 [dependencies.tokio-rustls]

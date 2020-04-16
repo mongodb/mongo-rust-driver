@@ -1,6 +1,7 @@
 mod atlas_connectivity;
 mod client;
 mod coll;
+mod cursor;
 mod db;
 mod spec;
 mod util;

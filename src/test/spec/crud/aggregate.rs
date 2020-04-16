@@ -62,9 +62,14 @@ async fn run_aggregate_test(test_file: TestFile) {
                 .await
                 .expect(&test_case.description);
 
+            let results = cursor
+                .try_collect::<Vec<_>>()
+                .await
+                .expect(&test_case.description);
+
             assert_eq!(
                 outcome.result.unwrap_or_default(),
-                cursor.try_collect::<Vec<_>>().await.unwrap(),
+                results,
                 "{}",
                 test_case.description,
             );
