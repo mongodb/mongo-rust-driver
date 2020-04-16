@@ -16,24 +16,17 @@ async fn tailable_cursor() {
     let _guard = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
-    client
-        .drop_collection(function_name!(), function_name!())
+    let coll = client
+        .create_fresh_collection(
+            function_name!(),
+            function_name!(),
+            CreateCollectionOptions::builder()
+                .capped(true)
+                .max(5)
+                .size(1_000_000)
+                .build(),
+        )
         .await;
-
-    let db = client.database(function_name!());
-
-    db.create_collection(
-        function_name!(),
-        CreateCollectionOptions::builder()
-            .capped(true)
-            .max(5)
-            .size(1_000_000)
-            .build(),
-    )
-    .await
-    .unwrap();
-
-    let coll = db.collection(function_name!());
 
     coll.insert_many((0..5).map(|i| doc! { "_id": i }), None)
         .await

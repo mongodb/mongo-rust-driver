@@ -18,7 +18,7 @@ use self::event::EventHandler;
 use super::CLIENT_OPTIONS;
 use crate::{
     error::{CommandError, ErrorKind, Result},
-    options::{auth::AuthMechanism, ClientOptions},
+    options::{auth::AuthMechanism, ClientOptions, CreateCollectionOptions},
     Client,
     Collection,
 };
@@ -105,6 +105,21 @@ impl TestClient {
         let coll = self.get_coll(db_name, coll_name);
         drop_collection(&coll).await;
         coll
+    }
+
+    pub async fn create_fresh_collection(
+        &self,
+        db_name: &str,
+        coll_name: &str,
+        options: impl Into<Option<CreateCollectionOptions>>,
+    ) -> Collection {
+        self.drop_collection(db_name, coll_name).await;
+        self.database(db_name)
+            .create_collection(coll_name, options)
+            .await
+            .unwrap();
+
+        self.get_coll(db_name, coll_name)
     }
 
     pub fn auth_enabled(&self) -> bool {
