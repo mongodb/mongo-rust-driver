@@ -467,75 +467,32 @@ async fn empty_insert() {
     };
 }
 
-fn get_allow_disk_use(event_client: &EventClient) -> bool {
-    event_client
-        .command_events
-        .read()
-        .unwrap()
-        .iter()
-        .any(|event| match event {
-            CommandEvent::CommandStartedEvent(CommandStartedEvent {
-                command_name,
-                command,
-                ..
-            }) => {
-                if command_name == "find" {
-                    match command.get_bool("allowDiskUse") {
-                        Ok(b) => b,
-                        _ => false,
-                    }
-                } else {
-                    false
-                }
-            }
-            _ => false,
-        })
-}
-
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn find_allow_disk_use() {
-    let _guard = LOCK.run_concurrently().await;
-
-    let event_client = EventClient::new().await;
-    if event_client.server_version_lt(4, 3) {
-        return;
-    }
-    let coll = event_client
-        .database(function_name!())
-        .collection(function_name!());
-
     let find_opts = FindOptions::builder().allow_disk_use(true).build();
-    coll.find(None, find_opts).await.unwrap();
-
-    assert!(get_allow_disk_use(&event_client));
+    allow_disk_use_test(find_opts, Some(true)).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn find_do_not_allow_disk_use() {
-    let _guard = LOCK.run_concurrently().await;
-
-    let event_client = EventClient::new().await;
-    if event_client.server_version_lt(4, 3) {
-        return;
-    }
-    let coll = event_client
-        .database(function_name!())
-        .collection(function_name!());
-
     let find_opts = FindOptions::builder().allow_disk_use(false).build();
-    coll.find(None, find_opts).await.unwrap();
-
-    assert!(!get_allow_disk_use(&event_client));
+    allow_disk_use_test(find_opts, Some(false)).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn find_allow_disk_use_not_specified() {
+    let find_opts = FindOptions::builder().build();
+    allow_disk_use_test(find_opts, None).await;
+}
+
+#[function_name::named]
+async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>) {
     let _guard = LOCK.run_concurrently().await;
 
     let event_client = EventClient::new().await;
@@ -545,30 +502,26 @@ async fn find_allow_disk_use_not_specified() {
     let coll = event_client
         .database(function_name!())
         .collection(function_name!());
+    coll.find(None, options).await.unwrap();
 
-    let find_opts = FindOptions::builder().build();
-    coll.find(None, find_opts).await.unwrap();
+    let events = event_client.command_events.read().unwrap();
+    let mut iter = events.iter().filter(|event| match event {
+        CommandEvent::CommandStartedEvent(CommandStartedEvent { command_name, .. }) => {
+            command_name == "find"
+        }
+        _ => false,
+    });
 
-    assert!(event_client
-        .command_events
-        .read()
-        .unwrap()
-        .iter()
-        .all(|event| match event {
-            CommandEvent::CommandStartedEvent(CommandStartedEvent {
-                command_name,
-                command,
-                ..
-            }) => {
-                if command_name == "find" {
-                    match command.get_bool("allowDiskUse") {
-                        Ok(_) => false,
-                        _ => true,
-                    }
-                } else {
-                    true
-                }
+    let event = iter.next().unwrap();
+    let allow_disk_use = match event {
+        CommandEvent::CommandStartedEvent(CommandStartedEvent { command, .. }) => {
+            match command.get_bool("allowDiskUse") {
+                Ok(b) => Some(b),
+                Err(_) => None,
             }
-            _ => true,
-        }));
+        }
+        _ => None,
+    };
+    assert_eq!(allow_disk_use, expected_value);
+    assert_eq!(iter.count(), 0);
 }
