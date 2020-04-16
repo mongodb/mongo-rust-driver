@@ -9,17 +9,19 @@ use crate::{
     error::Result,
     operation::Operation,
     selection_criteria::{ReadPreference, SelectionCriteria},
+    options::{ListDatabasesOptions},
 };
 
 #[derive(Debug)]
 pub(crate) struct ListDatabases {
     filter: Option<Document>,
     name_only: bool,
+    options: Option<ListDatabasesOptions>,
 }
 
 impl ListDatabases {
-    pub fn new(filter: Option<Document>, name_only: bool) -> Self {
-        ListDatabases { filter, name_only }
+    pub fn new(filter: Option<Document>, name_only: bool, options: Option<ListDatabasesOptions>) -> Self {
+        ListDatabases { filter, name_only, options }
     }
 
     #[cfg(test)]
@@ -27,6 +29,7 @@ impl ListDatabases {
         ListDatabases {
             filter: None,
             name_only: false,
+            options: None,
         }
     }
 }

@@ -136,3 +136,11 @@ pub struct ListCollectionsOptions {
     #[serde(serialize_with = "bson_util::serialize_batch_size", rename = "cursor")]
     pub batch_size: Option<u32>,
 }
+
+#[derive(Debug, Default, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListDatabasesOptions {
+    // isabeltodo: write comment
+    #[builder(default)]
+    pub authorized_databases: Option<bool>,
+}

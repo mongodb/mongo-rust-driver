@@ -100,12 +100,12 @@ impl Client {
     }
 
     /// Gets information about each database present in the cluster the Client is connected to.
-    pub fn list_databases(&self, filter: impl Into<Option<Document>>) -> Result<Vec<Document>> {
-        RUNTIME.block_on(self.async_client.list_databases(filter.into()))
+    pub fn list_databases(&self, filter: impl Into<Option<Document>>, options: impl Into<Option<ListDatabasesOptions>>) -> Result<Vec<Document>> {
+        RUNTIME.block_on(self.async_client.list_databases(filter.into(), options.into()))
     }
 
     /// Gets the names of the databases present in the cluster the Client is connected to.
-    pub fn list_database_names(&self, filter: impl Into<Option<Document>>) -> Result<Vec<String>> {
-        RUNTIME.block_on(self.async_client.list_database_names(filter.into()))
+    pub fn list_database_names(&self, filter: impl Into<Option<Document>>, options: impl Into<Option<ListDatabasesOptions>>) -> Result<Vec<String>> {
+        RUNTIME.block_on(self.async_client.list_database_names(filter.into(), options.into()))
     }
 }

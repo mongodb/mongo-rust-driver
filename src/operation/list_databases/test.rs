@@ -31,7 +31,7 @@ async fn build() {
 async fn build_with_name_only() {
     let name_only = true;
 
-    let list_databases_op = ListDatabases::new(None, name_only);
+    let list_databases_op = ListDatabases::new(None, name_only, None);
     let list_databases_command = list_databases_op
         .build(&StreamDescription::new_testing())
         .expect("error on build");
@@ -52,7 +52,7 @@ async fn build_with_name_only() {
 async fn build_with_filter() {
     let filter = doc! {"something" : "something else"};
 
-    let list_databases_op = ListDatabases::new(Some(filter.clone()), false);
+    let list_databases_op = ListDatabases::new(Some(filter.clone()), false, None);
     let list_databases_command = list_databases_op
         .build(&StreamDescription::new_testing())
         .unwrap();

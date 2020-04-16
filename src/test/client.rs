@@ -114,7 +114,7 @@ async fn list_databases() {
         client.database(name).drop(None).await.unwrap();
     }
 
-    let prev_dbs = client.list_databases(None).await.unwrap();
+    let prev_dbs = client.list_databases(None, None).await.unwrap();
 
     for name in expected_dbs {
         assert!(!prev_dbs
@@ -129,7 +129,7 @@ async fn list_databases() {
             .unwrap();
     }
 
-    let new_dbs = client.list_databases(None).await.unwrap();
+    let new_dbs = client.list_databases(None, None).await.unwrap();
     let new_dbs: Vec<_> = new_dbs
         .into_iter()
         .filter(|doc| match doc.get("name") {
@@ -167,7 +167,7 @@ async fn list_database_names() {
         client.database(name).drop(None).await.unwrap();
     }
 
-    let prev_dbs = client.list_database_names(None).await.unwrap();
+    let prev_dbs = client.list_database_names(None, None).await.unwrap();
 
     for name in expected_dbs {
         assert!(!prev_dbs.iter().any(|db_name| db_name == name));
@@ -180,7 +180,7 @@ async fn list_database_names() {
             .unwrap();
     }
 
-    let new_dbs = client.list_database_names(None).await.unwrap();
+    let new_dbs = client.list_database_names(None, None).await.unwrap();
 
     for name in expected_dbs {
         assert_eq!(new_dbs.iter().filter(|db_name| db_name == &name).count(), 1);
@@ -197,7 +197,7 @@ fn is_auth_error(error: Error) -> bool {
 /// Performs an operation that requires authentication and verifies that it either succeeded or
 /// failed with an authentication error according to the `should_succeed` parameter.
 async fn auth_test(client: Client, should_succeed: bool) {
-    let result = client.list_database_names(None).await;
+    let result = client.list_database_names(None, None).await;
     if should_succeed {
         result.expect("operation should have succeeded");
     } else {
