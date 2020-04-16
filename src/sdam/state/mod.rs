@@ -374,8 +374,7 @@ impl TopologyState {
     /// removed servers in the topology description.
     ///
     /// This must **ONLY** be called on a copy of a TopologyState, not one that is stored in a
-    /// client. The `topology` parameter should contain a reference to the Topology that
-    /// is actually stored in a client.
+    /// client.
     pub(crate) fn update(
         &mut self,
         server: ServerDescription,
@@ -394,8 +393,7 @@ impl TopologyState {
     /// removed servers in the topology description.
     ///
     /// This must **ONLY** be called on a copy of a TopologyState, not one that is stored in a
-    /// client. The `topology` parameter should contain a reference to the Topology that
-    /// is actually stored in a client.
+    /// client.
     pub(crate) fn update_hosts(
         &mut self,
         hosts: &HashSet<StreamAddress>,
