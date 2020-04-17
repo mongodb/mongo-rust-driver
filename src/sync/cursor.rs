@@ -1,12 +1,7 @@
 use bson::Document;
 use futures::StreamExt;
 
-use crate::{
-    cursor::ImpatientCursor as AsyncImpatientCursor,
-    error::Result,
-    Cursor as AsyncCursor,
-    RUNTIME,
-};
+use crate::{error::Result, Cursor as AsyncCursor, RUNTIME};
 
 /// A `Cursor` streams the result of a query. When a query is made, a `Cursor` will be returned with
 /// the first batch of results from the server; the documents will be returned as the `Cursor` is
@@ -71,32 +66,9 @@ impl Cursor {
     pub(crate) fn new(async_cursor: AsyncCursor) -> Self {
         Self { async_cursor }
     }
-
-    pub fn into_impatient(self) -> ImpatientCursor {
-        ImpatientCursor::new(self.async_cursor.into_impatent())
-    }
 }
 
 impl Iterator for Cursor {
-    type Item = Result<Document>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        RUNTIME.block_on(self.async_cursor.next())
-    }
-}
-
-#[derive(Debug)]
-pub struct ImpatientCursor {
-    async_cursor: AsyncImpatientCursor,
-}
-
-impl ImpatientCursor {
-    pub(crate) fn new(async_cursor: AsyncImpatientCursor) -> Self {
-        Self { async_cursor }
-    }
-}
-
-impl Iterator for ImpatientCursor {
     type Item = Result<Document>;
 
     fn next(&mut self) -> Option<Self::Item> {

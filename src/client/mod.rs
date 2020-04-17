@@ -37,8 +37,10 @@ const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 /// so it can safely be shared across threads. For example:
 ///
 /// ```rust
+/// # #[cfg(not(feature = "sync"))]
 /// # use mongodb::{Client, error::Result};
 /// #
+/// # #[cfg(not(feature = "sync"))]
 /// # async fn start_workers() -> Result<()> {
 /// let client = Client::with_uri_str("mongodb://example.com").await?;
 ///
