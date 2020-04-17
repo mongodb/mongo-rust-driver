@@ -46,9 +46,12 @@ const MAX_INSERT_DOCS_BYTES: usize = 16 * 1000 * 1000;
 ///
 /// ```rust
 /// # use bson::{bson, doc};
-/// # use mongodb::{Client, error::Result};
+/// # use mongodb::error::Result;
 /// #
+/// # #[cfg(not(feature = "sync"))]
 /// # async fn start_workers() -> Result<()> {
+/// # use mongodb::Client;
+/// #
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// let coll = client.database("items").collection("in_stock");
 ///

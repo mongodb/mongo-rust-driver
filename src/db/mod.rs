@@ -35,8 +35,10 @@ use crate::{
 ///
 /// ```rust
 /// 
+/// # #[cfg(not(feature = "sync"))]
 /// # use mongodb::{Client, error::Result};
-///
+/// #
+/// # #[cfg(not(feature = "sync"))]
 /// # async fn start_workers() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// let db = client.database("items");

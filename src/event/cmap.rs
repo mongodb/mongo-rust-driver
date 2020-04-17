@@ -190,8 +190,11 @@ pub struct ConnectionCheckedInEvent {
 /// #         ConnectionCheckoutFailedEvent
 /// #     },
 /// #     options::ClientOptions,
-/// #     Client,
 /// # };
+/// # #[cfg(feature = "sync")]
+/// # use mongodb::sync::Client;
+/// # #[cfg(not(feature = "sync"))]
+/// # use mongodb::Client;
 /// #
 /// struct FailedCheckoutLogger;
 ///

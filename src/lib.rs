@@ -5,8 +5,10 @@
 //! [`Client::with_uri_str`](struct.Client.html#method.with_uri_str):
 //!
 //! ```rust
+//! # #[cfg(not(feature = "sync"))]
 //! # use mongodb::{Client, error::Result};
 //! #
+//! # #[cfg(not(feature = "sync"))]
 //! # async fn make_client() -> Result<Client> {
 //! let client = Client::with_uri_str("mongodb://localhost:27017/").await?;
 //! # Ok(client)
@@ -19,8 +21,11 @@
 //! # use mongodb::{
 //! #     error::Result,
 //! #     options::{StreamAddress, ClientOptions},
-//! #     Client,
 //! # };
+//! # #[cfg(feature = "sync")]
+//! # use mongodb::sync::Client;
+//! # #[cfg(not(feature = "sync"))]
+//! # use mongodb::Client;
 //! #
 //! # fn make_client() -> Result<Client> {
 //! let options = ClientOptions::builder()
@@ -42,10 +47,13 @@
 //!
 //! ```rust
 //! # use bson::{bson, doc};
-//! # use mongodb::{Client, error::Result};
+//! # use mongodb::error::Result;
+//! # #[cfg(not(feature = "sync"))]
+//! # use mongodb::Client;
 //! #
+//! # #[cfg(not(feature = "sync"))]
 //! # async fn do_stuff() -> Result<()> {
-//! # let client = Client::with_uri_str("mongodb://localhost:27017").await?;
+//! # let client = Client::with_uri_str("mongodb://example.com").await?;
 //! #
 //! let db = client.database("some_db");
 //! for coll_name in db.list_collection_names(None).await? {
@@ -133,7 +141,11 @@ define_if_single_runtime_enabled! {
     pub use coll::Namespace;
 }
 
-#[cfg(all(feature = "tokio-runtime", feature = "async-std-runtime", not(feature = "sync")))]
+#[cfg(all(
+    feature = "tokio-runtime",
+    feature = "async-std-runtime",
+    not(feature = "sync")
+))]
 compile_error!(
     "`tokio-runtime` and `async-runtime` can't both be enabled; either disable \
      `async-std-runtime` or set `default-features = false` in your Cargo.toml"
@@ -141,8 +153,8 @@ compile_error!(
 
 #[cfg(all(feature = "tokio-runtime", feature = "sync"))]
 compile_error!(
-    "`tokio-runtime` and `sync` can't both be enabled; either disable \
-     `sync` or set `default-features = false` in your Cargo.toml"
+    "`tokio-runtime` and `sync` can't both be enabled; either disable `sync` or set \
+     `default-features = false` in your Cargo.toml"
 );
 
 #[cfg(all(not(feature = "tokio-runtime"), not(feature = "async-std-runtime")))]
