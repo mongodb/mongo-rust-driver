@@ -333,7 +333,7 @@ async fn scram_sha1() {
     }
 
     client
-        .create_user("sha1", "sha1", &["root"], &[AuthMechanism::ScramSha1])
+        .create_user("sha1", "sha1", &[Bson::from("root")], &[AuthMechanism::ScramSha1])
         .await
         .unwrap();
     scram_test(&client, "sha1", "sha1", &[AuthMechanism::ScramSha1]).await;
@@ -347,7 +347,7 @@ async fn scram_sha256() {
         return;
     }
     client
-        .create_user("sha256", "sha256", &["root"], &[AuthMechanism::ScramSha256])
+        .create_user("sha256", "sha256", &[Bson::from("root")], &[AuthMechanism::ScramSha256])
         .await
         .unwrap();
     scram_test(&client, "sha256", "sha256", &[AuthMechanism::ScramSha256]).await;
@@ -364,7 +364,7 @@ async fn scram_both() {
         .create_user(
             "both",
             "both",
-            &["root"],
+            &[Bson::from("root")],
             &[AuthMechanism::ScramSha1, AuthMechanism::ScramSha256],
         )
         .await
@@ -408,14 +408,14 @@ async fn saslprep_options() {
     }
 
     client
-        .create_user("IX", "IX", &["root"], &[AuthMechanism::ScramSha256])
+        .create_user("IX", "IX", &[Bson::from("root")], &[AuthMechanism::ScramSha256])
         .await
         .unwrap();
     client
         .create_user(
             "\u{2168}",
             "\u{2163}",
-            &["root"],
+            &[Bson::from("root")],
             &[AuthMechanism::ScramSha256],
         )
         .await
@@ -437,14 +437,14 @@ async fn saslprep_uri() {
     }
 
     client
-        .create_user("IX", "IX", &["root"], &[AuthMechanism::ScramSha256])
+        .create_user("IX", "IX", &[Bson::from("root")], &[AuthMechanism::ScramSha256])
         .await
         .unwrap();
     client
         .create_user(
             "\u{2168}",
             "\u{2163}",
-            &["root"],
+            &[Bson::from("root")],
             &[AuthMechanism::ScramSha256],
         )
         .await
