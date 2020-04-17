@@ -8,6 +8,7 @@ use crate::{
     options::{
         auth::{AuthMechanism, Credential},
         ClientOptions,
+        ListDatabasesOptions,
     },
     selection_criteria::{ReadPreference, SelectionCriteria},
     test::{util::TestClient, CLIENT_OPTIONS, LOCK},
@@ -187,6 +188,69 @@ async fn list_database_names() {
     }
 }
 
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn list_authorized_databases() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+    if client.server_version_lt(4, 0) || !client.auth_enabled() {
+        return;
+    }
+
+    let dbs = &[
+        format!("{}1", function_name!()),
+        format!("{}2", function_name!()),
+    ];
+
+    for (i, name) in dbs.iter().enumerate() {
+        client
+            .database(name)
+            .create_collection("coll", None)
+            .await
+            .unwrap();
+        client
+            .create_user(
+                &format!("user{}", i)[..],
+                "pwd",
+                &[Bson::from(doc! { "role": "readWrite", "db": name })],
+                &[AuthMechanism::ScramSha256],
+            )
+            .await
+            .unwrap();
+    }
+
+    for (i, name) in dbs.iter().enumerate() {
+        let credential = Credential::builder()
+            .username(Some(format!("user{}", i)))
+            .password(Some(String::from("pwd")))
+            .build();
+        let client = Client::with_options(
+            ClientOptions::builder()
+                .credential(Some(credential))
+                .build(),
+        )
+        .unwrap();
+
+        let options = ListDatabasesOptions::builder()
+            .authorized_databases(true)
+            .build();
+
+        let result = client
+            .list_database_names(None, Some(options))
+            .await
+            .unwrap();
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result.get(0).unwrap(), name);
+    }
+
+    for name in dbs {
+        client.database(name).drop(None).await.unwrap();
+    }
+}
+
 fn is_auth_error(error: Error) -> bool {
     match error.kind.as_ref() {
         ErrorKind::AuthenticationError { .. } => true,
@@ -333,7 +397,12 @@ async fn scram_sha1() {
     }
 
     client
-        .create_user("sha1", "sha1", &[Bson::from("root")], &[AuthMechanism::ScramSha1])
+        .create_user(
+            "sha1",
+            "sha1",
+            &[Bson::from("root")],
+            &[AuthMechanism::ScramSha1],
+        )
         .await
         .unwrap();
     scram_test(&client, "sha1", "sha1", &[AuthMechanism::ScramSha1]).await;
@@ -347,7 +416,12 @@ async fn scram_sha256() {
         return;
     }
     client
-        .create_user("sha256", "sha256", &[Bson::from("root")], &[AuthMechanism::ScramSha256])
+        .create_user(
+            "sha256",
+            "sha256",
+            &[Bson::from("root")],
+            &[AuthMechanism::ScramSha256],
+        )
         .await
         .unwrap();
     scram_test(&client, "sha256", "sha256", &[AuthMechanism::ScramSha256]).await;
@@ -408,7 +482,12 @@ async fn saslprep_options() {
     }
 
     client
-        .create_user("IX", "IX", &[Bson::from("root")], &[AuthMechanism::ScramSha256])
+        .create_user(
+            "IX",
+            "IX",
+            &[Bson::from("root")],
+            &[AuthMechanism::ScramSha256],
+        )
         .await
         .unwrap();
     client
@@ -437,7 +516,12 @@ async fn saslprep_uri() {
     }
 
     client
-        .create_user("IX", "IX", &[Bson::from("root")], &[AuthMechanism::ScramSha256])
+        .create_user(
+            "IX",
+            "IX",
+            &[Bson::from("root")],
+            &[AuthMechanism::ScramSha256],
+        )
         .await
         .unwrap();
     client

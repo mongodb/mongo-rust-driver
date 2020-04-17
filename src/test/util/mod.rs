@@ -87,7 +87,6 @@ impl TestClient {
         roles: &[Bson],
         mechanisms: &[AuthMechanism],
     ) -> Result<()> {
-        // let rs: bson::Array = vec!(roles);
         let mut cmd = doc! { "createUser": user, "pwd": pwd, "roles": roles };
         if self.server_version_gte(4, 0) {
             let ms: bson::Array = mechanisms.iter().map(|s| Bson::from(s.as_str())).collect();

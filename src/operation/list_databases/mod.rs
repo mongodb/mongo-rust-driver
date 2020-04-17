@@ -7,7 +7,7 @@ use serde::Deserialize;
 use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
     error::Result,
-    operation::Operation,
+    operation::{append_options, Operation},
     selection_criteria::{ReadPreference, SelectionCriteria},
     options::{ListDatabasesOptions},
 };
@@ -47,6 +47,8 @@ impl Operation for ListDatabases {
         if let Some(ref filter) = self.filter {
             body.insert("filter", filter.clone());
         }
+
+        append_options(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(
             Self::NAME.to_string(),
