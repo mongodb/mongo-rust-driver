@@ -1,15 +1,14 @@
-use trust_dns_resolver::{
-    error::ResolveErrorKind
-};
+use trust_dns_resolver::error::ResolveErrorKind;
 
 use crate::{
-    error::{ErrorKind, Error, Result},
+    error::{Error, ErrorKind, Result},
     options::StreamAddress,
     runtime::AsyncResolver,
 };
 
 pub(crate) struct SrvResolver {
     resolver: AsyncResolver,
+    min_ttl: Option<u32>,
 }
 
 #[derive(Debug)]
@@ -23,11 +22,17 @@ impl SrvResolver {
     pub(crate) async fn new() -> Result<Self> {
         let resolver = AsyncResolver::new().await?;
 
-        Ok(Self { resolver })
+        Ok(Self {
+            resolver,
+            min_ttl: None,
+        })
     }
 
-    pub(crate) async fn resolve_client_options(&self, hostname: &str) -> Result<ResolvedConfig> {
-        let hosts = self.get_srv_hosts(hostname).await?;
+    pub(crate) async fn resolve_client_options(
+        &mut self,
+        hostname: &str,
+    ) -> Result<ResolvedConfig> {
+        let hosts = self.get_srv_hosts(hostname).await?.collect::<Result<_>>()?;
         let mut config = ResolvedConfig {
             hosts,
             auth_source: None,
@@ -39,7 +44,14 @@ impl SrvResolver {
         Ok(config)
     }
 
-    async fn get_srv_hosts(&self, original_hostname: &str) -> Result<Vec<StreamAddress>> {
+    pub(crate) fn min_ttl(&self) -> Option<u32> {
+        self.min_ttl
+    }
+
+    pub(crate) async fn get_srv_hosts<'a>(
+        &'a mut self,
+        original_hostname: &'a str,
+    ) -> Result<impl Iterator<Item = Result<StreamAddress>> + 'a> {
         let hostname_parts: Vec<_> = original_hostname.split('.').collect();
 
         if hostname_parts.len() < 3 {
@@ -50,14 +62,17 @@ impl SrvResolver {
             .into());
         }
 
-        let domain_name = &hostname_parts[1..];
-
         let lookup_hostname = format!("_mongodb._tcp.{}", original_hostname);
 
-        let mut srv_addresses: Vec<_> = self
-            .resolver
-            .srv_lookup(lookup_hostname.as_str())
-            .await?
+        let srv_lookup = self.resolver.srv_lookup(lookup_hostname.as_str()).await?;
+
+        self.min_ttl = srv_lookup
+            .as_lookup()
+            .record_iter()
+            .map(|record| record.ttl())
+            .min();
+
+        let srv_addresses: Vec<_> = srv_lookup
             .iter()
             .map(|record| {
                 let hostname = record.target().to_utf8();
@@ -73,7 +88,9 @@ impl SrvResolver {
             .into());
         }
 
-        for address in srv_addresses.iter_mut() {
+        let results = srv_addresses.into_iter().map(move |mut address| {
+            let domain_name = &hostname_parts[1..];
+
             let mut hostname_parts: Vec<_> = address.hostname.split('.').collect();
 
             // Remove empty final section, which indicates a trailing dot.
@@ -93,15 +110,21 @@ impl SrvResolver {
                 .into());
             }
 
-            // The spec tests list the seeds without the trailing '.', so we remove it by joining
-            // the parts we split rather than manipulating the string.
+            // The spec tests list the seeds without the trailing '.', so we remove it by
+            // joining the parts we split rather than manipulating the string.
             address.hostname = hostname_parts.join(".");
-        }
 
-        Ok(srv_addresses)
+            Ok(address)
+        });
+
+        Ok(results)
     }
 
-    async fn get_txt_options(&self, original_hostname: &str, config: &mut ResolvedConfig) -> Result<()> {
+    async fn get_txt_options(
+        &self,
+        original_hostname: &str,
+        config: &mut ResolvedConfig,
+    ) -> Result<()> {
         let txt_records_response = match self.resolver.txt_lookup(original_hostname).await {
             Ok(response) => response,
             Err(e) => return ignore_no_records(e),
@@ -171,7 +194,9 @@ impl SrvResolver {
 
 fn ignore_no_records(error: Error) -> Result<()> {
     match error.kind.as_ref() {
-        ErrorKind::DnsResolve(resolve_error) if matches!(resolve_error.kind(), ResolveErrorKind::NoRecordsFound { .. }) => Ok(()),
+        ErrorKind::DnsResolve(resolve_error) if matches!(resolve_error.kind(), ResolveErrorKind::NoRecordsFound { .. }) => {
+            Ok(())
+        }
         _ => Err(error),
     }
 }

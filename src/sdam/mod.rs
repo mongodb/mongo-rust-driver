@@ -3,6 +3,7 @@ mod description;
 mod message_manager;
 mod monitor;
 pub mod public;
+mod srv_polling;
 mod state;
 
 pub use self::public::{ServerInfo, ServerType};

@@ -84,6 +84,27 @@ impl PartialEq for TopologyDescription {
 }
 
 impl TopologyDescription {
+    /// Creates a new TopologyDescription with the set of servers initialized to the addresses
+    /// specified in `hosts` and each other field set to its default value.
+    #[cfg(test)]
+    pub(crate) fn new_from_hosts(hosts: Vec<StreamAddress>) -> Self {
+        Self {
+            single_seed: false,
+            topology_type: TopologyType::Unknown,
+            set_name: None,
+            max_set_version: None,
+            max_election_id: None,
+            compatibility_error: None,
+            logical_session_timeout_minutes: None,
+            local_threshold: None,
+            heartbeat_freq: None,
+            servers: hosts
+                .into_iter()
+                .map(|address| (address.clone(), ServerDescription::new(address, None)))
+                .collect(),
+        }
+    }
+
     pub(crate) fn new(options: ClientOptions) -> Result<Self> {
         verify_max_staleness(
             options
@@ -122,6 +143,11 @@ impl TopologyDescription {
             heartbeat_freq: options.heartbeat_freq,
             servers,
         })
+    }
+
+    /// Gets the topology type of the cluster.
+    pub(crate) fn topology_type(&self) -> TopologyType {
+        self.topology_type
     }
 
     pub(crate) fn server_addresses(&self) -> impl Iterator<Item = &StreamAddress> {
@@ -270,6 +296,14 @@ impl TopologyDescription {
                 .cloned()
                 .collect(),
         })
+    }
+
+    /// Syncs the set of servers in the description to those in `hosts`. Servers in the set not
+    /// already present in the cluster will be added, and servers in the cluster not present in the
+    /// set will be removed.
+    pub(crate) fn sync_hosts(&mut self, hosts: &HashSet<StreamAddress>) {
+        self.add_new_servers_from_addresses(hosts.iter());
+        self.servers.retain(|host, _| hosts.contains(host));
     }
 
     /// Update the topology based on the new information about the topology contained by the
@@ -532,17 +566,24 @@ impl TopologyDescription {
     }
 
     /// Create a new ServerDescription for each address and add it to the topology.
-    fn add_new_servers<'a>(&'a mut self, servers: impl Iterator<Item = &'a String>) -> Result<()> {
-        for server in servers {
-            let server = StreamAddress::parse(&server)?;
+    fn add_new_servers<'a>(&mut self, servers: impl Iterator<Item = &'a String>) -> Result<()> {
+        let servers: Result<Vec<_>> = servers.map(|server| StreamAddress::parse(server)).collect();
 
+        self.add_new_servers_from_addresses(servers?.iter());
+        Ok(())
+    }
+
+    /// Create a new ServerDescription for each address and add it to the topology.
+    fn add_new_servers_from_addresses<'a>(
+        &mut self,
+        servers: impl Iterator<Item = &'a StreamAddress>,
+    ) {
+        for server in servers {
             if !self.servers.contains_key(&server) {
                 self.servers
-                    .insert(server.clone(), ServerDescription::new(server, None));
+                    .insert(server.clone(), ServerDescription::new(server.clone(), None));
             }
         }
-
-        Ok(())
     }
 }
 

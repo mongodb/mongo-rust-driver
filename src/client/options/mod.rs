@@ -305,6 +305,9 @@ pub struct ClientOptions {
     pub(crate) zlib_compression: Option<i32>,
 
     #[builder(default)]
+    original_srv_hostname: Option<String>,
+
+    #[builder(default)]
     original_uri: Option<String>,
 }
 
@@ -492,12 +495,22 @@ impl From<ClientOptionsParser> for ClientOptions {
             credential: parser.credential,
             cmap_event_handler: None,
             command_event_handler: None,
+            original_srv_hostname: None,
             original_uri: Some(parser.original_uri),
         }
     }
 }
 
 impl ClientOptions {
+    /// Creates a new ClientOptions with the `original_srv_hostname` field set to the testing value
+    /// used in the SRV tests.
+    #[cfg(test)]
+    pub(crate) fn new_srv() -> Self {
+        let mut options = Self::default();
+        options.original_srv_hostname = Some("localhost.test.test.build.10gen.cc".into());
+        options
+    }
+
     /// Parses a MongoDB connection string into a ClientOptions struct. If the string is malformed
     /// or one of the options has an invalid value, an error will be returned.
     ///
@@ -555,10 +568,13 @@ impl ClientOptions {
         let mut options: Self = parser.into();
 
         if srv {
-            let resolver = SrvResolver::new().await?;
+            let mut resolver = SrvResolver::new().await?;
             let mut config = resolver
                 .resolve_client_options(&options.hosts[0].hostname)
                 .await?;
+
+            // Save the original SRV hostname to allow mongos polling.
+            options.original_srv_hostname = Some(options.hosts[0].hostname.clone());
 
             // Set the ClientOptions hosts to those found during the SRV lookup.
             options.hosts = config.hosts;
@@ -591,6 +607,11 @@ impl ClientOptions {
 
         options.validate()?;
         Ok(options)
+    }
+
+    /// Gets the original SRV hostname specified when this ClientOptions was parsed from a URI.
+    pub(crate) fn original_srv_hostname(&self) -> Option<&String> {
+        self.original_srv_hostname.as_ref()
     }
 
     pub(crate) fn tls_options(&self) -> Option<TlsOptions> {

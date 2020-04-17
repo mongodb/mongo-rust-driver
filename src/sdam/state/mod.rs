@@ -15,8 +15,12 @@ use crate::{
     error::{Error, ErrorKind, Result},
     options::{ClientOptions, SelectionCriteria, StreamAddress},
     sdam::{
-        description::server::{ServerDescription, ServerType},
+        description::{
+            server::{ServerDescription, ServerType},
+            topology::{TopologyDescriptionDiff, TopologyType},
+        },
         monitor::Monitor,
+        srv_polling::SrvPollingMonitor,
         TopologyMessageManager,
     },
 };
@@ -54,6 +58,40 @@ pub(crate) struct TopologyState {
 }
 
 impl Topology {
+    /// Creates a new TopologyDescription with the set of servers initialized to the addresses
+    /// specified in `hosts` and each other field set to its default value. No monitoring threads
+    /// will be started for the servers in the topology that's returned.
+    #[cfg(test)]
+    pub(super) fn new_from_hosts<'a>(hosts: impl Iterator<Item = &'a StreamAddress>) -> Self {
+        let hosts: Vec<_> = hosts.cloned().collect();
+
+        let description = TopologyDescription::new_from_hosts(hosts.clone());
+        let servers = hosts
+            .into_iter()
+            .map(|address| {
+                (
+                    address.clone(),
+                    Server::new(address, &Default::default()).into(),
+                )
+            })
+            .collect();
+
+        let state = TopologyState {
+            description,
+            servers,
+        };
+
+        let common = Common {
+            message_manager: TopologyMessageManager::new(),
+            options: ClientOptions::new_srv(),
+        };
+
+        Self {
+            state: Arc::new(RwLock::new(state)),
+            common,
+        }
+    }
+
     /// Creates a new Topology given the `options`.
     pub(crate) fn new(mut options: ClientOptions) -> Result<Self> {
         let description = TopologyDescription::new(options.clone())?;
@@ -81,15 +119,30 @@ impl Topology {
             topology_state.start_monitoring_server(address.clone(), topology.downgrade());
         }
 
+        SrvPollingMonitor::start(topology.downgrade());
+
         Ok(topology)
     }
 
+    /// Gets the addresses of the servers in the cluster.
+    #[cfg(test)]
+    pub(super) async fn servers(&self) -> HashSet<StreamAddress> {
+        self.state.read().await.servers.keys().cloned().collect()
+    }
+
     /// Creates and returns a weak reference to the topology.
-    fn downgrade(&self) -> WeakTopology {
+    pub(super) fn downgrade(&self) -> WeakTopology {
         WeakTopology {
             state: Arc::downgrade(&self.state),
             common: self.common.clone(),
         }
+    }
+
+    /// Clones the underlying TopologyState. This will return a separate TopologyState than the one
+    /// contained by this `Topology`, but it will share references to the same Servers (and by
+    /// extension the connection pools).
+    pub(super) async fn clone_state(&self) -> TopologyState {
+        self.state.read().await.clone()
     }
 
     /// Attempts to select a server with the given `criteria`, returning an error if the topology is
@@ -215,16 +268,30 @@ impl Topology {
         // doesn't check the fields of an Unknown server, and we only return Unknown server
         // descriptions when errors occur. Once we implement SDAM monitoring, we can
         // properly inform users of errors that occur here.
-        let _ = state_clone.update(server_description, self.common.options.clone());
+        if let Ok(diff) = state_clone.update(server_description, &self.common.options) {
+            self.update_state(diff, state_clone).await
+        } else {
+            false
+        }
+    }
 
-        match old_description.diff(&state_clone.description) {
+    /// Sets the underlying TopologyState to `new_state` if `diff` indicates the topology has
+    /// changed. Monitoring theads will be started for any new servers added, and the monitoring
+    /// threads for servers removed will stop the next time they wake up due to the strong
+    /// references in the TopologyState having been dropped.
+    pub(crate) async fn update_state(
+        &self,
+        diff: Option<TopologyDescriptionDiff>,
+        new_state: TopologyState,
+    ) -> bool {
+        match diff {
             None => false,
             Some(diff) => {
                 // Now that we have the proper state in the copy, acquire a lock on the proper
                 // topology and move the info over.
                 let mut state_lock = self.state.write().await;
-                state_lock.description = state_clone.description;
-                state_lock.servers = state_clone.servers;
+                state_lock.description = new_state.description;
+                state_lock.servers = new_state.servers;
 
                 for new_address in diff.new_addresses {
                     state_lock.start_monitoring_server(new_address, self.downgrade());
@@ -266,6 +333,14 @@ impl WeakTopology {
 }
 
 impl TopologyState {
+    pub(super) fn is_sharded(&self) -> bool {
+        self.description.topology_type() == TopologyType::Sharded
+    }
+
+    pub(super) fn is_unknown(&self) -> bool {
+        self.description.topology_type() == TopologyType::Unknown
+    }
+
     /// Adds a new server to the cluster.
     ///
     /// A reference to the containing Topology is needed in order to start the monitoring task.
@@ -299,24 +374,45 @@ impl TopologyState {
     /// removed servers in the topology description.
     ///
     /// This must **ONLY** be called on a copy of a TopologyState, not one that is stored in a
-    /// client. The `topology` parameter should contain a reference to the Topology that
-    /// is actually stored in a client.
+    /// client.
     pub(crate) fn update(
         &mut self,
         server: ServerDescription,
-        options: ClientOptions,
-    ) -> Result<()> {
+        options: &ClientOptions,
+    ) -> Result<Option<TopologyDescriptionDiff>> {
+        let old_description = self.description.clone();
         self.description.update(server)?;
-        let addresses: HashSet<_> = self.description.server_addresses().cloned().collect();
 
-        for address in addresses.iter() {
+        let hosts: HashSet<_> = self.description.server_addresses().cloned().collect();
+        self.sync_hosts(&hosts, options);
+
+        Ok(old_description.diff(&self.description))
+    }
+
+    /// Start/stop monitoring tasks and create/destroy connection pools based on the new and
+    /// removed servers in the topology description.
+    ///
+    /// This must **ONLY** be called on a copy of a TopologyState, not one that is stored in a
+    /// client.
+    pub(crate) fn update_hosts(
+        &mut self,
+        hosts: &HashSet<StreamAddress>,
+        options: &ClientOptions,
+    ) -> Option<TopologyDescriptionDiff> {
+        let old_description = self.description.clone();
+        self.description.sync_hosts(&hosts);
+
+        self.sync_hosts(&hosts, options);
+
+        old_description.diff(&self.description)
+    }
+
+    pub(crate) fn sync_hosts(&mut self, hosts: &HashSet<StreamAddress>, options: &ClientOptions) {
+        for address in hosts.iter() {
             self.add_new_server(address.clone(), options.clone());
         }
 
-        self.servers
-            .retain(|address, _| addresses.contains(address));
-
-        Ok(())
+        self.servers.retain(|host, _| hosts.contains(host));
     }
 
     /// Start a monitor for the server at the given address if it is part of the topology.
