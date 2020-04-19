@@ -117,7 +117,7 @@ impl Message {
     }
 
     /// Serializes the Message to bytes and writes them to `writer`.
-    pub(crate) async fn write_to(&self, writer: &mut AsyncStream) -> Result<()> {
+    pub(crate) async fn write_to(&self, writer: &mut AsyncStream) -> Result<i32> {
         let mut sections_bytes = Vec::new();
 
         for section in &self.sections {
@@ -133,9 +133,11 @@ impl Message {
                 .map(std::mem::size_of_val)
                 .unwrap_or(0);
 
+        let request_id = self.request_id.unwrap_or_else(super::util::next_request_id);
+
         let header = Header {
             length: total_length as i32,
-            request_id: self.request_id.unwrap_or_else(super::util::next_request_id),
+            request_id,
             response_to: self.response_to,
             op_code: OpCode::Message,
         };
@@ -150,7 +152,7 @@ impl Message {
 
         writer.flush().await?;
 
-        Ok(())
+        Ok(request_id)
     }
 }
 

@@ -13,6 +13,7 @@ use crate::{
     selection_criteria::{ReadPreference, SelectionCriteria},
     test::{util::TestClient, CLIENT_OPTIONS, LOCK},
     Client,
+    RUNTIME,
 };
 
 #[derive(Debug, Deserialize)]
@@ -531,4 +532,43 @@ async fn saslprep_uri() {
     auth_test_uri("IX", "I%C2%ADX", None, true).await;
     auth_test_uri("%E2%85%A8", "IV", None, true).await;
     auth_test_uri("%E2%85%A8", "I%C2%ADV", None, true).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn future_drop_corrupt_issue() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let options = CLIENT_OPTIONS.clone();
+
+    let client = Client::with_options(options.clone()).unwrap();
+    let db = client.database("test");
+
+    db.collection("foo")
+        .insert_one(doc! { "x": 1 }, None)
+        .await
+        .unwrap();
+
+    let _: Result<_, _> = tokio::time::timeout(
+        Duration::from_millis(50),
+        db.run_command(
+            doc! { "count": "foo",
+                "query": {
+                    "$where": "sleep(100) && true"
+                }
+            },
+            None,
+        ),
+    )
+    .await;
+
+    RUNTIME.delay_for(Duration::from_millis(200)).await;
+
+    let is_master_response = db.run_command(doc! { "isMaster": 1 }, None).await;
+
+    // Ensure that the response to `isMaster` is read, not the response to `count`.
+    assert!(is_master_response
+        .ok()
+        .and_then(|value| value.get("ismaster").and_then(|value| value.as_bool()))
+        .is_some());
 }
