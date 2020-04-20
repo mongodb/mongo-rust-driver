@@ -222,16 +222,13 @@ async fn list_authorized_databases() {
     }
 
     for name in dbs {
+        let mut options = CLIENT_OPTIONS.clone();
         let credential = Credential::builder()
             .username(Some(format!("user_{}", name)))
             .password(Some(String::from("pwd")))
             .build();
-        let client = Client::with_options(
-            ClientOptions::builder()
-                .credential(Some(credential))
-                .build(),
-        )
-        .unwrap();
+        options.credential = Some(credential);
+        let client = Client::with_options(options).unwrap();
 
         let options = ListDatabasesOptions::builder()
             .authorized_databases(true)
