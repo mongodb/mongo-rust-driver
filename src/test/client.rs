@@ -233,10 +233,7 @@ async fn list_authorized_databases() {
         let options = ListDatabasesOptions::builder()
             .authorized_databases(true)
             .build();
-        let result = client
-            .list_database_names(None, options)
-            .await
-            .unwrap();
+        let result = client.list_database_names(None, options).await.unwrap();
 
         assert_eq!(result.len(), 1);
         assert_eq!(result.get(0).unwrap(), name);
