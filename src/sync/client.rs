@@ -4,7 +4,7 @@ use super::Database;
 use crate::{
     concern::{ReadConcern, WriteConcern},
     error::Result,
-    options::{ClientOptions, DatabaseOptions, ListDatabaseOptions, SelectionCriteria},
+    options::{ClientOptions, DatabaseOptions, ListDatabasesOptions, SelectionCriteria},
     Client as AsyncClient,
     RUNTIME,
 };
