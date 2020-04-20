@@ -8,8 +8,8 @@ use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
     error::Result,
     operation::{append_options, Operation},
+    options::ListDatabasesOptions,
     selection_criteria::{ReadPreference, SelectionCriteria},
-    options::{ListDatabasesOptions},
 };
 
 #[derive(Debug)]
@@ -20,8 +20,16 @@ pub(crate) struct ListDatabases {
 }
 
 impl ListDatabases {
-    pub fn new(filter: Option<Document>, name_only: bool, options: Option<ListDatabasesOptions>) -> Self {
-        ListDatabases { filter, name_only, options }
+    pub fn new(
+        filter: Option<Document>,
+        name_only: bool,
+        options: Option<ListDatabasesOptions>,
+    ) -> Self {
+        ListDatabases {
+            filter,
+            name_only,
+            options,
+        }
     }
 
     #[cfg(test)]

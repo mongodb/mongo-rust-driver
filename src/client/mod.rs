@@ -17,7 +17,13 @@ use crate::{
     error::{ErrorKind, Result},
     event::command::CommandEventHandler,
     operation::ListDatabases,
-    options::{ClientOptions, DatabaseOptions, ListDatabasesOptions, ReadPreference, SelectionCriteria},
+    options::{
+        ClientOptions,
+        DatabaseOptions,
+        ListDatabasesOptions,
+        ReadPreference,
+        SelectionCriteria,
+    },
     sdam::{Server, Topology},
 };
 
