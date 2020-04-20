@@ -204,7 +204,7 @@ async fn list_authorized_databases() {
         format!("{}2", function_name!()),
     ];
 
-    for (i, name) in dbs.iter().enumerate() {
+    for name in dbs {
         client
             .database(name)
             .create_collection("coll", None)
@@ -212,7 +212,7 @@ async fn list_authorized_databases() {
             .unwrap();
         client
             .create_user(
-                &format!("user{}", i)[..],
+                &format!("user_{}", name),
                 "pwd",
                 &[Bson::from(doc! { "role": "readWrite", "db": name })],
                 &[AuthMechanism::ScramSha256],
@@ -221,9 +221,9 @@ async fn list_authorized_databases() {
             .unwrap();
     }
 
-    for (i, name) in dbs.iter().enumerate() {
+    for name in dbs {
         let credential = Credential::builder()
-            .username(Some(format!("user{}", i)))
+            .username(Some(format!("user_{}", name)))
             .password(Some(String::from("pwd")))
             .build();
         let client = Client::with_options(
@@ -236,7 +236,6 @@ async fn list_authorized_databases() {
         let options = ListDatabasesOptions::builder()
             .authorized_databases(true)
             .build();
-
         let result = client
             .list_database_names(None, Some(options))
             .await

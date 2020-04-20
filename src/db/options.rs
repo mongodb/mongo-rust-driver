@@ -140,7 +140,7 @@ pub struct ListCollectionsOptions {
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListDatabasesOptions {
-    // isabeltodo: write comment
+    // Determines which databases to return based on the user's access privileges.
     #[builder(default)]
     pub authorized_databases: Option<bool>,
 }

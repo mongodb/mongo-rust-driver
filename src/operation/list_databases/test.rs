@@ -1,4 +1,3 @@
-// isabeltodo: create common function for build tests
 use bson::{doc, Bson, Document};
 
 use crate::{
@@ -89,7 +88,6 @@ async fn build_with_options() {
             "authorizedDatabases": true
         }
     );
-    // isabeltodo: are these the best asserts?
     assert_eq!(list_databases_command.target_db, "admin");
     assert_eq!(list_databases_command.read_pref, None);
 }
