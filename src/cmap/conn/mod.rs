@@ -3,12 +3,12 @@ mod stream_description;
 mod wire;
 
 use std::{
-    collections::VecDeque,
     sync::{Arc, Weak},
     time::{Duration, Instant},
 };
 
 use derivative::Derivative;
+use futures::io::AsyncReadExt;
 
 use self::wire::Message;
 use super::ConnectionPoolInner;
@@ -42,6 +42,12 @@ pub struct ConnectionInfo {
     pub address: StreamAddress,
 }
 
+#[derive(Clone, Debug, Default)]
+pub(crate) struct PartialMessageState {
+    bytes_remaining: usize,
+    needs_response: bool,
+}
+
 /// A wrapper around Stream that contains all the CMAP information needed to maintain a connection.
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -64,7 +70,7 @@ pub(crate) struct Connection {
 
     stream: AsyncStream,
 
-    pending_request_ids: VecDeque<i32>,
+    partial_message_state: PartialMessageState,
 
     #[derivative(Debug = "ignore")]
     handler: Option<Arc<dyn CmapEventHandler>>,
@@ -93,7 +99,7 @@ impl Connection {
             address,
             handler: options.and_then(|options| options.event_handler),
             stream_description: None,
-            pending_request_ids: Default::default(),
+            partial_message_state: Default::default(),
         };
 
         Ok(conn)
@@ -210,12 +216,23 @@ impl Connection {
         command: Command,
         request_id: impl Into<Option<i32>>,
     ) -> Result<CommandResponse> {
-        let message = Message::with_command(command, request_id.into());
-        let request_id = message.write_to(&mut self.stream).await?;
-        self.pending_request_ids.push_back(request_id);
+        if self.partial_message_state.needs_response {
+            Message::read_from(&mut self.stream, &mut self.partial_message_state).await?;
+        }
 
-        let response_message = Message::read_from(&mut self.stream).await?;
-        self.pending_request_ids.pop_front();
+        if self.partial_message_state.bytes_remaining > 0 {
+            let mut bytes = vec![0u8; self.partial_message_state.bytes_remaining];
+            self.stream.read_exact(&mut bytes).await?;
+            self.partial_message_state.bytes_remaining = 0;
+        }
+
+        let message = Message::with_command(command, request_id.into());
+        message.write_to(&mut self.stream).await?;
+
+        self.partial_message_state.needs_response = true;
+
+        let response_message =
+            Message::read_from(&mut self.stream, &mut self.partial_message_state).await?;
         CommandResponse::new(self.address.clone(), response_message)
     }
 
@@ -253,7 +270,7 @@ impl Connection {
             stream: std::mem::replace(&mut self.stream, AsyncStream::Null),
             handler: self.handler.take(),
             stream_description: self.stream_description.take(),
-            pending_request_ids: self.pending_request_ids.drain(..).collect(),
+            partial_message_state: self.partial_message_state.clone(),
         }
     }
 }
@@ -270,17 +287,8 @@ impl Drop for Connection {
         // helper explicitly, so we don't add it back to the pool or emit any events.
         if let Some(ref weak_pool_ref) = self.pool {
             if let Some(strong_pool_ref) = weak_pool_ref.upgrade() {
-                let mut dropped_connection_state = self.take();
+                let dropped_connection_state = self.take();
                 RUNTIME.execute(async move {
-                    while dropped_connection_state
-                        .pending_request_ids
-                        .pop_front()
-                        .is_some()
-                    {
-                        let _: Result<_> =
-                            Message::read_from(&mut dropped_connection_state.stream).await;
-                    }
-
                     strong_pool_ref
                         .check_in(dropped_connection_state.into())
                         .await;
@@ -311,7 +319,7 @@ struct DroppedConnectionState {
     #[derivative(Debug = "ignore")]
     handler: Option<Arc<dyn CmapEventHandler>>,
     stream_description: Option<StreamDescription>,
-    pending_request_ids: VecDeque<i32>,
+    partial_message_state: PartialMessageState,
 }
 
 impl Drop for DroppedConnectionState {
@@ -339,8 +347,8 @@ impl From<DroppedConnectionState> for Connection {
             handler: state.handler.take(),
             stream_description: state.stream_description.take(),
             ready_and_available_time: None,
-            pending_request_ids: state.pending_request_ids.drain(..).collect(),
             pool: None,
+            partial_message_state: state.partial_message_state.clone(),
         }
     }
 }

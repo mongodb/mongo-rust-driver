@@ -35,7 +35,9 @@ async fn basic() {
     let mut stream = AsyncStream::connect(options).await.unwrap();
     message.write_to(&mut stream).await.unwrap();
 
-    let reply = Message::read_from(&mut stream).await.unwrap();
+    let reply = Message::read_from(&mut stream, &mut Default::default())
+        .await
+        .unwrap();
 
     let response_doc = match reply.sections.into_iter().next().unwrap() {
         MessageSection::Document(doc) => doc,

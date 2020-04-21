@@ -8,7 +8,7 @@ use super::{
 };
 use crate::{
     bson_util::async_encoding,
-    cmap::conn::command::Command,
+    cmap::conn::{command::Command, PartialMessageState},
     error::{ErrorKind, Result},
     runtime::{AsyncLittleEndianRead, AsyncLittleEndianWrite, AsyncStream},
 };
@@ -75,33 +75,40 @@ impl Message {
     }
 
     /// Reads bytes from `reader` and deserializes them into a Message.
-    pub(crate) async fn read_from(reader: &mut AsyncStream) -> Result<Self> {
+    pub(crate) async fn read_from(
+        reader: &mut AsyncStream,
+        partial_message_state: &mut PartialMessageState,
+    ) -> Result<Self> {
         let header = Header::read_from(reader).await?;
-        let mut length_remaining = header.length - Header::LENGTH as i32;
+        partial_message_state.bytes_remaining = header.length as usize - Header::LENGTH;
+        partial_message_state.needs_response = false;
 
         let flags = MessageFlags::from_bits_truncate(reader.read_u32().await?);
-        length_remaining -= std::mem::size_of::<u32>() as i32;
+        partial_message_state.bytes_remaining -= std::mem::size_of::<u32>();
 
         let mut count_reader = CountReader::new(reader);
         let mut sections = Vec::new();
 
-        while length_remaining - count_reader.bytes_read() as i32 > 4 {
+        while partial_message_state.bytes_remaining - count_reader.bytes_read() > 4 {
             sections.push(MessageSection::read(&mut count_reader).await?);
         }
 
-        length_remaining -= count_reader.bytes_read() as i32;
+        partial_message_state.bytes_remaining -= count_reader.bytes_read();
 
         let mut checksum = None;
 
-        if length_remaining == 4 && flags.contains(MessageFlags::CHECKSUM_PRESENT) {
+        if partial_message_state.bytes_remaining == 4
+            && flags.contains(MessageFlags::CHECKSUM_PRESENT)
+        {
             checksum = Some(reader.read_u32().await?);
-        } else if length_remaining != 0 {
+        } else if partial_message_state.bytes_remaining != 0 {
             return Err(ErrorKind::OperationError {
                 message: format!(
                     "The server indicated that the reply would be {} bytes long, but it instead \
                      was {}",
                     header.length,
-                    header.length - length_remaining + count_reader.bytes_read() as i32,
+                    header.length as usize - partial_message_state.bytes_remaining
+                        + count_reader.bytes_read(),
                 ),
             }
             .into());
@@ -117,7 +124,7 @@ impl Message {
     }
 
     /// Serializes the Message to bytes and writes them to `writer`.
-    pub(crate) async fn write_to(&self, writer: &mut AsyncStream) -> Result<i32> {
+    pub(crate) async fn write_to(&self, writer: &mut AsyncStream) -> Result<()> {
         let mut sections_bytes = Vec::new();
 
         for section in &self.sections {
@@ -133,11 +140,9 @@ impl Message {
                 .map(std::mem::size_of_val)
                 .unwrap_or(0);
 
-        let request_id = self.request_id.unwrap_or_else(super::util::next_request_id);
-
         let header = Header {
             length: total_length as i32,
-            request_id,
+            request_id: self.request_id.unwrap_or_else(super::util::next_request_id),
             response_to: self.response_to,
             op_code: OpCode::Message,
         };
@@ -152,7 +157,7 @@ impl Message {
 
         writer.flush().await?;
 
-        Ok(request_id)
+        Ok(())
     }
 }
 
