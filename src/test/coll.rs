@@ -328,6 +328,10 @@ lazy_static! {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn large_insert() {
+    if std::env::consts::OS != "linux" {
+        return;
+    }
+
     let _guard = LOCK.run_concurrently().await;
 
     let docs = vec![LARGE_DOC.clone(); 35000];
@@ -373,6 +377,10 @@ fn multibatch_documents_with_duplicate_keys() -> Vec<Document> {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn large_insert_unordered_with_errors() {
+    if std::env::consts::OS != "linux" {
+        return;
+    }
+
     let _guard = LOCK.run_concurrently().await;
 
     let docs = multibatch_documents_with_duplicate_keys();
@@ -410,6 +418,10 @@ async fn large_insert_unordered_with_errors() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn large_insert_ordered_with_errors() {
+    if std::env::consts::OS != "linux" {
+        return;
+    }
+
     let _guard = LOCK.run_concurrently().await;
 
     let docs = multibatch_documents_with_duplicate_keys();
