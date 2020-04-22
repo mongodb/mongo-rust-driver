@@ -136,3 +136,14 @@ pub struct ListCollectionsOptions {
     #[serde(serialize_with = "bson_util::serialize_batch_size", rename = "cursor")]
     pub batch_size: Option<u32>,
 }
+
+/// Specifies the options to a
+/// [`Client::list_databases`](../struct.Client.html#method.list_databases) operation.
+#[derive(Debug, Default, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListDatabasesOptions {
+    /// Determines which databases to return based on the user's access privileges. This option is
+    /// only supported on server versions 4.0.5+.
+    #[builder(default)]
+    pub authorized_databases: Option<bool>,
+}

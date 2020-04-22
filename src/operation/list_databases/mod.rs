@@ -7,7 +7,8 @@ use serde::Deserialize;
 use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
     error::Result,
-    operation::Operation,
+    operation::{append_options, Operation},
+    options::ListDatabasesOptions,
     selection_criteria::{ReadPreference, SelectionCriteria},
 };
 
@@ -15,11 +16,20 @@ use crate::{
 pub(crate) struct ListDatabases {
     filter: Option<Document>,
     name_only: bool,
+    options: Option<ListDatabasesOptions>,
 }
 
 impl ListDatabases {
-    pub fn new(filter: Option<Document>, name_only: bool) -> Self {
-        ListDatabases { filter, name_only }
+    pub fn new(
+        filter: Option<Document>,
+        name_only: bool,
+        options: Option<ListDatabasesOptions>,
+    ) -> Self {
+        ListDatabases {
+            filter,
+            name_only,
+            options,
+        }
     }
 
     #[cfg(test)]
@@ -27,6 +37,7 @@ impl ListDatabases {
         ListDatabases {
             filter: None,
             name_only: false,
+            options: None,
         }
     }
 }
@@ -44,6 +55,8 @@ impl Operation for ListDatabases {
         if let Some(ref filter) = self.filter {
             body.insert("filter", filter.clone());
         }
+
+        append_options(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(
             Self::NAME.to_string(),

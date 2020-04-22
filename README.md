@@ -49,7 +49,7 @@ client_options.app_name = Some("My App".to_string());
 let client = Client::with_options(client_options)?;
 
 // List the names of the databases in that deployment.
-for db_name in client.list_database_names(None)? {
+for db_name in client.list_database_names(None, None)? {
     println!("{}", db_name);
 }
 ```

@@ -8,6 +8,7 @@ use crate::{
     options::{
         auth::{AuthMechanism, Credential},
         ClientOptions,
+        ListDatabasesOptions,
     },
     selection_criteria::{ReadPreference, SelectionCriteria},
     test::{util::TestClient, CLIENT_OPTIONS, LOCK},
@@ -114,7 +115,7 @@ async fn list_databases() {
         client.database(name).drop(None).await.unwrap();
     }
 
-    let prev_dbs = client.list_databases(None).await.unwrap();
+    let prev_dbs = client.list_databases(None, None).await.unwrap();
 
     for name in expected_dbs {
         assert!(!prev_dbs
@@ -129,7 +130,7 @@ async fn list_databases() {
             .unwrap();
     }
 
-    let new_dbs = client.list_databases(None).await.unwrap();
+    let new_dbs = client.list_databases(None, None).await.unwrap();
     let new_dbs: Vec<_> = new_dbs
         .into_iter()
         .filter(|doc| match doc.get("name") {
@@ -167,7 +168,7 @@ async fn list_database_names() {
         client.database(name).drop(None).await.unwrap();
     }
 
-    let prev_dbs = client.list_database_names(None).await.unwrap();
+    let prev_dbs = client.list_database_names(None, None).await.unwrap();
 
     for name in expected_dbs {
         assert!(!prev_dbs.iter().any(|db_name| db_name == name));
@@ -180,10 +181,66 @@ async fn list_database_names() {
             .unwrap();
     }
 
-    let new_dbs = client.list_database_names(None).await.unwrap();
+    let new_dbs = client.list_database_names(None, None).await.unwrap();
 
     for name in expected_dbs {
         assert_eq!(new_dbs.iter().filter(|db_name| db_name == &name).count(), 1);
+    }
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn list_authorized_databases() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+    if client.server_version_lt(4, 0) || !client.auth_enabled() {
+        return;
+    }
+
+    let dbs = &[
+        format!("{}1", function_name!()),
+        format!("{}2", function_name!()),
+    ];
+
+    for name in dbs {
+        client
+            .database(name)
+            .create_collection("coll", None)
+            .await
+            .unwrap();
+        client
+            .create_user(
+                &format!("user_{}", name),
+                "pwd",
+                &[Bson::from(doc! { "role": "readWrite", "db": name })],
+                &[AuthMechanism::ScramSha256],
+            )
+            .await
+            .unwrap();
+    }
+
+    for name in dbs {
+        let mut options = CLIENT_OPTIONS.clone();
+        let credential = Credential::builder()
+            .username(format!("user_{}", name))
+            .password(String::from("pwd"))
+            .build();
+        options.credential = Some(credential);
+        let client = Client::with_options(options).unwrap();
+
+        let options = ListDatabasesOptions::builder()
+            .authorized_databases(true)
+            .build();
+        let result = client.list_database_names(None, options).await.unwrap();
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result.get(0).unwrap(), name);
+    }
+
+    for name in dbs {
+        client.database(name).drop(None).await.unwrap();
     }
 }
 
@@ -197,7 +254,7 @@ fn is_auth_error(error: Error) -> bool {
 /// Performs an operation that requires authentication and verifies that it either succeeded or
 /// failed with an authentication error according to the `should_succeed` parameter.
 async fn auth_test(client: Client, should_succeed: bool) {
-    let result = client.list_database_names(None).await;
+    let result = client.list_database_names(None, None).await;
     if should_succeed {
         result.expect("operation should have succeeded");
     } else {
@@ -333,7 +390,12 @@ async fn scram_sha1() {
     }
 
     client
-        .create_user("sha1", "sha1", &["root"], &[AuthMechanism::ScramSha1])
+        .create_user(
+            "sha1",
+            "sha1",
+            &[Bson::from("root")],
+            &[AuthMechanism::ScramSha1],
+        )
         .await
         .unwrap();
     scram_test(&client, "sha1", "sha1", &[AuthMechanism::ScramSha1]).await;
@@ -347,7 +409,12 @@ async fn scram_sha256() {
         return;
     }
     client
-        .create_user("sha256", "sha256", &["root"], &[AuthMechanism::ScramSha256])
+        .create_user(
+            "sha256",
+            "sha256",
+            &[Bson::from("root")],
+            &[AuthMechanism::ScramSha256],
+        )
         .await
         .unwrap();
     scram_test(&client, "sha256", "sha256", &[AuthMechanism::ScramSha256]).await;
@@ -364,7 +431,7 @@ async fn scram_both() {
         .create_user(
             "both",
             "both",
-            &["root"],
+            &[Bson::from("root")],
             &[AuthMechanism::ScramSha1, AuthMechanism::ScramSha256],
         )
         .await
@@ -408,14 +475,19 @@ async fn saslprep_options() {
     }
 
     client
-        .create_user("IX", "IX", &["root"], &[AuthMechanism::ScramSha256])
+        .create_user(
+            "IX",
+            "IX",
+            &[Bson::from("root")],
+            &[AuthMechanism::ScramSha256],
+        )
         .await
         .unwrap();
     client
         .create_user(
             "\u{2168}",
             "\u{2163}",
-            &["root"],
+            &[Bson::from("root")],
             &[AuthMechanism::ScramSha256],
         )
         .await
@@ -437,14 +509,19 @@ async fn saslprep_uri() {
     }
 
     client
-        .create_user("IX", "IX", &["root"], &[AuthMechanism::ScramSha256])
+        .create_user(
+            "IX",
+            "IX",
+            &[Bson::from("root")],
+            &[AuthMechanism::ScramSha256],
+        )
         .await
         .unwrap();
     client
         .create_user(
             "\u{2168}",
             "\u{2163}",
-            &["root"],
+            &[Bson::from("root")],
             &[AuthMechanism::ScramSha256],
         )
         .await

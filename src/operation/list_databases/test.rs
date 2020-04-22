@@ -5,6 +5,7 @@ use crate::{
     cmap::{CommandResponse, StreamDescription},
     error::ErrorKind,
     operation::{ListDatabases, Operation},
+    options::ListDatabasesOptions,
     selection_criteria::ReadPreference,
 };
 
@@ -31,7 +32,7 @@ async fn build() {
 async fn build_with_name_only() {
     let name_only = true;
 
-    let list_databases_op = ListDatabases::new(None, name_only);
+    let list_databases_op = ListDatabases::new(None, name_only, None);
     let list_databases_command = list_databases_op
         .build(&StreamDescription::new_testing())
         .expect("error on build");
@@ -52,7 +53,7 @@ async fn build_with_name_only() {
 async fn build_with_filter() {
     let filter = doc! {"something" : "something else"};
 
-    let list_databases_op = ListDatabases::new(Some(filter.clone()), false);
+    let list_databases_op = ListDatabases::new(Some(filter.clone()), false, None);
     let list_databases_command = list_databases_op
         .build(&StreamDescription::new_testing())
         .unwrap();
@@ -62,6 +63,29 @@ async fn build_with_filter() {
             "listDatabases": 1,
             "nameOnly": false,
             "filter": Bson::Document(filter)
+        }
+    );
+    assert_eq!(list_databases_command.target_db, "admin");
+    assert_eq!(list_databases_command.read_pref, None);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_with_options() {
+    let options = ListDatabasesOptions::builder()
+        .authorized_databases(true)
+        .build();
+
+    let list_databases_op = ListDatabases::new(None, false, Some(options));
+    let list_databases_command = list_databases_op
+        .build(&StreamDescription::new_testing())
+        .unwrap();
+    assert_eq!(
+        list_databases_command.body,
+        doc! {
+            "listDatabases": 1,
+            "nameOnly": false,
+            "authorizedDatabases": true
         }
     );
     assert_eq!(list_databases_command.target_db, "admin");

@@ -17,7 +17,13 @@ use crate::{
     error::{ErrorKind, Result},
     event::command::CommandEventHandler,
     operation::ListDatabases,
-    options::{ClientOptions, DatabaseOptions, ReadPreference, SelectionCriteria},
+    options::{
+        ClientOptions,
+        DatabaseOptions,
+        ListDatabasesOptions,
+        ReadPreference,
+        SelectionCriteria,
+    },
     sdam::{Server, Topology},
 };
 
@@ -133,8 +139,9 @@ impl Client {
     pub async fn list_databases(
         &self,
         filter: impl Into<Option<Document>>,
+        options: impl Into<Option<ListDatabasesOptions>>,
     ) -> Result<Vec<Document>> {
-        let op = ListDatabases::new(filter.into(), false);
+        let op = ListDatabases::new(filter.into(), false, options.into());
         self.execute_operation(&op, None).await
     }
 
@@ -142,8 +149,9 @@ impl Client {
     pub async fn list_database_names(
         &self,
         filter: impl Into<Option<Document>>,
+        options: impl Into<Option<ListDatabasesOptions>>,
     ) -> Result<Vec<String>> {
-        let op = ListDatabases::new(filter.into(), true);
+        let op = ListDatabases::new(filter.into(), true, options.into());
         match self.execute_operation(&op, None).await {
             Ok(databases) => databases
                 .into_iter()
