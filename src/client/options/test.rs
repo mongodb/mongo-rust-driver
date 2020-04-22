@@ -3,7 +3,7 @@ use pretty_assertions::assert_eq;
 use serde::Deserialize;
 
 use crate::{
-    client::options::{ClientOptions, StreamAddress},
+    client::options::{ClientOptions, ClientOptionsParser, StreamAddress},
     error::ErrorKind,
     selection_criteria::{ReadPreference, SelectionCriteria},
     test::run_spec_test,
@@ -331,4 +331,44 @@ async fn run_uri_options_spec_tests() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_connection_string_spec_tests() {
     run_spec_test(&["connection-string"], run_test).await;
+}
+
+async fn parse_uri(option: &str, suggestion: Option<&str>) {
+    match ClientOptionsParser::parse(&format!("mongodb://host:27017/?{}=test", option))
+        .as_ref()
+        .map_err(|e| e.as_ref())
+    {
+        Ok(_) => panic!("expected error for option {}", option),
+        Err(ErrorKind::ArgumentError { message, .. }) => {
+            match suggestion {
+                Some(s) => assert_eq!(
+                    message,
+                    &format!(
+                        "{} is an invalid option. An option with a similar name exists: {}",
+                        option, s
+                    )
+                ),
+                None => assert_eq!(message, &format!("{} is an invalid option", option)),
+            };
+        }
+        Err(e) => panic!("expected ArgumentError, but got {:?}", e),
+    }
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn parse_unknown_options() {
+    parse_uri("invalidoption", None).await;
+    parse_uri("x", None).await;
+    parse_uri("max", None).await;
+    parse_uri("tlstimeout", None).await;
+    parse_uri("waitqueuetimeout", Some("waitqueuetimeoutms")).await;
+    parse_uri("retry_reads", Some("retryreads")).await;
+    parse_uri("poolsize", Some("maxpoolsize")).await;
+    parse_uri(
+        "tlspermitinvalidcertificates",
+        Some("tlsallowinvalidcertificates"),
+    )
+    .await;
+    parse_uri("maxstalenessms", Some("maxstalenessseconds")).await;
 }
