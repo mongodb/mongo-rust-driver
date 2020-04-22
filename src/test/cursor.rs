@@ -64,7 +64,9 @@ async fn tailable_cursor() {
         ),
     };
 
-    coll.insert_one(doc! { "_id": 5 }, None).await.unwrap();
+    RUNTIME.execute(async move {
+        coll.insert_one(doc! { "_id": 5 }, None).await.unwrap();
+    });
 
     let delay = RUNTIME.delay_for(await_time);
 
