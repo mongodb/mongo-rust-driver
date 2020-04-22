@@ -127,7 +127,7 @@ functions:
           export SSL="${SSL}"
           . .evergreen/generate-uri.sh
 
-          ASYNC_RUNTIME=${ASYNC_RUNTIME} .evergreen/run-tests.sh
+          SINGLE_THREAD=${SINGLE_THREAD} ASYNC_RUNTIME=${ASYNC_RUNTIME} .evergreen/run-tests.sh
 
   "run atlas tests":
     - command: shell.exec
@@ -428,6 +428,8 @@ axes:
       - id: macos-10.14
         display_name: "MacOS 10.14"
         run_on: macos-1014
+        variables:
+          SINGLE_THREAD: true
 
 buildvariants:
 -
