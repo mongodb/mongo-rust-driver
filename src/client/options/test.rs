@@ -341,14 +341,8 @@ async fn parse_uri(option: &str, suggestion: Option<&str>) {
         Ok(_) => panic!("expected error for option {}", option),
         Err(ErrorKind::ArgumentError { message, .. }) => {
             match suggestion {
-                Some(s) => assert_eq!(
-                    message,
-                    &format!(
-                        "{} is an invalid option. An option with a similar name exists: {}",
-                        option, s
-                    )
-                ),
-                None => assert_eq!(message, &format!("{} is an invalid option", option)),
+                Some(s) => assert!(message.contains(s)),
+                None => assert!(message.contains("invalid")),
             };
         }
         Err(e) => panic!("expected ArgumentError, but got {:?}", e),
