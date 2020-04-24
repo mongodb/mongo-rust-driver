@@ -549,25 +549,26 @@ async fn future_drop_flush_response() {
         .await
         .unwrap();
 
-    let _: Result<_, _> = tokio::time::timeout(
-        Duration::from_millis(50),
-        db.run_command(
-            doc! { "count": "foo",
-                "query": {
-                    "$where": "sleep(100) && true"
-                }
-            },
-            None,
-        ),
-    )
-    .await;
+    let _: Result<_, _> = RUNTIME
+        .timeout(
+            Duration::from_millis(50),
+            db.run_command(
+                doc! { "count": "foo",
+                    "query": {
+                        "$where": "sleep(100) && true"
+                    }
+                },
+                None,
+            ),
+        )
+        .await;
 
     RUNTIME.delay_for(Duration::from_millis(200)).await;
 
     let is_master_response = db.run_command(doc! { "isMaster": 1 }, None).await;
 
     // Ensure that the response to `isMaster` is read, not the response to `count`.
-    assert!(dbg!(is_master_response)
+    assert!(is_master_response
         .ok()
         .and_then(|value| value.get("ismaster").and_then(|value| value.as_bool()))
         .is_some());
