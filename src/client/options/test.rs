@@ -342,7 +342,7 @@ async fn parse_uri(option: &str, suggestion: Option<&str>) {
         Err(ErrorKind::ArgumentError { message, .. }) => {
             match suggestion {
                 Some(s) => assert!(message.contains(s)),
-                None => assert!(message.contains("invalid")),
+                None => assert!(!message.contains("similar")),
             };
         }
         Err(e) => panic!("expected ArgumentError, but got {:?}", e),
