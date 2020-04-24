@@ -23,6 +23,7 @@ use rustls::{
     ServerCertVerifier,
     TLSError,
 };
+use strsim::jaro_winkler;
 use typed_builder::TypedBuilder;
 use webpki_roots::TLS_SERVER_ROOTS;
 
@@ -37,6 +38,41 @@ use crate::{
 };
 
 const DEFAULT_PORT: u16 = 27017;
+
+const URI_OPTIONS: &[&str] = &[
+    "appname",
+    "authmechanism",
+    "authsource",
+    "authmechanismproperties",
+    "compressors",
+    "connecttimeoutms",
+    "directconnection",
+    "heartbeatfrequencyms",
+    "journal",
+    "localthresholdms",
+    "maxidletimems",
+    "maxstalenessseconds",
+    "maxpoolsize",
+    "minpoolsize",
+    "readconcernlevel",
+    "readpreference",
+    "readpreferencetags",
+    "replicaset",
+    "retrywrites",
+    "retryreads",
+    "serverselectiontimeoutms",
+    "sockettimeoutms",
+    "tls",
+    "ssl",
+    "tlsinsecure",
+    "tlsallowinvalidcertificates",
+    "tlscafile",
+    "tlscertificatekeyfile",
+    "w",
+    "waitqueuetimeoutms",
+    "wtimeoutms",
+    "zlibcompressionlevel",
+];
 
 lazy_static! {
     /// Reserved characters as defined by [Section 2.2 of RFC-3986](https://tools.ietf.org/html/rfc3986#section-2.2).
@@ -1393,11 +1429,22 @@ impl ClientOptionsParser {
                 self.zlib_compression = Some(i);
             }
 
-            _ => {
-                return Err(ErrorKind::ArgumentError {
-                    message: "invalid option warning".to_string(),
+            other => {
+                let (jaro_winkler, option) = URI_OPTIONS.iter().fold((0.0, ""), |acc, option| {
+                    let jaro_winkler = jaro_winkler(option, other).abs();
+                    if jaro_winkler > acc.0 {
+                        return (jaro_winkler, option);
+                    }
+                    acc
+                });
+                let mut message = format!("{} is an invalid option", other);
+                if jaro_winkler >= 0.84 {
+                    message.push_str(&format!(
+                        ". An option with a similar name exists: {}",
+                        option
+                    ));
                 }
-                .into());
+                return Err(ErrorKind::ArgumentError { message: message }.into());
             }
         }
 
