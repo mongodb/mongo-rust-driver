@@ -51,9 +51,9 @@ impl Header {
     }
 
     /// Reads bytes from `r` and deserializes them into a header.
-    pub(crate) async fn read_from(stream: &mut AsyncStream) -> Result<Self> {
+    pub(crate) async fn read_from(length: i32, stream: &mut AsyncStream) -> Result<Self> {
         Ok(Self {
-            length: stream.read_i32().await?,
+            length,
             request_id: stream.read_i32().await?,
             response_to: stream.read_i32().await?,
             op_code: OpCode::from_i32(stream.read_i32().await?)?,
