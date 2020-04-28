@@ -4,6 +4,7 @@ mod connection_stepdown;
 mod crud;
 mod initial_dns_seedlist_discovery;
 mod read_write_concern;
+mod retryable_reads;
 
 use std::{
     convert::TryFrom,
@@ -37,6 +38,7 @@ where
         }
 
         let test_file_path = PathBuf::from(test_file.file_name());
+
         if test_file_path.extension().and_then(OsStr::to_str) != Some("json") {
             continue;
         }

@@ -62,6 +62,10 @@ impl Operation for Count {
         }
         None
     }
+
+    fn is_read_retryable(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Deserialize)]

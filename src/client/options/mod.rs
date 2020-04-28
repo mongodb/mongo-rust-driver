@@ -304,8 +304,11 @@ pub struct ClientOptions {
     #[builder(default)]
     pub repl_set_name: Option<String>,
 
+    /// Whether or not the client should retry a read operation if the operation fails.
+    ///
+    /// The default value is true.
     #[builder(default)]
-    pub(crate) retry_reads: Option<bool>,
+    pub retry_reads: Option<bool>,
 
     #[builder(default)]
     pub(crate) retry_writes: Option<bool>,
@@ -607,7 +610,7 @@ impl ClientOptions {
     ///     tag set
     ///   * `replicaSet`: maps to the `repl_set_name` field
     ///   * `retryWrites`: not yet implemented
-    ///   * `retryReads`: not yet implemented
+    ///   * `retryReads`: maps to the `retry_reads` field
     ///   * `serverSelectionTimeoutMS`: maps to the `server_selection_timeout` field
     ///   * `socketTimeoutMS`: maps to the `socket_timeout` field
     ///   * `ssl`: an alias of the `tls` option

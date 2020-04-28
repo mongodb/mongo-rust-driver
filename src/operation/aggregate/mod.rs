@@ -92,6 +92,10 @@ impl Operation for Aggregate {
             .as_ref()
             .and_then(|opts| opts.write_concern.as_ref())
     }
+
+    fn is_read_retryable(&self) -> bool {
+        !self.is_out_or_merge()
+    }
 }
 
 impl Aggregate {

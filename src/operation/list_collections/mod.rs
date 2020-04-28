@@ -79,4 +79,8 @@ impl Operation for ListCollections {
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         Some(SelectionCriteria::ReadPreference(ReadPreference::Primary)).as_ref()
     }
+
+    fn is_read_retryable(&self) -> bool {
+        true
+    }
 }

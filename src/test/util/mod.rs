@@ -1,11 +1,17 @@
 mod event;
 mod lock;
 mod matchable;
+mod operation;
+mod test_event;
+mod test_file;
 
 pub use self::{
     event::{CommandEvent, EventClient},
     lock::TestLock,
     matchable::{assert_matches, Matchable},
+    operation::AnyTestOperation,
+    test_event::TestEvent,
+    test_file::TestFile,
 };
 
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
@@ -188,8 +194,8 @@ pub async fn drop_collection(coll: &Collection) {
 
 pub fn parse_version(version: &str) -> (u64, u64) {
     let parts: Vec<u64> = version.split('.').map(|s| s.parse().unwrap()).collect();
-    if parts.len() != 2 {
-        panic!("not two part version string: {:?}", parts);
+    if parts.len() != 2 && parts.len() != 3 {
+        panic!("not a version string: {}", version);
     }
     (parts[0], parts[1])
 }

@@ -80,6 +80,10 @@ impl Operation for Distinct {
         }
         None
     }
+
+    fn is_read_retryable(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Deserialize)]

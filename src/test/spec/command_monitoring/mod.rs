@@ -1,6 +1,3 @@
-mod event;
-mod operation;
-
 use std::convert::Into;
 
 use serde::Deserialize;
@@ -81,13 +78,15 @@ async fn run_command_monitoring_test(test_file: TestFile) {
 
         let client = EventClient::new().await;
 
-        let events: Vec<TestEvent> = client
-            .run_operation_with_events(
-                operation,
+        let _ = client
+            .run_collection_operation(
+                &operation,
                 &test_file.database_name,
                 &test_file.collection_name,
             )
-            .await
+            .await;
+        let events: Vec<TestEvent> = client
+            .collect_events(&operation, true)
             .into_iter()
             .map(Into::into)
             .collect();
