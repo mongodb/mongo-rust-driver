@@ -181,13 +181,18 @@ impl Client {
 
         let start_time = PreciseTime::now();
 
-        let response_result = connection
-            .send_command(cmd.clone(), request_id)
-            .await
-            .and_then(|response| {
-                response.validate()?;
-                Ok(response)
-            });
+        let response_result = match connection.send_command(cmd.clone(), request_id).await {
+            Ok(response) => {
+                if let Some(cluster_time) = response.cluster_time() {
+                    self.inner.topology.advance_cluster_time(cluster_time).await;
+                    if let Some(ref mut session) = session {
+                        session.advance_cluster_time(cluster_time)
+                    }
+                }
+                response.validate().map(|_| response)
+            }
+            err => dbg!(err),
+        };
 
         let end_time = PreciseTime::now();
         let duration = start_time.to(end_time).to_std()?;
@@ -233,13 +238,6 @@ impl Client {
                     };
                     handler.handle_command_succeeded_event(command_succeeded_event);
                 });
-
-                if let Some(cluster_time) = response.cluster_time() {
-                    self.inner.topology.advance_cluster_time(cluster_time).await;
-                    if let Some(session) = session {
-                        session.advance_cluster_time(cluster_time)
-                    }
-                }
 
                 op.handle_response(response)
             }
