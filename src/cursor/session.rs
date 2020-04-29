@@ -159,7 +159,8 @@ impl<'session> GetMoreProviderResult for ExecutionResult<'session> {
 }
 
 /// Wrapper around a mutable reference to a `ClientSession` that provides move semantics.
-/// This is required
+/// This is used to prevent re-borrowing of the session and forcing it to be moved instead
+/// by moving the wrapping struct.
 struct MutableSessionReference<'a> {
     reference: &'a mut ClientSession,
 }
