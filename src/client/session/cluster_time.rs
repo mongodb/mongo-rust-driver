@@ -1,24 +1,20 @@
 use bson::{Document, TimeStamp};
+use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 
 /// Struct modeling a cluster time reported by the server.
 ///
 /// See [the MongoDB documentation](https://docs.mongodb.com/manual/core/read-isolation-consistency-recency/)
 /// for more information.
-#[derive(Debug, Deserialize, Clone, Serialize)]
+#[derive(Debug, Deserialize, Clone, Serialize, Derivative)]
+#[derivative(PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ClusterTime {
     cluster_time: TimeStamp,
+
+    #[derivative(PartialEq = "ignore")]
     signature: Document,
 }
-
-impl std::cmp::PartialEq for ClusterTime {
-    fn eq(&self, other: &ClusterTime) -> bool {
-        self.cluster_time == other.cluster_time
-    }
-}
-
-impl std::cmp::Eq for ClusterTime {}
 
 impl std::cmp::Ord for ClusterTime {
     // TODO: RUST-390 use TimeStamp's Ord impl.
