@@ -188,7 +188,18 @@ impl TopologyDescription {
 
                 command.read_pref = Some(resolved_read_pref);
             }
-            _ => {}
+            _ => {
+                command.read_pref = match criteria {
+                    Some(SelectionCriteria::ReadPreference(rp)) => Some(rp.clone()),
+                    Some(SelectionCriteria::Predicate(_)) => {
+                        Some(ReadPreference::PrimaryPreferred {
+                            max_staleness: None,
+                            tag_sets: None,
+                        })
+                    }
+                    None => Some(ReadPreference::Primary),
+                }
+            }
         }
     }
 
