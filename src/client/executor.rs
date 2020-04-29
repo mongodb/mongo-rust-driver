@@ -189,9 +189,14 @@ impl Client {
                         session.advance_cluster_time(cluster_time)
                     }
                 }
-                response.validate().map(|_| response)
+
+                if !op.handles_command_errors() {
+                    response.validate().map(|_| response)
+                } else {
+                    Ok(response)
+                }
             }
-            err => dbg!(err),
+            err => err,
         };
 
         let end_time = PreciseTime::now();
