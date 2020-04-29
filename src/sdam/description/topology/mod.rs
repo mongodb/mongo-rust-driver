@@ -321,23 +321,16 @@ impl TopologyDescription {
                 SessionSupportStatus::Unsupported => {
                     // Check if the timeout is now reported on all servers, and, if so, assign the
                     // topology's timeout to the minimum.
-                    let min_timeout =
-                        self.servers
-                            .values()
-                            .fold(Some(timeout), |min_so_far, desc| {
-                                if desc.address == server_description.address
-                                    || !desc.server_type.is_data_bearing()
-                                {
-                                    return min_so_far;
-                                }
-
-                                min_so_far.and_then(|min_so_far| {
-                                    desc.logical_session_timeout()
-                                        .ok()
-                                        .flatten()
-                                        .map(|timeout| std::cmp::min(min_so_far, timeout))
-                                })
-                            });
+                    let min_timeout = self
+                        .servers
+                        .values()
+                        .filter(|s| {
+                            s.address != server_description.address
+                                && s.server_type.is_data_bearing()
+                        })
+                        .map(|s| s.logical_session_timeout().ok().flatten())
+                        .min()
+                        .flatten();
 
                     match min_timeout {
                         Some(timeout) => {
