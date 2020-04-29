@@ -19,7 +19,7 @@ impl ServerSessionPool {
     }
 
     /// Checks out a server session from the pool. Before doing so, it first clears out all the
-    /// expired ssessions. If there are no sessions left in the pool after clearing expired ones
+    /// expired sessions. If there are no sessions left in the pool after clearing expired ones
     /// out, a new session will be created.
     pub(crate) async fn check_out(&self, logical_session_timeout: Duration) -> ServerSession {
         let mut pool = self.pool.lock().await;
