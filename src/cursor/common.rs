@@ -55,6 +55,12 @@ impl<T: GetMoreProvider> GenericCursor<T> {
     pub(super) fn namespace(&self) -> &Namespace {
         &self.info.ns
     }
+
+    fn start_get_more(&mut self) {
+        let info = self.info.clone();
+        let client = self.client.clone();
+        self.provider.start_execution(info, client);
+    }
 }
 
 impl<T: GetMoreProvider> Stream for GenericCursor<T> {
@@ -78,11 +84,14 @@ impl<T: GetMoreProvider> Stream for GenericCursor<T> {
             }
 
             match self.buffer.pop_front() {
-                Some(doc) => return Poll::Ready(Some(Ok(doc))),
+                Some(doc) => {
+                    if self.buffer.is_empty() && !self.exhausted {
+                        self.start_get_more();
+                    }
+                    return Poll::Ready(Some(Ok(doc)));
+                }
                 None if !self.exhausted => {
-                    let info = self.info.clone();
-                    let client = self.client.clone();
-                    self.provider.start_execution(info, client);
+                    self.start_get_more();
                 }
                 None => return Poll::Ready(None),
             }
