@@ -28,7 +28,7 @@ lazy_static! {
 /// Session to be used with client operations. This acts as a handle to a server session.
 /// This keeps the details of how server sessions are pooled opaque to users.
 #[derive(Debug)]
-pub struct ClientSession {
+pub(crate) struct ClientSession {
     cluster_time: Option<ClusterTime>,
     server_session: ServerSession,
     client: Client,

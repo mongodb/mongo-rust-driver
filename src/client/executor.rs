@@ -7,7 +7,7 @@ use lazy_static::lazy_static;
 use time::PreciseTime;
 
 use crate::{
-    cmap::{Connection, StreamDescription},
+    cmap::Connection,
     error::{ErrorKind, Result},
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
     operation::Operation,

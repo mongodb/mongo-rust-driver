@@ -21,6 +21,7 @@ impl std::cmp::PartialEq for ClusterTime {
 impl std::cmp::Eq for ClusterTime {}
 
 impl std::cmp::Ord for ClusterTime {
+    // TODO: RUST-390 use TimeStamp's Ord impl.
     fn cmp(&self, other: &ClusterTime) -> std::cmp::Ordering {
         let lhs = (self.cluster_time.t, self.cluster_time.i);
         let rhs = (other.cluster_time.t, other.cluster_time.i);

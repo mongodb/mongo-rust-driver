@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use bson::{Bson, Document};
 use serde::de::DeserializeOwned;
 
@@ -49,7 +47,7 @@ impl Command {
     }
 
     pub(crate) fn set_session(&mut self, session: &ClientSession) {
-        self.body.insert("lsid", session.id().deref());
+        self.body.insert("lsid", session.id());
     }
 
     pub(crate) fn set_cluster_time(&mut self, cluster_time: &ClusterTime) {
