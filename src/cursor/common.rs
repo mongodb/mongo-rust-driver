@@ -12,6 +12,7 @@ use futures::{Future, Stream};
 use crate::{
     error::{ErrorKind, Result},
     options::StreamAddress,
+    results::GetMoreResult,
     Client,
     Namespace,
 };
@@ -121,10 +122,10 @@ pub(super) trait GetMoreProvider: Unpin {
 /// Trait describing results returned from a `GetMoreProvider`.
 pub(super) trait GetMoreProviderResult {
     /// A result containing a mutable reference to the raw getMore result.
-    fn as_mut(&mut self) -> Result<&mut crate::results::GetMoreResult>;
+    fn as_mut(&mut self) -> Result<&mut GetMoreResult>;
 
     /// A result containing a reference to the raw getMore result.
-    fn as_ref(&self) -> Result<&crate::results::GetMoreResult>;
+    fn as_ref(&self) -> Result<&GetMoreResult>;
 
     /// Take the buffer from the getMore result.
     fn take_buffer(&mut self) -> Result<VecDeque<Document>> {

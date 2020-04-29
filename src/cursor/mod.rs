@@ -11,7 +11,14 @@ use std::{
 use bson::Document;
 use futures::{future::BoxFuture, Stream};
 
-use crate::{client::ClientSession, error::Result, operation::GetMore, Client, RUNTIME};
+use crate::{
+    client::ClientSession,
+    error::Result,
+    operation::GetMore,
+    results::GetMoreResult,
+    Client,
+    RUNTIME,
+};
 pub(crate) use common::{CursorInformation, CursorSpecification};
 use common::{GenericCursor, GetMoreProvider, GetMoreProviderResult};
 
@@ -113,15 +120,15 @@ impl Drop for Cursor {
 }
 
 struct OwnedSessionGetMoreResult {
-    get_more_result: Result<crate::results::GetMoreResult>,
+    get_more_result: Result<GetMoreResult>,
     session: ClientSession,
 }
 
 impl GetMoreProviderResult for OwnedSessionGetMoreResult {
-    fn as_mut(&mut self) -> Result<&mut crate::results::GetMoreResult> {
+    fn as_mut(&mut self) -> Result<&mut GetMoreResult> {
         self.get_more_result.as_mut().map_err(|e| e.clone())
     }
-    fn as_ref(&self) -> Result<&crate::results::GetMoreResult> {
+    fn as_ref(&self) -> Result<&GetMoreResult> {
         self.get_more_result.as_ref().map_err(|e| e.clone())
     }
 }

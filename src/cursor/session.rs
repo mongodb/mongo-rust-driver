@@ -1,15 +1,18 @@
+use std::collections::VecDeque;
+
+use bson::Document;
+use futures::future::BoxFuture;
+
 use super::common::{CursorInformation, GenericCursor, GetMoreProvider, GetMoreProviderResult};
 use crate::{
     client::ClientSession,
     cursor::CursorSpecification,
     error::Result,
     operation::GetMore,
+    results::GetMoreResult,
     Client,
     RUNTIME,
 };
-use bson::Document;
-use futures::future::BoxFuture;
-use std::collections::VecDeque;
 
 /// A cursor that was started with a session and must be iterated using one.
 #[derive(Debug)]
@@ -141,16 +144,16 @@ impl<'session> GetMoreProvider for ExplicitSessionGetMoreProvider<'session> {
 /// Struct returned from awaiting on a `GetMoreFuture` containing the result of the getMore as
 /// well as the reference to the `ClientSession` used for the getMore.
 struct ExecutionResult<'session> {
-    get_more_result: Result<crate::results::GetMoreResult>,
+    get_more_result: Result<GetMoreResult>,
     session: &'session mut ClientSession,
 }
 
 impl<'session> GetMoreProviderResult for ExecutionResult<'session> {
-    fn as_mut(&mut self) -> Result<&mut crate::results::GetMoreResult> {
+    fn as_mut(&mut self) -> Result<&mut GetMoreResult> {
         self.get_more_result.as_mut().map_err(|e| e.clone())
     }
 
-    fn as_ref(&self) -> Result<&crate::results::GetMoreResult> {
+    fn as_ref(&self) -> Result<&GetMoreResult> {
         self.get_more_result.as_ref().map_err(|e| e.clone())
     }
 }
