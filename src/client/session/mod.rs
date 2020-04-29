@@ -48,7 +48,6 @@ impl ClientSession {
 
     /// The id of this session.
     pub(crate) fn id(&self) -> &Document {
-        self.server_session.assert_is_non_null();
         &self.server_session.id
     }
 
@@ -86,7 +85,12 @@ impl ClientSession {
 impl Drop for ClientSession {
     fn drop(&mut self) {
         let client = self.client.clone();
-        let server_session = std::mem::replace(&mut self.server_session, ServerSession::null());
+        let server_session = ServerSession {
+            id: self.server_session.id.clone(),
+            last_use: self.server_session.last_use,
+            dirty: self.server_session.dirty,
+        };
+
         RUNTIME.execute(async move {
             client.check_in_server_session(server_session).await;
         })
@@ -117,21 +121,6 @@ impl ServerSession {
             last_use: Instant::now(),
             dirty: false,
         }
-    }
-
-    /// Creates a "null" session that is used as a placeholder while a `ClientSession` is being
-    /// dropped.
-    fn null() -> Self {
-        Self {
-            id: doc! { "id": Bson::Null },
-            last_use: Instant::now(),
-            dirty: false,
-        }
-    }
-
-    /// Asserts this session is non-null.
-    fn assert_is_non_null(&self) {
-        assert!(self.id != doc! { "id": Bson::Null })
     }
 
     /// Determines if this server session is about to expire in a short amount of time (1 minute).
