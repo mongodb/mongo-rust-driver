@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
     error::{BulkWriteError, BulkWriteFailure, ErrorKind, Result, WriteConcernError, WriteFailure},
+    options::WriteConcern,
     selection_criteria::SelectionCriteria,
     Namespace,
 };
@@ -58,6 +59,18 @@ pub(crate) trait Operation {
 
     /// Criteria to use for selecting the server that this operation will be executed on.
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+        None
+    }
+
+    /// Whether or not this operation will request acknowledgment from the server.
+    fn is_acknowledged(&self) -> bool {
+        self.write_concern()
+            .map(WriteConcern::is_acknowledged)
+            .unwrap_or(true)
+    }
+
+    /// The write concern to use for this operation, if any.
+    fn write_concern(&self) -> Option<&WriteConcern> {
         None
     }
 

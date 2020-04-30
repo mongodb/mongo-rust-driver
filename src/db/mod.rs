@@ -231,7 +231,7 @@ impl Database {
         command: Document,
         selection_criteria: impl Into<Option<SelectionCriteria>>,
     ) -> Result<Document> {
-        let operation = RunCommand::new(self.name().into(), command, selection_criteria.into());
+        let operation = RunCommand::new(self.name().into(), command, selection_criteria.into())?;
         self.client().execute_operation(&operation, None).await
     }
 

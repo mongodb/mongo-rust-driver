@@ -10,7 +10,7 @@ use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
     error::{ErrorKind, Result},
     operation::{append_options, Operation, WriteResponseBody},
-    options::InsertManyOptions,
+    options::{InsertManyOptions, WriteConcern},
     results::InsertManyResult,
     Namespace,
 };
@@ -83,5 +83,11 @@ impl Operation for Insert {
             );
         }
         Ok(InsertManyResult { inserted_ids: map })
+    }
+
+    fn write_concern(&self) -> Option<&WriteConcern> {
+        self.options
+            .as_ref()
+            .and_then(|opts| opts.write_concern.as_ref())
     }
 }

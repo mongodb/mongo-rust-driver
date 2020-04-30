@@ -7,7 +7,7 @@ use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
     error::Result,
     operation::{append_options, Operation, WriteConcernOnlyBody},
-    options::DropCollectionOptions,
+    options::{DropCollectionOptions, WriteConcern},
     Namespace,
 };
 
@@ -54,5 +54,11 @@ impl Operation for DropCollection {
 
     fn handle_response(&self, response: CommandResponse) -> Result<Self::O> {
         response.body::<WriteConcernOnlyBody>()?.validate()
+    }
+
+    fn write_concern(&self) -> Option<&WriteConcern> {
+        self.options
+            .as_ref()
+            .and_then(|opts| opts.write_concern.as_ref())
     }
 }

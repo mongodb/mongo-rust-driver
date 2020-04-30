@@ -93,6 +93,10 @@ impl Client {
         op: &T,
         connection: &mut Connection,
     ) -> Result<T::O> {
+        if let Some(wc) = op.write_concern() {
+            wc.validate()?;
+        }
+
         let mut cmd = op.build(connection.stream_description()?)?;
         self.inner
             .topology

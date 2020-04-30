@@ -1,9 +1,12 @@
 //! Contains the types for read concerns and write concerns.
 
+#[cfg(test)]
+mod test;
+
 use std::time::Duration;
 
 use bson::doc;
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
@@ -72,7 +75,7 @@ impl Serialize for ReadConcern {
 /// See the documentation [here](https://docs.mongodb.com/manual/reference/write-concern/) for more
 /// information about write concerns.
 #[skip_serializing_none]
-#[derive(Clone, Debug, Default, PartialEq, TypedBuilder, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, TypedBuilder, Serialize, Deserialize)]
 pub struct WriteConcern {
     /// Requests acknowledgement that the operation has propagated to a specific number or variety
     /// of servers.
@@ -88,6 +91,8 @@ pub struct WriteConcern {
     #[builder(default)]
     #[serde(rename = "wtimeout")]
     #[serde(serialize_with = "bson_util::serialize_duration_as_i64_millis")]
+    #[serde(deserialize_with = "bson_util::deserialize_duration_from_u64_millis")]
+    #[serde(default)]
     pub w_timeout: Option<Duration>,
 
     /// Requests acknowledgement that the operation has propagated to the on-disk journal.
@@ -117,6 +122,24 @@ impl Serialize for Acknowledgment {
             Acknowledgment::Majority => serializer.serialize_str("majority"),
             Acknowledgment::Nodes(n) => serializer.serialize_i32(n.clone()),
             Acknowledgment::Tag(tag) => serializer.serialize_str(tag),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Acknowledgment {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum IntOrString {
+            Int(i32),
+            String(String),
+        }
+        match IntOrString::deserialize(deserializer)? {
+            IntOrString::String(s) => Ok(s.into()),
+            IntOrString::Int(i) => Ok(i.into()),
         }
     }
 }
@@ -152,6 +175,11 @@ impl Acknowledgment {
 }
 
 impl WriteConcern {
+    #[allow(dead_code)]
+    pub(crate) fn is_acknowledged(&self) -> bool {
+        self.w != Some(Acknowledgment::Nodes(0)) || self.journal == Some(true)
+    }
+
     /// Validates that the write concern. A write concern is invalid if the `w` field is 0
     /// and the `j` field is `true`.
     pub fn validate(&self) -> Result<()> {
