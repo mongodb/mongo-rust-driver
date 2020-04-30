@@ -9,7 +9,7 @@ use crate::{
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build() {
-    let op = RunCommand::new("foo".into(), doc! { "isMaster": 1 }, None);
+    let op = RunCommand::new("foo".into(), doc! { "isMaster": 1 }, None).unwrap();
     assert!(op.selection_criteria().is_none());
 
     let command = op.build(&StreamDescription::new_testing()).unwrap();
@@ -29,7 +29,7 @@ async fn build() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn no_error_ok_0() {
-    let op = RunCommand::new("foo".into(), doc! { "isMaster": 1 }, None);
+    let op = RunCommand::new("foo".into(), doc! { "isMaster": 1 }, None).unwrap();
     assert!(op.selection_criteria().is_none());
 
     let command_response = CommandResponse::with_document(doc! {

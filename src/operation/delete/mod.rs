@@ -9,7 +9,7 @@ use crate::{
     collation::Collation,
     error::{convert_bulk_errors, Result},
     operation::{append_options, Operation, WriteResponseBody},
-    options::DeleteOptions,
+    options::{DeleteOptions, WriteConcern},
     results::DeleteResult,
 };
 
@@ -87,5 +87,11 @@ impl Operation for Delete {
         Ok(DeleteResult {
             deleted_count: body.n,
         })
+    }
+
+    fn write_concern(&self) -> Option<&WriteConcern> {
+        self.options
+            .as_ref()
+            .and_then(|opts| opts.write_concern.as_ref())
     }
 }

@@ -7,6 +7,7 @@ use super::Operation;
 use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
     error::{ErrorKind, Result},
+    options::WriteConcern,
     selection_criteria::SelectionCriteria,
 };
 
@@ -15,6 +16,7 @@ pub(crate) struct RunCommand {
     db: String,
     command: Document,
     selection_criteria: Option<SelectionCriteria>,
+    write_concern: Option<WriteConcern>,
 }
 
 impl RunCommand {
@@ -22,12 +24,18 @@ impl RunCommand {
         db: String,
         command: Document,
         selection_criteria: Option<SelectionCriteria>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        let write_concern = command
+            .get("writeConcern")
+            .map(|doc| bson::from_bson::<WriteConcern>(doc.clone()))
+            .transpose()?;
+
+        Ok(Self {
             db,
             command,
             selection_criteria,
-        }
+            write_concern,
+        })
     }
 }
 
@@ -61,6 +69,10 @@ impl Operation for RunCommand {
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         self.selection_criteria.as_ref()
+    }
+
+    fn write_concern(&self) -> Option<&WriteConcern> {
+        self.write_concern.as_ref()
     }
 
     fn handles_command_errors(&self) -> bool {

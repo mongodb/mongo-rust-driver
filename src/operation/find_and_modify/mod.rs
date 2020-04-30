@@ -20,6 +20,7 @@ use crate::{
     },
     error::{ErrorKind, Result},
     operation::{append_options, Operation},
+    options::WriteConcern,
 };
 
 pub(crate) struct FindAndModify {
@@ -88,6 +89,7 @@ impl Operation for FindAndModify {
             body,
         ))
     }
+
     fn handle_response(&self, response: CommandResponse) -> Result<Self::O> {
         let body: ResponseBody = response.body()?;
         match body.value {
@@ -102,6 +104,10 @@ impl Operation for FindAndModify {
             }
             .into()),
         }
+    }
+
+    fn write_concern(&self) -> Option<&WriteConcern> {
+        self.options.write_concern.as_ref()
     }
 }
 
