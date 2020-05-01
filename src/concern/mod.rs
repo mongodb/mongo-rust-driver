@@ -215,8 +215,4 @@ impl WriteConcern {
 
         Ok(())
     }
-
-    pub(crate) fn is_acknowledged(&self) -> bool {
-        self.w != Some(Acknowledgment::Nodes(0))
-    }
 }
