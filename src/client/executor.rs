@@ -43,27 +43,17 @@ impl Client {
             .await
     }
 
-    /// Execute the given operation with an implicit session, returning an error if one cannot be
-    /// created or the topology doesn't support them. The implicit session will be returned from
-    /// this method.
+    /// Execute the given operation, returning the implicit session created for it if one was.
     ///
     /// Server selection be will performed using the criteria specified on the operation, if any.
     pub(crate) async fn execute_operation_with_implicit_session<T: Operation>(
         &self,
         op: T,
-    ) -> Result<(T::O, ClientSession)> {
-        let implicit_session = self.start_implicit_session(&op).await?;
-
-        match implicit_session {
-            Some(mut implicit_session) => self
-                .select_server_and_execute_operation(op, Some(&mut implicit_session))
-                .await
-                .map(|result| (result, implicit_session)),
-            None => Err(ErrorKind::InternalError {
-                message: "failed to start an implicit session".to_string(),
-            }
-            .into()),
-        }
+    ) -> Result<(T::O, Option<ClientSession>)> {
+        let mut implicit_session = self.start_implicit_session(&op).await?;
+        self.select_server_and_execute_operation(op, implicit_session.as_mut())
+            .await
+            .map(|result| (result, implicit_session))
     }
 
     /// Execute the given operation with the given session.

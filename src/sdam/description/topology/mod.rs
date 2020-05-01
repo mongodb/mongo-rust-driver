@@ -304,6 +304,16 @@ impl TopologyDescription {
             return;
         }
 
+        if server_description.server_type == ServerType::Standalone {
+            self.session_support_status = SessionSupportStatus::Unsupported {
+                logical_session_timeout: server_description
+                    .logical_session_timeout()
+                    .ok()
+                    .flatten(),
+            };
+            return;
+        }
+
         match server_description.logical_session_timeout().ok().flatten() {
             Some(timeout) => match self.session_support_status {
                 SessionSupportStatus::Supported {
@@ -318,16 +328,13 @@ impl TopologyDescription {
                         logical_session_timeout: timeout,
                     }
                 }
-                SessionSupportStatus::Unsupported => {
+                SessionSupportStatus::Unsupported { .. } => {
                     // Check if the timeout is now reported on all servers, and, if so, assign the
                     // topology's timeout to the minimum.
                     let min_timeout = self
                         .servers
                         .values()
-                        .filter(|s| {
-                            s.address != server_description.address
-                                && s.server_type.is_data_bearing()
-                        })
+                        .filter(|s| s.server_type.is_data_bearing())
                         .map(|s| s.logical_session_timeout().ok().flatten())
                         .min()
                         .flatten();
@@ -338,14 +345,20 @@ impl TopologyDescription {
                                 logical_session_timeout: timeout,
                             }
                         }
-                        None => self.session_support_status = SessionSupportStatus::Unsupported,
+                        None => {
+                            self.session_support_status = SessionSupportStatus::Unsupported {
+                                logical_session_timeout: None,
+                            }
+                        }
                     }
                 }
             },
             None if server_description.server_type.is_data_bearing()
                 || self.topology_type == TopologyType::Single =>
             {
-                self.session_support_status = SessionSupportStatus::Unsupported
+                self.session_support_status = SessionSupportStatus::Unsupported {
+                    logical_session_timeout: None,
+                }
             }
             None => {}
         }
@@ -693,7 +706,12 @@ pub(crate) enum SessionSupportStatus {
 
     /// Sessions are not supported by this topology. This is possible if there is a data-bearing
     /// server in the deployment that does not support sessions.
-    Unsupported,
+    ///
+    /// While standalones do not support sessions, they still do report a logical session timeout,
+    /// so it is stored here if necessary.
+    Unsupported {
+        logical_session_timeout: Option<Duration>,
+    },
 
     /// Sessions are supported by this topology. This is the minimum timeout of all data-bearing
     /// servers in the deployment.
@@ -703,6 +721,21 @@ pub(crate) enum SessionSupportStatus {
 impl Default for SessionSupportStatus {
     fn default() -> Self {
         Self::Undetermined
+    }
+}
+
+impl SessionSupportStatus {
+    #[cfg(test)]
+    fn logical_session_timeout(&self) -> Option<Duration> {
+        match self {
+            Self::Undetermined => None,
+            Self::Unsupported {
+                logical_session_timeout,
+            } => logical_session_timeout.clone(),
+            Self::Supported {
+                logical_session_timeout,
+            } => Some(logical_session_timeout.clone()),
+        }
     }
 }
 

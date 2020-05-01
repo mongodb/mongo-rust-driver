@@ -85,7 +85,11 @@ pub struct Cursor {
 }
 
 impl Cursor {
-    pub(crate) fn new(client: Client, spec: CursorSpecification, session: ClientSession) -> Self {
+    pub(crate) fn new(
+        client: Client,
+        spec: CursorSpecification,
+        session: Option<ClientSession>,
+    ) -> Self {
         let provider = OwnedSessionGetMoreProvider::new(&spec, session);
 
         Self {
@@ -121,7 +125,7 @@ impl Drop for Cursor {
 
 struct OwnedSessionGetMoreResult {
     get_more_result: Result<GetMoreResult>,
-    session: ClientSession,
+    session: Option<ClientSession>,
 }
 
 impl GetMoreProviderResult for OwnedSessionGetMoreResult {
@@ -135,12 +139,12 @@ impl GetMoreProviderResult for OwnedSessionGetMoreResult {
 
 enum OwnedSessionGetMoreProvider {
     Executing(BoxFuture<'static, OwnedSessionGetMoreResult>),
-    Idle(ClientSession),
+    Idle(Option<ClientSession>),
     Done,
 }
 
 impl OwnedSessionGetMoreProvider {
-    fn new(spec: &CursorSpecification, session: ClientSession) -> Self {
+    fn new(spec: &CursorSpecification, session: Option<ClientSession>) -> Self {
         if spec.id() == 0 {
             Self::Done
         } else {
@@ -174,9 +178,14 @@ impl GetMoreProvider for OwnedSessionGetMoreProvider {
             Self::Idle(mut session) => {
                 let future = Box::pin(async move {
                     let get_more = GetMore::new(info);
-                    let get_more_result = client
-                        .execute_operation_with_session(get_more, &mut session)
-                        .await;
+                    let get_more_result = match session {
+                        Some(ref mut session) => {
+                            client
+                                .execute_operation_with_session(get_more, session)
+                                .await
+                        }
+                        None => client.execute_operation(get_more).await,
+                    };
                     OwnedSessionGetMoreResult {
                         get_more_result,
                         session,
