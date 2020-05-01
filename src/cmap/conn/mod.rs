@@ -46,6 +46,7 @@ pub struct ConnectionInfo {
 pub(crate) struct PartialMessageState {
     bytes_remaining: usize,
     needs_response: bool,
+    unfinished_write: bool,
 }
 
 /// A wrapper around Stream that contains all the CMAP information needed to maintain a connection.
@@ -227,8 +228,11 @@ impl Connection {
         }
 
         let message = Message::with_command(command, request_id.into());
-        message.write_to(&mut self.stream).await?;
+        message
+            .write_to(&mut self.stream, &mut self.partial_message_state)
+            .await?;
 
+        self.partial_message_state.unfinished_write = false;
         self.partial_message_state.needs_response = true;
 
         let response_message =
@@ -286,13 +290,19 @@ impl Drop for Connection {
         // dropped while it's not checked out. This means that the pool called the `close_and_drop`
         // helper explicitly, so we don't add it back to the pool or emit any events.
         if let Some(ref weak_pool_ref) = self.pool {
-            if let Some(strong_pool_ref) = weak_pool_ref.upgrade() {
-                let dropped_connection_state = self.take();
-                RUNTIME.execute(async move {
-                    strong_pool_ref
-                        .check_in(dropped_connection_state.into())
-                        .await;
-                });
+            // If there's an unfinished write on the connection, then we close the connection rather
+            // than returning it to the pool. We do this because finishing the write could
+            // potentially cause surprising side-effects for the user, who might expect
+            // the operation not to occur due to the future being dropped.
+            if !self.partial_message_state.unfinished_write {
+                if let Some(strong_pool_ref) = weak_pool_ref.upgrade() {
+                    let dropped_connection_state = self.take();
+                    RUNTIME.execute(async move {
+                        strong_pool_ref
+                            .check_in(dropped_connection_state.into())
+                            .await;
+                    });
+                }
             } else {
                 self.close(ConnectionClosedReason::PoolClosed);
             }

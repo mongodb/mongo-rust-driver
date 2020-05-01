@@ -42,8 +42,14 @@ impl Header {
     pub(crate) const LENGTH: usize = 4 * std::mem::size_of::<i32>();
 
     /// Serializes the Header and writes the bytes to `w`.
-    pub(crate) async fn write_to(&self, stream: &mut AsyncStream) -> Result<()> {
+    pub(crate) async fn write_to(
+        &self,
+        stream: &mut AsyncStream,
+        partial_message_state: &mut PartialMessageState,
+    ) -> Result<()> {
         stream.write_i32(self.length).await?;
+        partial_message_state.unfinished_write = true;
+
         stream.write_i32(self.request_id).await?;
         stream.write_i32(self.response_to).await?;
         stream.write_i32(self.op_code as i32).await?;

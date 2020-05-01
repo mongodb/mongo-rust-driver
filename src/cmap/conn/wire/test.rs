@@ -33,7 +33,10 @@ async fn basic() {
     };
 
     let mut stream = AsyncStream::connect(options).await.unwrap();
-    message.write_to(&mut stream).await.unwrap();
+    message
+        .write_to(&mut stream, &mut Default::default())
+        .await
+        .unwrap();
 
     let reply = Message::read_from(&mut stream, &mut Default::default())
         .await
