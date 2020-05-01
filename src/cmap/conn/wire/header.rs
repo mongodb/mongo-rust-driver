@@ -1,6 +1,7 @@
 use crate::runtime::{AsyncLittleEndianRead, AsyncLittleEndianWrite};
 
 use crate::{
+    cmap::conn::PartialMessageState,
     error::{ErrorKind, Result},
     runtime::AsyncStream,
 };
@@ -51,12 +52,28 @@ impl Header {
     }
 
     /// Reads bytes from `r` and deserializes them into a header.
-    pub(crate) async fn read_from(length: i32, stream: &mut AsyncStream) -> Result<Self> {
+    pub(crate) async fn read_from(
+        stream: &mut AsyncStream,
+        partial_message_state: &mut PartialMessageState,
+    ) -> Result<Self> {
+        let length = stream.read_i32().await?;
+        partial_message_state.bytes_remaining = length as usize;
+        partial_message_state.needs_response = false;
+
+        let request_id = stream.read_i32().await?;
+        partial_message_state.bytes_remaining -= 4;
+
+        let response_to = stream.read_i32().await?;
+        partial_message_state.bytes_remaining -= 4;
+
+        let op_code = stream.read_i32().await?;
+        partial_message_state.bytes_remaining -= 4;
+
         Ok(Self {
             length,
-            request_id: stream.read_i32().await?,
-            response_to: stream.read_i32().await?,
-            op_code: OpCode::from_i32(stream.read_i32().await?)?,
+            request_id,
+            response_to,
+            op_code: OpCode::from_i32(op_code)?,
         })
     }
 }

@@ -79,11 +79,8 @@ impl Message {
         reader: &mut AsyncStream,
         partial_message_state: &mut PartialMessageState,
     ) -> Result<Self> {
-        let length = reader.read_i32().await?;
-        partial_message_state.bytes_remaining = length as usize - Header::LENGTH;
-        partial_message_state.needs_response = false;
+        let header = Header::read_from(reader, partial_message_state).await?;
 
-        let header = Header::read_from(length, reader).await?;
         let flags = MessageFlags::from_bits_truncate(reader.read_u32().await?);
         partial_message_state.bytes_remaining -= std::mem::size_of::<u32>();
 
