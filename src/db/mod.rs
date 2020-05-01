@@ -166,7 +166,7 @@ impl Database {
             options.into(),
         );
         self.client()
-            .execute_operation_with_implicit_session(list_collections)
+            .execute_cursor_operation(list_collections)
             .await
             .map(|(spec, session)| Cursor::new(self.client().clone(), spec, session))
     }
@@ -180,7 +180,7 @@ impl Database {
             ListCollections::new(self.name().to_string(), filter.into(), true, None);
         let cursor = self
             .client()
-            .execute_operation_with_implicit_session(list_collections)
+            .execute_cursor_operation(list_collections)
             .await
             .map(|(spec, session)| Cursor::new(self.client().clone(), spec, session))?;
 
@@ -254,7 +254,7 @@ impl Database {
         let aggregate = Aggregate::new(self.name().to_string(), pipeline, options);
         let client = self.client();
         client
-            .execute_operation_with_implicit_session(aggregate)
+            .execute_cursor_operation(aggregate)
             .await
             .map(|(spec, session)| Cursor::new(client.clone(), spec, session))
     }

@@ -177,7 +177,7 @@ impl Collection {
         let aggregate = Aggregate::new(self.namespace(), pipeline, options);
         let client = self.client();
         client
-            .execute_operation_with_implicit_session(aggregate)
+            .execute_cursor_operation(aggregate)
             .await
             .map(|(spec, session)| Cursor::new(client.clone(), spec, session))
     }
@@ -325,7 +325,7 @@ impl Collection {
         let client = self.client();
 
         client
-            .execute_operation_with_implicit_session(find)
+            .execute_cursor_operation(find)
             .await
             .map(|(result, session)| Cursor::new(client.clone(), result, session))
     }

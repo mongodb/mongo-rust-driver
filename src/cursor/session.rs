@@ -48,7 +48,11 @@ impl SessionCursor {
             initial_buffer: std::mem::take(&mut self.buffer),
         };
         SessionCursorHandle {
-            generic_cursor: GenericCursor::new(self.client.clone(), spec, get_more_provider),
+            generic_cursor: ExplicitSessionCursor::new(
+                self.client.clone(),
+                spec,
+                get_more_provider,
+            ),
             session_cursor: self,
         }
     }
@@ -70,9 +74,17 @@ impl Drop for SessionCursor {
     }
 }
 
+/// A `GenericCursor` that borrows its session.
+/// This is to be used with cursors associated with explicit sessions borrowed from the user.
+type ExplicitSessionCursor<'session> = GenericCursor<ExplicitSessionGetMoreProvider<'session>>;
+
+/// A handle that borrows a `ClientSession` temporarily for executing getMores or iterating through
+/// the current buffer.
+///
+/// This updates the buffer of the parent cursor when dropped.
 struct SessionCursorHandle<'cursor, 'session> {
     session_cursor: &'cursor mut SessionCursor,
-    generic_cursor: GenericCursor<ExplicitSessionGetMoreProvider<'session>>,
+    generic_cursor: ExplicitSessionCursor<'session>,
 }
 
 impl<'cursor, 'session> Drop for SessionCursorHandle<'cursor, 'session> {

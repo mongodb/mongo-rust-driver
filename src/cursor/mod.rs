@@ -81,7 +81,7 @@ use common::{GenericCursor, GetMoreProvider, GetMoreProviderResult};
 #[derive(Debug)]
 pub struct Cursor {
     client: Client,
-    wrapped_cursor: GenericCursor<OwnedSessionGetMoreProvider>,
+    wrapped_cursor: ImplicitSessionCursor,
 }
 
 impl Cursor {
@@ -90,11 +90,11 @@ impl Cursor {
         spec: CursorSpecification,
         session: Option<ClientSession>,
     ) -> Self {
-        let provider = OwnedSessionGetMoreProvider::new(&spec, session);
+        let provider = ImplicitSessionGetMoreProvider::new(&spec, session);
 
         Self {
             client: client.clone(),
-            wrapped_cursor: GenericCursor::new(client, spec, provider),
+            wrapped_cursor: ImplicitSessionCursor::new(client, spec, provider),
         }
     }
 }
@@ -123,12 +123,16 @@ impl Drop for Cursor {
     }
 }
 
-struct OwnedSessionGetMoreResult {
+/// A `GenericCursor` that optionally owns its own sessions.
+/// This is to be used by cursors associated with implicit sessions.
+type ImplicitSessionCursor = GenericCursor<ImplicitSessionGetMoreProvider>;
+
+struct ImplicitSessionGetMoreResult {
     get_more_result: Result<GetMoreResult>,
     session: Option<ClientSession>,
 }
 
-impl GetMoreProviderResult for OwnedSessionGetMoreResult {
+impl GetMoreProviderResult for ImplicitSessionGetMoreResult {
     fn as_mut(&mut self) -> Result<&mut GetMoreResult> {
         self.get_more_result.as_mut().map_err(|e| e.clone())
     }
@@ -137,13 +141,15 @@ impl GetMoreProviderResult for OwnedSessionGetMoreResult {
     }
 }
 
-enum OwnedSessionGetMoreProvider {
-    Executing(BoxFuture<'static, OwnedSessionGetMoreResult>),
+/// A `GetMoreProvider` that optionally owns its own session.
+/// This is to be used with cursors associated with implicit sessions.
+enum ImplicitSessionGetMoreProvider {
+    Executing(BoxFuture<'static, ImplicitSessionGetMoreResult>),
     Idle(Option<ClientSession>),
     Done,
 }
 
-impl OwnedSessionGetMoreProvider {
+impl ImplicitSessionGetMoreProvider {
     fn new(spec: &CursorSpecification, session: Option<ClientSession>) -> Self {
         if spec.id() == 0 {
             Self::Done
@@ -153,9 +159,9 @@ impl OwnedSessionGetMoreProvider {
     }
 }
 
-impl GetMoreProvider for OwnedSessionGetMoreProvider {
-    type GetMoreResult = OwnedSessionGetMoreResult;
-    type GetMoreFuture = BoxFuture<'static, OwnedSessionGetMoreResult>;
+impl GetMoreProvider for ImplicitSessionGetMoreProvider {
+    type GetMoreResult = ImplicitSessionGetMoreResult;
+    type GetMoreFuture = BoxFuture<'static, ImplicitSessionGetMoreResult>;
 
     fn executing_future(&mut self) -> Option<&mut Self::GetMoreFuture> {
         match self {
@@ -186,7 +192,7 @@ impl GetMoreProvider for OwnedSessionGetMoreProvider {
                         }
                         None => client.execute_operation(get_more).await,
                     };
-                    OwnedSessionGetMoreResult {
+                    ImplicitSessionGetMoreResult {
                         get_more_result,
                         session,
                     }

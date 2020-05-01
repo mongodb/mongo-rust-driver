@@ -46,7 +46,7 @@ impl Client {
     /// Execute the given operation, returning the implicit session created for it if one was.
     ///
     /// Server selection be will performed using the criteria specified on the operation, if any.
-    pub(crate) async fn execute_operation_with_implicit_session<T: Operation>(
+    pub(crate) async fn execute_cursor_operation<T: Operation>(
         &self,
         op: T,
     ) -> Result<(T::O, Option<ClientSession>)> {
