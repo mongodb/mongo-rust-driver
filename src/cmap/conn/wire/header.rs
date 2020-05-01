@@ -57,17 +57,17 @@ impl Header {
         partial_message_state: &mut PartialMessageState,
     ) -> Result<Self> {
         let length = stream.read_i32().await?;
-        partial_message_state.bytes_remaining = length as usize;
+        partial_message_state.bytes_remaining = length as usize - std::mem::size_of::<i32>();
         partial_message_state.needs_response = false;
 
         let request_id = stream.read_i32().await?;
-        partial_message_state.bytes_remaining -= 4;
+        partial_message_state.bytes_remaining -= std::mem::size_of::<i32>();
 
         let response_to = stream.read_i32().await?;
-        partial_message_state.bytes_remaining -= 4;
+        partial_message_state.bytes_remaining -= std::mem::size_of::<i32>();
 
         let op_code = stream.read_i32().await?;
-        partial_message_state.bytes_remaining -= 4;
+        partial_message_state.bytes_remaining -= std::mem::size_of::<i32>();
 
         Ok(Self {
             length,
