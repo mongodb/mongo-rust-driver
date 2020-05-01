@@ -731,10 +731,10 @@ impl SessionSupportStatus {
             Self::Undetermined => None,
             Self::Unsupported {
                 logical_session_timeout,
-            } => logical_session_timeout.clone(),
+            } => *logical_session_timeout,
             Self::Supported {
                 logical_session_timeout,
-            } => Some(logical_session_timeout.clone()),
+            } => Some(*logical_session_timeout),
         }
     }
 }
