@@ -7,7 +7,9 @@ use crate::{
     error::Result,
     options::{Acknowledgment, FindOptions, InsertOneOptions, ReadPreference, WriteConcern},
     test::{EventClient, TestClient, CLIENT_OPTIONS, LOCK},
-    Client, Collection, RUNTIME,
+    Client,
+    Collection,
+    RUNTIME,
 };
 
 /// Macro defining a closure that returns a future populated by an operation on the

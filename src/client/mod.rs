@@ -18,7 +18,11 @@ use crate::{
     event::command::CommandEventHandler,
     operation::ListDatabases,
     options::{
-        ClientOptions, DatabaseOptions, ListDatabasesOptions, ReadPreference, SelectionCriteria,
+        ClientOptions,
+        DatabaseOptions,
+        ListDatabasesOptions,
+        ReadPreference,
+        SelectionCriteria,
     },
     sdam::{Server, SessionSupportStatus, Topology},
 };
