@@ -69,6 +69,8 @@ impl Client {
 
     /// Selects a server and executes the given operation on it, optionally using a provided
     /// session.
+    ///
+    /// TODO: RUST-128: replace this with `execute_operation_with_retry` when implemented.
     async fn select_server_and_execute_operation<T: Operation>(
         &self,
         op: T,
