@@ -64,7 +64,7 @@ const MAX_INSERT_DOCS_BYTES: usize = 16 * 1000 * 1000;
 ///
 ///     task::spawn(async move {
 ///         // Perform operations with `coll_ref`. For example:
-///         coll_ref.insert_one(doc! { "x": i }, None);
+///         coll_ref.insert_one(doc! { "x": i }, None).await;
 ///     });
 /// }
 /// #
