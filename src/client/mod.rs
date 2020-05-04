@@ -34,11 +34,15 @@ const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 /// as servers being added or removed
 ///
 /// `Client` uses [`std::sync::Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html) internally,
-/// so it can safely be shared across threads. For example:
+/// so it can safely be shared across threads or async tasks. For example:
 ///
 /// ```rust
 /// # #[cfg(not(feature = "sync"))]
 /// # use mongodb::{Client, error::Result};
+/// # #[cfg(feature = "async-std-runtime")]
+/// # use async_std::task;
+/// # #[cfg(feature = "tokio-runtime")]
+/// # use tokio::task;
 /// #
 /// # #[cfg(not(feature = "sync"))]
 /// # async fn start_workers() -> Result<()> {
@@ -47,16 +51,13 @@ const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 /// for i in 0..5 {
 ///     let client_ref = client.clone();
 ///
-///     std::thread::spawn(move || {
+///     task::spawn(async move {
 ///         let collection = client_ref.database("items").collection(&format!("coll{}", i));
 ///
 ///         // Do something with the collection
 ///     });
 /// }
 /// #
-/// # // Technically we should join the threads here, but for the purpose of the example, we'll just
-/// # // sleep for a bit.
-/// # std::thread::sleep(std::time::Duration::from_secs(3));
 /// # Ok(())
 /// # }
 /// ```

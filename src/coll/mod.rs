@@ -42,11 +42,15 @@ const MAX_INSERT_DOCS_BYTES: usize = 16 * 1000 * 1000;
 /// [`Database::collection_with_options`](struct.Database.html#method.collection_with_options).
 ///
 /// `Collection` uses [`std::sync::Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html) internally,
-/// so it can safely be shared across threads. For example:
+/// so it can safely be shared across threads or async tasks. For example:
 ///
 /// ```rust
 /// # use bson::{bson, doc};
 /// # use mongodb::error::Result;
+/// # #[cfg(feature = "async-std-runtime")]
+/// # use async_std::task;
+/// # #[cfg(feature = "tokio-runtime")]
+/// # use tokio::task;
 /// #
 /// # #[cfg(not(feature = "sync"))]
 /// # async fn start_workers() -> Result<()> {
@@ -58,15 +62,12 @@ const MAX_INSERT_DOCS_BYTES: usize = 16 * 1000 * 1000;
 /// for i in 0..5 {
 ///     let coll_ref = coll.clone();
 ///
-///     std::thread::spawn(move || {
+///     task::spawn(async move {
 ///         // Perform operations with `coll_ref`. For example:
 ///         coll_ref.insert_one(doc! { "x": i }, None);
 ///     });
 /// }
 /// #
-/// # // Technically we should join the threads here, but for the purpose of the example, we'll just
-/// # // sleep for a bit.
-/// # std::thread::sleep(std::time::Duration::from_secs(3));
 /// # Ok(())
 /// # }
 /// ```
