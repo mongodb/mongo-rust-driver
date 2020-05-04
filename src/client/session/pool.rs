@@ -35,6 +35,8 @@ impl ServerSessionPool {
 
     /// Checks in a server session to the pool. If it is about to expire or is dirty, it will be
     /// discarded.
+    ///
+    /// This method will also clear out any expired session from the pool before checking in.
     pub(crate) async fn check_in(&self, session: ServerSession, logical_session_timeout: Duration) {
         let mut pool = self.pool.lock().await;
         while let Some(pooled_session) = pool.pop_back() {
