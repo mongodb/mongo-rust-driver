@@ -247,7 +247,7 @@ impl Client {
             SessionSupportStatus::Supported {
                 logical_session_timeout,
             } if op.supports_sessions() && op.is_acknowledged() => Ok(Some(
-                self.start_session_with_timeout(logical_session_timeout)
+                self.start_implicit_session_with_timeout(logical_session_timeout)
                     .await,
             )),
             _ => Ok(None),

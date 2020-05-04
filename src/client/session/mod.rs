@@ -37,7 +37,7 @@ pub(crate) struct ClientSession {
 
 impl ClientSession {
     /// Creates a new `ClientSession` wrapping the provided server session.
-    pub(crate) fn new(server_session: ServerSession, client: Client) -> Self {
+    pub(crate) fn new_implicit(server_session: ServerSession, client: Client) -> Self {
         Self {
             client,
             server_session,

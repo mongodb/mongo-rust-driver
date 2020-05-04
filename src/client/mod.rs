@@ -18,11 +18,7 @@ use crate::{
     event::command::CommandEventHandler,
     operation::ListDatabases,
     options::{
-        ClientOptions,
-        DatabaseOptions,
-        ListDatabasesOptions,
-        ReadPreference,
-        SelectionCriteria,
+        ClientOptions, DatabaseOptions, ListDatabasesOptions, ReadPreference, SelectionCriteria,
     },
     sdam::{Server, SessionSupportStatus, Topology},
 };
@@ -197,11 +193,11 @@ impl Client {
     /// This method will attempt to re-use server sessions from the pool which are not about to
     /// expire according to the provided logical session timeout. If no such sessions are
     /// available, a new one will be created.
-    pub(crate) async fn start_session_with_timeout(
+    pub(crate) async fn start_implicit_session_with_timeout(
         &self,
         logical_session_timeout: Duration,
     ) -> ClientSession {
-        ClientSession::new(
+        ClientSession::new_implicit(
             self.inner
                 .session_pool
                 .check_out(logical_session_timeout)
