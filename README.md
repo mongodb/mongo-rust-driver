@@ -137,7 +137,7 @@ while let Some(result) = cursor.next().await {
 ```
 
 ### Using the sync API
-The driver also provides a blocking sync API. See the [Installation](#Installation) section for instructions on how to enable it.
+The driver also provides a blocking sync API. See the [Installation](#enabling-the-sync-api) section for instructions on how to enable it.
 
 The various sync-specific types are found in the `mongodb::sync` submodule rather than in the crate's top level like in the async API. The sync API calls through to the async API internally though, so it looks and behaves similarly to it.
 ```rust
