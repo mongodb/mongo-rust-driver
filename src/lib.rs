@@ -113,7 +113,7 @@ define_if_single_runtime_enabled! {
     mod sdam;
     mod selection_criteria;
     mod srv;
-    #[cfg(feature = "sync")]
+    #[cfg(any(feature = "sync", docsrs))]
     pub mod sync;
     #[cfg(test)]
     mod test;
