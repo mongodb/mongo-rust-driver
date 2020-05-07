@@ -7,8 +7,7 @@ use crate::{
     error::{Error, ErrorKind},
     options::{
         auth::{AuthMechanism, Credential},
-        ClientOptions,
-        ListDatabasesOptions,
+        ClientOptions, ListDatabasesOptions,
     },
     selection_criteria::{ReadPreference, SelectionCriteria},
     test::{util::TestClient, CLIENT_OPTIONS, LOCK},
@@ -467,7 +466,7 @@ async fn scram_missing_user_options() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn saslprep_options() {
+async fn saslprep() {
     let client = TestClient::new().await;
 
     if client.server_version_lt(4, 0) || !client.auth_enabled() {
@@ -497,35 +496,6 @@ async fn saslprep_options() {
     auth_test_options("IX", "I\u{00AD}X", None, true).await;
     auth_test_options("\u{2168}", "IV", None, true).await;
     auth_test_options("\u{2168}", "I\u{00AD}V", None, true).await;
-}
-
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn saslprep_uri() {
-    let client = TestClient::new().await;
-
-    if client.server_version_lt(4, 0) || !client.auth_enabled() {
-        return;
-    }
-
-    client
-        .create_user(
-            "IX",
-            "IX",
-            &[Bson::from("root")],
-            &[AuthMechanism::ScramSha256],
-        )
-        .await
-        .unwrap();
-    client
-        .create_user(
-            "\u{2168}",
-            "\u{2163}",
-            &[Bson::from("root")],
-            &[AuthMechanism::ScramSha256],
-        )
-        .await
-        .unwrap();
 
     auth_test_uri("IX", "IX", None, true).await;
     auth_test_uri("IX", "I%C2%ADX", None, true).await;

@@ -181,12 +181,7 @@ impl Client {
                         session.advance_cluster_time(cluster_time)
                     }
                 }
-
-                if !op.handles_command_errors() {
-                    response.validate().map(|_| response)
-                } else {
-                    Ok(response)
-                }
+                response.validate().map(|_| response)
             }
             err => err,
         };
