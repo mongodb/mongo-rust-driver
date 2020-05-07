@@ -7,7 +7,8 @@ use crate::{
     error::{Error, ErrorKind},
     options::{
         auth::{AuthMechanism, Credential},
-        ClientOptions, ListDatabasesOptions,
+        ClientOptions,
+        ListDatabasesOptions,
     },
     selection_criteria::{ReadPreference, SelectionCriteria},
     test::{util::TestClient, CLIENT_OPTIONS, LOCK},
