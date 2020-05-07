@@ -90,6 +90,7 @@ impl Handshaker {
         let is_master_reply = IsMasterReply {
             command_response,
             round_trip_time: None,
+            cluster_time: None,
         };
 
         conn.stream_description = Some(StreamDescription::from_is_master(is_master_reply));

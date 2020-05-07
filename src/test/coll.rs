@@ -268,6 +268,8 @@ async fn no_kill_cursors_on_exhausted() {
 
     std::mem::drop(cursor);
 
+    // wait for any tasks to get spawned from `Cursor`'s `Drop`.
+    RUNTIME.delay_for(Duration::from_millis(250)).await;
     assert!(!kill_cursors_sent(&event_client));
 }
 

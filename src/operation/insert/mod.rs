@@ -7,6 +7,7 @@ use bson::{doc, Document};
 
 use crate::{
     bson_util,
+    client::ClientSession,
     cmap::{Command, CommandResponse, StreamDescription},
     error::{ErrorKind, Result},
     operation::{append_options, Operation, WriteResponseBody},
@@ -20,6 +21,7 @@ pub(crate) struct Insert {
     ns: Namespace,
     documents: Vec<Document>,
     options: Option<InsertManyOptions>,
+    session: Option<ClientSession>,
 }
 
 impl Insert {
@@ -38,6 +40,7 @@ impl Insert {
                     d
                 })
                 .collect(),
+            session: None,
         }
     }
 }

@@ -178,12 +178,15 @@ async fn handle_success() {
         ))
         .expect("handle should succeed");
 
-    assert_eq!(cursor_spec.address, StreamAddress::default());
-    assert_eq!(cursor_spec.id, 123);
-    assert_eq!(cursor_spec.batch_size, None);
-    assert_eq!(cursor_spec.max_time, None);
+    assert_eq!(cursor_spec.address(), &StreamAddress::default());
+    assert_eq!(cursor_spec.id(), 123);
+    assert_eq!(cursor_spec.batch_size(), None);
+    assert_eq!(cursor_spec.max_time(), None);
     assert_eq!(
-        cursor_spec.buffer.into_iter().collect::<Vec<Document>>(),
+        cursor_spec
+            .initial_buffer
+            .into_iter()
+            .collect::<Vec<Document>>(),
         first_batch
     );
 
@@ -200,12 +203,15 @@ async fn handle_success() {
         ))
         .expect("handle should succeed");
 
-    assert_eq!(cursor_spec.address, StreamAddress::default());
-    assert_eq!(cursor_spec.id, 123);
-    assert_eq!(cursor_spec.batch_size, Some(123));
-    assert_eq!(cursor_spec.max_time, None);
+    assert_eq!(cursor_spec.address(), &StreamAddress::default());
+    assert_eq!(cursor_spec.id(), 123);
+    assert_eq!(cursor_spec.batch_size(), Some(123));
+    assert_eq!(cursor_spec.max_time(), None);
     assert_eq!(
-        cursor_spec.buffer.into_iter().collect::<Vec<Document>>(),
+        cursor_spec
+            .initial_buffer
+            .into_iter()
+            .collect::<Vec<Document>>(),
         first_batch
     );
 }

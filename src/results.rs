@@ -1,6 +1,6 @@
 //! Contains the types of results returned by CRUD operations.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use bson::{Bson, Document};
 
@@ -60,8 +60,8 @@ pub struct DeleteResult {
     pub deleted_count: i64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct GetMoreResult {
-    pub(crate) batch: Vec<Document>,
+    pub(crate) batch: VecDeque<Document>,
     pub(crate) exhausted: bool,
 }

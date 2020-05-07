@@ -9,10 +9,11 @@ use std::{
 use tokio::sync::RwLock;
 
 use self::server::Server;
-use super::TopologyDescription;
+use super::{SessionSupportStatus, TopologyDescription};
 use crate::{
+    client::ClusterTime,
     cmap::{Command, Connection},
-    error::{Error, ErrorKind, Result},
+    error::{Error, Result},
     options::{ClientOptions, SelectionCriteria, StreamAddress},
     sdam::{
         description::{
@@ -153,13 +154,6 @@ impl Topology {
     ) -> Result<Option<Arc<Server>>> {
         let topology_state = self.state.read().await;
 
-        if let Some(message) = topology_state.description.compatibility_error() {
-            return Err(ErrorKind::ServerSelectionError {
-                message: message.to_string(),
-            }
-            .into());
-        }
-
         Ok(topology_state
             .description
             .select_server(criteria)?
@@ -275,6 +269,27 @@ impl Topology {
         }
     }
 
+    /// Update the topology's highest seen cluster time.
+    /// If the provided cluster time is not higher than the topology's currently highest seen
+    /// cluster time, this method has no effect.
+    pub(crate) async fn advance_cluster_time(&self, cluster_time: &ClusterTime) {
+        self.state
+            .write()
+            .await
+            .description
+            .advance_cluster_time(cluster_time);
+    }
+
+    /// Get the topology's currently highest seen cluster time.
+    pub(crate) async fn cluster_time(&self) -> Option<ClusterTime> {
+        self.state
+            .read()
+            .await
+            .description
+            .cluster_time()
+            .map(Clone::clone)
+    }
+
     /// Sets the underlying TopologyState to `new_state` if `diff` indicates the topology has
     /// changed. Monitoring theads will be started for any new servers added, and the monitoring
     /// threads for servers removed will stop the next time they wake up due to the strong
@@ -282,7 +297,7 @@ impl Topology {
     pub(crate) async fn update_state(
         &self,
         diff: Option<TopologyDescriptionDiff>,
-        new_state: TopologyState,
+        mut new_state: TopologyState,
     ) -> bool {
         match diff {
             None => false,
@@ -290,6 +305,14 @@ impl Topology {
                 // Now that we have the proper state in the copy, acquire a lock on the proper
                 // topology and move the info over.
                 let mut state_lock = self.state.write().await;
+
+                // Advance the new state's cluster time in case the topology had been updated with a
+                // newer one since the new state was created.
+                // This will have no effect if new_state's cluster time is ahead of the current one.
+                if let Some(cluster_time) = state_lock.description.cluster_time() {
+                    new_state.description.advance_cluster_time(cluster_time);
+                }
+
                 state_lock.description = new_state.description;
                 state_lock.servers = new_state.servers;
 
@@ -315,6 +338,11 @@ impl Topology {
             .read()
             .await
             .update_command_with_read_pref(server_address, command, criteria);
+    }
+
+    /// Gets the latest information on whether sessions are supported or not.
+    pub(crate) async fn session_support_status(&self) -> SessionSupportStatus {
+        self.state.read().await.description.session_support_status()
     }
 }
 

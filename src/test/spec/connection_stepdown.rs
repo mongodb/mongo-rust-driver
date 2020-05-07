@@ -19,10 +19,12 @@ use crate::{
 };
 
 async fn run_test<F: Future>(name: &str, test: impl Fn(EventClient, Database, Collection) -> F) {
+    let _guard = LOCK.run_exclusively().await;
+
     // TODO RUST-51: Disable retryable writes once they're implemented.
     let client = EventClient::new().await;
 
-    if client.options.repl_set_name.is_none() {
+    if !client.is_replica_set() {
         return;
     }
 
@@ -65,8 +67,6 @@ async fn get_more() {
             return;
         }
 
-        let _guard = LOCK.run_concurrently().await;
-
         let docs = vec![doc! { "x": 1 }; 5];
         coll.insert_many(
             docs,
@@ -84,7 +84,9 @@ async fn get_more() {
             .await
             .unwrap();
 
-        db.run_command(doc! { "replSetStepDown": 5, "force": true }, None)
+        client
+            .database("admin")
+            .run_command(doc! { "replSetStepDown": 5, "force": true }, None)
             .await
             .expect("stepdown should have succeeded");
 
@@ -111,8 +113,6 @@ async fn not_master_keep_pool() {
         if client.server_version_lt(4, 2) {
             return;
         }
-
-        let _guard = LOCK.run_exclusively().await;
 
         client
             .database("admin")
@@ -159,8 +159,6 @@ async fn not_master_reset_pool() {
             return;
         }
 
-        let _guard = LOCK.run_exclusively().await;
-
         client
             .database("admin")
             .run_command(
@@ -205,8 +203,6 @@ async fn shutdown_in_progress() {
             return;
         }
 
-        let _guard = LOCK.run_exclusively().await;
-
         client
             .database("admin")
             .run_command(
@@ -250,8 +246,6 @@ async fn interrupted_at_shutdown() {
         if client.server_version_lt(4, 0) {
             return;
         }
-
-        let _guard = LOCK.run_exclusively().await;
 
         client
             .database("admin")

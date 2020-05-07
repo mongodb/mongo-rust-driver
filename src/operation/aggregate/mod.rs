@@ -72,14 +72,14 @@ impl Operation for Aggregate {
             error_body.validate()?;
         }
 
-        Ok(CursorSpecification {
-            ns: body.cursor.ns,
-            address: response.source_address().clone(),
-            id: body.cursor.id,
-            batch_size: self.options.as_ref().and_then(|opts| opts.batch_size),
-            max_time: self.options.as_ref().and_then(|opts| opts.max_await_time),
-            buffer: body.cursor.first_batch,
-        })
+        Ok(CursorSpecification::new(
+            body.cursor.ns,
+            response.source_address().clone(),
+            body.cursor.id,
+            self.options.as_ref().and_then(|opts| opts.batch_size),
+            self.options.as_ref().and_then(|opts| opts.max_await_time),
+            body.cursor.first_batch,
+        ))
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

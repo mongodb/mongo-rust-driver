@@ -5,6 +5,7 @@ use bson::Document;
 
 use super::Operation;
 use crate::{
+    client::SESSIONS_UNSUPPORTED_COMMANDS,
     cmap::{Command, CommandResponse, StreamDescription},
     error::{ErrorKind, Result},
     options::WriteConcern,
@@ -37,6 +38,10 @@ impl RunCommand {
             write_concern,
         })
     }
+
+    fn command_name(&self) -> Option<&str> {
+        self.command.keys().next().map(String::as_str)
+    }
 }
 
 impl Operation for RunCommand {
@@ -47,17 +52,14 @@ impl Operation for RunCommand {
     const NAME: &'static str = "$genericRunCommand";
 
     fn build(&self, description: &StreamDescription) -> Result<Command> {
-        let command_name =
-            self.command
-                .keys()
-                .next()
-                .cloned()
-                .ok_or_else(|| ErrorKind::ArgumentError {
-                    message: "an empty document cannot be passed to a run_command operation".into(),
-                })?;
+        let command_name = self
+            .command_name()
+            .ok_or_else(|| ErrorKind::ArgumentError {
+                message: "an empty document cannot be passed to a run_command operation".into(),
+            })?;
 
         Ok(Command::new(
-            command_name,
+            command_name.to_string(),
             self.db.clone(),
             self.command.clone(),
         ))
@@ -65,6 +67,10 @@ impl Operation for RunCommand {
 
     fn handle_response(&self, response: CommandResponse) -> Result<Self::O> {
         Ok(response.raw_response)
+    }
+
+    fn handles_command_errors(&self) -> bool {
+        true
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
@@ -75,7 +81,11 @@ impl Operation for RunCommand {
         self.write_concern.as_ref()
     }
 
-    fn handles_command_errors(&self) -> bool {
-        true
+    fn supports_sessions(&self) -> bool {
+        self.command_name()
+            .map(|command_name| {
+                !SESSIONS_UNSUPPORTED_COMMANDS.contains(command_name.to_lowercase().as_str())
+            })
+            .unwrap_or(false)
     }
 }

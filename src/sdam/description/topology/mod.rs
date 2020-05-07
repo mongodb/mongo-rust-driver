@@ -11,6 +11,7 @@ use bson::oid::ObjectId;
 use serde::Deserialize;
 
 use crate::{
+    client::ClusterTime,
     cmap::Command,
     error::{ErrorKind, Result},
     options::{ClientOptions, StreamAddress},
@@ -58,8 +59,12 @@ pub(crate) struct TopologyDescription {
     /// respective supported wire versions.
     compatibility_error: Option<String>,
 
-    // TODO RUST-149: Session support.
-    logical_session_timeout_minutes: Option<u32>,
+    /// Whether or not this topology supports sessions, and if so, what the logicalSessionTimeout
+    /// is for them.
+    session_support_status: SessionSupportStatus,
+
+    /// The highest reported cluster time by any server in this topology.
+    cluster_time: Option<ClusterTime>,
 
     /// The amount of latency beyond that of the suitable server with the minimum latency that is
     /// acceptable for a read operation.
@@ -80,6 +85,7 @@ impl PartialEq for TopologyDescription {
         self.compatibility_error == other.compatibility_error
             && self.servers == other.servers
             && self.topology_type == other.topology_type
+            && self.cluster_time == other.cluster_time
     }
 }
 
@@ -95,7 +101,8 @@ impl TopologyDescription {
             max_set_version: None,
             max_election_id: None,
             compatibility_error: None,
-            logical_session_timeout_minutes: None,
+            session_support_status: Default::default(),
+            cluster_time: None,
             local_threshold: None,
             heartbeat_freq: None,
             servers: hosts
@@ -138,7 +145,8 @@ impl TopologyDescription {
             max_set_version: None,
             max_election_id: None,
             compatibility_error: None,
-            logical_session_timeout_minutes: None,
+            session_support_status: SessionSupportStatus::Undetermined,
+            cluster_time: None,
             local_threshold: options.local_threshold,
             heartbeat_freq: options.heartbeat_freq,
             servers,
@@ -152,6 +160,10 @@ impl TopologyDescription {
 
     pub(crate) fn server_addresses(&self) -> impl Iterator<Item = &StreamAddress> {
         self.servers.keys()
+    }
+
+    pub(crate) fn cluster_time(&self) -> Option<&ClusterTime> {
+        self.cluster_time.as_ref()
     }
 
     pub(crate) fn get_server_description(
@@ -286,6 +298,81 @@ impl TopologyDescription {
         }
     }
 
+    /// Updates the topology's logical session timeout value based on the server's value for it.
+    fn update_session_support_status(&mut self, server_description: &ServerDescription) {
+        if !server_description.server_type.is_data_bearing() {
+            return;
+        }
+
+        if server_description.server_type == ServerType::Standalone {
+            self.session_support_status = SessionSupportStatus::Unsupported {
+                logical_session_timeout: server_description
+                    .logical_session_timeout()
+                    .ok()
+                    .flatten(),
+            };
+            return;
+        }
+
+        match server_description.logical_session_timeout().ok().flatten() {
+            Some(timeout) => match self.session_support_status {
+                SessionSupportStatus::Supported {
+                    logical_session_timeout: topology_timeout,
+                } => {
+                    self.session_support_status = SessionSupportStatus::Supported {
+                        logical_session_timeout: std::cmp::min(timeout, topology_timeout),
+                    };
+                }
+                SessionSupportStatus::Undetermined => {
+                    self.session_support_status = SessionSupportStatus::Supported {
+                        logical_session_timeout: timeout,
+                    }
+                }
+                SessionSupportStatus::Unsupported { .. } => {
+                    // Check if the timeout is now reported on all servers, and, if so, assign the
+                    // topology's timeout to the minimum.
+                    let min_timeout = self
+                        .servers
+                        .values()
+                        .filter(|s| s.server_type.is_data_bearing())
+                        .map(|s| s.logical_session_timeout().ok().flatten())
+                        .min()
+                        .flatten();
+
+                    match min_timeout {
+                        Some(timeout) => {
+                            self.session_support_status = SessionSupportStatus::Supported {
+                                logical_session_timeout: timeout,
+                            }
+                        }
+                        None => {
+                            self.session_support_status = SessionSupportStatus::Unsupported {
+                                logical_session_timeout: None,
+                            }
+                        }
+                    }
+                }
+            },
+            None if server_description.server_type.is_data_bearing()
+                || self.topology_type == TopologyType::Single =>
+            {
+                self.session_support_status = SessionSupportStatus::Unsupported {
+                    logical_session_timeout: None,
+                }
+            }
+            None => {}
+        }
+    }
+
+    /// Sets the topology's cluster time to the provided one if it is higher than the currently
+    /// recorded one.
+    pub(crate) fn advance_cluster_time(&mut self, cluster_time: &ClusterTime) {
+        if self.cluster_time.as_ref() >= Some(cluster_time) {
+            return;
+        }
+        self.cluster_time = Some(cluster_time.clone());
+    }
+
     /// Returns the diff between this topology description and the provided one, or `None` if
     /// they are equal.
     ///
@@ -317,6 +404,10 @@ impl TopologyDescription {
         self.servers.retain(|host, _| hosts.contains(host));
     }
 
+    pub(crate) fn session_support_status(&self) -> SessionSupportStatus {
+        self.session_support_status
+    }
+
     /// Update the topology based on the new information about the topology contained by the
     /// ServerDescription.
     pub(crate) fn update(&mut self, mut server_description: ServerDescription) -> Result<()> {
@@ -334,6 +425,14 @@ impl TopologyDescription {
             server_description.address.clone(),
             server_description.clone(),
         );
+
+        // Update the topology's min logicalSessionTimeout.
+        self.update_session_support_status(&server_description);
+
+        // Update the topology's max reported $clusterTime.
+        if let Some(ref cluster_time) = server_description.cluster_time().ok().flatten() {
+            self.advance_cluster_time(cluster_time);
+        }
 
         // Update the topology description based on the current topology type.
         match self.topology_type {
@@ -594,6 +693,48 @@ impl TopologyDescription {
                 self.servers
                     .insert(server.clone(), ServerDescription::new(server.clone(), None));
             }
+        }
+    }
+}
+
+/// Enum representing whether sessions are supported by the topology.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum SessionSupportStatus {
+    /// It is not known yet whether the topology supports sessions. This is possible if no
+    /// data-bearing servers have updated the `TopologyDescription` yet.
+    Undetermined,
+
+    /// Sessions are not supported by this topology. This is possible if there is a data-bearing
+    /// server in the deployment that does not support sessions.
+    ///
+    /// While standalones do not support sessions, they still do report a logical session timeout,
+    /// so it is stored here if necessary.
+    Unsupported {
+        logical_session_timeout: Option<Duration>,
+    },
+
+    /// Sessions are supported by this topology. This is the minimum timeout of all data-bearing
+    /// servers in the deployment.
+    Supported { logical_session_timeout: Duration },
+}
+
+impl Default for SessionSupportStatus {
+    fn default() -> Self {
+        Self::Undetermined
+    }
+}
+
+impl SessionSupportStatus {
+    #[cfg(test)]
+    fn logical_session_timeout(&self) -> Option<Duration> {
+        match self {
+            Self::Undetermined => None,
+            Self::Unsupported {
+                logical_session_timeout,
+            } => *logical_session_timeout,
+            Self::Supported {
+                logical_session_timeout,
+            } => Some(*logical_session_timeout),
         }
     }
 }

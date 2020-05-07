@@ -105,6 +105,11 @@ pub struct WriteConcern {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Acknowledgment {
     /// Requires acknowledgement that the write has reached the specified number of nodes.
+    ///
+    /// Note: specifying 0 here indicates that the write is unacknowledged. Doing so means
+    /// the driver will not receive a response indicating whether an operation succeeded or failed.
+    /// It also means that the operation cannot be associated with a session. It is reccommended to
+    /// avoid using unacknowledged write concerns.
     Nodes(i32),
     /// Requires acknowledgement that the write has reached the majority of nodes.
     Majority,

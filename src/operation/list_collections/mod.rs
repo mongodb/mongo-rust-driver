@@ -67,14 +67,14 @@ impl Operation for ListCollections {
     fn handle_response(&self, response: CommandResponse) -> Result<Self::O> {
         let body: CursorBody = response.body()?;
 
-        Ok(CursorSpecification {
-            ns: body.cursor.ns,
-            address: response.source_address().clone(),
-            id: body.cursor.id,
-            batch_size: self.options.as_ref().and_then(|opts| opts.batch_size),
-            max_time: None,
-            buffer: body.cursor.first_batch,
-        })
+        Ok(CursorSpecification::new(
+            body.cursor.ns,
+            response.source_address().clone(),
+            body.cursor.id,
+            self.options.as_ref().and_then(|opts| opts.batch_size),
+            None,
+            body.cursor.first_batch,
+        ))
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

@@ -99,14 +99,14 @@ impl Operation for Find {
     fn handle_response(&self, response: CommandResponse) -> Result<Self::O> {
         let body: CursorBody = response.body()?;
 
-        Ok(CursorSpecification {
-            ns: self.ns.clone(),
-            address: response.source_address().clone(),
-            id: body.cursor.id,
-            batch_size: self.options.as_ref().and_then(|opts| opts.batch_size),
-            max_time: self.options.as_ref().and_then(|opts| opts.max_await_time),
-            buffer: body.cursor.first_batch,
-        })
+        Ok(CursorSpecification::new(
+            self.ns.clone(),
+            response.source_address().clone(),
+            body.cursor.id,
+            self.options.as_ref().and_then(|opts| opts.batch_size),
+            self.options.as_ref().and_then(|opts| opts.max_await_time),
+            body.cursor.first_batch,
+        ))
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

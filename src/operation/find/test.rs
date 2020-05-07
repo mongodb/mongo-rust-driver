@@ -226,11 +226,14 @@ async fn handle_success() {
     assert!(result.is_ok());
 
     let cursor_spec = result.unwrap();
-    assert_eq!(cursor_spec.address, address);
-    assert_eq!(cursor_spec.id, 123);
-    assert_eq!(cursor_spec.batch_size, None);
+    assert_eq!(cursor_spec.address(), &address);
+    assert_eq!(cursor_spec.id(), 123);
+    assert_eq!(cursor_spec.batch_size(), None);
     assert_eq!(
-        cursor_spec.buffer.into_iter().collect::<Vec<Document>>(),
+        cursor_spec
+            .initial_buffer
+            .into_iter()
+            .collect::<Vec<Document>>(),
         first_batch
     );
 
@@ -246,11 +249,14 @@ async fn handle_success() {
     assert!(result.is_ok());
 
     let cursor_spec = result.unwrap();
-    assert_eq!(cursor_spec.address, address);
-    assert_eq!(cursor_spec.id, 123);
-    assert_eq!(cursor_spec.batch_size, Some(123));
+    assert_eq!(cursor_spec.address(), &address);
+    assert_eq!(cursor_spec.id(), 123);
+    assert_eq!(cursor_spec.batch_size(), Some(123));
     assert_eq!(
-        cursor_spec.buffer.into_iter().collect::<Vec<Document>>(),
+        cursor_spec
+            .initial_buffer
+            .into_iter()
+            .collect::<Vec<Document>>(),
         first_batch
     );
 }
@@ -286,7 +292,7 @@ fn verify_max_await_time(max_await_time: Option<Duration>, cursor_type: Option<C
     let spec = find
         .handle_response(response)
         .expect("should handle correctly");
-    assert_eq!(spec.max_time, max_await_time);
+    assert_eq!(spec.max_time(), max_await_time);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

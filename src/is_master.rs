@@ -3,12 +3,13 @@ use std::time::Duration;
 use bson::{oid::ObjectId, TimeStamp, UtcDateTime};
 use serde::Deserialize;
 
-use crate::{sdam::ServerType, selection_criteria::TagSet};
+use crate::{sdam::ServerType, selection_criteria::TagSet, client::ClusterTime};
 
 #[derive(Debug, Clone)]
 pub(crate) struct IsMasterReply {
     pub command_response: IsMasterCommandResponse,
     pub round_trip_time: Option<Duration>,
+    pub cluster_time: Option<ClusterTime>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

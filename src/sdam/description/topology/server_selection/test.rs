@@ -200,6 +200,7 @@ fn convert_server_description(
     let is_master = IsMasterReply {
         command_response,
         round_trip_time: test_server_desc.avg_rtt_ms.map(f64_ms_as_duration),
+        cluster_time: None,
     };
 
     let mut server_desc = ServerDescription::new(
@@ -249,7 +250,8 @@ async fn run_test(test_file: TestFile) {
         max_set_version: None,
         max_election_id: None,
         compatibility_error: None,
-        logical_session_timeout_minutes: None,
+        session_support_status: Default::default(),
+        cluster_time: None,
         local_threshold: None,
         heartbeat_freq: test_file.heartbeat_frequency_ms.map(Duration::from_millis),
         servers: servers
