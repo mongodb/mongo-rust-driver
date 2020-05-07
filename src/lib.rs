@@ -77,6 +77,7 @@
         clippy::float_cmp
     )
 )]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 macro_rules! define_if_single_runtime_enabled {
     ( $( $def:item )+ ) => {
@@ -114,6 +115,7 @@ define_if_single_runtime_enabled! {
     mod selection_criteria;
     mod srv;
     #[cfg(any(feature = "sync", docsrs))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
     pub mod sync;
     #[cfg(test)]
     mod test;
