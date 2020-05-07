@@ -1,15 +1,20 @@
 # MongoDB Rust Driver
 [![Crates.io](https://img.shields.io/crates/v/mongodb.svg)](https://crates.io/crates/mongodb) [![docs.rs](https://docs.rs/mongodb/badge.svg)](https://docs.rs/mongodb) [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-This repository contains the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It depends on the community-supported [`bson`](https://docs.rs/bson) library for BSON support.
+This repository contains the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It depends on the [`bson`](https://docs.rs/bson) crate for BSON support. The driver contains a fully async API that supports either [`tokio`](https://crates.io/crates/tokio) (default) or [`async-std`](https://crates.io/crates/async-std), depending on the feature flags set. The driver also has a sync API that may be enabled via feature flag. 
 
 ## Index
 - [Installation](#Installation)
+    - [Importing](#importing)
+        - [Configuring the async runtime](#configuring-the-async-runtime)
+        - [Enabling the sync API](#enabling-the-sync-api)
 - [Example Usage](#example-usage)
-    - [Connecting to a MongoDB deployment](#connecting-to-a-mongodb-deployment)
-    - [Getting a handle to a database](#getting-a-handle-to-a-database)
-    - [Inserting documents into a collection](#inserting-documents-into-a-collection)
-    - [Finding documents in a collection](#finding-documents-in-a-collection)
+    - [Using the async API](#using-the-async-api)
+        - [Connecting to a MongoDB deployment](#connecting-to-a-mongodb-deployment)
+        - [Getting a handle to a database](#getting-a-handle-to-a-database)
+        - [Inserting documents into a collection](#inserting-documents-into-a-collection)
+        - [Finding documents in a collection](#finding-documents-in-a-collection)
+    - [Using the sync API](#using-the-sync-api)
 - [Bug Reporting / Feature Requests](#bug-reporting--feature-requests)
 - [Contributing](#contributing)
 - [Running the tests](#running-the-tests)
@@ -33,15 +38,38 @@ mongodb = "0.10.0"
 bson = "0.14.1"
 ```
 
+#### Configuring the async runtime
+The driver supports both of the most popular async runtime crates, namely [`tokio`](https://crates.io/crates/tokio) and [`async-std`](https://crates.io/crates/async-std). By default, the driver will use [`tokio`](https://crates.io/crates/tokio), but you can explicitly choose a runtime by specifying one of `"tokio-runtime"` or `"async-std-runtime"` feature flags in your `Cargo.toml`.
+
+For example, to instruct the driver to work with [`async-std`](https://crates.io/crates/async-std), add the following to your `Cargo.toml`:
+```toml
+[dependencies.mongodb]
+version = "0.10.0"
+default-features = false
+features = ["async-std-runtime"]
+```
+
+#### Enabling the sync API
+The driver also provides a blocking sync API. To enable this, add the `"sync"` feature to your `Cargo.toml`:
+```toml
+[dependencies.mongodb]
+version = "0.10.0"
+default-features = false
+features = ["sync"]
+```
+**Note:** if the sync API is enabled, the async-specific types will be privatized (e.g. `mongodb::Client`). The sync-specific types can be imported from `mongodb::sync` (e.g. `mongodb::sync::Client`).
+
 ## Example Usage
 Below are simple examples of using the driver. For more specific examples and the API reference, see the driver's [docs.rs page](https://docs.rs/mongodb).
-### Connecting to a MongoDB deployment
+
+### Using the async API
+#### Connecting to a MongoDB deployment
 ```rust
 use mongodb::{Client, options::ClientOptions};
 ```
 ```rust
 // Parse a connection string into an options struct.
-let mut client_options = ClientOptions::parse("mongodb://localhost:27017")?;
+let mut client_options = ClientOptions::parse("mongodb://localhost:27017").await?;
 
 // Manually set an option.
 client_options.app_name = Some("My App".to_string());
@@ -50,23 +78,23 @@ client_options.app_name = Some("My App".to_string());
 let client = Client::with_options(client_options)?;
 
 // List the names of the databases in that deployment.
-for db_name in client.list_database_names(None, None)? {
+for db_name in client.list_database_names(None, None).await? {
     println!("{}", db_name);
 }
 ```
-### Getting a handle to a database
+#### Getting a handle to a database
 ```rust
 // Get a handle to a database.
 let db = client.database("mydb");
 
 // List the names of the collections in that database.
-for collection_name in db.list_collection_names(None)? {
+for collection_name in db.list_collection_names(None).await? {
     println!("{}", collection_name);
 }
 ```
-### Inserting documents into a collection
+#### Inserting documents into a collection
 ```rust
-use bson::{doc, bson};
+use bson::doc;
 ```
 ```rust
 // Get a handle to a collection in the database.
@@ -79,26 +107,64 @@ let docs = vec![
 ];
 
 // Insert some documents into the "mydb.books" collection.
-collection.insert_many(docs, None)?;
+collection.insert_many(docs, None).await?;
 ```
-### Finding documents in a collection
+#### Finding documents in a collection
 ```rust
-use bson::{doc, bson, Bson};
+use bson::{doc, Bson};
+use futures::stream::StreamExt;
 use mongodb::options::FindOptions;
 ```
 ```rust
 // Query the documents in the collection with a filter and an option.
 let filter = doc! { "author": "George Orwell" };
 let find_options = FindOptions::builder().sort(doc! { "title": 1 }).build();
-let cursor = collection.find(filter, find_options)?;
+let mut cursor = collection.find(filter, find_options).await?;
 
 // Iterate over the results of the cursor.
-for result in cursor {
+while let Some(result) = cursor.next().await {
     match result {
         Ok(document) => {
             if let Some(title) = document.get("title").and_then(Bson::as_str) {
                 println!("title: {}", title);
             }  else {
+                println!("no title found");
+            }
+        }
+        Err(e) => return Err(e.into()),
+    }
+}
+```
+
+### Using the sync API
+The driver also provides a blocking sync API. See the [Installation](#enabling-the-sync-api) section for instructions on how to enable it.
+
+The various sync-specific types are found in the `mongodb::sync` submodule rather than in the crate's top level like in the async API. The sync API calls through to the async API internally though, so it looks and behaves similarly to it.
+```rust
+use bson::{doc, Bson};
+use mongodb::sync::Client;
+```
+```rust
+let client = Client::with_uri_str("mongodb://localhost:27017")?;
+let database = client.database("mydb");
+let collection = database.collection("books");
+
+let docs = vec![
+    doc! { "title": "1984", "author": "George Orwell" },
+    doc! { "title": "Animal Farm", "author": "George Orwell" },
+    doc! { "title": "The Great Gatsby", "author": "F. Scott Fitzgerald" },
+];
+
+// Insert some documents into the "mydb.books" collection.
+collection.insert_many(docs, None)?;
+
+let cursor = collection.find(doc! { "author": "George Orwell" }, None)?;
+for result in cursor {
+    match result {
+        Ok(document) => {
+            if let Some(title) = document.get("title").and_then(Bson::as_str) {
+                println!("title: {}", title);
+            } else {
                 println!("no title found");
             }
         }
@@ -162,7 +228,7 @@ To run the tests with TLS/SSL enabled, you must enable it on the deployment and 
 export MONGODB_URI="mongodb://localhost:27017/?tls=true&tlsCertificateKeyFile=cert.pem&tlsCAFile=ca.pem"
 cargo test --verbose
 ```
-**Note:** When you open a pull request, your code will be run against a comprehensive testing matrix, so it is usually not necessary run the integration tests against all combinations of topology/auth/TLS locally.
+**Note:** When you open a pull request, your code will be run against a comprehensive testing matrix, so it is usually not necessary to run the integration tests against all combinations of topology/auth/TLS locally.
 
 ### Linter Tests
 Our linter tests use the nightly version of `rustfmt` to verify that the source is formatted properly and the stable version of `clippy` to statically detect any common mistakes.
