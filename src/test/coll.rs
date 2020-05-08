@@ -533,3 +533,15 @@ async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>)
     assert_eq!(allow_disk_use, expected_value);
     assert_eq!(iter.count(), 0);
 }
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn ns_not_found_suppression() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+    let coll = client.get_coll(function_name!(), function_name!());
+    coll.drop(None).await.expect("drop should not fail");
+    coll.drop(None).await.expect("drop should not fail");
+}
