@@ -62,12 +62,6 @@ pub(crate) trait Operation {
         None
     }
 
-    /// Whether or not the operation has special handling for command errors, or whether they should
-    /// just be propogated to the user immediately.
-    fn handles_command_errors(&self) -> bool {
-        false
-    }
-
     /// Whether or not this operation will request acknowledgment from the server.
     fn is_acknowledged(&self) -> bool {
         self.write_concern()
