@@ -1,3 +1,5 @@
+//! Contains the sync API. This is only available when the `sync` feature is enabled.
+
 mod client;
 mod coll;
 mod cursor;

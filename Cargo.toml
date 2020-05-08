@@ -82,3 +82,6 @@ function_name = "0.2.0"
 pretty_assertions = "0.6.1"
 serde_json = "1.0.40"
 semver = "0.9.0"
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--cfg", "docsrs"]
