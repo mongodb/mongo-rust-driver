@@ -58,7 +58,15 @@ impl Error {
                 let error: Error = other_error_kind.into();
                 std::io::Error::new(std::io::ErrorKind::Other, Box::new(error))
             }
-            Err(e) => std::io::Error::new(std::io::ErrorKind::Other, Box::new(Error { kind: e }))
+            Err(e) => std::io::Error::new(std::io::ErrorKind::Other, Box::new(Error { kind: e })),
+        }
+    }
+
+    /// Whether this error is an "ns not found" error or not.
+    pub(crate) fn is_ns_not_found(&self) -> bool {
+        match self.kind.as_ref() {
+            ErrorKind::CommandError(err) if err.code == 26 => true,
+            _ => false,
         }
     }
 }

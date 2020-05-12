@@ -21,7 +21,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
-    error::{BulkWriteError, BulkWriteFailure, ErrorKind, Result, WriteConcernError, WriteFailure},
+    error::{
+        BulkWriteError,
+        BulkWriteFailure,
+        Error,
+        ErrorKind,
+        Result,
+        WriteConcernError,
+        WriteFailure,
+    },
     options::WriteConcern,
     selection_criteria::SelectionCriteria,
     Namespace,
@@ -56,6 +64,12 @@ pub(crate) trait Operation {
 
     /// Interprets the server response to the command.
     fn handle_response(&self, response: CommandResponse) -> Result<Self::O>;
+
+    /// Interpret an error encountered while sending the built command to the server, potentially
+    /// recovering.
+    fn handle_error(&self, error: Error) -> Result<Self::O> {
+        Err(error)
+    }
 
     /// Criteria to use for selecting the server that this operation will be executed on.
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

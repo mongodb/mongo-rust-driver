@@ -209,7 +209,7 @@ impl Client {
                     }
                 }
 
-                Err(error)
+                op.handle_error(error)
             }
             Ok(response) => {
                 self.emit_command_event(|handler| {

@@ -5,7 +5,7 @@ use bson::doc;
 
 use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
-    error::Result,
+    error::{Error, Result},
     operation::{append_options, Operation, WriteConcernOnlyBody},
     options::{DropCollectionOptions, WriteConcern},
     Namespace,
@@ -54,6 +54,14 @@ impl Operation for DropCollection {
 
     fn handle_response(&self, response: CommandResponse) -> Result<Self::O> {
         response.body::<WriteConcernOnlyBody>()?.validate()
+    }
+
+    fn handle_error(&self, error: Error) -> Result<Self::O> {
+        if error.is_ns_not_found() {
+            Ok(())
+        } else {
+            Err(error)
+        }
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {
