@@ -243,6 +243,11 @@ pub struct ClientOptions {
     #[builder(default)]
     pub direct_connection: Option<bool>,
 
+    /// Extra information to append to the driver version in the metadata of the handshake with the
+    /// server. This should be used by libraries wrapping the driver, e.g. ODMs.
+    #[builder(default)]
+    pub driver_info: Option<DriverInfo>,
+
     /// The amount of time each monitoring thread should wait between sending an isMaster command
     /// to its respective server.
     ///
@@ -504,6 +509,22 @@ impl TlsOptions {
     }
 }
 
+/// Extra information to append to the driver version in the metadata of the handshake with the
+/// server. This should be used by libraries wrapping the driver, e.g. ODMs.
+#[derive(Clone, Debug, TypedBuilder, PartialEq)]
+pub struct DriverInfo {
+    /// The name of the library wrapping the driver.
+    pub name: String,
+
+    /// The version of the library wrapping the driver.
+    #[builder(default)]
+    pub version: Option<String>,
+
+    /// Optional platform information for the wrapping driver.
+    #[builder(default)]
+    pub platform: Option<String>,
+}
+
 impl From<ClientOptionsParser> for ClientOptions {
     fn from(parser: ClientOptionsParser) -> Self {
         Self {
@@ -528,6 +549,7 @@ impl From<ClientOptionsParser> for ClientOptions {
             socket_timeout: parser.socket_timeout,
             zlib_compression: parser.zlib_compression,
             direct_connection: parser.direct_connection,
+            driver_info: None,
             credential: parser.credential,
             cmap_event_handler: None,
             command_event_handler: None,
