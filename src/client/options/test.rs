@@ -86,22 +86,20 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
     if let Some(SelectionCriteria::ReadPreference(read_pref)) = options.selection_criteria.take() {
         let (level, tag_sets, max_staleness) = match read_pref {
             ReadPreference::Primary => ("primary", None, None),
-            ReadPreference::PrimaryPreferred {
-                tag_sets,
-                max_staleness,
-            } => ("primaryPreferred", tag_sets, max_staleness),
-            ReadPreference::Secondary {
-                tag_sets,
-                max_staleness,
-            } => ("secondary", tag_sets, max_staleness),
-            ReadPreference::SecondaryPreferred {
-                tag_sets,
-                max_staleness,
-            } => ("secondaryPreferred", tag_sets, max_staleness),
-            ReadPreference::Nearest {
-                tag_sets,
-                max_staleness,
-            } => ("nearest", tag_sets, max_staleness),
+            ReadPreference::PrimaryPreferred { options } => {
+                ("primaryPreferred", options.tag_sets, options.max_staleness)
+            }
+            ReadPreference::Secondary { options } => {
+                ("secondary", options.tag_sets, options.max_staleness)
+            }
+            ReadPreference::SecondaryPreferred { options } => (
+                "secondaryPreferred",
+                options.tag_sets,
+                options.max_staleness,
+            ),
+            ReadPreference::Nearest { options } => {
+                ("nearest", options.tag_sets, options.max_staleness)
+            }
         };
 
         doc.insert("readpreference", level);

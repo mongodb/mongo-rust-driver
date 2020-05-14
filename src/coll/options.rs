@@ -15,6 +15,7 @@ use crate::{
 /// These are the valid options for creating a [`Collection`](../struct.Collection.html) with
 /// [`Database::collection_with_options`](../struct.Database.html#method.collection_with_options).
 #[derive(Debug, Default, TypedBuilder)]
+#[non_exhaustive]
 pub struct CollectionOptions {
     /// The default read preference for operations.
     #[builder(default)]
@@ -34,6 +35,7 @@ pub struct CollectionOptions {
 /// [`Collection::find_one_and_update`](../struct.Collection.html#method.find_one_and_update)
 /// operation should return the document before or after modification.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum ReturnDocument {
     /// Return the document after modification.
     After,
@@ -44,6 +46,7 @@ pub enum ReturnDocument {
 /// Specifies the index to use for an operation.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(untagged)]
+#[non_exhaustive]
 pub enum Hint {
     /// Specifies the keys of the index to use.
     Keys(Document),
@@ -62,6 +65,7 @@ impl Hint {
 
 /// Specifies the type of cursor to return from a find operation.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub enum CursorType {
     /// Default; close the cursor after the last document is received from the server.
     NonTailable,
@@ -78,6 +82,7 @@ pub enum CursorType {
 /// Specifies the options to a
 /// [`Collection::insert_one`](../struct.Collection.html#method.insert_one) operation.
 #[derive(Clone, Debug, Default, TypedBuilder)]
+#[non_exhaustive]
 pub struct InsertOneOptions {
     /// Opt out of document-level validation.
     #[builder(default)]
@@ -93,6 +98,7 @@ pub struct InsertOneOptions {
 #[skip_serializing_none]
 #[derive(Clone, Debug, Default, TypedBuilder, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct InsertManyOptions {
     /// Opt out of document-level validation.
     #[builder(default)]
@@ -126,6 +132,7 @@ impl InsertManyOptions {
 /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#update-command-behaviors)
 #[derive(Clone, Debug, Serialize)]
 #[serde(untagged)]
+#[non_exhaustive]
 pub enum UpdateModifications {
     /// A document that contains only update operator expressions.
     Document(Document),
@@ -162,6 +169,7 @@ impl From<Vec<Document>> for UpdateModifications {
 /// [`Collection::update_one`](../struct.Collection.html#method.update_one) or
 /// [`Collection::update_many`](../struct.Collection.html#method.update_many) operation.
 #[derive(Debug, Default, TypedBuilder)]
+#[non_exhaustive]
 pub struct UpdateOptions {
     /// A set of filters specifying to which array elements an update should apply.
     ///
@@ -213,6 +221,7 @@ impl UpdateOptions {
 /// Specifies the options to a
 /// [`Collection::replace_one`](../struct.Collection.html#method.replace_one) operation.
 #[derive(Debug, Default, TypedBuilder)]
+#[non_exhaustive]
 pub struct ReplaceOptions {
     /// Opt out of document-level validation.
     #[builder(default)]
@@ -247,6 +256,7 @@ pub struct ReplaceOptions {
 #[serde_with::skip_serializing_none]
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct DeleteOptions {
     /// The collation to use for the operation.
     ///
@@ -264,6 +274,7 @@ pub struct DeleteOptions {
 /// [`Collection::find_one_and_delete`](../struct.Collection.html#method.find_one_and_delete)
 /// operation.
 #[derive(Debug, Default, TypedBuilder)]
+#[non_exhaustive]
 pub struct FindOneAndDeleteOptions {
     /// The maximum amount of time to allow the query to run.
     ///
@@ -296,6 +307,7 @@ pub struct FindOneAndDeleteOptions {
 /// [`Collection::find_one_and_replace`](../struct.Collection.html#method.find_one_and_replace)
 /// operation.
 #[derive(Debug, Default, TypedBuilder)]
+#[non_exhaustive]
 pub struct FindOneAndReplaceOptions {
     /// Opt out of document-level validation.
     #[builder(default)]
@@ -340,6 +352,7 @@ pub struct FindOneAndReplaceOptions {
 /// [`Collection::find_one_and_update`](../struct.Collection.html#method.find_one_and_update)
 /// operation.
 #[derive(Debug, Default, TypedBuilder)]
+#[non_exhaustive]
 pub struct FindOneAndUpdateOptions {
     /// A set of filters specifying to which array elements an update should apply.
     ///
@@ -392,6 +405,7 @@ pub struct FindOneAndUpdateOptions {
 #[skip_serializing_none]
 #[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
+#[non_exhaustive]
 pub struct AggregateOptions {
     /// Enables writing to temporary files. When set to true, aggregation stages can write data to
     /// the _tmp subdirectory in the dbPath directory.
@@ -473,6 +487,7 @@ pub struct AggregateOptions {
 /// Specifies the options to a
 /// [`Collection::count_documents`](../struct.Collection.html#method.count_documents) operation.
 #[derive(Debug, Default, TypedBuilder)]
+#[non_exhaustive]
 pub struct CountOptions {
     /// The index to use for the operation.
     #[builder(default)]
@@ -511,6 +526,7 @@ pub struct CountOptions {
 #[serde_with::skip_serializing_none]
 #[derive(Debug, Default, TypedBuilder, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct EstimatedDocumentCountOptions {
     /// The maximum amount of time to allow the query to run.
     ///
@@ -540,6 +556,7 @@ pub struct EstimatedDocumentCountOptions {
 #[serde_with::skip_serializing_none]
 #[derive(Debug, Default, TypedBuilder, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct DistinctOptions {
     /// The maximum amount of time to allow the query to run.
     ///
@@ -576,6 +593,7 @@ pub struct DistinctOptions {
 #[skip_serializing_none]
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct FindOptions {
     /// Enables writing to temporary files by the server. When set to true, the find operation can
     /// write data to the _tmp subdirectory in the dbPath directory. Only supported in server
@@ -741,6 +759,7 @@ where
 /// Specifies the options to a [`Collection::find_one`](../struct.Collection.html#method.find_one)
 /// operation.
 #[derive(Debug, Default, TypedBuilder)]
+#[non_exhaustive]
 pub struct FindOneOptions {
     /// If true, partial results will be returned from a mongos rather than an error being
     /// returned if one or more shards is down.
@@ -820,6 +839,7 @@ pub struct FindOneOptions {
 
 /// Specifies an index to create.
 #[derive(Debug, TypedBuilder)]
+#[non_exhaustive]
 pub struct IndexModel {
     /// The fields to index, along with their sort order.
     pub keys: Document,
@@ -833,6 +853,7 @@ pub struct IndexModel {
 /// operation.
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct DropCollectionOptions {
     /// The write concern for the operation.
     #[builder(default)]

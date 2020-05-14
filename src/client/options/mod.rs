@@ -193,6 +193,7 @@ impl fmt::Display for StreamAddress {
 /// Contains the options that can be used to create a new [`Client`](../struct.Client.html).
 #[derive(Clone, Derivative, TypedBuilder)]
 #[derivative(Debug, PartialEq)]
+#[non_exhaustive]
 pub struct ClientOptions {
     /// The initial list of seeds that the Client should connect to.
     ///
@@ -416,6 +417,7 @@ impl From<TlsOptions> for Option<Tls> {
 
 /// Specifies the TLS configuration that the [`Client`](../struct.Client.html) should use.
 #[derive(Clone, Debug, Default, PartialEq, TypedBuilder)]
+#[non_exhaustive]
 pub struct TlsOptions {
     /// Whether or not the [`Client`](../struct.Client.html) should return an error if the server
     /// presents an invalid certificate. This setting should _not_ be set to `true` in
@@ -513,6 +515,7 @@ impl TlsOptions {
 /// Extra information to append to the driver version in the metadata of the handshake with the
 /// server. This should be used by libraries wrapping the driver, e.g. ODMs.
 #[derive(Clone, Debug, TypedBuilder, PartialEq)]
+#[non_exhaustive]
 pub struct DriverInfo {
     /// The name of the library wrapping the driver.
     pub name: String,
@@ -1238,20 +1241,16 @@ impl ClientOptionsParser {
                 self.read_preference = Some(match &value.to_lowercase()[..] {
                     "primary" => ReadPreference::Primary,
                     "secondary" => ReadPreference::Secondary {
-                        tag_sets: None,
-                        max_staleness: None,
+                        options: Default::default(),
                     },
                     "primarypreferred" => ReadPreference::PrimaryPreferred {
-                        tag_sets: None,
-                        max_staleness: None,
+                        options: Default::default(),
                     },
                     "secondarypreferred" => ReadPreference::SecondaryPreferred {
-                        tag_sets: None,
-                        max_staleness: None,
+                        options: Default::default(),
                     },
                     "nearest" => ReadPreference::Nearest {
-                        tag_sets: None,
-                        max_staleness: None,
+                        options: Default::default(),
                     },
                     other => {
                         return Err(ErrorKind::ArgumentError {
@@ -1484,7 +1483,7 @@ mod tests {
     use super::{ClientOptions, StreamAddress};
     use crate::{
         concern::{Acknowledgment, ReadConcernLevel, WriteConcern},
-        selection_criteria::ReadPreference,
+        selection_criteria::{ReadPreference, ReadPreferenceOptions},
     };
 
     macro_rules! tag_set {
@@ -1807,17 +1806,18 @@ mod tests {
                 ],
                 selection_criteria: Some(
                     ReadPreference::SecondaryPreferred {
-                        tag_sets: Some(vec![
-                            tag_set! {
-                                "dc" => "ny",
-                                "rack" => "1"
-                            },
-                            tag_set! {
-                                "dc" => "ny"
-                            },
-                            tag_set! {},
-                        ]),
-                        max_staleness: None,
+                        options: ReadPreferenceOptions::builder()
+                            .tag_sets(vec![
+                                tag_set! {
+                                    "dc" => "ny",
+                                    "rack" => "1"
+                                },
+                                tag_set! {
+                                    "dc" => "ny"
+                                },
+                                tag_set! {},
+                            ])
+                            .build()
                     }
                     .into()
                 ),
