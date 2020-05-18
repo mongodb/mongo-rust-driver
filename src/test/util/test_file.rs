@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct TestFile {
-    #[serde(rename = "camelCase")]
+    #[serde(rename = "runOn")]
     pub run_on: Option<Vec<RunOn>>,
     pub database_name: Option<String>,
     pub collection_name: Option<String>,
