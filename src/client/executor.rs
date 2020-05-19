@@ -46,7 +46,7 @@ impl Client {
             .into());
         }
         let mut implicit_session = self.start_implicit_session(&op).await?;
-        self.select_server_and_execute_operation(op, implicit_session.as_mut())
+        self.execute_operation_with_retry(op, implicit_session.as_mut())
             .await
     }
 
@@ -58,7 +58,7 @@ impl Client {
         op: T,
     ) -> Result<(T::O, Option<ClientSession>)> {
         let mut implicit_session = self.start_implicit_session(&op).await?;
-        self.select_server_and_execute_operation(op, implicit_session.as_mut())
+        self.execute_operation_with_retry(op, implicit_session.as_mut())
             .await
             .map(|result| (result, implicit_session))
     }
@@ -70,20 +70,89 @@ impl Client {
         op: T,
         session: &mut ClientSession,
     ) -> Result<T::O> {
-        self.select_server_and_execute_operation(op, Some(session))
+        self.execute_operation_with_retry(op, Some(session))
             .await
     }
 
     /// Selects a server and executes the given operation on it, optionally using a provided
-    /// session.
-    ///
-    /// TODO: RUST-128: replace this with `execute_operation_with_retry` when implemented.
-    async fn select_server_and_execute_operation<T: Operation>(
+    /// session. Retries the operation upon failure if retryability is supported.
+    async fn execute_operation_with_retry<T: Operation>(
         &self,
         op: T,
-        session: Option<&mut ClientSession>,
+        mut session: Option<&mut ClientSession>,
     ) -> Result<T::O> {
-        self.execute_operation_with_retry(op, session).await
+        let server = self.select_server(op.selection_criteria()).await?;
+
+        let mut conn = match server.checkout_connection().await {
+            Ok(conn) => conn,
+            Err(err) => {
+                self.inner
+                    .topology
+                    .handle_pre_handshake_error(err.clone(), server.address.clone())
+                    .await;
+                return Err(err);
+            }
+        };
+
+        let first_error = match self
+            .execute_operation_on_connection(&op, &mut conn, &mut session)
+            .await
+        {
+            Ok(result) => {
+                return Ok(result);
+            }
+            Err(err) => {
+                self.inner
+                    .topology
+                    .handle_post_handshake_error(err.clone(), conn, server)
+                    .await;
+                // TODO RUST-90: Do not retry if session is in a transaction
+                if self.inner.options.retry_reads == Some(false)
+                    || !op.is_read_retryable()
+                    || !err.is_read_retryable()
+                {
+                    return Err(err);
+                } else {
+                    err
+                }
+            }
+        };
+
+        let server = match self.select_server(op.selection_criteria()).await {
+            Ok(server) => server,
+            Err(err) => {
+                return Err(first_error);
+            }
+        };
+
+        let mut conn = match server.checkout_connection().await {
+            Ok(conn) => conn,
+            Err(err) => {
+                self.inner
+                    .topology
+                    .handle_pre_handshake_error(err.clone(), server.address.clone())
+                    .await;
+                return Err(first_error);
+            }
+        };
+
+        match self
+            .execute_operation_on_connection(&op, &mut conn, &mut session)
+            .await
+        {
+            Ok(result) => Ok(result),
+            Err(err) => {
+                self.inner
+                    .topology
+                    .handle_post_handshake_error(err.clone(), conn, server)
+                    .await;
+                if !err.clone().is_driver_error() {
+                    Err(first_error)
+                } else {
+                    Err(err)
+                }
+            }
+        }
     }
 
     /// Executes an operation on a given connection, optionally using a provided session.
@@ -248,87 +317,6 @@ impl Client {
                 Ok(self.inner.topology.session_support_status().await)
             }
             _ => Ok(initial_status),
-        }
-    }
-
-    /// Executes an operation and retries the operation upon failure if retryable reads are
-    /// supported
-    async fn execute_operation_with_retry<T: Operation>(
-        &self,
-        op: T,
-        mut session: Option<&mut ClientSession>,
-    ) -> Result<T::O> {
-        let server = self.select_server(op.selection_criteria()).await?;
-
-        let mut conn = match server.checkout_connection().await {
-            Ok(conn) => conn,
-            Err(err) => {
-                self.inner
-                    .topology
-                    .handle_pre_handshake_error(err.clone(), server.address.clone())
-                    .await;
-                return Err(err);
-            }
-        };
-
-        let first_error = match self
-            .execute_operation_on_connection(&op, &mut conn, &mut session)
-            .await
-        {
-            Ok(result) => {
-                return Ok(result);
-            }
-            Err(err) => {
-                self.inner
-                    .topology
-                    .handle_post_handshake_error(err.clone(), conn, server)
-                    .await;
-                // TODO RUST-90: Do not retry if session is in a transaction
-                if self.inner.options.retry_reads == Some(false)
-                    || !op.is_read_retryable()
-                    || !err.is_read_retryable()
-                {
-                    return Err(err);
-                } else {
-                    err
-                }
-            }
-        };
-
-        let server = match self.select_server(op.selection_criteria()).await {
-            Ok(server) => server,
-            Err(err) => {
-                return Err(first_error);
-            }
-        };
-
-        let mut conn = match server.checkout_connection().await {
-            Ok(conn) => conn,
-            Err(err) => {
-                self.inner
-                    .topology
-                    .handle_pre_handshake_error(err.clone(), server.address.clone())
-                    .await;
-                return Err(first_error);
-            }
-        };
-
-        match self
-            .execute_operation_on_connection(&op, &mut conn, &mut session)
-            .await
-        {
-            Ok(result) => Ok(result),
-            Err(err) => {
-                self.inner
-                    .topology
-                    .handle_post_handshake_error(err.clone(), conn, server)
-                    .await;
-                if !err.clone().is_driver_error() {
-                    Err(first_error)
-                } else {
-                    Err(err)
-                }
-            }
         }
     }
 }

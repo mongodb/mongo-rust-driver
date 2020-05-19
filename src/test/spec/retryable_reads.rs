@@ -1,4 +1,4 @@
-use bson::{Bson, Document};
+use bson::{doc, Bson, Document};
 
 use crate::test::{
     assert_matches,
@@ -111,10 +111,10 @@ async fn run() {
                 }
             }
 
-            if let Some(fail_point) = test_case.fail_point {
+            if let Some(ref fail_point) = test_case.fail_point {
                 client
                     .database("admin")
-                    .run_command(fail_point, None)
+                    .run_command(fail_point.clone(), None)
                     .await
                     .unwrap();
             }
@@ -160,6 +160,20 @@ async fn run() {
                 for (actual_event, expected_event) in events.iter().zip(expectations.iter()) {
                     assert_matches(actual_event, expected_event, None);
                 }
+            }
+
+            if test_case.fail_point.is_some() {
+                client
+                    .database("admin")
+                    .run_command(
+                        doc! {
+                            "configureFailPoint": "failCommand",
+                            "mode": "off"
+                        },
+                        None,
+                    )
+                    .await
+                    .unwrap();
             }
         }
     }
