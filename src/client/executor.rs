@@ -70,8 +70,7 @@ impl Client {
         op: T,
         session: &mut ClientSession,
     ) -> Result<T::O> {
-        self.execute_operation_with_retry(op, Some(session))
-            .await
+        self.execute_operation_with_retry(op, Some(session)).await
     }
 
     /// Selects a server and executes the given operation on it, optionally using a provided
