@@ -102,7 +102,6 @@ impl Error {
             ErrorKind::BsonEncode(_) => true,
             ErrorKind::InternalError { .. } => true,
             ErrorKind::InvalidHostname { .. } => true,
-            ErrorKind::Io(_) => true,
             ErrorKind::ParseError { .. } => true,
             #[cfg(feature = "tokio-runtime")]
             ErrorKind::TokioTimeoutElapsed(_) => true,
