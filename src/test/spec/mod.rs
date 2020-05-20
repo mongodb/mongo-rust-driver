@@ -38,7 +38,6 @@ where
         }
 
         let test_file_path = PathBuf::from(test_file.file_name());
-
         if test_file_path.extension().and_then(OsStr::to_str) != Some("json") {
             continue;
         }

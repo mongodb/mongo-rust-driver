@@ -77,7 +77,6 @@ impl Error {
         if self.is_network_error() {
             return true;
         }
-        let error_kind: &ErrorKind = &self.kind;
         match &self.kind.code_and_message() {
             Some((code, message)) => {
                 if RETRYABLE_READ_CODES.contains(&code) {
@@ -96,15 +95,11 @@ impl Error {
     pub(crate) fn is_driver_error(&self) -> bool {
         match self.kind.as_ref() {
             ErrorKind::AddrParse(_) => true,
-            #[cfg(feature = "async-std-runtime")]
-            ErrorKind::AsyncStdTimeout(_) => true,
             ErrorKind::BsonDecode(_) => true,
             ErrorKind::BsonEncode(_) => true,
             ErrorKind::InternalError { .. } => true,
             ErrorKind::InvalidHostname { .. } => true,
             ErrorKind::ParseError { .. } => true,
-            #[cfg(feature = "tokio-runtime")]
-            ErrorKind::TokioTimeoutElapsed(_) => true,
             _ => false,
         }
     }
