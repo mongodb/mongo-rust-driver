@@ -92,7 +92,7 @@ impl Client {
                 return Err(err);
             }
         };
-        
+
         let first_error = match self
             .execute_operation_on_connection(&op, &mut conn, &mut session)
             .await
