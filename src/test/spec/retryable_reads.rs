@@ -3,7 +3,7 @@ use bson::{doc, Bson, Document};
 use crate::test::{
     assert_matches,
     run_spec_test,
-    util::{parse_version, AnyTestOperation, EventClient, TestEvent, TestFile},
+    util::{parse_version, AnyTestOperation, EventClient, TestClient, TestEvent, TestFile},
     CLIENT_OPTIONS,
     LOCK,
 };
@@ -40,14 +40,15 @@ async fn run() {
                 continue;
             }
 
-            let client = match test_case.client_options {
-                Some(client_options) => {
-                    let mut options = CLIENT_OPTIONS.clone();
-                    options.retry_reads = Some(client_options.get_bool("retryReads").unwrap());
-                    EventClient::with_options(options).await
-                }
-                None => EventClient::new().await,
-            };
+            let mut options = CLIENT_OPTIONS.clone();
+            if let Some(client_options) = test_case.client_options {
+                options.retry_reads = Some(client_options.get_bool("retryReads").unwrap());
+            }
+            if TestClient::new().await.is_sharded() && test_case.use_multiple_mongoses != Some(true)
+            {
+                options.hosts = options.hosts.iter().cloned().take(1).collect();
+            }
+            let client = EventClient::with_options(options).await;
 
             if let Some(ref run_on) = test_file.run_on {
                 let can_run_on = run_on.iter().any(|run_on| {
