@@ -167,7 +167,7 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
     }
 
     if let Some(s) = options.read_concern.take() {
-        doc.insert("readconcernlevel", s.as_str());
+        doc.insert("readconcernlevel", s.level.as_str());
     }
 
     if let Some(i_or_s) = options

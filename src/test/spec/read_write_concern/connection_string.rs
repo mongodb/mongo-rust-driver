@@ -44,7 +44,7 @@ async fn run_connection_string_test(test_file: TestFile) {
                     let mut actual_read_concern = Document::new();
 
                     if let Some(client_read_concern) = options.read_concern {
-                        actual_read_concern.insert("level", client_read_concern.as_str());
+                        actual_read_concern.insert("level", client_read_concern.level.as_str());
                     }
 
                     assert_eq!(

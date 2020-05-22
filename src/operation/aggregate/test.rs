@@ -6,7 +6,7 @@ use super::AggregateTarget;
 use crate::{
     bson_util,
     cmap::{CommandResponse, StreamDescription},
-    concern::ReadConcern,
+    concern::{ReadConcern, ReadConcernLevel},
     error::{ErrorKind, WriteFailure},
     operation::{test, Aggregate, Operation},
     options::{AggregateOptions, Hint, StreamAddress},
@@ -47,7 +47,7 @@ async fn build() {
     let options = AggregateOptions::builder()
         .hint(Hint::Keys(doc! { "x": 1, "y": 2 }))
         .bypass_document_validation(true)
-        .read_concern(ReadConcern::Available)
+        .read_concern(ReadConcern::from(ReadConcernLevel::Available))
         .build();
 
     let expected_body = doc! {
