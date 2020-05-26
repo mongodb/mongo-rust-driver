@@ -94,7 +94,7 @@ impl Error {
     /// Whether an error originated from the server
     pub(crate) fn is_server_error(&self) -> bool {
         match self.kind.as_ref() {
-            ErrorKind::AuthenticationError{..}
+            ErrorKind::AuthenticationError { .. }
             | ErrorKind::BulkWriteError(_)
             | ErrorKind::CommandError(_)
             | ErrorKind::WriteError(_) => true,

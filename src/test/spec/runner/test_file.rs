@@ -1,4 +1,7 @@
-use crate::test::{TestEvent, util::{parse_version, EventClient}};
+use crate::test::{
+    util::{parse_version, EventClient},
+    TestEvent,
+};
 use bson::{doc, Bson, Document};
 use serde::Deserialize;
 use std::collections::HashMap;

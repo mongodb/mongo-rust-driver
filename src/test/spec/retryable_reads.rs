@@ -3,7 +3,7 @@ use bson::{doc, Bson};
 use crate::test::{
     assert_matches,
     run_spec_test,
-    util::{EventClient},
+    util::EventClient,
     AnyTestOperation,
     OperationObject,
     TestClient,

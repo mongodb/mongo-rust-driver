@@ -15,12 +15,9 @@ use std::{
     path::PathBuf,
 };
 
-<<<<<<< HEAD
-=======
-pub use self::runner::{AnyTestOperation, OperationObject, TestEvent, TestFile, TestData};
+pub use self::runner::{AnyTestOperation, OperationObject, TestData, TestEvent, TestFile};
 
 use bson::Bson;
->>>>>>> reorganization
 use serde::Deserialize;
 use serde_json::Value;
 

@@ -5,5 +5,5 @@ mod test_file;
 pub use self::{
     operation::AnyTestOperation,
     test_event::TestEvent,
-    test_file::{OperationObject, TestFile, TestData},
+    test_file::{OperationObject, TestData, TestFile},
 };
