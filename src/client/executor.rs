@@ -38,6 +38,13 @@ impl Client {
     /// an implicit session will be created if the operation and write concern are compatible with
     /// sessions.
     pub(crate) async fn execute_operation<T: Operation>(&self, op: T) -> Result<T::O> {
+        // TODO RUST-9: allow unacknowledged write concerns
+        if !op.is_acknowledged() {
+            return Err(ErrorKind::ArgumentError {
+                message: "Unacknowledged write concerns are not supported".to_string(),
+            }
+            .into());
+        }
         let mut implicit_session = self.start_implicit_session(&op).await?;
         self.select_server_and_execute_operation(op, implicit_session.as_mut())
             .await

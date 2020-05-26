@@ -122,3 +122,25 @@ async fn inconsistent_write_concern_rejected() {
         .expect_err("insert should fail");
     assert!(matches!(error.kind.as_ref(), ErrorKind::ArgumentError { .. }));
 }
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn unacknowledged_write_concern_rejected() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+    let db = client.database(function_name!());
+    let error = db
+        .run_command(
+            doc! {
+                "insert": function_name!(),
+                "documents": [ {} ],
+                "writeConcern": { "w": 0 }
+            },
+            None,
+        )
+        .await
+        .expect_err("insert should fail");
+    assert!(matches!(error.kind.as_ref(), ErrorKind::ArgumentError { .. }));
+}
