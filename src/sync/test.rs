@@ -115,7 +115,7 @@ fn collection() {
     assert_eq!(results, vec![doc! { "x": 1 }]);
 
     let wc = WriteConcern {
-        w: Acknowledgment::Tag("hello".to_string()).into(),
+        w: Acknowledgment::Custom("hello".to_string()).into(),
         journal: None,
         w_timeout: None,
     };

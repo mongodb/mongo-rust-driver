@@ -14,7 +14,7 @@ use crate::{
 async fn build() {
     let options = DropCollectionOptions {
         write_concern: Some(WriteConcern {
-            w: Some(Acknowledgment::Tag("abc".to_string())),
+            w: Some(Acknowledgment::Custom("abc".to_string())),
             ..Default::default()
         }),
     };
