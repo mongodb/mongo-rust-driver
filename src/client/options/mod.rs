@@ -32,6 +32,7 @@ use crate::{
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::{ErrorKind, Result},
     event::{cmap::CmapEventHandler, command::CommandEventHandler},
+    options::ReadConcernLevel,
     sdam::MIN_HEARTBEAT_FREQUENCY,
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
     srv::SrvResolver,
@@ -1231,7 +1232,7 @@ impl ClientOptionsParser {
                 self.max_pool_size = Some(get_u32!(value, k));
             }
             "readconcernlevel" => {
-                self.read_concern = Some(ReadConcern::Custom(value.to_string()));
+                self.read_concern = Some(ReadConcernLevel::from_str(value).into());
             }
             "readpreference" => {
                 self.read_preference = Some(match &value.to_lowercase()[..] {
@@ -1482,7 +1483,7 @@ mod tests {
 
     use super::{ClientOptions, StreamAddress};
     use crate::{
-        concern::{Acknowledgment, ReadConcern, WriteConcern},
+        concern::{Acknowledgment, ReadConcernLevel, WriteConcern},
         selection_criteria::ReadPreference,
     };
 
@@ -1620,7 +1621,7 @@ mod tests {
                     hostname: "localhost".to_string(),
                     port: Some(27017),
                 }],
-                read_concern: Some(ReadConcern::Custom("foo".to_string())),
+                read_concern: Some(ReadConcernLevel::Custom("foo".to_string()).into()),
                 original_uri: Some(uri.into()),
                 ..Default::default()
             }
@@ -1820,7 +1821,7 @@ mod tests {
                     }
                     .into()
                 ),
-                read_concern: Some(ReadConcern::Majority),
+                read_concern: Some(ReadConcernLevel::Majority.into()),
                 write_concern: Some(write_concern),
                 repl_set_name: Some("foo".to_string()),
                 heartbeat_freq: Some(Duration::from_millis(1000)),

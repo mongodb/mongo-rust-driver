@@ -20,8 +20,59 @@ use crate::{
 ///
 /// See the documentation [here](https://docs.mongodb.com/manual/reference/read-concern/) for more
 /// information about read concerns.
-#[derive(Clone, Debug)]
-pub enum ReadConcern {
+#[derive(Clone, Debug, Serialize, PartialEq)]
+#[non_exhaustive]
+pub struct ReadConcern {
+    /// The level of the read concern.
+    pub level: ReadConcernLevel,
+}
+
+impl ReadConcern {
+    /// Creates a read concern with level "majority".
+    /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-majority/).
+    pub fn majority() -> Self {
+        ReadConcernLevel::Majority.into()
+    }
+
+    /// Creates a read concern with level "local".
+    /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-local/).
+    pub fn local() -> Self {
+        ReadConcernLevel::Local.into()
+    }
+
+    /// Creates a read concern with level "linearizable".
+    /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-linearizable/).
+    pub fn linearizable() -> Self {
+        ReadConcernLevel::Linearizable.into()
+    }
+
+    /// Creates a read concern with level "available".
+    /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-available/).
+    pub fn available() -> Self {
+        ReadConcernLevel::Available.into()
+    }
+
+    /// Creates a read concern with a custom read concern level. This is present to provide forwards
+    /// compatibility with any future read concerns which may be added to new versions of
+    /// MongoDB.
+    pub fn custom(level: String) -> Self {
+        ReadConcernLevel::from_str(level.as_str()).into()
+    }
+}
+
+impl From<ReadConcernLevel> for ReadConcern {
+    fn from(level: ReadConcernLevel) -> Self {
+        Self { level }
+    }
+}
+
+/// Specifies the level consistency and isolation properties of a given `ReadCocnern`.
+///
+/// See the documentation [here](https://docs.mongodb.com/manual/reference/read-concern/) for more
+/// information about read concerns.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub enum ReadConcernLevel {
     /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-local/).
     Local,
 
@@ -39,34 +90,35 @@ pub enum ReadConcern {
     Custom(String),
 }
 
-impl PartialEq for ReadConcern {
-    fn eq(&self, other: &Self) -> bool {
-        self.as_str() == other.as_str()
+impl ReadConcernLevel {
+    pub(crate) fn from_str(s: &str) -> Self {
+        match s {
+            "local" => ReadConcernLevel::Local,
+            "majority" => ReadConcernLevel::Majority,
+            "linearizable" => ReadConcernLevel::Linearizable,
+            "available" => ReadConcernLevel::Available,
+            s => ReadConcernLevel::Custom(s.to_string()),
+        }
     }
-}
 
-impl ReadConcern {
-    /// Gets the string representation of the `ReadConcern`.
-    pub fn as_str(&self) -> &str {
-        match *self {
-            ReadConcern::Local => "local",
-            ReadConcern::Majority => "majority",
-            ReadConcern::Linearizable => "linearizable",
-            ReadConcern::Available => "available",
-            ReadConcern::Custom(ref s) => s,
+    /// Gets the string representation of the `ReadConcernLevel`.
+    pub(crate) fn as_str(&self) -> &str {
+        match self {
+            ReadConcernLevel::Local => "local",
+            ReadConcernLevel::Majority => "majority",
+            ReadConcernLevel::Linearizable => "linearizable",
+            ReadConcernLevel::Available => "available",
+            ReadConcernLevel::Custom(ref s) => s,
         }
     }
 }
 
-impl Serialize for ReadConcern {
+impl Serialize for ReadConcernLevel {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        (doc! {
-            "level": self.as_str().to_string()
-        })
-        .serialize(serializer)
+        self.as_str().serialize(serializer)
     }
 }
 

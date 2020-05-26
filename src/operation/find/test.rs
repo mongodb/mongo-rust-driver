@@ -6,7 +6,7 @@ use crate::{
     bson_util,
     cmap::{CommandResponse, StreamDescription},
     operation::{test, Find, Operation},
-    options::{CursorType, FindOptions, Hint, ReadConcern, StreamAddress},
+    options::{CursorType, FindOptions, Hint, ReadConcern, ReadConcernLevel, StreamAddress},
     Namespace,
 };
 
@@ -46,7 +46,7 @@ async fn build() {
         .hint(Hint::Keys(doc! { "x": 1, "y": 2 }))
         .projection(doc! { "x": 0 })
         .allow_partial_results(true)
-        .read_concern(ReadConcern::Available)
+        .read_concern(ReadConcern::from(ReadConcernLevel::Available))
         .build();
 
     let expected_body = doc! {

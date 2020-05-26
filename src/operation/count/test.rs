@@ -8,6 +8,7 @@ use crate::{
     concern::ReadConcern,
     error::ErrorKind,
     operation::{test, Count, Operation},
+    options::ReadConcernLevel,
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -34,7 +35,7 @@ async fn build() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_with_options() {
-    let read_concern = ReadConcern::Local;
+    let read_concern: ReadConcern = ReadConcernLevel::Local.into();
     let max_time = Duration::from_millis(2 as u64);
     let options: EstimatedDocumentCountOptions = EstimatedDocumentCountOptions::builder()
         .max_time(max_time)
@@ -54,7 +55,7 @@ async fn build_with_options() {
         doc! {
             "count": "test_coll",
             "maxTimeMS": max_time.as_millis() as i64,
-            "readConcern": doc!{"level": read_concern.as_str().to_string()}
+            "readConcern": doc!{"level": read_concern.level.as_str().to_string()}
         }
     );
     assert_eq!(count_command.target_db, "test_db");
