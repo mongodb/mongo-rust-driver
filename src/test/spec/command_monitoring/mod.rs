@@ -1,3 +1,5 @@
+mod event;
+
 use std::convert::Into;
 
 use serde::Deserialize;

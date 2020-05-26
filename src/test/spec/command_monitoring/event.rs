@@ -9,8 +9,8 @@ use crate::{
 #[serde(rename_all = "snake_case")]
 pub enum TestEvent {
     CommandStartedEvent {
-        command_name: Option<String>,
-        database_name: Option<String>,
+        command_name: String,
+        database_name: String,
         command: Document,
     },
 
@@ -39,19 +39,9 @@ impl Matchable for TestEvent {
                     command: expected_command,
                 },
             ) => {
-                if actual_command_name.is_some()
-                    && expected_command_name.is_some()
-                    && actual_command_name != expected_command_name
-                {
-                    return false;
-                }
-                if actual_database_name.is_some()
-                    && expected_database_name.is_some()
-                    && actual_database_name != expected_database_name
-                {
-                    return false;
-                }
-                actual_command.matches(expected_command)
+                actual_command_name == expected_command_name
+                    && actual_database_name == expected_database_name
+                    && actual_command.matches(expected_command)
             }
             (
                 TestEvent::CommandSucceededEvent {
@@ -82,8 +72,8 @@ impl From<CommandEvent> for TestEvent {
     fn from(event: CommandEvent) -> Self {
         match event {
             CommandEvent::CommandStartedEvent(event) => TestEvent::CommandStartedEvent {
-                command_name: Some(event.command_name),
-                database_name: Some(event.db),
+                command_name: event.command_name,
+                database_name: event.db,
                 command: event.command,
             },
             CommandEvent::CommandFailedEvent(event) => TestEvent::CommandFailedEvent {

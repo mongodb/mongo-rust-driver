@@ -145,7 +145,7 @@ impl Client {
                     .topology
                     .handle_post_handshake_error(err.clone(), conn, server)
                     .await;
-                if !err.clone().is_driver_error() {
+                if !err.is_server_error() {
                     Err(first_error)
                 } else {
                     Err(err)

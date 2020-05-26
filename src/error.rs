@@ -82,7 +82,7 @@ impl Error {
                 if RETRYABLE_READ_CODES.contains(&code) {
                     return true;
                 }
-                if message.contains("not master") || message.contains("node is recovering") {
+                if is_not_master(*code, message) || is_recovering(*code, message) {
                     return true;
                 }
                 false
@@ -91,15 +91,13 @@ impl Error {
         }
     }
 
-    /// Whether an error originated in the driver
-    pub(crate) fn is_driver_error(&self) -> bool {
+    /// Whether an error originated from the server
+    pub(crate) fn is_server_error(&self) -> bool {
         match self.kind.as_ref() {
-            ErrorKind::AddrParse(_) => true,
-            ErrorKind::BsonDecode(_) => true,
-            ErrorKind::BsonEncode(_) => true,
-            ErrorKind::InternalError { .. } => true,
-            ErrorKind::InvalidHostname { .. } => true,
-            ErrorKind::ParseError { .. } => true,
+            ErrorKind::AuthenticationError{..}
+            | ErrorKind::BulkWriteError(_)
+            | ErrorKind::CommandError(_)
+            | ErrorKind::WriteError(_) => true,
             _ => false,
         }
     }

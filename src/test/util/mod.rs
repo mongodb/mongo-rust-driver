@@ -1,17 +1,11 @@
 mod event;
 mod lock;
 mod matchable;
-mod operation;
-mod test_event;
-mod test_file;
 
 pub use self::{
     event::{CommandEvent, EventClient},
     lock::TestLock,
     matchable::{assert_matches, Matchable},
-    operation::AnyTestOperation,
-    test_event::TestEvent,
-    test_file::TestFile,
 };
 
 use std::{collections::HashMap, fmt::Debug, sync::Arc};

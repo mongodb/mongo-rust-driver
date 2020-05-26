@@ -5,6 +5,7 @@ mod crud;
 mod initial_dns_seedlist_discovery;
 mod read_write_concern;
 mod retryable_reads;
+mod runner;
 
 use std::{
     convert::TryFrom,
@@ -14,6 +15,12 @@ use std::{
     path::PathBuf,
 };
 
+<<<<<<< HEAD
+=======
+pub use self::runner::{AnyTestOperation, OperationObject, TestEvent, TestFile, TestData};
+
+use bson::Bson;
+>>>>>>> reorganization
 use serde::Deserialize;
 use serde_json::Value;
 

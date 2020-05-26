@@ -1,9 +1,15 @@
-use bson::{doc, Bson, Document};
+use bson::{doc, Bson};
 
 use crate::test::{
     assert_matches,
     run_spec_test,
-    util::{parse_version, AnyTestOperation, EventClient, TestClient, TestEvent, TestFile},
+    util::{EventClient},
+    AnyTestOperation,
+    OperationObject,
+    TestClient,
+    TestData,
+    TestEvent,
+    TestFile,
     CLIENT_OPTIONS,
     LOCK,
 };
@@ -51,38 +57,10 @@ async fn run() {
             let client = EventClient::with_options(options).await;
 
             if let Some(ref run_on) = test_file.run_on {
-                let can_run_on = run_on.iter().any(|run_on| {
-                    if let Some(ref min_server_version) = run_on.min_server_version {
-                        let (major, minor) = parse_version(min_server_version);
-                        if client.server_version_lt(major, minor) {
-                            return false;
-                        }
-                    }
-                    if let Some(ref max_server_version) = run_on.max_server_version {
-                        let (major, minor) = parse_version(max_server_version);
-                        if client.server_version_gt(major, minor) {
-                            return false;
-                        }
-                    }
-                    if let Some(ref topology) = run_on.topology {
-                        if !topology.contains(&client.topology()) {
-                            return false;
-                        }
-                    }
-                    true
-                });
+                let can_run_on = run_on.iter().any(|run_on| run_on.can_run_on(&client));
                 if !can_run_on {
                     println!("Skipping {}", test_case.description);
                     continue;
-                }
-            }
-
-            match test_case.fail_point {
-                Some(_) => {
-                    let _guard = LOCK.run_exclusively().await;
-                }
-                _ => {
-                    let _guard = LOCK.run_concurrently().await;
                 }
             }
 
@@ -93,22 +71,21 @@ async fn run() {
 
             let coll_name = match test_file.collection_name {
                 Some(ref coll_name) => coll_name.clone(),
-                None => String::from("coll"),
+                None => "coll".to_string(),
             };
 
             let coll = client.init_db_and_coll(&db_name, &coll_name).await;
 
             if let Some(ref data) = test_file.data {
-                let data: Vec<Document> = data
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|doc| doc.as_document().unwrap().clone())
-                    .collect();
-                if !data.is_empty() {
-                    coll.insert_many(data, None)
-                        .await
-                        .expect(&test_case.description);
+                match data {
+                    TestData::Single(data) => {
+                        if !data.is_empty() {
+                            coll.insert_many(data.clone(), None)
+                                .await
+                                .expect(&test_case.description);
+                        }
+                    }
+                    TestData::Many(_) => panic!("{}: invalid data format", &test_case.description),
                 }
             }
 
@@ -124,19 +101,19 @@ async fn run() {
             for operation in test_case.operations {
                 let test_operation: AnyTestOperation =
                     bson::from_bson(Bson::Document(operation.as_document())).unwrap();
-                let result = match operation.object.as_ref().map(String::as_ref) {
-                    Some("client") => client.run_client_operation(&test_operation).await,
-                    Some("database") => {
+                let result = match operation.object {
+                    OperationObject::Client => client.run_client_operation(&test_operation).await,
+                    OperationObject::Database => {
                         client
                             .run_database_operation(&test_operation, &db_name)
                             .await
                     }
-                    Some("collection") | None => {
+                    OperationObject::Collection => {
                         client
                             .run_collection_operation(&test_operation, &db_name, &coll_name)
                             .await
                     }
-                    Some(op_type) => panic!("unsupported operation type {}", op_type),
+                    OperationObject::GridfsBucket => panic!("unsupported operation type"),
                 };
                 let mut operation_events: Vec<TestEvent> = client
                     .collect_events(&test_operation, false)
@@ -145,12 +122,25 @@ async fn run() {
                     .collect();
 
                 if let Some(error) = operation.error {
-                    if error {
-                        assert!(result.is_err());
-                    }
+                    assert_eq!(
+                        result.is_err(),
+                        error,
+                        "{}: expected error: {}, got {:?}",
+                        test_case.description,
+                        error,
+                        result
+                    );
                 }
                 if let Some(expected_result) = operation.result {
-                    assert_eq!(result.unwrap().unwrap(), expected_result);
+                    let description = &test_case.description;
+                    let result = result
+                        .unwrap()
+                        .unwrap_or_else(|| panic!("{:?}: operation should succeed", description));
+                    assert_eq!(
+                        result, expected_result,
+                        "{}: expected {:?}, got {:?}",
+                        description, expected_result, result
+                    );
                 }
 
                 events.append(&mut operation_events);
@@ -179,5 +169,6 @@ async fn run() {
         }
     }
 
-    run_spec_test(&["retryable-reads", "tests"], run_test).await;
+    let _guard = LOCK.run_exclusively().await;
+    run_spec_test(&["retryable-reads"], run_test).await;
 }
