@@ -165,9 +165,9 @@ pub enum Acknowledgment {
     Nodes(i32),
     /// Requires acknowledgement that the write has reached the majority of nodes.
     Majority,
-    /// Requires acknowledgement according to the given write tag. See [here](https://docs.mongodb.com/manual/tutorial/configure-replica-set-tag-sets/#tag-sets-and-custom-write-concern-behavior)
+    /// Requires acknowledgement according to the given custom write concern. See [here](https://docs.mongodb.com/manual/tutorial/configure-replica-set-tag-sets/#tag-sets-and-custom-write-concern-behavior)
     /// for more information.
-    Tag(String),
+    Custom(String),
 }
 
 impl Serialize for Acknowledgment {
@@ -178,7 +178,7 @@ impl Serialize for Acknowledgment {
         match self {
             Acknowledgment::Majority => serializer.serialize_str("majority"),
             Acknowledgment::Nodes(n) => serializer.serialize_i32(n.clone()),
-            Acknowledgment::Tag(tag) => serializer.serialize_str(tag),
+            Acknowledgment::Custom(name) => serializer.serialize_str(name),
         }
     }
 }
@@ -212,7 +212,7 @@ impl From<String> for Acknowledgment {
         if s == "majority" {
             Acknowledgment::Majority
         } else {
-            Acknowledgment::Tag(s)
+            Acknowledgment::Custom(s)
         }
     }
 }
@@ -226,7 +226,7 @@ impl Acknowledgment {
         match self {
             Acknowledgment::Nodes(i) => Bson::I64(i64::from(*i)),
             Acknowledgment::Majority => Bson::String("majority".to_string()),
-            Acknowledgment::Tag(s) => Bson::String(s.to_string()),
+            Acknowledgment::Custom(s) => Bson::String(s.to_string()),
         }
     }
 }

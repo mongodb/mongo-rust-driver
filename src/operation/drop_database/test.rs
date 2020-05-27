@@ -15,7 +15,7 @@ async fn build() {
         target_db: "test_db".to_string(),
         options: Some(DropDatabaseOptions {
             write_concern: Some(WriteConcern {
-                w: Some(Acknowledgment::Tag("abc".to_string())),
+                w: Some(Acknowledgment::Custom("abc".to_string())),
                 ..Default::default()
             }),
         }),
