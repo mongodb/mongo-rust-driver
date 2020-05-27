@@ -1,4 +1,4 @@
-use std::{ops::Deref, time::Duration};
+use std::{fmt::Debug, ops::Deref, time::Duration};
 
 use async_trait::async_trait;
 use bson::{doc, Bson, Decoder, Document};
@@ -12,13 +12,16 @@ use crate::{
     bson_util,
     error::Result,
     options::{FindOptions, Hint, InsertManyOptions, UpdateOptions},
-    test::util::{CommandEvent, EventClient},
+    test::{
+        util::{CommandEvent, EventClient},
+        OperationObject,
+    },
     Collection,
     Database,
 };
 
 #[async_trait]
-pub trait TestOperation {
+pub trait TestOperation: Debug {
     /// The command names to monitor as part of this test.
     fn command_names(&self) -> &[&str];
 
@@ -32,8 +35,13 @@ pub trait TestOperation {
     async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>>;
 }
 
+#[derive(Debug)]
 pub struct AnyTestOperation {
     operation: Box<dyn TestOperation>,
+    pub name: String,
+    pub object: OperationObject,
+    pub result: Option<Bson>,
+    pub error: Option<bool>,
 }
 
 impl<'de> Deserialize<'de> for AnyTestOperation {
@@ -42,6 +50,9 @@ impl<'de> Deserialize<'de> for AnyTestOperation {
         struct OperationDefinition {
             name: String,
             arguments: Option<Bson>,
+            object: OperationObject,
+            result: Option<Bson>,
+            error: Option<bool>,
         };
 
         let definition = OperationDefinition::deserialize(deserializer)?;
@@ -69,20 +80,24 @@ impl<'de> Deserialize<'de> for AnyTestOperation {
                     .map(|op| Box::new(op) as Box<dyn TestOperation>)
             }
             "estimatedDocumentCount" => {
-                Ok(Box::new(EstimatedDocumentCount {}) as Box<dyn TestOperation>)
+                Ok(Box::new(EstimatedDocumentCount) as Box<dyn TestOperation>)
             }
             "findOne" => FindOne::deserialize(Decoder::new(definition.arguments.unwrap()))
                 .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "listDatabases" => Ok(Box::new(ListDatabases {}) as Box<dyn TestOperation>),
-            "listDatabaseNames" => Ok(Box::new(ListDatabaseNames {}) as Box<dyn TestOperation>),
-            "listCollections" => Ok(Box::new(ListCollections {}) as Box<dyn TestOperation>),
-            "listCollectionNames" => Ok(Box::new(ListCollectionNames {}) as Box<dyn TestOperation>),
-            _ => unimplemented!(),
+            "listDatabases" => Ok(Box::new(ListDatabases) as Box<dyn TestOperation>),
+            "listDatabaseNames" => Ok(Box::new(ListDatabaseNames) as Box<dyn TestOperation>),
+            "listCollections" => Ok(Box::new(ListCollections) as Box<dyn TestOperation>),
+            "listCollectionNames" => Ok(Box::new(ListCollectionNames) as Box<dyn TestOperation>),
+            _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| de::Error::custom(format!("{}", e)))?;
 
         Ok(AnyTestOperation {
             operation: boxed_op,
+            name: definition.name,
+            object: definition.object,
+            result: definition.result,
+            error: definition.error,
         })
     }
 }
@@ -95,7 +110,7 @@ impl Deref for AnyTestOperation {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub(super) struct DeleteMany {
     filter: Document,
 }
@@ -121,7 +136,7 @@ impl TestOperation for DeleteMany {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub(super) struct DeleteOne {
     filter: Document,
 }
@@ -461,7 +476,7 @@ impl TestOperation for CountDocuments {
 }
 
 #[derive(Debug, Deserialize)]
-pub(super) struct EstimatedDocumentCount {}
+pub(super) struct EstimatedDocumentCount;
 
 #[async_trait]
 impl TestOperation for EstimatedDocumentCount {
@@ -512,7 +527,7 @@ impl TestOperation for FindOne {
 }
 
 #[derive(Debug, Deserialize)]
-pub(super) struct ListDatabases {}
+pub(super) struct ListDatabases;
 
 #[async_trait]
 impl TestOperation for ListDatabases {
@@ -536,7 +551,7 @@ impl TestOperation for ListDatabases {
 }
 
 #[derive(Debug, Deserialize)]
-pub(super) struct ListDatabaseNames {}
+pub(super) struct ListDatabaseNames;
 
 #[async_trait]
 impl TestOperation for ListDatabaseNames {
@@ -560,7 +575,7 @@ impl TestOperation for ListDatabaseNames {
 }
 
 #[derive(Debug, Deserialize)]
-pub(super) struct ListCollections {}
+pub(super) struct ListCollections;
 
 #[async_trait]
 impl TestOperation for ListCollections {
@@ -584,7 +599,7 @@ impl TestOperation for ListCollections {
 }
 
 #[derive(Debug, Deserialize)]
-pub(super) struct ListCollectionNames {}
+pub(super) struct ListCollectionNames;
 
 #[async_trait]
 impl TestOperation for ListCollectionNames {
@@ -604,6 +619,28 @@ impl TestOperation for ListCollectionNames {
         let result = database.list_collection_names(None).await?;
         let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
         Ok(Some(Bson::from(result)))
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct UnimplementedOperation;
+
+#[async_trait]
+impl TestOperation for UnimplementedOperation {
+    fn command_names(&self) -> &[&str] {
+        unimplemented!()
+    }
+
+    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
+        unimplemented!()
     }
 }
 

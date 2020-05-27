@@ -1,8 +1,9 @@
 use crate::test::{
     util::{parse_version, EventClient},
+    AnyTestOperation,
     TestEvent,
 };
-use bson::{doc, Bson, Document};
+use bson::{doc, Document};
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -63,18 +64,9 @@ pub struct TestCase {
     pub use_multiple_mongoses: Option<bool>,
     pub skip_reason: Option<String>,
     pub fail_point: Option<Document>,
-    pub operations: Vec<Operation>,
+    pub operations: Vec<AnyTestOperation>,
     pub outcome: Option<Document>,
     pub expectations: Option<Vec<TestEvent>>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Operation {
-    pub name: String,
-    pub object: OperationObject,
-    pub arguments: Option<Bson>,
-    pub result: Option<Bson>,
-    pub error: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -84,15 +76,4 @@ pub enum OperationObject {
     Collection,
     Client,
     GridfsBucket,
-}
-
-impl Operation {
-    pub fn as_document(&self) -> Document {
-        let mut doc = Document::new();
-        doc.insert("name", self.name.clone());
-        if let Some(ref arguments) = self.arguments {
-            doc.insert("arguments", arguments);
-        }
-        doc
-    }
 }

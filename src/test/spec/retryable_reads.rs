@@ -1,10 +1,9 @@
-use bson::{doc, Bson};
+use bson::doc;
 
 use crate::test::{
     assert_matches,
     run_spec_test,
     util::EventClient,
-    AnyTestOperation,
     OperationObject,
     TestClient,
     TestData,
@@ -99,24 +98,20 @@ async fn run() {
 
             let mut events: Vec<TestEvent> = Vec::new();
             for operation in test_case.operations {
-                let test_operation: AnyTestOperation =
-                    bson::from_bson(Bson::Document(operation.as_document())).unwrap();
                 let result = match operation.object {
-                    OperationObject::Client => client.run_client_operation(&test_operation).await,
+                    OperationObject::Client => client.run_client_operation(&operation).await,
                     OperationObject::Database => {
-                        client
-                            .run_database_operation(&test_operation, &db_name)
-                            .await
+                        client.run_database_operation(&operation, &db_name).await
                     }
                     OperationObject::Collection => {
                         client
-                            .run_collection_operation(&test_operation, &db_name, &coll_name)
+                            .run_collection_operation(&operation, &db_name, &coll_name)
                             .await
                     }
                     OperationObject::GridfsBucket => panic!("unsupported operation type"),
                 };
                 let mut operation_events: Vec<TestEvent> = client
-                    .collect_events(&test_operation, false)
+                    .collect_events(&operation, false)
                     .into_iter()
                     .map(Into::into)
                     .collect();
