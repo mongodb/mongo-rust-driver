@@ -635,7 +635,7 @@ impl ServerFinal {
 mod tests {
     use bson::Bson;
 
-    use crate::options::auth::scram::ServerFirst;
+    use super::ServerFirst;
 
     #[cfg_attr(feature = "tokio-runtime", tokio::test)]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]

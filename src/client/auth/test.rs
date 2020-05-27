@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 
-use crate::{cmap::StreamDescription, options::auth::AuthMechanism};
+use crate::{cmap::StreamDescription, options::AuthMechanism};
 
 lazy_static! {
     static ref MECHS: [String; 2] = [

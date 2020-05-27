@@ -4,10 +4,7 @@ use bson::Document;
 use serde::Deserialize;
 
 use crate::{
-    options::{
-        auth::{AuthMechanism, Credential},
-        ClientOptions,
-    },
+    options::{AuthMechanism, ClientOptions, Credential},
     test::run_spec_test,
 };
 

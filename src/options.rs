@@ -16,7 +16,7 @@
 //! ```
 
 pub use crate::{
-    client::{auth, options::*},
+    client::{auth::*, options::*},
     coll::options::*,
     collation::*,
     concern::*,
