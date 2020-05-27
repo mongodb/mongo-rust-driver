@@ -5,11 +5,7 @@ use serde::Deserialize;
 
 use crate::{
     error::{Error, ErrorKind},
-    options::{
-        auth::{AuthMechanism, Credential},
-        ClientOptions,
-        ListDatabasesOptions,
-    },
+    options::{AuthMechanism, ClientOptions, Credential, ListDatabasesOptions},
     selection_criteria::{ReadPreference, SelectionCriteria},
     test::{util::TestClient, CLIENT_OPTIONS, LOCK},
     Client,

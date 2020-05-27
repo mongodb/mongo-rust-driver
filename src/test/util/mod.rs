@@ -18,7 +18,7 @@ use self::event::EventHandler;
 use super::CLIENT_OPTIONS;
 use crate::{
     error::{CommandError, ErrorKind, Result},
-    options::{auth::AuthMechanism, ClientOptions, CreateCollectionOptions},
+    options::{AuthMechanism, ClientOptions, CreateCollectionOptions},
     Client,
     Collection,
 };

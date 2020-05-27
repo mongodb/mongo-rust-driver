@@ -4,7 +4,7 @@ use bson::{Bson, Document};
 
 use crate::{
     bson_util,
-    options::auth::{AuthMechanism, Credential},
+    options::{AuthMechanism, Credential},
 };
 
 pub trait Matchable: Sized + 'static {
