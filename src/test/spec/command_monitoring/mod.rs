@@ -1,4 +1,5 @@
 mod event;
+mod operation;
 
 use std::convert::Into;
 
@@ -30,8 +31,6 @@ struct TestCase {
 }
 
 async fn run_command_monitoring_test(test_file: TestFile) {
-    let _guard = LOCK.run_exclusively().await;
-
     let client = TestClient::new().await;
 
     let skipped_tests = vec![
@@ -66,6 +65,8 @@ async fn run_command_monitoring_test(test_file: TestFile) {
             }
         }
 
+        let _guard = LOCK.run_exclusively().await;
+
         println!("Running {}", test_case.description);
 
         let operation: AnyTestOperation =
@@ -80,15 +81,13 @@ async fn run_command_monitoring_test(test_file: TestFile) {
 
         let client = EventClient::new().await;
 
-        let _ = client
-            .run_collection_operation(
-                &operation,
+        let events: Vec<TestEvent> = client
+            .run_operation_with_events(
+                operation,
                 &test_file.database_name,
                 &test_file.collection_name,
             )
-            .await;
-        let events: Vec<TestEvent> = client
-            .collect_events(&operation, true)
+            .await
             .into_iter()
             .map(Into::into)
             .collect();
