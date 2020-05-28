@@ -465,20 +465,16 @@ async fn find_and_getmore_share_session() {
     let read_preferences: Vec<ReadPreference> = vec![
         ReadPreference::Primary,
         ReadPreference::PrimaryPreferred {
-            tag_sets: None,
-            max_staleness: None,
+            options: Default::default(),
         },
         ReadPreference::Secondary {
-            tag_sets: None,
-            max_staleness: None,
+            options: Default::default(),
         },
         ReadPreference::SecondaryPreferred {
-            tag_sets: None,
-            max_staleness: None,
+            options: Default::default(),
         },
         ReadPreference::Nearest {
-            tag_sets: None,
-            max_staleness: None,
+            options: Default::default(),
         },
     ];
 

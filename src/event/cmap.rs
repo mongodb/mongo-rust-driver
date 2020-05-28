@@ -20,6 +20,7 @@ fn empty_address() -> StreamAddress {
 
 /// Event emitted when a connection pool is created.
 #[derive(Debug, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct PoolCreatedEvent {
     /// The address of the server that the pool's connections will connect to.
     #[serde(default = "self::empty_address")]
@@ -32,6 +33,7 @@ pub struct PoolCreatedEvent {
 
 /// Event emitted when a connection pool is cleared.
 #[derive(Debug, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct PoolClearedEvent {
     /// The address of the server that the pool's connections will connect to.
     #[serde(default = "self::empty_address")]
@@ -41,6 +43,7 @@ pub struct PoolClearedEvent {
 
 /// Event emitted when a connection pool is cleared.
 #[derive(Debug, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct PoolClosedEvent {
     /// The address of the server that the pool's connections will connect to.
     #[serde(default = "self::empty_address")]
@@ -51,6 +54,7 @@ pub struct PoolClosedEvent {
 /// Event emitted when a connection is created.
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ConnectionCreatedEvent {
     /// The address of the server that the connection will connect to.
     #[serde(default = "self::empty_address")]
@@ -67,6 +71,7 @@ pub struct ConnectionCreatedEvent {
 /// prerequisites for using a connection (handshake, authentication, etc.) have been completed.
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ConnectionReadyEvent {
     /// The address of the server that the connection is connected to.
     #[serde(default = "self::empty_address")]
@@ -82,6 +87,7 @@ pub struct ConnectionReadyEvent {
 /// Event emitted when a connection is closed.
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ConnectionClosedEvent {
     /// The address of the server that the connection was connected to.
     #[serde(default = "self::empty_address")]
@@ -100,6 +106,7 @@ pub struct ConnectionClosedEvent {
 /// The reasons that a connection may be closed.
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub enum ConnectionClosedReason {
     /// The connection pool has been cleared since the connection was created.
     Stale,
@@ -116,6 +123,7 @@ pub enum ConnectionClosedReason {
 
 /// Event emitted when a thread begins checking out a connection to use for an operation.
 #[derive(Debug, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct ConnectionCheckoutStartedEvent {
     /// The address of the server that the connection will connect to.
     #[serde(default = "self::empty_address")]
@@ -125,6 +133,7 @@ pub struct ConnectionCheckoutStartedEvent {
 
 /// Event emitted when a thread is unable to check out a connection.
 #[derive(Debug, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct ConnectionCheckoutFailedEvent {
     /// The address of the server that the connection would have connected to.
     #[serde(default = "self::empty_address")]
@@ -138,6 +147,7 @@ pub struct ConnectionCheckoutFailedEvent {
 /// The reasons a connection may not be able to be checked out.
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub enum ConnectionCheckoutFailedReason {
     /// The `wait_queue_timeout` has elapsed while waiting for a connection to be available.
     Timeout,
@@ -150,6 +160,7 @@ pub enum ConnectionCheckoutFailedReason {
 /// Event emitted when a connection is successfully checked out.
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ConnectionCheckedOutEvent {
     /// The address of the server that the connection will connect to.
     #[serde(default = "self::empty_address")]
@@ -165,6 +176,7 @@ pub struct ConnectionCheckedOutEvent {
 /// Event emitted when a connection is checked back into a connection pool.
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ConnectionCheckedInEvent {
     /// The address of the server that the connection was connected to.
     #[serde(default = "self::empty_address")]

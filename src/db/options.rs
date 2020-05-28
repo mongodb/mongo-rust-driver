@@ -13,6 +13,7 @@ use crate::{
 /// These are the valid options for creating a [`Database`](../struct.Database.html) with
 /// [`Client::database_with_options`](../struct.Client.html#method.database_with_options).
 #[derive(Clone, Debug, Default, TypedBuilder)]
+#[non_exhaustive]
 pub struct DatabaseOptions {
     /// The default read preference for operations.
     #[builder(default)]
@@ -32,6 +33,7 @@ pub struct DatabaseOptions {
 #[skip_serializing_none]
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct CreateCollectionOptions {
     /// Whether the collection should be capped. If true, `size` must also be set.
     #[builder(default)]
@@ -94,6 +96,7 @@ pub struct CreateCollectionOptions {
 /// an update.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub enum ValidationLevel {
     /// Perform no validation for inserts and updates.
     Off,
@@ -108,6 +111,7 @@ pub enum ValidationLevel {
 /// documents do not pass the validation.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub enum ValidationAction {
     Error,
     Warn,
@@ -116,6 +120,7 @@ pub enum ValidationAction {
 /// Specifies the options to a [`Database::drop`](../struct.Database.html#method.drop) operation.
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct DropDatabaseOptions {
     /// The write concern for the operation.
     #[builder(default)]
@@ -125,6 +130,7 @@ pub struct DropDatabaseOptions {
 /// Specifies the options to a
 /// [`Database::list_collections`](../struct.Database.html#method.list_collections) operation.
 #[derive(Debug, Default, TypedBuilder, Serialize)]
+#[non_exhaustive]
 pub struct ListCollectionsOptions {
     /// The number of documents the server should return per cursor batch.
     ///
@@ -141,6 +147,7 @@ pub struct ListCollectionsOptions {
 /// [`Client::list_databases`](../struct.Client.html#method.list_databases) operation.
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ListDatabasesOptions {
     /// Determines which databases to return based on the user's access privileges. This option is
     /// only supported on server versions 4.0.5+.

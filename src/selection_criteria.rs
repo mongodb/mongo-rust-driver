@@ -2,6 +2,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use bson::{doc, Bson, Document};
 use derivative::Derivative;
+use typed_builder::TypedBuilder;
 
 use crate::{
     error::{ErrorKind, Result},
@@ -12,6 +13,7 @@ use crate::{
 /// Describes which servers are suitable for a given operation.
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
+#[non_exhaustive]
 pub enum SelectionCriteria {
     /// A read preference that describes the suitable servers based on the server type, max
     /// staleness, and server tags.
@@ -88,45 +90,52 @@ pub enum ReadPreference {
     /// Only route this operation to the primary.
     Primary,
     /// Only route this operation to a secondary.
-    Secondary {
-        tag_sets: Option<Vec<TagSet>>,
-        max_staleness: Option<Duration>,
-    },
+    Secondary { options: ReadPreferenceOptions },
     /// Route this operation to the primary if it's available, but fall back to the secondaries if
     /// not.
-    PrimaryPreferred {
-        tag_sets: Option<Vec<TagSet>>,
-        max_staleness: Option<Duration>,
-    },
+    PrimaryPreferred { options: ReadPreferenceOptions },
+
     /// Route this operation to a secondary if one is available, but fall back to the primary if
     /// not.
-    SecondaryPreferred {
-        tag_sets: Option<Vec<TagSet>>,
-        max_staleness: Option<Duration>,
-    },
+    SecondaryPreferred { options: ReadPreferenceOptions },
+
     /// Route this operation to the node with the least network latency regardless of whether it's
     /// the primary or a secondary.
-    Nearest {
-        tag_sets: Option<Vec<TagSet>>,
-        max_staleness: Option<Duration>,
-    },
+    Nearest { options: ReadPreferenceOptions },
+}
+
+/// Specifies read preference options for non-primary read preferences.
+#[derive(Clone, Debug, Default, PartialEq, TypedBuilder)]
+#[non_exhaustive]
+pub struct ReadPreferenceOptions {
+    /// Specifies which replica set members should be considered for operations. Each tag set will
+    /// be checked in order until one or more servers is found with each tag in the set.
+    #[builder(default)]
+    pub tag_sets: Option<Vec<TagSet>>,
+
+    /// Specifies the maximum amount of lag behind the primary that a secondary can be to be
+    /// considered for the given operation. Any secondaries lagging behind more than
+    /// `max_staleness` will not be considered for the operation.
+    ///
+    /// `max_stalesness` must be at least 90 seconds. If a `max_stalness` less than 90 seconds is
+    /// specified for an operation, the operation will return an error.
+    #[builder(default)]
+    pub max_staleness: Option<Duration>,
 }
 
 impl ReadPreference {
     pub(crate) fn max_staleness(&self) -> Option<Duration> {
         match self {
             ReadPreference::Primary => None,
-            ReadPreference::Secondary { max_staleness, .. }
-            | ReadPreference::PrimaryPreferred { max_staleness, .. }
-            | ReadPreference::SecondaryPreferred { max_staleness, .. }
-            | ReadPreference::Nearest { max_staleness, .. } => *max_staleness,
+            ReadPreference::Secondary { ref options }
+            | ReadPreference::PrimaryPreferred { ref options }
+            | ReadPreference::SecondaryPreferred { ref options }
+            | ReadPreference::Nearest { ref options } => options.max_staleness,
         }
     }
 
-    pub(crate) fn with_tags(self, tag_sets: Vec<TagSet>) -> Result<Self> {
-        let tag_sets = Some(tag_sets);
-
-        let read_pref = match self {
+    pub(crate) fn with_tags(mut self, tag_sets: Vec<TagSet>) -> Result<Self> {
+        let options = match self {
             ReadPreference::Primary => {
                 return Err(ErrorKind::ArgumentError {
                     message: "read preference tags can only be specified when a non-primary mode \
@@ -135,35 +144,19 @@ impl ReadPreference {
                 }
                 .into());
             }
-            ReadPreference::Secondary { max_staleness, .. } => ReadPreference::Secondary {
-                tag_sets,
-                max_staleness,
-            },
-            ReadPreference::PrimaryPreferred { max_staleness, .. } => {
-                ReadPreference::PrimaryPreferred {
-                    tag_sets,
-                    max_staleness,
-                }
-            }
-            ReadPreference::SecondaryPreferred { max_staleness, .. } => {
-                ReadPreference::SecondaryPreferred {
-                    tag_sets,
-                    max_staleness,
-                }
-            }
-            ReadPreference::Nearest { max_staleness, .. } => ReadPreference::Nearest {
-                tag_sets,
-                max_staleness,
-            },
+            ReadPreference::Secondary { ref mut options } => options,
+            ReadPreference::PrimaryPreferred { ref mut options } => options,
+            ReadPreference::SecondaryPreferred { ref mut options } => options,
+            ReadPreference::Nearest { ref mut options } => options,
         };
 
-        Ok(read_pref)
+        options.tag_sets = Some(tag_sets);
+
+        Ok(self)
     }
 
-    pub(crate) fn with_max_staleness(self, max_staleness: Duration) -> Result<Self> {
-        let max_staleness = Some(max_staleness);
-
-        let read_pref = match self {
+    pub(crate) fn with_max_staleness(mut self, max_staleness: Duration) -> Result<Self> {
+        let options = match self {
             ReadPreference::Primary => {
                 return Err(ErrorKind::ArgumentError {
                     message: "max staleness can only be specified when a non-primary mode is \
@@ -172,48 +165,34 @@ impl ReadPreference {
                 }
                 .into());
             }
-            ReadPreference::Secondary { tag_sets, .. } => ReadPreference::Secondary {
-                tag_sets,
-                max_staleness,
-            },
-            ReadPreference::PrimaryPreferred { tag_sets, .. } => ReadPreference::PrimaryPreferred {
-                tag_sets,
-                max_staleness,
-            },
-            ReadPreference::SecondaryPreferred { tag_sets, .. } => {
-                ReadPreference::SecondaryPreferred {
-                    tag_sets,
-                    max_staleness,
-                }
-            }
-            ReadPreference::Nearest { tag_sets, .. } => ReadPreference::Nearest {
-                tag_sets,
-                max_staleness,
-            },
+            ReadPreference::Secondary { ref mut options } => options,
+            ReadPreference::PrimaryPreferred { ref mut options } => options,
+            ReadPreference::SecondaryPreferred { ref mut options } => options,
+            ReadPreference::Nearest { ref mut options } => options,
         };
 
-        Ok(read_pref)
+        options.max_staleness = Some(max_staleness);
+
+        Ok(self)
     }
 
     pub(crate) fn into_document(self) -> Document {
         let (mode, tag_sets, max_staleness) = match self {
             ReadPreference::Primary => ("primary", None, None),
-            ReadPreference::PrimaryPreferred {
-                tag_sets,
-                max_staleness,
-            } => ("primaryPreferred", tag_sets, max_staleness),
-            ReadPreference::Secondary {
-                tag_sets,
-                max_staleness,
-            } => ("secondary", tag_sets, max_staleness),
-            ReadPreference::SecondaryPreferred {
-                tag_sets,
-                max_staleness,
-            } => ("secondaryPreferred", tag_sets, max_staleness),
-            ReadPreference::Nearest {
-                tag_sets,
-                max_staleness,
-            } => ("nearest", tag_sets, max_staleness),
+            ReadPreference::PrimaryPreferred { options } => {
+                ("primaryPreferred", options.tag_sets, options.max_staleness)
+            }
+            ReadPreference::Secondary { options } => {
+                ("secondary", options.tag_sets, options.max_staleness)
+            }
+            ReadPreference::SecondaryPreferred { options } => (
+                "secondaryPreferred",
+                options.tag_sets,
+                options.max_staleness,
+            ),
+            ReadPreference::Nearest { options } => {
+                ("nearest", options.tag_sets, options.max_staleness)
+            }
         };
 
         let mut doc = doc! { "mode": mode };

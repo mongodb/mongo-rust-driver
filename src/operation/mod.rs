@@ -204,8 +204,7 @@ mod test {
         assert_eq!(op.selection_criteria(), None);
 
         let read_pref: SelectionCriteria = ReadPreference::Secondary {
-            tag_sets: None,
-            max_staleness: None,
+            options: Default::default(),
         }
         .into();
 

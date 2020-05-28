@@ -49,8 +49,8 @@ impl Error {
     }
 
     /// Attempts to get the `std::io::Error` from this `Error`.
-    /// If there are other references to the underlying `Arc`, or if the `ErrorKind` is not `Io`, then
-    /// the original error is returned as a custom `std::io::Error`.
+    /// If there are other references to the underlying `Arc`, or if the `ErrorKind` is not `Io`,
+    /// then the original error is returned as a custom `std::io::Error`.
     pub(crate) fn into_io_error(self) -> std::io::Error {
         match Arc::try_unwrap(self.kind) {
             Ok(ErrorKind::Io(io_error)) => io_error,
@@ -92,6 +92,7 @@ impl std::ops::Deref for Error {
 
 /// The types of errors that can occur.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum ErrorKind {
     /// Wrapper around [`std::net::AddrParseError`](https://doc.rust-lang.org/std/net/struct.AddrParseError.html).
     #[error(display = "{}", _0)]
@@ -102,6 +103,7 @@ pub enum ErrorKind {
         display = "An invalid argument was provided to a database operation: {}",
         message
     )]
+    #[non_exhaustive]
     ArgumentError { message: String },
 
     #[cfg(feature = "async-std-runtime")]
@@ -111,6 +113,7 @@ pub enum ErrorKind {
     /// An error occurred while the [`Client`](../struct.Client.html) attempted to authenticate a
     /// connection.
     #[error(display = "{}", message)]
+    #[non_exhaustive]
     AuthenticationError { message: String },
 
     /// Wrapper around `bson::DecoderError`.
@@ -139,6 +142,7 @@ pub enum ErrorKind {
     DnsResolve(trust_dns_resolver::error::ResolveError),
 
     #[error(display = "Internal error: {}", message)]
+    #[non_exhaustive]
     InternalError { message: String },
 
     /// Wrapper around `webpki::InvalidDNSNameError`.
@@ -147,6 +151,7 @@ pub enum ErrorKind {
 
     /// A hostname could not be parsed.
     #[error(display = "Unable to parse hostname: {}", hostname)]
+    #[non_exhaustive]
     InvalidHostname { hostname: String },
 
     /// Wrapper around [`std::io::Error`](https://doc.rust-lang.org/std/io/struct.Error.html).
@@ -161,6 +166,7 @@ pub enum ErrorKind {
         display = "A database operation failed to send or receive a reply: {}",
         message
     )]
+    #[non_exhaustive]
     OperationError { message: String },
 
     #[error(display = "{}", _0)]
@@ -168,6 +174,7 @@ pub enum ErrorKind {
 
     /// Data from a file could not be parsed.
     #[error(display = "Unable to parse {} data from {}", data_type, file_path)]
+    #[non_exhaustive]
     ParseError {
         data_type: String,
         file_path: String,
@@ -178,14 +185,17 @@ pub enum ErrorKind {
         display = "The server returned an invalid reply to a database operation: {}",
         message
     )]
+    #[non_exhaustive]
     ResponseError { message: String },
 
     /// The Client was not able to select a server for the operation.
     #[error(display = "{}", message)]
+    #[non_exhaustive]
     ServerSelectionError { message: String },
 
     /// An error occurred during SRV record lookup.
     #[error(display = "An error occurred during SRV record lookup: {}", message)]
+    #[non_exhaustive]
     SrvLookupError { message: String },
 
     /// A timeout occurred before a Tokio task could be completed.
@@ -198,6 +208,7 @@ pub enum ErrorKind {
 
     /// An error occurred during TXT record lookup
     #[error(display = "An error occurred during TXT record lookup: {}", message)]
+    #[non_exhaustive]
     TxtLookupError { message: String },
 
     /// The Client timed out while checking out a connection from connection pool.
@@ -205,6 +216,7 @@ pub enum ErrorKind {
         display = "Timed out while checking out a connection from connection pool with address {}",
         address
     )]
+    #[non_exhaustive]
     WaitQueueTimeoutError { address: StreamAddress },
 
     /// An error occurred when trying to execute a write operation
@@ -299,6 +311,7 @@ fn is_recovering(code: i32, message: &str) -> bool {
 
 /// An error that occurred due to a database command failing.
 #[derive(Clone, Debug, Deserialize)]
+#[non_exhaustive]
 pub struct CommandError {
     /// Identifies the type of error.
     pub code: i32,
@@ -324,6 +337,7 @@ impl fmt::Display for CommandError {
 
 /// An error that occurred due to not being able to satisfy a write concern.
 #[derive(Clone, Debug, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct WriteConcernError {
     /// Identifies the type of write concern error.
     pub code: i32,
@@ -340,6 +354,7 @@ pub struct WriteConcernError {
 /// An error that occurred during a write operation that wasn't due to being unable to satisfy a
 /// write concern.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct WriteError {
     /// Identifies the type of write error.
     pub code: i32,
@@ -357,6 +372,7 @@ pub struct WriteError {
 /// An error that occurred during a write operation consisting of multiple writes that wasn't due to
 /// being unable to satisfy a write concern.
 #[derive(Debug, PartialEq, Clone, Deserialize)]
+#[non_exhaustive]
 pub struct BulkWriteError {
     /// Index into the list of operations that this error corresponds to.
     pub index: usize,
@@ -378,6 +394,7 @@ pub struct BulkWriteError {
 
 /// The set of errors that occurred during a write operation.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct BulkWriteFailure {
     /// The error(s) that occurred on account of a non write concern failure.
     pub write_errors: Option<Vec<BulkWriteError>>,
@@ -397,6 +414,7 @@ impl BulkWriteFailure {
 
 /// An error that occurred when trying to execute a write operation.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub enum WriteFailure {
     WriteConcernError(WriteConcernError),
     WriteError(WriteError),

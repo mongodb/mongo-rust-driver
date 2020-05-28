@@ -192,8 +192,7 @@ impl TopologyDescription {
 
                 let resolved_read_pref = match specified_read_pref {
                     Some(ReadPreference::Primary) | None => ReadPreference::PrimaryPreferred {
-                        max_staleness: None,
-                        tag_sets: None,
+                        options: Default::default(),
                     },
                     Some(other) => other,
                 };
@@ -205,8 +204,7 @@ impl TopologyDescription {
                     Some(SelectionCriteria::ReadPreference(rp)) => Some(rp.clone()),
                     Some(SelectionCriteria::Predicate(_)) => {
                         Some(ReadPreference::PrimaryPreferred {
-                            max_staleness: None,
-                            tag_sets: None,
+                            options: Default::default(),
                         })
                     }
                     None => Some(ReadPreference::Primary),
@@ -221,40 +219,28 @@ impl TopologyDescription {
         criteria: Option<&SelectionCriteria>,
     ) {
         match criteria {
-            Some(SelectionCriteria::ReadPreference(ReadPreference::Secondary {
-                max_staleness,
-                tag_sets,
-            })) => {
+            Some(SelectionCriteria::ReadPreference(ReadPreference::Secondary { ref options })) => {
                 command.read_pref = Some(ReadPreference::Secondary {
-                    max_staleness: *max_staleness,
-                    tag_sets: tag_sets.clone(),
+                    options: options.clone(),
                 });
             }
             Some(SelectionCriteria::ReadPreference(ReadPreference::PrimaryPreferred {
-                max_staleness,
-                tag_sets,
+                ref options,
             })) => {
                 command.read_pref = Some(ReadPreference::PrimaryPreferred {
-                    max_staleness: *max_staleness,
-                    tag_sets: tag_sets.clone(),
+                    options: options.clone(),
                 });
             }
             Some(SelectionCriteria::ReadPreference(ReadPreference::SecondaryPreferred {
-                max_staleness,
-                tag_sets,
-            })) if max_staleness.is_some() || tag_sets.is_some() => {
+                ref options,
+            })) if options.max_staleness.is_some() || options.tag_sets.is_some() => {
                 command.read_pref = Some(ReadPreference::SecondaryPreferred {
-                    max_staleness: *max_staleness,
-                    tag_sets: tag_sets.clone(),
+                    options: options.clone(),
                 });
             }
-            Some(SelectionCriteria::ReadPreference(ReadPreference::Nearest {
-                max_staleness,
-                tag_sets,
-            })) => {
+            Some(SelectionCriteria::ReadPreference(ReadPreference::Nearest { ref options })) => {
                 command.read_pref = Some(ReadPreference::Nearest {
-                    max_staleness: *max_staleness,
-                    tag_sets: tag_sets.clone(),
+                    options: options.clone(),
                 });
             }
             _ => {}

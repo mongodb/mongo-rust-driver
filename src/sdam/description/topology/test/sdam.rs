@@ -261,8 +261,7 @@ async fn direct_connection() {
     }
 
     let criteria = SelectionCriteria::ReadPreference(ReadPreference::Secondary {
-        max_staleness: None,
-        tag_sets: None,
+        options: Default::default(),
     });
     let secondary_address = test_client
         .test_select_server(Some(&criteria))

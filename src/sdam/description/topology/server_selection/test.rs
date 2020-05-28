@@ -13,7 +13,7 @@ use crate::{
         server::{ServerDescription, ServerType},
         topology::{test::f64_ms_as_duration, TopologyDescription, TopologyType},
     },
-    selection_criteria::{ReadPreference, TagSet},
+    selection_criteria::{ReadPreference, ReadPreferenceOptions, TagSet},
 };
 
 #[derive(Debug, Deserialize)]
@@ -105,20 +105,28 @@ fn convert_read_preference(test_read_pref: TestReadPreference) -> Option<ReadPre
     let read_pref = match &test_read_pref.mode.as_ref()?[..] {
         "Primary" => ReadPreference::Primary,
         "Secondary" => ReadPreference::Secondary {
-            tag_sets: test_read_pref.tag_sets,
-            max_staleness,
+            options: ReadPreferenceOptions::builder()
+                .tag_sets(test_read_pref.tag_sets)
+                .max_staleness(max_staleness.clone())
+                .build(),
         },
         "PrimaryPreferred" => ReadPreference::PrimaryPreferred {
-            tag_sets: test_read_pref.tag_sets,
-            max_staleness,
+            options: ReadPreferenceOptions::builder()
+                .tag_sets(test_read_pref.tag_sets)
+                .max_staleness(max_staleness.clone())
+                .build(),
         },
         "SecondaryPreferred" => ReadPreference::SecondaryPreferred {
-            tag_sets: test_read_pref.tag_sets,
-            max_staleness,
+            options: ReadPreferenceOptions::builder()
+                .tag_sets(test_read_pref.tag_sets)
+                .max_staleness(max_staleness.clone())
+                .build(),
         },
         "Nearest" => ReadPreference::Nearest {
-            tag_sets: test_read_pref.tag_sets,
-            max_staleness,
+            options: ReadPreferenceOptions::builder()
+                .tag_sets(test_read_pref.tag_sets)
+                .max_staleness(max_staleness.clone())
+                .build(),
         },
         _ => panic!("invalid read preference: {:?}", test_read_pref),
     };

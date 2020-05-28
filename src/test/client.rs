@@ -6,7 +6,7 @@ use serde::Deserialize;
 use crate::{
     error::{Error, ErrorKind},
     options::{AuthMechanism, ClientOptions, Credential, ListDatabasesOptions},
-    selection_criteria::{ReadPreference, SelectionCriteria},
+    selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria},
     test::{util::TestClient, CLIENT_OPTIONS, LOCK},
     Client,
 };
@@ -70,8 +70,9 @@ async fn server_selection_timeout_message() {
     tag_set.insert("asdfasdf".to_string(), "asdfadsf".to_string());
 
     let unsatisfiable_read_preference = ReadPreference::Secondary {
-        tag_sets: Some(vec![tag_set]),
-        max_staleness: None,
+        options: ReadPreferenceOptions::builder()
+            .tag_sets(vec![tag_set])
+            .build(),
     };
 
     let mut options = CLIENT_OPTIONS.clone();

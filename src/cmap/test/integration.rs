@@ -30,8 +30,7 @@ async fn acquire_connection_and_send_command() {
 
     let body = doc! { "listDatabases": 1 };
     let read_pref = ReadPreference::PrimaryPreferred {
-        tag_sets: None,
-        max_staleness: None,
+        options: Default::default(),
     };
     let cmd = Command::new_read(
         "listDatabases".to_string(),

@@ -9,6 +9,7 @@ use crate::{cmap::ConnectionInfo, error::Error};
 
 /// An event that triggers when a database command is initiated.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct CommandStartedEvent {
     /// The command being run.
     pub command: Document,
@@ -31,6 +32,7 @@ pub struct CommandStartedEvent {
 
 /// An event that triggers when a database command completes without an error.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct CommandSucceededEvent {
     /// The total execution time of the command (including the network round-trip).
     pub duration: Duration,
@@ -52,6 +54,7 @@ pub struct CommandSucceededEvent {
 
 /// An event that triggers when a command failed to complete successfully.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct CommandFailedEvent {
     /// The total execution time of the command (including the network round-trip).
     pub duration: Duration,

@@ -128,6 +128,7 @@ impl Serialize for ReadConcernLevel {
 /// information about write concerns.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Default, PartialEq, TypedBuilder, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct WriteConcern {
     /// Requests acknowledgement that the operation has propagated to a specific number or variety
     /// of servers.
@@ -155,6 +156,7 @@ pub struct WriteConcern {
 
 /// The type of the `w` field in a [`WriteConcern`](struct.WriteConcern.html).
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum Acknowledgment {
     /// Requires acknowledgement that the write has reached the specified number of nodes.
     ///

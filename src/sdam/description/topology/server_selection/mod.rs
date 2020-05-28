@@ -143,33 +143,27 @@ impl TopologyDescription {
     ) -> Result<Vec<&'a ServerDescription>> {
         let servers = match read_preference {
             ReadPreference::Primary => self.servers_with_type(&[ServerType::RSPrimary]).collect(),
-            ReadPreference::Secondary {
-                ref tag_sets,
-                max_staleness,
-            } => self.suitable_servers_for_read_preference(
-                &[ServerType::RSSecondary],
-                tag_sets.as_ref(),
-                *max_staleness,
-            )?,
-            ReadPreference::PrimaryPreferred {
-                ref tag_sets,
-                max_staleness,
-            } => match self.servers_with_type(&[ServerType::RSPrimary]).next() {
-                Some(primary) => vec![primary],
-                None => self.suitable_servers_for_read_preference(
+            ReadPreference::Secondary { ref options } => self
+                .suitable_servers_for_read_preference(
                     &[ServerType::RSSecondary],
-                    tag_sets.as_ref(),
-                    *max_staleness,
+                    options.tag_sets.as_ref(),
+                    options.max_staleness,
                 )?,
-            },
-            ReadPreference::SecondaryPreferred {
-                ref tag_sets,
-                max_staleness,
-            } => {
+            ReadPreference::PrimaryPreferred { ref options } => {
+                match self.servers_with_type(&[ServerType::RSPrimary]).next() {
+                    Some(primary) => vec![primary],
+                    None => self.suitable_servers_for_read_preference(
+                        &[ServerType::RSSecondary],
+                        options.tag_sets.as_ref(),
+                        options.max_staleness,
+                    )?,
+                }
+            }
+            ReadPreference::SecondaryPreferred { ref options } => {
                 let suitable_servers = self.suitable_servers_for_read_preference(
                     &[ServerType::RSSecondary],
-                    tag_sets.as_ref(),
-                    *max_staleness,
+                    options.tag_sets.as_ref(),
+                    options.max_staleness,
                 )?;
 
                 if suitable_servers.is_empty() {
@@ -178,13 +172,10 @@ impl TopologyDescription {
                     suitable_servers
                 }
             }
-            ReadPreference::Nearest {
-                ref tag_sets,
-                max_staleness,
-            } => self.suitable_servers_for_read_preference(
+            ReadPreference::Nearest { ref options } => self.suitable_servers_for_read_preference(
                 &[ServerType::RSPrimary, ServerType::RSSecondary],
-                tag_sets.as_ref(),
-                *max_staleness,
+                options.tag_sets.as_ref(),
+                options.max_staleness,
             )?,
         };
 
