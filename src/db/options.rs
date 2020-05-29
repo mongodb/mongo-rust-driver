@@ -90,6 +90,13 @@ pub struct CreateCollectionOptions {
     /// The write concern for the operation.   
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
+
+    /// The default configuration for indexes. This option accepts a `storageEngine` document in
+    /// the following form:
+    ///
+    /// `{ <storage-engine-name>: <options> }`
+    #[builder(default)]
+    pub index_option_defaults: Option<Document>,
 }
 
 /// Specifies how strictly the database should apply validation rules to existing documents during
