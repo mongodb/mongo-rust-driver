@@ -831,6 +831,75 @@ pub struct FindOneOptions {
     pub sort: Option<Document>,
 }
 
+/// Specifies an index to create.
+#[derive(Debug, TypedBuilder)]
+#[non_exhaustive]
+#[deprecated]
+pub struct IndexModel {
+    /// The fields to index, along with their sort order.
+    pub keys: Document,
+
+    /// Extra options to use when creating the index.
+    #[builder(default)]
+    pub options: Option<Document>,
+}
+
+/// Specifies the options to a [`Collection::create_index`](../struct.Collection.html#method.create_index)
+/// operation.
+/// See the [documentation](https://docs.mongodb.com/manual/reference/method/db.collection.createIndex/#options-for-all-index-types) for more
+/// information on how to use this option.
+#[derive(Debug, Default, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct CreateIndexOptions {
+    /// Optional. Creates a unique index so that the collection will not accept insertion or update of documents where the index key value matches an existing value in the index.
+    ///
+    /// Specify true to create a unique index. The default value is false.
+    ///
+    /// The option is unavailable for [hashed](https://docs.mongodb.com/manual/core/index-hashed/) indexes.
+    #[builder(default)]
+    pub unique: Option<bool>,
+
+    /// Optional. The name of the index.
+    ///
+    /// If unspecified, MongoDB generates an index name by concatenating the names of the indexed fields and the sort order.
+    #[builder(default)]
+    pub name: Option<String>,
+
+    /// Optional. If specified, the index only references documents that match the filter expression. See Partial Indexes for more information.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/core/index-partial/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub partial_filter_expression: Option<Document>,
+
+    /// Optional. If true, the index only references documents with the specified field.
+    ///
+    /// These indexes use less space but behave differently in some situations (particularly sorts). The default value is false.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/core/index-sparse/) for more
+    /// information on how to use this option.
+    #[builder(default)]
+    pub sparse: Option<bool>,
+
+    /// Optional. Specifies a value, in seconds, as a TTL to control how long MongoDB retains documents in this collection.
+    ///
+    /// See the [documentation](https://docs.mongodb.com/manual/tutorial/expire-data/) for more
+    /// information on how to use this option.
+    ///
+    /// This applies only to [TTL](https://docs.mongodb.com/manual/reference/glossary/#term-ttl) indexes.
+    #[builder(default)]
+    pub expire_after_seconds: Option<u32>,
+
+    /// Optional. Allows users to configure the storage engine on a per-index basis when creating an index.
+    ///
+    /// The storageEngine option should take the following form:
+    ///
+    /// storageEngine: { <storage-engine-name>: <options> }
+    #[builder(default)]
+    pub storage_engine: Option<Document>,
+}
+
 /// Specifies the options to a [`Collection::drop`](../struct.Collection.html#method.drop)
 /// operation.
 #[serde_with::skip_serializing_none]
