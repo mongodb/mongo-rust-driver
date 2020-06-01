@@ -7,8 +7,12 @@ use serde::Deserialize;
 use crate::{
     bson::{doc, Bson, Document},
     error::Result,
+    event::command::CommandStartedEvent,
     options::{AggregateOptions, CreateCollectionOptions},
-    test::{util::TestClient, LOCK},
+    test::{
+        util::{CommandEvent, EventClient, TestClient},
+        LOCK,
+    },
     Database,
 };
 
@@ -317,4 +321,51 @@ async fn db_aggregate_disk_use() {
     db.aggregate(pipeline, Some(options))
         .await
         .expect("aggregate with disk use should succeed");
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn create_index_options_defaults() {
+    let defaults = doc! { "storageEngine": doc! { "wiredTiger": doc! {} } };
+    index_option_defaults_test(Some(defaults)).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn create_index_options_defaults_not_specified() {
+    index_option_defaults_test(None).await;
+}
+
+#[function_name::named]
+async fn index_option_defaults_test(defaults: Option<Document>) {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = EventClient::new().await;
+    let db = client.database(function_name!());
+
+    let options = CreateCollectionOptions::builder()
+        .index_option_defaults(defaults.clone())
+        .build();
+    db.create_collection(function_name!(), options)
+        .await
+        .unwrap();
+    db.drop(None).await.unwrap();
+
+    let events = client.command_events.read().unwrap();
+    let mut iter = events.iter().filter(|event| match event {
+        CommandEvent::CommandStartedEvent(CommandStartedEvent { command_name, .. }) => {
+            command_name == "create"
+        }
+        _ => false,
+    });
+
+    let event = iter.next().unwrap();
+    let event_defaults = match event {
+        CommandEvent::CommandStartedEvent(CommandStartedEvent { command, .. }) => {
+            command.get_document("indexOptionDefaults").ok()
+        }
+        _ => None,
+    };
+    assert_eq!(event_defaults, defaults.as_ref());
+    assert!(iter.next().is_none());
 }
