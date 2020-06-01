@@ -8,7 +8,7 @@ use crate::{
     bson::{doc, Bson, Document},
     error::Result,
     event::command::CommandStartedEvent,
-    options::{AggregateOptions, CreateCollectionOptions},
+    options::{AggregateOptions, CreateCollectionOptions, IndexOptionDefaults},
     test::{
         util::{CommandEvent, EventClient, TestClient},
         LOCK,
@@ -326,7 +326,9 @@ async fn db_aggregate_disk_use() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn create_index_options_defaults() {
-    let defaults = doc! { "storageEngine": doc! { "wiredTiger": doc! {} } };
+    let defaults = IndexOptionDefaults {
+        storage_engine: doc! { "wiredTiger": doc! {} },
+    };
     index_option_defaults_test(Some(defaults)).await;
 }
 
@@ -337,7 +339,7 @@ async fn create_index_options_defaults_not_specified() {
 }
 
 #[function_name::named]
-async fn index_option_defaults_test(defaults: Option<Document>) {
+async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>) {
     let _guard = LOCK.run_concurrently().await;
 
     let client = EventClient::new().await;
@@ -362,10 +364,15 @@ async fn index_option_defaults_test(defaults: Option<Document>) {
     let event = iter.next().unwrap();
     let event_defaults = match event {
         CommandEvent::CommandStartedEvent(CommandStartedEvent { command, .. }) => {
-            command.get_document("indexOptionDefaults").ok()
+            match command.get_document("indexOptionDefaults") {
+                Ok(defaults) => Some(IndexOptionDefaults {
+                    storage_engine: defaults.get_document("storageEngine").unwrap().clone(),
+                }),
+                Err(_) => None,
+            }
         }
         _ => None,
     };
-    assert_eq!(event_defaults, defaults.as_ref());
+    assert_eq!(event_defaults, defaults);
     assert!(iter.next().is_none());
 }

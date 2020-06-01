@@ -96,7 +96,7 @@ pub struct CreateCollectionOptions {
     ///
     /// `{ <storage-engine-name>: <options> }`
     #[builder(default)]
-    pub index_option_defaults: Option<Document>,
+    pub index_option_defaults: Option<IndexOptionDefaults>,
 }
 
 /// Specifies how strictly the database should apply validation rules to existing documents during
@@ -122,6 +122,12 @@ pub enum ValidationLevel {
 pub enum ValidationAction {
     Error,
     Warn,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IndexOptionDefaults {
+    pub storage_engine: Document,
 }
 
 /// Specifies the options to a [`Database::drop`](../struct.Database.html#method.drop) operation.
