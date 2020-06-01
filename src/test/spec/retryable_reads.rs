@@ -108,7 +108,9 @@ async fn run() {
                             .run_collection_operation(&operation, &db_name, &coll_name)
                             .await
                     }
-                    OperationObject::GridfsBucket => panic!("unsupported operation type"),
+                    OperationObject::GridfsBucket => {
+                        panic!("unsupported operation: {}", operation.name)
+                    }
                 };
                 let mut operation_events: Vec<TestEvent> = client
                     .collect_events(&operation, false)
