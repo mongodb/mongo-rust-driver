@@ -11,6 +11,7 @@ use crate::{
     options::{AggregateOptions, CreateCollectionOptions, IndexOptionDefaults},
     test::{
         util::{CommandEvent, EventClient, TestClient},
+        CLIENT_OPTIONS,
         LOCK,
     },
     Database,
@@ -342,7 +343,11 @@ async fn create_index_options_defaults_not_specified() {
 async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>) {
     let _guard = LOCK.run_concurrently().await;
 
-    let client = EventClient::new().await;
+    let mut options = CLIENT_OPTIONS.clone();
+    if TestClient::new().await.is_sharded() {
+        options.hosts = options.hosts.iter().cloned().take(1).collect();
+    }
+    let client = EventClient::with_options(options).await;
     let db = client.database(function_name!());
 
     let options = CreateCollectionOptions::builder()
