@@ -268,6 +268,10 @@ pub struct DeleteOptions {
     /// The write concern for the operation.
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
+
+    /// The index to use for the operation.
+    #[builder(default)]
+    pub hint: Option<Hint>,
 }
 
 /// Specifies the options to a
