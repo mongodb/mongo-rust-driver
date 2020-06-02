@@ -7,7 +7,6 @@ use serde::Deserialize;
 use crate::{
     bson::{doc, Bson, Document},
     error::Result,
-    event::command::CommandStartedEvent,
     options::{AggregateOptions, CreateCollectionOptions, IndexOptionDefaults},
     test::{
         util::{CommandEvent, EventClient, TestClient},
@@ -326,21 +325,22 @@ async fn db_aggregate_disk_use() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
 async fn create_index_options_defaults() {
     let defaults = IndexOptionDefaults {
         storage_engine: doc! { "wiredTiger": doc! {} },
     };
-    index_option_defaults_test(Some(defaults)).await;
+    index_option_defaults_test(Some(defaults), function_name!()).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
 async fn create_index_options_defaults_not_specified() {
-    index_option_defaults_test(None).await;
+    index_option_defaults_test(None, function_name!()).await;
 }
 
-#[function_name::named]
-async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>) {
+async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>, name: &str) {
     let _guard = LOCK.run_concurrently().await;
 
     let mut options = CLIENT_OPTIONS.clone();
@@ -348,35 +348,32 @@ async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>) {
         options.hosts = options.hosts.iter().cloned().take(1).collect();
     }
     let client = EventClient::with_options(options).await;
-    let db = client.database(function_name!());
+    let db = client.database(name);
 
     let options = CreateCollectionOptions::builder()
         .index_option_defaults(defaults.clone())
         .build();
-    db.create_collection(function_name!(), options)
-        .await
-        .unwrap();
+    db.create_collection(name, options).await.unwrap();
     db.drop(None).await.unwrap();
 
     let events = client.command_events.read().unwrap();
-    let mut iter = events.iter().filter(|event| match event {
-        CommandEvent::CommandStartedEvent(CommandStartedEvent { command_name, .. }) => {
-            command_name == "create"
-        }
-        _ => false,
-    });
-
-    let event = iter.next().unwrap();
-    let event_defaults = match event {
-        CommandEvent::CommandStartedEvent(CommandStartedEvent { command, .. }) => {
-            match command.get_document("indexOptionDefaults") {
-                Ok(defaults) => Some(IndexOptionDefaults {
-                    storage_engine: defaults.get_document("storageEngine").unwrap().clone(),
-                }),
-                Err(_) => None,
+    let mut iter = events.iter().filter_map(|event| match event {
+        CommandEvent::CommandStartedEvent(event) => {
+            if event.command_name == "create" {
+                Some(event)
+            } else {
+                None
             }
         }
         _ => None,
+    });
+
+    let event = iter.next().unwrap();
+    let event_defaults = match event.command.get_document("indexOptionDefaults") {
+        Ok(defaults) => Some(IndexOptionDefaults {
+            storage_engine: defaults.get_document("storageEngine").unwrap().clone(),
+        }),
+        Err(_) => None,
     };
     assert_eq!(event_defaults, defaults);
     assert!(iter.next().is_none());
