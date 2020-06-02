@@ -254,7 +254,7 @@ pub struct ReplaceOptions {
 /// [`Collection::delete_one`](../struct.Collection.html#method.delete_one) or
 /// [`Collection::delete_many`](../struct.Collection.html#method.delete_many) operation.
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Default, TypedBuilder, Serialize)]
+#[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct DeleteOptions {

@@ -192,6 +192,24 @@ impl EventClient {
             String::from("single")
         }
     }
+
+    /// Gets all of the command started events for a specified command name.
+    pub fn get_command_started_events(&self, command_name: &str) -> Vec<CommandStartedEvent> {
+        let events = self.command_events.read().unwrap();
+        events
+            .iter()
+            .filter_map(|event| match event {
+                CommandEvent::CommandStartedEvent(event) => {
+                    if event.command_name == command_name {
+                        Some(event.clone())
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            })
+            .collect()
+    }
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

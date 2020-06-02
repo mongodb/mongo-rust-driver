@@ -7,7 +7,14 @@ use crate::{
     bson::{doc, Bson, Document},
     error::ErrorKind,
     event::command::CommandStartedEvent,
-    options::{AggregateOptions, FindOptions, InsertManyOptions, UpdateOptions},
+    options::{
+        AggregateOptions,
+        DeleteOptions,
+        FindOptions,
+        Hint,
+        InsertManyOptions,
+        UpdateOptions,
+    },
     test::{
         util::{drop_collection, CommandEvent, EventClient, TestClient},
         LOCK,
@@ -515,23 +522,16 @@ async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>)
         .collection(function_name!());
     coll.find(None, options).await.unwrap();
 
-    let events = event_client.command_events.read().unwrap();
-    let mut iter = events.iter().filter(|event| match event {
-        CommandEvent::CommandStartedEvent(CommandStartedEvent { command_name, .. }) => {
-            command_name == "find"
-        }
-        _ => false,
-    });
+    let events = event_client.get_command_started_events("find");
+    assert_eq!(events.len(), 1);
 
-    let event = iter.next().unwrap();
-    let allow_disk_use = match event {
-        CommandEvent::CommandStartedEvent(CommandStartedEvent { command, .. }) => {
-            command.get_bool("allowDiskUse").ok()
-        }
-        _ => None,
-    };
+    let allow_disk_use = events
+        .first()
+        .unwrap()
+        .command
+        .get_bool("allowDiskUse")
+        .ok();
     assert_eq!(allow_disk_use, expected_value);
-    assert_eq!(iter.count(), 0);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -544,4 +544,47 @@ async fn ns_not_found_suppression() {
     let coll = client.get_coll(function_name!(), function_name!());
     coll.drop(None).await.expect("drop should not fail");
     coll.drop(None).await.expect("drop should not fail");
+}
+
+async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = EventClient::new().await;
+    let coll = client.database(name).collection(name);
+    let _ = coll.delete_many(doc! {}, options.clone()).await;
+
+    let events = client.get_command_started_events("delete");
+    assert_eq!(events.len(), 1);
+
+    let event_hint = events.first().unwrap().command.get("hint").cloned();
+    let expected_hint = match options {
+        Some(options) => options.hint.map(|hint| hint.to_bson()),
+        None => None,
+    };
+    assert_eq!(event_hint, expected_hint);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn delete_hint_keys_specified() {
+    let options = DeleteOptions::builder().hint(Hint::Keys(doc! {})).build();
+    delete_hint_test(Some(options), function_name!()).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn delete_hint_string_specified() {
+    let options = DeleteOptions::builder()
+        .hint(Hint::Name(String::new()))
+        .build();
+    delete_hint_test(Some(options), function_name!()).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn delete_hint_not_specified() {
+    delete_hint_test(None, function_name!()).await;
 }
