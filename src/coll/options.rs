@@ -305,6 +305,10 @@ pub struct FindOneAndDeleteOptions {
     /// information on how to use this option.
     #[builder(default)]
     pub collation: Option<Collation>,
+
+    /// The index to use for the operation.
+    #[builder(default)]
+    pub hint: Option<Hint>,
 }
 
 /// Specifies the options to a
