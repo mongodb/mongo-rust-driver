@@ -10,6 +10,7 @@ use crate::{
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
         FindOneAndUpdateOptions,
+        Hint,
         ReturnDocument,
         UpdateModifications,
     },
@@ -67,6 +68,9 @@ pub(super) struct FindAndModifyOptions {
 
     #[builder(default)]
     pub(crate) collation: Option<Collation>,
+
+    #[builder(default)]
+    pub(crate) hint: Option<Hint>,
 }
 
 impl FindAndModifyOptions {
@@ -80,6 +84,7 @@ impl FindAndModifyOptions {
             .projection(opts.projection)
             .sort(opts.sort)
             .write_concern(opts.write_concern)
+            .hint(opts.hint)
             .build()
     }
 

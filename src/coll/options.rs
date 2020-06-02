@@ -277,7 +277,7 @@ pub struct DeleteOptions {
 /// Specifies the options to a
 /// [`Collection::find_one_and_delete`](../struct.Collection.html#method.find_one_and_delete)
 /// operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 #[non_exhaustive]
 pub struct FindOneAndDeleteOptions {
     /// The maximum amount of time to allow the query to run.

@@ -10,6 +10,7 @@ use crate::{
     options::{
         AggregateOptions,
         DeleteOptions,
+        FindOneAndDeleteOptions,
         FindOptions,
         Hint,
         InsertManyOptions,
@@ -587,4 +588,49 @@ async fn delete_hint_string_specified() {
 #[function_name::named]
 async fn delete_hint_not_specified() {
     delete_hint_test(None, function_name!()).await;
+}
+
+async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>, name: &str) {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = EventClient::new().await;
+    let coll = client.database(name).collection(name);
+    let _ = coll.find_one_and_delete(doc! {}, options.clone()).await;
+
+    let events = client.get_command_started_events("findAndModify");
+    assert_eq!(events.len(), 1);
+
+    let event_hint = events.first().unwrap().command.get("hint").cloned();
+    let expected_hint = match options {
+        Some(options) => options.hint.map(|hint| hint.to_bson()),
+        None => None,
+    };
+    assert_eq!(event_hint, expected_hint);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn find_one_and_delete_hint_keys_specified() {
+    let options = FindOneAndDeleteOptions::builder()
+        .hint(Hint::Keys(doc! {}))
+        .build();
+    find_one_and_delete_hint_test(Some(options), function_name!()).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn find_one_and_delete_hint_string_specified() {
+    let options = FindOneAndDeleteOptions::builder()
+        .hint(Hint::Name(String::new()))
+        .build();
+    find_one_and_delete_hint_test(Some(options), function_name!()).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn find_one_and_delete_hint_not_specified() {
+    find_one_and_delete_hint_test(None, function_name!()).await;
 }
