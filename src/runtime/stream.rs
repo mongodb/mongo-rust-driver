@@ -20,6 +20,7 @@ use crate::{
 };
 
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+const KEEPALIVE: Duration = Duration::from_secs(120);
 
 /// A runtime-agnostic async stream possibly using TLS.
 #[allow(clippy::large_enum_variant)]
@@ -73,6 +74,18 @@ impl AsyncTcpStream {
         Ok(())
     }
 
+    fn set_keepalive(&self) -> Result<()> {
+        match self {
+            #[cfg(feature = "tokio-runtime")]
+            Self::Tokio(ref stream) => stream.set_keepalive(Some(KEEPALIVE))?,
+
+            #[cfg(feature = "async-std-runtime")]
+            Self::AsyncStd(ref stream) => stream.set_keepalive(Some(KEEPALIVE))?,
+        };
+
+        Ok(())
+    }
+
     async fn try_connect(address: &SocketAddr, connect_timeout: Duration) -> Result<Self> {
         #[cfg(feature = "tokio-runtime")]
         use tokio::{net::TcpStream, time::timeout};
@@ -89,6 +102,8 @@ impl AsyncTcpStream {
         } else {
             timeout(connect_timeout, stream_future).await??.into()
         };
+
+        stream.set_keepalive()?;
 
         stream.set_nodelay()?;
 
