@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 
 use crate::{
     bson::{doc, Bson, Document},
-    error::ErrorKind,
+    error::{ErrorKind, Result},
     event::command::CommandStartedEvent,
     options::{
         AggregateOptions,
@@ -16,6 +16,7 @@ use crate::{
         InsertManyOptions,
         UpdateOptions,
     },
+    results::DeleteResult,
     test::{
         util::{drop_collection, CommandEvent, EventClient, TestClient},
         LOCK,
@@ -552,12 +553,12 @@ async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
 
     let client = EventClient::new().await;
     let coll = client.database(name).collection(name);
-    let _ = coll.delete_many(doc! {}, options.clone()).await;
+    let _: Result<DeleteResult> = coll.delete_many(doc! {}, options.clone()).await;
 
     let events = client.get_command_started_events("delete");
     assert_eq!(events.len(), 1);
 
-    let event_hint = events.first().unwrap().command.get("hint").cloned();
+    let event_hint = events[0].command.get("hint").cloned();
     let expected_hint = match options {
         Some(options) => options.hint.map(|hint| hint.to_bson()),
         None => None,
@@ -595,16 +596,13 @@ async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>,
 
     let client = EventClient::new().await;
     let coll = client.database(name).collection(name);
-    let _ = coll.find_one_and_delete(doc! {}, options.clone()).await;
+    let _: Result<Option<Document>> = coll.find_one_and_delete(doc! {}, options.clone()).await;
 
     let events = client.get_command_started_events("findAndModify");
     assert_eq!(events.len(), 1);
 
-    let event_hint = events.first().unwrap().command.get("hint").cloned();
-    let expected_hint = match options {
-        Some(options) => options.hint.map(|hint| hint.to_bson()),
-        None => None,
-    };
+    let event_hint = events[0].command.get("hint").cloned();
+    let expected_hint = options.and_then(|options| options.hint.map(|hint| hint.to_bson()));
     assert_eq!(event_hint, expected_hint);
 }
 
