@@ -1,9 +1,8 @@
 #[cfg(test)]
 mod test;
 
-use bson::{doc, Bson, Document};
-
 use crate::{
+    bson::{doc, Bson, Document},
     bson_util,
     cmap::{Command, CommandResponse, StreamDescription},
     cursor::CursorSpecification,
@@ -117,7 +116,7 @@ pub(crate) enum AggregateTarget {
 impl AggregateTarget {
     fn to_bson(&self) -> Bson {
         match self {
-            AggregateTarget::Database(_) => Bson::I32(1),
+            AggregateTarget::Database(_) => Bson::Int32(1),
             AggregateTarget::Collection(ref ns) => Bson::String(ns.coll.to_string()),
         }
     }

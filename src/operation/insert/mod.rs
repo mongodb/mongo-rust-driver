@@ -3,9 +3,8 @@ mod test;
 
 use std::collections::HashMap;
 
-use bson::{doc, Document};
-
 use crate::{
+    bson::{doc, Document},
     bson_util,
     client::ClientSession,
     cmap::{Command, CommandResponse, StreamDescription},

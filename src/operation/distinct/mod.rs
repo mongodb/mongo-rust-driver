@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod test;
 
-use bson::{doc, Bson, Document};
 use serde::Deserialize;
 
 use crate::{
+    bson::{doc, Bson, Document},
     cmap::{Command, CommandResponse, StreamDescription},
     coll::{options::DistinctOptions, Namespace},
     error::Result,

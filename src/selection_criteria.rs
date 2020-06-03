@@ -1,10 +1,10 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use bson::{doc, Bson, Document};
 use derivative::Derivative;
 use typed_builder::TypedBuilder;
 
 use crate::{
+    bson::{doc, Bson, Document},
     error::{ErrorKind, Result},
     options::StreamAddress,
     sdam::public::ServerInfo,

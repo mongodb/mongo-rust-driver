@@ -1,6 +1,4 @@
-use bson::doc;
-
-use crate::Client;
+use crate::{bson::doc, Client};
 
 async fn run_test(uri_env_var: &str) {
     if std::env::var_os("MONGO_ATLAS_TESTS").is_none() {

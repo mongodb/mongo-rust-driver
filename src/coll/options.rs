@@ -1,12 +1,12 @@
 use std::time::Duration;
 
-use bson::{doc, Bson, Document};
 use serde::{Deserialize, Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    bson_util::{serialize_batch_size, serialize_duration_as_i64_millis, serialize_u32_as_i32},
+    bson::{doc, Bson, Document},
+    bson_util::{serialize_batch_size, serialize_duration_as_int_millis, serialize_u32_as_i32},
     concern::{ReadConcern, WriteConcern},
     options::Collation,
     selection_criteria::SelectionCriteria,
@@ -456,7 +456,7 @@ pub struct AggregateOptions {
     /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     #[serde(
-        serialize_with = "serialize_duration_as_i64_millis",
+        serialize_with = "serialize_duration_as_int_millis",
         rename = "maxTimeMS"
     )]
     pub max_time: Option<Duration>,
@@ -534,7 +534,7 @@ pub struct EstimatedDocumentCountOptions {
     /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     #[serde(
-        serialize_with = "serialize_duration_as_i64_millis",
+        serialize_with = "serialize_duration_as_int_millis",
         rename = "maxTimeMS"
     )]
     pub max_time: Option<Duration>,
@@ -564,7 +564,7 @@ pub struct DistinctOptions {
     /// across the wire as an integer number of milliseconds.
     #[builder(default)]
     #[serde(
-        serialize_with = "serialize_duration_as_i64_millis",
+        serialize_with = "serialize_duration_as_int_millis",
         rename = "maxTimeMS"
     )]
     pub max_time: Option<Duration>,
@@ -661,7 +661,7 @@ pub struct FindOptions {
     #[builder(default)]
     #[serde(
         rename = "maxTimeMS",
-        serialize_with = "serialize_duration_as_i64_millis"
+        serialize_with = "serialize_duration_as_int_millis"
     )]
     pub max_time: Option<Duration>,
 

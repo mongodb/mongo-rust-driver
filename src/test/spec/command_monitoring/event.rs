@@ -1,6 +1,9 @@
-use crate::test::{CommandEvent, Matchable};
-use bson::Document;
 use serde::Deserialize;
+
+use crate::{
+    bson::Document,
+    test::{CommandEvent, Matchable},
+};
 
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]

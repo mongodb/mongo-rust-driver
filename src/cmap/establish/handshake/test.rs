@@ -1,7 +1,5 @@
-use bson::doc;
-
 use super::Handshaker;
-use crate::{cmap::options::ConnectionPoolOptions, options::DriverInfo};
+use crate::{bson::doc, cmap::options::ConnectionPoolOptions, options::DriverInfo};
 
 #[test]
 fn metadata_no_options() {

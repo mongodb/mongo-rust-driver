@@ -1,9 +1,9 @@
 use std::future::Future;
 
-use bson::doc;
 use futures::stream::StreamExt;
 
 use crate::{
+    bson::doc,
     error::{CommandError, ErrorKind},
     options::{
         Acknowledgment,

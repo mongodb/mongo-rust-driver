@@ -2,11 +2,11 @@ mod options;
 #[cfg(test)]
 mod test;
 
-use bson::{doc, Bson, Document};
 use serde::Deserialize;
 
 use self::options::FindAndModifyOptions;
 use crate::{
+    bson::{doc, Bson, Document},
     bson_util,
     cmap::{Command, CommandResponse, StreamDescription},
     coll::{

@@ -1,8 +1,8 @@
-use bson::{Bson, Document};
 use pretty_assertions::assert_eq;
 use serde::Deserialize;
 
 use crate::{
+    bson::{Bson, Document},
     client::options::{ClientOptions, ClientOptionsParser, StreamAddress},
     error::ErrorKind,
     selection_criteria::{ReadPreference, SelectionCriteria},
@@ -60,7 +60,7 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
     }
 
     if let Some(i) = options.connect_timeout.take() {
-        doc.insert("connecttimeoutms", i.as_millis() as i64);
+        doc.insert("connecttimeoutms", i.as_millis() as i32);
     }
 
     if let Some(b) = options.direct_connection.take() {
@@ -68,15 +68,15 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
     }
 
     if let Some(i) = options.heartbeat_freq.take() {
-        doc.insert("heartbeatfrequencyms", i.as_millis() as i64);
+        doc.insert("heartbeatfrequencyms", i.as_millis() as i32);
     }
 
     if let Some(i) = options.local_threshold.take() {
-        doc.insert("localthresholdms", i.as_millis() as i64);
+        doc.insert("localthresholdms", i.as_millis() as i32);
     }
 
     if let Some(i) = options.max_idle_time.take() {
-        doc.insert("maxidletimems", i.as_millis() as i64);
+        doc.insert("maxidletimems", i.as_millis() as i32);
     }
 
     if let Some(s) = options.repl_set_name.take() {
@@ -118,7 +118,7 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
         }
 
         if let Some(i) = max_staleness {
-            doc.insert("maxstalenessseconds", i.as_secs() as i64);
+            doc.insert("maxstalenessseconds", i.as_secs() as i32);
         }
     }
 
@@ -131,11 +131,11 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
     }
 
     if let Some(i) = options.server_selection_timeout.take() {
-        doc.insert("serverselectiontimeoutms", i.as_millis() as i64);
+        doc.insert("serverselectiontimeoutms", i.as_millis() as i32);
     }
 
     if let Some(i) = options.socket_timeout.take() {
-        doc.insert("sockettimeoutms", i.as_millis() as i64);
+        doc.insert("sockettimeoutms", i.as_millis() as i32);
     }
 
     if let Some(mut opt) = options.tls_options() {
@@ -183,7 +183,7 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
         .w_timeout
         .take()
     {
-        doc.insert("wtimeoutms", i.as_millis() as i64);
+        doc.insert("wtimeoutms", i.as_millis() as i32);
     }
 
     if let Some(b) = options
@@ -196,7 +196,7 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
     }
 
     if let Some(i) = options.zlib_compression.take() {
-        doc.insert("zlibcompressionlevel", i64::from(i));
+        doc.insert("zlibcompressionlevel", i);
     }
 
     doc

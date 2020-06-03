@@ -1,8 +1,6 @@
-use crate::runtime::{AsyncLittleEndianRead, AsyncLittleEndianWrite};
-
 use crate::{
     error::{ErrorKind, Result},
-    runtime::AsyncStream,
+    runtime::{AsyncLittleEndianRead, AsyncLittleEndianWrite, AsyncStream},
 };
 
 /// The wire protocol op codes.

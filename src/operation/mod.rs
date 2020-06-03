@@ -16,10 +16,10 @@ mod update;
 
 use std::{collections::VecDeque, fmt::Debug, ops::Deref};
 
-use bson::{self, Bson, Document};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    bson::{self, Bson, Document},
     cmap::{Command, CommandResponse, StreamDescription},
     error::{
         BulkWriteError,

@@ -5,13 +5,13 @@ mod session;
 
 use std::{sync::Arc, time::Duration};
 
-use bson::{Bson, Document};
 use derivative::Derivative;
 use time::PreciseTime;
 
 #[cfg(test)]
 use crate::options::StreamAddress;
 use crate::{
+    bson::{Bson, Document},
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::{ErrorKind, Result},

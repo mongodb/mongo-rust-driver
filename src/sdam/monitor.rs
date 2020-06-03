@@ -3,7 +3,6 @@ use std::{
     time::Duration,
 };
 
-use bson::doc;
 use time::PreciseTime;
 
 use super::{
@@ -11,6 +10,7 @@ use super::{
     state::{server::Server, Topology, WeakTopology},
 };
 use crate::{
+    bson::doc,
     cmap::{Command, Connection},
     error::Result,
     is_master::IsMasterReply,

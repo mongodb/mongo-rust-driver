@@ -1,10 +1,10 @@
 use std::cmp;
 
-use bson::{Bson, Document};
 use serde::Deserialize;
 
 use super::{Outcome, TestFile};
 use crate::{
+    bson::{Bson, Document},
     options::{Collation, FindOneAndUpdateOptions, ReturnDocument},
     test::{run_spec_test, util::TestClient, LOCK},
 };

@@ -1,10 +1,10 @@
 use std::time::Duration;
 
-use bson::{doc, Bson, Document};
 use futures::stream::StreamExt;
 use lazy_static::lazy_static;
 
 use crate::{
+    bson::{doc, Bson, Document},
     error::ErrorKind,
     event::command::CommandStartedEvent,
     options::{AggregateOptions, FindOptions, InsertManyOptions, UpdateOptions},
@@ -66,7 +66,7 @@ async fn find() {
 
         assert_eq!(doc.len(), 2);
         assert!(doc.contains_key("_id"));
-        assert_eq!(doc.get("x"), Some(&Bson::I32(i as i32)));
+        assert_eq!(doc.get("x"), Some(&Bson::Int32(i as i32)));
     }
 }
 

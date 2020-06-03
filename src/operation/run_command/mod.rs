@@ -1,10 +1,9 @@
 #[cfg(test)]
 mod test;
 
-use bson::Document;
-
 use super::Operation;
 use crate::{
+    bson::Document,
     client::SESSIONS_UNSUPPORTED_COMMANDS,
     cmap::{Command, CommandResponse, StreamDescription},
     error::{ErrorKind, Result},

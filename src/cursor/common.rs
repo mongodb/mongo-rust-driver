@@ -5,11 +5,11 @@ use std::{
     time::Duration,
 };
 
-use bson::Document;
 use derivative::Derivative;
 use futures::{Future, Stream};
 
 use crate::{
+    bson::Document,
     error::{ErrorKind, Result},
     options::StreamAddress,
     results::GetMoreResult,

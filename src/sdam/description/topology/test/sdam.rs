@@ -1,9 +1,9 @@
 use std::{collections::HashMap, time::Duration};
 
-use bson::{doc, oid::ObjectId};
 use serde::Deserialize;
 
 use crate::{
+    bson::{doc, oid::ObjectId},
     client::Client,
     error::ErrorKind,
     is_master::{IsMasterCommandResponse, IsMasterReply},

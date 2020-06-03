@@ -3,12 +3,12 @@ pub mod options;
 
 use std::{fmt, sync::Arc};
 
-use bson::{doc, Bson, Document};
 use futures::StreamExt;
 use serde::{de::Error, Deserialize, Deserializer};
 
 use self::options::*;
 use crate::{
+    bson::{doc, Bson, Document},
     bson_util,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, ErrorKind, Result},
@@ -45,8 +45,10 @@ const MAX_INSERT_DOCS_BYTES: usize = 16 * 1000 * 1000;
 /// so it can safely be shared across threads or async tasks. For example:
 ///
 /// ```rust
-/// # use bson::{bson, doc};
-/// # use mongodb::error::Result;
+/// # use mongodb::{
+/// #     bson::doc,
+/// #     error::Result,
+/// # };
 /// # #[cfg(feature = "async-std-runtime")]
 /// # use async_std::task;
 /// # #[cfg(feature = "tokio-runtime")]

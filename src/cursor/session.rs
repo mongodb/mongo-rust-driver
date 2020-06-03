@@ -1,10 +1,10 @@
 use std::collections::VecDeque;
 
-use bson::Document;
 use futures::future::BoxFuture;
 
 use super::common::{CursorInformation, GenericCursor, GetMoreProvider, GetMoreProviderResult};
 use crate::{
+    bson::Document,
     client::ClientSession,
     cursor::CursorSpecification,
     error::Result,

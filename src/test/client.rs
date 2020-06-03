@@ -1,9 +1,9 @@
 use std::{borrow::Cow, collections::HashMap, time::Duration};
 
-use bson::{doc, Bson};
 use serde::Deserialize;
 
 use crate::{
+    bson::{doc, Bson},
     error::{Error, ErrorKind},
     options::{AuthMechanism, ClientOptions, Credential, ListDatabasesOptions},
     selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria},

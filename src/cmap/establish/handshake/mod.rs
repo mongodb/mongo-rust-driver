@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod test;
 
-use bson::{doc, Bson, Document};
 use lazy_static::lazy_static;
 use os_info::{Type, Version};
 
 use crate::{
+    bson::{doc, Bson, Document},
     cmap::{options::ConnectionPoolOptions, Command, Connection, StreamDescription},
     error::Result,
     is_master::IsMasterReply,

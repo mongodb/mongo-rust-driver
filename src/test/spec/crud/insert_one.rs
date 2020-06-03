@@ -1,8 +1,10 @@
-use bson::{Bson, Document};
 use serde::Deserialize;
 
 use super::{Outcome, TestFile};
-use crate::test::{run_spec_test, util::TestClient, LOCK};
+use crate::{
+    bson::{Bson, Document},
+    test::{run_spec_test, util::TestClient, LOCK},
+};
 
 #[derive(Debug, Deserialize)]
 struct Arguments {

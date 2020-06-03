@@ -1,7 +1,6 @@
-use bson::{Bson, Document};
 use serde::Deserialize;
 
-use crate::{options::ClientOptions, test::run_spec_test};
+use crate::{bson::Document, options::ClientOptions, test::run_spec_test};
 
 #[derive(Debug, Deserialize)]
 struct TestFile {
@@ -19,10 +18,6 @@ struct TestCase {
 }
 
 fn normalize_write_concern_doc(mut write_concern_doc: Document) -> Document {
-    if let Some(&Bson::I32(i)) = write_concern_doc.get("w") {
-        write_concern_doc.insert("w", i64::from(i));
-    }
-
     if let Some(w_timeout) = write_concern_doc.remove("wtimeout") {
         write_concern_doc.insert("wtimeoutMS", w_timeout);
     }

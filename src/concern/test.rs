@@ -1,8 +1,7 @@
 use std::time::Duration;
 
-use bson::{doc, Bson};
-
 use crate::{
+    bson::{doc, Bson},
     error::ErrorKind,
     options::{Acknowledgment, InsertOneOptions, WriteConcern},
     test::{TestClient, LOCK},

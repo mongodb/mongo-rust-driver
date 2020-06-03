@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, VecDeque};
 
-use bson::{Bson, Document};
+use crate::bson::{Bson, Document};
 
 /// The result of a [`Collection::insert_one`](../struct.Collection.html#method.insert_one)
 /// operation.

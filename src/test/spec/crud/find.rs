@@ -1,9 +1,9 @@
-use bson::{Bson, Document};
 use futures::stream::TryStreamExt;
 use serde::Deserialize;
 
 use super::{Outcome, TestFile};
 use crate::{
+    bson::{Bson, Document},
     options::{Collation, FindOptions},
     test::{run_spec_test, util::TestClient, LOCK},
 };

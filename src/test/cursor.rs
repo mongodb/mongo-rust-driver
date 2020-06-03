@@ -1,9 +1,9 @@
 use std::time::Duration;
 
-use bson::doc;
 use futures::{future::Either, StreamExt};
 
 use crate::{
+    bson::doc,
     options::{CreateCollectionOptions, CursorType, FindOptions},
     test::{TestClient, LOCK},
     RUNTIME,

@@ -1,7 +1,7 @@
-use bson::doc;
 use pretty_assertions::assert_eq;
 
 use crate::{
+    bson::doc,
     bson_util,
     cmap::{CommandResponse, StreamDescription},
     concern::{Acknowledgment, WriteConcern},

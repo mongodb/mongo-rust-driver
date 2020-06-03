@@ -1,9 +1,9 @@
-use bson::Document;
 use serde::Serialize;
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
 use crate::{
+    bson::Document,
     bson_util,
     concern::{ReadConcern, WriteConcern},
     options::Collation,

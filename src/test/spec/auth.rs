@@ -1,9 +1,9 @@
 use std::str::FromStr;
 
-use bson::Document;
 use serde::Deserialize;
 
 use crate::{
+    bson::Document,
     options::{AuthMechanism, ClientOptions, Credential},
     test::run_spec_test,
 };

@@ -7,10 +7,10 @@ use std::{
     time::Duration,
 };
 
-use bson::oid::ObjectId;
 use serde::Deserialize;
 
 use crate::{
+    bson::oid::ObjectId,
     client::ClusterTime,
     cmap::Command,
     error::{ErrorKind, Result},

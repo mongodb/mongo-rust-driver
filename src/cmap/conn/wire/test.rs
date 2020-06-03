@@ -1,7 +1,6 @@
-use bson::{doc, Bson};
-
 use super::message::{Message, MessageFlags, MessageSection};
 use crate::{
+    bson::{doc, Bson},
     cmap::options::StreamOptions,
     runtime::AsyncStream,
     test::{CLIENT_OPTIONS, LOCK},
@@ -42,5 +41,5 @@ async fn basic() {
         MessageSection::Sequence { documents, .. } => documents.into_iter().next().unwrap(),
     };
 
-    assert_eq!(response_doc.get("ok"), Some(&Bson::FloatingPoint(1.0)));
+    assert_eq!(response_doc.get("ok"), Some(&Bson::Double(1.0)));
 }

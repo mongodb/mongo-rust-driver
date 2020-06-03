@@ -1,11 +1,11 @@
 use std::cmp::Ord;
 
 use approx::assert_ulps_eq;
-use bson::{doc, Bson, Document};
 use futures::stream::TryStreamExt;
 use serde::Deserialize;
 
 use crate::{
+    bson::{doc, Bson, Document},
     error::Result,
     options::{AggregateOptions, CreateCollectionOptions},
     test::{util::TestClient, LOCK},
@@ -225,7 +225,7 @@ async fn collection_management() {
     assert_eq!(colls[1].name, format!("{}2", function_name!()));
     assert_eq!(colls[1].coll_type, "collection");
     assert_eq!(colls[1].options.get("capped"), Some(&Bson::Boolean(true)));
-    assert_eq!(colls[1].options.get("size"), Some(&Bson::I32(512)));
+    assert_eq!(colls[1].options.get("size"), Some(&Bson::Int32(512)));
     assert!(!colls[1].info.read_only);
 }
 
