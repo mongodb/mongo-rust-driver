@@ -1,8 +1,7 @@
 use std::time::Duration;
 
-use bson::{doc, oid::ObjectId, Bson};
-
 use crate::{
+    bson::{doc, oid::ObjectId, Bson},
     bson_util,
     cmap::{CommandResponse, StreamDescription},
     coll::options::ReturnDocument,
@@ -84,7 +83,7 @@ async fn build_with_delete() {
     let mut expected_body = doc! {
         "findAndModify": "test_coll",
         "query": filter,
-        "maxTimeMS": max_time.as_millis() as i64,
+        "maxTimeMS": max_time.as_millis() as i32,
         "remove": true
     };
 
@@ -99,7 +98,7 @@ async fn build_with_delete() {
 async fn handle_success_delete() {
     let op = empty_delete();
     let value = doc! {
-        "_id" : Bson::ObjectId(ObjectId::new().unwrap()),
+        "_id" : Bson::ObjectId(ObjectId::new()),
         "name" : "Tom",
         "state" : "active",
         "rating" : 100,
@@ -235,7 +234,7 @@ async fn build_with_replace() {
 async fn handle_success_replace() {
     let op = empty_replace();
     let value = doc! {
-        "_id" : Bson::ObjectId(ObjectId::new().unwrap()),
+        "_id" : Bson::ObjectId(ObjectId::new()),
         "name" : "Tom",
         "state" : "active",
         "rating" : 100,
@@ -367,7 +366,7 @@ async fn build_with_update() {
 async fn handle_success_update() {
     let op = empty_update();
     let value = doc! {
-        "_id" : Bson::ObjectId(ObjectId::new().unwrap()),
+        "_id" : Bson::ObjectId(ObjectId::new()),
         "name" : "Tom",
         "state" : "active",
         "rating" : 100,

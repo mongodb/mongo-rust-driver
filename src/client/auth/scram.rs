@@ -7,7 +7,6 @@ use std::{
     sync::RwLock,
 };
 
-use bson::{doc, spec::BinarySubtype, Bson, Document};
 use hmac::{Hmac, Mac};
 use lazy_static::lazy_static;
 use md5::Md5;
@@ -15,6 +14,7 @@ use sha1::{Digest, Sha1};
 use sha2::Sha256;
 
 use crate::{
+    bson::{doc, spec::BinarySubtype, Binary, Bson, Document},
     bson_util,
     client::auth::{self, Credential},
     cmap::{Command, Connection},
@@ -145,7 +145,7 @@ impl ScramVersion {
         let noop = doc! {
             "saslContinue": 1,
             "conversationId": server_final.conversation_id().clone(),
-            "payload": Bson::Binary(BinarySubtype::Generic, Vec::new())
+            "payload": Bson::Binary(Binary { subtype: BinarySubtype::Generic, bytes: Vec::new() })
         };
         let command = Command::new("saslContinue".into(), source.into(), noop);
 
@@ -366,7 +366,7 @@ impl ClientFirst {
         doc! {
             "saslStart": 1,
             "mechanism": scram.to_string(),
-            "payload": Bson::Binary(BinarySubtype::Generic, self.message().as_bytes().to_vec())
+            "payload": Bson::Binary(Binary { subtype: BinarySubtype::Generic, bytes: self.message().as_bytes().to_vec() })
         }
     }
 }
@@ -517,7 +517,10 @@ impl ClientFinal {
     }
 
     fn payload(&self) -> Bson {
-        Bson::Binary(BinarySubtype::Generic, self.message().as_bytes().to_vec())
+        Bson::Binary(Binary {
+            subtype: BinarySubtype::Generic,
+            bytes: self.message().as_bytes().to_vec(),
+        })
     }
 
     fn message(&self) -> &str {
@@ -633,7 +636,7 @@ impl ServerFinal {
 
 #[cfg(test)]
 mod tests {
-    use bson::Bson;
+    use crate::bson::Bson;
 
     use super::ServerFirst;
 

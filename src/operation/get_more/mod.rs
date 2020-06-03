@@ -3,10 +3,10 @@ mod test;
 
 use std::{collections::VecDeque, time::Duration};
 
-use bson::{doc, Document};
 use serde::Deserialize;
 
 use crate::{
+    bson::{doc, Document},
     cmap::{Command, CommandResponse, StreamDescription},
     cursor::CursorInformation,
     error::{ErrorKind, Result},

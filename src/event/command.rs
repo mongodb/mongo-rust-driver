@@ -3,9 +3,7 @@
 
 use std::time::Duration;
 
-use bson::Document;
-
-use crate::{cmap::ConnectionInfo, error::Error};
+use crate::{bson::Document, cmap::ConnectionInfo, error::Error};
 
 /// An event that triggers when a database command is initiated.
 #[derive(Clone, Debug)]

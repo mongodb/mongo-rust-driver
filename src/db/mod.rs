@@ -2,10 +2,10 @@ pub mod options;
 
 use std::sync::Arc;
 
-use bson::{Bson, Document};
 use futures::stream::TryStreamExt;
 
 use crate::{
+    bson::{Bson, Document},
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{ErrorKind, Result},

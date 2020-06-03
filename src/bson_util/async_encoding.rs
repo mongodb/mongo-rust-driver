@@ -1,7 +1,7 @@
-use bson::Document;
 use futures::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use crate::{
+    bson::Document,
     error::Result,
     runtime::{AsyncLittleEndianRead, AsyncLittleEndianWrite},
 };
@@ -19,7 +19,7 @@ pub(crate) async fn decode_document<R: AsyncRead + Unpin + Send>(
         .read_to_end(&mut bytes)
         .await?;
 
-    let document = bson::decode_document(&mut bytes.as_slice())?;
+    let document = Document::from_reader(&mut bytes.as_slice())?;
     Ok(document)
 }
 
@@ -29,7 +29,7 @@ pub(crate) async fn encode_document<W: AsyncWrite + Unpin + Send>(
 ) -> Result<()> {
     let mut bytes = Vec::new();
 
-    bson::encode_document(&mut bytes, document)?;
+    document.to_writer(&mut bytes)?;
 
     writer.write_all(&bytes).await?;
 

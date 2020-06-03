@@ -1,9 +1,13 @@
 use std::time::Duration;
 
-use bson::{oid::ObjectId, TimeStamp, UtcDateTime};
 use serde::Deserialize;
 
-use crate::{sdam::ServerType, selection_criteria::TagSet, client::ClusterTime};
+use crate::{
+    bson::{oid::ObjectId, DateTime, Timestamp},
+    client::ClusterTime,
+    sdam::ServerType,
+    selection_criteria::TagSet,
+};
 
 #[derive(Debug, Clone)]
 pub(crate) struct IsMasterReply {
@@ -87,11 +91,11 @@ impl IsMasterCommandResponse {
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct LastWrite {
-    pub last_write_date: UtcDateTime,
+    pub last_write_date: DateTime,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub(crate) struct OpTime {
-    ts: TimeStamp,
+    ts: Timestamp,
     t: i32,
 }

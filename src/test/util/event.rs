@@ -3,10 +3,9 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use bson::doc;
-
 use super::TestClient;
 use crate::{
+    bson::doc,
     event::{
         cmap::{CmapEventHandler, PoolClearedEvent},
         command::{

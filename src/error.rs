@@ -116,13 +116,13 @@ pub enum ErrorKind {
     #[non_exhaustive]
     AuthenticationError { message: String },
 
-    /// Wrapper around `bson::DecoderError`.
+    /// Wrapper around `bson::de::Error`.
     #[error(display = "{}", _0)]
-    BsonDecode(#[error(source)] bson::DecoderError),
+    BsonDecode(#[error(source)] crate::bson::de::Error),
 
-    /// Wrapper around `bson::EncoderError`.
+    /// Wrapper around `bson::ser::Error`.
     #[error(display = "{}", _0)]
-    BsonEncode(#[error(source)] bson::EncoderError),
+    BsonEncode(#[error(source)] crate::bson::ser::Error),
 
     /// An error occurred when trying to execute a write operation consisting of multiple writes.
     #[error(

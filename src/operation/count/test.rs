@@ -1,8 +1,7 @@
 use std::time::Duration;
 
-use bson::doc;
-
 use crate::{
+    bson::doc,
     cmap::{CommandResponse, StreamDescription},
     coll::{options::EstimatedDocumentCountOptions, Namespace},
     concern::ReadConcern,
@@ -54,7 +53,7 @@ async fn build_with_options() {
         count_command.body,
         doc! {
             "count": "test_coll",
-            "maxTimeMS": max_time.as_millis() as i64,
+            "maxTimeMS": max_time.as_millis() as i32,
             "readConcern": doc!{"level": read_concern.level.as_str().to_string()}
         }
     );

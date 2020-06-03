@@ -1,7 +1,7 @@
-use bson::doc;
 use serde::Deserialize;
 
 use crate::{
+    bson::doc,
     cmap::{options::ConnectionPoolOptions, Command, ConnectionPool},
     selection_criteria::ReadPreference,
     test::{CLIENT_OPTIONS, LOCK},

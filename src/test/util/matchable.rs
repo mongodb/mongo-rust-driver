@@ -1,8 +1,7 @@
 use std::{any::Any, fmt::Debug, time::Duration};
 
-use bson::{Bson, Document};
-
 use crate::{
+    bson::{Bson, Document},
     bson_util,
     options::{AuthMechanism, Credential},
 };

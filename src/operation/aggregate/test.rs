@@ -1,9 +1,8 @@
 use std::time::Duration;
 
-use bson::{doc, Document};
-
 use super::AggregateTarget;
 use crate::{
+    bson::{doc, Document},
     bson_util,
     cmap::{CommandResponse, StreamDescription},
     concern::{ReadConcern, ReadConcernLevel},
@@ -156,7 +155,7 @@ async fn build_max_await_time() {
     let body = doc! {
         "aggregate": 1,
         "cursor": {},
-        "maxTimeMS": 10 as i64,
+        "maxTimeMS": 10i32,
         "pipeline": []
     };
 

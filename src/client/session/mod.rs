@@ -8,11 +8,14 @@ use std::{
     time::{Duration, Instant},
 };
 
-use bson::{doc, spec::BinarySubtype, Bson, Document};
 use lazy_static::lazy_static;
 use uuid::Uuid;
 
-use crate::{Client, RUNTIME};
+use crate::{
+    bson::{doc, spec::BinarySubtype, Binary, Bson, Document},
+    Client,
+    RUNTIME,
+};
 pub(crate) use cluster_time::ClusterTime;
 pub(super) use pool::ServerSessionPool;
 
@@ -114,7 +117,10 @@ pub(crate) struct ServerSession {
 impl ServerSession {
     /// Creates a new session, generating the id client side.
     fn new() -> Self {
-        let binary = Bson::Binary(BinarySubtype::Uuid, Uuid::new_v4().as_bytes().to_vec());
+        let binary = Bson::Binary(Binary {
+            subtype: BinarySubtype::Uuid,
+            bytes: Uuid::new_v4().as_bytes().to_vec(),
+        });
 
         Self {
             id: doc! { "id": binary },

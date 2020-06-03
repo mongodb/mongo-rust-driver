@@ -1,6 +1,5 @@
-use bson::{doc, Bson, Document};
-
 use crate::{
+    bson::{doc, Bson, Document},
     cmap::{CommandResponse, StreamDescription},
     concern::WriteConcern,
     error::{BulkWriteError, ErrorKind, WriteConcernError},

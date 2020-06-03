@@ -21,6 +21,7 @@ pub struct TestFile {
 #[serde(untagged)]
 pub enum AverageRtt {
     F(f64),
+    I(i32),
     S(String),
 }
 
@@ -28,6 +29,7 @@ async fn run_test(test_file: TestFile) {
     let avg_rtt_ms = match test_file.avg_rtt_ms {
         AverageRtt::F(f) => Some(f),
         AverageRtt::S(ref s) if s == "NULL" => None,
+        AverageRtt::I(i) => Some(i as f64),
         AverageRtt::S(ref s) => panic!("invalid average round trip time: {}", s),
     };
 

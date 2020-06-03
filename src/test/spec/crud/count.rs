@@ -1,8 +1,8 @@
-use bson::{Bson, Document};
 use serde::Deserialize;
 
 use super::{Outcome, TestFile};
 use crate::{
+    bson::{Bson, Document},
     options::{Collation, CountOptions},
     test::{run_spec_test, util::TestClient, LOCK},
 };

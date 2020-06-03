@@ -1,6 +1,7 @@
-use bson::{Document, TimeStamp};
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
+
+use crate::bson::{Document, Timestamp};
 
 /// Struct modeling a cluster time reported by the server.
 ///
@@ -10,17 +11,17 @@ use serde::{Deserialize, Serialize};
 #[derivative(PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ClusterTime {
-    cluster_time: TimeStamp,
+    cluster_time: Timestamp,
 
     #[derivative(PartialEq = "ignore")]
     signature: Document,
 }
 
 impl std::cmp::Ord for ClusterTime {
-    // TODO: RUST-390 use TimeStamp's Ord impl.
+    // TODO: RUST-390 use Timestamp's Ord impl.
     fn cmp(&self, other: &ClusterTime) -> std::cmp::Ordering {
-        let lhs = (self.cluster_time.t, self.cluster_time.i);
-        let rhs = (other.cluster_time.t, other.cluster_time.i);
+        let lhs = (self.cluster_time.time, self.cluster_time.increment);
+        let rhs = (other.cluster_time.time, other.cluster_time.increment);
         lhs.cmp(&rhs)
     }
 }

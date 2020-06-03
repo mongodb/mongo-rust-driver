@@ -8,10 +8,10 @@ use std::{
     task::{Context, Poll},
 };
 
-use bson::Document;
 use futures::{future::BoxFuture, Stream};
 
 use crate::{
+    bson::Document,
     client::ClientSession,
     error::Result,
     operation::GetMore,
@@ -65,9 +65,12 @@ use common::{GenericCursor, GetMoreProvider, GetMoreProviderResult};
 /// to collect them into a vector:
 ///
 /// ```rust
-/// # use bson::{doc, bson, Document};
 /// # use futures::stream::StreamExt;
-/// # use mongodb::{Client, error::Result};
+/// # use mongodb::{
+/// #     bson::{doc, Document},
+/// #     error::Result,
+/// #     Client,
+/// # };
 /// #
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;

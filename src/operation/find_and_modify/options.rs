@@ -1,10 +1,10 @@
 use std::time::Duration;
 
-use bson::{doc, Document};
 use serde::{Serialize, Serializer};
 use typed_builder::TypedBuilder;
 
 use crate::{
+    bson::{doc, Document},
     bson_util,
     coll::options::{
         FindOneAndDeleteOptions,
@@ -56,7 +56,7 @@ pub(super) struct FindAndModifyOptions {
 
     #[builder(default)]
     #[serde(
-        serialize_with = "bson_util::serialize_duration_as_i64_millis",
+        serialize_with = "bson_util::serialize_duration_as_int_millis",
         rename = "maxTimeMS"
     )]
     pub(crate) max_time: Option<Duration>,

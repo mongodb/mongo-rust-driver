@@ -46,8 +46,10 @@
 //! [`Collection`](struct.Collection.html) from the [`Client`](struct.Client.html):
 //!
 //! ```rust
-//! # use bson::{bson, doc};
-//! # use mongodb::error::Result;
+//! # use mongodb::{
+//! #   bson::doc,
+//! #   error::Result,
+//! # };
 //! # #[cfg(not(feature = "sync"))]
 //! # use mongodb::Client;
 //! #
@@ -96,6 +98,8 @@ macro_rules! define_if_single_runtime_enabled {
 define_if_single_runtime_enabled! {
     #[macro_use]
     pub mod options;
+
+    pub use ::bson;
 
     mod bson_util;
     mod client;

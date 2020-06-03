@@ -2,11 +2,11 @@ use super::{Client, ClientSession};
 
 use std::{collections::HashSet, sync::Arc};
 
-use bson::Document;
 use lazy_static::lazy_static;
 use time::PreciseTime;
 
 use crate::{
+    bson::Document,
     cmap::Connection,
     error::{ErrorKind, Result},
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},

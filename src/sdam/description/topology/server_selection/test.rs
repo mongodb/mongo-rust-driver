@@ -1,12 +1,10 @@
 use std::time::Duration;
 
-use bson::UtcDateTime;
 use chrono::{naive::NaiveDateTime, offset::Utc, DateTime};
 use serde::Deserialize;
 
-use crate::test::run_spec_test;
-
 use crate::{
+    bson::DateTime as BsonDateTime,
     is_master::{IsMasterCommandResponse, IsMasterReply, LastWrite},
     options::StreamAddress,
     sdam::description::{
@@ -14,6 +12,7 @@ use crate::{
         topology::{test::f64_ms_as_duration, TopologyDescription, TopologyType},
     },
     selection_criteria::{ReadPreference, ReadPreferenceOptions, TagSet},
+    test::run_spec_test,
 };
 
 #[derive(Debug, Deserialize)]
@@ -43,7 +42,7 @@ struct TestServerDescription {
     #[serde(rename = "type")]
     server_type: TestServerType,
     tags: Option<TagSet>,
-    last_update_time: Option<i64>,
+    last_update_time: Option<i32>,
     last_write: Option<LastWriteDate>,
     max_wire_version: Option<i32>,
 }
@@ -51,13 +50,7 @@ struct TestServerDescription {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct LastWriteDate {
-    last_write_date: NumberLong,
-}
-
-#[derive(Debug, Deserialize)]
-struct NumberLong {
-    #[serde(rename = "$numberLong")]
-    number: String,
+    last_write_date: i64,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
@@ -177,14 +170,14 @@ fn is_master_response_from_server_type(server_type: ServerType) -> IsMasterComma
     response
 }
 
-fn utc_datetime_from_millis(millis: i64) -> UtcDateTime {
+fn utc_datetime_from_millis(millis: i64) -> BsonDateTime {
     let seconds_portion = millis / 1000;
     let nanos_portion = (millis % 1000) * 1_000_000;
 
     let naive_datetime = NaiveDateTime::from_timestamp(seconds_portion, nanos_portion as u32);
     let datetime = DateTime::from_utc(naive_datetime, Utc);
 
-    UtcDateTime(datetime)
+    BsonDateTime(datetime)
 }
 
 fn convert_server_description(
@@ -197,12 +190,8 @@ fn convert_server_description(
 
     let mut command_response = is_master_response_from_server_type(server_type);
     command_response.tags = test_server_desc.tags;
-    command_response.last_write = test_server_desc.last_write.map(|last_write| {
-        let millis: i64 = last_write.last_write_date.number.parse().unwrap();
-
-        LastWrite {
-            last_write_date: utc_datetime_from_millis(millis),
-        }
+    command_response.last_write = test_server_desc.last_write.map(|last_write| LastWrite {
+        last_write_date: utc_datetime_from_millis(last_write.last_write_date),
     });
 
     let is_master = IsMasterReply {
@@ -217,7 +206,7 @@ fn convert_server_description(
     );
     server_desc.last_update_time = test_server_desc
         .last_update_time
-        .map(utc_datetime_from_millis);
+        .map(|i| utc_datetime_from_millis(i as i64));
 
     Some(server_desc)
 }

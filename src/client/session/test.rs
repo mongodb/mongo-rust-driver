@@ -1,9 +1,9 @@
 use std::{future::Future, time::Duration};
 
-use bson::{doc, Bson};
 use futures::stream::StreamExt;
 
 use crate::{
+    bson::{doc, Bson},
     error::Result,
     options::{Acknowledgment, FindOptions, InsertOneOptions, ReadPreference, WriteConcern},
     test::{EventClient, TestClient, CLIENT_OPTIONS, LOCK},

@@ -12,7 +12,6 @@ use std::{
     time::Duration,
 };
 
-use bson::{Bson, Document};
 use derivative::Derivative;
 use lazy_static::lazy_static;
 use rustls::{
@@ -28,6 +27,7 @@ use typed_builder::TypedBuilder;
 use webpki_roots::TLS_SERVER_ROOTS;
 
 use crate::{
+    bson::{Bson, Document},
     client::auth::{AuthMechanism, Credential},
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::{ErrorKind, Result},
@@ -170,7 +170,7 @@ impl StreamAddress {
         doc.insert("host", &self.hostname);
 
         if let Some(i) = self.port.take() {
-            doc.insert("port", i64::from(i));
+            doc.insert("port", i32::from(i));
         } else {
             doc.insert("port", Bson::Null);
         }

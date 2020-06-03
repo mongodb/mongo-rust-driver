@@ -7,12 +7,12 @@ mod test;
 
 use std::{borrow::Cow, str::FromStr};
 
-use bson::Document;
 use rand::Rng;
 use typed_builder::TypedBuilder;
 
 use self::scram::ScramVersion;
 use crate::{
+    bson::Document,
     cmap::{Connection, StreamDescription},
     error::{Error, ErrorKind, Result},
 };
@@ -206,7 +206,7 @@ pub struct Credential {
 impl Credential {
     #[cfg(test)]
     pub(crate) fn into_document(mut self) -> Document {
-        use bson::Bson;
+        use crate::bson::Bson;
 
         let mut doc = Document::new();
 

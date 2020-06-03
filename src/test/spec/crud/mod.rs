@@ -13,11 +13,10 @@ mod replace_one;
 mod update_many;
 mod update_one;
 
-use bson::Document;
 use futures::stream::TryStreamExt;
 use serde::Deserialize;
 
-use crate::Collection;
+use crate::{bson::Document, Collection};
 
 #[derive(Debug, Deserialize)]
 pub struct TestFile {

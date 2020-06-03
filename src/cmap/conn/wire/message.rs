@@ -1,5 +1,4 @@
 use bitflags::bitflags;
-use bson::Document;
 use futures::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use super::{
@@ -7,6 +6,7 @@ use super::{
     util::CountReader,
 };
 use crate::{
+    bson::Document,
     bson_util::async_encoding,
     cmap::conn::command::Command,
     error::{ErrorKind, Result},

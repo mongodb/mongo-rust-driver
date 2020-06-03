@@ -1,10 +1,10 @@
 use std::{collections::VecDeque, time::Duration};
 
-#[cfg(test)]
-use bson::Document;
 use tokio::sync::Mutex;
 
 use super::ServerSession;
+#[cfg(test)]
+use crate::bson::Document;
 
 #[derive(Debug)]
 pub(crate) struct ServerSessionPool {

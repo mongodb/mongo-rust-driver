@@ -1,8 +1,7 @@
 use std::time::Duration;
 
-use bson::{doc, Bson};
-
 use crate::{
+    bson::{doc, Bson},
     cmap::{CommandResponse, StreamDescription},
     coll::{options::DistinctOptions, Namespace},
     error::ErrorKind,
@@ -77,7 +76,7 @@ async fn build_with_options() {
         doc! {
             "distinct": "test_coll",
             "key": field_name,
-            "maxTimeMS": max_time.as_millis() as i64
+            "maxTimeMS": max_time.as_millis() as i32
         }
     );
     assert_eq!(distinct_command.target_db, "test_db");

@@ -1,9 +1,8 @@
 use std::{fmt, time::Duration};
 
-use bson::UtcDateTime;
-
 pub use crate::sdam::description::server::ServerType;
 use crate::{
+    bson::DateTime,
     is_master::IsMasterCommandResponse,
     options::StreamAddress,
     sdam::description::server::ServerDescription,
@@ -48,7 +47,7 @@ impl<'a> ServerInfo<'a> {
 
     /// Gets the last time that the driver's monitoring thread for the server updated the internal
     /// information about the server.
-    pub fn last_update_time(&self) -> Option<UtcDateTime> {
+    pub fn last_update_time(&self) -> Option<DateTime> {
         self.description.last_update_time
     }
 

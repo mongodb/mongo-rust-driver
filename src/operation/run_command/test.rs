@@ -1,7 +1,6 @@
-use bson::doc;
-
 use super::RunCommand;
 use crate::{
+    bson::doc,
     cmap::{CommandResponse, StreamDescription},
     operation::Operation,
 };

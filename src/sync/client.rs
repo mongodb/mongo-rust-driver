@@ -1,7 +1,6 @@
-use bson::Document;
-
 use super::Database;
 use crate::{
+    bson::Document,
     concern::{ReadConcern, WriteConcern},
     error::Result,
     options::{ClientOptions, DatabaseOptions, ListDatabasesOptions, SelectionCriteria},

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::{oid::ObjectId, UtcDateTime};
+use crate::bson::{oid::ObjectId, DateTime};
 use chrono::offset::Utc;
 
 use crate::{
@@ -60,7 +60,7 @@ impl Default for ServerType {
 pub(crate) struct ServerDescription {
     pub(crate) address: StreamAddress,
     pub(crate) server_type: ServerType,
-    pub(crate) last_update_time: Option<UtcDateTime>,
+    pub(crate) last_update_time: Option<DateTime>,
     pub(crate) average_round_trip_time: Option<Duration>,
 
     // The SDAM spec indicates that a ServerDescription needs to contain an error message if an
@@ -287,7 +287,7 @@ impl ServerDescription {
         Ok(me)
     }
 
-    pub(crate) fn last_write_date(&self) -> Result<Option<UtcDateTime>> {
+    pub(crate) fn last_write_date(&self) -> Result<Option<DateTime>> {
         match self.reply {
             Ok(None) => Ok(None),
             Ok(Some(ref reply)) => Ok(reply

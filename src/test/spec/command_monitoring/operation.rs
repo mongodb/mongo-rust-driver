@@ -1,7 +1,6 @@
 use std::{ops::Deref, time::Duration};
 
 use async_trait::async_trait;
-use bson::{Bson, Decoder, Document};
 use futures::stream::StreamExt;
 use serde::{
     de::{self, Deserializer},
@@ -9,6 +8,7 @@ use serde::{
 };
 
 use crate::{
+    bson::{Bson, Deserializer as BsonDeserializer, Document},
     bson_util,
     error::Result,
     options::{FindOptions, Hint, InsertManyOptions, UpdateOptions},
@@ -38,19 +38,19 @@ impl<'de> Deserialize<'de> for AnyTestOperation {
 
         let definition = OperationDefinition::deserialize(deserializer)?;
         let boxed_op = match definition.name.as_str() {
-            "insertOne" => InsertOne::deserialize(Decoder::new(definition.arguments))
+            "insertOne" => InsertOne::deserialize(BsonDeserializer::new(definition.arguments))
                 .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "insertMany" => InsertMany::deserialize(Decoder::new(definition.arguments))
+            "insertMany" => InsertMany::deserialize(BsonDeserializer::new(definition.arguments))
                 .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "updateOne" => UpdateOne::deserialize(Decoder::new(definition.arguments))
+            "updateOne" => UpdateOne::deserialize(BsonDeserializer::new(definition.arguments))
                 .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "updateMany" => UpdateMany::deserialize(Decoder::new(definition.arguments))
+            "updateMany" => UpdateMany::deserialize(BsonDeserializer::new(definition.arguments))
                 .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "deleteMany" => DeleteMany::deserialize(Decoder::new(definition.arguments))
+            "deleteMany" => DeleteMany::deserialize(BsonDeserializer::new(definition.arguments))
                 .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "deleteOne" => DeleteOne::deserialize(Decoder::new(definition.arguments))
+            "deleteOne" => DeleteOne::deserialize(BsonDeserializer::new(definition.arguments))
                 .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "find" => Find::deserialize(Decoder::new(definition.arguments))
+            "find" => Find::deserialize(BsonDeserializer::new(definition.arguments))
                 .map(|op| Box::new(op) as Box<dyn TestOperation>),
             _ => unimplemented!(),
         }
@@ -108,28 +108,6 @@ impl TestOperation for DeleteOne {
     }
 }
 
-fn deserialize_i64_from_ext_json<'de, D>(
-    deserializer: D,
-) -> std::result::Result<Option<i64>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let document = Option::<Document>::deserialize(deserializer)?;
-    match document {
-        Some(document) => {
-            let number_string = document
-                .get("$numberLong")
-                .and_then(Bson::as_str)
-                .ok_or_else(|| de::Error::custom("missing $numberLong field"))?;
-            let parsed = number_string
-                .parse::<i64>()
-                .map_err(|_| de::Error::custom("failed to parse to i64"))?;
-            Ok(Some(parsed))
-        }
-        None => Ok(None),
-    }
-}
-
 // This struct is necessary because the command monitoring tests specify the options in a very old
 // way (SPEC-1519).
 #[derive(Debug, Deserialize, Default)]
@@ -171,15 +149,11 @@ pub(super) struct Find {
     filter: Option<Document>,
     #[serde(default)]
     sort: Option<Document>,
-    #[serde(default, deserialize_with = "deserialize_i64_from_ext_json")]
+    #[serde(default)]
     skip: Option<i64>,
-    #[serde(
-        default,
-        rename = "batchSize",
-        deserialize_with = "deserialize_i64_from_ext_json"
-    )]
+    #[serde(default, rename = "batchSize")]
     batch_size: Option<i64>,
-    #[serde(default, deserialize_with = "deserialize_i64_from_ext_json")]
+    #[serde(default)]
     limit: Option<i64>,
     #[serde(default)]
     modifiers: Option<FindModifiers>,

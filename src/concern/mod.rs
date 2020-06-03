@@ -5,12 +5,12 @@ mod test;
 
 use std::time::Duration;
 
-use bson::doc;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
 use crate::{
+    bson::doc,
     bson_util,
     error::{ErrorKind, Result},
 };
@@ -143,7 +143,7 @@ pub struct WriteConcern {
     /// server will not roll back the writes that occurred before the timeout was reached.
     #[builder(default)]
     #[serde(rename = "wtimeout")]
-    #[serde(serialize_with = "bson_util::serialize_duration_as_i64_millis")]
+    #[serde(serialize_with = "bson_util::serialize_duration_as_int_millis")]
     #[serde(deserialize_with = "bson_util::deserialize_duration_from_u64_millis")]
     #[serde(default)]
     pub w_timeout: Option<Duration>,
@@ -220,13 +220,13 @@ impl From<String> for Acknowledgment {
 }
 
 #[cfg(test)]
-use bson::Bson;
+use crate::bson::Bson;
 
 impl Acknowledgment {
     #[cfg(test)]
     pub(crate) fn to_bson(&self) -> Bson {
         match self {
-            Acknowledgment::Nodes(i) => Bson::I64(i64::from(*i)),
+            Acknowledgment::Nodes(i) => Bson::Int32(*i),
             Acknowledgment::Majority => Bson::String("majority".to_string()),
             Acknowledgment::Custom(s) => Bson::String(s.to_string()),
         }

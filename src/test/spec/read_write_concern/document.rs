@@ -1,9 +1,9 @@
 use std::time::Duration;
 
-use bson::{Bson, Document};
 use serde::Deserialize;
 
 use crate::{
+    bson::{Bson, Document},
     error::Error,
     options::{Acknowledgment, WriteConcern},
     test::run_spec_test,
@@ -31,8 +31,8 @@ fn write_concern_from_document(write_concern_doc: Document) -> Option<WriteConce
 
     for (key, value) in write_concern_doc {
         match (&key[..], value) {
-            ("w", Bson::I64(i)) => {
-                write_concern.w = Some(Acknowledgment::from(i as i32));
+            ("w", Bson::Int32(i)) => {
+                write_concern.w = Some(Acknowledgment::from(i));
             }
             ("w", Bson::String(s)) => {
                 write_concern.w = Some(Acknowledgment::from(s));
@@ -40,10 +40,10 @@ fn write_concern_from_document(write_concern_doc: Document) -> Option<WriteConce
             ("journal", Bson::Boolean(b)) => {
                 write_concern.journal = Some(b);
             }
-            ("wtimeoutMS", Bson::I64(i)) if i > 0 => {
+            ("wtimeoutMS", Bson::Int32(i)) if i > 0 => {
                 write_concern.w_timeout = Some(Duration::from_millis(i as u64));
             }
-            ("wtimeoutMS", Bson::I64(_)) => {
+            ("wtimeoutMS", Bson::Int32(_)) => {
                 // WriteConcern has an unsigned integer for the wtimeout field, so this is
                 // impossible to test.
                 return None;
@@ -53,21 +53,6 @@ fn write_concern_from_document(write_concern_doc: Document) -> Option<WriteConce
     }
 
     Some(write_concern)
-}
-
-fn normalize_write_concern_doc(write_concern_doc: Document) -> Document {
-    write_concern_doc
-        .into_iter()
-        .map(|(key, mut val)| {
-            if key == "w" {
-                if let Bson::I32(i) = val {
-                    val = Bson::I64(i64::from(i));
-                }
-            }
-
-            (key, val)
-        })
-        .collect()
 }
 
 async fn run_document_test(test_file: TestFile) {
@@ -98,8 +83,7 @@ async fn run_document_test(test_file: TestFile) {
 
             if let Some(expected_write_concern) = test_case.write_concern_document {
                 assert_eq!(
-                    normalize_write_concern_doc(actual_write_concern),
-                    normalize_write_concern_doc(expected_write_concern),
+                    actual_write_concern, expected_write_concern,
                     "{}",
                     &test_case.description
                 );

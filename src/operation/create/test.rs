@@ -1,6 +1,5 @@
-use bson::doc;
-
 use crate::{
+    bson::doc,
     cmap::{CommandResponse, StreamDescription},
     concern::WriteConcern,
     error::{ErrorKind, WriteFailure},

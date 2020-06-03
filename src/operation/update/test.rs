@@ -1,8 +1,7 @@
 use pretty_assertions::assert_eq;
 
-use bson::{doc, Bson};
-
 use crate::{
+    bson::{doc, Bson},
     bson_util,
     cmap::{CommandResponse, StreamDescription},
     concern::{Acknowledgment, WriteConcern},
@@ -120,7 +119,7 @@ async fn handle_success() {
     let update_result = ok_result.unwrap();
     assert_eq!(update_result.matched_count, 0);
     assert_eq!(update_result.modified_count, 1);
-    assert_eq!(update_result.upserted_id, Some(Bson::I32(1)));
+    assert_eq!(update_result.upserted_id, Some(Bson::Int32(1)));
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

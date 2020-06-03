@@ -1,6 +1,5 @@
-use bson::{doc, Document};
-
 use crate::{
+    bson::{doc, Document},
     bson_util,
     cmap::{CommandResponse, StreamDescription},
     operation::{ListCollections, Operation},

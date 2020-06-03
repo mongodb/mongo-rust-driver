@@ -3,11 +3,13 @@ mod operation;
 
 use std::convert::Into;
 
-use bson::{Bson, Document};
 use serde::Deserialize;
 
 use self::{event::TestEvent, operation::*};
-use crate::test::{assert_matches, parse_version, util::TestClient, EventClient, LOCK};
+use crate::{
+    bson::{Bson, Document},
+    test::{assert_matches, parse_version, util::TestClient, EventClient, LOCK},
+};
 
 #[derive(Deserialize)]
 struct TestFile {

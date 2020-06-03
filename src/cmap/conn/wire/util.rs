@@ -5,10 +5,9 @@ use std::{
 };
 
 use futures::io::{self, AsyncRead, AsyncWrite, AsyncWriteExt};
+use lazy_static::lazy_static;
 
 use crate::error::Result;
-
-use lazy_static::lazy_static;
 
 /// Closure to obtain a new, unique request ID.
 pub(crate) fn next_request_id() -> i32 {

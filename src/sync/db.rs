@@ -1,4 +1,4 @@
-use bson::Document;
+use crate::bson::Document;
 
 use super::{Collection, Cursor};
 use crate::{

@@ -1,6 +1,5 @@
-use bson::{doc, Document};
-
 use crate::{
+    bson::{doc, Document},
     error::{CommandError, ErrorKind, Result},
     options::{Acknowledgment, CollectionOptions, DatabaseOptions, FindOptions, WriteConcern},
     sync::{Client, Collection},

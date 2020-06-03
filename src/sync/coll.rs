@@ -1,5 +1,6 @@
 use super::Cursor;
 use crate::{
+    bson::{Bson, Document},
     error::Result,
     options::{
         AggregateOptions,
@@ -27,7 +28,6 @@ use crate::{
     Namespace,
     RUNTIME,
 };
-use bson::{Bson, Document};
 
 /// `Collection` is the client-side abstraction of a MongoDB Collection. It can be used to
 /// perform collection-level operations such as CRUD operations. A `Collection` can be obtained
@@ -39,8 +39,11 @@ use bson::{Bson, Document};
 /// so it can safely be shared across threads. For example:
 ///
 /// ```rust
-/// # use bson::{bson, doc};
-/// # use mongodb::{sync::Client, error::Result};
+/// # use mongodb::{
+/// #     bson::doc,
+/// #     error::Result,
+/// #     sync::Client,
+/// # };
 /// #
 /// # fn start_workers() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com")?;

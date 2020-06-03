@@ -1,8 +1,7 @@
 use std::time::Duration;
 
-use bson::{doc, Document};
-
 use crate::{
+    bson::{doc, Document},
     bson_util,
     cmap::{CommandResponse, StreamDescription},
     operation::{test, Find, Operation},
@@ -130,7 +129,7 @@ async fn build_max_await_time() {
 
     let body = doc! {
         "find": "test_coll",
-        "maxTimeMS": 10 as i64
+        "maxTimeMS": 10i32
     };
 
     build_test(ns, None, Some(options), body);

@@ -1,7 +1,6 @@
-use bson::Document;
 use futures::StreamExt;
 
-use crate::{error::Result, Cursor as AsyncCursor, RUNTIME};
+use crate::{bson::Document, error::Result, Cursor as AsyncCursor, RUNTIME};
 
 /// A `Cursor` streams the result of a query. When a query is made, a `Cursor` will be returned with
 /// the first batch of results from the server; the documents will be returned as the `Cursor` is
@@ -45,8 +44,11 @@ use crate::{error::Result, Cursor as AsyncCursor, RUNTIME};
 /// to collect them into a vector:
 ///
 /// ```rust
-/// # use bson::{doc, bson, Document};
-/// # use mongodb::{sync::Client, error::Result};
+/// # use mongodb::{
+/// #     bson::{doc, Document},
+/// #     error::Result,
+/// #     sync::Client,
+/// # };
 /// #
 /// # fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com")?;

@@ -1,8 +1,8 @@
-use bson::{Bson, Document};
 use serde::de::DeserializeOwned;
 
 use super::wire::Message;
 use crate::{
+    bson::{Bson, Document},
     bson_util,
     client::{ClientSession, ClusterTime},
     error::{CommandError, ErrorKind, Result},
