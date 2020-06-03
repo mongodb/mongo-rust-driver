@@ -196,7 +196,7 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
     }
 
     if let Some(i) = options.zlib_compression.take() {
-        doc.insert("zlibcompressionlevel", i32::from(i));
+        doc.insert("zlibcompressionlevel", i);
     }
 
     doc
