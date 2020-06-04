@@ -81,7 +81,7 @@ impl AsyncTcpStream {
             Self::Tokio(ref stream) => stream.set_keepalive(Some(KEEPALIVE_TIME))?,
 
             #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd(ref stream) => {},
+            Self::AsyncStd(ref stream) => {}
         };
 
         Ok(())
