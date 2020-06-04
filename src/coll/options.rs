@@ -837,18 +837,6 @@ pub struct FindOneOptions {
     pub sort: Option<Document>,
 }
 
-/// Specifies an index to create.
-#[derive(Debug, TypedBuilder)]
-#[non_exhaustive]
-pub struct IndexModel {
-    /// The fields to index, along with their sort order.
-    pub keys: Document,
-
-    /// Extra options to use when creating the index.
-    #[builder(default)]
-    pub options: Option<Document>,
-}
-
 /// Specifies the options to a [`Collection::drop`](../struct.Collection.html#method.drop)
 /// operation.
 #[derive(Debug, Default, TypedBuilder, Serialize)]
