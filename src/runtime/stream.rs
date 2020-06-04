@@ -20,7 +20,6 @@ use crate::{
 };
 
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
-#[cfg(feature = "tokio-runtime")]
 const KEEPALIVE_TIME: Duration = Duration::from_secs(120);
 
 /// A runtime-agnostic async stream possibly using TLS.
@@ -63,52 +62,47 @@ impl From<async_std::net::TcpStream> for AsyncTcpStream {
 }
 
 impl AsyncTcpStream {
-    fn set_nodelay(&self) -> Result<()> {
-        match self {
-            #[cfg(feature = "tokio-runtime")]
-            Self::Tokio(ref stream) => stream.set_nodelay(true)?,
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd(ref stream) => stream.set_nodelay(true)?,
-        };
-
-        Ok(())
-    }
-
-    fn set_keepalive(&self) -> Result<()> {
-        match self {
-            #[cfg(feature = "tokio-runtime")]
-            Self::Tokio(ref stream) => stream.set_keepalive(Some(KEEPALIVE_TIME))?,
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd(ref stream) => {}
-        };
-
-        Ok(())
-    }
-
+    #[cfg(feature = "tokio-runtime")]
     async fn try_connect(address: &SocketAddr, connect_timeout: Duration) -> Result<Self> {
-        #[cfg(feature = "tokio-runtime")]
         use tokio::{net::TcpStream, time::timeout};
-
-        #[cfg(feature = "async-std-runtime")]
-        use async_std::{future::timeout, net::TcpStream};
 
         let stream_future = TcpStream::connect(address);
 
-        // The URI options spec requires that the default connect timeout is 10 seconds, but that 0
-        // should indicate no timeout.
-        let stream: Self = if connect_timeout == Duration::from_secs(0) {
-            stream_future.await?.into()
+        let stream = if connect_timeout == Duration::from_secs(0) {
+            stream_future.await?
         } else {
-            timeout(connect_timeout, stream_future).await??.into()
+            timeout(connect_timeout, stream_future).await??
         };
 
-        stream.set_keepalive()?;
+        stream.set_keepalive(Some(KEEPALIVE_TIME))?;
+        stream.set_nodelay(true)?;
 
-        stream.set_nodelay()?;
+        Ok(stream.into())
+    }
 
-        Ok(stream)
+    #[cfg(feature = "async-std-runtime")]
+    async fn try_connect(address: &SocketAddr, connect_timeout: Duration) -> Result<Self> {
+        use async_std::net::TcpStream;
+        use socket2::{Domain, Protocol, SockAddr, Socket, Type};
+
+        let domain = match address {
+            SocketAddr::V4(_) => Domain::ipv4(),
+            SocketAddr::V6(_) => Domain::ipv6(),
+        };
+        let socket = Socket::new(domain, Type::stream(), Some(Protocol::tcp()))?;
+        socket.set_keepalive(Some(KEEPALIVE_TIME))?;
+
+        let address: SockAddr = address.clone().into();
+        if connect_timeout == Duration::from_secs(0) {
+            socket.connect(&address)?;
+        } else {
+            socket.connect_timeout(&address, connect_timeout)?;
+        }
+
+        let stream: TcpStream = socket.into_tcp_stream().into();
+        stream.set_nodelay(true)?;
+
+        Ok(stream.into())
     }
 
     pub(crate) async fn connect_socket_addr(
