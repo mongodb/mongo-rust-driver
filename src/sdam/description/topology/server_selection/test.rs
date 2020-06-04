@@ -100,25 +100,25 @@ fn convert_read_preference(test_read_pref: TestReadPreference) -> Option<ReadPre
         "Secondary" => ReadPreference::Secondary {
             options: ReadPreferenceOptions::builder()
                 .tag_sets(test_read_pref.tag_sets)
-                .max_staleness(max_staleness.clone())
+                .max_staleness(max_staleness)
                 .build(),
         },
         "PrimaryPreferred" => ReadPreference::PrimaryPreferred {
             options: ReadPreferenceOptions::builder()
                 .tag_sets(test_read_pref.tag_sets)
-                .max_staleness(max_staleness.clone())
+                .max_staleness(max_staleness)
                 .build(),
         },
         "SecondaryPreferred" => ReadPreference::SecondaryPreferred {
             options: ReadPreferenceOptions::builder()
                 .tag_sets(test_read_pref.tag_sets)
-                .max_staleness(max_staleness.clone())
+                .max_staleness(max_staleness)
                 .build(),
         },
         "Nearest" => ReadPreference::Nearest {
             options: ReadPreferenceOptions::builder()
                 .tag_sets(test_read_pref.tag_sets)
-                .max_staleness(max_staleness.clone())
+                .max_staleness(max_staleness)
                 .build(),
         },
         _ => panic!("invalid read preference: {:?}", test_read_pref),

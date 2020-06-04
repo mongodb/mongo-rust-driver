@@ -188,8 +188,6 @@ struct CursorInfo {
 
 #[cfg(test)]
 mod test {
-    use std::sync::Arc;
-
     use crate::{
         operation::Operation,
         options::{ReadPreference, SelectionCriteria},
@@ -210,9 +208,5 @@ mod test {
 
         let op = constructor(Some(read_pref.clone()));
         assert_eq!(op.selection_criteria(), Some(&read_pref));
-
-        let predicate = SelectionCriteria::Predicate(Arc::new(|_| true));
-        let op = constructor(Some(predicate.clone()));
-        assert_eq!(op.selection_criteria(), Some(&predicate));
     }
 }
