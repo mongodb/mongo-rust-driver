@@ -91,10 +91,7 @@ pub struct CreateCollectionOptions {
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 
-    /// The default configuration for indexes. This option accepts a `storageEngine` document in
-    /// the following form:
-    ///
-    /// `{ <storage-engine-name>: <options> }`
+    /// The default configuration for indexes created on this collection, including the _id index.
     #[builder(default)]
     pub index_option_defaults: Option<IndexOptionDefaults>,
 }
@@ -124,9 +121,13 @@ pub enum ValidationAction {
     Warn,
 }
 
+/// Specifies default configuration for indexes created on a collection, including the _id index.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IndexOptionDefaults {
+    /// The `storageEngine` document should be in the following form:
+    ///
+    /// `{ <storage-engine-name>: <options> }`
     pub storage_engine: Document,
 }
 
