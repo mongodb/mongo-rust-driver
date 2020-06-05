@@ -108,7 +108,7 @@ define_if_single_runtime_enabled! {
     mod collation;
     mod concern;
     mod cursor;
-    mod db;
+    pub mod db;
     pub mod error;
     pub mod event;
     mod is_master;
