@@ -75,7 +75,7 @@ let mut client_options = ClientOptions::parse("mongodb://localhost:27017").await
 client_options.app_name = Some("My App".to_string());
 
 // Get a handle to the deployment.
-let client = Client::with_options(client_options)?;
+let client: Client = Client::with_options(client_options)?;
 
 // List the names of the databases in that deployment.
 for db_name in client.list_database_names(None, None).await? {
@@ -84,8 +84,11 @@ for db_name in client.list_database_names(None, None).await? {
 ```
 #### Getting a handle to a database
 ```rust
+use mongodb::Database;
+```
+```rust
 // Get a handle to a database.
-let db = client.database("mydb");
+let db: Database = client.database("mydb");
 
 // List the names of the collections in that database.
 for collection_name in db.list_collection_names(None).await? {
@@ -94,11 +97,11 @@ for collection_name in db.list_collection_names(None).await? {
 ```
 #### Inserting documents into a collection
 ```rust
-use mongodb::bson::doc;
+use mongodb::{bson::doc, Collection};
 ```
 ```rust
 // Get a handle to a collection in the database.
-let collection = db.collection("books");
+let collection: Collection = db.collection("books");
 
 let docs = vec![
     doc! { "title": "1984", "author": "George Orwell" },
@@ -114,6 +117,7 @@ collection.insert_many(docs, None).await?;
 use futures::stream::StreamExt;
 use mongodb::{
     bson::{doc, Bson},
+    Cursor,
     options::FindOptions,
 };
 ```
@@ -121,7 +125,7 @@ use mongodb::{
 // Query the documents in the collection with a filter and an option.
 let filter = doc! { "author": "George Orwell" };
 let find_options = FindOptions::builder().sort(doc! { "title": 1 }).build();
-let mut cursor = collection.find(filter, find_options).await?;
+let mut cursor: Cursor = collection.find(filter, find_options).await?;
 
 // Iterate over the results of the cursor.
 while let Some(result) = cursor.next().await {
