@@ -1,5 +1,7 @@
-use crate::test::{CommandEvent, Matchable};
-use bson::Document;
+use crate::{
+    bson::Document,
+    test::{CommandEvent, Matchable},
+};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, PartialEq)]

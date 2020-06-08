@@ -1,16 +1,17 @@
-use bson::doc;
-
-use crate::test::{
-    assert_matches,
-    run_spec_test,
-    util::EventClient,
-    OperationObject,
-    TestClient,
-    TestData,
-    TestEvent,
-    TestFile,
-    CLIENT_OPTIONS,
-    LOCK,
+use crate::{
+    bson::{doc, Bson},
+    test::{
+        assert_matches,
+        run_spec_test,
+        util::EventClient,
+        OperationObject,
+        TestClient,
+        TestData,
+        TestEvent,
+        TestFile,
+        CLIENT_OPTIONS,
+        LOCK,
+    },
 };
 
 const SKIPPED_OPERATIONS: &[&str] = &[
@@ -129,6 +130,10 @@ async fn run() {
                     );
                 }
                 if let Some(expected_result) = operation.result {
+                    let expected_result = match expected_result {
+                        Bson::Int32(n) => Bson::Int64(n as i64),
+                        _ => expected_result,
+                    };
                     let description = &test_case.description;
                     let result = result
                         .unwrap()

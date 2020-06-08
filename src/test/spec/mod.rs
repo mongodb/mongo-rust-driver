@@ -17,7 +17,6 @@ use std::{
 
 pub use self::runner::{AnyTestOperation, OperationObject, TestData, TestEvent, TestFile};
 
-use bson::Bson;
 use serde::Deserialize;
 use serde_json::Value;
 

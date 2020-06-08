@@ -1,7 +1,6 @@
 use std::{fmt::Debug, ops::Deref, time::Duration};
 
 use async_trait::async_trait;
-use bson::{doc, Bson, Decoder, Document};
 use futures::stream::TryStreamExt;
 use serde::{
     de::{self, Deserializer},
@@ -9,6 +8,7 @@ use serde::{
 };
 
 use crate::{
+    bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
     bson_util,
     error::Result,
     options::{FindOptions, Hint, InsertManyOptions, UpdateOptions},
@@ -57,32 +57,48 @@ impl<'de> Deserialize<'de> for AnyTestOperation {
 
         let definition = OperationDefinition::deserialize(deserializer)?;
         let boxed_op = match definition.name.as_str() {
-            "insertOne" => InsertOne::deserialize(Decoder::new(definition.arguments.unwrap()))
+            "insertOne" => {
+                InsertOne::deserialize(BsonDeserializer::new(definition.arguments.unwrap()))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "insertMany" => {
+                InsertMany::deserialize(BsonDeserializer::new(definition.arguments.unwrap()))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "updateOne" => {
+                UpdateOne::deserialize(BsonDeserializer::new(definition.arguments.unwrap()))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "updateMany" => {
+                UpdateMany::deserialize(BsonDeserializer::new(definition.arguments.unwrap()))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "deleteMany" => {
+                DeleteMany::deserialize(BsonDeserializer::new(definition.arguments.unwrap()))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "deleteOne" => {
+                DeleteOne::deserialize(BsonDeserializer::new(definition.arguments.unwrap()))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "find" => Find::deserialize(BsonDeserializer::new(definition.arguments.unwrap()))
                 .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "insertMany" => InsertMany::deserialize(Decoder::new(definition.arguments.unwrap()))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "updateOne" => UpdateOne::deserialize(Decoder::new(definition.arguments.unwrap()))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "updateMany" => UpdateMany::deserialize(Decoder::new(definition.arguments.unwrap()))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "deleteMany" => DeleteMany::deserialize(Decoder::new(definition.arguments.unwrap()))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "deleteOne" => DeleteOne::deserialize(Decoder::new(definition.arguments.unwrap()))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "find" => Find::deserialize(Decoder::new(definition.arguments.unwrap()))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "aggregate" => Aggregate::deserialize(Decoder::new(definition.arguments.unwrap()))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "distinct" => Distinct::deserialize(Decoder::new(definition.arguments.unwrap()))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "aggregate" => {
+                Aggregate::deserialize(BsonDeserializer::new(definition.arguments.unwrap()))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "distinct" => {
+                Distinct::deserialize(BsonDeserializer::new(definition.arguments.unwrap()))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
             "countDocuments" => {
-                CountDocuments::deserialize(Decoder::new(definition.arguments.unwrap()))
+                CountDocuments::deserialize(BsonDeserializer::new(definition.arguments.unwrap()))
                     .map(|op| Box::new(op) as Box<dyn TestOperation>)
             }
             "estimatedDocumentCount" => {
                 Ok(Box::new(EstimatedDocumentCount) as Box<dyn TestOperation>)
             }
-            "findOne" => FindOne::deserialize(Decoder::new(definition.arguments.unwrap()))
+            "findOne" => FindOne::deserialize(BsonDeserializer::new(definition.arguments.unwrap()))
                 .map(|op| Box::new(op) as Box<dyn TestOperation>),
             "listDatabases" => Ok(Box::new(ListDatabases) as Box<dyn TestOperation>),
             "listDatabaseNames" => Ok(Box::new(ListDatabaseNames) as Box<dyn TestOperation>),
@@ -162,28 +178,6 @@ impl TestOperation for DeleteOne {
     }
 }
 
-fn deserialize_i64_from_ext_json<'de, D>(
-    deserializer: D,
-) -> std::result::Result<Option<i64>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let document = Option::<Document>::deserialize(deserializer)?;
-    match document {
-        Some(document) => {
-            let number_string = document
-                .get("$numberLong")
-                .and_then(Bson::as_str)
-                .ok_or_else(|| de::Error::custom("missing $numberLong field"))?;
-            let parsed = number_string
-                .parse::<i64>()
-                .map_err(|_| de::Error::custom("failed to parse to i64"))?;
-            Ok(Some(parsed))
-        }
-        None => Ok(None),
-    }
-}
-
 // This struct is necessary because the command monitoring tests specify the options in a very old
 // way (SPEC-1519).
 #[derive(Debug, Deserialize, Default)]
@@ -225,13 +219,9 @@ pub(super) struct Find {
     filter: Option<Document>,
     #[serde(default)]
     sort: Option<Document>,
-    #[serde(default, deserialize_with = "deserialize_i64_from_ext_json")]
+    #[serde(default)]
     skip: Option<i64>,
-    #[serde(
-        default,
-        rename = "batchSize",
-        deserialize_with = "deserialize_i64_from_ext_json"
-    )]
+    #[serde(default, rename = "batchSize")]
     batch_size: Option<i64>,
     #[serde(default)]
     limit: Option<i64>,

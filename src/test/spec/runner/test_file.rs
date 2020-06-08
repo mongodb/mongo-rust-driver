@@ -1,9 +1,11 @@
-use crate::test::{
-    util::{parse_version, EventClient},
-    AnyTestOperation,
-    TestEvent,
+use crate::{
+    bson::{doc, Document},
+    test::{
+        util::{parse_version, EventClient},
+        AnyTestOperation,
+        TestEvent,
+    },
 };
-use bson::{doc, Document};
 use serde::Deserialize;
 use std::collections::HashMap;
 
