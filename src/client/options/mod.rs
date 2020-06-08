@@ -1466,7 +1466,7 @@ impl ClientOptionsParser {
                         option
                     ));
                 }
-                return Err(ErrorKind::ArgumentError { message: message }.into());
+                return Err(ErrorKind::ArgumentError { message }.into());
             }
         }
 

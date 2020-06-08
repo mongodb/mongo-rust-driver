@@ -179,7 +179,7 @@ impl Serialize for Acknowledgment {
     {
         match self {
             Acknowledgment::Majority => serializer.serialize_str("majority"),
-            Acknowledgment::Nodes(n) => serializer.serialize_i32(n.clone()),
+            Acknowledgment::Nodes(n) => serializer.serialize_i32(*n),
             Acknowledgment::Custom(name) => serializer.serialize_str(name),
         }
     }

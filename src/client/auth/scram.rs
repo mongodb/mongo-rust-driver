@@ -261,7 +261,7 @@ fn xor(lhs: &[u8], rhs: &[u8]) -> Vec<u8> {
 
     lhs.iter()
         .zip(rhs.iter())
-        .map(|(l, r)| l.bitxor(r.clone()))
+        .map(|(l, r)| l.bitxor(r))
         .collect()
 }
 
