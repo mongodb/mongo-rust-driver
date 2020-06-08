@@ -527,12 +527,7 @@ async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>)
     let events = event_client.get_command_started_events("find");
     assert_eq!(events.len(), 1);
 
-    let allow_disk_use = events
-        .first()
-        .unwrap()
-        .command
-        .get_bool("allowDiskUse")
-        .ok();
+    let allow_disk_use = events[0].command.get_bool("allowDiskUse").ok();
     assert_eq!(allow_disk_use, expected_value);
 }
 

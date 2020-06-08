@@ -9,7 +9,7 @@ use crate::{
     error::Result,
     options::{AggregateOptions, CreateCollectionOptions, IndexOptionDefaults},
     test::{
-        util::{CommandEvent, EventClient, TestClient},
+        util::{EventClient, TestClient},
         LOCK,
     },
     Database,
@@ -351,25 +351,14 @@ async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>, name:
     db.create_collection(name, options).await.unwrap();
     db.drop(None).await.unwrap();
 
-    let events = client.command_events.read().unwrap();
-    let mut iter = events.iter().filter_map(|event| match event {
-        CommandEvent::CommandStartedEvent(event) => {
-            if event.command_name == "create" {
-                Some(event)
-            } else {
-                None
-            }
-        }
-        _ => None,
-    });
+    let events = client.get_command_started_events("create");
+    assert_eq!(events.len(), 1);
 
-    let event = iter.next().unwrap();
-    let event_defaults = match event.command.get_document("indexOptionDefaults") {
+    let event_defaults = match events[0].command.get_document("indexOptionDefaults") {
         Ok(defaults) => Some(IndexOptionDefaults {
             storage_engine: defaults.get_document("storageEngine").unwrap().clone(),
         }),
         Err(_) => None,
     };
     assert_eq!(event_defaults, defaults);
-    assert!(iter.next().is_none());
 }
