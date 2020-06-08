@@ -90,6 +90,10 @@ pub struct CreateCollectionOptions {
     /// The write concern for the operation.   
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
+
+    /// The default configuration for indexes created on this collection, including the _id index.
+    #[builder(default)]
+    pub index_option_defaults: Option<IndexOptionDefaults>,
 }
 
 /// Specifies how strictly the database should apply validation rules to existing documents during
@@ -115,6 +119,16 @@ pub enum ValidationLevel {
 pub enum ValidationAction {
     Error,
     Warn,
+}
+
+/// Specifies default configuration for indexes created on a collection, including the _id index.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IndexOptionDefaults {
+    /// The `storageEngine` document should be in the following form:
+    ///
+    /// `{ <storage-engine-name>: <options> }`
+    pub storage_engine: Document,
 }
 
 /// Specifies the options to a [`Database::drop`](../struct.Database.html#method.drop) operation.

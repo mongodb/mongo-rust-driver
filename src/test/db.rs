@@ -7,8 +7,11 @@ use serde::Deserialize;
 use crate::{
     bson::{doc, Bson, Document},
     error::Result,
-    options::{AggregateOptions, CreateCollectionOptions},
-    test::{util::TestClient, LOCK},
+    options::{AggregateOptions, CreateCollectionOptions, IndexOptionDefaults},
+    test::{
+        util::{CommandEvent, EventClient, TestClient},
+        LOCK,
+    },
     Database,
 };
 
@@ -317,4 +320,56 @@ async fn db_aggregate_disk_use() {
     db.aggregate(pipeline, Some(options))
         .await
         .expect("aggregate with disk use should succeed");
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn create_index_options_defaults() {
+    let defaults = IndexOptionDefaults {
+        storage_engine: doc! { "wiredTiger": doc! {} },
+    };
+    index_option_defaults_test(Some(defaults), function_name!()).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn create_index_options_defaults_not_specified() {
+    index_option_defaults_test(None, function_name!()).await;
+}
+
+async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>, name: &str) {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = EventClient::new().await;
+    let db = client.database(name);
+
+    let options = CreateCollectionOptions::builder()
+        .index_option_defaults(defaults.clone())
+        .build();
+    db.create_collection(name, options).await.unwrap();
+    db.drop(None).await.unwrap();
+
+    let events = client.command_events.read().unwrap();
+    let mut iter = events.iter().filter_map(|event| match event {
+        CommandEvent::CommandStartedEvent(event) => {
+            if event.command_name == "create" {
+                Some(event)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    });
+
+    let event = iter.next().unwrap();
+    let event_defaults = match event.command.get_document("indexOptionDefaults") {
+        Ok(defaults) => Some(IndexOptionDefaults {
+            storage_engine: defaults.get_document("storageEngine").unwrap().clone(),
+        }),
+        Err(_) => None,
+    };
+    assert_eq!(event_defaults, defaults);
+    assert!(iter.next().is_none());
 }
