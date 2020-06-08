@@ -1,5 +1,5 @@
 use crate::{
-    bson::{doc, Bson},
+    bson::doc,
     test::{
         assert_matches,
         run_spec_test,
@@ -130,19 +130,11 @@ async fn run() {
                     );
                 }
                 if let Some(expected_result) = operation.result {
-                    let expected_result = match expected_result {
-                        Bson::Int32(n) => Bson::Int64(n as i64),
-                        _ => expected_result,
-                    };
                     let description = &test_case.description;
                     let result = result
                         .unwrap()
                         .unwrap_or_else(|| panic!("{:?}: operation should succeed", description));
-                    assert_eq!(
-                        result, expected_result,
-                        "{}: expected {:?}, got {:?}",
-                        description, expected_result, result
-                    );
+                    assert_matches(&expected_result, &result, Some(description));
                 }
 
                 events.append(&mut operation_events);
