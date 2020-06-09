@@ -33,7 +33,7 @@ const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// This is the main entry point for the API. A `Client` is used to connect to a MongoDB cluster.
 /// By default, it will monitor the topology of the cluster, keeping track of any changes, such
-/// as servers being added or removed
+/// as servers being added or removed.
 ///
 /// `Client` uses [`std::sync::Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html) internally,
 /// so it can safely be shared across threads or async tasks. For example:
@@ -63,6 +63,12 @@ const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 /// # Ok(())
 /// # }
 /// ```
+///
+/// ## TCP Keepalive
+/// TCP keepalive is enabled by default with ``tcp_keepalive_time`` set to 120 seconds. The
+/// driver does not set ``tcp_keepalive_intvl``. See the
+/// [MongoDB Diagnostics FAQ keepalive section](https://docs.mongodb.com/manual/faq/diagnostics/#does-tcp-keepalive-time-affect-mongodb-deployments)
+/// for instructions on setting these values at the system level.
 #[derive(Clone, Debug)]
 pub struct Client {
     inner: Arc<ClientInner>,
