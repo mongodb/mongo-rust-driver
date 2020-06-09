@@ -40,6 +40,12 @@ use crate::{
 /// # Ok(())
 /// # }
 /// ```
+///
+/// ## TCP Keepalive
+/// TCP keepalive is enabled by default with ``tcp_keepalive_time`` set to 120 seconds. The
+/// driver does not set ``tcp_keepalive_intvl``. See the
+/// [MongoDB Diagnostics FAQ keepalive section](https://docs.mongodb.com/manual/faq/diagnostics/#does-tcp-keepalive-time-affect-mongodb-deployments)
+/// for instructions on setting these values at the system level.
 #[derive(Clone, Debug)]
 pub struct Client {
     async_client: AsyncClient,
