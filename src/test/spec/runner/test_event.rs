@@ -38,14 +38,10 @@ impl Matchable for TestEvent {
                     command: expected_command,
                 },
             ) => {
-                if actual_command_name.is_some()
-                    && expected_command_name.is_some()
-                    && actual_command_name != expected_command_name
-                {
+                if expected_command_name.is_some() && actual_command_name != expected_command_name {
                     return false;
                 }
-                if actual_database_name.is_some()
-                    && expected_database_name.is_some()
+                if expected_database_name.is_some()
                     && actual_database_name != expected_database_name
                 {
                     return false;

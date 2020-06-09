@@ -660,18 +660,14 @@ impl EventClient {
         operation.execute_on_client(self).await
     }
 
-    pub fn collect_events(
-        &self,
-        operation: &AnyTestOperation,
-        command_monitoring: bool,
-    ) -> Vec<CommandEvent> {
+    pub fn collect_events(&self, operation: &AnyTestOperation) -> Vec<CommandEvent> {
         self.command_events
             .write()
             .unwrap()
             .drain(..)
             .filter(|event| {
-                operation.command_names().contains(&event.command_name())
-                    && (command_monitoring || event.is_command_started())
+                event.is_command_started()
+                    && operation.command_names().contains(&event.command_name())
             })
             .collect()
     }

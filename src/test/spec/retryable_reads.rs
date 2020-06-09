@@ -114,7 +114,7 @@ async fn run() {
                     }
                 };
                 let mut operation_events: Vec<TestEvent> = client
-                    .collect_events(&operation, false)
+                    .collect_events(&operation)
                     .into_iter()
                     .map(Into::into)
                     .collect();
