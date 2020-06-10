@@ -29,20 +29,20 @@ pub enum TestData {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunOn {
-    pub min_version: Option<String>,
-    pub max_version: Option<String>,
+    pub min_server_version: Option<String>,
+    pub max_server_version: Option<String>,
     pub topology: Option<Vec<String>>,
 }
 
 impl RunOn {
     pub fn can_run_on(&self, client: &EventClient) -> bool {
-        if let Some(ref min_version) = self.min_version {
+        if let Some(ref min_version) = self.min_server_version {
             let req = VersionReq::parse(&format!(">= {}", &min_version)).unwrap();
             if !req.matches(&client.server_version) {
                 return false;
             }
         }
-        if let Some(ref max_version) = self.max_version {
+        if let Some(ref max_version) = self.max_server_version {
             let req = VersionReq::parse(&format!("<= {}", &max_version)).unwrap();
             if !req.matches(&client.server_version) {
                 return false;
