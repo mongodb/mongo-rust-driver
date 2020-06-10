@@ -113,4 +113,8 @@ impl Operation for Find {
             .as_ref()
             .and_then(|opts| opts.selection_criteria.as_ref())
     }
+
+    fn is_read_retryable(&self) -> bool {
+        true
+    }
 }

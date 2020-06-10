@@ -37,7 +37,7 @@ impl CommandEvent {
         }
     }
 
-    fn is_command_started(&self) -> bool {
+    pub fn is_command_started(&self) -> bool {
         match self {
             CommandEvent::CommandStartedEvent(_) => true,
             _ => false,
@@ -181,6 +181,16 @@ impl EventClient {
             }
         }
         panic!("could not find event for {} command", command_name);
+    }
+
+    pub fn topology(&self) -> String {
+        if self.client.is_sharded() {
+            String::from("sharded")
+        } else if self.client.is_replica_set() {
+            String::from("replicaset")
+        } else {
+            String::from("single")
+        }
     }
 }
 

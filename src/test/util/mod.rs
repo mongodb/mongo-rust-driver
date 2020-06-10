@@ -186,14 +186,6 @@ pub async fn drop_collection(coll: &Collection) {
     };
 }
 
-pub fn parse_version(version: &str) -> (u64, u64) {
-    let parts: Vec<u64> = version.split('.').map(|s| s.parse().unwrap()).collect();
-    if parts.len() != 2 {
-        panic!("not two part version string: {:?}", parts);
-    }
-    (parts[0], parts[1])
-}
-
 #[derive(Debug, Deserialize)]
 struct BuildInfo {
     version: String,

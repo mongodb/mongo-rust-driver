@@ -4,9 +4,12 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::bson::{Bson, Document};
 
+use serde::Serialize;
+
 /// The result of a [`Collection::insert_one`](../struct.Collection.html#method.insert_one)
 /// operation.
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InsertOneResult {
     /// The `_id` field of the document inserted.
     pub inserted_id: Bson,
@@ -26,7 +29,8 @@ impl InsertOneResult {
 
 /// The result of a [`Collection::insert_many`](../struct.Collection.html#method.insert_many)
 /// operation.
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InsertManyResult {
     /// The `_id` field of the documents inserted.
     pub inserted_ids: HashMap<usize, Bson>,
@@ -42,7 +46,8 @@ impl InsertManyResult {
 
 /// The result of a [`Collection::update_one`](../struct.Collection.html#method.update_one) or
 /// [`Collection::update_many`](../struct.Collection.html#method.update_many) operation.
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateResult {
     /// The number of documents that matched the filter.
     pub matched_count: i64,
@@ -54,7 +59,8 @@ pub struct UpdateResult {
 
 /// The result of a [`Collection::delete_one`](../struct.Collection.html#method.delete_one) or
 /// [`Collection::delete_many`](../struct.Collection.html#method.delete_many) operation.
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DeleteResult {
     /// The number of documents deleted by the operation.
     pub deleted_count: i64,

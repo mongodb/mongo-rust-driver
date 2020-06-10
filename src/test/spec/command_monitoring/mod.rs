@@ -3,12 +3,13 @@ mod operation;
 
 use std::convert::Into;
 
+use semver::VersionReq;
 use serde::Deserialize;
 
 use self::{event::TestEvent, operation::*};
 use crate::{
     bson::{Bson, Document},
-    test::{assert_matches, parse_version, util::TestClient, EventClient, LOCK},
+    test::{assert_matches, util::TestClient, EventClient, LOCK},
 };
 
 #[derive(Deserialize)]
@@ -53,15 +54,17 @@ async fn run_command_monitoring_test(test_file: TestFile) {
             continue;
         }
 
-        if let Some((major, minor)) = test_case.max_version.map(|s| parse_version(s.as_str())) {
-            if client.server_version_gt(major, minor) {
+        if let Some(ref max_version) = test_case.max_version {
+            let req = VersionReq::parse(&format!("<= {}", &max_version)).unwrap();
+            if !req.matches(&client.server_version) {
                 println!("Skipping {}", test_case.description);
                 continue;
             }
         }
 
-        if let Some((major, minor)) = test_case.min_version.map(|s| parse_version(s.as_str())) {
-            if client.server_version_lt(major, minor) {
+        if let Some(ref min_version) = test_case.min_version {
+            let req = VersionReq::parse(&format!(">= {}", &min_version)).unwrap();
+            if !req.matches(&client.server_version) {
                 println!("Skipping {}", test_case.description);
                 continue;
             }

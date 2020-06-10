@@ -4,6 +4,8 @@ mod connection_stepdown;
 mod crud;
 mod initial_dns_seedlist_discovery;
 mod read_write_concern;
+mod retryable_reads;
+mod runner;
 
 use std::{
     convert::TryFrom,
@@ -12,6 +14,8 @@ use std::{
     future::Future,
     path::PathBuf,
 };
+
+pub use self::runner::{AnyTestOperation, OperationObject, TestData, TestEvent, TestFile};
 
 use serde::Deserialize;
 use serde_json::Value;

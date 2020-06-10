@@ -92,6 +92,11 @@ pub(crate) trait Operation {
     fn supports_sessions(&self) -> bool {
         true
     }
+
+    /// Whether or not the operation supports retryable reads
+    fn is_read_retryable(&self) -> bool {
+        false
+    }
 }
 
 /// Appends a serializable struct to the input document.

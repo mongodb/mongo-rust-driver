@@ -13,6 +13,8 @@ lazy_static! {
     static ref RECOVERING_CODES: Vec<i32> = vec![11600, 11602, 13436, 189, 91];
     static ref NOTMASTER_CODES: Vec<i32> = vec![10107, 13435];
     static ref SHUTTING_DOWN_CODES: Vec<i32> = vec![11600, 91];
+    static ref RETRYABLE_READ_CODES: Vec<i32> =
+        vec![11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001];
 }
 
 /// The result type for all methods that can return an error in the `mongodb` crate.
@@ -66,6 +68,36 @@ impl Error {
     pub(crate) fn is_ns_not_found(&self) -> bool {
         match self.kind.as_ref() {
             ErrorKind::CommandError(err) if err.code == 26 => true,
+            _ => false,
+        }
+    }
+
+    /// Whether a read operation should be retried if this error occurs
+    pub(crate) fn is_read_retryable(&self) -> bool {
+        if self.is_network_error() {
+            return true;
+        }
+        match &self.kind.code_and_message() {
+            Some((code, message)) => {
+                if RETRYABLE_READ_CODES.contains(&code) {
+                    return true;
+                }
+                if is_not_master(*code, message) || is_recovering(*code, message) {
+                    return true;
+                }
+                false
+            }
+            None => false,
+        }
+    }
+
+    /// Whether an error originated from the server
+    pub(crate) fn is_server_error(&self) -> bool {
+        match self.kind.as_ref() {
+            ErrorKind::AuthenticationError { .. }
+            | ErrorKind::BulkWriteError(_)
+            | ErrorKind::CommandError(_)
+            | ErrorKind::WriteError(_) => true,
             _ => false,
         }
     }
