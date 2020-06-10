@@ -1,4 +1,3 @@
-
 use std::collections::HashMap;
 
 use semver::VersionReq;
@@ -6,11 +5,7 @@ use serde::Deserialize;
 
 use crate::{
     bson::{doc, Document},
-    test::{
-        util::EventClient,
-        AnyTestOperation,
-        TestEvent,
-    },
+    test::{util::EventClient, AnyTestOperation, TestEvent},
 };
 
 #[derive(Debug, Deserialize)]
