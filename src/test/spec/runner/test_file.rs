@@ -1,13 +1,17 @@
+
+use std::collections::HashMap;
+
+use semver::VersionReq;
+use serde::Deserialize;
+
 use crate::{
     bson::{doc, Document},
     test::{
-        util::{parse_version, EventClient},
+        util::EventClient,
         AnyTestOperation,
         TestEvent,
     },
 };
-use serde::Deserialize;
-use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
 pub struct TestFile {
@@ -30,22 +34,22 @@ pub enum TestData {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunOn {
-    pub min_server_version: Option<String>,
-    pub max_server_version: Option<String>,
+    pub min_version: Option<String>,
+    pub max_version: Option<String>,
     pub topology: Option<Vec<String>>,
 }
 
 impl RunOn {
     pub fn can_run_on(&self, client: &EventClient) -> bool {
-        if let Some(ref min_server_version) = self.min_server_version {
-            let (major, minor) = parse_version(min_server_version);
-            if client.server_version_lt(major, minor) {
+        if let Some(ref min_version) = self.min_version {
+            let req = VersionReq::parse(&format!(">= {}", &min_version)).unwrap();
+            if !req.matches(&client.server_version) {
                 return false;
             }
         }
-        if let Some(ref max_server_version) = self.max_server_version {
-            let (major, minor) = parse_version(max_server_version);
-            if client.server_version_gt(major, minor) {
+        if let Some(ref max_version) = self.max_version {
+            let req = VersionReq::parse(&format!("<= {}", &max_version)).unwrap();
+            if !req.matches(&client.server_version) {
                 return false;
             }
         }

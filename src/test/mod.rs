@@ -8,7 +8,7 @@ mod util;
 
 pub(crate) use self::{
     spec::{run_spec_test, AnyTestOperation, OperationObject, TestData, TestEvent, TestFile},
-    util::{assert_matches, parse_version, CommandEvent, EventClient, Matchable, TestClient},
+    util::{assert_matches, CommandEvent, EventClient, Matchable, TestClient},
 };
 
 use lazy_static::lazy_static;
