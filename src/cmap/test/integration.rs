@@ -25,7 +25,11 @@ async fn acquire_connection_and_send_command() {
     let client_options = CLIENT_OPTIONS.clone();
     let pool_options = ConnectionPoolOptions::from_client_options(&client_options);
 
-    let pool = ConnectionPool::new(client_options.hosts[0].clone(), Some(pool_options));
+    let pool = ConnectionPool::new(
+        client_options.hosts[0].clone(),
+        Default::default(),
+        Some(pool_options),
+    );
     let mut connection = pool.check_out().await.unwrap();
 
     let body = doc! { "listDatabases": 1 };

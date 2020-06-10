@@ -2,6 +2,7 @@ use crate::{
     cmap::{options::ConnectionPoolOptions, Connection, ConnectionPool},
     error::Result,
     options::{ClientOptions, StreamAddress},
+    runtime::HttpClient,
 };
 
 /// Contains the state for a given server in the topology.
@@ -14,10 +15,15 @@ pub(crate) struct Server {
 }
 
 impl Server {
-    pub(crate) fn new(address: StreamAddress, options: &ClientOptions) -> Self {
+    pub(crate) fn new(
+        address: StreamAddress,
+        options: &ClientOptions,
+        http_client: HttpClient,
+    ) -> Self {
         Self {
             pool: ConnectionPool::new(
                 address.clone(),
+                http_client,
                 Some(ConnectionPoolOptions::from_client_options(options)),
             ),
             address,

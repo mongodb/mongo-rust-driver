@@ -1,12 +1,16 @@
 //! Contains the types needed to specify the auth configuration for a
 //! [`Client`](struct.Client.html).
 
+#[cfg(feature = "tokio-runtime")]
+mod aws;
+mod sasl;
 mod scram;
 #[cfg(test)]
 mod test;
 
 use std::{borrow::Cow, str::FromStr};
 
+use hmac::Mac;
 use rand::Rng;
 use serde::Deserialize;
 use typed_builder::TypedBuilder;
@@ -16,12 +20,14 @@ use crate::{
     bson::Document,
     cmap::{Connection, StreamDescription},
     error::{Error, ErrorKind, Result},
+    runtime::HttpClient,
 };
 
 const SCRAM_SHA_1_STR: &str = "SCRAM-SHA-1";
 const SCRAM_SHA_256_STR: &str = "SCRAM-SHA-256";
 const MONGODB_CR_STR: &str = "MONGODB-CR";
 const GSSAPI_STR: &str = "GSSAPI";
+const MONGODB_AWS_STR: &str = "MONGODB-AWS";
 const MONGODB_X509_STR: &str = "MONGODB-X509";
 const PLAIN_STR: &str = "PLAIN";
 
@@ -68,9 +74,19 @@ pub enum AuthMechanism {
     ///
     /// Note: This mechanism is not currently supported by this driver but will be in the future.
     Plain,
+
+    #[cfg(feature = "tokio-runtime")]
+    MongoDbAws,
 }
 
 impl AuthMechanism {
+    fn from_scram_version(scram: &ScramVersion) -> Self {
+        match scram {
+            ScramVersion::Sha1 => Self::ScramSha1,
+            ScramVersion::Sha256 => Self::ScramSha256,
+        }
+    }
+
     pub(crate) fn from_stream_description(description: &StreamDescription) -> AuthMechanism {
         let scram_sha_256_found = description
             .sasl_supported_mechs
@@ -110,6 +126,8 @@ impl AuthMechanism {
             AuthMechanism::MongoDbX509 => MONGODB_X509_STR,
             AuthMechanism::Gssapi => GSSAPI_STR,
             AuthMechanism::Plain => PLAIN_STR,
+            #[cfg(feature = "tokio-runtime")]
+            AuthMechanism::MongoDbAws => MONGODB_AWS_STR,
         }
     }
 
@@ -121,6 +139,8 @@ impl AuthMechanism {
             AuthMechanism::ScramSha1 | AuthMechanism::ScramSha256 | AuthMechanism::MongoDbCr => {
                 uri_db.unwrap_or("admin")
             }
+            #[cfg(feature = "tokio-runtime")]
+            AuthMechanism::MongoDbAws => "$external",
             _ => "",
         }
     }
@@ -129,6 +149,7 @@ impl AuthMechanism {
         &self,
         stream: &mut Connection,
         credential: &Credential,
+        #[cfg_attr(not(feature = "tokio-runtime"), allow(unused))] http_client: &HttpClient,
     ) -> Result<()> {
         match self {
             AuthMechanism::ScramSha1 => {
@@ -140,6 +161,10 @@ impl AuthMechanism {
                 ScramVersion::Sha256
                     .authenticate_stream(stream, credential)
                     .await
+            }
+            #[cfg(feature = "tokio-runtime")]
+            AuthMechanism::MongoDbAws => {
+                aws::authenticate_stream(stream, credential, http_client).await
             }
             AuthMechanism::MongoDbCr => Err(ErrorKind::AuthenticationError {
                 message: "MONGODB-CR is deprecated and not supported by this driver. Use SCRAM \
@@ -166,6 +191,15 @@ impl FromStr for AuthMechanism {
             MONGODB_X509_STR => Ok(AuthMechanism::MongoDbX509),
             GSSAPI_STR => Ok(AuthMechanism::Gssapi),
             PLAIN_STR => Ok(AuthMechanism::Plain),
+
+            #[cfg(feature = "tokio-runtime")]
+            MONGODB_AWS_STR => Ok(AuthMechanism::MongoDbAws),
+            #[cfg(not(feature = "tokio-runtime"))]
+            MONGODB_AWS_STR => Err(ErrorKind::ArgumentError {
+                message: "MONGODB-AWS auth is only supported with the tokio runtime".into(),
+            }
+            .into()),
+
             _ => Err(ErrorKind::ArgumentError {
                 message: format!("invalid mechanism string: {}", str),
             }
@@ -249,7 +283,11 @@ impl Credential {
     /// Attempts to authenticate a stream according this credential, returning an error
     /// result on failure. A mechanism may be negotiated if one is not provided as part of the
     /// credential.
-    pub(crate) async fn authenticate_stream(&self, conn: &mut Connection) -> Result<()> {
+    pub(crate) async fn authenticate_stream(
+        &self,
+        conn: &mut Connection,
+        http_client: &HttpClient,
+    ) -> Result<()> {
         let stream_description = conn.stream_description()?;
 
         // Verify server can authenticate.
@@ -263,12 +301,22 @@ impl Credential {
         };
 
         // Authenticate according to the chosen mechanism.
-        mechanism.authenticate_stream(conn, self).await
+        mechanism.authenticate_stream(conn, self, http_client).await
     }
 }
 
+pub(crate) fn generate_nonce_bytes() -> [u8; 32] {
+    rand::thread_rng().gen()
+}
+
 pub(crate) fn generate_nonce() -> String {
-    let mut rng = rand::thread_rng();
-    let result: Vec<u8> = (0..32).map(|_| rng.gen()).collect();
-    base64::encode(result.as_slice())
+    let result = generate_nonce_bytes();
+    base64::encode(&result)
+}
+
+fn mac<M: Mac>(key: &[u8], input: &[u8], auth_mechanism: &str) -> Result<impl AsRef<[u8]>> {
+    let mut mac =
+        M::new_varkey(key).map_err(|_| Error::unknown_authentication_error(auth_mechanism))?;
+    mac.input(input);
+    Ok(mac.result().code())
 }
