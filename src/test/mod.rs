@@ -7,7 +7,7 @@ mod spec;
 mod util;
 
 pub(crate) use self::{
-    spec::{run_spec_test, AnyTestOperation, OperationObject, TestData, TestEvent, TestFile},
+    spec::{run_spec_test, run_v2_test, AnyTestOperation, OperationObject, TestEvent},
     util::{assert_matches, CommandEvent, EventClient, Matchable, TestClient},
 };
 

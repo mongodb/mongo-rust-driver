@@ -15,7 +15,14 @@ use std::{
     path::PathBuf,
 };
 
-pub use self::runner::{AnyTestOperation, OperationObject, TestData, TestEvent, TestFile};
+pub use self::runner::{
+    run_v2_test,
+    AnyTestOperation,
+    OperationObject,
+    TestData,
+    TestEvent,
+    TestFile,
+};
 
 use serde::Deserialize;
 use serde_json::Value;
