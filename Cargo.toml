@@ -24,6 +24,7 @@ default = ["tokio-runtime"]
 tokio-runtime = ["tokio/dns", "tokio/macros", "tokio/rt-core", "tokio/tcp", "tokio/rt-threaded", "tokio/time", "reqwest", "serde_bytes"]
 async-std-runtime = ["async-std", "async-std/attributes"]
 sync = ["async-std-runtime"]
+bson-u2i = ["bson/u2i"]
 
 [dependencies]
 async-trait = "0.1.24"
