@@ -49,7 +49,7 @@ webpki = "0.21.0"
 webpki-roots = "0.18.0"
 
 [dependencies.async-std]
-version = "1.6.0"
+version = "1.6.2"
 optional = true
 
 [dependencies.pbkdf2]
