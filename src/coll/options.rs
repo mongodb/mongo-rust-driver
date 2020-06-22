@@ -356,6 +356,11 @@ pub struct FindOneAndReplaceOptions {
     /// information on how to use this option.
     #[builder(default)]
     pub collation: Option<Collation>,
+
+    /// The index to use for the operation.
+    /// Only available in MongoDB 4.4+.
+    #[builder(default)]
+    pub hint: Option<Hint>,
 }
 
 /// Specifies the options to a
@@ -408,6 +413,11 @@ pub struct FindOneAndUpdateOptions {
     /// information on how to use this option.
     #[builder(default)]
     pub collation: Option<Collation>,
+
+    /// The index to use for the operation.
+    /// Only available in MongoDB 4.4+.
+    #[builder(default)]
+    pub hint: Option<Hint>,
 }
 
 /// Specifies the options to a [`Collection::aggregate`](../struct.Collection.html#method.aggregate)

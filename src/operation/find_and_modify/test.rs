@@ -10,6 +10,7 @@ use crate::{
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
         FindOneAndUpdateOptions,
+        Hint,
         UpdateModifications,
     },
     Namespace,
@@ -24,6 +25,48 @@ fn empty_delete() -> FindAndModify {
     };
     let filter = doc! {};
     FindAndModify::with_delete(ns, filter, None)
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_with_delete_hint() {
+    let ns = Namespace {
+        db: "test_db".to_string(),
+        coll: "test_coll".to_string(),
+    };
+    let filter = doc! {
+        "x": 2,
+        "y": { "$gt": 1 },
+    };
+
+    let options = FindOneAndDeleteOptions {
+        hint: Some(Hint::Keys(doc! { "x": 1, "y": -1 })),
+        ..Default::default()
+    };
+
+    let op = FindAndModify::with_delete(ns, filter.clone(), Some(options));
+
+    let description = StreamDescription::new_testing();
+    let mut cmd = op.build(&description).unwrap();
+
+    assert_eq!(cmd.name.as_str(), "findAndModify");
+    assert_eq!(cmd.target_db.as_str(), "test_db");
+    assert_eq!(cmd.read_pref.as_ref(), None);
+
+    let mut expected_body = doc! {
+        "findAndModify": "test_coll",
+        "query": filter,
+        "hint": {
+            "x": 1,
+            "y": -1,
+        },
+        "remove": true
+    };
+
+    bson_util::sort_document(&mut cmd.body);
+    bson_util::sort_document(&mut expected_body);
+
+    assert_eq!(cmd.body, expected_body);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -154,6 +197,52 @@ fn empty_replace() -> FindAndModify {
     let filter = doc! {};
     let replacement = doc! { "x": { "inc": 1 } };
     FindAndModify::with_replace(ns, filter, replacement, None).unwrap()
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_with_replace_hint() {
+    let ns = Namespace {
+        db: "test_db".to_string(),
+        coll: "test_coll".to_string(),
+    };
+    let filter = doc! { "x": { "$gt": 1 } };
+    let replacement = doc! { "x": { "inc": 1 } };
+    let options = FindOneAndReplaceOptions {
+        hint: Some(Hint::Keys(doc! { "x": 1, "y": -1 })),
+        upsert: Some(false),
+        bypass_document_validation: Some(true),
+        return_document: Some(ReturnDocument::After),
+        ..Default::default()
+    };
+
+    let op = FindAndModify::with_replace(ns, filter.clone(), replacement.clone(), Some(options))
+        .unwrap();
+
+    let description = StreamDescription::new_testing();
+    let mut cmd = op.build(&description).unwrap();
+
+    assert_eq!(cmd.name.as_str(), "findAndModify");
+    assert_eq!(cmd.target_db.as_str(), "test_db");
+    assert_eq!(cmd.read_pref.as_ref(), None);
+
+    let mut expected_body = doc! {
+        "findAndModify": "test_coll",
+        "query": filter,
+        "update": replacement,
+        "upsert": false,
+        "bypassDocumentValidation": true,
+        "new": true,
+        "hint": {
+            "x": 1,
+            "y": -1,
+        },
+    };
+
+    bson_util::sort_document(&mut cmd.body);
+    bson_util::sort_document(&mut expected_body);
+
+    assert_eq!(cmd.body, expected_body);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -290,6 +379,49 @@ fn empty_update() -> FindAndModify {
     let filter = doc! {};
     let update = UpdateModifications::Document(doc! { "$x": { "$inc": 1 } });
     FindAndModify::with_update(ns, filter, update, None).unwrap()
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_with_update_hint() {
+    let ns = Namespace {
+        db: "test_db".to_string(),
+        coll: "test_coll".to_string(),
+    };
+    let filter = doc! { "x": { "$gt": 1 } };
+    let update = UpdateModifications::Document(doc! { "$x": { "$inc": 1 } });
+    let options = FindOneAndUpdateOptions {
+        hint: Some(Hint::Keys(doc! { "x": 1, "y": -1 })),
+        upsert: Some(false),
+        bypass_document_validation: Some(true),
+        ..Default::default()
+    };
+
+    let op = FindAndModify::with_update(ns, filter.clone(), update.clone(), Some(options)).unwrap();
+
+    let description = StreamDescription::new_testing();
+    let mut cmd = op.build(&description).unwrap();
+
+    assert_eq!(cmd.name.as_str(), "findAndModify");
+    assert_eq!(cmd.target_db.as_str(), "test_db");
+    assert_eq!(cmd.read_pref.as_ref(), None);
+
+    let mut expected_body = doc! {
+        "findAndModify": "test_coll",
+        "query": filter,
+        "update": update.to_bson(),
+        "upsert": false,
+        "bypassDocumentValidation": true,
+        "hint": {
+            "x": 1,
+            "y": -1,
+        },
+    };
+
+    bson_util::sort_document(&mut cmd.body);
+    bson_util::sort_document(&mut expected_body);
+
+    assert_eq!(cmd.body, expected_body);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

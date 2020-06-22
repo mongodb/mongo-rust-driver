@@ -103,6 +103,7 @@ impl FindAndModifyOptions {
             .sort(opts.sort)
             .upsert(opts.upsert)
             .write_concern(opts.write_concern)
+            .hint(opts.hint)
             .build()
     }
 
@@ -121,6 +122,7 @@ impl FindAndModifyOptions {
             .sort(opts.sort)
             .upsert(opts.upsert)
             .write_concern(opts.write_concern)
+            .hint(opts.hint)
             .build()
     }
 }
