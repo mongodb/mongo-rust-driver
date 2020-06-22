@@ -20,7 +20,7 @@ use crate::{
 ///
 /// See the documentation [here](https://docs.mongodb.com/manual/reference/read-concern/) for more
 /// information about read concerns.
-#[derive(Clone, Debug, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[non_exhaustive]
 pub struct ReadConcern {
     /// The level of the read concern.
@@ -70,7 +70,7 @@ impl From<ReadConcernLevel> for ReadConcern {
 ///
 /// See the documentation [here](https://docs.mongodb.com/manual/reference/read-concern/) for more
 /// information about read concerns.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum ReadConcernLevel {
     /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-local/).
@@ -110,6 +110,13 @@ impl ReadConcernLevel {
             ReadConcernLevel::Available => "available",
             ReadConcernLevel::Custom(ref s) => s,
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for ReadConcernLevel {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        Ok(ReadConcernLevel::from_str(&s))
     }
 }
 

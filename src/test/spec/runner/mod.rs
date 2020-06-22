@@ -14,6 +14,7 @@ pub use self::{
 };
 
 const SKIPPED_OPERATIONS: &[&str] = &[
+    "bulkWrite",
     "count",
     "download",
     "download_by_name",
@@ -95,16 +96,16 @@ pub async fn run_v2_test(test_file: TestFile) {
         let mut events: Vec<TestEvent> = Vec::new();
         for operation in test_case.operations {
             let result = match operation.object {
-                OperationObject::Client => client.run_client_operation(&operation).await,
-                OperationObject::Database => {
+                Some(OperationObject::Client) => client.run_client_operation(&operation).await,
+                Some(OperationObject::Database) => {
                     client.run_database_operation(&operation, &db_name).await
                 }
-                OperationObject::Collection => {
+                Some(OperationObject::Collection) | None => {
                     client
                         .run_collection_operation(&operation, &db_name, &coll_name)
                         .await
                 }
-                OperationObject::GridfsBucket => {
+                Some(OperationObject::GridfsBucket) => {
                     panic!("unsupported operation: {}", operation.name)
                 }
             };
@@ -129,7 +130,7 @@ pub async fn run_v2_test(test_file: TestFile) {
                 let result = result
                     .unwrap()
                     .unwrap_or_else(|| panic!("{:?}: operation should succeed", description));
-                assert_matches(&expected_result, &result, Some(description));
+                assert_matches(&result, &expected_result, Some(description));
             }
 
             events.append(&mut operation_events);
@@ -157,3 +158,10 @@ pub async fn run_v2_test(test_file: TestFile) {
         }
     }
 }
+
+// fn results_match(expected: &Document, actual: &Document) -> bool {
+//     for (k, v) in expected.iter() {
+//         if let Some(actual_v) = actual.
+//     }
+//     true
+// }

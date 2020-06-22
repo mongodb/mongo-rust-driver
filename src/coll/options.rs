@@ -14,8 +14,9 @@ use crate::{
 
 /// These are the valid options for creating a [`Collection`](../struct.Collection.html) with
 /// [`Database::collection_with_options`](../struct.Database.html#method.collection_with_options).
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Debug, Default, Deserialize, TypedBuilder)]
 #[non_exhaustive]
+#[serde(rename_all = "camelCase")]
 pub struct CollectionOptions {
     /// The default read preference for operations.
     #[builder(default)]

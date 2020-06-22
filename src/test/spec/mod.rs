@@ -1,7 +1,8 @@
 mod auth;
 mod command_monitoring;
 mod connection_stepdown;
-mod crud;
+mod crud_v1;
+mod crud_v2;
 mod initial_dns_seedlist_discovery;
 mod read_write_concern;
 mod retryable_reads;
@@ -56,12 +57,13 @@ where
         let json: Value =
             serde_json::from_reader(File::open(test_file_full_path.as_path()).unwrap()).unwrap();
 
+
         run_test_file(
             bson::from_bson(
                 Bson::try_from(json)
                     .unwrap_or_else(|_| panic!(test_file_full_path.display().to_string())),
             )
-            .unwrap_or_else(|_| panic!(test_file_full_path.display().to_string())),
+            .unwrap() //_or_else(|_| panic!(test_file_full_path.display().to_string())),
         )
         .await
     }

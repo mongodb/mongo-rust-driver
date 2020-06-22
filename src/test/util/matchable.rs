@@ -59,6 +59,20 @@ impl Matchable for Bson {
 impl Matchable for Document {
     fn content_matches(&self, expected: &Document) -> bool {
         for (k, v) in expected.iter() {
+            if k == "upsertedCount" {
+                if let Some(actual_v) = self.get("upsertedId") {
+                    let count = match actual_v {
+                        Bson::Null => Bson::Int32(0),
+                        _ => Bson::Int32(1),
+                    };
+                    if v != &count {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+                continue;
+            }
             if let Some(actual_v) = self.get(k) {
                 if !actual_v.matches(v) {
                     return false;

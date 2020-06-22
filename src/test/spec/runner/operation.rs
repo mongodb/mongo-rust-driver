@@ -11,7 +11,7 @@ use crate::{
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
     bson_util,
     error::Result,
-    options::{FindOptions, Hint, InsertManyOptions, UpdateOptions},
+    options::{CollectionOptions, FindOptions, Hint, InsertManyOptions, UpdateOptions},
     test::{
         util::{CommandEvent, EventClient},
         OperationObject,
@@ -39,20 +39,23 @@ pub trait TestOperation: Debug {
 pub struct AnyTestOperation {
     operation: Box<dyn TestOperation>,
     pub name: String,
-    pub object: OperationObject,
+    pub object: Option<OperationObject>,
     pub result: Option<Bson>,
     pub error: Option<bool>,
+    pub collection_options: Option<CollectionOptions>,
 }
 
 impl<'de> Deserialize<'de> for AnyTestOperation {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
         #[derive(Debug, Deserialize)]
+        #[serde(rename_all = "camelCase")]
         struct OperationDefinition {
             name: String,
             arguments: Option<Bson>,
-            object: OperationObject,
+            object: Option<OperationObject>,
             result: Option<Bson>,
             error: Option<bool>,
+            collection_options: Option<CollectionOptions>,
         };
 
         let definition = OperationDefinition::deserialize(deserializer)?;
@@ -114,6 +117,7 @@ impl<'de> Deserialize<'de> for AnyTestOperation {
             object: definition.object,
             result: definition.result,
             error: definition.error,
+            collection_options: definition.collection_options,
         })
     }
 }
