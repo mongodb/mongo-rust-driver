@@ -11,7 +11,7 @@ use crate::{
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
     bson_util,
     error::Result,
-    options::{CollectionOptions, FindOptions, Hint, InsertManyOptions, UpdateOptions},
+    options::{CollectionOptions, FindOptions, Hint, InsertManyOptions, ReplaceOptions, UpdateOptions},
     test::{
         util::{CommandEvent, EventClient},
         OperationObject,
@@ -107,6 +107,10 @@ impl<'de> Deserialize<'de> for AnyTestOperation {
             "listDatabaseNames" => Ok(Box::new(ListDatabaseNames) as Box<dyn TestOperation>),
             "listCollections" => Ok(Box::new(ListCollections) as Box<dyn TestOperation>),
             "listCollectionNames" => Ok(Box::new(ListCollectionNames) as Box<dyn TestOperation>),
+            "replaceOne" => ReplaceOne::deserialize(BsonDeserializer::new(definition.arguments.unwrap()))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            // isabeltodo
+            // other => {dbg!("{}", other); Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>)},
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| de::Error::custom(format!("{}", e)))?;
@@ -325,7 +329,9 @@ impl TestOperation for InsertOne {
 #[derive(Debug, Deserialize)]
 pub(super) struct UpdateMany {
     filter: Document,
-    update: Document,
+    update: Bson,
+    #[serde(default)]
+    hint: Option<Hint>,
 }
 
 #[async_trait]
@@ -335,8 +341,12 @@ impl TestOperation for UpdateMany {
     }
 
     async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+        let options = UpdateOptions {
+            hint: self.hint.clone(),
+            ..Default::default()
+        };
         let result = collection
-            .update_many(self.filter.clone(), self.update.clone(), None)
+            .update_many(self.filter.clone(), self.update.as_document().unwrap().clone(), options)
             .await?;
         let result = bson::to_bson(&result)?;
         Ok(Some(result))
@@ -354,9 +364,11 @@ impl TestOperation for UpdateMany {
 #[derive(Debug, Deserialize)]
 pub(super) struct UpdateOne {
     filter: Document,
-    update: Document,
+    update: Bson,
     #[serde(default)]
     upsert: Option<bool>,
+    #[serde(default)]
+    hint: Option<Hint>,
 }
 
 #[async_trait]
@@ -366,12 +378,13 @@ impl TestOperation for UpdateOne {
     }
 
     async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
-        let options = self.upsert.map(|b| UpdateOptions {
-            upsert: Some(b),
+        let options = UpdateOptions {
+            upsert: self.upsert,
+            hint: self.hint.clone(),
             ..Default::default()
-        });
+        };
         let result = collection
-            .update_one(self.filter.clone(), self.update.clone(), options)
+            .update_one(self.filter.clone(), self.update.as_document().unwrap().clone(), options)
             .await?;
         let result = bson::to_bson(&result)?;
         Ok(Some(result))
@@ -387,6 +400,7 @@ impl TestOperation for UpdateOne {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(super) struct Aggregate {
     pipeline: Vec<Document>,
 }
@@ -617,6 +631,41 @@ impl TestOperation for ListCollectionNames {
 }
 
 #[derive(Debug, Deserialize)]
+pub(super) struct ReplaceOne {
+    filter: Document,
+    replacement: Document,
+    #[serde(default)]
+    hint: Option<Hint>,
+}
+
+#[async_trait]
+impl TestOperation for ReplaceOne {
+    fn command_names(&self) -> &[&str] {
+        &["update"]
+    }
+
+    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+        let options = ReplaceOptions {
+            hint: self.hint.clone(),
+            ..Default::default()
+        };
+        let result = collection
+            .replace_one(self.filter.clone(), self.replacement.clone(), options)
+            .await?;
+        let result = bson::to_bson(&result)?;
+        Ok(Some(result))
+    }
+
+    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Deserialize)]
 pub(super) struct UnimplementedOperation;
 
 #[async_trait]
@@ -652,11 +701,16 @@ impl EventClient {
     pub async fn run_collection_operation(
         &self,
         operation: &AnyTestOperation,
-        database_name: &str,
-        collection_name: &str,
+        db_name: &str,
+        coll_name: &str,
+        collection_options: Option<CollectionOptions>,
     ) -> Result<Option<Bson>> {
+        let coll = match collection_options {
+            Some(options) => self.database(db_name).collection_with_options(coll_name, options),
+            None => self.database(db_name).collection(coll_name),
+        };
         operation
-            .execute_on_collection(&self.database(database_name).collection(collection_name))
+            .execute_on_collection(&coll)
             .await
     }
 
@@ -665,7 +719,7 @@ impl EventClient {
     }
 
     pub fn collect_events(&self, operation: &AnyTestOperation) -> Vec<CommandEvent> {
-        self.command_events
+        let events = self.command_events
             .write()
             .unwrap()
             .drain(..)
@@ -673,6 +727,9 @@ impl EventClient {
                 event.is_command_started()
                     && operation.command_names().contains(&event.command_name())
             })
-            .collect()
+            .collect();
+        // isabeltodo
+        // dbg!("{}", &events);
+        events
     }
 }
