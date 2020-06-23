@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use futures::stream::StreamExt;
 use lazy_static::lazy_static;
+use semver::VersionReq;
 
 use crate::{
     bson::{doc, Bson, Document},
@@ -588,8 +589,13 @@ async fn delete_hint_not_specified() {
 
 async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>, name: &str) {
     let _guard = LOCK.run_concurrently().await;
-
     let client = EventClient::new().await;
+
+    let req = VersionReq::parse("< 4.2").unwrap();
+    if options.is_some() && req.matches(&client.server_version) {
+        return;
+    }
+
     let coll = client.database(name).collection(name);
     let _: Result<Option<Document>> = coll.find_one_and_delete(doc! {}, options.clone()).await;
 
@@ -626,4 +632,31 @@ async fn find_one_and_delete_hint_string_specified() {
 #[function_name::named]
 async fn find_one_and_delete_hint_not_specified() {
     find_one_and_delete_hint_test(None, function_name!()).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn find_one_and_delete_hint_server_version() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = EventClient::new().await;
+    let coll = client.database(function_name!()).collection("coll");
+
+    let options = FindOneAndDeleteOptions::builder()
+        .hint(Hint::Name(String::new()))
+        .build();
+    let res = coll.find_one_and_delete(doc! {}, options).await;
+
+    let req1 = VersionReq::parse("< 4.2").unwrap();
+    let req2 = VersionReq::parse("4.2.*").unwrap();
+    if req1.matches(&client.server_version) {
+        let error = res.expect_err("find one and delete should fail");
+        assert!(matches!(error.kind.as_ref(), ErrorKind::OperationError { .. }));
+    } else if req2.matches(&client.server_version) {
+        let error = res.expect_err("find one and delete should fail");
+        assert!(matches!(error.kind.as_ref(), ErrorKind::CommandError { .. }));
+    } else {
+        assert!(res.is_ok());
+    }
 }
