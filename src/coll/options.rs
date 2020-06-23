@@ -270,6 +270,7 @@ pub struct DeleteOptions {
     pub write_concern: Option<WriteConcern>,
 
     /// The index to use for the operation.
+    /// Only available in MongoDB 4.4+.
     #[builder(default)]
     pub hint: Option<Hint>,
 }
@@ -307,6 +308,7 @@ pub struct FindOneAndDeleteOptions {
     pub collation: Option<Collation>,
 
     /// The index to use for the operation.
+    /// /// Only available in MongoDB 4.4+.
     #[builder(default)]
     pub hint: Option<Hint>,
 }
