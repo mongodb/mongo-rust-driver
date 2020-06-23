@@ -75,7 +75,27 @@ impl Operation for FindAndModify {
     type O = Option<Document>;
     const NAME: &'static str = "findAndModify";
 
-    fn build(&self, _description: &StreamDescription) -> Result<Command> {
+    fn build(&self, description: &StreamDescription) -> Result<Command> {
+        if self.options.hint.is_some() {
+            match description.max_wire_version {
+                Some(version) if version < 8 => {
+                    return Err(ErrorKind::OperationError {
+                        message: "Specifying a hint is not supported on server versions < 4.4"
+                            .to_string(),
+                    }
+                    .into());
+                }
+                None => {
+                    return Err(ErrorKind::OperationError {
+                        message: "Specifying a hint is not supported on server versions < 4.4"
+                            .to_string(),
+                    }
+                    .into());
+                }
+                _ => {}
+            }
+        }
+
         let mut body: Document = doc! {
             Self::NAME: self.ns.coll.clone(),
             "query": self.query.clone(),
