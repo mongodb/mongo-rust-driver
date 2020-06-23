@@ -61,6 +61,7 @@ pub struct CreateCollectionOptions {
     /// collection. Expressions can be specified using any query operators except `$near`,
     /// `$nearSphere`, `$text`, and `$where`.
     #[builder(default)]
+    #[serde(rename = "validator")]
     pub validation: Option<Document>,
 
     /// Specifies how strictly the database should apply the validation rules to existing documents
