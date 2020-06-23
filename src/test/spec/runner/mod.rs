@@ -2,8 +2,10 @@ mod operation;
 mod test_event;
 mod test_file;
 
+use futures::stream::TryStreamExt;
+
 use crate::{
-    bson::doc,
+    bson::{doc, Document},
     test::{assert_matches, util::EventClient, TestClient, CLIENT_OPTIONS},
 };
 
@@ -26,15 +28,6 @@ const SKIPPED_OPERATIONS: &[&str] = &[
     "watch",
 ];
 
-const SKIPPED_DESCRIPTIONS: &[&str] = &[
-    // TODO RUST-422: unskip pipeline update tests
-    "UpdateOne using pipelines",
-    "UpdateMany using pipelines",
-    "FindOneAndUpdate using pipelines",
-    "UpdateOne in bulk write using pipelines",
-    "UpdateMany in bulk write using pipelines",
-];
-
 pub async fn run_v2_test(test_file: TestFile) {
     let has_skipped_op = test_file.tests.iter().any(|test_case| {
         test_case
@@ -47,14 +40,11 @@ pub async fn run_v2_test(test_file: TestFile) {
     }
 
     for test_case in test_file.tests {
-        if test_case.description != "UpdateOne with hint string" {
+        if test_case.description.contains("Aggregate with $listLocalSessions") {
             continue;
         }
 
-        if SKIPPED_DESCRIPTIONS.contains(&test_case.description.as_str()) {
-            println!("Skipping {}", test_case.description);
-            continue;
-        }
+        println!("{}", &test_case.description);
 
         if let Some(skip_reason) = test_case.skip_reason {
             println!("Skipping {}: {}", test_case.description, skip_reason);
@@ -120,7 +110,12 @@ pub async fn run_v2_test(test_file: TestFile) {
                 }
                 Some(OperationObject::Collection) | None => {
                     client
-                        .run_collection_operation(&operation, &db_name, &coll_name, operation.collection_options.clone())
+                        .run_collection_operation(
+                            &operation,
+                            &db_name,
+                            &coll_name,
+                            operation.collection_options.clone(),
+                        )
                         .await
                 }
                 Some(OperationObject::GridfsBucket) => {
@@ -155,11 +150,25 @@ pub async fn run_v2_test(test_file: TestFile) {
         }
 
         if let Some(expectations) = test_case.expectations {
-            dbg!("{}", &test_case.description);
             assert_eq!(events.len(), expectations.len());
             for (actual_event, expected_event) in events.iter().zip(expectations.iter()) {
                 assert_matches(actual_event, expected_event, None);
             }
+        }
+
+        if let Some(outcome) = test_case.outcome {
+            let coll_name = match outcome.collection.name {
+                Some(name) => name,
+                None => coll_name,
+            };
+            let coll = client.database(&db_name).collection(&coll_name);
+            let actual_data: Vec<Document> = coll.find(None, None)
+                .await
+                .unwrap()
+                .try_collect()
+                .await
+                .unwrap();
+            assert_eq!(outcome.collection.data, actual_data);
         }
 
         if test_case.fail_point.is_some() {

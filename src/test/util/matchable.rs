@@ -78,8 +78,6 @@ impl Matchable for Document {
                     return false;
                 }
             } else {
-                dbg!("{:?}", self);
-                dbg!("{:?}", expected);
                 return false;
             }
         }

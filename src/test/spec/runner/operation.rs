@@ -11,7 +11,16 @@ use crate::{
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
     bson_util,
     error::Result,
-    options::{CollectionOptions, FindOptions, Hint, InsertManyOptions, ReplaceOptions, UpdateOptions},
+    options::{
+        AggregateOptions,
+        CollectionOptions,
+        FindOptions,
+        Hint,
+        InsertManyOptions,
+        ReplaceOptions,
+        UpdateModifications,
+        UpdateOptions,
+    },
     test::{
         util::{CommandEvent, EventClient},
         OperationObject,
@@ -329,7 +338,7 @@ impl TestOperation for InsertOne {
 #[derive(Debug, Deserialize)]
 pub(super) struct UpdateMany {
     filter: Document,
-    update: Bson,
+    update: UpdateModifications,
     #[serde(default)]
     hint: Option<Hint>,
 }
@@ -346,7 +355,7 @@ impl TestOperation for UpdateMany {
             ..Default::default()
         };
         let result = collection
-            .update_many(self.filter.clone(), self.update.as_document().unwrap().clone(), options)
+            .update_many(self.filter.clone(), self.update.clone(), options)
             .await?;
         let result = bson::to_bson(&result)?;
         Ok(Some(result))
@@ -364,7 +373,7 @@ impl TestOperation for UpdateMany {
 #[derive(Debug, Deserialize)]
 pub(super) struct UpdateOne {
     filter: Document,
-    update: Bson,
+    update: UpdateModifications,
     #[serde(default)]
     upsert: Option<bool>,
     #[serde(default)]
@@ -384,7 +393,7 @@ impl TestOperation for UpdateOne {
             ..Default::default()
         };
         let result = collection
-            .update_one(self.filter.clone(), self.update.as_document().unwrap().clone(), options)
+            .update_one(self.filter.clone(), self.update.clone(), options)
             .await?;
         let result = bson::to_bson(&result)?;
         Ok(Some(result))
@@ -661,7 +670,14 @@ impl TestOperation for ReplaceOne {
     }
 
     async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
+        let options = AggregateOptions {
+            allow_disk_use: Some(true),
+            ..Default::default()
+        };
+        let cursor = database.aggregate(self.pipeline.clone(), None).await?;
+        let result = cursor.try_collect::<Vec<Document>>().await?;
+        // dbg!("{:?}", &result);
+        Ok(Some(Bson::from(result)))
     }
 }
 
@@ -706,12 +722,12 @@ impl EventClient {
         collection_options: Option<CollectionOptions>,
     ) -> Result<Option<Bson>> {
         let coll = match collection_options {
-            Some(options) => self.database(db_name).collection_with_options(coll_name, options),
+            Some(options) => self
+                .database(db_name)
+                .collection_with_options(coll_name, options),
             None => self.database(db_name).collection(coll_name),
         };
-        operation
-            .execute_on_collection(&coll)
-            .await
+        operation.execute_on_collection(&coll).await
     }
 
     pub async fn run_client_operation(&self, operation: &AnyTestOperation) -> Result<Option<Bson>> {
@@ -719,7 +735,8 @@ impl EventClient {
     }
 
     pub fn collect_events(&self, operation: &AnyTestOperation) -> Vec<CommandEvent> {
-        let events = self.command_events
+        self
+            .command_events
             .write()
             .unwrap()
             .drain(..)
@@ -727,9 +744,6 @@ impl EventClient {
                 event.is_command_started()
                     && operation.command_names().contains(&event.command_name())
             })
-            .collect();
-        // isabeltodo
-        // dbg!("{}", &events);
-        events
+            .collect()
     }
 }

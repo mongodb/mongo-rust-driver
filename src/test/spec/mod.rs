@@ -57,13 +57,12 @@ where
         let json: Value =
             serde_json::from_reader(File::open(test_file_full_path.as_path()).unwrap()).unwrap();
 
-
         run_test_file(
             bson::from_bson(
                 Bson::try_from(json)
                     .unwrap_or_else(|_| panic!(test_file_full_path.display().to_string())),
             )
-            .unwrap() //_or_else(|_| panic!(test_file_full_path.display().to_string())),
+            .unwrap(), //_or_else(|_| panic!(test_file_full_path.display().to_string())),
         )
         .await
     }

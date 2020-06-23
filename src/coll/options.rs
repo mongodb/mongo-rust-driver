@@ -131,7 +131,7 @@ impl InsertManyOptions {
 /// Enum modeling the modifications to apply during an update.
 /// For details, see the official MongoDB
 /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#update-command-behaviors)
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 #[non_exhaustive]
 pub enum UpdateModifications {

@@ -71,8 +71,19 @@ pub struct TestCase {
     pub skip_reason: Option<String>,
     pub fail_point: Option<Document>,
     pub operations: Vec<AnyTestOperation>,
-    pub outcome: Option<Document>,
+    pub outcome: Option<Outcome>,
     pub expectations: Option<Vec<TestEvent>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Outcome {
+    pub collection: CollectionOutcome,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CollectionOutcome {
+    pub name: Option<String>,
+    pub data: Vec<Document>,
 }
 
 #[derive(Debug, Deserialize)]
