@@ -400,7 +400,7 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
-    for i in 0..5 {
+    for _ in 0..5 {
         coll.insert_one(doc! {}, None)
             .await
             .expect("insert should succeed");
@@ -416,7 +416,7 @@ async fn implicit_session_returned_after_exhaust_by_get_more() {
         .await
         .expect("find should succeed");
 
-    for i in 0..4 {
+    for _ in 0..4 {
         assert!(matches!(cursor.next().await, Some(Ok(_))));
     }
 
@@ -456,7 +456,7 @@ async fn find_and_getmore_share_session() {
     let options = InsertOneOptions::builder()
         .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
         .build();
-    for i in 0..3 {
+    for _ in 0..3 {
         coll.insert_one(doc! {}, options.clone())
             .await
             .expect("insert should succeed");
@@ -489,7 +489,7 @@ async fn find_and_getmore_share_session() {
             .await
             .expect("find should succeed");
 
-        for i in 0..3 {
+        for _ in 0..3 {
             assert!(matches!(cursor.next().await, Some(Ok(_))));
         }
 

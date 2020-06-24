@@ -61,7 +61,7 @@ async fn run_test<F: Future>(name: &str, test: impl Fn(EventClient, Database, Co
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn get_more() {
-    async fn get_more_test(client: EventClient, db: Database, coll: Collection) {
+    async fn get_more_test(client: EventClient, _db: Database, coll: Collection) {
         // This test requires server version 4.2 or higher.
         if client.server_version_lt(4, 2) {
             return;
@@ -108,7 +108,7 @@ async fn get_more() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn not_master_keep_pool() {
-    async fn not_master_keep_pool_test(client: EventClient, db: Database, coll: Collection) {
+    async fn not_master_keep_pool_test(client: EventClient, _db: Database, coll: Collection) {
         // This test requires server version 4.2 or higher.
         if client.server_version_lt(4, 2) {
             return;
@@ -153,7 +153,7 @@ async fn not_master_keep_pool() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn not_master_reset_pool() {
-    async fn not_master_reset_pool_test(client: EventClient, db: Database, coll: Collection) {
+    async fn not_master_reset_pool_test(client: EventClient, _db: Database, coll: Collection) {
         // This test must only run on 4.0 servers.
         if !client.server_version_eq(4, 0) {
             return;
@@ -198,7 +198,7 @@ async fn not_master_reset_pool() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn shutdown_in_progress() {
-    async fn shutdown_in_progress_test(client: EventClient, db: Database, coll: Collection) {
+    async fn shutdown_in_progress_test(client: EventClient, _db: Database, coll: Collection) {
         if client.server_version_lt(4, 0) {
             return;
         }
@@ -242,7 +242,7 @@ async fn shutdown_in_progress() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn interrupted_at_shutdown() {
-    async fn interrupted_at_shutdown_test(client: EventClient, db: Database, coll: Collection) {
+    async fn interrupted_at_shutdown_test(client: EventClient, _db: Database, coll: Collection) {
         if client.server_version_lt(4, 0) {
             return;
         }

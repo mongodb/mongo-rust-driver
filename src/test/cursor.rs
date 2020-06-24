@@ -71,9 +71,7 @@ async fn tailable_cursor() {
     let delay = RUNTIME.delay_for(await_time);
 
     match futures::future::select(Box::pin(delay), Box::pin(next_doc)).await {
-        Either::Left((_, next_doc)) => {
-            panic!("should have gotten next document, but instead timed")
-        }
+        Either::Left((..)) => panic!("should have gotten next document, but instead timed"),
         Either::Right((next_doc, _)) => {
             assert_eq!(next_doc.transpose().unwrap(), Some(doc! { "_id": 5 }))
         }
