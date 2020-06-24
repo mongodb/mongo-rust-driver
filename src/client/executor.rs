@@ -119,7 +119,7 @@ impl Client {
 
         let server = match self.select_server(op.selection_criteria()).await {
             Ok(server) => server,
-            Err(err) => {
+            Err(_) => {
                 return Err(first_error);
             }
         };

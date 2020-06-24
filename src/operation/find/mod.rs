@@ -48,7 +48,7 @@ impl Operation for Find {
     type O = CursorSpecification;
     const NAME: &'static str = "find";
 
-    fn build(&self, description: &StreamDescription) -> Result<Command> {
+    fn build(&self, _description: &StreamDescription) -> Result<Command> {
         let mut body = doc! {
             Self::NAME: self.ns.coll.clone(),
         };

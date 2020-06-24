@@ -50,7 +50,7 @@ impl Operation for RunCommand {
     // that should fail loudly if accidentally passed to the server.
     const NAME: &'static str = "$genericRunCommand";
 
-    fn build(&self, description: &StreamDescription) -> Result<Command> {
+    fn build(&self, _description: &StreamDescription) -> Result<Command> {
         let command_name = self
             .command_name()
             .ok_or_else(|| ErrorKind::ArgumentError {

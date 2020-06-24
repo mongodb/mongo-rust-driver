@@ -38,7 +38,7 @@ impl Operation for Count {
     type O = i64;
     const NAME: &'static str = "count";
 
-    fn build(&self, description: &StreamDescription) -> Result<Command> {
+    fn build(&self, _description: &StreamDescription) -> Result<Command> {
         let mut body: Document = doc! {
             Self::NAME: self.ns.coll.clone(),
         };

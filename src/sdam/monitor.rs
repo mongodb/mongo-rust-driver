@@ -1,7 +1,4 @@
-use std::{
-    sync::{Arc, Weak},
-    time::Duration,
-};
+use std::{sync::Weak, time::Duration};
 
 use time::PreciseTime;
 
@@ -55,13 +52,13 @@ impl Monitor {
             .heartbeat_freq
             .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
 
-        while let Some(server) = self.server.upgrade() {
+        while let Some(_server) = self.server.upgrade() {
             let topology = match self.topology.upgrade() {
                 Some(topology) => topology,
                 None => break,
             };
 
-            if self.check_if_topology_changed(server, &topology).await {
+            if self.check_if_topology_changed(&topology).await {
                 topology.notify_topology_changed();
             }
 
@@ -77,11 +74,7 @@ impl Monitor {
     /// connection will replaced with a new one.
     ///
     /// Returns true if the topology has changed and false otherwise.
-    async fn check_if_topology_changed(
-        &mut self,
-        server: Arc<Server>,
-        topology: &Topology,
-    ) -> bool {
+    async fn check_if_topology_changed(&mut self, topology: &Topology) -> bool {
         // Send an isMaster to the server.
         let server_description = self.check_server().await;
         self.server_type = server_description.server_type;

@@ -55,7 +55,7 @@ impl Operation for Delete {
     type O = DeleteResult;
     const NAME: &'static str = "delete";
 
-    fn build(&self, description: &StreamDescription) -> Result<Command> {
+    fn build(&self, _description: &StreamDescription) -> Result<Command> {
         let mut delete = doc! {
             "q": self.filter.clone(),
             "limit": self.limit,
