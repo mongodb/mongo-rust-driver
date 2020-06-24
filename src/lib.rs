@@ -70,7 +70,6 @@
 //! # }
 //! ```
 
-#![allow(unused_variables)]
 #![cfg_attr(
     feature = "cargo-clippy",
     allow(

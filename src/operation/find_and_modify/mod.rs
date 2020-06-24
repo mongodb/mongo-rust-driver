@@ -75,7 +75,7 @@ impl Operation for FindAndModify {
     type O = Option<Document>;
     const NAME: &'static str = "findAndModify";
 
-    fn build(&self, description: &StreamDescription) -> Result<Command> {
+    fn build(&self, _description: &StreamDescription) -> Result<Command> {
         let mut body: Document = doc! {
             Self::NAME: self.ns.coll.clone(),
             "query": self.query.clone(),

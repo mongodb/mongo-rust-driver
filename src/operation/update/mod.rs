@@ -59,7 +59,7 @@ impl Operation for Update {
     type O = UpdateResult;
     const NAME: &'static str = "update";
 
-    fn build(&self, description: &StreamDescription) -> Result<Command> {
+    fn build(&self, _description: &StreamDescription) -> Result<Command> {
         let mut body = doc! {
             Self::NAME: self.ns.coll.clone(),
         };

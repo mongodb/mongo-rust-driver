@@ -46,7 +46,7 @@ impl Operation for ListDatabases {
     type O = Vec<Document>;
     const NAME: &'static str = "listDatabases";
 
-    fn build(&self, description: &StreamDescription) -> Result<Command> {
+    fn build(&self, _description: &StreamDescription) -> Result<Command> {
         let mut body: Document = doc! {
             Self::NAME: 1,
             "nameOnly": self.name_only

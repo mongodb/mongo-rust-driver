@@ -61,7 +61,7 @@ impl ConnectionPool {
                         Ok(connection) => {
                             connection_manager.checked_in_connections.push(connection)
                         }
-                        e @ Err(_) => {
+                        Err(_) => {
                             // Since we encountered an error, we return early from this function and
                             // put the background thread back to sleep. Next time it wakes up, any
                             // stale connections will be closed, and the thread can try to create

@@ -34,7 +34,6 @@ async fn build_with_delete_no_options() {
         coll: "test_coll".to_string(),
     };
     let filter = doc! { "x": { "$gt": 1 } };
-    let max_time = Duration::from_millis(2u64);
 
     let op = FindAndModify::with_delete(ns, filter.clone(), None);
 

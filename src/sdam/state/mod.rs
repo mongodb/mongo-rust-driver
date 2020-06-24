@@ -254,8 +254,6 @@ impl Topology {
         // references to the same instances though, since each is wrapped in an `Arc`.
         let mut state_clone = self.state.read().await.clone();
 
-        let old_description = state_clone.description.clone();
-
         // TODO RUST-232: Theoretically, `TopologyDescription::update` can return an error. However,
         // this can only happen if we try to access a field from the isMaster response when an error
         // occurred during the check. In practice, this can't happen, because the SDAM algorithm

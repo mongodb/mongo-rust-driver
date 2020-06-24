@@ -151,8 +151,8 @@ impl Handshaker {
 
             if let Some(ref mut platform) = metadata.platform {
                 if let Some(ref driver_info_platform) = driver_info.platform {
-                    metadata.driver.version.push('|');
-                    metadata.driver.version.push_str(driver_info_platform);
+                    platform.push('|');
+                    platform.push_str(driver_info_platform);
                 }
             }
         }

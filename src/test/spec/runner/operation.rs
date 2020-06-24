@@ -143,11 +143,11 @@ impl TestOperation for DeleteMany {
         Ok(Some(result))
     }
 
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -169,11 +169,11 @@ impl TestOperation for DeleteOne {
         Ok(Some(result))
     }
 
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -253,11 +253,11 @@ impl TestOperation for Find {
         Ok(Some(Bson::from(result)))
     }
 
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -283,11 +283,11 @@ impl TestOperation for InsertMany {
         Ok(Some(result))
     }
 
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -309,11 +309,11 @@ impl TestOperation for InsertOne {
         Ok(Some(result))
     }
 
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -338,11 +338,11 @@ impl TestOperation for UpdateMany {
         Ok(Some(result))
     }
 
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -373,11 +373,11 @@ impl TestOperation for UpdateOne {
         Ok(Some(result))
     }
 
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -399,11 +399,11 @@ impl TestOperation for Aggregate {
         Ok(Some(Bson::from(result)))
     }
 
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -429,11 +429,11 @@ impl TestOperation for Distinct {
         Ok(Some(Bson::Array(result)))
     }
 
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -456,11 +456,11 @@ impl TestOperation for CountDocuments {
         Ok(Some(Bson::from(result)))
     }
 
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -479,11 +479,11 @@ impl TestOperation for EstimatedDocumentCount {
         Ok(Some(Bson::from(result)))
     }
 
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -507,11 +507,11 @@ impl TestOperation for FindOne {
         }
     }
 
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -525,7 +525,7 @@ impl TestOperation for ListDatabases {
         &["listDatabases"]
     }
 
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+    async fn execute_on_collection(&self, _collection: &Collection) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
@@ -535,7 +535,7 @@ impl TestOperation for ListDatabases {
         Ok(Some(Bson::Array(result)))
     }
 
-    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -549,7 +549,7 @@ impl TestOperation for ListDatabaseNames {
         &["listDatabases"]
     }
 
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+    async fn execute_on_collection(&self, _collection: &Collection) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
@@ -559,7 +559,7 @@ impl TestOperation for ListDatabaseNames {
         Ok(Some(Bson::Array(result)))
     }
 
-    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -573,11 +573,11 @@ impl TestOperation for ListCollections {
         &["listCollections"]
     }
 
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+    async fn execute_on_collection(&self, _collection: &Collection) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
@@ -597,11 +597,11 @@ impl TestOperation for ListCollectionNames {
         &["listCollections"]
     }
 
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+    async fn execute_on_collection(&self, _collection: &Collection) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
@@ -621,15 +621,15 @@ impl TestOperation for UnimplementedOperation {
         unimplemented!()
     }
 
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+    async fn execute_on_collection(&self, _collection: &Collection) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }

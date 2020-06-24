@@ -48,7 +48,7 @@ impl Operation for Insert {
     type O = InsertManyResult;
     const NAME: &'static str = "insert";
 
-    fn build(&self, description: &StreamDescription) -> Result<Command> {
+    fn build(&self, _description: &StreamDescription) -> Result<Command> {
         let mut body = doc! {
             Self::NAME: self.ns.coll.clone(),
             "documents": bson_util::to_bson_array(&self.documents),

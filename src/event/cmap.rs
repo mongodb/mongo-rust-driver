@@ -230,41 +230,41 @@ pub struct ConnectionCheckedInEvent {
 pub trait CmapEventHandler: Send + Sync {
     /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
     /// whenever a connection pool is created.
-    fn handle_pool_created_event(&self, event: PoolCreatedEvent) {}
+    fn handle_pool_created_event(&self, _event: PoolCreatedEvent) {}
 
     /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
     /// whenever a connection pool is cleared.
-    fn handle_pool_cleared_event(&self, event: PoolClearedEvent) {}
+    fn handle_pool_cleared_event(&self, _event: PoolClearedEvent) {}
 
     /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
     /// whenever a connection pool is cleared.
-    fn handle_pool_closed_event(&self, event: PoolClosedEvent) {}
+    fn handle_pool_closed_event(&self, _event: PoolClosedEvent) {}
 
     /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
     /// whenever a connection is created.
-    fn handle_connection_created_event(&self, event: ConnectionCreatedEvent) {}
+    fn handle_connection_created_event(&self, _event: ConnectionCreatedEvent) {}
 
     /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
     /// whenever a connection is ready to be used.
-    fn handle_connection_ready_event(&self, event: ConnectionReadyEvent) {}
+    fn handle_connection_ready_event(&self, _event: ConnectionReadyEvent) {}
 
     /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
     /// whenever a connection is closed.
-    fn handle_connection_closed_event(&self, event: ConnectionClosedEvent) {}
+    fn handle_connection_closed_event(&self, _event: ConnectionClosedEvent) {}
 
     /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
     /// whenever a thread begins checking out a connection to use for an operation.
-    fn handle_connection_checkout_started_event(&self, event: ConnectionCheckoutStartedEvent) {}
+    fn handle_connection_checkout_started_event(&self, _event: ConnectionCheckoutStartedEvent) {}
 
     /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
     /// whenever a thread is unable to check out a connection.
-    fn handle_connection_checkout_failed_event(&self, event: ConnectionCheckoutFailedEvent) {}
+    fn handle_connection_checkout_failed_event(&self, _event: ConnectionCheckoutFailedEvent) {}
 
     /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
     /// whenever a connection is successfully checked out.
-    fn handle_connection_checked_out_event(&self, event: ConnectionCheckedOutEvent) {}
+    fn handle_connection_checked_out_event(&self, _event: ConnectionCheckedOutEvent) {}
 
     /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
     /// whenever a connection is checked back into a connection pool.
-    fn handle_connection_checked_in_event(&self, event: ConnectionCheckedInEvent) {}
+    fn handle_connection_checked_in_event(&self, _event: ConnectionCheckedInEvent) {}
 }
