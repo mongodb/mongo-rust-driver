@@ -2,12 +2,22 @@ use std::time::Duration;
 
 use futures::stream::StreamExt;
 use lazy_static::lazy_static;
+use semver::VersionReq;
 
 use crate::{
     bson::{doc, Bson, Document},
-    error::ErrorKind,
+    error::{ErrorKind, Result},
     event::command::CommandStartedEvent,
-    options::{AggregateOptions, FindOptions, InsertManyOptions, UpdateOptions},
+    options::{
+        AggregateOptions,
+        DeleteOptions,
+        FindOneAndDeleteOptions,
+        FindOptions,
+        Hint,
+        InsertManyOptions,
+        UpdateOptions,
+    },
+    results::DeleteResult,
     test::{
         util::{drop_collection, CommandEvent, EventClient, TestClient},
         LOCK,
@@ -515,23 +525,11 @@ async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>)
         .collection(function_name!());
     coll.find(None, options).await.unwrap();
 
-    let events = event_client.command_events.read().unwrap();
-    let mut iter = events.iter().filter(|event| match event {
-        CommandEvent::CommandStartedEvent(CommandStartedEvent { command_name, .. }) => {
-            command_name == "find"
-        }
-        _ => false,
-    });
+    let events = event_client.get_command_started_events("find");
+    assert_eq!(events.len(), 1);
 
-    let event = iter.next().unwrap();
-    let allow_disk_use = match event {
-        CommandEvent::CommandStartedEvent(CommandStartedEvent { command, .. }) => {
-            command.get_bool("allowDiskUse").ok()
-        }
-        _ => None,
-    };
+    let allow_disk_use = events[0].command.get_bool("allowDiskUse").ok();
     assert_eq!(allow_disk_use, expected_value);
-    assert_eq!(iter.count(), 0);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -544,4 +542,121 @@ async fn ns_not_found_suppression() {
     let coll = client.get_coll(function_name!(), function_name!());
     coll.drop(None).await.expect("drop should not fail");
     coll.drop(None).await.expect("drop should not fail");
+}
+
+async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = EventClient::new().await;
+    let coll = client.database(name).collection(name);
+    let _: Result<DeleteResult> = coll.delete_many(doc! {}, options.clone()).await;
+
+    let events = client.get_command_started_events("delete");
+    assert_eq!(events.len(), 1);
+
+    let event_hint = events[0].command.get("hint").cloned();
+    let expected_hint = match options {
+        Some(options) => options.hint.map(|hint| hint.to_bson()),
+        None => None,
+    };
+    assert_eq!(event_hint, expected_hint);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn delete_hint_keys_specified() {
+    let options = DeleteOptions::builder().hint(Hint::Keys(doc! {})).build();
+    delete_hint_test(Some(options), function_name!()).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn delete_hint_string_specified() {
+    let options = DeleteOptions::builder()
+        .hint(Hint::Name(String::new()))
+        .build();
+    delete_hint_test(Some(options), function_name!()).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn delete_hint_not_specified() {
+    delete_hint_test(None, function_name!()).await;
+}
+
+async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>, name: &str) {
+    let _guard = LOCK.run_concurrently().await;
+    let client = EventClient::new().await;
+
+    let req = VersionReq::parse("< 4.2").unwrap();
+    if options.is_some() && req.matches(&client.server_version) {
+        return;
+    }
+
+    let coll = client.database(name).collection(name);
+    let _: Result<Option<Document>> = coll.find_one_and_delete(doc! {}, options.clone()).await;
+
+    let events = client.get_command_started_events("findAndModify");
+    assert_eq!(events.len(), 1);
+
+    let event_hint = events[0].command.get("hint").cloned();
+    let expected_hint = options.and_then(|options| options.hint.map(|hint| hint.to_bson()));
+    assert_eq!(event_hint, expected_hint);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn find_one_and_delete_hint_keys_specified() {
+    let options = FindOneAndDeleteOptions::builder()
+        .hint(Hint::Keys(doc! {}))
+        .build();
+    find_one_and_delete_hint_test(Some(options), function_name!()).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn find_one_and_delete_hint_string_specified() {
+    let options = FindOneAndDeleteOptions::builder()
+        .hint(Hint::Name(String::new()))
+        .build();
+    find_one_and_delete_hint_test(Some(options), function_name!()).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn find_one_and_delete_hint_not_specified() {
+    find_one_and_delete_hint_test(None, function_name!()).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn find_one_and_delete_hint_server_version() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = EventClient::new().await;
+    let coll = client.database(function_name!()).collection("coll");
+
+    let options = FindOneAndDeleteOptions::builder()
+        .hint(Hint::Name(String::new()))
+        .build();
+    let res = coll.find_one_and_delete(doc! {}, options).await;
+
+    let req1 = VersionReq::parse("< 4.2").unwrap();
+    let req2 = VersionReq::parse("4.2.*").unwrap();
+    if req1.matches(&client.server_version) {
+        let error = res.expect_err("find one and delete should fail");
+        assert!(matches!(error.kind.as_ref(), ErrorKind::OperationError { .. }));
+    } else if req2.matches(&client.server_version) {
+        let error = res.expect_err("find one and delete should fail");
+        assert!(matches!(error.kind.as_ref(), ErrorKind::CommandError { .. }));
+    } else {
+        assert!(res.is_ok());
+    }
 }

@@ -254,7 +254,7 @@ pub struct ReplaceOptions {
 /// [`Collection::delete_one`](../struct.Collection.html#method.delete_one) or
 /// [`Collection::delete_many`](../struct.Collection.html#method.delete_many) operation.
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Default, TypedBuilder, Serialize)]
+#[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct DeleteOptions {
@@ -268,12 +268,17 @@ pub struct DeleteOptions {
     /// The write concern for the operation.
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
+
+    /// The index to use for the operation.
+    /// Only available in MongoDB 4.4+.
+    #[builder(default)]
+    pub hint: Option<Hint>,
 }
 
 /// Specifies the options to a
 /// [`Collection::find_one_and_delete`](../struct.Collection.html#method.find_one_and_delete)
 /// operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 #[non_exhaustive]
 pub struct FindOneAndDeleteOptions {
     /// The maximum amount of time to allow the query to run.
@@ -301,6 +306,11 @@ pub struct FindOneAndDeleteOptions {
     /// information on how to use this option.
     #[builder(default)]
     pub collation: Option<Collation>,
+
+    /// The index to use for the operation.
+    /// Only available in MongoDB 4.4+.
+    #[builder(default)]
+    pub hint: Option<Hint>,
 }
 
 /// Specifies the options to a
