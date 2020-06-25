@@ -9,6 +9,7 @@ use futures::stream::TryStreamExt;
 use crate::{
     bson::{doc, Document},
     operation::RunCommand,
+    options::FindOptions,
     test::{assert_matches, util::EventClient, TestClient, CLIENT_OPTIONS},
 };
 
@@ -175,8 +176,9 @@ pub async fn run_v2_test(test_file: TestFile) {
                 None => coll_name,
             };
             let coll = client.database(&db_name).collection(&coll_name);
+            let options = FindOptions::builder().sort(doc! { "_id": 1 }).build();
             let actual_data: Vec<Document> = coll
-                .find(None, None)
+                .find(None, options)
                 .await
                 .unwrap()
                 .try_collect()

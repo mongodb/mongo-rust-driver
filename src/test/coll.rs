@@ -720,3 +720,54 @@ async fn find_one_and_delete_hint_server_version() {
         assert!(res.is_ok());
     }
 }
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn err_info_is_propogated() {
+    let _guard = LOCK.run_exclusively().await;
+
+    let client = TestClient::new().await;
+    client
+        .database("admin")
+        .run_command(
+            doc! {
+              "configureFailPoint": "failCommand",
+              "data": {
+                "failCommands": ["insert"],
+                "writeConcernError": {
+                  "code": 100,
+                  "codeName": "UnsatisfiableWriteConcern",
+                  "errmsg": "Not enough data-bearing nodes",
+                  "errInfo": {
+                    "writeConcern": {
+                      "w": 2,
+                      "wtimeout": 0,
+                      "provenance": "clientSupplied"
+                    }
+                  }
+                }
+              },
+              "mode": { "times": 1 }
+            },
+            None,
+        )
+        .await
+        .unwrap();
+
+    let error = client
+        .database(function_name!())
+        .collection(function_name!())
+        .insert_one(doc! { "x": 1 }, None)
+        .await
+        .expect_err("insert should fail");
+
+    let expected = ErrorKind::WriteError(WriteFailure::WriteConcernError(WriteConcernError {
+        info: doc! { "writeConcern": doc! { "w": 2, "wtimeout": 0, "provenance": "clientSupplied" } },
+        code: 100,
+        code_name: "UnsatisfiableWriteConcern".to_string(),
+        message: "Not enough data-bearing nodes".to_string(),
+    }));
+
+    assert!(matches!(error.kind.as_ref(), expected));
+}
