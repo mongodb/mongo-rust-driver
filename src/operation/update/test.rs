@@ -4,6 +4,7 @@ use crate::{
     bson::{doc, Bson},
     bson_util,
     cmap::{CommandResponse, StreamDescription},
+    coll::options::Hint,
     concern::{Acknowledgment, WriteConcern},
     error::{ErrorKind, WriteConcernError, WriteError, WriteFailure},
     operation::{Operation, Update},
@@ -47,6 +48,62 @@ async fn build() {
                 "q": filter,
                 "u": update.to_bson(),
                 "upsert": false,
+            }
+        ],
+        "writeConcern": {
+            "w": "majority"
+        },
+        "bypassDocumentValidation": true,
+        "ordered": true,
+    };
+
+    bson_util::sort_document(&mut cmd.body);
+    bson_util::sort_document(&mut expected_body);
+
+    assert_eq!(cmd.body, expected_body);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_hint() {
+    let ns = Namespace {
+        db: "test_db".to_string(),
+        coll: "test_coll".to_string(),
+    };
+    let filter = doc! { "x": { "$gt": 1 } };
+    let update = UpdateModifications::Document(doc! { "x": { "$inc": 1 } });
+    let wc = WriteConcern {
+        w: Some(Acknowledgment::Majority),
+        ..Default::default()
+    };
+    let options = UpdateOptions {
+        upsert: Some(false),
+        bypass_document_validation: Some(true),
+        write_concern: Some(wc),
+        hint: Some(Hint::Keys(doc! { "x": 1, "y": -1 })),
+        ..Default::default()
+    };
+
+    let op = Update::new(ns, filter.clone(), update.clone(), false, Some(options));
+
+    let description = StreamDescription::new_testing();
+    let mut cmd = op.build(&description).unwrap();
+
+    assert_eq!(cmd.name.as_str(), "update");
+    assert_eq!(cmd.target_db.as_str(), "test_db");
+    assert_eq!(cmd.read_pref.as_ref(), None);
+
+    let mut expected_body = doc! {
+        "update": "test_coll",
+        "updates": [
+            {
+                "q": filter,
+                "u": update.to_bson(),
+                "upsert": false,
+                "hint": {
+                    "x": 1,
+                    "y": -1,
+                },
             }
         ],
         "writeConcern": {
