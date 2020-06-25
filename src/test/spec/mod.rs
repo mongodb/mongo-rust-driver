@@ -62,7 +62,7 @@ where
                 Bson::try_from(json)
                     .unwrap_or_else(|_| panic!(test_file_full_path.display().to_string())),
             )
-            .unwrap(), //_or_else(|_| panic!(test_file_full_path.display().to_string())),
+            .unwrap_or_else(|_| panic!(test_file_full_path.display().to_string())),
         )
         .await
     }

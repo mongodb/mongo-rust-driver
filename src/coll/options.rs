@@ -6,7 +6,12 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     bson::{doc, Bson, Document},
-    bson_util::{deserialize_duration_from_u64_millis, serialize_batch_size, serialize_duration_as_int_millis, serialize_u32_as_i32},
+    bson_util::{
+        deserialize_duration_from_u64_millis,
+        serialize_batch_size,
+        serialize_duration_as_int_millis,
+        serialize_u32_as_i32,
+    },
     concern::{ReadConcern, WriteConcern},
     options::Collation,
     selection_criteria::SelectionCriteria,
@@ -15,8 +20,8 @@ use crate::{
 /// These are the valid options for creating a [`Collection`](../struct.Collection.html) with
 /// [`Database::collection_with_options`](../struct.Database.html#method.collection_with_options).
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
-#[non_exhaustive]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct CollectionOptions {
     /// The default read preference for operations.
     #[builder(default)]
@@ -83,6 +88,7 @@ pub enum CursorType {
 /// Specifies the options to a
 /// [`Collection::insert_one`](../struct.Collection.html#method.insert_one) operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct InsertOneOptions {
     /// Opt out of document-level validation.
@@ -170,6 +176,7 @@ impl From<Vec<Document>> for UpdateModifications {
 /// [`Collection::update_one`](../struct.Collection.html#method.update_one) or
 /// [`Collection::update_many`](../struct.Collection.html#method.update_many) operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct UpdateOptions {
     /// A set of filters specifying to which array elements an update should apply.
@@ -482,7 +489,7 @@ pub struct AggregateOptions {
     #[builder(default)]
     #[serde(
         serialize_with = "serialize_duration_as_int_millis",
-        rename (serialize = "maxTimeMS"),
+        rename(serialize = "maxTimeMS"),
         deserialize_with = "deserialize_duration_from_u64_millis"
     )]
     pub max_time: Option<Duration>,
@@ -563,7 +570,7 @@ pub struct EstimatedDocumentCountOptions {
     #[builder(default)]
     #[serde(
         serialize_with = "serialize_duration_as_int_millis",
-        rename (serialize = "maxTimeMS"),
+        rename(serialize = "maxTimeMS"),
         deserialize_with = "deserialize_duration_from_u64_millis"
     )]
     pub max_time: Option<Duration>,
@@ -594,7 +601,7 @@ pub struct DistinctOptions {
     #[builder(default)]
     #[serde(
         serialize_with = "serialize_duration_as_int_millis",
-        rename (serialize = "maxTimeMS"),
+        rename(serialize = "maxTimeMS"),
         deserialize_with = "deserialize_duration_from_u64_millis"
     )]
     pub max_time: Option<Duration>,

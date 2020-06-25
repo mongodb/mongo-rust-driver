@@ -113,10 +113,10 @@ impl<'de> Deserialize<'de> for AnyTestOperation {
                 CountDocuments::deserialize(BsonDeserializer::new(definition.arguments.unwrap()))
                     .map(|op| Box::new(op) as Box<dyn TestOperation>)
             }
-            "estimatedDocumentCount" => {
-                EstimatedDocumentCount::deserialize(BsonDeserializer::new(definition.arguments.unwrap()))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
+            "estimatedDocumentCount" => EstimatedDocumentCount::deserialize(BsonDeserializer::new(
+                definition.arguments.unwrap(),
+            ))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
             "findOne" => FindOne::deserialize(BsonDeserializer::new(definition.arguments.unwrap()))
                 .map(|op| Box::new(op) as Box<dyn TestOperation>),
             "listDatabases" => {
@@ -131,17 +131,14 @@ impl<'de> Deserialize<'de> for AnyTestOperation {
                 ListCollections::deserialize(BsonDeserializer::new(definition.arguments.unwrap()))
                     .map(|op| Box::new(op) as Box<dyn TestOperation>)
             }
-            "listCollectionNames" => {
-                ListCollectionNames::deserialize(BsonDeserializer::new(definition.arguments.unwrap()))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
+            "listCollectionNames" => ListCollectionNames::deserialize(BsonDeserializer::new(
+                definition.arguments.unwrap(),
+            ))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
             "replaceOne" => {
                 ReplaceOne::deserialize(BsonDeserializer::new(definition.arguments.unwrap()))
                     .map(|op| Box::new(op) as Box<dyn TestOperation>)
             }
-            // isabeltodo
-            // other => {dbg!("{}", other); Ok(Box::new(UnimplementedOperation) as Box<dyn
-            // TestOperation>)},
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| de::Error::custom(format!("{}", e)))?;
@@ -179,7 +176,9 @@ impl TestOperation for DeleteMany {
     }
 
     async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
-        let result = collection.delete_many(self.filter.clone(), self.options.clone()).await?;
+        let result = collection
+            .delete_many(self.filter.clone(), self.options.clone())
+            .await?;
         let result = bson::to_bson(&result)?;
         Ok(Some(result))
     }
@@ -207,7 +206,9 @@ impl TestOperation for DeleteOne {
     }
 
     async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
-        let result = collection.delete_one(self.filter.clone(), self.options.clone()).await?;
+        let result = collection
+            .delete_one(self.filter.clone(), self.options.clone())
+            .await?;
         let result = bson::to_bson(&result)?;
         Ok(Some(result))
     }
@@ -235,7 +236,9 @@ impl TestOperation for Find {
     }
 
     async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
-        let cursor = collection.find(self.filter.clone(), self.options.clone()).await?;
+        let cursor = collection
+            .find(self.filter.clone(), self.options.clone())
+            .await?;
         let result = cursor.try_collect::<Vec<Document>>().await?;
         Ok(Some(Bson::from(result)))
     }
@@ -293,7 +296,9 @@ impl TestOperation for InsertOne {
     }
 
     async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
-        let result = collection.insert_one(self.document.clone(), self.options.clone()).await?;
+        let result = collection
+            .insert_one(self.document.clone(), self.options.clone())
+            .await?;
         let result = bson::to_bson(&result)?;
         Ok(Some(result))
     }
@@ -323,7 +328,11 @@ impl TestOperation for UpdateMany {
 
     async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
         let result = collection
-            .update_many(self.filter.clone(), self.update.clone(), self.options.clone())
+            .update_many(
+                self.filter.clone(),
+                self.update.clone(),
+                self.options.clone(),
+            )
             .await?;
         let result = bson::to_bson(&result)?;
         Ok(Some(result))
@@ -354,7 +363,11 @@ impl TestOperation for UpdateOne {
 
     async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
         let result = collection
-            .update_one(self.filter.clone(), self.update.clone(), self.options.clone())
+            .update_one(
+                self.filter.clone(),
+                self.update.clone(),
+                self.options.clone(),
+            )
             .await?;
         let result = bson::to_bson(&result)?;
         Ok(Some(result))
@@ -384,7 +397,9 @@ impl TestOperation for Aggregate {
     }
 
     async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
-        let cursor = collection.aggregate(self.pipeline.clone(), self.options.clone()).await?;
+        let cursor = collection
+            .aggregate(self.pipeline.clone(), self.options.clone())
+            .await?;
         let result = cursor.try_collect::<Vec<Document>>().await?;
         Ok(Some(Bson::from(result)))
     }
@@ -394,7 +409,9 @@ impl TestOperation for Aggregate {
     }
 
     async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
-        let cursor = database.aggregate(self.pipeline.clone(), self.options.clone()).await?;
+        let cursor = database
+            .aggregate(self.pipeline.clone(), self.options.clone())
+            .await?;
         let result = cursor.try_collect::<Vec<Document>>().await?;
         Ok(Some(Bson::from(result)))
     }
@@ -473,7 +490,9 @@ impl TestOperation for EstimatedDocumentCount {
     }
 
     async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
-        let result = collection.estimated_document_count(self.options.clone()).await?;
+        let result = collection
+            .estimated_document_count(self.options.clone())
+            .await?;
         Ok(Some(Bson::from(result)))
     }
 
@@ -500,7 +519,9 @@ impl TestOperation for FindOne {
     }
 
     async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
-        let result = collection.find_one(self.filter.clone(), self.options.clone()).await?;
+        let result = collection
+            .find_one(self.filter.clone(), self.options.clone())
+            .await?;
         match result {
             Some(result) => Ok(Some(Bson::from(result))),
             None => Ok(None),
@@ -534,7 +555,9 @@ impl TestOperation for ListDatabases {
     }
 
     async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
-        let result = client.list_databases(self.filter.clone(), self.options.clone()).await?;
+        let result = client
+            .list_databases(self.filter.clone(), self.options.clone())
+            .await?;
         let result: Vec<Bson> = result.iter().map(Bson::from).collect();
         Ok(Some(Bson::Array(result)))
     }
@@ -562,7 +585,9 @@ impl TestOperation for ListDatabaseNames {
     }
 
     async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
-        let result = client.list_database_names(self.filter.clone(), self.options.clone()).await?;
+        let result = client
+            .list_database_names(self.filter.clone(), self.options.clone())
+            .await?;
         let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
         Ok(Some(Bson::Array(result)))
     }
@@ -594,7 +619,9 @@ impl TestOperation for ListCollections {
     }
 
     async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
-        let cursor = database.list_collections(self.filter.clone(), self.options.clone()).await?;
+        let cursor = database
+            .list_collections(self.filter.clone(), self.options.clone())
+            .await?;
         let result = cursor.try_collect::<Vec<Document>>().await?;
         Ok(Some(Bson::from(result)))
     }
@@ -642,7 +669,11 @@ impl TestOperation for ReplaceOne {
 
     async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
         let result = collection
-            .replace_one(self.filter.clone(), self.replacement.clone(), self.options.clone())
+            .replace_one(
+                self.filter.clone(),
+                self.replacement.clone(),
+                self.options.clone(),
+            )
             .await?;
         let result = bson::to_bson(&result)?;
         Ok(Some(result))

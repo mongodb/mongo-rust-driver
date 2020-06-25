@@ -155,7 +155,10 @@ pub struct ListCollectionsOptions {
     /// number of round trips needed to return the entire set of documents returned by the
     /// query).
     #[builder(default)]
-    #[serde(serialize_with = "bson_util::serialize_batch_size", rename (serialize = "cursor"))]
+    #[serde(
+        serialize_with = "bson_util::serialize_batch_size",
+        rename(serialize = "cursor")
+    )]
     pub batch_size: Option<u32>,
 }
 
