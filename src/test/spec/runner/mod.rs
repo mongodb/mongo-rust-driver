@@ -2,10 +2,13 @@ mod operation;
 mod test_event;
 mod test_file;
 
+use std::time::Duration;
+
 use futures::stream::TryStreamExt;
 
 use crate::{
     bson::{doc, Document},
+    operation::RunCommand,
     test::{assert_matches, util::EventClient, TestClient, CLIENT_OPTIONS},
 };
 
@@ -40,9 +43,6 @@ pub async fn run_v2_test(test_file: TestFile) {
     }
 
     for test_case in test_file.tests {
-        if test_case.description.contains("Aggregate with $listLocalSessions") {
-            continue;
-        }
 
         println!("{}", &test_case.description);
 
@@ -79,6 +79,12 @@ pub async fn run_v2_test(test_file: TestFile) {
         };
 
         let coll = client.init_db_and_coll(&db_name, &coll_name).await;
+
+        if test_case.description.contains("Aggregate with $listLocalSessions") {
+            let mut session = client.start_implicit_session_with_timeout(Duration::from_secs(60 * 60)).await;
+            let op = RunCommand::new(db_name.clone(), doc! {"ping": 1}, None).unwrap();
+            client.execute_operation_with_session(op, &mut session).await.unwrap();
+        }
 
         if let Some(ref data) = test_file.data {
             match data {
