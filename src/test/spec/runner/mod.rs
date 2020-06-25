@@ -43,7 +43,6 @@ pub async fn run_v2_test(test_file: TestFile) {
     }
 
     for test_case in test_file.tests {
-
         println!("{}", &test_case.description);
 
         if let Some(skip_reason) = test_case.skip_reason {
@@ -80,10 +79,18 @@ pub async fn run_v2_test(test_file: TestFile) {
 
         let coll = client.init_db_and_coll(&db_name, &coll_name).await;
 
-        if test_case.description.contains("Aggregate with $listLocalSessions") {
-            let mut session = client.start_implicit_session_with_timeout(Duration::from_secs(60 * 60)).await;
-            let op = RunCommand::new(db_name.clone(), doc! {"ping": 1}, None).unwrap();
-            client.execute_operation_with_session(op, &mut session).await.unwrap();
+        if test_case
+            .description
+            .contains("Aggregate with $listLocalSessions")
+        {
+            let mut session = client
+                .start_implicit_session_with_timeout(Duration::from_secs(60 * 60))
+                .await;
+            let op = RunCommand::new(db_name.clone(), doc! { "ping": 1 }, None).unwrap();
+            client
+                .execute_operation_with_session(op, &mut session)
+                .await
+                .unwrap();
         }
 
         if let Some(ref data) = test_file.data {
@@ -168,7 +175,8 @@ pub async fn run_v2_test(test_file: TestFile) {
                 None => coll_name,
             };
             let coll = client.database(&db_name).collection(&coll_name);
-            let actual_data: Vec<Document> = coll.find(None, None)
+            let actual_data: Vec<Document> = coll
+                .find(None, None)
                 .await
                 .unwrap()
                 .try_collect()

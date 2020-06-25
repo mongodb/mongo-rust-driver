@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
@@ -144,7 +144,8 @@ pub struct DropDatabaseOptions {
 
 /// Specifies the options to a
 /// [`Database::list_collections`](../struct.Database.html#method.list_collections) operation.
-#[derive(Debug, Default, TypedBuilder, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ListCollectionsOptions {
     /// The number of documents the server should return per cursor batch.
@@ -154,13 +155,13 @@ pub struct ListCollectionsOptions {
     /// number of round trips needed to return the entire set of documents returned by the
     /// query).
     #[builder(default)]
-    #[serde(serialize_with = "bson_util::serialize_batch_size", rename = "cursor")]
+    #[serde(serialize_with = "bson_util::serialize_batch_size", rename (serialize = "cursor"))]
     pub batch_size: Option<u32>,
 }
 
 /// Specifies the options to a
 /// [`Client::list_databases`](../struct.Client.html#method.list_databases) operation.
-#[derive(Debug, Default, TypedBuilder, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ListDatabasesOptions {

@@ -6,7 +6,7 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     bson::{doc, Bson, Document},
-    bson_util::{serialize_batch_size, serialize_duration_as_int_millis, serialize_u32_as_i32},
+    bson_util::{deserialize_duration_from_u64_millis, serialize_batch_size, serialize_duration_as_int_millis, serialize_u32_as_i32},
     concern::{ReadConcern, WriteConcern},
     options::Collation,
     selection_criteria::SelectionCriteria,
@@ -82,7 +82,7 @@ pub enum CursorType {
 
 /// Specifies the options to a
 /// [`Collection::insert_one`](../struct.Collection.html#method.insert_one) operation.
-#[derive(Clone, Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[non_exhaustive]
 pub struct InsertOneOptions {
     /// Opt out of document-level validation.
@@ -169,7 +169,7 @@ impl From<Vec<Document>> for UpdateModifications {
 /// Specifies the options to a
 /// [`Collection::update_one`](../struct.Collection.html#method.update_one) or
 /// [`Collection::update_many`](../struct.Collection.html#method.update_many) operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[non_exhaustive]
 pub struct UpdateOptions {
     /// A set of filters specifying to which array elements an update should apply.
@@ -221,7 +221,8 @@ impl UpdateOptions {
 
 /// Specifies the options to a
 /// [`Collection::replace_one`](../struct.Collection.html#method.replace_one) operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ReplaceOptions {
     /// Opt out of document-level validation.
@@ -255,7 +256,7 @@ pub struct ReplaceOptions {
 /// [`Collection::delete_one`](../struct.Collection.html#method.delete_one) or
 /// [`Collection::delete_many`](../struct.Collection.html#method.delete_many) operation.
 #[serde_with::skip_serializing_none]
-#[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct DeleteOptions {
@@ -425,7 +426,7 @@ pub struct FindOneAndUpdateOptions {
 /// operation.
 #[skip_serializing_none]
 #[serde(rename_all = "camelCase")]
-#[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
 #[non_exhaustive]
 pub struct AggregateOptions {
     /// Enables writing to temporary files. When set to true, aggregation stages can write data to
@@ -440,7 +441,7 @@ pub struct AggregateOptions {
     /// number of round trips needed to return the entire set of documents returned by the
     /// query).
     #[builder(default)]
-    #[serde(serialize_with = "serialize_batch_size", rename = "cursor")]
+    #[serde(serialize_with = "serialize_batch_size", rename(serialize = "cursor"))]
     pub batch_size: Option<u32>,
 
     /// Opt out of document-level validation.
@@ -468,7 +469,10 @@ pub struct AggregateOptions {
     ///
     /// This option will have no effect on non-tailable cursors that result from this operation.
     #[builder(default)]
-    #[serde(skip)]
+    #[serde(
+        skip_serializing,
+        deserialize_with = "deserialize_duration_from_u64_millis"
+    )]
     pub max_await_time: Option<Duration>,
 
     /// The maximum amount of time to allow the query to run.
@@ -478,7 +482,8 @@ pub struct AggregateOptions {
     #[builder(default)]
     #[serde(
         serialize_with = "serialize_duration_as_int_millis",
-        rename = "maxTimeMS"
+        rename (serialize = "maxTimeMS"),
+        deserialize_with = "deserialize_duration_from_u64_millis"
     )]
     pub max_time: Option<Duration>,
 
@@ -494,7 +499,7 @@ pub struct AggregateOptions {
     /// If none is specified, the selection criteria defined on the object executing this operation
     /// will be used.
     #[builder(default)]
-    #[serde(skip)]
+    #[serde(skip_serializing)]
     pub selection_criteria: Option<SelectionCriteria>,
 
     /// The write concern to use for the operation.
@@ -507,7 +512,8 @@ pub struct AggregateOptions {
 
 /// Specifies the options to a
 /// [`Collection::count_documents`](../struct.Collection.html#method.count_documents) operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CountOptions {
     /// The index to use for the operation.
@@ -523,6 +529,7 @@ pub struct CountOptions {
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
     #[builder(default)]
+    #[serde(deserialize_with = "deserialize_duration_from_u64_millis")]
     pub max_time: Option<Duration>,
 
     /// The number of documents to skip before counting.
@@ -545,7 +552,7 @@ pub struct CountOptions {
 ///  `Collection::estimated_document_count`
 /// ](../struct.Collection.html#method.estimated_document_count) operation.
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Default, TypedBuilder, Serialize, Clone)]
+#[derive(Debug, Default, Deserialize, TypedBuilder, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct EstimatedDocumentCountOptions {
@@ -556,7 +563,8 @@ pub struct EstimatedDocumentCountOptions {
     #[builder(default)]
     #[serde(
         serialize_with = "serialize_duration_as_int_millis",
-        rename = "maxTimeMS"
+        rename (serialize = "maxTimeMS"),
+        deserialize_with = "deserialize_duration_from_u64_millis"
     )]
     pub max_time: Option<Duration>,
 
@@ -575,7 +583,7 @@ pub struct EstimatedDocumentCountOptions {
 /// Specifies the options to a [`Collection::distinct`](../struct.Collection.html#method.distinct)
 /// operation.
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Default, TypedBuilder, Serialize, Clone)]
+#[derive(Debug, Default, Deserialize, TypedBuilder, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct DistinctOptions {
@@ -586,7 +594,8 @@ pub struct DistinctOptions {
     #[builder(default)]
     #[serde(
         serialize_with = "serialize_duration_as_int_millis",
-        rename = "maxTimeMS"
+        rename (serialize = "maxTimeMS"),
+        deserialize_with = "deserialize_duration_from_u64_millis"
     )]
     pub max_time: Option<Duration>,
 
@@ -612,7 +621,7 @@ pub struct DistinctOptions {
 /// Specifies the options to a [`Collection::find`](../struct.Collection.html#method.find)
 /// operation.
 #[skip_serializing_none]
-#[derive(Debug, Default, TypedBuilder, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct FindOptions {
@@ -779,7 +788,8 @@ where
 
 /// Specifies the options to a [`Collection::find_one`](../struct.Collection.html#method.find_one)
 /// operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct FindOneOptions {
     /// If true, partial results will be returned from a mongos rather than an error being
@@ -819,6 +829,7 @@ pub struct FindOneOptions {
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
     #[builder(default)]
+    #[serde(deserialize_with = "deserialize_duration_from_u64_millis")]
     pub max_time: Option<Duration>,
 
     /// The inclusive lower bound for a specific index.
