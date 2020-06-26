@@ -728,6 +728,10 @@ async fn err_info_is_propogated() {
     let _guard = LOCK.run_exclusively().await;
 
     let client = TestClient::new().await;
+    let req = VersionReq::parse("<= 3.6").unwrap();
+    if req.matches(&client.server_version) {
+        return;
+    }
     client
         .database("admin")
         .run_command(
