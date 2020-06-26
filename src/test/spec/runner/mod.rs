@@ -49,7 +49,6 @@ pub async fn run_v2_test(test_file: TestFile) {
         let client = create_client(&test_case).await;
 
         if let Some(ref run_on) = test_file.run_on {
-            println!("1 checking runon");
             let can_run_on = run_on.iter().any(|run_on| run_on.can_run_on(&client));
             if !can_run_on {
                 println!("Skipping {}", test_case.description);
@@ -73,14 +72,12 @@ pub async fn run_v2_test(test_file: TestFile) {
             .description
             .contains("Aggregate with $listLocalSessions")
         {
-            println!("2 starting session");
             start_session(&client, &db_name).await;
         }
 
         if let Some(ref data) = test_file.data {
             match data {
                 TestData::Single(data) => {
-                    println!("3 inserting data");
                     if !data.is_empty() {
                         coll.insert_many(data.clone(), None)
                             .await
@@ -92,7 +89,6 @@ pub async fn run_v2_test(test_file: TestFile) {
         }
 
         if let Some(ref fail_point) = test_case.fail_point {
-            println!("4 setting fail point");
             client
                 .database("admin")
                 .run_command(fail_point.clone(), None)
@@ -102,7 +98,6 @@ pub async fn run_v2_test(test_file: TestFile) {
 
         let mut events: Vec<TestEvent> = Vec::new();
         for operation in test_case.operations {
-            println!("5 running op");
             let result = match operation.object {
                 Some(OperationObject::Client) => client.run_client_operation(&operation).await,
                 Some(OperationObject::Database) => {
@@ -129,7 +124,6 @@ pub async fn run_v2_test(test_file: TestFile) {
                 .collect();
 
             if let Some(error) = operation.error {
-                println!("6 checking error");
                 assert_eq!(
                     result.is_err(),
                     error,
@@ -140,7 +134,6 @@ pub async fn run_v2_test(test_file: TestFile) {
                 );
             }
             if let Some(expected_result) = operation.result {
-                println!("6 checking result");
                 let description = &test_case.description;
                 let result = result
                     .unwrap()
@@ -152,7 +145,6 @@ pub async fn run_v2_test(test_file: TestFile) {
         }
 
         if let Some(expectations) = test_case.expectations {
-            println!("7 checking expectations");
             assert_eq!(events.len(), expectations.len());
             for (actual_event, expected_event) in events.iter().zip(expectations.iter()) {
                 assert_matches(actual_event, expected_event, None);
@@ -160,12 +152,10 @@ pub async fn run_v2_test(test_file: TestFile) {
         }
 
         if let Some(outcome) = test_case.outcome {
-            println!("8 checking outcome");
             assert!(outcome.matches_actual(db_name, coll_name, &client).await);
         }
 
         if test_case.fail_point.is_some() {
-            println!("9 unsetting fail point");
             client
                 .database("admin")
                 .run_command(
