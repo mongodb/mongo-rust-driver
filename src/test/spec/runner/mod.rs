@@ -44,8 +44,6 @@ pub async fn run_v2_test(test_file: TestFile) {
     }
 
     for test_case in test_file.tests {
-        println!("{}", &test_case.description);
-
         if let Some(skip_reason) = test_case.skip_reason {
             println!("Skipping {}: {}", test_case.description, skip_reason);
             continue;

@@ -763,7 +763,7 @@ async fn err_info_is_propogated() {
         .expect_err("insert should fail");
 
     let expected = ErrorKind::WriteError(WriteFailure::WriteConcernError(WriteConcernError {
-        info: doc! { "writeConcern": doc! { "w": 2, "wtimeout": 0, "provenance": "clientSupplied" } },
+        // info: doc! { "writeConcern": doc! { "w": 2, "wtimeout": 0, "provenance": "clientSupplied" } },
         code: 100,
         code_name: "UnsatisfiableWriteConcern".to_string(),
         message: "Not enough data-bearing nodes".to_string(),
