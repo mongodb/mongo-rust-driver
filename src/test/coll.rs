@@ -6,7 +6,7 @@ use semver::VersionReq;
 
 use crate::{
     bson::{doc, Bson, Document},
-    error::{ErrorKind, Result, WriteFailure},
+    error::{ErrorKind, Result, WriteConcernError, WriteFailure},
     event::command::CommandStartedEvent,
     options::{
         AggregateOptions,
@@ -766,7 +766,7 @@ async fn err_info_is_propogated() {
         .await
         .expect_err("insert should fail");
 
-    let expected = ErrorKind::WriteError(WriteFailure::WriteConcernError(WriteConcernError {
+    let _expected = ErrorKind::WriteError(WriteFailure::WriteConcernError(WriteConcernError {
         // info: doc! { "writeConcern": doc! { "w": 2, "wtimeout": 0, "provenance": "clientSupplied"
         // } },
         code: 100,
@@ -774,5 +774,5 @@ async fn err_info_is_propogated() {
         message: "Not enough data-bearing nodes".to_string(),
     }));
 
-    assert!(matches!(error.kind.as_ref(), expected));
+    assert!(matches!(error.kind.as_ref(), _expected));
 }

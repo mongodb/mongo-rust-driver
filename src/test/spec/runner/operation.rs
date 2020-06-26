@@ -666,19 +666,12 @@ impl TestOperation for ReplaceOne {
         Ok(Some(result))
     }
 
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
-        let options = AggregateOptions {
-            allow_disk_use: Some(true),
-            ..Default::default()
-        };
-        let cursor = database.aggregate(self.pipeline.clone(), None).await?;
-        let result = cursor.try_collect::<Vec<Document>>().await?;
-        // dbg!("{:?}", &result);
-        Ok(Some(Bson::from(result)))
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
+        unimplemented!()
     }
 }
 
