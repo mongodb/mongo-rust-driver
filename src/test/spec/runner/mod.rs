@@ -4,12 +4,9 @@ mod test_file;
 
 use std::time::Duration;
 
-use futures::stream::TryStreamExt;
-
 use crate::{
-    bson::{doc, Document},
+    bson::doc,
     operation::RunCommand,
-    options::FindOptions,
     test::{assert_matches, util::EventClient, TestClient, CLIENT_OPTIONS},
 };
 
@@ -51,7 +48,7 @@ pub async fn run_v2_test(test_file: TestFile) {
 
         let mut options = CLIENT_OPTIONS.clone();
         if let Some(client_options) = test_case.client_options {
-            options.retry_reads = Some(client_options.get_bool("retryReads").unwrap());
+            options.retry_reads = client_options.retry_reads;
         }
         if TestClient::new().await.is_sharded() && test_case.use_multiple_mongoses != Some(true) {
             options.hosts = options.hosts.iter().cloned().take(1).collect();
@@ -78,18 +75,8 @@ pub async fn run_v2_test(test_file: TestFile) {
 
         let coll = client.init_db_and_coll(&db_name, &coll_name).await;
 
-        if test_case
-            .description
-            .contains("Aggregate with $listLocalSessions")
-        {
-            let mut session = client
-                .start_implicit_session_with_timeout(Duration::from_secs(60 * 60))
-                .await;
-            let op = RunCommand::new(db_name.clone(), doc! { "ping": 1 }, None).unwrap();
-            client
-                .execute_operation_with_session(op, &mut session)
-                .await
-                .unwrap();
+        if test_case.description.contains("Aggregate with $listLocalSessions") {
+            start_session(&client, &db_name).await;
         }
 
         if let Some(ref data) = test_file.data {
@@ -169,20 +156,7 @@ pub async fn run_v2_test(test_file: TestFile) {
         }
 
         if let Some(outcome) = test_case.outcome {
-            let coll_name = match outcome.collection.name {
-                Some(name) => name,
-                None => coll_name,
-            };
-            let coll = client.database(&db_name).collection(&coll_name);
-            let options = FindOptions::builder().sort(doc! { "_id": 1 }).build();
-            let actual_data: Vec<Document> = coll
-                .find(None, options)
-                .await
-                .unwrap()
-                .try_collect()
-                .await
-                .unwrap();
-            assert_eq!(outcome.collection.data, actual_data);
+            assert!(outcome.matches_actual(db_name, coll_name, &client).await);
         }
 
         if test_case.fail_point.is_some() {
@@ -198,5 +172,16 @@ pub async fn run_v2_test(test_file: TestFile) {
                 .await
                 .unwrap();
         }
+    }
+
+    async fn start_session(client: &EventClient, db_name: &String) {
+        let mut session = client
+                .start_implicit_session_with_timeout(Duration::from_secs(60 * 60))
+                .await;
+            let op = RunCommand::new(db_name.clone(), doc! { "ping": 1 }, None).unwrap();
+            client
+                .execute_operation_with_session(op, &mut session)
+                .await
+                .unwrap();
     }
 }
