@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use crate::{
     bson::{doc, Document},
-    options::{ClientOptions, FindOptions},
+    options::FindOptions,
     test::{util::EventClient, AnyTestOperation, TestEvent},
 };
 
@@ -68,7 +68,7 @@ impl RunOn {
 #[serde(rename_all = "camelCase")]
 pub struct TestCase {
     pub description: String,
-    pub client_options: Option<ClientOptions>,
+    pub client_options: Option<Document>,
     pub use_multiple_mongoses: Option<bool>,
     pub skip_reason: Option<String>,
     pub fail_point: Option<Document>,
@@ -83,7 +83,12 @@ pub struct Outcome {
 }
 
 impl Outcome {
-    pub async fn matches_actual(self, db_name: String, coll_name: String, client: &EventClient) -> bool {
+    pub async fn matches_actual(
+        self,
+        db_name: String,
+        coll_name: String,
+        client: &EventClient,
+    ) -> bool {
         let coll_name = match self.collection.name {
             Some(name) => name,
             None => coll_name,

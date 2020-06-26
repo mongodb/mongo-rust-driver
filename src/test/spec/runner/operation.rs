@@ -76,48 +76,32 @@ impl<'de> Deserialize<'de> for AnyTestOperation {
 
         let definition = OperationDefinition::deserialize(deserializer)?;
         let boxed_op = match definition.name.as_str() {
-            "insertOne" => {
-                InsertOne::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "insertMany" => {
-                InsertMany::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "updateOne" => {
-                UpdateOne::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "updateMany" => {
-                UpdateMany::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "deleteMany" => {
-                DeleteMany::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "deleteOne" => {
-                DeleteOne::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
+            "insertOne" => InsertOne::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "insertMany" => InsertMany::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "updateOne" => UpdateOne::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "updateMany" => UpdateMany::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "deleteMany" => DeleteMany::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "deleteOne" => DeleteOne::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
             "find" => Find::deserialize(BsonDeserializer::new(definition.arguments))
                 .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "aggregate" => {
-                Aggregate::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "distinct" => {
-                Distinct::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
+            "aggregate" => Aggregate::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "distinct" => Distinct::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
             "countDocuments" => {
                 CountDocuments::deserialize(BsonDeserializer::new(definition.arguments))
                     .map(|op| Box::new(op) as Box<dyn TestOperation>)
             }
-            "estimatedDocumentCount" => EstimatedDocumentCount::deserialize(BsonDeserializer::new(
-                definition.arguments,
-            ))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "estimatedDocumentCount" => {
+                EstimatedDocumentCount::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
             "findOne" => FindOne::deserialize(BsonDeserializer::new(definition.arguments))
                 .map(|op| Box::new(op) as Box<dyn TestOperation>),
             "listDatabases" => {
@@ -132,14 +116,12 @@ impl<'de> Deserialize<'de> for AnyTestOperation {
                 ListCollections::deserialize(BsonDeserializer::new(definition.arguments))
                     .map(|op| Box::new(op) as Box<dyn TestOperation>)
             }
-            "listCollectionNames" => ListCollectionNames::deserialize(BsonDeserializer::new(
-                definition.arguments,
-            ))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "replaceOne" => {
-                ReplaceOne::deserialize(BsonDeserializer::new(definition.arguments))
+            "listCollectionNames" => {
+                ListCollectionNames::deserialize(BsonDeserializer::new(definition.arguments))
                     .map(|op| Box::new(op) as Box<dyn TestOperation>)
             }
+            "replaceOne" => ReplaceOne::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| de::Error::custom(format!("{}", e)))?;
