@@ -729,7 +729,7 @@ async fn err_info_is_propogated() {
 
     let client = TestClient::new().await;
     let req = VersionReq::parse("<= 3.6").unwrap();
-    if req.matches(&client.server_version) {
+    if req.matches(&client.server_version) || client.is_sharded() {
         return;
     }
     client
