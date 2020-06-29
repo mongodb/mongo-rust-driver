@@ -66,8 +66,6 @@ pub async fn run_v2_test(test_file: TestFile) {
             None => "coll".to_string(),
         };
 
-        let coll = client.init_db_and_coll(&db_name, &coll_name).await;
-
         if test_case
             .description
             .contains("Aggregate with $listLocalSessions")
@@ -79,6 +77,7 @@ pub async fn run_v2_test(test_file: TestFile) {
             match data {
                 TestData::Single(data) => {
                     if !data.is_empty() {
+                        let coll = client.init_db_and_coll(&db_name, &coll_name).await;
                         coll.insert_many(data.clone(), None)
                             .await
                             .expect(&test_case.description);
