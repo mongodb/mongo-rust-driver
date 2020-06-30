@@ -72,6 +72,10 @@ pub async fn run_v2_test(test_file: TestFile) {
             .description
             .contains("Aggregate with $listLocalSessions")
         {
+            let req = semver::VersionReq::parse("<= 3.6").unwrap();
+            if req.matches(&client.server_version) && client.is_standalone() {
+                continue;
+            }
             start_session(&client, &db_name).await;
         }
 
