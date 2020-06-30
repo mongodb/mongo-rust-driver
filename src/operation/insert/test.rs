@@ -179,7 +179,14 @@ async fn handle_write_failure() {
         "writeConcernError": {
             "code": 123,
             "codeName": "woohoo",
-            "errmsg": "error message"
+            "errmsg": "error message",
+            "errInfo": {
+                "writeConcern": {
+                    "w": 2,
+                    "wtimeout": 0,
+                    "provenance": "clientSupplied"
+                }
+            }
         }
     });
 
@@ -203,6 +210,11 @@ async fn handle_write_failure() {
                 code: 123,
                 code_name: "woohoo".to_string(),
                 message: "error message".to_string(),
+                details: Some(doc! { "writeConcern": {
+                    "w": 2,
+                    "wtimeout": 0,
+                    "provenance": "clientSupplied"
+                } }),
             };
             assert_eq!(write_concern_error, expected_wc_err);
         }

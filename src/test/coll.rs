@@ -6,7 +6,7 @@ use semver::VersionReq;
 
 use crate::{
     bson::{doc, Bson, Document},
-    error::{ErrorKind, Result},
+    error::{ErrorKind, Result, WriteFailure},
     event::command::CommandStartedEvent,
     options::{
         AggregateOptions,
@@ -24,6 +24,66 @@ use crate::{
     },
     RUNTIME,
 };
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn insert_err_details() {
+    let _guard = LOCK.run_exclusively().await;
+
+    let client = TestClient::new().await;
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
+    if client.server_version_lt(4, 0) || !client.is_replica_set() {
+        return;
+    }
+    client
+        .database("admin")
+        .run_command(
+            doc! {
+                "configureFailPoint": "failCommand",
+                "data": {
+                "failCommands": ["insert"],
+                "writeConcernError": {
+                    "code": 100,
+                    "codeName": "UnsatisfiableWriteConcern",
+                    "errmsg": "Not enough data-bearing nodes",
+                    "errInfo": {
+                    "writeConcern": {
+                        "w": 2,
+                        "wtimeout": 0,
+                        "provenance": "clientSupplied"
+                    }
+                    }
+                }
+                },
+                "mode": { "times": 1 }
+            },
+            None,
+        )
+        .await
+        .unwrap();
+
+    let wc_error_result = coll.insert_one(doc! { "test": 1 }, None).await;
+    match *wc_error_result.unwrap_err().kind {
+        ErrorKind::WriteError(WriteFailure::WriteConcernError(ref wc_error)) => {
+            match &wc_error.details {
+                Some(doc) => {
+                    let result = doc.get_document("writeConcern");
+                    match result {
+                        Ok(write_concern_doc) => {
+                            assert_eq!(write_concern_doc.contains_key("provenance"), true);
+                        }
+                        Err(e) => panic!("{:?}", e),
+                    }
+                }
+                None => panic!("expected details field"),
+            }
+        }
+        ref e => panic!("expected write concern error, got {:?}", e),
+    }
+}
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
