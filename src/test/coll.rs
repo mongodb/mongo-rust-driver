@@ -725,7 +725,7 @@ async fn find_one_and_delete_hint_server_version() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-async fn err_info_is_propogated() {
+async fn errinfo_is_propagated() {
     let _guard = LOCK.run_exclusively().await;
 
     let mut options = CLIENT_OPTIONS.clone();
@@ -734,7 +734,8 @@ async fn err_info_is_propogated() {
     }
     let client = TestClient::with_options(Some(options)).await;
     let req = VersionReq::parse("<= 3.6").unwrap();
-    if req.matches(&client.server_version) {
+    let sharded_req = VersionReq::parse("< 4.1.5").unwrap();
+    if req.matches(&client.server_version) || (sharded_req.matches(&client.server_version) && client.is_sharded()) {
         return;
     }
     client
