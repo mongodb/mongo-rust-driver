@@ -72,6 +72,9 @@ pub async fn run_v2_test(test_file: TestFile) {
             .description
             .contains("Aggregate with $listLocalSessions")
         {
+            // TODO DRIVERS-1230: This test currently fails on 3.6 standalones because the session
+            // does not attach to the server ping. When the driver is updated to send implicit
+            // sessions to standalones, this test should be unskipped.
             let req = semver::VersionReq::parse("<= 3.6").unwrap();
             if req.matches(&client.server_version) && client.is_standalone() {
                 continue;
@@ -83,7 +86,7 @@ pub async fn run_v2_test(test_file: TestFile) {
             match data {
                 TestData::Single(data) => {
                     if !data.is_empty() {
-                        let coll = if client.is_replica_set() {
+                        let coll = if client.is_replica_set() || client.is_sharded() {
                             let write_concern =
                                 WriteConcern::builder().w(Acknowledgment::Majority).build();
                             let options = CollectionOptions::builder()

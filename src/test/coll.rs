@@ -20,6 +20,7 @@ use crate::{
     results::DeleteResult,
     test::{
         util::{drop_collection, CommandEvent, EventClient, TestClient},
+        CLIENT_OPTIONS,
         LOCK,
     },
     RUNTIME,
@@ -727,9 +728,13 @@ async fn find_one_and_delete_hint_server_version() {
 async fn err_info_is_propogated() {
     let _guard = LOCK.run_exclusively().await;
 
-    let client = TestClient::new().await;
+    let mut options = CLIENT_OPTIONS.clone();
+    if TestClient::new().await.is_sharded() {
+        options.hosts = options.hosts.iter().cloned().take(1).collect();
+    }
+    let client = TestClient::with_options(Some(options)).await;
     let req = VersionReq::parse("<= 3.6").unwrap();
-    if req.matches(&client.server_version) || client.is_sharded() {
+    if req.matches(&client.server_version) {
         return;
     }
     client
