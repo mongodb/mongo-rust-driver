@@ -735,7 +735,9 @@ async fn errinfo_is_propagated() {
     let client = TestClient::with_options(Some(options)).await;
     let req = VersionReq::parse("<= 3.6").unwrap();
     let sharded_req = VersionReq::parse("< 4.1.5").unwrap();
-    if req.matches(&client.server_version) || (sharded_req.matches(&client.server_version) && client.is_sharded()) {
+    if req.matches(&client.server_version)
+        || (sharded_req.matches(&client.server_version) && client.is_sharded())
+    {
         return;
     }
     client
