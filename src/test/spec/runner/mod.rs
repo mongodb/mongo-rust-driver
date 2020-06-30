@@ -6,7 +6,9 @@ use std::time::Duration;
 
 use crate::{
     bson::doc,
+    concern::{Acknowledgment, WriteConcern},
     operation::RunCommand,
+    options::CollectionOptions,
     test::{assert_matches, util::EventClient, TestClient, CLIENT_OPTIONS},
 };
 
@@ -77,7 +79,18 @@ pub async fn run_v2_test(test_file: TestFile) {
             match data {
                 TestData::Single(data) => {
                     if !data.is_empty() {
-                        let coll = client.init_db_and_coll(&db_name, &coll_name).await;
+                        let coll = if client.is_replica_set() {
+                            let write_concern =
+                                WriteConcern::builder().w(Acknowledgment::Majority).build();
+                            let options = CollectionOptions::builder()
+                                .write_concern(write_concern)
+                                .build();
+                            client
+                                .init_db_and_coll_with_options(&db_name, &coll_name, options)
+                                .await
+                        } else {
+                            client.init_db_and_coll(&db_name, &coll_name).await
+                        };
                         coll.insert_many(data.clone(), None)
                             .await
                             .expect(&test_case.description);
@@ -132,6 +145,7 @@ pub async fn run_v2_test(test_file: TestFile) {
                     result
                 );
             }
+
             if let Some(expected_result) = operation.result {
                 let description = &test_case.description;
                 let result = result
