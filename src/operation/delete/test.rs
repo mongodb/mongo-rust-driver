@@ -167,7 +167,14 @@ async fn handle_write_concern_failure() {
         "writeConcernError": {
             "code": 456,
             "codeName": "wcError",
-            "errmsg": "some message"
+            "errmsg": "some message",
+            "errInfo": {
+                "writeConcern": {
+                    "w": 2,
+                    "wtimeout": 0,
+                    "provenance": "clientSupplied"
+                }
+            }
         }
     });
 
@@ -180,6 +187,11 @@ async fn handle_write_concern_failure() {
                 code: 456,
                 code_name: "wcError".to_string(),
                 message: "some message".to_string(),
+                details: Some(doc! { "writeConcern": {
+                    "w": 2,
+                    "wtimeout": 0,
+                    "provenance": "clientSupplied"
+                } }),
             };
             assert_eq!(wc_error, &expected_wc_err);
         }

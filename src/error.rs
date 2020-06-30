@@ -7,7 +7,7 @@ use lazy_static::lazy_static;
 use serde::Deserialize;
 use time::OutOfRangeError;
 
-use crate::options::StreamAddress;
+use crate::{bson::Document, options::StreamAddress};
 
 lazy_static! {
     static ref RECOVERING_CODES: Vec<i32> = vec![11600, 11602, 13436, 189, 91];
@@ -381,6 +381,10 @@ pub struct WriteConcernError {
     /// A description of the error that occurred.
     #[serde(rename = "errmsg")]
     pub message: String,
+
+    /// A document identifying the write concern setting related to the error.
+    #[serde(rename = "errInfo")]
+    pub details: Option<Document>,
 }
 
 /// An error that occurred during a write operation that wasn't due to being unable to satisfy a
