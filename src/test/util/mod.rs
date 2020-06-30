@@ -8,7 +8,7 @@ pub use self::{
     matchable::{assert_matches, Matchable},
 };
 
-use std::{collections::HashMap, fmt::Debug, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
 
 use crate::bson::{doc, oid::ObjectId, Bson};
 use semver::Version;
@@ -18,6 +18,7 @@ use self::event::EventHandler;
 use super::CLIENT_OPTIONS;
 use crate::{
     error::{CommandError, ErrorKind, Result},
+    operation::RunCommand,
     options::{AuthMechanism, ClientOptions, CreateCollectionOptions},
     Client,
     Collection,
@@ -61,18 +62,27 @@ impl TestClient {
 
         let client = Client::with_options(options.clone()).unwrap();
 
+        // To avoid populating the session pool with leftover implicit sessions, we check out a
+        // session here and immediately mark it as dirty, then use it with any operations we need.
+        let mut session = client
+            .start_implicit_session_with_timeout(Duration::from_secs(60 * 60))
+            .await;
+        session.mark_dirty();
+
+        let is_master = RunCommand::new("admin".into(), doc! { "isMaster":  1 }, None).unwrap();
+
         let server_info = bson::from_bson(Bson::Document(
             client
-                .database("admin")
-                .run_command(doc! { "isMaster":  1 }, None)
+                .execute_operation_with_session(is_master, &mut session)
                 .await
                 .unwrap(),
         ))
         .unwrap();
 
+        let build_info = RunCommand::new("test".into(), doc! { "buildInfo":  1 }, None).unwrap();
+
         let response = client
-            .database("test")
-            .run_command(doc! { "buildInfo": 1 }, None)
+            .execute_operation_with_session(build_info, &mut session)
             .await
             .unwrap();
 
