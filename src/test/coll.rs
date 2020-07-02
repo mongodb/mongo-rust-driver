@@ -6,7 +6,7 @@ use semver::VersionReq;
 
 use crate::{
     bson::{doc, Bson, Document},
-    error::{ErrorKind, Result, WriteConcernError, WriteFailure},
+    error::{ErrorKind, Result, WriteFailure},
     event::command::CommandStartedEvent,
     options::{
         AggregateOptions,
@@ -733,6 +733,7 @@ async fn errinfo_is_propagated() {
         options.hosts = options.hosts.iter().cloned().take(1).collect();
     }
     let client = TestClient::with_options(Some(options)).await;
+
     let req = VersionReq::parse("<= 3.6").unwrap();
     let sharded_req = VersionReq::parse("< 4.1.5").unwrap();
     if req.matches(&client.server_version)
@@ -740,6 +741,7 @@ async fn errinfo_is_propagated() {
     {
         return;
     }
+
     client
         .database("admin")
         .run_command(
@@ -774,13 +776,19 @@ async fn errinfo_is_propagated() {
         .await
         .expect_err("insert should fail");
 
-    let _expected = ErrorKind::WriteError(WriteFailure::WriteConcernError(WriteConcernError {
-        // info: doc! { "writeConcern": doc! { "w": 2, "wtimeout": 0, "provenance": "clientSupplied"
-        // } },
-        code: 100,
-        code_name: "UnsatisfiableWriteConcern".to_string(),
-        message: "Not enough data-bearing nodes".to_string(),
-    }));
-
-    assert!(matches!(error.kind.as_ref(), _expected));
+    match error.kind.as_ref() {
+        ErrorKind::WriteError(error) => match error {
+            WriteFailure::WriteConcernError(error) => {
+                assert_eq!(error.code, 100);
+                assert_eq!(error.code_name, "UnsatisfiableWriteConcern");
+                assert_eq!(error.message, "Not enough data-bearing nodes");
+                // assert_eq!(
+                //     err.info,
+                //     doc! { "writeConcern": doc! { "w": 2, "wtimeout": 0, "provenance":
+                // "clientSupplied" } } );
+            }
+            e => panic!("expected write concern error, got {:?} instead", e),
+        },
+        e => panic!("expected write concern error, got {:?} instead", e),
+    }
 }
