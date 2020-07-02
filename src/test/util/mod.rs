@@ -87,7 +87,8 @@ impl TestClient {
             .unwrap();
 
         let info: BuildInfo = bson::from_bson(Bson::Document(response)).unwrap();
-        let server_version = Version::parse(&info.version).unwrap();
+        let server_version = info.version.split('-').next().unwrap();
+        let server_version = Version::parse(server_version).unwrap();
 
         Self {
             client,
