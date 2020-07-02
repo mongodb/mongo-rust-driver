@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use crate::{
     bson::{doc, Document},
-    options::FindOptions,
+    options::{ClientOptions, FindOptions},
     test::{util::EventClient, AnyTestOperation, TestEvent},
 };
 
@@ -63,7 +63,7 @@ impl RunOn {
 #[serde(rename_all = "camelCase")]
 pub struct TestCase {
     pub description: String,
-    pub client_options: Option<Document>,
+    pub client_options: Option<ClientOptions>,
     pub use_multiple_mongoses: Option<bool>,
     pub skip_reason: Option<String>,
     pub fail_point: Option<Document>,

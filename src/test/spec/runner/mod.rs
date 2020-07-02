@@ -8,7 +8,7 @@ use crate::{
     bson::doc,
     concern::{Acknowledgment, WriteConcern},
     operation::RunCommand,
-    options::CollectionOptions,
+    options::{ClientOptions, CollectionOptions},
     test::{assert_matches, util::EventClient, TestClient, CLIENT_OPTIONS},
 };
 
@@ -48,7 +48,7 @@ pub async fn run_v2_test(test_file: TestFile) {
             continue;
         }
 
-        let client = create_client(&test_case).await;
+        let client = create_client(test_case.client_options, test_case.use_multiple_mongoses).await;
 
         if let Some(ref run_on) = test_file.run_on {
             let can_run_on = run_on.iter().any(|run_on| run_on.can_run_on(&client));
@@ -190,12 +190,19 @@ pub async fn run_v2_test(test_file: TestFile) {
         }
     }
 
-    async fn create_client(test_case: &TestCase) -> EventClient {
-        let mut options = CLIENT_OPTIONS.clone();
-        if let Some(ref client_options) = test_case.client_options {
-            options.retry_reads = Some(client_options.get_bool("retryReads").unwrap());
-        }
-        if TestClient::new().await.is_sharded() && test_case.use_multiple_mongoses != Some(true) {
+    async fn create_client(
+        options: Option<ClientOptions>,
+        use_multiple_mongoses: Option<bool>,
+    ) -> EventClient {
+        let mut options = match options {
+            Some(mut options) => {
+                options.hosts = CLIENT_OPTIONS.hosts.clone();
+                options.merge(CLIENT_OPTIONS.clone());
+                options
+            }
+            None => CLIENT_OPTIONS.clone(),
+        };
+        if TestClient::new().await.is_sharded() && use_multiple_mongoses != Some(true) {
             options.hosts = options.hosts.iter().cloned().take(1).collect();
         }
         EventClient::with_options(options).await

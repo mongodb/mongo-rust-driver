@@ -8,6 +8,7 @@ mod test;
 use std::{borrow::Cow, str::FromStr};
 
 use rand::Rng;
+use serde::Deserialize;
 use typed_builder::TypedBuilder;
 
 use self::scram::ScramVersion;
@@ -27,7 +28,7 @@ const PLAIN_STR: &str = "PLAIN";
 /// The authentication mechanisms supported by MongoDB.
 ///
 /// Note: not all of these mechanisms are currently supported by the driver.
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Deserialize, PartialEq, Debug)]
 pub enum AuthMechanism {
     /// MongoDB Challenge Response nonce and MD5 based authentication system. It is currently
     /// deprecated and will never be supported by this driver.
@@ -177,7 +178,7 @@ impl FromStr for AuthMechanism {
 ///
 /// Some fields (mechanism and source) may be omitted and will either be negotiated or assigned a
 /// default value, depending on the values of other fields in the credential.
-#[derive(Clone, Debug, Default, TypedBuilder, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder, PartialEq)]
 pub struct Credential {
     /// The username to authenticate with. This applies to all mechanisms but may be omitted when
     /// authenticating via MONGODB-X509.
