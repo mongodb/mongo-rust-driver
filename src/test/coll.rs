@@ -782,10 +782,13 @@ async fn errinfo_is_propagated() {
                 assert_eq!(error.code, 100);
                 assert_eq!(error.code_name, "UnsatisfiableWriteConcern");
                 assert_eq!(error.message, "Not enough data-bearing nodes");
-                // assert_eq!(
-                //     err.info,
-                //     doc! { "writeConcern": doc! { "w": 2, "wtimeout": 0, "provenance":
-                // "clientSupplied" } } );
+                assert_eq!(
+                    error.details,
+                    Some(
+                        doc! { "writeConcern": doc! { "w": 2, "wtimeout": 0, "provenance":
+                        "clientSupplied" } }
+                    )
+                );
             }
             e => panic!("expected write concern error, got {:?} instead", e),
         },

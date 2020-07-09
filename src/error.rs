@@ -7,7 +7,7 @@ use lazy_static::lazy_static;
 use serde::Deserialize;
 use time::OutOfRangeError;
 
-use crate::options::StreamAddress;
+use crate::{bson::Document, options::StreamAddress};
 
 lazy_static! {
     static ref RECOVERING_CODES: Vec<i32> = vec![11600, 11602, 13436, 189, 91];
