@@ -8,14 +8,14 @@ use crate::{
     bson::doc,
     concern::{Acknowledgment, WriteConcern},
     operation::RunCommand,
-    options::{ClientOptions, CollectionOptions},
-    test::{assert_matches, util::EventClient, TestClient, CLIENT_OPTIONS},
+    options::CollectionOptions,
+    test::{assert_matches, util::EventClient},
 };
 
 pub use self::{
     operation::AnyTestOperation,
     test_event::TestEvent,
-    test_file::{OperationObject, TestCase, TestData, TestFile},
+    test_file::{OperationObject, RunOn, TestCase, TestData, TestFile},
 };
 
 const SKIPPED_OPERATIONS: &[&str] = &[
@@ -46,7 +46,9 @@ pub async fn run_v2_test(test_file: TestFile) {
             continue;
         }
 
-        let client = create_client(test_case.client_options, test_case.use_multiple_mongoses).await;
+        let client =
+            EventClient::merge_options(test_case.client_options, test_case.use_multiple_mongoses)
+                .await;
 
         if let Some(ref run_on) = test_file.run_on {
             let can_run_on = run_on.iter().any(|run_on| run_on.can_run_on(&client));
@@ -186,55 +188,6 @@ pub async fn run_v2_test(test_file: TestFile) {
                 .await
                 .unwrap();
         }
-    }
-
-    async fn create_client(
-        options: Option<ClientOptions>,
-        use_multiple_mongoses: Option<bool>,
-    ) -> EventClient {
-        let mut options = match options {
-            Some(mut options) => {
-                options.hosts = CLIENT_OPTIONS.hosts.clone();
-                merge_options!(
-                    CLIENT_OPTIONS.clone(),
-                    &mut options,
-                    [
-                        app_name,
-                        compressors,
-                        cmap_event_handler,
-                        command_event_handler,
-                        connect_timeout,
-                        credential,
-                        direct_connection,
-                        driver_info,
-                        heartbeat_freq,
-                        local_threshold,
-                        max_idle_time,
-                        max_pool_size,
-                        min_pool_size,
-                        read_concern,
-                        repl_set_name,
-                        retry_reads,
-                        retry_writes,
-                        selection_criteria,
-                        server_selection_timeout,
-                        socket_timeout,
-                        tls,
-                        wait_queue_timeout,
-                        write_concern,
-                        zlib_compression,
-                        original_srv_hostname,
-                        original_uri
-                    ]
-                );
-                options
-            }
-            None => CLIENT_OPTIONS.clone(),
-        };
-        if TestClient::new().await.is_sharded() && use_multiple_mongoses != Some(true) {
-            options.hosts = options.hosts.iter().cloned().take(1).collect();
-        }
-        EventClient::with_options(options).await
     }
 
     async fn start_session(client: &EventClient, db_name: &str) {

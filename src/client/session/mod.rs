@@ -87,6 +87,7 @@ impl ClientSession {
     }
 
     /// Increments the txn_number and returns the new value.
+    #[allow(dead_code)]
     pub(crate) fn get_txn_number(&mut self) -> u64 {
         self.txn_number += 1;
         self.txn_number

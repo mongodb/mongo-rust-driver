@@ -97,9 +97,7 @@ impl Client {
             .execute_operation_on_connection(&op, &mut conn, &mut session)
             .await
         {
-            Ok(result) => {
-                Ok(result)
-            }
+            Ok(result) => Ok(result),
             Err(err) => {
                 self.inner
                     .topology

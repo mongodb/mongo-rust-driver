@@ -16,7 +16,7 @@ use crate::{
         },
     },
     options::ClientOptions,
-    test::LOCK,
+    test::{CLIENT_OPTIONS, LOCK},
 };
 
 pub type EventQueue<T> = Arc<RwLock<VecDeque<T>>>;
@@ -141,6 +141,55 @@ impl EventClient {
             command_events,
             pool_cleared_events,
         }
+    }
+
+    pub async fn merge_options(
+        options: Option<ClientOptions>,
+        use_multiple_mongoses: Option<bool>,
+    ) -> Self {
+        let mut options = match options {
+            Some(mut options) => {
+                options.hosts = CLIENT_OPTIONS.hosts.clone();
+                merge_options!(
+                    CLIENT_OPTIONS.clone(),
+                    &mut options,
+                    [
+                        app_name,
+                        compressors,
+                        cmap_event_handler,
+                        command_event_handler,
+                        connect_timeout,
+                        credential,
+                        direct_connection,
+                        driver_info,
+                        heartbeat_freq,
+                        local_threshold,
+                        max_idle_time,
+                        max_pool_size,
+                        min_pool_size,
+                        read_concern,
+                        repl_set_name,
+                        retry_reads,
+                        retry_writes,
+                        selection_criteria,
+                        server_selection_timeout,
+                        socket_timeout,
+                        tls,
+                        wait_queue_timeout,
+                        write_concern,
+                        zlib_compression,
+                        original_srv_hostname,
+                        original_uri
+                    ]
+                );
+                options
+            }
+            None => CLIENT_OPTIONS.clone(),
+        };
+        if TestClient::new().await.is_sharded() && use_multiple_mongoses != Some(true) {
+            options.hosts = options.hosts.iter().cloned().take(1).collect();
+        }
+        EventClient::with_options(options).await
     }
 
     /// Gets the first started/succeeded pair of events for the given command name, popping off all
