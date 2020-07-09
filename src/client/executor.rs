@@ -8,7 +8,7 @@ use time::PreciseTime;
 use crate::{
     bson::Document,
     cmap::Connection,
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
     operation::Operation,
     options::SelectionCriteria,
@@ -93,12 +93,12 @@ impl Client {
             }
         };
 
-        let first_error = match self
+        match self
             .execute_operation_on_connection(&op, &mut conn, &mut session)
             .await
         {
             Ok(result) => {
-                return Ok(result);
+                Ok(result)
             }
             Err(err) => {
                 self.inner
@@ -106,17 +106,24 @@ impl Client {
                     .handle_post_handshake_error(err.clone(), conn, server)
                     .await;
                 // TODO RUST-90: Do not retry if session is in a transaction
-                if self.inner.options.retry_reads == Some(false)
-                    || !op.is_read_retryable()
-                    || !err.is_read_retryable()
+                if self.inner.options.retry_reads != Some(false)
+                    && op.is_read_retryable()
+                    && err.is_read_retryable()
                 {
-                    return Err(err);
+                    self.retry_read(op, session, err).await
                 } else {
-                    err
+                    Err(err)
                 }
             }
-        };
+        }
+    }
 
+    async fn retry_read<T: Operation>(
+        &self,
+        op: T,
+        mut session: Option<&mut ClientSession>,
+        first_error: Error,
+    ) -> Result<T::O> {
         let server = match self.select_server(op.selection_criteria()).await {
             Ok(server) => server,
             Err(_) => {

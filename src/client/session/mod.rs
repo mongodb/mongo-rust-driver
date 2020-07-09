@@ -36,6 +36,7 @@ pub(crate) struct ClientSession {
     server_session: ServerSession,
     client: Client,
     is_implicit: bool,
+    txn_number: u64,
 }
 
 impl ClientSession {
@@ -46,6 +47,7 @@ impl ClientSession {
             server_session,
             cluster_time: None,
             is_implicit: true,
+            txn_number: 0,
         }
     }
 
@@ -82,6 +84,12 @@ impl ClientSession {
     /// sent to the server.
     pub(crate) fn update_last_use(&mut self) {
         self.server_session.last_use = Instant::now();
+    }
+
+    /// Increments the txn_number and returns the new value.
+    pub(crate) fn get_txn_number(&mut self) -> u64 {
+        self.txn_number += 1;
+        self.txn_number
     }
 }
 

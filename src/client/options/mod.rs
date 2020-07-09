@@ -316,6 +316,9 @@ pub struct ClientOptions {
     #[builder(default)]
     pub retry_reads: Option<bool>,
 
+    /// Whether or not the client should retry a write operation if the operation fails.
+    ///
+    /// The default value is true.
     #[builder(default)]
     pub(crate) retry_writes: Option<bool>,
 
