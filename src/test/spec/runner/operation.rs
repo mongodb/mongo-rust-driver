@@ -17,6 +17,7 @@ use crate::{
         DeleteOptions,
         DistinctOptions,
         EstimatedDocumentCountOptions,
+        FindOneAndUpdateOptions,
         FindOneOptions,
         FindOptions,
         InsertManyOptions,
@@ -122,6 +123,10 @@ impl<'de> Deserialize<'de> for AnyTestOperation {
             }
             "replaceOne" => ReplaceOne::deserialize(BsonDeserializer::new(definition.arguments))
                 .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "findOneAndUpdate" => {
+                FindOneAndUpdate::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| de::Error::custom(format!("{}", e)))?;
@@ -659,6 +664,41 @@ impl TestOperation for ReplaceOne {
             .replace_one(
                 self.filter.clone(),
                 self.replacement.clone(),
+                self.options.clone(),
+            )
+            .await?;
+        let result = bson::to_bson(&result)?;
+        Ok(Some(result))
+    }
+
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct FindOneAndUpdate {
+    filter: Document,
+    update: UpdateModifications,
+    #[serde(flatten)]
+    options: Option<FindOneAndUpdateOptions>,
+}
+
+#[async_trait]
+impl TestOperation for FindOneAndUpdate {
+    fn command_names(&self) -> &[&str] {
+        &["findAndModify"]
+    }
+
+    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+        let result = collection
+            .find_one_and_update(
+                self.filter.clone(),
+                self.update.clone(),
                 self.options.clone(),
             )
             .await?;

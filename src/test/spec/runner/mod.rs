@@ -32,17 +32,15 @@ const SKIPPED_OPERATIONS: &[&str] = &[
 ];
 
 pub async fn run_v2_test(test_file: TestFile) {
-    let has_skipped_op = test_file.tests.iter().any(|test_case| {
-        test_case
+    for test_case in test_file.tests {
+        let has_skipped_op = test_case
             .operations
             .iter()
-            .any(|op| SKIPPED_OPERATIONS.contains(&op.name.as_str()))
-    });
-    if has_skipped_op {
-        return;
-    }
+            .any(|op| SKIPPED_OPERATIONS.contains(&op.name.as_str()));
+        if has_skipped_op {
+            continue;
+        }
 
-    for test_case in test_file.tests {
         if let Some(skip_reason) = test_case.skip_reason {
             println!("Skipping {}: {}", test_case.description, skip_reason);
             continue;

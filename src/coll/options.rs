@@ -40,7 +40,7 @@ pub struct CollectionOptions {
 /// [`Collection::find_one_and_replace`](../struct.Collection.html#method.find_one_and_replace) and
 /// [`Collection::find_one_and_update`](../struct.Collection.html#method.find_one_and_update)
 /// operation should return the document before or after modification.
-#[derive(Debug)]
+#[derive(Clone, Debug, Deserialize)]
 #[non_exhaustive]
 pub enum ReturnDocument {
     /// Return the document after modification.
@@ -375,7 +375,7 @@ pub struct FindOneAndReplaceOptions {
 /// Specifies the options to a
 /// [`Collection::find_one_and_update`](../struct.Collection.html#method.find_one_and_update)
 /// operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[non_exhaustive]
 pub struct FindOneAndUpdateOptions {
     /// A set of filters specifying to which array elements an update should apply.
@@ -489,7 +489,7 @@ pub struct AggregateOptions {
     #[builder(default)]
     #[serde(
         serialize_with = "serialize_duration_as_int_millis",
-        rename(serialize = "maxTimeMS"),
+        rename = "maxTimeMS",
         deserialize_with = "deserialize_duration_from_u64_millis"
     )]
     pub max_time: Option<Duration>,
@@ -570,7 +570,7 @@ pub struct EstimatedDocumentCountOptions {
     #[builder(default)]
     #[serde(
         serialize_with = "serialize_duration_as_int_millis",
-        rename(serialize = "maxTimeMS"),
+        rename = "maxTimeMS",
         deserialize_with = "deserialize_duration_from_u64_millis"
     )]
     pub max_time: Option<Duration>,
@@ -601,7 +601,7 @@ pub struct DistinctOptions {
     #[builder(default)]
     #[serde(
         serialize_with = "serialize_duration_as_int_millis",
-        rename(serialize = "maxTimeMS"),
+        rename = "maxTimeMS",
         deserialize_with = "deserialize_duration_from_u64_millis"
     )]
     pub max_time: Option<Duration>,
