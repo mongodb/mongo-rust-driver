@@ -195,7 +195,38 @@ pub async fn run_v2_test(test_file: TestFile) {
         let mut options = match options {
             Some(mut options) => {
                 options.hosts = CLIENT_OPTIONS.hosts.clone();
-                options.merge(CLIENT_OPTIONS.clone());
+                merge_options!(
+                    CLIENT_OPTIONS.clone(),
+                    &mut options,
+                    [
+                        app_name,
+                        compressors,
+                        cmap_event_handler,
+                        command_event_handler,
+                        connect_timeout,
+                        credential,
+                        direct_connection,
+                        driver_info,
+                        heartbeat_freq,
+                        local_threshold,
+                        max_idle_time,
+                        max_pool_size,
+                        min_pool_size,
+                        read_concern,
+                        repl_set_name,
+                        retry_reads,
+                        retry_writes,
+                        selection_criteria,
+                        server_selection_timeout,
+                        socket_timeout,
+                        tls,
+                        wait_queue_timeout,
+                        write_concern,
+                        zlib_compression,
+                        original_srv_hostname,
+                        original_uri
+                    ]
+                );
                 options
             }
             None => CLIENT_OPTIONS.clone(),

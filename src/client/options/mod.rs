@@ -356,10 +356,10 @@ pub struct ClientOptions {
     pub(crate) zlib_compression: Option<i32>,
 
     #[builder(default)]
-    original_srv_hostname: Option<String>,
+    pub(crate) original_srv_hostname: Option<String>,
 
     #[builder(default)]
-    original_uri: Option<String>,
+    pub(crate) original_uri: Option<String>,
 }
 
 fn default_hosts() -> Vec<StreamAddress> {
@@ -713,87 +713,6 @@ impl ClientOptions {
             write_concern.validate()?;
         }
         Ok(())
-    }
-
-    /// Merges these options with another set of ClientOptions (excluding hosts). If a field is
-    /// present on both options, favors the option present on self.
-    #[cfg(test)]
-    pub(crate) fn merge(&mut self, other: ClientOptions) {
-        if other.app_name.is_some() && self.app_name.is_none() {
-            self.app_name = other.app_name;
-        }
-        if other.compressors.is_some() && self.compressors.is_none() {
-            self.compressors = other.compressors;
-        }
-        if other.cmap_event_handler.is_some() && self.cmap_event_handler.is_none() {
-            self.cmap_event_handler = other.cmap_event_handler;
-        }
-        if other.command_event_handler.is_some() && self.command_event_handler.is_none() {
-            self.command_event_handler = other.command_event_handler;
-        }
-        if other.connect_timeout.is_some() && self.connect_timeout.is_none() {
-            self.connect_timeout = other.connect_timeout;
-        }
-        if other.credential.is_some() && self.credential.is_none() {
-            self.credential = other.credential;
-        }
-        if other.direct_connection.is_some() && self.direct_connection.is_none() {
-            self.direct_connection = other.direct_connection;
-        }
-        if other.driver_info.is_some() && self.driver_info.is_none() {
-            self.driver_info = other.driver_info;
-        }
-        if other.heartbeat_freq.is_some() && self.heartbeat_freq.is_none() {
-            self.heartbeat_freq = other.heartbeat_freq;
-        }
-        if other.local_threshold.is_some() && self.local_threshold.is_none() {
-            self.local_threshold = other.local_threshold;
-        }
-        if other.max_idle_time.is_some() && self.max_idle_time.is_none() {
-            self.max_idle_time = other.max_idle_time;
-        }
-        if other.min_pool_size.is_some() && self.min_pool_size.is_none() {
-            self.min_pool_size = other.min_pool_size;
-        }
-        if other.read_concern.is_some() && self.read_concern.is_none() {
-            self.read_concern = other.read_concern;
-        }
-        if other.repl_set_name.is_some() && self.repl_set_name.is_none() {
-            self.repl_set_name = other.repl_set_name;
-        }
-        if other.retry_reads.is_some() && self.retry_reads.is_none() {
-            self.retry_reads = other.retry_reads;
-        }
-        if other.retry_writes.is_some() && self.retry_writes.is_none() {
-            self.retry_writes = other.retry_writes;
-        }
-        if other.selection_criteria.is_some() && self.selection_criteria.is_none() {
-            self.selection_criteria = other.selection_criteria;
-        }
-        if other.server_selection_timeout.is_some() && self.server_selection_timeout.is_none() {
-            self.server_selection_timeout = other.server_selection_timeout;
-        }
-        if other.socket_timeout.is_some() && self.socket_timeout.is_none() {
-            self.socket_timeout = other.socket_timeout;
-        }
-        if other.tls.is_some() && self.tls.is_none() {
-            self.tls = other.tls;
-        }
-        if other.wait_queue_timeout.is_some() && self.wait_queue_timeout.is_none() {
-            self.wait_queue_timeout = other.wait_queue_timeout;
-        }
-        if other.write_concern.is_some() && self.write_concern.is_none() {
-            self.write_concern = other.write_concern;
-        }
-        if other.zlib_compression.is_some() && self.zlib_compression.is_none() {
-            self.zlib_compression = other.zlib_compression;
-        }
-        if other.original_srv_hostname.is_some() && self.original_srv_hostname.is_none() {
-            self.original_srv_hostname = other.original_srv_hostname;
-        }
-        if other.original_uri.is_some() && self.original_uri.is_none() {
-            self.original_uri = other.original_uri;
-        }
     }
 }
 
