@@ -144,6 +144,8 @@ define_if_single_runtime_enabled! {
     };
 
     pub use coll::Namespace;
+    #[allow(unused)]
+    pub mod change_stream;
 }
 
 #[cfg(all(
