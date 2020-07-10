@@ -507,6 +507,7 @@ pub struct AggregateOptions {
     /// will be used.
     #[builder(default)]
     #[serde(skip_serializing)]
+    #[serde(rename = "readPreference")]
     pub selection_criteria: Option<SelectionCriteria>,
 
     /// The write concern to use for the operation.

@@ -14,12 +14,15 @@ use crate::{
 /// Describes which servers are suitable for a given operation.
 #[derive(Clone, Derivative, Deserialize)]
 #[derivative(Debug)]
+#[serde(untagged)]
 #[non_exhaustive]
 pub enum SelectionCriteria {
     /// A read preference that describes the suitable servers based on the server type, max
     /// staleness, and server tags.
     ///
     /// See the documentation [here](https://docs.mongodb.com/manual/core/read-preference/) for more details.
+    // TODO RUST-495: unskip for deserialization
+    #[serde(skip)]
     ReadPreference(ReadPreference),
 
     /// A predicate used to filter servers that are considered suitable. A `server` will be
@@ -86,7 +89,8 @@ pub type Predicate = Arc<dyn Send + Sync + Fn(&ServerInfo) -> bool>;
 /// option and will be sent to the server as an integer number of seconds.
 ///
 /// See the [MongoDB docs](https://docs.mongodb.com/manual/core/read-preference) for more details.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
+// TODO RUST-495: implement Deserialize for ReadPreference
 pub enum ReadPreference {
     /// Only route this operation to the primary.
     Primary,
