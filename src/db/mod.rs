@@ -6,6 +6,7 @@ use futures::stream::TryStreamExt;
 
 use crate::{
     bson::{Bson, Document},
+    change_stream::{options::ChangeStreamOptions, ChangeStream},
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{ErrorKind, Result},
@@ -259,5 +260,28 @@ impl Database {
             .execute_cursor_operation(aggregate)
             .await
             .map(|(spec, session)| Cursor::new(client.clone(), spec, session))
+    }
+
+    /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
+    /// for all changes in this database. The stream does not observe changes from system
+    /// collections and cannot be started on "config", "local" or "admin" databases.
+    ///
+    /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
+    /// streams.
+    ///
+    /// Change streams require either a "majority" read concern or no read
+    /// concern. Anything else will cause a server error.
+    ///
+    /// Note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
+    /// fields will cause an error. The driver requires these fields to support resumability. For
+    /// more information on resumability, see the documentation for
+    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
+    #[allow(unused)]
+    pub async fn watch(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: Option<ChangeStreamOptions>,
+    ) -> Result<ChangeStream> {
+        todo!();
     }
 }

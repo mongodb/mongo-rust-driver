@@ -97,6 +97,8 @@ macro_rules! define_if_single_runtime_enabled {
 define_if_single_runtime_enabled! {
     #[macro_use]
     pub mod options;
+    #[allow(unused)]
+    pub mod change_stream;
 
     pub use ::bson;
 

@@ -10,6 +10,7 @@ use self::options::*;
 use crate::{
     bson::{doc, Bson, Document},
     bson_util,
+    change_stream::{options::ChangeStreamOptions, ChangeStream},
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, ErrorKind, Result},
     operation::{
@@ -578,6 +579,29 @@ impl Collection {
             )
             .await?;
         Ok(())
+    }
+    /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
+    /// for all changes in this collection. A
+    /// [`ChangeStream`](change_stream/struct.ChangeStream.html) cannot be started on system
+    /// collections.
+    ///
+    /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
+    /// streams.
+    ///
+    /// Change streams require either a "majority" read concern or no read concern. Anything else
+    /// will cause a server error.
+    ///
+    /// Also note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
+    /// fields will cause an error. The driver requires these fields to support resumability. For
+    /// more information on resumability, see the documentation for
+    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
+    #[allow(unused)]
+    pub async fn watch(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: Option<ChangeStreamOptions>,
+    ) -> Result<ChangeStream> {
+        todo!();
     }
 }
 
