@@ -16,6 +16,7 @@
 //! ```
 
 pub use crate::{
+    change_stream::options::*,
     client::{auth::*, options::*},
     coll::options::*,
     collation::*,

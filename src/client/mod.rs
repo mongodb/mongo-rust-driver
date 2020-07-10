@@ -12,6 +12,7 @@ use time::PreciseTime;
 use crate::options::StreamAddress;
 use crate::{
     bson::{Bson, Document},
+    change_stream::{options::ChangeStreamOptions, ChangeStream},
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::{ErrorKind, Result},
@@ -285,5 +286,29 @@ impl Client {
                 .into());
             }
         }
+    }
+
+    /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
+    /// for all changes in the cluster. The stream does not observe changes from system
+    /// collections or the "config", "local" or "admin" databases. Note that this method
+    /// (`watch` on a cluster) is only supported in MongoDB 4.0 or greater.
+    ///
+    /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
+    /// streams.
+    ///
+    /// Change streams require either a "majority" read concern or no read
+    /// concern. Anything else will cause a server error.
+    ///
+    /// Note that using a `$project` stage to remove any of the `_id` `operationType` or `ns` fields
+    /// will cause an error. The driver requires these fields to support resumability. For
+    /// more information on resumability, see the documentation for
+    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
+    #[allow(unused)]
+    pub async fn watch(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: Option<ChangeStreamOptions>,
+    ) -> Result<ChangeStream> {
+        todo!();
     }
 }
