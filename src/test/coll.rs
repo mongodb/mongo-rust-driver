@@ -20,7 +20,6 @@ use crate::{
     results::DeleteResult,
     test::{
         util::{drop_collection, CommandEvent, EventClient, TestClient},
-        CLIENT_OPTIONS,
         LOCK,
     },
     RUNTIME,
@@ -719,79 +718,5 @@ async fn find_one_and_delete_hint_server_version() {
         assert!(matches!(error.kind.as_ref(), ErrorKind::CommandError { .. }));
     } else {
         assert!(res.is_ok());
-    }
-}
-
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-#[function_name::named]
-async fn errinfo_is_propagated() {
-    let _guard = LOCK.run_exclusively().await;
-
-    let mut options = CLIENT_OPTIONS.clone();
-    if TestClient::new().await.is_sharded() {
-        options.hosts = options.hosts.iter().cloned().take(1).collect();
-    }
-    let client = TestClient::with_options(Some(options)).await;
-
-    let req = VersionReq::parse("<= 3.6").unwrap();
-    let sharded_req = VersionReq::parse("< 4.1.5").unwrap();
-    if req.matches(&client.server_version)
-        || (sharded_req.matches(&client.server_version) && client.is_sharded())
-    {
-        return;
-    }
-
-    client
-        .database("admin")
-        .run_command(
-            doc! {
-              "configureFailPoint": "failCommand",
-              "data": {
-                "failCommands": ["insert"],
-                "writeConcernError": {
-                  "code": 100,
-                  "codeName": "UnsatisfiableWriteConcern",
-                  "errmsg": "Not enough data-bearing nodes",
-                  "errInfo": {
-                    "writeConcern": {
-                      "w": 2,
-                      "wtimeout": 0,
-                      "provenance": "clientSupplied"
-                    }
-                  }
-                }
-              },
-              "mode": { "times": 1 }
-            },
-            None,
-        )
-        .await
-        .unwrap();
-
-    let error = client
-        .database(function_name!())
-        .collection(function_name!())
-        .insert_one(doc! { "x": 1 }, None)
-        .await
-        .expect_err("insert should fail");
-
-    match error.kind.as_ref() {
-        ErrorKind::WriteError(error) => match error {
-            WriteFailure::WriteConcernError(error) => {
-                assert_eq!(error.code, 100);
-                assert_eq!(error.code_name, "UnsatisfiableWriteConcern");
-                assert_eq!(error.message, "Not enough data-bearing nodes");
-                assert_eq!(
-                    error.details,
-                    Some(
-                        doc! { "writeConcern": doc! { "w": 2, "wtimeout": 0, "provenance":
-                        "clientSupplied" } }
-                    )
-                );
-            }
-            e => panic!("expected write concern error, got {:?} instead", e),
-        },
-        e => panic!("expected write concern error, got {:?} instead", e),
     }
 }
