@@ -19,7 +19,7 @@ use super::CLIENT_OPTIONS;
 use crate::{
     error::{CommandError, ErrorKind, Result},
     operation::RunCommand,
-    options::{AuthMechanism, ClientOptions, CreateCollectionOptions},
+    options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
     Client,
     Collection,
 };
@@ -87,7 +87,8 @@ impl TestClient {
             .unwrap();
 
         let info: BuildInfo = bson::from_bson(Bson::Document(response)).unwrap();
-        let server_version = Version::parse(&info.version).unwrap();
+        let server_version = info.version.split('-').next().unwrap();
+        let server_version = Version::parse(server_version).unwrap();
 
         Self {
             client,
@@ -119,6 +120,27 @@ impl TestClient {
 
     pub async fn init_db_and_coll(&self, db_name: &str, coll_name: &str) -> Collection {
         let coll = self.get_coll(db_name, coll_name);
+        drop_collection(&coll).await;
+        coll
+    }
+
+    pub fn get_coll_with_options(
+        &self,
+        db_name: &str,
+        coll_name: &str,
+        options: CollectionOptions,
+    ) -> Collection {
+        self.database(db_name)
+            .collection_with_options(coll_name, options)
+    }
+
+    pub async fn init_db_and_coll_with_options(
+        &self,
+        db_name: &str,
+        coll_name: &str,
+        options: CollectionOptions,
+    ) -> Collection {
+        let coll = self.get_coll_with_options(db_name, coll_name, options);
         drop_collection(&coll).await;
         coll
     }

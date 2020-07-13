@@ -41,3 +41,17 @@ macro_rules! resolve_options {
         )+
     };
 }
+
+/// Merges the options from src into dst.
+#[cfg(test)]
+macro_rules! merge_options {
+    ($src:expr, $dst:expr, [$( $field:ident ),+] ) => {
+        $(
+            if let Some(option) = $src.$field {
+                if !$dst.$field.is_some() {
+                    $dst.$field = Some(option.clone());
+                }
+            }
+        )+
+    };
+}

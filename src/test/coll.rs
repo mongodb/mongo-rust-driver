@@ -651,8 +651,8 @@ async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>,
     let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
 
-    let req = VersionReq::parse("< 4.2").unwrap();
-    if options.is_some() && req.matches(&client.server_version) {
+    let req = VersionReq::parse(">= 4.2").unwrap();
+    if options.is_some() && !req.matches(&client.server_version) {
         return;
     }
 

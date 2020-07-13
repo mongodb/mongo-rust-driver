@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 
+use futures::stream::TryStreamExt;
 use semver::VersionReq;
 use serde::Deserialize;
 
 use crate::{
     bson::{doc, Document},
+    options::{ClientOptions, FindOptions},
     test::{util::EventClient, AnyTestOperation, TestEvent},
 };
 
@@ -61,13 +63,48 @@ impl RunOn {
 #[serde(rename_all = "camelCase")]
 pub struct TestCase {
     pub description: String,
-    pub client_options: Option<Document>,
+    pub client_options: Option<ClientOptions>,
     pub use_multiple_mongoses: Option<bool>,
     pub skip_reason: Option<String>,
     pub fail_point: Option<Document>,
     pub operations: Vec<AnyTestOperation>,
-    pub outcome: Option<Document>,
+    pub outcome: Option<Outcome>,
     pub expectations: Option<Vec<TestEvent>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Outcome {
+    pub collection: CollectionOutcome,
+}
+
+impl Outcome {
+    pub async fn matches_actual(
+        self,
+        db_name: String,
+        coll_name: String,
+        client: &EventClient,
+    ) -> bool {
+        let coll_name = match self.collection.name {
+            Some(name) => name,
+            None => coll_name,
+        };
+        let coll = client.database(&db_name).collection(&coll_name);
+        let options = FindOptions::builder().sort(doc! { "_id": 1 }).build();
+        let actual_data: Vec<Document> = coll
+            .find(None, options)
+            .await
+            .unwrap()
+            .try_collect()
+            .await
+            .unwrap();
+        actual_data == self.collection.data
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CollectionOutcome {
+    pub name: Option<String>,
+    pub data: Vec<Document>,
 }
 
 #[derive(Debug, Deserialize)]

@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use derivative::Derivative;
+use serde::Deserialize;
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -11,18 +12,22 @@ use crate::{
 };
 
 /// Describes which servers are suitable for a given operation.
-#[derive(Clone, Derivative)]
+#[derive(Clone, Derivative, Deserialize)]
 #[derivative(Debug)]
+#[serde(untagged)]
 #[non_exhaustive]
 pub enum SelectionCriteria {
     /// A read preference that describes the suitable servers based on the server type, max
     /// staleness, and server tags.
     ///
     /// See the documentation [here](https://docs.mongodb.com/manual/core/read-preference/) for more details.
+    // TODO RUST-495: unskip for deserialization
+    #[serde(skip)]
     ReadPreference(ReadPreference),
 
     /// A predicate used to filter servers that are considered suitable. A `server` will be
     /// considered suitable by a `predicate` if `predicate(server)` returns true.
+    #[serde(skip)]
     Predicate(#[derivative(Debug = "ignore")] Predicate),
 }
 
@@ -85,6 +90,7 @@ pub type Predicate = Arc<dyn Send + Sync + Fn(&ServerInfo) -> bool>;
 ///
 /// See the [MongoDB docs](https://docs.mongodb.com/manual/core/read-preference) for more details.
 #[derive(Clone, Debug, PartialEq)]
+// TODO RUST-495: implement Deserialize for ReadPreference
 pub enum ReadPreference {
     /// Only route this operation to the primary.
     Primary,
@@ -104,7 +110,7 @@ pub enum ReadPreference {
 }
 
 /// Specifies read preference options for non-primary read preferences.
-#[derive(Clone, Debug, Default, PartialEq, TypedBuilder)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, TypedBuilder)]
 #[non_exhaustive]
 pub struct ReadPreferenceOptions {
     /// Specifies which replica set members should be considered for operations. Each tag set will

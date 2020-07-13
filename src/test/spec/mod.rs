@@ -1,7 +1,8 @@
 mod auth;
 mod command_monitoring;
 mod connection_stepdown;
-mod crud;
+mod crud_v1;
+mod crud_v2;
 mod initial_dns_seedlist_discovery;
 mod read_write_concern;
 mod retryable_reads;
@@ -15,7 +16,14 @@ use std::{
     path::PathBuf,
 };
 
-pub use self::runner::{AnyTestOperation, OperationObject, TestData, TestEvent, TestFile};
+pub use self::runner::{
+    run_v2_test,
+    AnyTestOperation,
+    OperationObject,
+    TestData,
+    TestEvent,
+    TestFile,
+};
 
 use serde::Deserialize;
 use serde_json::Value;

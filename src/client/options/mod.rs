@@ -22,6 +22,7 @@ use rustls::{
     ServerCertVerifier,
     TLSError,
 };
+use serde::Deserialize;
 use strsim::jaro_winkler;
 use typed_builder::TypedBuilder;
 use webpki_roots::TLS_SERVER_ROOTS;
@@ -89,7 +90,7 @@ lazy_static! {
 }
 
 /// A hostname:port address pair.
-#[derive(Clone, Debug, Eq)]
+#[derive(Clone, Debug, Deserialize, Eq)]
 pub struct StreamAddress {
     /// The hostname of the address.
     pub hostname: String,
@@ -191,8 +192,9 @@ impl fmt::Display for StreamAddress {
 }
 
 /// Contains the options that can be used to create a new [`Client`](../struct.Client.html).
-#[derive(Clone, Derivative, TypedBuilder)]
+#[derive(Clone, Derivative, Deserialize, TypedBuilder)]
 #[derivative(Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ClientOptions {
     /// The initial list of seeds that the Client should connect to.
@@ -204,6 +206,7 @@ pub struct ClientOptions {
         hostname: \"localhost\".to_string(),
         port: Some(27017),
     }]")]
+    #[serde(default = "default_hosts")]
     pub hosts: Vec<StreamAddress>,
 
     /// The application name that the Client will send to the server as part of the handshake. This
@@ -219,12 +222,14 @@ pub struct ClientOptions {
     /// CmapEventHandler type documentation for more details.
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
     #[builder(default)]
+    #[serde(skip)]
     pub cmap_event_handler: Option<Arc<dyn CmapEventHandler>>,
 
     /// The handler that should process all command-related events. See the CommandEventHandler
     /// type documentation for more details.
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
     #[builder(default)]
+    #[serde(skip)]
     pub command_event_handler: Option<Arc<dyn CommandEventHandler>>,
 
     /// The connect timeout passed to each underlying TcpStream when attemtping to connect to the
@@ -351,10 +356,17 @@ pub struct ClientOptions {
     pub(crate) zlib_compression: Option<i32>,
 
     #[builder(default)]
-    original_srv_hostname: Option<String>,
+    pub(crate) original_srv_hostname: Option<String>,
 
     #[builder(default)]
-    original_uri: Option<String>,
+    pub(crate) original_uri: Option<String>,
+}
+
+fn default_hosts() -> Vec<StreamAddress> {
+    vec![StreamAddress {
+        hostname: "localhost".to_string(),
+        port: Some(27017),
+    }]
 }
 
 impl Default for ClientOptions {
@@ -400,7 +412,7 @@ struct ClientOptionsParser {
 
 /// Specifies whether TLS configuration should be used with the operations that the
 /// [`Client`](../struct.Client.html) performs.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub enum Tls {
     Enabled(TlsOptions),
     Disabled,
@@ -419,7 +431,7 @@ impl From<TlsOptions> for Option<Tls> {
 }
 
 /// Specifies the TLS configuration that the [`Client`](../struct.Client.html) should use.
-#[derive(Clone, Debug, Default, PartialEq, TypedBuilder)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, TypedBuilder)]
 #[non_exhaustive]
 pub struct TlsOptions {
     /// Whether or not the [`Client`](../struct.Client.html) should return an error if the server
@@ -517,7 +529,7 @@ impl TlsOptions {
 
 /// Extra information to append to the driver version in the metadata of the handshake with the
 /// server. This should be used by libraries wrapping the driver, e.g. ODMs.
-#[derive(Clone, Debug, TypedBuilder, PartialEq)]
+#[derive(Clone, Debug, Deserialize, TypedBuilder, PartialEq)]
 #[non_exhaustive]
 pub struct DriverInfo {
     /// The name of the library wrapping the driver.
