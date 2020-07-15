@@ -944,6 +944,13 @@ impl ClientOptionsParser {
             }
         }
 
+        if options.auth_source.as_deref() == Some("") {
+            return Err(ErrorKind::ArgumentError {
+                message: "empty authSource provided".to_string(),
+            }
+            .into());
+        }
+
         let db_str = db.as_deref();
 
         match options.auth_mechanism {
@@ -992,13 +999,6 @@ impl ClientOptionsParser {
                     return Err(ErrorKind::ArgumentError {
                         message: "username and mechanism both not provided, but authentication \
                                   was requested"
-                            .to_string(),
-                    }
-                    .into());
-                } else if options.auth_source.is_some() {
-                    return Err(ErrorKind::ArgumentError {
-                        message: "username and mechanism both not provided, but authSource was \
-                                  specified"
                             .to_string(),
                     }
                     .into());
