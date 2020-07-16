@@ -266,15 +266,13 @@ fn xor(lhs: &[u8], rhs: &[u8]) -> Vec<u8> {
 }
 
 fn mac<M: Mac>(key: &[u8], input: &[u8]) -> Result<Vec<u8>> {
-    let mut mac =
-        M::new_varkey(key).or_else(|_| Err(Error::unknown_authentication_error("SCRAM")))?;
+    let mut mac = M::new_varkey(key).map_err(|_| Error::unknown_authentication_error("SCRAM"))?;
     mac.input(input);
     Ok(mac.result().code().to_vec())
 }
 
 fn mac_verify<M: Mac>(key: &[u8], input: &[u8], signature: &[u8]) -> Result<()> {
-    let mut mac =
-        M::new_varkey(key).or_else(|_| Err(Error::unknown_authentication_error("SCRAM")))?;
+    let mut mac = M::new_varkey(key).map_err(|_| Error::unknown_authentication_error("SCRAM"))?;
     mac.input(input);
     match mac.verify(signature) {
         Ok(_) => Ok(()),
@@ -396,9 +394,9 @@ impl ServerFirst {
         };
         let done = response
             .get_bool("done")
-            .or_else(|_| Err(Error::invalid_authentication_response("SCRAM")))?;
-        let message = str::from_utf8(payload)
-            .or_else(|_| Err(Error::invalid_authentication_response("SCRAM")))?;
+            .map_err(|_| Error::invalid_authentication_response("SCRAM"))?;
+        let message =
+            str::from_utf8(payload).map_err(|_| Error::invalid_authentication_response("SCRAM"))?;
 
         let parts: Vec<&str> = message.split(',').collect();
 
@@ -409,7 +407,7 @@ impl ServerFirst {
         let full_nonce = parse_kvp(parts[0], NONCE_KEY)?;
 
         let salt = base64::decode(parse_kvp(parts[1], SALT_KEY)?.as_str())
-            .or_else(|_| Err(Error::invalid_authentication_response("SCRAM")))?;
+            .map_err(|_| Error::invalid_authentication_response("SCRAM"))?;
 
         let i: usize = match parse_kvp(parts[2], ITERATION_COUNT_KEY)?.parse() {
             Ok(num) => num,
@@ -563,12 +561,12 @@ impl ServerFinal {
             .ok_or_else(|| Error::invalid_authentication_response("SCRAM"))?;
         let done = response
             .get_bool("done")
-            .or_else(|_| Err(Error::invalid_authentication_response("SCRAM")))?;
+            .map_err(|_| Error::invalid_authentication_response("SCRAM"))?;
         let payload = response
             .get_binary_generic("payload")
-            .or_else(|_| Err(Error::invalid_authentication_response("SCRAM")))?;
-        let message = str::from_utf8(payload)
-            .or_else(|_| Err(Error::invalid_authentication_response("SCRAM")))?;
+            .map_err(|_| Error::invalid_authentication_response("SCRAM"))?;
+        let message =
+            str::from_utf8(payload).map_err(|_| Error::invalid_authentication_response("SCRAM"))?;
 
         let first = message
             .chars()
@@ -615,7 +613,7 @@ impl ServerFinal {
             ServerFinalBody::Verifier(ref body) => {
                 let server_key = scram.hmac(salted_password, b"Server Key")?;
                 let body_decoded = base64::decode(body.as_bytes())
-                    .or_else(|_| Err(Error::invalid_authentication_response("SCRAM")))?;
+                    .map_err(|_| Error::invalid_authentication_response("SCRAM"))?;
 
                 scram.hmac_verify(
                     server_key.as_slice(),

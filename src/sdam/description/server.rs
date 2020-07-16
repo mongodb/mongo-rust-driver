@@ -138,7 +138,7 @@ impl ServerDescription {
                     .map(|hostname| hostname.to_lowercase())
                     .collect();
 
-                std::mem::replace(hosts, normalized_hostnames);
+                *hosts = normalized_hostnames;
             }
 
             if let Some(ref mut passives) = reply.command_response.passives {
@@ -147,7 +147,7 @@ impl ServerDescription {
                     .map(|hostname| hostname.to_lowercase())
                     .collect();
 
-                std::mem::replace(passives, normalized_hostnames);
+                *passives = normalized_hostnames;
             }
 
             if let Some(ref mut arbiters) = reply.command_response.arbiters {
@@ -156,11 +156,11 @@ impl ServerDescription {
                     .map(|hostname| hostname.to_lowercase())
                     .collect();
 
-                std::mem::replace(arbiters, normalized_hostnames);
+                *arbiters = normalized_hostnames;
             }
 
             if let Some(ref mut me) = reply.command_response.me {
-                std::mem::replace(me, me.to_lowercase());
+                *me = me.to_lowercase();
             }
         }
 
