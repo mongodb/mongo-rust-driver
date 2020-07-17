@@ -19,7 +19,7 @@ use crate::{
         Namespace,
     },
     error::{ErrorKind, Result},
-    operation::{append_options, Operation},
+    operation::{append_options, Operation, Retryability},
     options::WriteConcern,
 };
 
@@ -128,6 +128,10 @@ impl Operation for FindAndModify {
 
     fn write_concern(&self) -> Option<&WriteConcern> {
         self.options.write_concern.as_ref()
+    }
+
+    fn retryability(&self) -> Retryability {
+        Retryability::Write
     }
 }
 

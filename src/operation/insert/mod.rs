@@ -9,7 +9,7 @@ use crate::{
     client::ClientSession,
     cmap::{Command, CommandResponse, StreamDescription},
     error::{ErrorKind, Result},
-    operation::{append_options, Operation, WriteResponseBody},
+    operation::{append_options, Operation, Retryability, WriteResponseBody},
     options::{InsertManyOptions, WriteConcern},
     results::InsertManyResult,
     Namespace,
@@ -91,5 +91,9 @@ impl Operation for Insert {
         self.options
             .as_ref()
             .and_then(|opts| opts.write_concern.as_ref())
+    }
+
+    fn retryability(&self) -> Retryability {
+        Retryability::Write
     }
 }

@@ -38,6 +38,12 @@ impl StreamDescription {
         }
     }
 
+    pub(crate) fn supports_retryable_writes(&self) -> bool {
+        self.initial_server_type != ServerType::Standalone
+            && self.logical_session_timeout.is_some()
+            && self.max_wire_version.map_or(false, |version| version >= 6)
+    }
+
     /// Gets a description of a stream for a 4.2 connection.
     #[cfg(test)]
     pub(crate) fn new_testing() -> Self {

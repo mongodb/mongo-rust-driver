@@ -94,8 +94,8 @@ pub(crate) trait Operation {
     }
 
     /// Whether or not the operation supports retryable reads
-    fn is_read_retryable(&self) -> bool {
-        false
+    fn retryability(&self) -> Retryability {
+        Retryability::None
     }
 }
 
@@ -189,6 +189,13 @@ struct CursorInfo {
     ns: Namespace,
     #[serde(rename = "firstBatch")]
     first_batch: VecDeque<Document>,
+}
+
+#[derive(PartialEq)]
+pub(crate) enum Retryability {
+    Write,
+    Read,
+    None,
 }
 
 #[cfg(test)]

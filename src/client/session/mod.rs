@@ -36,7 +36,6 @@ pub(crate) struct ClientSession {
     server_session: ServerSession,
     client: Client,
     is_implicit: bool,
-    txn_number: u64,
 }
 
 impl ClientSession {
@@ -47,7 +46,6 @@ impl ClientSession {
             server_session,
             cluster_time: None,
             is_implicit: true,
-            txn_number: 0,
         }
     }
 
@@ -87,10 +85,9 @@ impl ClientSession {
     }
 
     /// Increments the txn_number and returns the new value.
-    #[allow(dead_code)]
-    pub(crate) fn get_txn_number(&mut self) -> u64 {
-        self.txn_number += 1;
-        self.txn_number
+    pub(crate) fn get_and_increment_txn_number(&mut self) -> u64 {
+        self.server_session.txn_number += 1;
+        self.server_session.txn_number
     }
 }
 
@@ -101,6 +98,7 @@ impl Drop for ClientSession {
             id: self.server_session.id.clone(),
             last_use: self.server_session.last_use,
             dirty: self.server_session.dirty,
+            txn_number: self.server_session.txn_number,
         };
 
         RUNTIME.execute(async move {
@@ -121,6 +119,9 @@ pub(crate) struct ServerSession {
 
     /// Whether a network error was encountered while using this session.
     dirty: bool,
+
+    /// A monotonically increasing transaction number for this session.
+    txn_number: u64,
 }
 
 impl ServerSession {
@@ -135,6 +136,7 @@ impl ServerSession {
             id: doc! { "id": binary },
             last_use: Instant::now(),
             dirty: false,
+            txn_number: 0,
         }
     }
 

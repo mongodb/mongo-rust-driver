@@ -7,7 +7,7 @@ use crate::{
     coll::Namespace,
     collation::Collation,
     error::{convert_bulk_errors, Result},
-    operation::{append_options, Operation, WriteResponseBody},
+    operation::{append_options, Operation, Retryability, WriteResponseBody},
     options::{DeleteOptions, WriteConcern},
     results::DeleteResult,
 };
@@ -92,5 +92,13 @@ impl Operation for Delete {
         self.options
             .as_ref()
             .and_then(|opts| opts.write_concern.as_ref())
+    }
+
+    fn retryability(&self) -> Retryability {
+        if self.limit == 1 {
+            Retryability::Write
+        } else {
+            Retryability::None
+        }
     }
 }

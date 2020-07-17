@@ -56,6 +56,10 @@ impl Command {
             self.body.insert("$clusterTime", doc);
         }
     }
+
+    pub(crate) fn set_txn_number(&mut self, txn_number: u64) {
+        self.body.insert("txnNumber", txn_number);
+    }
 }
 
 #[derive(Debug, Clone)]

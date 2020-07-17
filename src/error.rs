@@ -15,6 +15,8 @@ lazy_static! {
     static ref SHUTTING_DOWN_CODES: Vec<i32> = vec![11600, 91];
     static ref RETRYABLE_READ_CODES: Vec<i32> =
         vec![11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001];
+    static ref RETRYABLE_WRITE_CODES: Vec<i32> =
+        vec![11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001, 262];
 }
 
 /// The result type for all methods that can return an error in the `mongodb` crate.
@@ -90,6 +92,36 @@ impl Error {
             }
             None => false,
         }
+    }
+
+    // Whether a write operation should be retried if this error occurs
+    pub(crate) fn is_write_retryable(&self) -> bool {
+        match self.kind.as_ref() {
+            ErrorKind::CommandError(err) => {
+                if err.labels.contains(&"RetryableWriteError".to_string()) {
+                    return true;
+                }
+            }
+            ErrorKind::WriteError(_) => {
+                // isabeltodo not sure what to do here
+                return true;
+            }
+            _ => {}
+        };
+        if self.is_network_error() {
+            return true;
+        }
+        match &self.kind.code_and_message() {
+            Some((code, _)) => {
+                if RETRYABLE_WRITE_CODES.contains(&code) {
+                    true
+                } else {
+                    false
+                }
+            }
+            None => false,
+        }
+        // isabeltodo error labels
     }
 
     /// Whether an error originated from the server

@@ -8,7 +8,7 @@ use crate::{
     bson_util,
     cmap::{Command, CommandResponse, StreamDescription},
     error::{convert_bulk_errors, Result},
-    operation::{Operation, WriteResponseBody},
+    operation::{Operation, Retryability, WriteResponseBody},
     options::{UpdateModifications, UpdateOptions, WriteConcern},
     results::UpdateResult,
     Namespace,
@@ -134,6 +134,14 @@ impl Operation for Update {
         self.options
             .as_ref()
             .and_then(|opts| opts.write_concern.as_ref())
+    }
+
+    fn retryability(&self) -> Retryability {
+        if self.multi != Some(true) {
+            Retryability::Write
+        } else {
+            Retryability::None
+        }
     }
 }
 

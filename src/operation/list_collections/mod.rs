@@ -6,7 +6,7 @@ use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
-    operation::{append_options, CursorBody, Operation},
+    operation::{append_options, CursorBody, Operation, Retryability},
     options::{ListCollectionsOptions, ReadPreference, SelectionCriteria},
 };
 
@@ -80,7 +80,7 @@ impl Operation for ListCollections {
         Some(SelectionCriteria::ReadPreference(ReadPreference::Primary)).as_ref()
     }
 
-    fn is_read_retryable(&self) -> bool {
-        true
+    fn retryability(&self) -> Retryability {
+        Retryability::Read
     }
 }

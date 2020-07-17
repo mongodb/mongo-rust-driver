@@ -216,7 +216,7 @@ impl Topology {
     pub(crate) async fn handle_post_handshake_error(
         &self,
         error: Error,
-        conn: Connection,
+        conn: &Connection,
         server: Arc<Server>,
     ) {
         // If we encounter certain errors, we must update the topology as per the

@@ -8,9 +8,9 @@ use time::PreciseTime;
 use crate::{
     bson::Document,
     cmap::Connection,
-    error::{Error, ErrorKind, Result},
+    error::{ErrorKind, Result},
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
-    operation::Operation,
+    operation::{Operation, Retryability},
     options::SelectionCriteria,
     sdam::{Server, SessionSupportStatus},
 };
@@ -93,35 +93,48 @@ impl Client {
             }
         };
 
-        match self
-            .execute_operation_on_connection(&op, &mut conn, &mut session)
+        let txn_number = match session {
+            Some(ref mut session) => {
+                if conn.stream_description()?.supports_retryable_writes()
+                    && op.retryability() == Retryability::Write
+                    && self.inner.options.retry_writes != Some(false)
+                {
+                    Some(session.get_and_increment_txn_number())
+                } else {
+                    None
+                }
+            }
+            None => None,
+        };
+
+        let first_error = match self
+            .execute_operation_on_connection(&op, &mut conn, &mut session, txn_number)
             .await
         {
-            Ok(result) => Ok(result),
+            Ok(result) => {
+                return Ok(result);
+            }
             Err(err) => {
                 self.inner
                     .topology
-                    .handle_post_handshake_error(err.clone(), conn, server)
+                    .handle_post_handshake_error(err.clone(), &conn, server)
                     .await;
                 // TODO RUST-90: Do not retry if session is in a transaction
-                if self.inner.options.retry_reads != Some(false)
-                    && op.is_read_retryable()
-                    && err.is_read_retryable()
+                if (self.inner.options.retry_reads != Some(false)
+                    && op.retryability() == Retryability::Read
+                    && err.is_read_retryable())
+                    || (self.inner.options.retry_writes != Some(false)
+                        && op.retryability() == Retryability::Write
+                        && err.is_write_retryable()
+                        && conn.stream_description()?.supports_retryable_writes())
                 {
-                    self.retry_read(op, session, err).await
+                    err
                 } else {
-                    Err(err)
+                    return Err(err);
                 }
             }
-        }
-    }
+        };
 
-    async fn retry_read<T: Operation>(
-        &self,
-        op: T,
-        mut session: Option<&mut ClientSession>,
-        first_error: Error,
-    ) -> Result<T::O> {
         let server = match self.select_server(op.selection_criteria()).await {
             Ok(server) => server,
             Err(_) => {
@@ -140,17 +153,21 @@ impl Client {
             }
         };
 
+        if op.retryability() == Retryability::Write && !conn.stream_description()?.supports_retryable_writes() {
+            return Err(first_error);
+        }
+
         match self
-            .execute_operation_on_connection(&op, &mut conn, &mut session)
+            .execute_operation_on_connection(&op, &mut conn, &mut session, txn_number)
             .await
         {
             Ok(result) => Ok(result),
             Err(err) => {
                 self.inner
                     .topology
-                    .handle_post_handshake_error(err.clone(), conn, server)
+                    .handle_post_handshake_error(err.clone(), &conn, server)
                     .await;
-                if err.is_server_error() || err.is_read_retryable() {
+                if err.is_server_error() || err.is_read_retryable() || err.is_write_retryable() {
                     Err(err)
                 } else {
                     Err(first_error)
@@ -165,6 +182,7 @@ impl Client {
         op: &T,
         connection: &mut Connection,
         session: &mut Option<&mut ClientSession>,
+        txn_number: Option<u64>,
     ) -> Result<T::O> {
         if let Some(wc) = op.write_concern() {
             wc.validate()?;
@@ -179,6 +197,9 @@ impl Client {
         match session {
             Some(ref mut session) if op.supports_sessions() && op.is_acknowledged() => {
                 cmd.set_session(session);
+                if let Some(txn_number) = txn_number {
+                    cmd.set_txn_number(txn_number);
+                }
                 session.update_last_use();
             }
             Some(ref session) if !op.supports_sessions() && !session.is_implicit() => {

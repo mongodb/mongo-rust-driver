@@ -8,7 +8,7 @@ use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
     coll::{options::DistinctOptions, Namespace},
     error::Result,
-    operation::{append_options, Operation},
+    operation::{append_options, Operation, Retryability},
     selection_criteria::SelectionCriteria,
 };
 
@@ -81,8 +81,8 @@ impl Operation for Distinct {
         None
     }
 
-    fn is_read_retryable(&self) -> bool {
-        true
+    fn retryability(&self) -> Retryability {
+        Retryability::Read
     }
 }
 
