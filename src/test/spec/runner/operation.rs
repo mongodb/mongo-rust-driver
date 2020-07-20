@@ -17,6 +17,8 @@ use crate::{
         DeleteOptions,
         DistinctOptions,
         EstimatedDocumentCountOptions,
+        FindOneAndDeleteOptions,
+        FindOneAndReplaceOptions,
         FindOneAndUpdateOptions,
         FindOneOptions,
         FindOptions,
@@ -125,6 +127,14 @@ impl<'de> Deserialize<'de> for AnyTestOperation {
                 .map(|op| Box::new(op) as Box<dyn TestOperation>),
             "findOneAndUpdate" => {
                 FindOneAndUpdate::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "findOneAndReplace" => {
+                FindOneAndReplace::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "findOneAndDelete" => {
+                FindOneAndDelete::deserialize(BsonDeserializer::new(definition.arguments))
                     .map(|op| Box::new(op) as Box<dyn TestOperation>)
             }
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
@@ -261,8 +271,11 @@ impl TestOperation for InsertMany {
         let result = collection
             .insert_many(self.documents.clone(), self.options.clone())
             .await?;
-        let result = bson::to_bson(&result)?;
-        Ok(Some(result))
+        let mut ids = Document::new();
+        for (id, bson) in result.inserted_ids {
+            ids.insert(id.to_string(), bson);
+        }
+        Ok(Some(Bson::from(doc! { "insertedIds": ids })))
     }
 
     async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
@@ -716,6 +729,71 @@ impl TestOperation for FindOneAndUpdate {
 }
 
 #[derive(Debug, Deserialize)]
+pub(super) struct FindOneAndReplace {
+    filter: Document,
+    replacement: Document,
+    #[serde(flatten)]
+    options: Option<FindOneAndReplaceOptions>,
+}
+
+#[async_trait]
+impl TestOperation for FindOneAndReplace {
+    fn command_names(&self) -> &[&str] {
+        &["findAndModify"]
+    }
+
+    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+        let result = collection
+            .find_one_and_replace(
+                self.filter.clone(),
+                self.replacement.clone(),
+                self.options.clone(),
+            )
+            .await?;
+        let result = bson::to_bson(&result)?;
+        Ok(Some(result))
+    }
+
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct FindOneAndDelete {
+    filter: Document,
+    #[serde(flatten)]
+    options: Option<FindOneAndDeleteOptions>,
+}
+
+#[async_trait]
+impl TestOperation for FindOneAndDelete {
+    fn command_names(&self) -> &[&str] {
+        &["findAndModify"]
+    }
+
+    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+        let result = collection
+            .find_one_and_delete(self.filter.clone(), self.options.clone())
+            .await?;
+        let result = bson::to_bson(&result)?;
+        Ok(Some(result))
+    }
+
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Deserialize)]
 pub(super) struct UnimplementedOperation;
 
 #[async_trait]
@@ -756,10 +834,8 @@ impl EventClient {
         collection_options: Option<CollectionOptions>,
     ) -> Result<Option<Bson>> {
         let coll = match collection_options {
-            Some(options) => self
-                .database(db_name)
-                .collection_with_options(coll_name, options),
-            None => self.database(db_name).collection(coll_name),
+            Some(options) => self.get_coll_with_options(&db_name, &coll_name, options),
+            None => self.get_coll(&db_name, &coll_name),
         };
         operation.execute_on_collection(&coll).await
     }

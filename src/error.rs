@@ -113,11 +113,7 @@ impl Error {
         }
         match &self.kind.code_and_message() {
             Some((code, _)) => {
-                if RETRYABLE_WRITE_CODES.contains(&code) {
-                    true
-                } else {
-                    false
-                }
+                RETRYABLE_WRITE_CODES.contains(&code)
             }
             None => false,
         }
@@ -408,7 +404,7 @@ pub struct WriteConcernError {
     pub code: i32,
 
     /// The name associated with the error code.
-    #[serde(rename = "codeName")]
+    #[serde(rename = "codeName", default = "String::new")]
     pub code_name: String,
 
     /// A description of the error that occurred.

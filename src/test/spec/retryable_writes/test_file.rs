@@ -35,12 +35,12 @@ pub struct Outcome {
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub enum Result {
-    Value(Bson),
     Labels(Labels),
+    Value(Bson),
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Labels {
     pub error_labels_contain: Option<Vec<String>>,
     pub error_labels_omit: Option<Vec<String>>,

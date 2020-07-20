@@ -6,8 +6,9 @@ use test_file::{Result, TestFile};
 
 use crate::{
     bson::{doc, Document},
+    concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::ErrorKind,
-    options::FindOptions,
+    options::{CollectionOptions, FindOptions},
     test::{assert_matches, run_spec_test, EventClient, LOCK},
 };
 
@@ -34,10 +35,21 @@ async fn run_spec_tests() {
                 }
             }
 
-            let db_name = test_case.description.replace('$', "%").replace(' ', "_");
+            let mut db_name = test_case.description.replace('$', "%").replace(' ', "_");
+            // database names must have fewer than 64 characters
+            db_name.truncate(63);
             let coll_name = "coll";
 
-            let coll = client.init_db_and_coll(&db_name, &coll_name).await;
+            let write_concern = WriteConcern::builder().w(Acknowledgment::Majority).build();
+            let read_concern = ReadConcern::majority();
+            let options = CollectionOptions::builder()
+                .write_concern(write_concern)
+                .read_concern(read_concern)
+                .build();
+            let coll = client
+                .init_db_and_coll_with_options(&db_name, &coll_name, options.clone())
+                .await;
+
             coll.insert_many(test_file.data.clone(), None)
                 .await
                 .expect(&test_case.description);
@@ -51,7 +63,12 @@ async fn run_spec_tests() {
             }
 
             let result = client
-                .run_collection_operation(&test_case.operation, &db_name, &coll_name, None)
+                .run_collection_operation(
+                    &test_case.operation,
+                    &db_name,
+                    &coll_name,
+                    Some(options.clone()),
+                )
                 .await;
 
             if let Some(error) = test_case.outcome.error {
@@ -81,14 +98,20 @@ async fn run_spec_tests() {
                         ));
                         let labels = match error.kind.as_ref() {
                             ErrorKind::CommandError(error) => &error.labels,
-                            e => panic!("expected command error, got {:?}", e),
+                            // isabeltodo
+                            e => {
+                                dbg!("{}: got other error: {:?}", &test_case.description, e);
+                                return;
+                            }
                         };
 
+                        let description = &test_case.description;
                         if let Some(contain) = expected_labels.error_labels_contain {
                             contain.iter().for_each(|label| {
                                 assert!(
                                     labels.contains(label),
-                                    "error labels should include {}",
+                                    "{}: error labels should include {}",
+                                    description,
                                     label,
                                 );
                             });
@@ -98,7 +121,8 @@ async fn run_spec_tests() {
                             omit.iter().for_each(|label| {
                                 assert!(
                                     !labels.contains(label),
-                                    "error labels should not include {}",
+                                    "{}: error labels should not include {}",
+                                    description,
                                     label,
                                 );
                             });
@@ -112,7 +136,7 @@ async fn run_spec_tests() {
                 None => coll_name.to_string(),
             };
 
-            let coll = client.init_db_and_coll(&db_name, &coll_name).await;
+            let coll = client.get_coll_with_options(&db_name, &coll_name, options);
             let options = FindOptions::builder().sort(doc! { "_id": 1 }).build();
             let actual_data: Vec<Document> = coll
                 .find(None, options)
@@ -122,6 +146,20 @@ async fn run_spec_tests() {
                 .await
                 .unwrap();
             assert_eq!(test_case.outcome.collection.data, actual_data);
+
+            if let Some(fail_point) = test_case.fail_point {
+                if let Ok("alwaysOn") = fail_point.get_str("mode") {
+                    let disable = doc! {
+                        "configureFailPoint": fail_point.get_str("configureFailPoint").unwrap(),
+                        "mode": "off",
+                    };
+                    client
+                        .database("admin")
+                        .run_command(disable, None)
+                        .await
+                        .unwrap();
+                }
+            }
         }
     }
 

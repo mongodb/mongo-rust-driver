@@ -153,7 +153,9 @@ impl Client {
             }
         };
 
-        if op.retryability() == Retryability::Write && !conn.stream_description()?.supports_retryable_writes() {
+        if op.retryability() == Retryability::Write
+            && !conn.stream_description()?.supports_retryable_writes()
+        {
             return Err(first_error);
         }
 
