@@ -117,6 +117,9 @@ pub enum ConnectionClosedReason {
     /// An error occurred while using the connection.
     Error,
 
+    /// The connection was dropped during read or write.
+    Dropped,
+
     /// The pool that the connection belongs to has been closed.
     PoolClosed,
 }

@@ -61,6 +61,11 @@ pub(crate) struct Connection {
     /// currently checked into the pool, this will be None.
     pub(super) pool: Option<Weak<ConnectionPoolInner>>,
 
+    /// Whether or not a command is currently being run on this connection. This is set to `true`
+    /// right before sending bytes to the server and set back to `false` once a full response has
+    /// been read.
+    command_executing: bool,
+
     stream: AsyncStream,
 
     #[derivative(Debug = "ignore")]
@@ -85,6 +90,7 @@ impl Connection {
             id,
             generation,
             pool: None,
+            command_executing: false,
             ready_and_available_time: None,
             stream: AsyncStream::connect(stream_options).await?,
             address,
@@ -207,9 +213,13 @@ impl Connection {
         request_id: impl Into<Option<i32>>,
     ) -> Result<CommandResponse> {
         let message = Message::with_command(command, request_id.into());
+
+        self.command_executing = true;
         message.write_to(&mut self.stream).await?;
 
         let response_message = Message::read_from(&mut self.stream).await?;
+        self.command_executing = false;
+
         CommandResponse::new(self.address.clone(), response_message)
     }
 
@@ -253,24 +263,30 @@ impl Connection {
 
 impl Drop for Connection {
     fn drop(&mut self) {
-        // If the connection has a weak reference to a pool, that means that the connection is being
-        // dropped when it's checked out. If the pool is still alive, it should check itself back
-        // in. Otherwise, the connection should close itself and emit a ConnectionClosed event
-        // (because the `close_and_drop` helper was not called explicitly).
-        //
-        // If the connection does not have a weak reference to a pool, then the connection is being
-        // dropped while it's not checked out. This means that the pool called the `close_and_drop`
-        // helper explicitly, so we don't add it back to the pool or emit any events.
-        if let Some(ref weak_pool_ref) = self.pool {
-            if let Some(strong_pool_ref) = weak_pool_ref.upgrade() {
-                let dropped_connection_state = self.take();
-                RUNTIME.execute(async move {
-                    strong_pool_ref
-                        .check_in(dropped_connection_state.into())
-                        .await;
-                });
-            } else {
-                self.close(ConnectionClosedReason::PoolClosed);
+        if self.command_executing {
+            self.close(ConnectionClosedReason::Dropped);
+        } else {
+            // If the connection has a weak reference to a pool, that means that the connection is
+            // being dropped when it's checked out. If the pool is still alive, it
+            // should check itself back in. Otherwise, the connection should close
+            // itself and emit a ConnectionClosed event (because the `close_and_drop`
+            // helper was not called explicitly).
+            //
+            // If the connection does not have a weak reference to a pool, then the connection is
+            // being dropped while it's not checked out. This means that the pool called
+            // the `close_and_drop` helper explicitly, so we don't add it back to the
+            // pool or emit any events.
+            if let Some(ref weak_pool_ref) = self.pool {
+                if let Some(strong_pool_ref) = weak_pool_ref.upgrade() {
+                    let dropped_connection_state = self.take();
+                    RUNTIME.execute(async move {
+                        strong_pool_ref
+                            .check_in(dropped_connection_state.into())
+                            .await;
+                    });
+                } else {
+                    self.close(ConnectionClosedReason::PoolClosed);
+                }
             }
         }
     }
@@ -318,6 +334,7 @@ impl From<DroppedConnectionState> for Connection {
             id: state.id,
             address: state.address.clone(),
             generation: state.generation,
+            command_executing: false,
             stream: std::mem::replace(&mut state.stream, AsyncStream::Null),
             handler: state.handler.take(),
             stream_description: state.stream_description.take(),

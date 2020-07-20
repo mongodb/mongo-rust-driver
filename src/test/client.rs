@@ -9,6 +9,7 @@ use crate::{
     selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria},
     test::{util::TestClient, CLIENT_OPTIONS, LOCK},
     Client,
+    RUNTIME,
 };
 
 #[derive(Debug, Deserialize)]
@@ -55,6 +56,48 @@ async fn metadata_sent_in_handshake() {
 
     let metadata: Metadata = bson::from_bson(in_prog[0].clone()).unwrap();
     assert_eq!(metadata.client.driver.name, "mrd");
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn connection_drop_during_read() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let options = CLIENT_OPTIONS.clone();
+
+    let client = Client::with_options(options.clone()).unwrap();
+    let db = client.database("test");
+
+    db.collection(function_name!())
+        .insert_one(doc! { "x": 1 }, None)
+        .await
+        .unwrap();
+
+    let _: Result<_, _> = RUNTIME
+        .timeout(
+            Duration::from_millis(50),
+            db.run_command(
+                doc! {
+                    "count": function_name!(),
+                    "query": {
+                        "$where": "sleep(100) && true"
+                    }
+                },
+                None,
+            ),
+        )
+        .await;
+
+    RUNTIME.delay_for(Duration::from_millis(200)).await;
+
+    let is_master_response = db.run_command(doc! { "isMaster": 1 }, None).await;
+
+    // Ensure that the response to `isMaster` is read, not the response to `count`.
+    assert!(is_master_response
+        .ok()
+        .and_then(|value| value.get("ismaster").and_then(|value| value.as_bool()))
+        .is_some());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
