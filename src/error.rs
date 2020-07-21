@@ -31,9 +31,17 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub struct Error {
     /// The type of error that occurred.
     pub kind: Arc<ErrorKind>,
+    labels: Vec<String>,
 }
 
 impl Error {
+    pub(crate) fn new(e: Arc<ErrorKind>) -> Error {
+        Error {
+            kind: e,
+            labels: Vec::new(),
+        }
+    }
+
     /// Creates an `AuthenticationError` for the given mechanism with the provided reason.
     pub(crate) fn authentication_error(mechanism_name: &str, reason: &str) -> Self {
         ErrorKind::AuthenticationError {
@@ -63,7 +71,7 @@ impl Error {
                 let error: Error = other_error_kind.into();
                 std::io::Error::new(std::io::ErrorKind::Other, Box::new(error))
             }
-            Err(e) => std::io::Error::new(std::io::ErrorKind::Other, Box::new(Error { kind: e })),
+            Err(e) => std::io::Error::new(std::io::ErrorKind::Other, Box::new(Error::new(e))),
         }
     }
 
@@ -96,18 +104,6 @@ impl Error {
 
     // Whether a write operation should be retried if this error occurs
     pub(crate) fn is_write_retryable(&self) -> bool {
-        match self.kind.as_ref() {
-            ErrorKind::CommandError(err) => {
-                if err.labels.contains(&"RetryableWriteError".to_string()) {
-                    return true;
-                }
-            }
-            ErrorKind::WriteError(_) => {
-                // isabeltodo not sure what to do here
-                return true;
-            }
-            _ => {}
-        };
         if self.is_network_error() {
             return true;
         }
@@ -117,7 +113,6 @@ impl Error {
             }
             None => false,
         }
-        // isabeltodo error labels
     }
 
     /// Whether an error originated from the server
@@ -130,6 +125,77 @@ impl Error {
             _ => false,
         }
     }
+
+    pub(crate) fn labels(&self) -> &Vec<String> {
+        match self.kind.as_ref() {
+            ErrorKind::CommandError(err, ..) =>  {
+                &err.labels
+            }
+            ErrorKind::WriteError(err) => {
+                match err {
+                    WriteFailure::WriteError(_) => {
+                        &self.labels
+                    }
+                    WriteFailure::WriteConcernError(err) => {
+                        &err.labels
+                    }
+                }
+            }
+            ErrorKind::BulkWriteError(err) => {
+                match err.write_concern_error {
+                    Some(ref err) => {
+                        &err.labels
+                    }
+                    None => {
+                        &self.labels
+                    }
+                }
+            }
+            _ => &self.labels
+        }
+    }
+
+    pub(crate) fn with_label(mut self, label: String) -> Self {
+        match self.kind.as_ref() {
+            ErrorKind::CommandError(err) => {
+                let mut err = err.clone();
+                err.labels.push(label);
+                Error::new(Arc::new(ErrorKind::CommandError(err)))
+            }
+            ErrorKind::WriteError(err) => {
+                match err {
+                    WriteFailure::WriteError(_) => {
+                        self.labels.push(label);
+                        self
+                    }
+                    WriteFailure::WriteConcernError(err) => {
+                        let mut err = err.clone();
+                        err.labels.push(label);
+                        Error::new(Arc::new(ErrorKind::WriteError(WriteFailure::WriteConcernError(err))))
+                    }
+                }
+            }
+            ErrorKind::BulkWriteError(err) => {
+                match err.write_concern_error {
+                    Some(ref write_concern_error) => {
+                        let mut err = err.clone();
+                        let mut write_concern_error = write_concern_error.clone();
+                        write_concern_error.labels.push(label);
+                        err.write_concern_error = Some(write_concern_error);
+                        Error::new(Arc::new(ErrorKind::BulkWriteError(err)))
+                    }
+                    None => {
+                        self.labels.push(label);
+                        self
+                    }
+                }
+            }
+            _ => {
+                self.labels.push(label);
+                self
+            }
+        }
+    }
 }
 
 impl<E> From<E> for Error
@@ -139,6 +205,7 @@ where
     fn from(err: E) -> Self {
         Self {
             kind: Arc::new(err.into()),
+            labels: Vec::new(),
         }
     }
 }
@@ -414,6 +481,10 @@ pub struct WriteConcernError {
     /// A document identifying the write concern setting related to the error.
     #[serde(rename = "errInfo")]
     pub details: Option<Document>,
+
+    /// The error labels that the server returned.
+    #[serde(rename = "errorLabels", default)]
+    pub labels: Vec<String>,
 }
 
 /// An error that occurred during a write operation that wasn't due to being unable to satisfy a

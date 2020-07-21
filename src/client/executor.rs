@@ -8,7 +8,7 @@ use time::PreciseTime;
 use crate::{
     bson::Document,
     cmap::Connection,
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
     operation::{Operation, Retryability},
     options::SelectionCriteria,
@@ -119,13 +119,50 @@ impl Client {
                     .topology
                     .handle_post_handshake_error(err.clone(), &conn, server)
                     .await;
-                // TODO RUST-90: Do not retry if session is in a transaction
+
+                // must add a retryable write label if the client allows retryable writes and either
+                // a retryable error on a pre-4.4 server or a network error occurred
+                // let err = if self.inner.options.retry_writes != Some(false)
+                //     && ((err.is_write_retryable()
+                //         && conn
+                //             .stream_description()?
+                //             .max_wire_version
+                //             .map_or(false, |version| version <= 8))
+                //         || err.is_network_error())
+                // {
+                //     err.with_label("RetryableWriteError".to_string())
+                // } else {
+                //     err
+                // };
+
+                let err = if self.inner.options.retry_writes != Some(false) {
+                    if conn.stream_description()?.max_wire_version.map_or(false, |version| version <= 8) && err.is_write_retryable() {
+                        err.with_label("RetryableWriteError".to_string())
+                    } else {
+                        match err.kind.as_ref() {
+                            ErrorKind::CommandError(_) => {
+                                err
+                            }
+                            _ => {
+                                if err.is_write_retryable() {
+                                    err.with_label("RetryableWriteError".to_string())
+                                } else {
+                                    err
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    err
+                };
+
+                // TODO RUST-90: Do not retry read if session is in a transaction
                 if (self.inner.options.retry_reads != Some(false)
                     && op.retryability() == Retryability::Read
                     && err.is_read_retryable())
                     || (self.inner.options.retry_writes != Some(false)
                         && op.retryability() == Retryability::Write
-                        && err.is_write_retryable()
+                        && err.labels().contains(&"RetryableWriteError".to_string())
                         && conn.stream_description()?.supports_retryable_writes())
                 {
                     err
@@ -169,14 +206,54 @@ impl Client {
                     .topology
                     .handle_post_handshake_error(err.clone(), &conn, server)
                     .await;
+
                 if err.is_server_error() || err.is_read_retryable() || err.is_write_retryable() {
-                    Err(err)
+                    if self.inner.options.retry_writes != Some(false) {
+                        if conn.stream_description()?.max_wire_version.map_or(false, |version| version <= 8) && err.is_write_retryable() {
+                            Err(err.with_label("RetryableWriteError".to_string()))
+                        } else {
+                            match err.kind.as_ref() {
+                                ErrorKind::CommandError(_) => {
+                                    Err(err)
+                                }
+                                _ => {
+                                    if err.is_write_retryable() {
+                                        Err(err.with_label("RetryableWriteError".to_string()))
+                                    } else {
+                                        Err(err)
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Err(err)
+                    }
                 } else {
                     Err(first_error)
                 }
             }
         }
     }
+
+    // fn with_retryable_write_label(err: Error, conn: &Connection) -> Result<Error> {
+    //     match err.kind.as_ref() {
+    //         ErrorKind::CommandError(_) => {
+    //             if conn.stream_description()?.max_wire_version.map_or(false, |version| version <= 8)
+    //             && err.is_write_retryable() {
+    //                 Ok(err.with_label("RetryableWriteError".to_string()))
+    //             } else {
+    //                 Ok(err)
+    //             }
+    //         }
+    //         _ => {
+    //             if err.is_write_retryable() {
+    //                 Ok(err.with_label("RetryableWriteError".to_string()))
+    //             } else {
+    //                 Ok(err)
+    //             }
+    //         }
+    //     }
+    // }
 
     /// Executes an operation on a given connection, optionally using a provided session.
     async fn execute_operation_on_connection<T: Operation>(

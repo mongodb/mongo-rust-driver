@@ -7,7 +7,6 @@ use test_file::{Result, TestFile};
 use crate::{
     bson::{doc, Document},
     concern::{Acknowledgment, ReadConcern, WriteConcern},
-    error::ErrorKind,
     options::{CollectionOptions, FindOptions},
     test::{assert_matches, run_spec_test, EventClient, LOCK},
 };
@@ -50,9 +49,11 @@ async fn run_spec_tests() {
                 .init_db_and_coll_with_options(&db_name, &coll_name, options.clone())
                 .await;
 
-            coll.insert_many(test_file.data.clone(), None)
-                .await
-                .expect(&test_case.description);
+            if test_file.data.len() != 0 {
+                coll.insert_many(test_file.data.clone(), None)
+                    .await
+                    .expect(&test_case.description);
+            }
 
             if let Some(ref fail_point) = test_case.fail_point {
                 client
@@ -86,30 +87,24 @@ async fn run_spec_tests() {
                 match expected_result {
                     Result::Value(value) => {
                         let description = &test_case.description;
+                        dbg!("{}", &description);
                         let result = result.unwrap().unwrap_or_else(|| {
                             panic!("{:?}: operation should succeed", description)
                         });
                         assert_matches(&result, &value, Some(description));
                     }
                     Result::Labels(expected_labels) => {
+                        dbg!("{}", &test_case.description);
                         let error = result.expect_err(&format!(
                             "{:?}: operation should fail",
                             &test_case.description
                         ));
-                        let labels = match error.kind.as_ref() {
-                            ErrorKind::CommandError(error) => &error.labels,
-                            // isabeltodo
-                            e => {
-                                dbg!("{}: got other error: {:?}", &test_case.description, e);
-                                return;
-                            }
-                        };
 
                         let description = &test_case.description;
                         if let Some(contain) = expected_labels.error_labels_contain {
                             contain.iter().for_each(|label| {
                                 assert!(
-                                    labels.contains(label),
+                                    error.labels().contains(label),
                                     "{}: error labels should include {}",
                                     description,
                                     label,
@@ -120,7 +115,7 @@ async fn run_spec_tests() {
                         if let Some(omit) = expected_labels.error_labels_omit {
                             omit.iter().for_each(|label| {
                                 assert!(
-                                    !labels.contains(label),
+                                    !error.labels().contains(label),
                                     "{}: error labels should not include {}",
                                     description,
                                     label,
