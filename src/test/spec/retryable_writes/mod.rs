@@ -7,8 +7,9 @@ use test_file::{Result, TestFile};
 use crate::{
     bson::{doc, Document},
     concern::{Acknowledgment, ReadConcern, WriteConcern},
-    options::{CollectionOptions, FindOptions},
-    test::{assert_matches, run_spec_test, EventClient, LOCK},
+    error::ErrorKind,
+    options::{CollectionOptions, CreateCollectionOptions, FindOptions, InsertManyOptions},
+    test::{assert_matches, run_spec_test, EventClient, TestClient, LOCK},
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -19,6 +20,10 @@ async fn run_spec_tests() {
             if test_case.operation.name == "bulkWrite" {
                 continue;
             }
+
+            // if test_case.description != "InsertOne fails after multiple retryable
+            // writeConcernErrors" {     continue;
+            // }
 
             let client = EventClient::merge_options(
                 test_case.client_options,
@@ -49,7 +54,7 @@ async fn run_spec_tests() {
                 .init_db_and_coll_with_options(&db_name, &coll_name, options.clone())
                 .await;
 
-            if test_file.data.len() != 0 {
+            if !test_file.data.is_empty() {
                 coll.insert_many(test_file.data.clone(), None)
                     .await
                     .expect(&test_case.description);
@@ -160,4 +165,136 @@ async fn run_spec_tests() {
 
     let _guard = LOCK.run_exclusively().await;
     run_spec_test(&["retryable-writes"], run_test).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn transaction_ids_excluded() {
+    let client = EventClient::new().await;
+
+    if !(client.is_replica_set() || client.is_sharded()) {
+        return;
+    }
+
+    let coll = client.init_db_and_coll(function_name!(), "coll").await;
+
+    coll.update_many(doc! {}, doc! { "$set": doc! { "x": 1 } }, None)
+        .await
+        .unwrap();
+    coll.delete_many(doc! {}, None).await.unwrap();
+    coll.aggregate(
+        vec![
+            doc! { "$match": doc! { "x": 1 } },
+            doc! { "$out": "other_coll" },
+        ],
+        None,
+    )
+    .await
+    .unwrap();
+    coll.aggregate(
+        vec![
+            doc! { "$match": doc! { "x": 1 } },
+            doc! { "$merge": "other_coll" },
+        ],
+        None,
+    )
+    .await
+    .unwrap();
+
+    let command_names = vec!["update", "delete", "aggregate", "aggregate"];
+    for name in command_names {
+        let (started, _) = client.get_successful_command_execution(name);
+        assert!(!started.command.contains_key("txnNumber"));
+    }
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn transaction_ids_included() {
+    let client = EventClient::new().await;
+
+    if !(client.is_replica_set() || client.is_sharded()) {
+        return;
+    }
+
+    let coll = client.init_db_and_coll(function_name!(), "coll").await;
+
+    coll.insert_one(doc! { "x": 1 }, None).await.unwrap();
+    coll.update_one(doc! {}, doc! { "$set": doc! { "x": 1 } }, None)
+        .await
+        .unwrap();
+    coll.replace_one(doc! {}, doc! { "x": 1 }, None)
+        .await
+        .unwrap();
+    coll.delete_one(doc! {}, None).await.unwrap();
+    coll.find_one_and_delete(doc! {}, None).await.unwrap();
+    coll.find_one_and_replace(doc! {}, doc! { "x": 1 }, None)
+        .await
+        .unwrap();
+    coll.find_one_and_update(doc! {}, doc! { "$set": doc! { "x": 1 } }, None)
+        .await
+        .unwrap();
+    let options = InsertManyOptions::builder().ordered(true).build();
+    coll.insert_many(vec![doc! { "x": 1 }], options)
+        .await
+        .unwrap();
+    let options = InsertManyOptions::builder().ordered(false).build();
+    coll.insert_many(vec![doc! { "x": 1 }], options)
+        .await
+        .unwrap();
+
+    let command_names = vec![
+        "insert",
+        "update",
+        "update",
+        "delete",
+        "findAndModify",
+        "findAndModify",
+        "findAndModify",
+        "insert",
+        "insert",
+    ];
+    for name in command_names {
+        let (started, _) = client.get_successful_command_execution(name);
+        assert!(started.command.contains_key("txnNumber"));
+    }
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn storage_engine_error_raised() {
+    let client = TestClient::new().await;
+
+    if !(client.is_replica_set() || client.is_sharded()) {
+        return;
+    }
+
+    let db = client.database(function_name!());
+    db.collection("coll").drop(None).await.unwrap();
+
+    let options = CreateCollectionOptions::builder()
+        .storage_engine(doc! { "mmapv1": doc! {} })
+        .build();
+    let res = db.create_collection("coll", options).await;
+    // this test should only run when the server supports the mmapv1 storage engine
+    if res.is_err() {
+        return;
+    }
+
+    let coll = db.collection("coll");
+
+    let err = coll.insert_one(doc! { "x": 1 }, None).await.unwrap_err();
+    match err.kind.as_ref() {
+        ErrorKind::CommandError(err) => {
+            assert_eq!(
+                err.message,
+                "This MongoDB deployment does not support retryable writes. Please add \
+                 retryWrites=false to your connection string."
+            );
+        }
+        e => panic!("expected command error, got: {:?}", e),
+    }
 }

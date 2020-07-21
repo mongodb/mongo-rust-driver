@@ -8,7 +8,7 @@ use time::PreciseTime;
 use crate::{
     bson::Document,
     cmap::Connection,
-    error::{Error, ErrorKind, Result},
+    error::{ErrorKind, Result},
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
     operation::{Operation, Retryability},
     options::SelectionCriteria,
@@ -120,29 +120,27 @@ impl Client {
                     .handle_post_handshake_error(err.clone(), &conn, server)
                     .await;
 
-                // must add a retryable write label if the client allows retryable writes and either
-                // a retryable error on a pre-4.4 server or a network error occurred
-                // let err = if self.inner.options.retry_writes != Some(false)
-                //     && ((err.is_write_retryable()
-                //         && conn
-                //             .stream_description()?
-                //             .max_wire_version
-                //             .map_or(false, |version| version <= 8))
-                //         || err.is_network_error())
-                // {
-                //     err.with_label("RetryableWriteError".to_string())
-                // } else {
-                //     err
-                // };
+                if let ErrorKind::CommandError(ref err) = err.kind.as_ref() {
+                    if err.code == 20 && err.message.starts_with("Transaction numbers") {
+                        let mut err = err.clone();
+                        err.message = "This MongoDB deployment does not support retryable writes. \
+                                       Please add retryWrites=false to your connection string."
+                            .to_string();
+                        return Err(ErrorKind::CommandError(err).into());
+                    }
+                }
 
                 let err = if self.inner.options.retry_writes != Some(false) {
-                    if conn.stream_description()?.max_wire_version.map_or(false, |version| version <= 8) && err.is_write_retryable() {
+                    if conn
+                        .stream_description()?
+                        .max_wire_version
+                        .map_or(false, |version| version <= 8)
+                        && err.is_write_retryable()
+                    {
                         err.with_label("RetryableWriteError".to_string())
                     } else {
                         match err.kind.as_ref() {
-                            ErrorKind::CommandError(_) => {
-                                err
-                            }
+                            ErrorKind::CommandError(_) => err,
                             _ => {
                                 if err.is_write_retryable() {
                                     err.with_label("RetryableWriteError".to_string())
@@ -209,13 +207,16 @@ impl Client {
 
                 if err.is_server_error() || err.is_read_retryable() || err.is_write_retryable() {
                     if self.inner.options.retry_writes != Some(false) {
-                        if conn.stream_description()?.max_wire_version.map_or(false, |version| version <= 8) && err.is_write_retryable() {
+                        if conn
+                            .stream_description()?
+                            .max_wire_version
+                            .map_or(false, |version| version <= 8)
+                            && err.is_write_retryable()
+                        {
                             Err(err.with_label("RetryableWriteError".to_string()))
                         } else {
                             match err.kind.as_ref() {
-                                ErrorKind::CommandError(_) => {
-                                    Err(err)
-                                }
+                                ErrorKind::CommandError(_) => Err(err),
                                 _ => {
                                     if err.is_write_retryable() {
                                         Err(err.with_label("RetryableWriteError".to_string()))
@@ -234,26 +235,6 @@ impl Client {
             }
         }
     }
-
-    // fn with_retryable_write_label(err: Error, conn: &Connection) -> Result<Error> {
-    //     match err.kind.as_ref() {
-    //         ErrorKind::CommandError(_) => {
-    //             if conn.stream_description()?.max_wire_version.map_or(false, |version| version <= 8)
-    //             && err.is_write_retryable() {
-    //                 Ok(err.with_label("RetryableWriteError".to_string()))
-    //             } else {
-    //                 Ok(err)
-    //             }
-    //         }
-    //         _ => {
-    //             if err.is_write_retryable() {
-    //                 Ok(err.with_label("RetryableWriteError".to_string()))
-    //             } else {
-    //                 Ok(err)
-    //             }
-    //         }
-    //     }
-    // }
 
     /// Executes an operation on a given connection, optionally using a provided session.
     async fn execute_operation_on_connection<T: Operation>(

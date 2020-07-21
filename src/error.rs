@@ -160,7 +160,7 @@ impl Error {
             ErrorKind::CommandError(err) => {
                 let mut err = err.clone();
                 err.labels.push(label);
-                Error::new(Arc::new(ErrorKind::CommandError(err)))
+                ErrorKind::CommandError(err).into()
             }
             ErrorKind::WriteError(err) => {
                 match err {
@@ -171,7 +171,7 @@ impl Error {
                     WriteFailure::WriteConcernError(err) => {
                         let mut err = err.clone();
                         err.labels.push(label);
-                        Error::new(Arc::new(ErrorKind::WriteError(WriteFailure::WriteConcernError(err))))
+                        ErrorKind::WriteError(WriteFailure::WriteConcernError(err)).into()
                     }
                 }
             }
@@ -182,7 +182,7 @@ impl Error {
                         let mut write_concern_error = write_concern_error.clone();
                         write_concern_error.labels.push(label);
                         err.write_concern_error = Some(write_concern_error);
-                        Error::new(Arc::new(ErrorKind::BulkWriteError(err)))
+                        ErrorKind::BulkWriteError(err).into()
                     }
                     None => {
                         self.labels.push(label);
@@ -385,7 +385,7 @@ impl ErrorKind {
 
     /// Gets the code/message tuple from this error, if applicable. In the case of write errors, the
     /// code and message are taken from the write concern error, if there is one.
-    fn code_and_message(&self) -> Option<(i32, &str)> {
+    pub(crate) fn code_and_message(&self) -> Option<(i32, &str)> {
         match self {
             ErrorKind::CommandError(ref cmd_err) => Some((cmd_err.code, cmd_err.message.as_str())),
             ErrorKind::WriteError(WriteFailure::WriteConcernError(ref wc_err)) => {
