@@ -293,7 +293,6 @@ async fn storage_engine_error_raised() {
         return;
     }
     let coll = db.collection("coll");
-    dbg!("here");
 
     let err = coll.insert_one(doc! { "x": 1 }, None).await.unwrap_err();
     match err.kind.as_ref() {
