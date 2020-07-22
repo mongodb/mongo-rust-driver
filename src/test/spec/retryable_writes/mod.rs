@@ -142,17 +142,15 @@ async fn run_spec_tests() {
             assert_eq!(test_case.outcome.collection.data, actual_data);
 
             if let Some(fail_point) = test_case.fail_point {
-                if let Ok("alwaysOn") = fail_point.get_str("mode") {
-                    let disable = doc! {
-                        "configureFailPoint": fail_point.get_str("configureFailPoint").unwrap(),
-                        "mode": "off",
-                    };
-                    client
-                        .database("admin")
-                        .run_command(disable, None)
-                        .await
-                        .unwrap();
-                }
+                let disable = doc! {
+                    "configureFailPoint": fail_point.get_str("configureFailPoint").unwrap(),
+                    "mode": "off",
+                };
+                client
+                    .database("admin")
+                    .run_command(disable, None)
+                    .await
+                    .unwrap();
             }
         }
     }
