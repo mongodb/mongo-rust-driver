@@ -165,6 +165,8 @@ async fn run_spec_tests() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn transaction_ids_excluded() {
+    let _guard = LOCK.run_concurrently().await;
+
     let client = EventClient::new().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
@@ -216,6 +218,8 @@ async fn transaction_ids_excluded() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn transaction_ids_included() {
+    let _guard = LOCK.run_concurrently().await;
+
     let client = EventClient::new().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
@@ -275,6 +279,8 @@ async fn transaction_ids_included() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn mmapv1_error_raised() {
+    let _guard = LOCK.run_concurrently().await;
+
     let client = TestClient::new().await;
 
     let req = semver::VersionReq::parse("<=4.0").unwrap();

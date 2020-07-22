@@ -126,7 +126,7 @@ impl Error {
 
     pub fn labels(&self) -> &Vec<String> {
         match self.kind.as_ref() {
-            ErrorKind::CommandError(err, ..) => &err.labels,
+            ErrorKind::CommandError(err) => &err.labels,
             ErrorKind::WriteError(err) => match err {
                 WriteFailure::WriteError(_) => &self.labels,
                 WriteFailure::WriteConcernError(err) => &err.labels,
