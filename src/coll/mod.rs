@@ -290,7 +290,7 @@ impl Collection {
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// here[https://docs.mongodb.com/manual/core/retryable-writes/] for more information on
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn delete_one(
         &self,
@@ -357,7 +357,7 @@ impl Collection {
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// here[https://docs.mongodb.com/manual/core/retryable-writes/] for more information on
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn find_one_and_delete(
         &self,
@@ -376,7 +376,7 @@ impl Collection {
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// here[https://docs.mongodb.com/manual/core/retryable-writes/] for more information on
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn find_one_and_replace(
         &self,
@@ -398,7 +398,7 @@ impl Collection {
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// here[https://docs.mongodb.com/manual/core/retryable-writes/] for more information on
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn find_one_and_update(
         &self,
@@ -418,7 +418,7 @@ impl Collection {
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// here[https://docs.mongodb.com/manual/core/retryable-writes/] for more information on
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn insert_many(
         &self,
@@ -505,7 +505,7 @@ impl Collection {
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// here[https://docs.mongodb.com/manual/core/retryable-writes/] for more information on
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn insert_one(
         &self,
@@ -531,7 +531,7 @@ impl Collection {
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// here[https://docs.mongodb.com/manual/core/retryable-writes/] for more information on
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn replace_one(
         &self,
@@ -588,7 +588,7 @@ impl Collection {
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
-    /// here[https://docs.mongodb.com/manual/core/retryable-writes/] for more information on
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub async fn update_one(
         &self,
