@@ -15,6 +15,8 @@ This repository contains the officially supported MongoDB Rust driver, a client 
         - [Inserting documents into a collection](#inserting-documents-into-a-collection)
         - [Finding documents in a collection](#finding-documents-in-a-collection)
     - [Using the sync API](#using-the-sync-api)
+- [Atlas note](#atlas-note)
+- [Windows DNS note](#windows-dns-note)
 - [Bug Reporting / Feature Requests](#bug-reporting--feature-requests)
 - [Contributing](#contributing)
 - [Running the tests](#running-the-tests)
@@ -181,6 +183,21 @@ for result in cursor {
 ## Atlas note
 
 Currently, the driver has issues connecting to Atlas tiers above M2 unless the server version is at least 4.2. We're working on fixing this, but in the meantime, a workaround is to upgrade your cluster to 4.2. The driver has no known issues with either M0 or M2 instances.
+
+## Windows DNS note
+
+On Windows, there is a known issue in the `trust-dns-resolver` crate, which the driver uses to perform DNS lookups, that causes severe performance degradation in resolvers that use the system configuration. Since the driver uses the system configuration by default, users are recommended to specify an alternate resolver configuration on Windows until that issue is resolved. This is only has an effect when connecting to deployments using a `mongodb+srv` connection string.
+
+e.g.
+
+``` rust
+let options = ClientOptions::parse_with_resolver_config(
+    "mongodb+srv://my.host.com",
+    ResolverConfig::cloudflare(),
+)
+.await?;
+let client = Client::with_options(options)?;
+```
 
 ## Bug Reporting / Feature Requests
 To file a bug report or submit a feature request, please open a ticket on our [Jira project](https://jira.mongodb.org/browse/RUST):

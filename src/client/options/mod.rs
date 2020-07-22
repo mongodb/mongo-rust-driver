@@ -314,7 +314,7 @@ pub struct ClientOptions {
     /// By default, the host system's resolver configuration will be used.
     ///
     /// On Windows, there is a known performance issue in trust-dns with using the default system
-    /// configuration, so a custom configuration is reccommended.
+    /// configuration, so a custom configuration is recommended.
     #[builder(default)]
     #[serde(skip)]
     pub resolver_config: Option<ResolverConfig>,
