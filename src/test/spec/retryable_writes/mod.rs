@@ -241,7 +241,7 @@ async fn transaction_ids_included() {
         .await
         .unwrap();
     assert!(includes("update"));
-    
+
     coll.delete_one(doc! {}, None).await.unwrap();
     assert!(includes("delete"));
 
@@ -252,18 +252,18 @@ async fn transaction_ids_included() {
         .await
         .unwrap();
     assert!(includes("findAndModify"));
-    
+
     coll.find_one_and_update(doc! {}, doc! { "$set": doc! { "x": 1 } }, None)
         .await
         .unwrap();
     assert!(includes("findAndModify"));
-    
+
     let options = InsertManyOptions::builder().ordered(true).build();
     coll.insert_many(vec![doc! { "x": 1 }], options)
         .await
         .unwrap();
     assert!(includes("insert"));
-    
+
     let options = InsertManyOptions::builder().ordered(false).build();
     coll.insert_many(vec![doc! { "x": 1 }], options)
         .await
@@ -274,25 +274,29 @@ async fn transaction_ids_included() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-async fn storage_engine_error_raised() {
+async fn mmapv1_error_raised() {
     let client = TestClient::new().await;
 
     let req = semver::VersionReq::parse("<=4.0").unwrap();
-    if !req.matches(&client.server_version) || client.is_standalone() {
+    if !req.matches(&client.server_version) || !client.is_replica_set() {
         return;
     }
 
-    let db = client.database(function_name!());
-    db.collection("coll").drop(None).await.unwrap();
+    let coll = client.init_db_and_coll(function_name!(), "coll").await;
 
-    let options = CreateCollectionOptions::builder()
-        .storage_engine(doc! { "mmapv1": doc! {} })
-        .build();
-    if db.create_collection("coll", options).await.is_err() {
-        // this test should only be run when the server supports mmapv1
+    let server_status = client
+        .database(function_name!())
+        .run_command(doc! { "serverStatus": 1 }, None)
+        .await
+        .unwrap();
+    let name = server_status
+        .get_document("storageEngine")
+        .unwrap()
+        .get_str("name")
+        .unwrap();
+    if name != "mmapv1" {
         return;
     }
-    let coll = db.collection("coll");
 
     let err = coll.insert_one(doc! { "x": 1 }, None).await.unwrap_err();
     match err.kind.as_ref() {
