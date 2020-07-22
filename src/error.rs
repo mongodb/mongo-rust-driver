@@ -108,9 +108,7 @@ impl Error {
             return true;
         }
         match &self.kind.code_and_message() {
-            Some((code, _)) => {
-                RETRYABLE_WRITE_CODES.contains(&code)
-            }
+            Some((code, _)) => RETRYABLE_WRITE_CODES.contains(&code),
             None => false,
         }
     }
@@ -126,32 +124,18 @@ impl Error {
         }
     }
 
-    pub(crate) fn labels(&self) -> &Vec<String> {
+    pub fn labels(&self) -> &Vec<String> {
         match self.kind.as_ref() {
-            ErrorKind::CommandError(err, ..) =>  {
-                &err.labels
-            }
-            ErrorKind::WriteError(err) => {
-                match err {
-                    WriteFailure::WriteError(_) => {
-                        &self.labels
-                    }
-                    WriteFailure::WriteConcernError(err) => {
-                        &err.labels
-                    }
-                }
-            }
-            ErrorKind::BulkWriteError(err) => {
-                match err.write_concern_error {
-                    Some(ref err) => {
-                        &err.labels
-                    }
-                    None => {
-                        &self.labels
-                    }
-                }
-            }
-            _ => &self.labels
+            ErrorKind::CommandError(err, ..) => &err.labels,
+            ErrorKind::WriteError(err) => match err {
+                WriteFailure::WriteError(_) => &self.labels,
+                WriteFailure::WriteConcernError(err) => &err.labels,
+            },
+            ErrorKind::BulkWriteError(err) => match err.write_concern_error {
+                Some(ref err) => &err.labels,
+                None => &self.labels,
+            },
+            _ => &self.labels,
         }
     }
 
@@ -162,37 +146,50 @@ impl Error {
                 err.labels.push(label);
                 ErrorKind::CommandError(err).into()
             }
-            ErrorKind::WriteError(err) => {
-                match err {
-                    WriteFailure::WriteError(_) => {
-                        self.labels.push(label);
-                        self
-                    }
-                    WriteFailure::WriteConcernError(err) => {
-                        let mut err = err.clone();
-                        err.labels.push(label);
-                        ErrorKind::WriteError(WriteFailure::WriteConcernError(err)).into()
-                    }
+            ErrorKind::WriteError(err) => match err {
+                WriteFailure::WriteError(_) => {
+                    self.labels.push(label);
+                    self
                 }
-            }
-            ErrorKind::BulkWriteError(err) => {
-                match err.write_concern_error {
-                    Some(ref write_concern_error) => {
-                        let mut err = err.clone();
-                        let mut write_concern_error = write_concern_error.clone();
-                        write_concern_error.labels.push(label);
-                        err.write_concern_error = Some(write_concern_error);
-                        ErrorKind::BulkWriteError(err).into()
-                    }
-                    None => {
-                        self.labels.push(label);
-                        self
-                    }
+                WriteFailure::WriteConcernError(err) => {
+                    let mut err = err.clone();
+                    err.labels.push(label);
+                    ErrorKind::WriteError(WriteFailure::WriteConcernError(err)).into()
                 }
-            }
+            },
+            ErrorKind::BulkWriteError(err) => match err.write_concern_error {
+                Some(ref write_concern_error) => {
+                    let mut err = err.clone();
+                    let mut write_concern_error = write_concern_error.clone();
+                    write_concern_error.labels.push(label);
+                    err.write_concern_error = Some(write_concern_error);
+                    ErrorKind::BulkWriteError(err).into()
+                }
+                None => {
+                    self.labels.push(label);
+                    self
+                }
+            },
             _ => {
                 self.labels.push(label);
                 self
+            }
+        }
+    }
+
+    pub(crate) fn with_retryable_write_label(self, add_to_command_error: bool) -> Self {
+        if add_to_command_error && self.is_write_retryable() {
+            self.with_label("RetryableWriteError".to_string())
+        } else {
+            match self.kind.as_ref() {
+                ErrorKind::CommandError(_) => self,
+                _ => {
+                    if self.is_write_retryable() {
+                        self.with_label("RetryableWriteError".to_string())
+                    } else {
+                        self
+                    }
+                }
             }
         }
     }
@@ -385,7 +382,7 @@ impl ErrorKind {
 
     /// Gets the code/message tuple from this error, if applicable. In the case of write errors, the
     /// code and message are taken from the write concern error, if there is one.
-    pub(crate) fn code_and_message(&self) -> Option<(i32, &str)> {
+    fn code_and_message(&self) -> Option<(i32, &str)> {
         match self {
             ErrorKind::CommandError(ref cmd_err) => Some((cmd_err.code, cmd_err.message.as_str())),
             ErrorKind::WriteError(WriteFailure::WriteConcernError(ref wc_err)) => {

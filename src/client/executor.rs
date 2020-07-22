@@ -95,9 +95,10 @@ impl Client {
 
         let txn_number = match session {
             Some(ref mut session) => {
-                if conn.stream_description()?.supports_retryable_writes()
+                if self.inner.options.retry_writes != Some(false)
                     && op.retryability() == Retryability::Write
-                    && self.inner.options.retry_writes != Some(false)
+                    && op.is_acknowledged()
+                    && conn.stream_description()?.supports_retryable_writes()
                 {
                     Some(session.get_and_increment_txn_number())
                 } else {
@@ -131,25 +132,11 @@ impl Client {
                 }
 
                 let err = if self.inner.options.retry_writes != Some(false) {
-                    if conn
+                    let add_to_command_error = conn
                         .stream_description()?
                         .max_wire_version
-                        .map_or(false, |version| version <= 8)
-                        && err.is_write_retryable()
-                    {
-                        err.with_label("RetryableWriteError".to_string())
-                    } else {
-                        match err.kind.as_ref() {
-                            ErrorKind::CommandError(_) => err,
-                            _ => {
-                                if err.is_write_retryable() {
-                                    err.with_label("RetryableWriteError".to_string())
-                                } else {
-                                    err
-                                }
-                            }
-                        }
-                    }
+                        .map_or(false, |version| version <= 8);
+                    err.with_retryable_write_label(add_to_command_error)
                 } else {
                     err
                 };
@@ -160,6 +147,7 @@ impl Client {
                     && err.is_read_retryable())
                     || (self.inner.options.retry_writes != Some(false)
                         && op.retryability() == Retryability::Write
+                        && op.is_acknowledged()
                         && err.labels().contains(&"RetryableWriteError".to_string())
                         && conn.stream_description()?.supports_retryable_writes())
                 {
@@ -207,25 +195,11 @@ impl Client {
 
                 if err.is_server_error() || err.is_read_retryable() || err.is_write_retryable() {
                     if self.inner.options.retry_writes != Some(false) {
-                        if conn
+                        let add_to_command_error = conn
                             .stream_description()?
                             .max_wire_version
-                            .map_or(false, |version| version <= 8)
-                            && err.is_write_retryable()
-                        {
-                            Err(err.with_label("RetryableWriteError".to_string()))
-                        } else {
-                            match err.kind.as_ref() {
-                                ErrorKind::CommandError(_) => Err(err),
-                                _ => {
-                                    if err.is_write_retryable() {
-                                        Err(err.with_label("RetryableWriteError".to_string()))
-                                    } else {
-                                        Err(err)
-                                    }
-                                }
-                            }
-                        }
+                            .map_or(false, |version| version <= 8);
+                        Err(err.with_retryable_write_label(add_to_command_error))
                     } else {
                         Err(err)
                     }

@@ -8,7 +8,7 @@ use crate::{
     bson::{doc, Document},
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::ErrorKind,
-    options::{CollectionOptions, CreateCollectionOptions, FindOptions, InsertManyOptions},
+    options::{CollectionOptions, FindOptions, InsertManyOptions},
     test::{assert_matches, run_spec_test, EventClient, TestClient, LOCK},
 };
 
