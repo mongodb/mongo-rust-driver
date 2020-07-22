@@ -310,15 +310,6 @@ pub struct ClientOptions {
     #[builder(default)]
     pub repl_set_name: Option<String>,
 
-    /// Configuration of the trust-dns resolver used for SRV and TXT lookups.
-    /// By default, the host system's resolver configuration will be used.
-    ///
-    /// On Windows, there is a known performance issue in trust-dns with using the default system
-    /// configuration, so a custom configuration is recommended.
-    #[builder(default)]
-    #[serde(skip)]
-    pub resolver_config: Option<ResolverConfig>,
-
     /// Whether or not the client should retry a read operation if the operation fails.
     ///
     /// The default value is true.
@@ -370,6 +361,15 @@ pub struct ClientOptions {
 
     #[builder(default)]
     pub(crate) original_uri: Option<String>,
+
+    /// Configuration of the trust-dns resolver used for SRV and TXT lookups.
+    /// By default, the host system's resolver configuration will be used.
+    ///
+    /// On Windows, there is a known performance issue in trust-dns with using the default system
+    /// configuration, so a custom configuration is recommended.
+    #[builder(default)]
+    #[serde(skip)]
+    pub(crate) resolver_config: Option<ResolverConfig>,
 }
 
 fn default_hosts() -> Vec<StreamAddress> {
@@ -678,9 +678,10 @@ impl ClientOptions {
         let srv = parser.srv;
         let auth_source_present = parser.auth_source.is_some();
         let mut options: Self = parser.into();
+        options.resolver_config = resolver_config.clone();
 
         if srv {
-            let mut resolver = SrvResolver::new(resolver_config.clone()).await?;
+            let mut resolver = SrvResolver::new(resolver_config).await?;
             let mut config = resolver
                 .resolve_client_options(&options.hosts[0].hostname)
                 .await?;
