@@ -320,7 +320,7 @@ pub struct ClientOptions {
     ///
     /// The default value is true.
     #[builder(default)]
-    pub(crate) retry_writes: Option<bool>,
+    pub retry_writes: Option<bool>,
 
     /// The default selection criteria for operations performed on the Client. See the
     /// SelectionCriteria type documentation for more details.

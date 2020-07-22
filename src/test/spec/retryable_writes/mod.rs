@@ -21,10 +21,6 @@ async fn run_spec_tests() {
                 continue;
             }
 
-            // if test_case.description != "InsertOne fails after multiple retryable
-            // writeConcernErrors" {     continue;
-            // }
-
             let client = EventClient::merge_options(
                 test_case.client_options,
                 test_case.use_multiple_mongoses,
@@ -92,14 +88,12 @@ async fn run_spec_tests() {
                 match expected_result {
                     Result::Value(value) => {
                         let description = &test_case.description;
-                        dbg!("{}", &description);
                         let result = result.unwrap().unwrap_or_else(|| {
                             panic!("{:?}: operation should succeed", description)
                         });
                         assert_matches(&result, &value, Some(description));
                     }
                     Result::Labels(expected_labels) => {
-                        dbg!("{}", &test_case.description);
                         let error = result.expect_err(&format!(
                             "{:?}: operation should fail",
                             &test_case.description
@@ -179,10 +173,19 @@ async fn transaction_ids_excluded() {
 
     let coll = client.init_db_and_coll(function_name!(), "coll").await;
 
+    let excludes = |command_name: &str| -> bool {
+        let (started, _) = client.get_successful_command_execution(command_name);
+        !started.command.contains_key("txnNumber")
+    };
+
     coll.update_many(doc! {}, doc! { "$set": doc! { "x": 1 } }, None)
         .await
         .unwrap();
+    assert!(excludes("update"));
+
     coll.delete_many(doc! {}, None).await.unwrap();
+    assert!(excludes("delete"));
+
     coll.aggregate(
         vec![
             doc! { "$match": doc! { "x": 1 } },
@@ -192,6 +195,8 @@ async fn transaction_ids_excluded() {
     )
     .await
     .unwrap();
+    assert!(excludes("aggregate"));
+
     coll.aggregate(
         vec![
             doc! { "$match": doc! { "x": 1 } },
@@ -201,12 +206,7 @@ async fn transaction_ids_excluded() {
     )
     .await
     .unwrap();
-
-    let command_names = vec!["update", "delete", "aggregate", "aggregate"];
-    for name in command_names {
-        let (started, _) = client.get_successful_command_execution(name);
-        assert!(!started.command.contains_key("txnNumber"));
-    }
+    assert!(excludes("aggregate"));
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -221,45 +221,51 @@ async fn transaction_ids_included() {
 
     let coll = client.init_db_and_coll(function_name!(), "coll").await;
 
+    let includes = |command_name: &str| -> bool {
+        let (started, _) = client.get_successful_command_execution(command_name);
+        started.command.contains_key("txnNumber")
+    };
+
     coll.insert_one(doc! { "x": 1 }, None).await.unwrap();
+    assert!(includes("insert"));
+
     coll.update_one(doc! {}, doc! { "$set": doc! { "x": 1 } }, None)
         .await
         .unwrap();
+    assert!(includes("update"));
+
     coll.replace_one(doc! {}, doc! { "x": 1 }, None)
         .await
         .unwrap();
+    assert!(includes("update"));
+    
     coll.delete_one(doc! {}, None).await.unwrap();
+    assert!(includes("delete"));
+
     coll.find_one_and_delete(doc! {}, None).await.unwrap();
+    assert!(includes("findAndModify"));
+
     coll.find_one_and_replace(doc! {}, doc! { "x": 1 }, None)
         .await
         .unwrap();
+    assert!(includes("findAndModify"));
+    
     coll.find_one_and_update(doc! {}, doc! { "$set": doc! { "x": 1 } }, None)
         .await
         .unwrap();
+    assert!(includes("findAndModify"));
+    
     let options = InsertManyOptions::builder().ordered(true).build();
     coll.insert_many(vec![doc! { "x": 1 }], options)
         .await
         .unwrap();
+    assert!(includes("insert"));
+    
     let options = InsertManyOptions::builder().ordered(false).build();
     coll.insert_many(vec![doc! { "x": 1 }], options)
         .await
         .unwrap();
-
-    let command_names = vec![
-        "insert",
-        "update",
-        "update",
-        "delete",
-        "findAndModify",
-        "findAndModify",
-        "findAndModify",
-        "insert",
-        "insert",
-    ];
-    for name in command_names {
-        let (started, _) = client.get_successful_command_execution(name);
-        assert!(started.command.contains_key("txnNumber"));
-    }
+    assert!(includes("insert"));
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -268,7 +274,8 @@ async fn transaction_ids_included() {
 async fn storage_engine_error_raised() {
     let client = TestClient::new().await;
 
-    if !(client.is_replica_set() || client.is_sharded()) {
+    let req = semver::VersionReq::parse("<=4.0").unwrap();
+    if !req.matches(&client.server_version) || client.is_standalone() {
         return;
     }
 
@@ -278,13 +285,12 @@ async fn storage_engine_error_raised() {
     let options = CreateCollectionOptions::builder()
         .storage_engine(doc! { "mmapv1": doc! {} })
         .build();
-    let res = db.create_collection("coll", options).await;
-    // this test should only run when the server supports the mmapv1 storage engine
-    if res.is_err() {
+    if db.create_collection("coll", options).await.is_err() {
+        // this test should only be run when the server supports mmapv1
         return;
     }
-
     let coll = db.collection("coll");
+    dbg!("here");
 
     let err = coll.insert_one(doc! { "x": 1 }, None).await.unwrap_err();
     match err.kind.as_ref() {

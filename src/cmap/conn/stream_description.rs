@@ -38,6 +38,7 @@ impl StreamDescription {
         }
     }
 
+    /// Whether this StreamDescription supports retryable writes.
     pub(crate) fn supports_retryable_writes(&self) -> bool {
         self.initial_server_type != ServerType::Standalone
             && self.logical_session_timeout.is_some()

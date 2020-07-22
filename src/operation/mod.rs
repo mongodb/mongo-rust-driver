@@ -93,7 +93,7 @@ pub(crate) trait Operation {
         true
     }
 
-    /// Whether or not the operation supports retryable reads
+    /// The level of retryability the operation supports.
     fn retryability(&self) -> Retryability {
         Retryability::None
     }
