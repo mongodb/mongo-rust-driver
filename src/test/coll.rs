@@ -12,9 +12,12 @@ use crate::{
         AggregateOptions,
         DeleteOptions,
         FindOneAndDeleteOptions,
+        FindOneOptions,
         FindOptions,
         Hint,
         InsertManyOptions,
+        ReadPreference,
+        SelectionCriteria,
         UpdateOptions,
     },
     results::DeleteResult,
@@ -719,4 +722,34 @@ async fn find_one_and_delete_hint_server_version() {
     } else {
         assert!(res.is_ok());
     }
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn no_read_preference_to_standalone() {
+    let client = EventClient::new().await;
+
+    if !client.is_standalone() {
+        return;
+    }
+
+    let options = FindOneOptions::builder()
+        .selection_criteria(SelectionCriteria::ReadPreference(
+            ReadPreference::SecondaryPreferred {
+                options: Default::default(),
+            },
+        ))
+        .build();
+
+    client
+        .database(function_name!())
+        .collection(function_name!())
+        .find_one(None, options)
+        .await
+        .unwrap();
+
+    let command_started = client.get_successful_command_execution("find").0;
+
+    assert!(!command_started.command.contains_key("$readPreference"));
 }
