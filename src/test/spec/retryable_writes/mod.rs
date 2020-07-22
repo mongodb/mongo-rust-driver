@@ -197,16 +197,19 @@ async fn transaction_ids_excluded() {
     .unwrap();
     assert!(excludes("aggregate"));
 
-    coll.aggregate(
-        vec![
-            doc! { "$match": doc! { "x": 1 } },
-            doc! { "$merge": "other_coll" },
-        ],
-        None,
-    )
-    .await
-    .unwrap();
-    assert!(excludes("aggregate"));
+    let req = semver::VersionReq::parse(">=4.2").unwrap();
+    if req.matches(&client.server_version) {
+        coll.aggregate(
+            vec![
+                doc! { "$match": doc! { "x": 1 } },
+                doc! { "$merge": "other_coll" },
+            ],
+            None,
+        )
+        .await
+        .unwrap();
+        assert!(excludes("aggregate"));
+    }
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
