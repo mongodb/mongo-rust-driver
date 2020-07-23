@@ -1,4 +1,4 @@
-use trust_dns_resolver::error::ResolveErrorKind;
+use trust_dns_resolver::{config::ResolverConfig, error::ResolveErrorKind};
 
 use crate::{
     error::{Error, ErrorKind, Result},
@@ -19,8 +19,8 @@ pub(crate) struct ResolvedConfig {
 }
 
 impl SrvResolver {
-    pub(crate) async fn new() -> Result<Self> {
-        let resolver = AsyncResolver::new().await?;
+    pub(crate) async fn new(config: Option<ResolverConfig>) -> Result<Self> {
+        let resolver = AsyncResolver::new(config).await?;
 
         Ok(Self {
             resolver,

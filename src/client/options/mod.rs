@@ -24,6 +24,7 @@ use rustls::{
 };
 use serde::Deserialize;
 use strsim::jaro_winkler;
+use trust_dns_resolver::config::ResolverConfig;
 use typed_builder::TypedBuilder;
 use webpki_roots::TLS_SERVER_ROOTS;
 
@@ -360,6 +361,15 @@ pub struct ClientOptions {
 
     #[builder(default)]
     pub(crate) original_uri: Option<String>,
+
+    /// Configuration of the trust-dns resolver used for SRV and TXT lookups.
+    /// By default, the host system's resolver configuration will be used.
+    ///
+    /// On Windows, there is a known performance issue in trust-dns with using the default system
+    /// configuration, so a custom configuration is recommended.
+    #[builder(default)]
+    #[serde(skip)]
+    pub(crate) resolver_config: Option<ResolverConfig>,
 }
 
 fn default_hosts() -> Vec<StreamAddress> {
@@ -574,6 +584,7 @@ impl From<ClientOptionsParser> for ClientOptions {
             command_event_handler: None,
             original_srv_hostname: None,
             original_uri: Some(parser.original_uri),
+            resolver_config: None,
         }
     }
 }
@@ -639,13 +650,38 @@ impl ClientOptions {
     ///   * `wTimeoutMS`: maps to the `w_timeout` field of the `write_concern` field
     ///   * `zlibCompressionLevel`: not yet implemented
     pub async fn parse(s: &str) -> Result<Self> {
-        let parser = ClientOptionsParser::parse(s)?;
+        Self::parse_uri(s, None).await
+    }
+
+    /// Parses a MongoDB connection string into a `ClientOptions` struct.
+    /// If the string is malformed or one of the options has an invalid value, an error will be
+    /// returned.
+    ///
+    /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done using the
+    /// provided `ResolverConfig` as part of this method.
+    ///
+    /// The format of a MongoDB connection string is described [here](https://docs.mongodb.com/manual/reference/connection-string/#connection-string-formats).
+    ///
+    /// See the docstring on `ClientOptions::parse` for information on how the various URI options
+    /// map to fields on `ClientOptions`.
+    pub async fn parse_with_resolver_config(
+        uri: &str,
+        resolver_config: ResolverConfig,
+    ) -> Result<Self> {
+        Self::parse_uri(uri, Some(resolver_config)).await
+    }
+
+    /// Populate this `ClientOptions` from the given URI, optionally using the resolver config for
+    /// DNS lookups.
+    async fn parse_uri(uri: &str, resolver_config: Option<ResolverConfig>) -> Result<Self> {
+        let parser = ClientOptionsParser::parse(uri)?;
         let srv = parser.srv;
         let auth_source_present = parser.auth_source.is_some();
         let mut options: Self = parser.into();
+        options.resolver_config = resolver_config.clone();
 
         if srv {
-            let mut resolver = SrvResolver::new().await?;
+            let mut resolver = SrvResolver::new(resolver_config).await?;
             let mut config = resolver
                 .resolve_client_options(&options.hosts[0].hostname)
                 .await?;

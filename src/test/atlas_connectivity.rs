@@ -1,6 +1,7 @@
-use crate::{bson::doc, Client};
+use crate::{bson::doc, options::ClientOptions, Client};
+use trust_dns_resolver::config::ResolverConfig;
 
-async fn run_test(uri_env_var: &str) {
+async fn run_test(uri_env_var: &str, resolver_config: Option<ResolverConfig>) {
     if std::env::var_os("MONGO_ATLAS_TESTS").is_none() {
         return;
     }
@@ -11,9 +12,15 @@ async fn run_test(uri_env_var: &str) {
         panic!("could not find variable {}", uri_env_var);
     };
 
-    let client = Client::with_uri_str(uri.to_string_lossy().as_ref())
-        .await
-        .unwrap();
+    let uri_string = uri.to_string_lossy();
+    let options = match resolver_config {
+        Some(resolver_config) => {
+            ClientOptions::parse_with_resolver_config(uri_string.as_ref(), resolver_config).await
+        }
+        None => ClientOptions::parse(uri_string.as_ref()).await,
+    }
+    .expect("uri parsing should succeed");
+    let client = Client::with_options(options).expect("option validation should succeed");
 
     let db = client.database("test");
     db.run_command(doc! { "isMaster": 1 }, None)
@@ -29,11 +36,16 @@ async fn run_test(uri_env_var: &str) {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn atlas_repl_set() {
-    run_test("MONGO_ATLAS_FREE_TIER_REPL_URI").await;
+    run_test("MONGO_ATLAS_FREE_TIER_REPL_URI", None).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn atlas_repl_set_srv() {
-    run_test("MONGO_ATLAS_FREE_TIER_REPL_URI_SRV").await;
+    run_test("MONGO_ATLAS_FREE_TIER_REPL_URI_SRV", None).await;
+    run_test(
+        "MONGO_ATLAS_FREE_TIER_REPL_URI_SRV",
+        Some(ResolverConfig::cloudflare()),
+    )
+    .await;
 }

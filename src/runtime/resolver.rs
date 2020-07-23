@@ -3,6 +3,7 @@ use std::{future::Future, net::SocketAddr, time::Duration};
 use async_trait::async_trait;
 use trust_dns_proto::error::ProtoError;
 use trust_dns_resolver::{
+    config::ResolverConfig,
     lookup::{SrvLookup, TxtLookup},
     name_server::{GenericConnection, GenericConnectionProvider},
     IntoName,
@@ -26,8 +27,13 @@ pub(crate) struct AsyncResolver {
 }
 
 impl AsyncResolver {
-    pub(crate) async fn new() -> Result<Self> {
-        let resolver = TrustDnsResolver::from_system_conf(crate::RUNTIME).await?;
+    pub(crate) async fn new(config: Option<ResolverConfig>) -> Result<Self> {
+        let resolver = match config {
+            Some(config) => {
+                TrustDnsResolver::new(config, Default::default(), crate::RUNTIME).await?
+            }
+            None => TrustDnsResolver::from_system_conf(crate::RUNTIME).await?,
+        };
         Ok(Self { resolver })
     }
 }
