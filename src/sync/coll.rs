@@ -161,6 +161,11 @@ impl Collection {
     }
 
     /// Deletes up to one document found matching `query`.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
     pub fn delete_one(
         &self,
         query: Document,
@@ -206,6 +211,11 @@ impl Collection {
     }
 
     /// Atomically finds up to one document in the collection matching `filter` and deletes it.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
     pub fn find_one_and_delete(
         &self,
         filter: Document,
@@ -219,6 +229,11 @@ impl Collection {
 
     /// Atomically finds up to one document in the collection matching `filter` and replaces it with
     /// `replacement`.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
     pub fn find_one_and_replace(
         &self,
         filter: Document,
@@ -236,6 +251,11 @@ impl Collection {
     /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
     /// passed in place of constructing the enum case. Note: pipeline updates are only supported
     /// in MongoDB 4.2+.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
     pub fn find_one_and_update(
         &self,
         filter: Document,
@@ -250,6 +270,11 @@ impl Collection {
     }
 
     /// Inserts the documents in `docs` into the collection.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
     pub fn insert_many(
         &self,
         docs: impl IntoIterator<Item = Document>,
@@ -260,6 +285,11 @@ impl Collection {
     }
 
     /// Inserts `doc` into the collection.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
     pub fn insert_one(
         &self,
         doc: Document,
@@ -269,6 +299,11 @@ impl Collection {
     }
 
     /// Replaces up to one document matching `query` in the collection with `replacement`.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
     pub fn replace_one(
         &self,
         query: Document,
@@ -305,6 +340,11 @@ impl Collection {
     /// passed in place of constructing the enum case. Note: pipeline updates are only supported
     /// in MongoDB 4.2+. See the official MongoDB
     /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#behavior) for more information on specifying updates.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
     pub fn update_one(
         &self,
         query: Document,
