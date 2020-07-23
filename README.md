@@ -186,7 +186,7 @@ Currently, the driver has issues connecting to Atlas tiers above M2 unless the s
 
 ## Windows DNS note
 
-On Windows, there is a known issue in the `trust-dns-resolver` crate, which the driver uses to perform DNS lookups, that causes severe performance degradation in resolvers that use the system configuration. Since the driver uses the system configuration by default, users are recommended to specify an alternate resolver configuration on Windows until that issue is resolved. This is only has an effect when connecting to deployments using a `mongodb+srv` connection string.
+On Windows, there is a known issue in the `trust-dns-resolver` crate, which the driver uses to perform DNS lookups, that causes severe performance degradation in resolvers that use the system configuration. Since the driver uses the system configuration by default, users are recommended to specify an alternate resolver configuration on Windows until that issue is resolved. This only has an effect when connecting to deployments using a `mongodb+srv` connection string.
 
 e.g.
 
