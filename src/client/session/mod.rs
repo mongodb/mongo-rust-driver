@@ -110,7 +110,7 @@ pub(crate) struct ServerSession {
     /// The last time an operation was executed with this session.
     last_use: std::time::Instant,
 
-    /// Whether a network error was encounterd while using this session.
+    /// Whether a network error was encountered while using this session.
     dirty: bool,
 }
 
