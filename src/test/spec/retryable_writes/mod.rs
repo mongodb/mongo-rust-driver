@@ -8,7 +8,7 @@ use crate::{
     bson::{doc, Document},
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::ErrorKind,
-    options::{CollectionOptions, FindOptions, InsertManyOptions},
+    options::{ClientOptions, CollectionOptions, FindOptions, InsertManyOptions},
     test::{assert_matches, run_spec_test, EventClient, TestClient, LOCK},
 };
 
@@ -313,4 +313,46 @@ async fn mmapv1_error_raised() {
         }
         e => panic!("expected command error, got: {:?}", e),
     }
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn label_not_added_first_read_error() {
+    let _guard = LOCK.run_exclusively().await;
+    assert!(label_not_added(false, 1).await);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn label_not_added_second_read_error() {
+    let _guard = LOCK.run_exclusively().await;
+    assert!(label_not_added(true, 2).await);
+}
+
+#[function_name::named]
+async fn label_not_added(retry_reads: bool, times: i32) -> bool {
+    let options = ClientOptions::builder().retry_reads(retry_reads).build();
+    let client = EventClient::merge_options(Some(options), Some(false)).await;
+
+    let coll = client
+        .init_db_and_coll(&format!("{}{}", function_name!(), times), "coll")
+        .await;
+
+    let failpoint = doc! {
+        "configureFailPoint": "failCommand",
+        "mode": { "times": times },
+        "data": {
+            "failCommands": ["find"],
+            "errorCode": 11600
+        }
+    };
+    client
+        .database("admin")
+        .run_command(failpoint, None)
+        .await
+        .unwrap();
+
+    let err = coll.find(doc! {}, None).await.unwrap_err();
+
+    !err.labels().contains(&"RetryableWriteError".to_string())
 }

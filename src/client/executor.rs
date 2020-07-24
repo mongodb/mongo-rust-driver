@@ -131,7 +131,9 @@ impl Client {
                     }
                 }
 
-                let err = if self.inner.options.retry_writes != Some(false) {
+                let err = if self.inner.options.retry_writes != Some(false)
+                    && op.retryability() == Retryability::Write
+                {
                     let add_to_command_error = conn
                         .stream_description()?
                         .max_wire_version
@@ -194,7 +196,9 @@ impl Client {
                     .await;
 
                 if err.is_server_error() || err.is_read_retryable() || err.is_write_retryable() {
-                    if self.inner.options.retry_writes != Some(false) {
+                    if self.inner.options.retry_writes != Some(false)
+                        && op.retryability() == Retryability::Write
+                    {
                         let add_to_command_error = conn
                             .stream_description()?
                             .max_wire_version
