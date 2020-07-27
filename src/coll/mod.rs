@@ -10,7 +10,7 @@ use self::options::*;
 use crate::{
     bson::{doc, Bson, Document},
     bson_util,
-    change_stream::{options::ChangeStreamOptions, ChangeStream},
+    change_stream::{options::ChangeStreamOptions, ChangeStream, ChangeStreamTarget},
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, ErrorKind, Result},
     operation::{
@@ -599,9 +599,18 @@ impl Collection {
     pub async fn watch(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
-        options: Option<ChangeStreamOptions>,
+        options: impl Into<Option<ChangeStreamOptions>>,
     ) -> Result<ChangeStream> {
-        todo!();
+        let mut options = options.into();
+        resolve_options!(self, options, [read_concern, selection_criteria]);
+        let client = self.client();
+        client
+            .start_change_stream(
+                pipeline,
+                options,
+                ChangeStreamTarget::Collection(self.namespace()),
+            )
+            .await
     }
 }
 

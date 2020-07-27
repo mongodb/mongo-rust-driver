@@ -301,8 +301,8 @@ pub struct ClientOptions {
     #[builder(default)]
     pub min_pool_size: Option<u32>,
 
-    /// Specifies the default read concern for operations performed on the Client. See the
-    /// ReadConcern type documentation for more details.
+    /// Specifies the default read concern for operations performed on the `Client`. See the
+    /// `ReadConcern` type documentation for more details.
     #[builder(default)]
     pub read_concern: Option<ReadConcern>,
 

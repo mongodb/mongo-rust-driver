@@ -6,10 +6,13 @@ use semver::VersionReq;
 
 use crate::{
     bson::{doc, Bson, Document},
+    concern::{ReadConcern, ReadConcernLevel},
     error::{ErrorKind, Result, WriteFailure},
     event::command::CommandStartedEvent,
     options::{
         AggregateOptions,
+        ChangeStreamOptions,
+        CollectionOptions,
         DeleteOptions,
         FindOneAndDeleteOptions,
         FindOneOptions,
@@ -728,6 +731,8 @@ async fn find_one_and_delete_hint_server_version() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn no_read_preference_to_standalone() {
+    let _guard = LOCK.run_concurrently().await;
+
     let client = EventClient::new().await;
 
     if !client.is_standalone() {
@@ -752,4 +757,77 @@ async fn no_read_preference_to_standalone() {
     let command_started = client.get_successful_command_execution("find").0;
 
     assert!(!command_started.command.contains_key("$readPreference"));
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn watch_test_coll() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = EventClient::new().await;
+    if client.is_standalone() {
+        return;
+    }
+
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
+    client
+        .database(function_name!())
+        .create_collection(function_name!(), None)
+        .await
+        .unwrap();
+
+    let pipeline = vec![doc! { "$match": { "x": 3 } }];
+    let options = ChangeStreamOptions::builder()
+        .selection_criteria(SelectionCriteria::ReadPreference(ReadPreference::Primary))
+        .read_concern(ReadConcern::from(ReadConcernLevel::Majority))
+        .max_await_time(Duration::from_millis(5))
+        .batch_size(10)
+        .build();
+    coll.watch(pipeline, Some(options)).await.unwrap();
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn watch_options_test() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = EventClient::new().await;
+    if client.is_standalone() {
+        return;
+    }
+
+    let coll_options = CollectionOptions::builder()
+        .selection_criteria(SelectionCriteria::ReadPreference(ReadPreference::Primary))
+        .read_concern(ReadConcern::from(ReadConcernLevel::Available))
+        .build();
+
+    let coll = client
+        .init_db_and_coll_with_options(function_name!(), function_name!(), coll_options)
+        .await;
+
+    client
+        .database(function_name!())
+        .create_collection(function_name!(), None)
+        .await
+        .unwrap();
+
+    let pipeline = vec![doc! { "$match": { "x": 3 } }];
+    let options = ChangeStreamOptions::builder()
+        .read_concern(ReadConcern::from(ReadConcernLevel::Majority))
+        .max_await_time(Duration::from_millis(5))
+        .batch_size(10)
+        .build();
+    let result = coll.watch(pipeline, Some(options)).await.unwrap();
+    assert_eq!(
+        result.options().unwrap().selection_criteria.unwrap(),
+        SelectionCriteria::ReadPreference(ReadPreference::Primary)
+    );
+    assert_eq!(
+        result.options().unwrap().read_concern.unwrap(),
+        ReadConcern::from(ReadConcernLevel::Majority)
+    );
 }

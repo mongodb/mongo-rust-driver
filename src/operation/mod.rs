@@ -13,6 +13,7 @@ mod list_collections;
 mod list_databases;
 mod run_command;
 mod update;
+mod watch;
 
 use std::{collections::VecDeque, fmt::Debug, ops::Deref};
 
@@ -50,6 +51,7 @@ pub(crate) use list_collections::ListCollections;
 pub(crate) use list_databases::ListDatabases;
 pub(crate) use run_command::RunCommand;
 pub(crate) use update::Update;
+pub(crate) use watch::Watch;
 
 /// A trait modeling the behavior of a server side operation.
 pub(crate) trait Operation {
