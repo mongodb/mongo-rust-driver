@@ -326,7 +326,9 @@ async fn label_not_added_first_read_error() {
 
     let req = VersionReq::parse(">=4.0").unwrap();
     let sharded_req = VersionReq::parse(">=4.1.5").unwrap();
-    if client.is_sharded() && !sharded_req.matches(&client.server_version) || !req.matches(&client.server_version) {
+    if client.is_sharded() && !sharded_req.matches(&client.server_version)
+        || !req.matches(&client.server_version)
+    {
         return;
     }
 
@@ -342,7 +344,9 @@ async fn label_not_added_second_read_error() {
 
     let req = VersionReq::parse(">=4.0").unwrap();
     let sharded_req = VersionReq::parse(">=4.1.5").unwrap();
-    if client.is_sharded() && !sharded_req.matches(&client.server_version) || !req.matches(&client.server_version) {
+    if client.is_sharded() && !sharded_req.matches(&client.server_version)
+        || !req.matches(&client.server_version)
+    {
         return;
     }
 

@@ -1,4 +1,4 @@
-use std::{fmt::Debug, ops::Deref};
+use std::{collections::HashMap, fmt::Debug, ops::Deref};
 
 use async_trait::async_trait;
 use futures::stream::TryStreamExt;
@@ -271,10 +271,12 @@ impl TestOperation for InsertMany {
         let result = collection
             .insert_many(self.documents.clone(), self.options.clone())
             .await?;
-        let mut ids = Document::new();
-        for (id, bson) in result.inserted_ids {
-            ids.insert(id.to_string(), bson);
-        }
+        let ids: HashMap<String, Bson> = result
+            .inserted_ids
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.clone()))
+            .collect();
+        let ids = bson::to_bson(&ids)?;
         Ok(Some(Bson::from(doc! { "insertedIds": ids })))
     }
 
