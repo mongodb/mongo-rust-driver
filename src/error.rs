@@ -124,7 +124,8 @@ impl Error {
         }
     }
 
-    pub fn labels(&self) -> &Vec<String> {
+    /// Returns the labels for this error
+    pub fn labels(&self) -> &[String] {
         match self.kind.as_ref() {
             ErrorKind::CommandError(err) => &err.labels,
             ErrorKind::WriteError(err) => match err {
@@ -139,6 +140,7 @@ impl Error {
         }
     }
 
+    /// Returns a copy of this Error with the specified label added
     pub(crate) fn with_label(mut self, label: String) -> Self {
         match self.kind.as_ref() {
             ErrorKind::CommandError(err) => {
@@ -177,6 +179,8 @@ impl Error {
         }
     }
 
+    /// Returns a new Error with a "RetryableWriteError" label added if the Error is write
+    /// retryable. Only adds the label to command errors if add_to_command_error is true.
     pub(crate) fn with_retryable_write_label(self, add_to_command_error: bool) -> Self {
         if add_to_command_error && self.is_write_retryable() {
             self.with_label("RetryableWriteError".to_string())
@@ -468,7 +472,7 @@ pub struct WriteConcernError {
     pub code: i32,
 
     /// The name associated with the error code.
-    #[serde(rename = "codeName", default = "String::new")]
+    #[serde(rename = "codeName", default)]
     pub code_name: String,
 
     /// A description of the error that occurred.

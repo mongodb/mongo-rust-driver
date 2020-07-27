@@ -21,7 +21,7 @@ async fn run_spec_tests() {
                 continue;
             }
 
-            let client = EventClient::merge_options(
+            let client = EventClient::with_additional_options(
                 test_case.client_options,
                 test_case.use_multiple_mongoses,
             )
@@ -332,7 +332,7 @@ async fn label_not_added_second_read_error() {
 #[function_name::named]
 async fn label_not_added(retry_reads: bool, times: i32) -> bool {
     let options = ClientOptions::builder().retry_reads(retry_reads).build();
-    let client = EventClient::merge_options(Some(options), Some(false)).await;
+    let client = EventClient::with_additional_options(Some(options), Some(false)).await;
 
     let coll = client
         .init_db_and_coll(&format!("{}{}", function_name!(), times), "coll")

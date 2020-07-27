@@ -46,9 +46,11 @@ pub async fn run_v2_test(test_file: TestFile) {
             continue;
         }
 
-        let client =
-            EventClient::merge_options(test_case.client_options, test_case.use_multiple_mongoses)
-                .await;
+        let client = EventClient::with_additional_options(
+            test_case.client_options,
+            test_case.use_multiple_mongoses,
+        )
+        .await;
 
         if let Some(ref run_on) = test_file.run_on {
             let can_run_on = run_on.iter().any(|run_on| run_on.can_run_on(&client));

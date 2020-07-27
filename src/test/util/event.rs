@@ -143,7 +143,7 @@ impl EventClient {
         }
     }
 
-    pub async fn merge_options(
+    pub async fn with_additional_options(
         options: Option<ClientOptions>,
         use_multiple_mongoses: Option<bool>,
     ) -> Self {

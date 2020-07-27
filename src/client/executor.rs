@@ -131,6 +131,9 @@ impl Client {
                     }
                 }
 
+                // For a pre-4.4 connection, an error label should be added to any write-retryable
+                // error as long as the retry_writes client option is not set to false. For a 4.4+
+                // connection, a label should be added only to non-command errors.
                 let err = if self.inner.options.retry_writes != Some(false)
                     && op.retryability() == Retryability::Write
                 {
