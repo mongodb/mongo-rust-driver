@@ -1,6 +1,7 @@
 mod test_file;
 
 use futures::stream::TryStreamExt;
+use semver::VersionReq;
 
 use test_file::{Result, TestFile};
 
@@ -319,21 +320,37 @@ async fn mmapv1_error_raised() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn label_not_added_first_read_error() {
     let _guard = LOCK.run_exclusively().await;
-    assert!(label_not_added(false, 1).await);
+
+    let options = ClientOptions::builder().retry_reads(false).build();
+    let client = EventClient::with_additional_options(Some(options), Some(false)).await;
+
+    let req = VersionReq::parse(">=4.0").unwrap();
+    let sharded_req = VersionReq::parse(">=4.1.5").unwrap();
+    if client.is_sharded() && !sharded_req.matches(&client.server_version) || !req.matches(&client.server_version) {
+        return;
+    }
+
+    assert!(label_not_added(client, 1).await);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn label_not_added_second_read_error() {
     let _guard = LOCK.run_exclusively().await;
-    assert!(label_not_added(true, 2).await);
+
+    let client = EventClient::new().await;
+
+    let req = VersionReq::parse(">=4.0").unwrap();
+    let sharded_req = VersionReq::parse(">=4.1.5").unwrap();
+    if client.is_sharded() && !sharded_req.matches(&client.server_version) || !req.matches(&client.server_version) {
+        return;
+    }
+
+    assert!(label_not_added(client, 2).await);
 }
 
 #[function_name::named]
-async fn label_not_added(retry_reads: bool, times: i32) -> bool {
-    let options = ClientOptions::builder().retry_reads(retry_reads).build();
-    let client = EventClient::with_additional_options(Some(options), Some(false)).await;
-
+async fn label_not_added(client: EventClient, times: i32) -> bool {
     let coll = client
         .init_db_and_coll(&format!("{}{}", function_name!(), times), "coll")
         .await;
