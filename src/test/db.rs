@@ -1,4 +1,4 @@
-use std::cmp::Ord;
+use std::{cmp::Ord, time::Duration};
 
 use approx::assert_ulps_eq;
 use futures::stream::TryStreamExt;
@@ -6,8 +6,17 @@ use serde::Deserialize;
 
 use crate::{
     bson::{doc, Bson, Document},
+    concern::{ReadConcern, ReadConcernLevel},
     error::Result,
-    options::{AggregateOptions, CreateCollectionOptions, IndexOptionDefaults},
+    options::{
+        AggregateOptions,
+        ChangeStreamOptions,
+        CreateCollectionOptions,
+        DatabaseOptions,
+        IndexOptionDefaults,
+        ReadPreference,
+        SelectionCriteria,
+    },
     test::{
         util::{EventClient, TestClient},
         LOCK,
@@ -361,4 +370,60 @@ async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>, name:
         Err(_) => None,
     };
     assert_eq!(event_defaults, defaults);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn watch_test_db() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = EventClient::new().await;
+    if client.server_version_lt(4, 0) || client.is_standalone() {
+        return;
+    }
+    let db = client.database(function_name!());
+    let pipeline = vec![doc! { "$match": { "x": 3 } }];
+    let options = ChangeStreamOptions::builder()
+        .selection_criteria(SelectionCriteria::ReadPreference(ReadPreference::Primary))
+        .read_concern(ReadConcern::from(ReadConcernLevel::Majority))
+        .max_await_time(Duration::from_millis(5))
+        .batch_size(10)
+        .build();
+    db.watch(pipeline, Some(options)).await.unwrap();
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn watch_options_test_db() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = EventClient::new().await;
+    if client.server_version_lt(4, 0) || client.is_standalone() {
+        return;
+    }
+
+    let db_options = DatabaseOptions::builder()
+        .selection_criteria(SelectionCriteria::ReadPreference(ReadPreference::Primary))
+        .read_concern(ReadConcern::from(ReadConcernLevel::Available))
+        .build();
+
+    let db = client.database_with_options(function_name!(), db_options);
+
+    let pipeline = vec![doc! { "$match": { "x": 3 } }];
+    let options = ChangeStreamOptions::builder()
+        .read_concern(ReadConcern::from(ReadConcernLevel::Majority))
+        .max_await_time(Duration::from_millis(5))
+        .batch_size(10)
+        .build();
+    let result = db.watch(pipeline, Some(options)).await.unwrap();
+    assert_eq!(
+        result.options().unwrap().selection_criteria.unwrap(),
+        SelectionCriteria::ReadPreference(ReadPreference::Primary)
+    );
+    assert_eq!(
+        result.options().unwrap().read_concern.unwrap(),
+        ReadConcern::from(ReadConcernLevel::Majority)
+    );
 }

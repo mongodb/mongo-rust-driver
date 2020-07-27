@@ -6,7 +6,9 @@ use typed_builder::TypedBuilder;
 use crate::{
     change_stream::document::ResumeToken,
     collation::Collation,
+    concern::ReadConcern,
     options::AggregateOptions,
+    selection_criteria::SelectionCriteria,
 };
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, TypedBuilder)]
@@ -66,10 +68,35 @@ pub struct ChangeStreamOptions {
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub start_after: Option<ResumeToken>,
+
+    /// The criteria used to select a server for this operation.
+    ///
+    /// If none is specified, the selection criteria defined on the object executing this operation
+    /// will be used.
+    #[builder(default)]
+    #[serde(skip)]
+    #[serde(rename = "readPreference")]
+    pub selection_criteria: Option<SelectionCriteria>,
+
+    /// The `ReadConcern` to be used by the `ChangeStream`.
+    ///
+    /// `ChangeStreams` support only “majority” `ReadConcern` or no `ReadConcern`.
+    /// If a non-"majority" `ReadConcern` is specified on or inherited by the `Client`, `Database`,
+    /// or `Collection` that will be used to create the `ChangeStream`, then a "majority"
+    /// `ReadConcern` MUST be specified here.
+    ///
+    /// For MongoDB 4.2+, `ChangeStreams` are supported even if "majority" read concerns are
+    /// disabled server side.
+    /// See the official MongoDB documentation for more information on when ChangeStreams are
+    /// available: [here]("https://docs.mongodb.com/manual/changeStreams/#availability")
+    #[builder(default)]
+    #[serde(skip)]
+    pub read_concern: Option<ReadConcern>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[non_exhaustive]
+#[serde(rename_all = "camelCase")]
 /// Describes the modes for configuring the `full_document` field of a
 /// [`ChangeStreamEventDocument`](../document/struct.ChangeStreamEventDocument.html)
 pub enum FullDocumentType {
@@ -80,4 +107,15 @@ pub enum FullDocumentType {
 
     /// User-defined other types for forward compatibility.
     Other(String),
+}
+
+impl ChangeStreamOptions {
+    pub(crate) fn get_aggregation_options(&self) -> AggregateOptions {
+        AggregateOptions::builder()
+            .batch_size(self.batch_size.map(|batch_size| batch_size as u32))
+            .collation(self.collation.as_ref().map(Clone::clone))
+            .max_await_time(self.max_await_time)
+            .read_concern(self.read_concern.clone())
+            .build()
+    }
 }

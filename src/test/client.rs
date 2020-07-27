@@ -4,8 +4,15 @@ use serde::Deserialize;
 
 use crate::{
     bson::{doc, Bson},
+    concern::{ReadConcern, ReadConcernLevel},
     error::{Error, ErrorKind},
-    options::{AuthMechanism, ClientOptions, Credential, ListDatabasesOptions},
+    options::{
+        AuthMechanism,
+        ChangeStreamOptions,
+        ClientOptions,
+        Credential,
+        ListDatabasesOptions,
+    },
     selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria},
     test::{util::TestClient, CLIENT_OPTIONS, LOCK},
     Client,
@@ -542,4 +549,56 @@ async fn saslprep() {
     auth_test_uri("IX", "I%C2%ADX", None, true).await;
     auth_test_uri("%E2%85%A8", "IV", None, true).await;
     auth_test_uri("%E2%85%A8", "I%C2%ADV", None, true).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn watch_test_client() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+    if client.server_version_lt(4, 0) || client.is_standalone() {
+        return;
+    }
+    let pipeline = vec![doc! { "$match": { "x": 3 } }];
+    let options = ChangeStreamOptions::builder()
+        .selection_criteria(SelectionCriteria::ReadPreference(ReadPreference::Primary))
+        .read_concern(ReadConcern::from(ReadConcernLevel::Majority))
+        .max_await_time(Duration::from_millis(5))
+        .batch_size(10)
+        .build();
+    client.watch(pipeline, Some(options)).await.unwrap();
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn watch_options_test_client() {
+    let _guard = LOCK.run_concurrently().await;
+    let mut client_options = CLIENT_OPTIONS.clone();
+    client_options.selection_criteria =
+        Some(SelectionCriteria::ReadPreference(ReadPreference::Primary));
+    client_options.read_concern = Some(ReadConcern::from(ReadConcernLevel::Available));
+
+    let client = TestClient::with_options(Some(client_options)).await;
+    if client.server_version_lt(4, 0) || client.is_standalone() {
+        return;
+    }
+    let pipeline = vec![doc! { "$match": { "x": 3 } }];
+    let options = ChangeStreamOptions::builder()
+        .read_concern(ReadConcern::from(ReadConcernLevel::Majority))
+        .max_await_time(Duration::from_millis(5))
+        .batch_size(10)
+        .build();
+
+    let result = client.watch(pipeline, Some(options)).await.unwrap();
+    assert_eq!(
+        result.options().unwrap().selection_criteria.unwrap(),
+        SelectionCriteria::ReadPreference(ReadPreference::Primary)
+    );
+    assert_eq!(
+        result.options().unwrap().read_concern.unwrap(),
+        ReadConcern::from(ReadConcernLevel::Majority)
+    );
 }

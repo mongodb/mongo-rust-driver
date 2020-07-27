@@ -12,12 +12,12 @@ use time::PreciseTime;
 use crate::options::StreamAddress;
 use crate::{
     bson::{Bson, Document},
-    change_stream::{options::ChangeStreamOptions, ChangeStream},
+    change_stream::{options::ChangeStreamOptions, ChangeStream, ChangeStreamTarget},
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::{ErrorKind, Result},
     event::command::CommandEventHandler,
-    operation::ListDatabases,
+    operation::{ListDatabases, Watch},
     options::{
         ClientOptions,
         DatabaseOptions,
@@ -288,10 +288,24 @@ impl Client {
         }
     }
 
+    /// A helper method to start a `ChangeStream`. Used by watch methods in client, coll, and db.
+    pub(crate) async fn start_change_stream(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: Option<ChangeStreamOptions>,
+        target: ChangeStreamTarget,
+    ) -> Result<ChangeStream> {
+        let pipeline: Vec<Document> = pipeline.into_iter().collect();
+        let watch = Watch::new(target, pipeline.clone(), options.clone())?;
+        let (change_stream_spec, session) = self.execute_cursor_operation(watch).await?;
+        Ok(ChangeStream::new(change_stream_spec, session, self.clone()))
+    }
+
     /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
     /// for all changes in the cluster. The stream does not observe changes from system
-    /// collections or the "config", "local" or "admin" databases. Note that this method
-    /// (`watch` on a cluster) is only supported in MongoDB 4.0 or greater.
+    /// collections or the "config", "local" or "admin" databases.
+    ///
+    /// Note that this method (`watch` on a cluster) is only supported in MongoDB 4.0 or greater.
     ///
     /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
     /// streams.
@@ -307,8 +321,15 @@ impl Client {
     pub async fn watch(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
-        options: Option<ChangeStreamOptions>,
+        options: impl Into<Option<ChangeStreamOptions>>,
     ) -> Result<ChangeStream> {
-        todo!();
+        let mut options = options.into();
+        resolve_options!(self, options, [read_concern, selection_criteria]);
+        self.start_change_stream(
+            pipeline,
+            options,
+            ChangeStreamTarget::Cluster("admin".to_string()),
+        )
+        .await
     }
 }

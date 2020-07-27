@@ -6,7 +6,7 @@ use futures::stream::TryStreamExt;
 
 use crate::{
     bson::{Bson, Document},
-    change_stream::{options::ChangeStreamOptions, ChangeStream},
+    change_stream::{options::ChangeStreamOptions, ChangeStream, ChangeStreamTarget},
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{ErrorKind, Result},
@@ -266,6 +266,8 @@ impl Database {
     /// for all changes in this database. The stream does not observe changes from system
     /// collections and cannot be started on "config", "local" or "admin" databases.
     ///
+    /// Note that this method (`watch` on a database) is only supported in MongoDB 4.0 or greater.
+    ///
     /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
     /// streams.
     ///
@@ -280,8 +282,17 @@ impl Database {
     pub async fn watch(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
-        options: Option<ChangeStreamOptions>,
+        options: impl Into<Option<ChangeStreamOptions>>,
     ) -> Result<ChangeStream> {
-        todo!();
+        let mut options = options.into();
+        resolve_options!(self, options, [read_concern, selection_criteria]);
+        let client = self.client();
+        client
+            .start_change_stream(
+                pipeline,
+                options,
+                ChangeStreamTarget::Database(self.name().to_string()),
+            )
+            .await
     }
 }

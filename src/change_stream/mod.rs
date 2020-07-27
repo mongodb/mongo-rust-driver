@@ -13,13 +13,16 @@ use crate::{
         document::{ChangeStreamEventDocument, ResumeToken},
         options::ChangeStreamOptions,
     },
+    client::ClientSession,
+    cursor::CursorSpecification,
     error::Result,
     options::AggregateOptions,
-    selection_criteria::ReadPreference,
+    selection_criteria::SelectionCriteria,
     Client,
     Collection,
     Cursor,
     Database,
+    Namespace,
 };
 
 /// A `ChangeStream` streams the ongoing changes of its associated collection, database or
@@ -72,6 +75,7 @@ use crate::{
 ///
 /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams) for more
 /// details. Also see the documentation on [usage recommendations](https://docs.mongodb.com/manual/administration/change-streams-production-recommendations/).
+#[derive(Debug)]
 pub struct ChangeStream {
     /// The cursor to iterate over `ChangeStreamEventDocument` instances.
     cursor: Cursor,
@@ -93,9 +97,9 @@ pub struct ChangeStream {
     /// The options provided to the initial `$changeStream` stage.
     options: Option<ChangeStreamOptions>,
 
-    /// The read preference for the initial `$changeStream` aggregation, used for server selection
-    /// during an automatic resume.
-    read_preference: Option<ReadPreference>,
+    /// The SelectionCriteria for the initial `$changeStream` aggregation, used for server
+    /// selection during an automatic resume.
+    selection_criteria: Option<SelectionCriteria>,
 
     /// Whether or not the change stream has attempted a resume, used to attempt a resume only
     /// once.
@@ -107,6 +111,25 @@ pub struct ChangeStream {
 }
 
 impl ChangeStream {
+    pub(crate) fn new(
+        spec: ChangeStreamSpecification,
+        session: Option<ClientSession>,
+        client: Client,
+    ) -> Self {
+        let cursor = Cursor::new(client.clone(), spec.cursor_spec, session);
+        Self {
+            cursor,
+            pipeline: spec.pipeline,
+            client,
+            target: spec.target,
+            resume_token: None,
+            options: spec.options.clone(),
+            selection_criteria: spec.options.and_then(|opts| opts.selection_criteria),
+            resume_attempted: false,
+            document_returned: false,
+        }
+    }
+
     /// Returns the cached resume token that can be used to resume after the most recently returned
     /// change.
     ///
@@ -116,13 +139,18 @@ impl ChangeStream {
     pub fn resume_token(&self) -> Option<ResumeToken> {
         todo!();
     }
+
+    #[cfg(test)]
+    pub fn options(&self) -> Option<ChangeStreamOptions> {
+        self.options.clone()
+    }
 }
 
 #[derive(Debug, Clone)]
 pub(crate) enum ChangeStreamTarget {
-    Collection(Collection),
-    Database(Database),
-    Cluster(Database),
+    Collection(Namespace),
+    Database(String),
+    Cluster(String),
 }
 
 impl Stream for ChangeStream {
@@ -130,5 +158,38 @@ impl Stream for ChangeStream {
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
         todo!();
+    }
+}
+
+// Specification used to create a new `ChangeStream`.
+#[derive(Debug)]
+pub(crate) struct ChangeStreamSpecification {
+    /// Specification used to create a cursor wrapped by the `ChangeStream`.
+    pub(crate) cursor_spec: CursorSpecification,
+
+    /// The pipeline of stages to append to an initial `$changeStream` stage.
+    pub(crate) pipeline: Vec<Document>,
+
+    /// The options provided to the initial `$changeStream` stage.
+    pub(crate) options: Option<ChangeStreamOptions>,
+
+    /// The original target of the change stream, used for re-issuing the aggregation during
+    /// an automatic resume.
+    pub(crate) target: ChangeStreamTarget,
+}
+
+impl ChangeStreamSpecification {
+    pub(crate) fn new(
+        cursor_spec: CursorSpecification,
+        pipeline: Vec<Document>,
+        options: Option<ChangeStreamOptions>,
+        target: ChangeStreamTarget,
+    ) -> Self {
+        Self {
+            cursor_spec,
+            pipeline,
+            options,
+            target,
+        }
     }
 }
