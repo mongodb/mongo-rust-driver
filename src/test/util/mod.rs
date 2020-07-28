@@ -98,13 +98,16 @@ impl TestClient {
         }
     }
 
-    pub async fn with_additional_options(options: Option<ClientOptions>, use_multiple_mongoses: bool) -> Self {
+    pub async fn with_additional_options(
+        options: Option<ClientOptions>,
+        use_multiple_mongoses: bool,
+    ) -> Self {
         let mut options = match options {
             Some(mut options) => {
                 options.merge(CLIENT_OPTIONS.clone());
                 options
             }
-            None => CLIENT_OPTIONS.clone()
+            None => CLIENT_OPTIONS.clone(),
         };
         if !use_multiple_mongoses && Self::new().await.is_sharded() {
             options.hosts = options.hosts.iter().cloned().take(1).collect();
