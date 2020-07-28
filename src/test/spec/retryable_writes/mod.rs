@@ -322,7 +322,7 @@ async fn label_not_added_first_read_error() {
     let _guard = LOCK.run_exclusively().await;
 
     let options = ClientOptions::builder().retry_reads(false).build();
-    let client = TestClient::with_additional_options(&options).await;
+    let client = TestClient::with_additional_options(Some(options), false).await;
 
     let req = VersionReq::parse(">=4.0").unwrap();
     let sharded_req = VersionReq::parse(">=4.1.5").unwrap();
@@ -340,7 +340,7 @@ async fn label_not_added_first_read_error() {
 async fn label_not_added_second_read_error() {
     let _guard = LOCK.run_exclusively().await;
 
-    let client = TestClient::new().await;
+    let client = TestClient::with_additional_options(None, false).await;
 
     let req = VersionReq::parse(">=4.0").unwrap();
     let sharded_req = VersionReq::parse(">=4.1.5").unwrap();
