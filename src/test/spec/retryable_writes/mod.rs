@@ -322,7 +322,7 @@ async fn label_not_added_first_read_error() {
     let _guard = LOCK.run_exclusively().await;
 
     let options = ClientOptions::builder().retry_reads(false).build();
-    let client = EventClient::with_additional_options(Some(options), Some(false)).await;
+    let client = TestClient::with_additional_options(&options).await;
 
     let req = VersionReq::parse(">=4.0").unwrap();
     let sharded_req = VersionReq::parse(">=4.1.5").unwrap();
@@ -340,7 +340,7 @@ async fn label_not_added_first_read_error() {
 async fn label_not_added_second_read_error() {
     let _guard = LOCK.run_exclusively().await;
 
-    let client = EventClient::new().await;
+    let client = TestClient::new().await;
 
     let req = VersionReq::parse(">=4.0").unwrap();
     let sharded_req = VersionReq::parse(">=4.1.5").unwrap();
@@ -354,7 +354,7 @@ async fn label_not_added_second_read_error() {
 }
 
 #[function_name::named]
-async fn label_not_added(client: EventClient, times: i32) -> bool {
+async fn label_not_added(client: TestClient, times: i32) -> bool {
     let coll = client
         .init_db_and_coll(&format!("{}{}", function_name!(), times), "coll")
         .await;

@@ -762,6 +762,39 @@ impl ClientOptions {
         }
         Ok(())
     }
+
+    /// Applies the options in other to these options if a value is not already present
+    #[cfg(test)]
+    pub(crate) fn merge(&mut self, other: ClientOptions) {
+        merge_options!(other, self, [
+            app_name,
+            compressors,
+            cmap_event_handler,
+            command_event_handler,
+            connect_timeout,
+            credential,
+            direct_connection,
+            driver_info,
+            heartbeat_freq,
+            local_threshold,
+            max_idle_time,
+            max_pool_size,
+            min_pool_size,
+            read_concern,
+            repl_set_name,
+            retry_reads,
+            retry_writes,
+            selection_criteria,
+            server_selection_timeout,
+            socket_timeout,
+            tls,
+            wait_queue_timeout,
+            write_concern,
+            zlib_compression,
+            original_srv_hostname,
+            original_uri
+        ]);
+    }
 }
 
 /// Splits a string into a section before a given index and a section exclusively after the index.

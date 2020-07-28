@@ -98,6 +98,12 @@ impl TestClient {
         }
     }
 
+    pub async fn with_additional_options(options: &ClientOptions) -> Self {
+        let mut options = options.clone();
+        options.merge(CLIENT_OPTIONS.clone());
+        Self::with_options(Some(options)).await
+    }
+
     pub async fn create_user(
         &self,
         user: &str,
