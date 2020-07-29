@@ -53,6 +53,7 @@ functions:
 
            export MONGO_ORCHESTRATION_HOME="$DRIVERS_TOOLS/.evergreen/orchestration"
            export MONGODB_BINARIES="$DRIVERS_TOOLS/mongodb/bin"
+           export UPLOAD_BUCKET="${project}"
            export PROJECT_DIRECTORY="$(pwd)"
 
            cat <<EOT > expansion.yml
@@ -60,6 +61,7 @@ functions:
            DRIVERS_TOOLS: "$DRIVERS_TOOLS"
            MONGO_ORCHESTRATION_HOME: "$MONGO_ORCHESTRATION_HOME"
            MONGODB_BINARIES: "$MONGODB_BINARIES"
+           UPLOAD_BUCKET: "$UPLOAD_BUCKET"
            PROJECT_DIRECTORY: "$PROJECT_DIRECTORY"
            PREPARE_SHELL: |
               set -o errexit
@@ -67,6 +69,7 @@ functions:
               export DRIVERS_TOOLS="$DRIVERS_TOOLS"
               export MONGO_ORCHESTRATION_HOME="$MONGO_ORCHESTRATION_HOME"
               export MONGODB_BINARIES="$MONGODB_BINARIES"
+              export UPLOAD_BUCKET="$UPLOAD_BUCKET"
               export PROJECT_DIRECTORY="$PROJECT_DIRECTORY"
               export DRIVERS_TOOLS_X509="$DRIVERS_TOOLS/.evergreen/x509gen"
 
@@ -163,13 +166,29 @@ functions:
           ${PREPARE_SHELL}
           .evergreen/check-clippy.sh
 
-  "cleanup":
+  "upload-mo-artifacts":
     - command: shell.exec
       params:
         script: |
           ${PREPARE_SHELL}
-          rm -rf ~/.rustup
+          find $MONGO_ORCHESTRATION_HOME -name \*.log | xargs tar czf mongodb-logs.tar.gz
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: mongodb-logs.tar.gz
+        remote_file: ${UPLOAD_BUCKET}/${build_variant}/${revision}/${version_id}/${build_id}/logs/${task_id}-${execution}-mongodb-logs.tar.gz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: "mongodb-logs.tar.gz"
 
+  "stop mongo orchestration":
+    - command: shell.exec
+      params:
+        script: |
+          ${PREPARE_SHELL}
+          
           cd "$MONGO_ORCHESTRATION_HOME"
           # source the mongo-orchestration virtualenv if it exists
           if [ -f venv/bin/activate ]; then
@@ -178,7 +197,14 @@ functions:
             . venv/Scripts/activate
           fi
           mongo-orchestration stop
-          cd -
+
+
+  "cleanup":
+    - command: shell.exec
+      params:
+        script: |
+          ${PREPARE_SHELL}
+          rm -rf ~/.rustup
           rm -rf $DRIVERS_TOOLS || true
 
   "fix absolute paths":
@@ -229,6 +255,8 @@ pre:
   - func: "install dependencies"
 
 post:
+  - func: "stop mongo orchestration"
+  - func: "upload-mo-artifacts"
   - func: "cleanup"
 
 tasks:

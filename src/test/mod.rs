@@ -14,7 +14,7 @@ pub(crate) use self::{
 use lazy_static::lazy_static;
 
 use self::util::TestLock;
-use crate::{options::ClientOptions, RUNTIME};
+use crate::options::ClientOptions;
 
 const MAX_POOL_SIZE: u32 = 100;
 
@@ -22,7 +22,7 @@ lazy_static! {
     pub(crate) static ref CLIENT_OPTIONS: ClientOptions = {
         let uri = std::env::var("MONGODB_URI")
             .unwrap_or_else(|_| "mongodb://localhost:27017".to_string());
-        let mut options = RUNTIME.block_on(ClientOptions::parse(&uri)).unwrap();
+        let mut options = ClientOptions::parse_without_srv_resolution(&uri).unwrap();
         options.max_pool_size = Some(MAX_POOL_SIZE);
 
         options

@@ -722,6 +722,15 @@ impl ClientOptions {
         Ok(options)
     }
 
+    #[cfg(test)]
+    pub(crate) fn parse_without_srv_resolution(s: &str) -> Result<Self> {
+        let parser = ClientOptionsParser::parse(s)?;
+        let options: Self = parser.into();
+        options.validate()?;
+
+        Ok(options)
+    }
+
     /// Gets the original SRV hostname specified when this ClientOptions was parsed from a URI.
     pub(crate) fn original_srv_hostname(&self) -> Option<&String> {
         self.original_srv_hostname.as_ref()
