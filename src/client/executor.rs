@@ -8,7 +8,7 @@ use time::PreciseTime;
 use crate::{
     bson::Document,
     cmap::Connection,
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
     operation::{Operation, Retryability},
     options::SelectionCriteria,
@@ -135,18 +135,10 @@ impl Client {
 
                 // For a pre-4.4 connection, an error label should be added to any write-retryable
                 // error as long as the retry_writes client option is not set to false. For a 4.4+
-                // connection, a label should be added only to non-command errors.
-                let err = if self.inner.options.retry_writes != Some(false)
-                    && op.retryability() == Retryability::Write
-                {
-                    let add_to_command_error = conn
-                        .stream_description()?
-                        .max_wire_version
-                        .map_or(false, |version| version <= 8);
-                    err.with_retryable_write_label(add_to_command_error)
-                } else {
-                    err
-                };
+                // connection, a label should be added only to network errors.
+                let err = self
+                    .get_error_with_retryable_write_label(&conn, &op, err)
+                    .await?;
 
                 // TODO RUST-90: Do not retry read if session is in a transaction
                 if (self.inner.options.retry_reads != Some(false)
@@ -155,7 +147,7 @@ impl Client {
                     || (self.inner.options.retry_writes != Some(false)
                         && op.retryability() == Retryability::Write
                         && op.is_acknowledged()
-                        && err.contains_label("RetryableWriteError")
+                        && err.is_write_retryable()
                         && conn.stream_description()?.supports_retryable_writes())
                 {
                     err
@@ -200,18 +192,15 @@ impl Client {
                     .handle_post_handshake_error(err.clone(), &conn, server)
                     .await;
 
-                if err.is_server_error() || err.is_read_retryable() || err.is_write_retryable() {
-                    if self.inner.options.retry_writes != Some(false)
-                        && op.retryability() == Retryability::Write
-                    {
-                        let add_to_command_error = conn
-                            .stream_description()?
-                            .max_wire_version
-                            .map_or(false, |version| version <= 8);
-                        Err(err.with_retryable_write_label(add_to_command_error))
-                    } else {
-                        Err(err)
-                    }
+                let err = self
+                    .get_error_with_retryable_write_label(&conn, &op, err)
+                    .await?;
+
+                if err.is_server_error()
+                    || err.is_read_retryable()
+                    || err.is_write_retryable()
+                {
+                    Err(err)
                 } else {
                     Err(first_error)
                 }
@@ -385,6 +374,33 @@ impl Client {
                 Ok(self.inner.topology.session_support_status().await)
             }
             _ => Ok(initial_status),
+        }
+    }
+
+    /// Returns an Error with a "RetryableWriteError" label added if necessary. On a pre-4.4
+    /// connection, a label should be added to any write-retryable error. On a 4.4+ connection, a
+    /// label should only be added to network errors. Regardless of server version, a label should
+    /// only be added if the `retry_writes` client option is not set to `false`.
+    async fn get_error_with_retryable_write_label<T: Operation>(
+        &self,
+        conn: &Connection,
+        op: &T,
+        err: Error,
+    ) -> Result<Error> {
+        if self.inner.options.retry_writes != Some(false)
+            && op.retryability() == Retryability::Write
+        {
+            if let Some(max_wire_version) = conn.stream_description()?.max_wire_version {
+                if err.should_add_retryable_write_label(max_wire_version) {
+                    Ok(err.with_label("RetryableWriteError"))
+                } else {
+                    Ok(err)
+                }
+            } else {
+                Ok(err)
+            }
+        } else {
+            Ok(err)
         }
     }
 }

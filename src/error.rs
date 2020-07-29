@@ -83,7 +83,7 @@ impl Error {
         }
     }
 
-    /// Whether a read operation should be retried if this error occurs
+    /// Whether a read operation should be retried if this error occurs.
     pub(crate) fn is_read_retryable(&self) -> bool {
         if self.is_network_error() {
             return true;
@@ -102,8 +102,18 @@ impl Error {
         }
     }
 
-    // Whether a write operation should be retried if this error occurs
     pub(crate) fn is_write_retryable(&self) -> bool {
+        self.contains_label("RetryableWriteError")
+    }
+
+    /// Whether a "RetryableWriteError" label should be added to this error. If max_wire_version
+    /// indicates a 4.4+ server, a label should only be added if the error is a network error.
+    /// Otherwise, a label should be added if the error is a network error or the error code
+    /// matches one of the retryable write codes.
+    pub(crate) fn should_add_retryable_write_label(&self, max_wire_version: i32) -> bool {
+        if max_wire_version >= 8 {
+            return self.is_network_error();
+        }
         if self.is_network_error() {
             return true;
         }
@@ -113,7 +123,7 @@ impl Error {
         }
     }
 
-    /// Whether an error originated from the server
+    /// Whether an error originated from the server.
     pub(crate) fn is_server_error(&self) -> bool {
         match self.kind.as_ref() {
             ErrorKind::AuthenticationError { .. }
@@ -124,7 +134,7 @@ impl Error {
         }
     }
 
-    /// Returns the labels for this error
+    /// Returns the labels for this error.
     pub fn labels(&self) -> &[String] {
         match self.kind.as_ref() {
             ErrorKind::CommandError(err) => &err.labels,
@@ -144,8 +154,9 @@ impl Error {
         self.labels().contains(&label.as_ref().to_string())
     }
 
-    /// Returns a copy of this Error with the specified label added
-    pub(crate) fn with_label(mut self, label: String) -> Self {
+    /// Returns a copy of this Error with the specified label added.
+    pub(crate) fn with_label<T: AsRef<str>>(mut self, label: T) -> Self {
+        let label = label.as_ref().to_string();
         match self.kind.as_ref() {
             ErrorKind::CommandError(err) => {
                 let mut err = err.clone();
@@ -179,25 +190,6 @@ impl Error {
             _ => {
                 self.labels.push(label);
                 self
-            }
-        }
-    }
-
-    /// Returns a new Error with a "RetryableWriteError" label added if the Error is write
-    /// retryable. Only adds the label to command errors if add_to_command_error is true.
-    pub(crate) fn with_retryable_write_label(self, add_to_command_error: bool) -> Self {
-        if add_to_command_error && self.is_write_retryable() {
-            self.with_label("RetryableWriteError".to_string())
-        } else {
-            match self.kind.as_ref() {
-                ErrorKind::CommandError(_) => self,
-                _ => {
-                    if self.is_write_retryable() {
-                        self.with_label("RetryableWriteError".to_string())
-                    } else {
-                        self
-                    }
-                }
             }
         }
     }
