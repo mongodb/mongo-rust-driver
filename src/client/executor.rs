@@ -121,6 +121,8 @@ impl Client {
                     .handle_post_handshake_error(err.clone(), &conn, server)
                     .await;
 
+                // Retryable writes are only supported by storage engines with document-level
+                // locking, so users need to disable retryable writes if using mmapv1.
                 if let ErrorKind::CommandError(ref err) = err.kind.as_ref() {
                     if err.code == 20 && err.message.starts_with("Transaction numbers") {
                         let mut err = err.clone();
@@ -153,7 +155,7 @@ impl Client {
                     || (self.inner.options.retry_writes != Some(false)
                         && op.retryability() == Retryability::Write
                         && op.is_acknowledged()
-                        && err.labels().contains(&"RetryableWriteError".to_string())
+                        && err.contains_label("RetryableWriteError")
                         && conn.stream_description()?.supports_retryable_writes())
                 {
                     err

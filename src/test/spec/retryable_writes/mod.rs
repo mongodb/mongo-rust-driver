@@ -104,7 +104,7 @@ async fn run_spec_tests() {
                         if let Some(contain) = expected_labels.error_labels_contain {
                             contain.iter().for_each(|label| {
                                 assert!(
-                                    error.labels().contains(label),
+                                    error.contains_label(label),
                                     "{}: error labels should include {}",
                                     description,
                                     label,
@@ -115,7 +115,7 @@ async fn run_spec_tests() {
                         if let Some(omit) = expected_labels.error_labels_omit {
                             omit.iter().for_each(|label| {
                                 assert!(
-                                    !error.labels().contains(label),
+                                    !error.contains_label(label),
                                     "{}: error labels should not include {}",
                                     description,
                                     label,
@@ -320,28 +320,22 @@ async fn mmapv1_error_raised() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn label_not_added_first_read_error() {
     let _guard = LOCK.run_exclusively().await;
-
-    let options = ClientOptions::builder().retry_reads(false).build();
-    let client = TestClient::with_additional_options(Some(options), false).await;
-
-    let req = VersionReq::parse(">=4.0").unwrap();
-    let sharded_req = VersionReq::parse(">=4.1.5").unwrap();
-    if client.is_sharded() && !sharded_req.matches(&client.server_version)
-        || !req.matches(&client.server_version)
-    {
-        return;
-    }
-
-    assert!(label_not_added(client, 1).await);
+    label_not_added(false).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn label_not_added_second_read_error() {
     let _guard = LOCK.run_exclusively().await;
+    label_not_added(true).await;
+}
 
-    let client = TestClient::with_additional_options(None, false).await;
+#[function_name::named]
+async fn label_not_added(retry_reads: bool) {
+    let options = ClientOptions::builder().retry_reads(retry_reads).build();
+    let client = TestClient::with_additional_options(Some(options), false).await;
 
+    // Configuring a failpoint is only supported on 4.0+ replica sets and 4.1.5+ sharded clusters.
     let req = VersionReq::parse(">=4.0").unwrap();
     let sharded_req = VersionReq::parse(">=4.1.5").unwrap();
     if client.is_sharded() && !sharded_req.matches(&client.server_version)
@@ -350,18 +344,13 @@ async fn label_not_added_second_read_error() {
         return;
     }
 
-    assert!(label_not_added(client, 2).await);
-}
-
-#[function_name::named]
-async fn label_not_added(client: TestClient, times: i32) -> bool {
     let coll = client
-        .init_db_and_coll(&format!("{}{}", function_name!(), times), "coll")
+        .init_db_and_coll(&format!("{}{}", function_name!(), retry_reads), "coll")
         .await;
 
     let failpoint = doc! {
         "configureFailPoint": "failCommand",
-        "mode": { "times": times },
+        "mode": { "times": if retry_reads { 2 } else { 1 } },
         "data": {
             "failCommands": ["find"],
             "errorCode": 11600
@@ -375,5 +364,5 @@ async fn label_not_added(client: TestClient, times: i32) -> bool {
 
     let err = coll.find(doc! {}, None).await.unwrap_err();
 
-    !err.labels().contains(&"RetryableWriteError".to_string())
+    assert!(!err.contains_label("RetryableWriteError"));
 }

@@ -273,8 +273,8 @@ impl TestOperation for InsertMany {
             .await?;
         let ids: HashMap<String, Bson> = result
             .inserted_ids
-            .iter()
-            .map(|(k, v)| (k.to_string(), v.clone()))
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v))
             .collect();
         let ids = bson::to_bson(&ids)?;
         Ok(Some(Bson::from(doc! { "insertedIds": ids })))

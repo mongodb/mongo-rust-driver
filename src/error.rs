@@ -140,6 +140,10 @@ impl Error {
         }
     }
 
+    pub fn contains_label<T: AsRef<str>>(&self, label: T) -> bool {
+        self.labels().contains(&label.as_ref().to_string())
+    }
+
     /// Returns a copy of this Error with the specified label added
     pub(crate) fn with_label(mut self, label: String) -> Self {
         match self.kind.as_ref() {
