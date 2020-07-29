@@ -35,6 +35,7 @@ const PLAIN_STR: &str = "PLAIN";
 ///
 /// Note: not all of these mechanisms are currently supported by the driver.
 #[derive(Clone, Deserialize, PartialEq, Debug)]
+#[non_exhaustive]
 pub enum AuthMechanism {
     /// MongoDB Challenge Response nonce and MD5 based authentication system. It is currently
     /// deprecated and will never be supported by this driver.
@@ -75,6 +76,12 @@ pub enum AuthMechanism {
     /// Note: This mechanism is not currently supported by this driver but will be in the future.
     Plain,
 
+    /// MONGODB-AWS authenticates using AWS IAM credentials (an access key ID and a secret access
+    /// key), temporary AWS IAM credentials obtained from an AWS Security Token Service (STS)
+    /// Assume Role request, or temporary AWS IAM credentials assigned to an EC2 instance or ECS
+    /// task.
+    ///
+    /// Note: This mechanism is not currently only supported with the tokio runtime.
     #[cfg(feature = "tokio-runtime")]
     MongoDbAws,
 }
