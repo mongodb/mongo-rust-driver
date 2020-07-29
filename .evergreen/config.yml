@@ -200,6 +200,9 @@ functions:
             mv $i.new $i
           done
 
+          # Copy client certificate because symlinks do not work on Windows.
+          cp ${DRIVERS_TOOLS}/.evergreen/x509gen/client.pem ${MONGO_ORCHESTRATION_HOME}/lib/client.pem
+
   "make files executable":
     - command: shell.exec
       params:
@@ -430,6 +433,9 @@ axes:
         run_on: macos-1014
         variables:
           SINGLE_THREAD: true
+      - id: windows-64-vs2017-small
+        display_name: "Windows (VS 2017)"
+        run_on: windows-64-vs2017-small
 
 buildvariants:
 -
@@ -446,7 +452,9 @@ buildvariants:
      - ".3.6"
 - matrix_name: "atlas-connect"
   matrix_spec:
-    os: "*"
+    os:
+      - ubuntu-16.04
+      - macos-10.14
     async-runtime: "*"
   display_name: "Atlas Connectivity ${os} with ${async-runtime}"
   tasks:

@@ -1,6 +1,9 @@
 use serde::Deserialize;
 
-use crate::{options::ClientOptions, test::run_spec_test};
+use crate::{
+    options::{ClientOptions, ResolverConfig},
+    test::run_spec_test,
+};
 
 #[derive(Debug, Deserialize)]
 struct TestFile {
@@ -37,7 +40,12 @@ async fn run() {
             return;
         }
 
-        let result = ClientOptions::parse(&test_file.uri).await;
+        let result = if cfg!(target_os = "windows") {
+            ClientOptions::parse_with_resolver_config(&test_file.uri, ResolverConfig::cloudflare())
+                .await
+        } else {
+            ClientOptions::parse(&test_file.uri).await
+        };
 
         if let Some(true) = test_file.error {
             assert!(matches!(result, Err(_)), test_file.comment.unwrap());

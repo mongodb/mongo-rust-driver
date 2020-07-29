@@ -24,7 +24,7 @@ use rustls::{
 };
 use serde::Deserialize;
 use strsim::jaro_winkler;
-use trust_dns_resolver::config::ResolverConfig;
+pub use trust_dns_resolver::config::ResolverConfig;
 use typed_builder::TypedBuilder;
 use webpki_roots::TLS_SERVER_ROOTS;
 

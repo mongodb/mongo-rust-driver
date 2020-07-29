@@ -15,6 +15,7 @@ This repository contains the officially supported MongoDB Rust driver, a client 
         - [Inserting documents into a collection](#inserting-documents-into-a-collection)
         - [Finding documents in a collection](#finding-documents-in-a-collection)
     - [Using the sync API](#using-the-sync-api)
+- [Platforms](#platforms)
 - [Atlas note](#atlas-note)
 - [Windows DNS note](#windows-dns-note)
 - [Bug Reporting / Feature Requests](#bug-reporting--feature-requests)
@@ -179,6 +180,10 @@ for result in cursor {
     }
 }
 ```
+
+## Platforms
+
+The driver tests against Linux, MacOS, and Windows in CI.
 
 ## Atlas note
 
