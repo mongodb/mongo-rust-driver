@@ -32,6 +32,7 @@ use crate::{
         PoolCreatedEvent,
     },
     options::StreamAddress,
+    runtime::HttpClient,
     RUNTIME,
 };
 
@@ -83,7 +84,11 @@ struct ConnectionManager {
 }
 
 impl ConnectionManager {
-    fn new(address: StreamAddress, options: Option<ConnectionPoolOptions>) -> Self {
+    fn new(
+        address: StreamAddress,
+        http_client: HttpClient,
+        options: Option<ConnectionPoolOptions>,
+    ) -> Self {
         let connection_options: Option<ConnectionOptions> = options
             .as_ref()
             .map(|pool_options| ConnectionOptions::from(pool_options.clone()));
@@ -93,7 +98,7 @@ impl ConnectionManager {
             total_connection_count: 0,
             next_connection_id: 1,
             generation: 0,
-            establisher: ConnectionEstablisher::new(options.as_ref()),
+            establisher: ConnectionEstablisher::new(http_client, options.as_ref()),
             address,
             connection_options,
         }
@@ -209,8 +214,13 @@ pub(crate) struct ConnectionPoolInner {
 }
 
 impl ConnectionPool {
-    pub(crate) fn new(address: StreamAddress, options: Option<ConnectionPoolOptions>) -> Self {
-        let connection_manager = ConnectionManager::new(address.clone(), options.clone());
+    pub(crate) fn new(
+        address: StreamAddress,
+        http_client: HttpClient,
+        options: Option<ConnectionPoolOptions>,
+    ) -> Self {
+        let connection_manager =
+            ConnectionManager::new(address.clone(), http_client, options.clone());
 
         let event_handler = options.as_ref().and_then(|opts| opts.event_handler.clone());
 

@@ -15,6 +15,7 @@ use crate::{
     cmap::{Command, Connection},
     error::{Error, Result},
     options::{ClientOptions, SelectionCriteria, StreamAddress},
+    runtime::HttpClient,
     sdam::{
         description::{
             server::{ServerDescription, ServerType},
@@ -54,6 +55,7 @@ struct Common {
 /// servers.
 #[derive(Clone, Debug)]
 pub(crate) struct TopologyState {
+    http_client: HttpClient,
     description: TopologyDescription,
     servers: HashMap<StreamAddress, Arc<Server>>,
 }
@@ -67,12 +69,20 @@ impl Topology {
         let hosts: Vec<_> = hosts.cloned().collect();
 
         let description = TopologyDescription::new_from_hosts(hosts.clone());
+
+        let common = Common {
+            message_manager: TopologyMessageManager::new(),
+            options: ClientOptions::new_srv(),
+        };
+
+        let http_client = HttpClient::default();
+
         let servers = hosts
             .into_iter()
             .map(|address| {
                 (
                     address.clone(),
-                    Server::new(address, &Default::default()).into(),
+                    Server::new(address, &ClientOptions::default(), http_client.clone()).into(),
                 )
             })
             .collect();
@@ -80,11 +90,7 @@ impl Topology {
         let state = TopologyState {
             description,
             servers,
-        };
-
-        let common = Common {
-            message_manager: TopologyMessageManager::new(),
-            options: ClientOptions::new_srv(),
+            http_client,
         };
 
         Self {
@@ -107,6 +113,7 @@ impl Topology {
         let mut topology_state = TopologyState {
             description,
             servers: Default::default(),
+            http_client: Default::default(),
         };
 
         for address in hosts.iter() {
@@ -375,7 +382,11 @@ impl TopologyState {
             return;
         }
 
-        let server = Arc::new(Server::new(address.clone(), &options));
+        let server = Arc::new(Server::new(
+            address.clone(),
+            &options,
+            self.http_client.clone(),
+        ));
         self.servers.insert(address, server);
     }
 

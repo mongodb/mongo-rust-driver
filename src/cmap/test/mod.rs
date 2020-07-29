@@ -82,7 +82,11 @@ impl Executor {
             .get_or_insert_with(Default::default)
             .event_handler = Some(handler.clone());
 
-        let pool = ConnectionPool::new(CLIENT_OPTIONS.hosts[0].clone(), test_file.pool_options);
+        let pool = ConnectionPool::new(
+            CLIENT_OPTIONS.hosts[0].clone(),
+            Default::default(),
+            test_file.pool_options,
+        );
 
         let state = State {
             handler,

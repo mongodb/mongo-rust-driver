@@ -14,9 +14,13 @@ use sha1::{Digest, Sha1};
 use sha2::Sha256;
 
 use crate::{
-    bson::{doc, spec::BinarySubtype, Binary, Bson, Document},
-    bson_util,
-    client::auth::{self, Credential},
+    bson::{doc, Bson, Document},
+    client::auth::{
+        self,
+        sasl::{SaslContinue, SaslResponse, SaslStart},
+        AuthMechanism,
+        Credential,
+    },
     cmap::{Command, Connection},
     error::{Error, Result},
 };
@@ -90,13 +94,9 @@ impl ScramVersion {
 
         let nonce = auth::generate_nonce();
 
-        let client_first = ClientFirst::new(username, nonce.as_str());
+        let client_first = ClientFirst::new(source, username, nonce.as_str());
 
-        let command = Command::new(
-            "saslStart".into(),
-            source.into(),
-            client_first.to_command(self),
-        );
+        let command = client_first.to_command(self);
 
         let server_first_response = conn.send_command(command, None).await?;
         let server_first = ServerFirst::parse(server_first_response.raw_response)?;
@@ -123,17 +123,14 @@ impl ScramVersion {
             };
 
         let client_final = ClientFinal::new(
+            source,
             salted_password.as_slice(),
             &client_first,
             &server_first,
             self,
         )?;
 
-        let command = Command::new(
-            "saslContinue".into(),
-            source.into(),
-            client_final.to_command(),
-        );
+        let command = client_final.to_command();
 
         let server_final_response = conn.send_command(command, None).await?;
         let server_final = ServerFinal::parse(server_final_response.raw_response)?;
@@ -142,12 +139,12 @@ impl ScramVersion {
         // Normal SCRAM implementations would cease here. The following round trip is MongoDB
         // implementation specific and just consists of a client no-op followed by a server no-op
         // with "done: true".
-        let noop = doc! {
-            "saslContinue": 1,
-            "conversationId": server_final.conversation_id().clone(),
-            "payload": Bson::Binary(Binary { subtype: BinarySubtype::Generic, bytes: Vec::new() })
-        };
-        let command = Command::new("saslContinue".into(), source.into(), noop);
+        let noop = SaslContinue::new(
+            source.into(),
+            server_final.conversation_id().clone(),
+            Vec::new(),
+        );
+        let command = noop.into_command();
 
         let server_noop_response = conn.send_command(command, None).await?;
 
@@ -187,10 +184,16 @@ impl ScramVersion {
 
     /// HMAC function used as part of SCRAM authentication.
     fn hmac(&self, key: &[u8], input: &[u8]) -> Result<Vec<u8>> {
-        match self {
-            ScramVersion::Sha1 => mac::<Hmac<Sha1>>(key, input),
-            ScramVersion::Sha256 => mac::<Hmac<Sha256>>(key, input),
-        }
+        let bytes = match self {
+            ScramVersion::Sha1 => auth::mac::<Hmac<Sha1>>(key, input, "SCRAM")?
+                .as_ref()
+                .into(),
+            ScramVersion::Sha256 => auth::mac::<Hmac<Sha256>>(key, input, "SCRAM")?
+                .as_ref()
+                .into(),
+        };
+
+        Ok(bytes)
     }
 
     /// Compute the HMAC of the given key and input and verify it matches the given signature.
@@ -265,12 +268,6 @@ fn xor(lhs: &[u8], rhs: &[u8]) -> Vec<u8> {
         .collect()
 }
 
-fn mac<M: Mac>(key: &[u8], input: &[u8]) -> Result<Vec<u8>> {
-    let mut mac = M::new_varkey(key).map_err(|_| Error::unknown_authentication_error("SCRAM"))?;
-    mac.input(input);
-    Ok(mac.result().code().to_vec())
-}
-
 fn mac_verify<M: Mac>(key: &[u8], input: &[u8], signature: &[u8]) -> Result<()> {
     let mut mac = M::new_varkey(key).map_err(|_| Error::unknown_authentication_error("SCRAM"))?;
     mac.input(input);
@@ -304,24 +301,10 @@ fn parse_kvp(str: &str, expected_key: char) -> Result<String> {
     }
 }
 
-fn validate_command_success(response: &Document) -> Result<()> {
-    let ok = response
-        .get("ok")
-        .ok_or_else(|| Error::invalid_authentication_response("SCRAM"))?;
-    match bson_util::get_int(ok) {
-        Some(1) => Ok(()),
-        Some(_) => Err(Error::authentication_error(
-            "SCRAM",
-            response
-                .get_str("errmsg")
-                .unwrap_or("Authentication failure"),
-        )),
-        _ => Err(Error::invalid_authentication_response("SCRAM")),
-    }
-}
-
 /// Model of the first message sent by the client.
 struct ClientFirst {
+    source: String,
+
     message: String,
 
     gs2_header: Range<usize>,
@@ -330,12 +313,13 @@ struct ClientFirst {
 }
 
 impl ClientFirst {
-    fn new(username: &str, nonce: &str) -> Self {
+    fn new(source: &str, username: &str, nonce: &str) -> Self {
         let gs2_header = format!("{},,", NO_CHANNEL_BINDING);
         let bare = format!("{}={},{}={}", USERNAME_KEY, username, NONCE_KEY, nonce);
         let full = format!("{}{}", &gs2_header, &bare);
         let end = full.len();
         ClientFirst {
+            source: source.into(),
             message: full,
             gs2_header: Range {
                 start: 0,
@@ -360,12 +344,12 @@ impl ClientFirst {
         &self.message[..]
     }
 
-    fn to_command(&self, scram: &ScramVersion) -> Document {
-        doc! {
-            "saslStart": 1,
-            "mechanism": scram.to_string(),
-            "payload": Bson::Binary(Binary { subtype: BinarySubtype::Generic, bytes: self.message().as_bytes().to_vec() })
-        }
+    fn to_command(&self, scram: &ScramVersion) -> Command {
+        let payload = self.message().as_bytes().to_vec();
+        let auth_mech = AuthMechanism::from_scram_version(scram);
+        let sasl_start = SaslStart::new(self.source.clone(), auth_mech, payload);
+
+        sasl_start.into_command()
     }
 }
 
@@ -383,20 +367,14 @@ struct ServerFirst {
 
 impl ServerFirst {
     fn parse(response: Document) -> Result<Self> {
-        validate_command_success(&response)?;
+        let SaslResponse {
+            conversation_id,
+            payload,
+            done,
+        } = SaslResponse::parse("SCRAM", response)?;
 
-        let conversation_id = response
-            .get("conversationId")
-            .ok_or_else(|| Error::authentication_error("SCRAM", "mismatched conversationId's"))?;
-        let payload = match response.get_binary_generic("payload") {
-            Ok(p) => p,
-            Err(_) => return Err(Error::invalid_authentication_response("SCRAM")),
-        };
-        let done = response
-            .get_bool("done")
+        let message = str::from_utf8(&payload)
             .map_err(|_| Error::invalid_authentication_response("SCRAM"))?;
-        let message =
-            str::from_utf8(payload).map_err(|_| Error::invalid_authentication_response("SCRAM"))?;
 
         let parts: Vec<&str> = message.split(',').collect();
 
@@ -420,7 +398,7 @@ impl ServerFirst {
         };
 
         Ok(ServerFirst {
-            conversation_id: conversation_id.clone(),
+            conversation_id,
             done,
             message: message.to_string(),
             nonce: full_nonce,
@@ -473,6 +451,7 @@ impl ServerFirst {
 /// Contains the "AuthMessage" mentioned in the RFC used in computing the client and server
 /// signatures.
 struct ClientFinal {
+    source: String,
     message: String,
     auth_message: String,
     conversation_id: Bson,
@@ -480,13 +459,14 @@ struct ClientFinal {
 
 impl ClientFinal {
     fn new(
+        source: &str,
         salted_password: &[u8],
         client_first: &ClientFirst,
         server_first: &ServerFirst,
         scram: &ScramVersion,
     ) -> Result<Self> {
         let client_key = scram.hmac(salted_password, b"Client Key")?;
-        let stored_key = scram.h(client_key.as_slice());
+        let stored_key = scram.h(client_key.as_ref());
 
         let without_proof = format!(
             "{}={},{}={}",
@@ -503,22 +483,20 @@ impl ClientFinal {
         );
         let client_signature = scram.hmac(stored_key.as_slice(), auth_message.as_bytes())?;
         let client_proof =
-            base64::encode(xor(client_key.as_slice(), client_signature.as_slice()).as_slice());
+            base64::encode(xor(client_key.as_ref(), client_signature.as_ref()).as_slice());
 
         let message = format!("{},{}={}", without_proof, PROOF_KEY, client_proof);
 
         Ok(ClientFinal {
+            source: source.into(),
             message,
             auth_message,
             conversation_id: server_first.conversation_id().clone(),
         })
     }
 
-    fn payload(&self) -> Bson {
-        Bson::Binary(Binary {
-            subtype: BinarySubtype::Generic,
-            bytes: self.message().as_bytes().to_vec(),
-        })
+    fn payload(&self) -> Vec<u8> {
+        self.message().as_bytes().to_vec()
     }
 
     fn message(&self) -> &str {
@@ -529,12 +507,13 @@ impl ClientFinal {
         self.auth_message.as_str()
     }
 
-    fn to_command(&self) -> Document {
-        doc! {
-            "saslContinue": 1,
-            "conversationId": self.conversation_id.clone(),
-            "payload": self.payload()
-        }
+    fn to_command(&self) -> Command {
+        SaslContinue::new(
+            self.source.clone(),
+            self.conversation_id.clone(),
+            self.payload(),
+        )
+        .into_command()
     }
 }
 
@@ -554,19 +533,14 @@ struct ServerFinal {
 
 impl ServerFinal {
     fn parse(response: Document) -> Result<Self> {
-        validate_command_success(&response)?;
+        let SaslResponse {
+            conversation_id,
+            payload,
+            done,
+        } = SaslResponse::parse("SCRAM", response)?;
 
-        let conversation_id = response
-            .get("conversationId")
-            .ok_or_else(|| Error::invalid_authentication_response("SCRAM"))?;
-        let done = response
-            .get_bool("done")
+        let message = str::from_utf8(&payload)
             .map_err(|_| Error::invalid_authentication_response("SCRAM"))?;
-        let payload = response
-            .get_binary_generic("payload")
-            .map_err(|_| Error::invalid_authentication_response("SCRAM"))?;
-        let message =
-            str::from_utf8(payload).map_err(|_| Error::invalid_authentication_response("SCRAM"))?;
 
         let first = message
             .chars()
@@ -583,7 +557,7 @@ impl ServerFinal {
         };
 
         Ok(ServerFinal {
-            conversation_id: conversation_id.clone(),
+            conversation_id,
             done,
             body,
         })
@@ -616,7 +590,7 @@ impl ServerFinal {
                     .map_err(|_| Error::invalid_authentication_response("SCRAM"))?;
 
                 scram.hmac_verify(
-                    server_key.as_slice(),
+                    server_key.as_ref(),
                     client_final.auth_message().as_bytes(),
                     body_decoded.as_slice(),
                 )
