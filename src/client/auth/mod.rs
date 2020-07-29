@@ -81,7 +81,7 @@ pub enum AuthMechanism {
     /// Assume Role request, or temporary AWS IAM credentials assigned to an EC2 instance or ECS
     /// task.
     ///
-    /// Note: Only server versions 4.4+ suppport AWS authentication. Additionally, the driver only
+    /// Note: Only server versions 4.4+ support AWS authentication. Additionally, the driver only
     /// supports AWS authentication with the tokio runtime.
     #[cfg(feature = "tokio-runtime")]
     MongoDbAws,
