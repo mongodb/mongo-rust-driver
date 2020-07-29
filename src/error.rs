@@ -111,7 +111,7 @@ impl Error {
     /// Otherwise, a label should be added if the error is a network error or the error code
     /// matches one of the retryable write codes.
     pub(crate) fn should_add_retryable_write_label(&self, max_wire_version: i32) -> bool {
-        if max_wire_version >= 8 {
+        if max_wire_version > 8 {
             return self.is_network_error();
         }
         if self.is_network_error() {
