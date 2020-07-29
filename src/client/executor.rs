@@ -196,10 +196,7 @@ impl Client {
                     .get_error_with_retryable_write_label(&conn, &op, err)
                     .await?;
 
-                if err.is_server_error()
-                    || err.is_read_retryable()
-                    || err.is_write_retryable()
-                {
+                if err.is_server_error() || err.is_read_retryable() || err.is_write_retryable() {
                     Err(err)
                 } else {
                     Err(first_error)
