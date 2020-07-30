@@ -29,6 +29,7 @@ async fn main() -> Result<()> {
 
 #[cfg(feature = "async-std-runtime")]
 #[async_std::main]
+#[cfg(not(feature = "sync"))]
 async fn main() -> Result<()> {
     use mongodb::{options::ClientOptions, Client};
     let client_options = ClientOptions::parse(CONNECTION_URI).await?;
@@ -36,10 +37,3 @@ async fn main() -> Result<()> {
     let database = client.database("test");
     Ok(())
 }
-
-#[cfg(all(
-    not(feature = "sync"),
-    not(feature = "tokio-runtime"),
-    not(feature = "async-std-runtime")
-))]
-fn main() {}
