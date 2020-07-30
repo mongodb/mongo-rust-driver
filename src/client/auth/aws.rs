@@ -39,7 +39,7 @@ pub(super) async fn authenticate_stream(
     let nonce = auth::generate_nonce_bytes();
 
     let client_first_payload = doc! {
-        "r": Binary { subtype: BinarySubtype::Generic, bytes: nonce.clone().into() },
+        "r": Binary { subtype: BinarySubtype::Generic, bytes: nonce.clone().to_vec() },
         // `110` is ASCII for the character `n`, which is required by the spec to indicate that
         // channel binding is not supported.
         "p": 110i32,
