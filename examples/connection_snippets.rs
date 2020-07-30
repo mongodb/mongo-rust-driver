@@ -27,9 +27,8 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "async-std-runtime")]
+#[cfg(all(feature = "async-std-runtime", not(feature = "sync")))]
 #[async_std::main]
-#[cfg(not(feature = "sync"))]
 async fn main() -> Result<()> {
     use mongodb::{options::ClientOptions, Client};
     let client_options = ClientOptions::parse(CONNECTION_URI).await?;
