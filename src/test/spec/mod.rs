@@ -25,16 +25,16 @@ pub use self::runner::{
     TestFile,
 };
 
-use serde::Deserialize;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::bson::Bson;
 
-pub(crate) async fn run_spec_test<'a, T, F, G>(spec: &[&str], run_test_file: F)
+pub(crate) async fn run_spec_test<T, F, G>(spec: &[&str], run_test_file: F)
 where
     F: Fn(T) -> G,
     G: Future<Output = ()>,
-    T: Deserialize<'a>,
+    T: DeserializeOwned,
 {
     let base_path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "src", "test", "spec", "json"]
         .iter()
