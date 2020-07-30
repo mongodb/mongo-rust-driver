@@ -339,6 +339,16 @@ functions:
           export MONGO_ATLAS_FREE_TIER_REPL_URI_SRV='${MONGO_ATLAS_FREE_TIER_REPL_URI_SRV}'
           ASYNC_RUNTIME=${ASYNC_RUNTIME} .evergreen/run-atlas-tests.sh
 
+  "compile only":
+    - command: shell.exec
+      type: test
+      params:
+        shell: bash
+        working_dir: "src"
+        script: |
+          ${PREPARE_SHELL}
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} RUST_VERSION=${RUST_VERSION} .evergreen/compile-only.sh
+
   "check rustfmt":
     - command: shell.exec
       type: test
@@ -629,6 +639,10 @@ tasks:
     commands:
       - func: "run atlas tests"
 
+  - name: "compile-only"
+    commands:
+      - func: "compile only"
+
   - name: "check-rustfmt"
     commands:
       - func: "check rustfmt"
@@ -640,6 +654,16 @@ tasks:
 
 
 axes:
+  - id: "extra-rust-versions"
+    values:
+      - id: "min"
+        display_name: "1.43 (minimum supported version)" 
+        variables:
+          RUST_VERSION: "1.43.1"
+      - id: "nightly"
+        display_name: "nightly"
+        variables:
+          RUST_VERSION: "nightly"
   - id: "mongodb-version"
     display_name: MongoDB Version
     values:
@@ -757,6 +781,15 @@ buildvariants:
   display_name: "AWS Auth ${os} with ${async-runtime}"
   tasks:
     - ".aws-auth"
+- matrix_name: "compile-only"
+  matrix_spec:
+    os:
+      - ubuntu-18.04
+    async-runtime: "*"
+    extra-rust-versions: "*"
+  display_name: "Compile on Rust ${extra-rust-versions} with ${async-runtime}"
+  tasks:
+    - "compile-only"
 
 -
   name: "lint"
