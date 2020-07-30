@@ -7,6 +7,7 @@ use typed_builder::TypedBuilder;
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Default, Serialize, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct Collation {
     /// The ICU locale.
     ///
