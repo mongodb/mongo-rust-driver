@@ -10,6 +10,7 @@ use serde::Serialize;
 /// operation.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct InsertOneResult {
     /// The `_id` field of the document inserted.
     pub inserted_id: Bson,
@@ -31,6 +32,7 @@ impl InsertOneResult {
 /// operation.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct InsertManyResult {
     /// The `_id` field of the documents inserted.
     pub inserted_ids: HashMap<usize, Bson>,
@@ -48,6 +50,7 @@ impl InsertManyResult {
 /// [`Collection::update_many`](../struct.Collection.html#method.update_many) operation.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct UpdateResult {
     /// The number of documents that matched the filter.
     pub matched_count: i64,
@@ -61,6 +64,7 @@ pub struct UpdateResult {
 /// [`Collection::delete_many`](../struct.Collection.html#method.delete_many) operation.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct DeleteResult {
     /// The number of documents deleted by the operation.
     pub deleted_count: i64,
