@@ -152,7 +152,7 @@ define_if_single_runtime_enabled! {
     not(feature = "sync")
 ))]
 compile_error!(
-    "`tokio-runtime` and `async-runtime` can't both be enabled; either disable \
+    "`tokio-runtime` and `async-std-runtime` can't both be enabled; either disable \
      `async-std-runtime` or set `default-features = false` in your Cargo.toml"
 );
 
@@ -164,7 +164,7 @@ compile_error!(
 
 #[cfg(all(not(feature = "tokio-runtime"), not(feature = "async-std-runtime")))]
 compile_error!(
-    "one of `tokio-runtime`, `async-runtime`, or `sync` must be enabled; either enable \
+    "one of `tokio-runtime`, `async-std-runtime`, or `sync` must be enabled; either enable \
      `default-features`, or enable one of those features specifically in your Cargo.toml"
 );
 
