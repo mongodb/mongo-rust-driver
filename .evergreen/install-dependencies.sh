@@ -18,5 +18,8 @@ fi
 echo 'export PATH=$PATH:~/.cargo/bin' >> ~/.cargo/env
 
 echo "export CARGO_NET_GIT_FETCH_WITH_CLI=true" >> ~/.cargo/env
+
 . ~/.cargo/env
+
+# Install nightly rustfmt
 rustup toolchain install nightly -c rustfmt
