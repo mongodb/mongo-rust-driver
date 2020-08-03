@@ -93,6 +93,19 @@ impl Client {
             }
         };
 
+        let retryability = match op.retryability() {
+            Retryability::Read if self.inner.options.retry_reads != Some(false) => {
+                Retryability::Read
+            }
+            Retryability::Write
+                if self.inner.options.retry_writes != Some(false)
+                    && conn.stream_description()?.supports_retryable_writes() =>
+            {
+                Retryability::Write
+            }
+            _ => Retryability::None,
+        };
+
         let txn_number = match session {
             Some(ref mut session) => {
                 if self.inner.options.retry_writes != Some(false)
@@ -141,14 +154,8 @@ impl Client {
                     .await?;
 
                 // TODO RUST-90: Do not retry read if session is in a transaction
-                if (self.inner.options.retry_reads != Some(false)
-                    && op.retryability() == Retryability::Read
-                    && err.is_read_retryable())
-                    || (self.inner.options.retry_writes != Some(false)
-                        && op.retryability() == Retryability::Write
-                        && op.is_acknowledged()
-                        && err.is_write_retryable()
-                        && conn.stream_description()?.supports_retryable_writes())
+                if retryability == Retryability::Read && err.is_read_retryable()
+                    || retryability == Retryability::Write && err.is_write_retryable()
                 {
                     err
                 } else {
@@ -389,15 +396,10 @@ impl Client {
         {
             if let Some(max_wire_version) = conn.stream_description()?.max_wire_version {
                 if err.should_add_retryable_write_label(max_wire_version) {
-                    Ok(err.with_label("RetryableWriteError"))
-                } else {
-                    Ok(err)
+                    return Ok(err.with_label("RetryableWriteError"));
                 }
-            } else {
-                Ok(err)
             }
-        } else {
-            Ok(err)
         }
+        Ok(err)
     }
 }

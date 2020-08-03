@@ -153,6 +153,9 @@ struct WriteResponseBody<T = EmptyBody> {
 
     #[serde(rename = "writeConcernError")]
     write_concern_error: Option<WriteConcernError>,
+
+    #[serde(rename = "errorLabels")]
+    labels: Option<Vec<String>>,
 }
 
 impl<T> WriteResponseBody<T> {
@@ -161,9 +164,21 @@ impl<T> WriteResponseBody<T> {
             return Ok(());
         };
 
+        // Error labels for WriteConcernErrors are sent from the server in a separate field.
+        let write_concern_error = match self.write_concern_error {
+            Some(ref write_concern_error) => {
+                let mut write_concern_error = write_concern_error.clone();
+                if let Some(ref labels) = self.labels {
+                    write_concern_error.labels.append(&mut labels.clone());
+                }
+                Some(write_concern_error)
+            }
+            None => None,
+        };
+
         let failure = BulkWriteFailure {
             write_errors: self.write_errors.clone(),
-            write_concern_error: self.write_concern_error.clone(),
+            write_concern_error,
         };
 
         Err(ErrorKind::BulkWriteError(failure).into())
