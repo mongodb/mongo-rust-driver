@@ -2,12 +2,12 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 
-use crate::error::Result;
-use crate as mongodb;
+extern crate mongodb;
 
 #[cfg(feature = "tokio-runtime")]
-async fn connect() -> Result<()> {
-    // CONNECTION EXAMPLE STARTS HERE
+// CONNECTION EXAMPLE STARTS HERE
+#[tokio::main]
+async fn main() -> mongodb::error::Result<()> {
     use mongodb::{options::ClientOptions, Client};
     let client_options = ClientOptions::parse(
         "mongodb+srv://<username>:<password>@<cluster-url>/<dbname>?w=majority",
@@ -15,6 +15,6 @@ async fn connect() -> Result<()> {
     .await?;
     let client = Client::with_options(client_options)?;
     let database = client.database("test");
-    // CONNECTION EXAMPLE ENDS HERE
     Ok(())
 }
+// CONNECTION EXAMPLE ENDS HERE
