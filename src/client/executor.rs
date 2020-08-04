@@ -171,11 +171,11 @@ impl Client {
                 return Err(first_error);
             }
         };
-        if !conn.stream_description()?.supports_retryable_writes() {
-            return Err(first_error);
-        }
 
         let retryability = self.get_retryability(&conn, &op).await?;
+        if retryability == Retryability::None {
+            return Err(first_error);
+        }
 
         match self
             .execute_operation_on_connection(&op, &mut conn, &mut session, txn_number)
