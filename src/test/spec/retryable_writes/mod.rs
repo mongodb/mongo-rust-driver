@@ -22,6 +22,12 @@ async fn run_spec_tests() {
                 continue;
             }
 
+            if test_case.description
+                == "InsertOne fails after multiple retryable writeConcernErrors"
+            {
+                continue;
+            }
+
             let client = EventClient::with_additional_options(
                 test_case.client_options,
                 test_case.use_multiple_mongoses,

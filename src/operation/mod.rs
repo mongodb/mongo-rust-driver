@@ -206,7 +206,7 @@ struct CursorInfo {
     first_batch: VecDeque<Document>,
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub(crate) enum Retryability {
     Write,
     Read,

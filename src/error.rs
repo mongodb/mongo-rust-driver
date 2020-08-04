@@ -152,7 +152,7 @@ impl Error {
 
     /// Whether this error contains the specified label.
     pub fn contains_label<T: AsRef<str>>(&self, label: T) -> bool {
-        self.labels().contains(&label.as_ref().to_string())
+        self.labels().iter().any(|actual_label| actual_label.as_str() == label.as_ref())
     }
 
     /// Returns a copy of this Error with the specified label added.
