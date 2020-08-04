@@ -4,35 +4,35 @@
 
 extern crate mongodb;
 
-use mongodb::error::Result;
+#[cfg(feature = "tokio-runtime")]
+use tokio::main;
 
-const CONNECTION_URI: &str =
-    "mongodb+srv://<username>:<password>@<cluster-url>/<dbname>?w=majority";
+#[cfg(feature = "async-std-runtime")]
+use async_std::main;
+
+use mongodb::error::Result;
 
 #[cfg(feature = "sync")]
 fn main() -> Result<()> {
     use mongodb::sync::Client;
-    let client = Client::with_uri_str(CONNECTION_URI)?;
+    let client = Client::with_uri_str(
+        "mongodb+srv://<username>:<password>@<cluster-url>/<dbname>?w=majority",
+    )?;
     let database = client.database("test");
     Ok(())
 }
 
-#[cfg(feature = "tokio-runtime")]
-#[tokio::main]
+#[cfg(not(feature = "sync"))]
+#[crate::main]
 async fn main() -> Result<()> {
+    // CONNECTION EXAMPLE STARTS HERE
     use mongodb::{options::ClientOptions, Client};
-    let client_options = ClientOptions::parse(CONNECTION_URI).await?;
+    let client_options = ClientOptions::parse(
+        "mongodb+srv://<username>:<password>@<cluster-url>/<dbname>?w=majority",
+    )
+    .await?;
     let client = Client::with_options(client_options)?;
     let database = client.database("test");
-    Ok(())
-}
-
-#[cfg(all(feature = "async-std-runtime", not(feature = "sync")))]
-#[async_std::main]
-async fn main() -> Result<()> {
-    use mongodb::{options::ClientOptions, Client};
-    let client_options = ClientOptions::parse(CONNECTION_URI).await?;
-    let client = Client::with_options(client_options)?;
-    let database = client.database("test");
+    // CONNECTION EXAMPLE ENDS HERE
     Ok(())
 }
