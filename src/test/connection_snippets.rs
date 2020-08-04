@@ -2,29 +2,11 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 
-extern crate mongodb;
+use crate::error::Result;
+use crate as mongodb;
 
 #[cfg(feature = "tokio-runtime")]
-use tokio::main;
-
-#[cfg(feature = "async-std-runtime")]
-use async_std::main;
-
-use mongodb::error::Result;
-
-#[cfg(feature = "sync")]
-fn main() -> Result<()> {
-    use mongodb::sync::Client;
-    let client = Client::with_uri_str(
-        "mongodb+srv://<username>:<password>@<cluster-url>/<dbname>?w=majority",
-    )?;
-    let database = client.database("test");
-    Ok(())
-}
-
-#[cfg(not(feature = "sync"))]
-#[crate::main]
-async fn main() -> Result<()> {
+async fn connect() -> Result<()> {
     // CONNECTION EXAMPLE STARTS HERE
     use mongodb::{options::ClientOptions, Client};
     let client_options = ClientOptions::parse(
