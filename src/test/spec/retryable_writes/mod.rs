@@ -10,7 +10,7 @@ use crate::{
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::ErrorKind,
     options::{ClientOptions, CollectionOptions, FindOptions, InsertManyOptions},
-    test::{assert_matches, run_spec_test, EventClient, TestClient, LOCK},
+    test::{assert_matches, run_spec_test, util::get_db_name, EventClient, TestClient, LOCK},
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -42,9 +42,7 @@ async fn run_spec_tests() {
                 }
             }
 
-            let mut db_name = test_case.description.replace('$', "%").replace(' ', "_");
-            // database names must have fewer than 64 characters
-            db_name.truncate(63);
+            let db_name = get_db_name(&test_case.description);
             let coll_name = "coll";
 
             let write_concern = WriteConcern::builder().w(Acknowledgment::Majority).build();
@@ -180,7 +178,7 @@ async fn transaction_ids_excluded() {
 
     let coll = client.init_db_and_coll(function_name!(), "coll").await;
 
-    let excludes = |command_name: &str| -> bool {
+    let excludes_txn_number = |command_name: &str| -> bool {
         let (started, _) = client.get_successful_command_execution(command_name);
         !started.command.contains_key("txnNumber")
     };
@@ -188,10 +186,10 @@ async fn transaction_ids_excluded() {
     coll.update_many(doc! {}, doc! { "$set": doc! { "x": 1 } }, None)
         .await
         .unwrap();
-    assert!(excludes("update"));
+    assert!(excludes_txn_number("update"));
 
     coll.delete_many(doc! {}, None).await.unwrap();
-    assert!(excludes("delete"));
+    assert!(excludes_txn_number("delete"));
 
     coll.aggregate(
         vec![
@@ -202,7 +200,7 @@ async fn transaction_ids_excluded() {
     )
     .await
     .unwrap();
-    assert!(excludes("aggregate"));
+    assert!(excludes_txn_number("aggregate"));
 
     let req = semver::VersionReq::parse(">=4.2").unwrap();
     if req.matches(&client.server_version) {
@@ -215,7 +213,7 @@ async fn transaction_ids_excluded() {
         )
         .await
         .unwrap();
-        assert!(excludes("aggregate"));
+        assert!(excludes_txn_number("aggregate"));
     }
 }
 
@@ -233,51 +231,51 @@ async fn transaction_ids_included() {
 
     let coll = client.init_db_and_coll(function_name!(), "coll").await;
 
-    let includes = |command_name: &str| -> bool {
+    let includes_txn_number = |command_name: &str| -> bool {
         let (started, _) = client.get_successful_command_execution(command_name);
         started.command.contains_key("txnNumber")
     };
 
     coll.insert_one(doc! { "x": 1 }, None).await.unwrap();
-    assert!(includes("insert"));
+    assert!(includes_txn_number("insert"));
 
     coll.update_one(doc! {}, doc! { "$set": doc! { "x": 1 } }, None)
         .await
         .unwrap();
-    assert!(includes("update"));
+    assert!(includes_txn_number("update"));
 
     coll.replace_one(doc! {}, doc! { "x": 1 }, None)
         .await
         .unwrap();
-    assert!(includes("update"));
+    assert!(includes_txn_number("update"));
 
     coll.delete_one(doc! {}, None).await.unwrap();
-    assert!(includes("delete"));
+    assert!(includes_txn_number("delete"));
 
     coll.find_one_and_delete(doc! {}, None).await.unwrap();
-    assert!(includes("findAndModify"));
+    assert!(includes_txn_number("findAndModify"));
 
     coll.find_one_and_replace(doc! {}, doc! { "x": 1 }, None)
         .await
         .unwrap();
-    assert!(includes("findAndModify"));
+    assert!(includes_txn_number("findAndModify"));
 
     coll.find_one_and_update(doc! {}, doc! { "$set": doc! { "x": 1 } }, None)
         .await
         .unwrap();
-    assert!(includes("findAndModify"));
+    assert!(includes_txn_number("findAndModify"));
 
     let options = InsertManyOptions::builder().ordered(true).build();
     coll.insert_many(vec![doc! { "x": 1 }], options)
         .await
         .unwrap();
-    assert!(includes("insert"));
+    assert!(includes_txn_number("insert"));
 
     let options = InsertManyOptions::builder().ordered(false).build();
     coll.insert_many(vec![doc! { "x": 1 }], options)
         .await
         .unwrap();
-    assert!(includes("insert"));
+    assert!(includes_txn_number("insert"));
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

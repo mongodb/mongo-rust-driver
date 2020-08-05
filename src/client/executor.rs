@@ -96,18 +96,10 @@ impl Client {
         let retryability = self.get_retryability(&conn, &op).await?;
 
         let txn_number = match session {
-            Some(ref mut session) => {
-                if self.inner.options.retry_writes != Some(false)
-                    && op.retryability() == Retryability::Write
-                    && op.is_acknowledged()
-                    && conn.stream_description()?.supports_retryable_writes()
-                {
-                    Some(session.get_and_increment_txn_number())
-                } else {
-                    None
-                }
+            Some(ref mut session) if retryability == Retryability::Write => {
+                Some(session.get_and_increment_txn_number())
             }
-            None => None,
+            _ => None,
         };
 
         let first_error = match self

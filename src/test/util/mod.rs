@@ -266,3 +266,10 @@ pub struct IsMasterCommandResponse {
     pub election_id: Option<ObjectId>,
     pub primary: Option<String>,
 }
+
+pub fn get_db_name(description: &str) -> String {
+    let mut db_name = description.replace('$', "%").replace(' ', "_");
+    // database names must have fewer than 64 characters
+    db_name.truncate(63);
+    db_name
+}

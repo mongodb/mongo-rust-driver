@@ -9,7 +9,10 @@ use crate::{
     concern::{Acknowledgment, WriteConcern},
     operation::RunCommand,
     options::CollectionOptions,
-    test::{assert_matches, util::EventClient},
+    test::{
+        assert_matches,
+        util::{get_db_name, EventClient},
+    },
 };
 
 pub use self::{
@@ -62,7 +65,7 @@ pub async fn run_v2_test(test_file: TestFile) {
 
         let db_name = match test_file.database_name {
             Some(ref db_name) => db_name.clone(),
-            None => test_case.description.replace('$', "%").replace(' ', "_"),
+            None => get_db_name(&test_case.description),
         };
 
         let coll_name = match test_file.collection_name {
