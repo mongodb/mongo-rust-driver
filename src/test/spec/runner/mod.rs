@@ -51,6 +51,7 @@ pub async fn run_v2_test(test_file: TestFile) {
 
         let client = EventClient::with_additional_options(
             test_case.client_options,
+            Some(Duration::from_millis(50)),
             test_case.use_multiple_mongoses,
         )
         .await;

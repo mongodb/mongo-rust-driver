@@ -1,5 +1,7 @@
 mod test_file;
 
+use std::time::Duration;
+
 use futures::stream::TryStreamExt;
 use semver::VersionReq;
 
@@ -30,6 +32,7 @@ async fn run_spec_tests() {
 
             let client = EventClient::with_additional_options(
                 test_case.client_options,
+                Some(Duration::from_millis(50)),
                 test_case.use_multiple_mongoses,
             )
             .await;

@@ -1,6 +1,7 @@
 use std::{
     collections::VecDeque,
     sync::{Arc, RwLock},
+    time::Duration,
 };
 
 use super::TestClient;
@@ -145,6 +146,7 @@ impl EventClient {
 
     pub async fn with_additional_options(
         options: Option<ClientOptions>,
+        heartbeat_freq: Option<Duration>,
         use_multiple_mongoses: Option<bool>,
     ) -> Self {
         let mut options = match options {
@@ -155,6 +157,7 @@ impl EventClient {
             }
             None => CLIENT_OPTIONS.clone(),
         };
+        options.heartbeat_freq_test = heartbeat_freq;
         if TestClient::new().await.is_sharded() && use_multiple_mongoses != Some(true) {
             options.hosts = options.hosts.iter().cloned().take(1).collect();
         }

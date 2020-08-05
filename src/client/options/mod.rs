@@ -373,6 +373,10 @@ pub struct ClientOptions {
     #[builder(default)]
     #[serde(skip)]
     pub(crate) resolver_config: Option<ResolverConfig>,
+
+    /// Used by tests to override MIN_HEARTBEAT_FREQUENCY.
+    #[builder(default)]
+    pub(crate) heartbeat_freq_test: Option<Duration>,
 }
 
 fn default_hosts() -> Vec<StreamAddress> {
@@ -588,6 +592,7 @@ impl From<ClientOptionsParser> for ClientOptions {
             original_srv_hostname: None,
             original_uri: Some(parser.original_uri),
             resolver_config: None,
+            heartbeat_freq_test: None,
         }
     }
 }
