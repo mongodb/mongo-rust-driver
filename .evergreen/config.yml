@@ -755,6 +755,7 @@ buildvariants:
     os:
       - ubuntu-16.04
       - macos-10.14
+      - windows-64-vs2017-small
     auth-and-tls: "*"
     async-runtime: "*"
   display_name: "${os} ${auth-and-tls} with ${async-runtime}"
@@ -769,6 +770,7 @@ buildvariants:
     os:
       - ubuntu-16.04
       - macos-10.14
+      - windows-64-vs2017-small
     async-runtime: "*"
   display_name: "Atlas Connectivity ${os} with ${async-runtime}"
   tasks:
