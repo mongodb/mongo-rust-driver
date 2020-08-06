@@ -615,7 +615,7 @@ impl Collection {
 }
 
 /// A struct modeling the canonical name for a collection in MongoDB.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Namespace {
     /// The name of the database associated with this namespace.
     pub db: String,
@@ -632,16 +632,8 @@ impl Namespace {
             coll: String::new(),
         }
     }
-}
 
-impl fmt::Display for Namespace {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "{}.{}", self.db, self.coll)
-    }
-}
-
-impl<'de> Deserialize<'de> for Namespace {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    pub(crate) fn deserialize_ns<'de, D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -658,5 +650,11 @@ impl<'de> Deserialize<'de> for Namespace {
             }),
             _ => Err(D::Error::custom("Missing one or more fields in namespace")),
         }
+    }
+}
+
+impl fmt::Display for Namespace {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "{}.{}", self.db, self.coll)
     }
 }

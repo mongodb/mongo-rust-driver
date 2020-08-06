@@ -188,6 +188,7 @@ struct CursorBody {
 #[derive(Debug, Deserialize)]
 struct CursorInfo {
     id: i64,
+    #[serde(deserialize_with = "Namespace::deserialize_ns")]
     ns: Namespace,
     #[serde(rename = "firstBatch")]
     first_batch: VecDeque<Document>,

@@ -3,6 +3,7 @@ pub mod options;
 use std::sync::Arc;
 
 use futures::stream::TryStreamExt;
+use serde::{Deserialize, Deserializer};
 
 use crate::{
     bson::{Bson, Document},
@@ -294,5 +295,20 @@ impl Database {
                 ChangeStreamTarget::Database(self.name().to_string()),
             )
             .await
+    }
+
+    pub(crate) fn deserialize_str_from_map<'de, D>(
+        deserializer: D,
+    ) -> std::result::Result<String, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Db {
+            db: String,
+        }
+
+        let db_object: Db = Deserialize::deserialize(deserializer)?;
+        Ok(db_object.db)
     }
 }

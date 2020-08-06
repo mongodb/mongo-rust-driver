@@ -1,5 +1,5 @@
 //! Contains documents related to a ChangeStream event.
-use crate::coll::Namespace;
+use crate::{coll::Namespace, db::Database};
 use bson::{Bson, Document};
 use serde::{Deserialize, Serialize};
 
@@ -66,7 +66,7 @@ pub struct ChangeStreamEventDocument {
 }
 
 /// Describes which fields have been updated or removed from a document.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct UpdateDescription {
@@ -109,7 +109,7 @@ pub enum OperationType {
 }
 
 /// Identifies which collection or database where an event occurred.
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, PartialEq)]
 #[serde(untagged)]
 pub enum ChangeStreamEventSource {
     /// Contains two fields: "db" and "coll" containing the database and collection name in which
@@ -117,5 +117,6 @@ pub enum ChangeStreamEventSource {
     Namespace(Namespace),
 
     // Contains the name of the dabatase in which the change happened.
+    #[serde(deserialize_with = "Database::deserialize_str_from_map")]
     Database(String),
 }

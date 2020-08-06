@@ -4,7 +4,7 @@ pub(crate) mod options;
 
 use std::{marker::PhantomData, pin::Pin, task::Poll};
 
-use bson::Document;
+use bson::{Bson, Document};
 use futures::{stream::Stream, task::Context};
 use serde::{de::DeserializeOwned, Deserialize};
 
@@ -154,10 +154,20 @@ pub(crate) enum ChangeStreamTarget {
 }
 
 impl Stream for ChangeStream {
-    type Item = ChangeStreamEventDocument;
+    type Item = Result<ChangeStreamEventDocument>;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        todo!();
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
+        let poll = Pin::new(&mut self.cursor).poll_next(cx);
+        // Using existing Poll instead of constructing a new one would lead to it having the wrong
+        // generic type parameter.
+        match poll {
+            Poll::Ready(Some(Ok(doc))) => {
+                Poll::Ready(Some(Ok(bson::from_bson(Bson::Document(doc))?)))
+            }
+            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
+            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Pending => Poll::Pending,
+        }
     }
 }
 

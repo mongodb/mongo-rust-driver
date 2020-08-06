@@ -1,5 +1,6 @@
 mod atlas_connectivity;
 mod auth_aws;
+mod change_stream;
 mod client;
 mod coll;
 mod cursor;
