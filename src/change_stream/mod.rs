@@ -65,6 +65,7 @@ use crate::{
 ///     coll_ref.insert_one(doc! { "x": 1 }, None).await;
 /// });
 /// while let Some(document) = change_stream.next().await {
+///     let document = document?;
 ///     println!("operation performed: {:?}, document: {:?}", document.operation_type, document.full_document);
 ///     // operation performed: Insert, document: Some(Document({"x": Int32(1)}))
 /// }
