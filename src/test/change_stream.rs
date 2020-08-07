@@ -592,7 +592,7 @@ async fn change_stream_rename() {
             .database("admin")
             .run_command(
                 doc! {
-                    "renameCollection": format!("{}.{}", function_name!().to_string(), function_name!().to_string()),
+                    "renameCollection": format!("{}.{}", function_name!(), function_name!()),
                     "to": format!("{}.{}", function_name!().to_string(), "new_coll".to_string()),
                 },
                 None,
