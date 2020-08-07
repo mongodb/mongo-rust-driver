@@ -504,7 +504,7 @@ async fn change_stream_drop() {
     };
 
     let client = TestClient::new().await;
-    if client.is_standalone() {
+    if client.server_version_lt(4, 0) || client.is_standalone() {
         return;
     }
 
@@ -569,7 +569,7 @@ async fn change_stream_rename() {
     };
 
     let client = TestClient::new().await;
-    if client.is_standalone() {
+    if client.server_version_lt(4, 0) || client.is_standalone() {
         return;
     }
 
