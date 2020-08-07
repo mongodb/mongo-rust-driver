@@ -1,5 +1,5 @@
 //! Contains documents related to a ChangeStream event.
-use crate::{coll::Namespace, db::Database};
+use crate::{bson_util, coll::Namespace, db::Database};
 use bson::{Bson, Document};
 use serde::{Deserialize, Serialize};
 
@@ -117,6 +117,6 @@ pub enum ChangeStreamEventSource {
     Namespace(Namespace),
 
     // Contains the name of the dabatase in which the change happened.
-    #[serde(deserialize_with = "Database::deserialize_str_from_map")]
+    #[serde(deserialize_with = "bson_util::deserialize_str_from_map")]
     Database(String),
 }

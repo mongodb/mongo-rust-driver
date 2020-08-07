@@ -24,10 +24,10 @@ async fn empty_change_stream() {
     let pipeline = vec![doc! { "$match": { "x": 3 } }];
     let options = ChangeStreamOptions::builder()
         .selection_criteria(SelectionCriteria::ReadPreference(ReadPreference::Primary))
-        .max_await_time(Duration::from_millis(5))
+        .max_await_time(Duration::from_millis(500))
         .batch_size(10)
         .build();
-    let mut change_stream = client.watch(pipeline, Some(options)).await.unwrap();
+    let mut change_stream = client.watch(pipeline, options).await.unwrap();
     let result = RUNTIME
         .timeout(Duration::from_millis(5), change_stream.next())
         .await;
@@ -46,7 +46,7 @@ async fn change_stream_insert_one() {
     };
 
     let client = TestClient::new().await;
-    if client.server_version_lt(4, 0) || client.is_standalone() {
+    if client.is_standalone() {
         return;
     }
 
@@ -91,7 +91,7 @@ async fn change_stream_insert_many() {
     };
 
     let client = TestClient::new().await;
-    if client.server_version_lt(4, 0) || client.is_standalone() {
+    if client.is_standalone() {
         return;
     }
 
@@ -117,7 +117,7 @@ async fn change_stream_insert_many() {
         coll_ref.insert_many(docs, None).await.unwrap();
     });
 
-    for id in 1..4 {
+    for id in 1..=3 {
         let document = change_stream.next().await.unwrap().unwrap();
         assert_eq!(document.operation_type, OperationType::Insert);
         assert_eq!(
@@ -140,7 +140,7 @@ async fn change_stream_update_one() {
     };
 
     let client = TestClient::new().await;
-    if client.server_version_lt(4, 0) || client.is_standalone() {
+    if client.is_standalone() {
         return;
     }
 
@@ -154,22 +154,19 @@ async fn change_stream_update_one() {
         .await
         .unwrap();
 
+    let original_doc = doc! { "_id": 1, "x": 1 };
+    coll.insert_one(original_doc.clone(), None).await.unwrap();
+
     let mut change_stream = coll.watch(None, None).await.unwrap();
 
     let coll_ref = coll.clone();
     RUNTIME.spawn(async move {
-        let original_doc = doc! { "_id": 1, "x": 1 };
-        coll_ref
-            .insert_one(original_doc.clone(), None)
-            .await
-            .unwrap();
         coll_ref
             .update_one(original_doc, doc! { "$set": { "x": 5 } }, None)
             .await
             .unwrap();
     });
 
-    let _insert_document = change_stream.next().await.unwrap().unwrap();
     let update_document = change_stream.next().await.unwrap().unwrap();
 
     assert_eq!(update_document.operation_type, OperationType::Update);
@@ -196,7 +193,7 @@ async fn change_stream_update_lookup() {
     let _guard = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
-    if client.server_version_lt(4, 0) || client.is_standalone() {
+    if client.is_standalone() {
         return;
     }
 
@@ -214,22 +211,19 @@ async fn change_stream_update_lookup() {
         .full_document(FullDocumentType::UpdateLookup)
         .build();
 
-    let mut change_stream = coll.watch(None, Some(change_stream_options)).await.unwrap();
+    let original_doc = doc! { "_id": 1, "x": 1 };
+    coll.insert_one(original_doc.clone(), None).await.unwrap();
+
+    let mut change_stream = coll.watch(None, change_stream_options).await.unwrap();
 
     let coll_ref = coll.clone();
     RUNTIME.spawn(async move {
-        let original_doc = doc! { "_id": 1, "x": 1 };
-        coll_ref
-            .insert_one(original_doc.clone(), None)
-            .await
-            .unwrap();
         coll_ref
             .update_one(original_doc, doc! {"$set": { "x": 5 }}, None)
             .await
             .unwrap();
     });
 
-    let _insert_document = change_stream.next().await.unwrap().unwrap();
     let update_document = change_stream.next().await.unwrap().unwrap();
     assert_eq!(
         update_document.full_document,
@@ -249,7 +243,7 @@ async fn change_stream_upsert() {
     };
 
     let client = TestClient::new().await;
-    if client.server_version_lt(4, 0) || client.is_standalone() {
+    if client.is_standalone() {
         return;
     }
 
@@ -263,15 +257,13 @@ async fn change_stream_upsert() {
         .await
         .unwrap();
 
+    let original_doc = doc! { "_id": 1, "x": 1 };
+    coll.insert_one(original_doc.clone(), None).await.unwrap();
+
     let mut change_stream = coll.watch(None, None).await.unwrap();
 
     let coll_ref = coll.clone();
     RUNTIME.spawn(async move {
-        let original_doc = doc! { "_id": 1, "x": 1 };
-        coll_ref
-            .insert_one(original_doc.clone(), None)
-            .await
-            .unwrap();
         let filter = doc! { "x": { "$gt": 1 } };
         let options = UpdateOptions {
             upsert: Some(true),
@@ -283,7 +275,6 @@ async fn change_stream_upsert() {
             .unwrap();
     });
 
-    let _insert_document = change_stream.next().await.unwrap().unwrap();
     let upsert_document = change_stream.next().await.unwrap().unwrap();
     assert_eq!(upsert_document.operation_type, OperationType::Insert);
     assert_eq!(
@@ -311,7 +302,7 @@ async fn change_stream_update_many() {
     };
 
     let client = TestClient::new().await;
-    if client.server_version_lt(4, 0) || client.is_standalone() {
+    if client.is_standalone() {
         return;
     }
 
@@ -325,20 +316,20 @@ async fn change_stream_update_many() {
         .await
         .unwrap();
 
+    let docs = vec![
+        doc! { "_id": 1, "x": 1, "y": 1 },
+        doc! { "_id": 2, "x": 2, "y": 2 },
+    ];
+    coll.insert_many(docs, None).await.unwrap();
+
     let change_stream_options = ChangeStreamOptions::builder()
         .full_document(FullDocumentType::UpdateLookup)
         .build();
 
-    let mut change_stream = coll.watch(None, Some(change_stream_options)).await.unwrap();
+    let mut change_stream = coll.watch(None, change_stream_options).await.unwrap();
 
     let coll_ref = coll.clone();
     RUNTIME.spawn(async move {
-        let docs = vec![
-            doc! { "_id": 1, "x": 1, "y": 1 },
-            doc! { "_id": 2, "x": 2, "y": 2 },
-        ];
-        coll_ref.insert_many(docs, None).await.unwrap();
-
         let filter = doc! { "x": { "$gt": 0 } };
 
         coll_ref
@@ -346,10 +337,6 @@ async fn change_stream_update_many() {
             .await
             .unwrap();
     });
-
-    for _i in 0..2 {
-        let _insert_document = change_stream.next().await.unwrap().unwrap();
-    }
 
     let first_update = change_stream.next().await.unwrap().unwrap();
     assert_eq!(first_update.operation_type, OperationType::Update);
@@ -403,7 +390,7 @@ async fn change_stream_replace() {
     };
 
     let client = TestClient::new().await;
-    if client.server_version_lt(4, 0) || client.is_standalone() {
+    if client.is_standalone() {
         return;
     }
 
@@ -417,19 +404,18 @@ async fn change_stream_replace() {
         .await
         .unwrap();
 
+    coll.insert_one(doc! { "_id": 0, "x": 0 }, None)
+        .await
+        .unwrap();
+
     let change_stream_options = ChangeStreamOptions::builder()
         .full_document(FullDocumentType::UpdateLookup)
         .build();
 
-    let mut change_stream = coll.watch(None, Some(change_stream_options)).await.unwrap();
+    let mut change_stream = coll.watch(None, change_stream_options).await.unwrap();
 
     let coll_ref = coll.clone();
     RUNTIME.spawn(async move {
-        coll_ref
-            .insert_one(doc! { "_id": 0, "x": 0 }, None)
-            .await
-            .unwrap();
-
         let filter = doc! { "x": 0 };
         coll_ref
             .replace_one(filter, doc! { "x": 1 }, None)
@@ -437,7 +423,6 @@ async fn change_stream_replace() {
             .unwrap();
     });
 
-    let _insert_document = change_stream.next().await.unwrap().unwrap();
     let replace_document = change_stream.next().await.unwrap().unwrap();
     assert_eq!(replace_document.operation_type, OperationType::Replace);
     assert_eq!(
@@ -465,7 +450,7 @@ async fn change_stream_delete() {
     };
 
     let client = TestClient::new().await;
-    if client.server_version_lt(4, 0) || client.is_standalone() {
+    if client.is_standalone() {
         return;
     }
 
@@ -479,24 +464,22 @@ async fn change_stream_delete() {
         .await
         .unwrap();
 
+    coll.insert_one(doc! { "_id": 0, "x": 0 }, None)
+        .await
+        .unwrap();
+
     let change_stream_options = ChangeStreamOptions::builder()
         .full_document(FullDocumentType::UpdateLookup)
         .build();
 
-    let mut change_stream = coll.watch(None, Some(change_stream_options)).await.unwrap();
+    let mut change_stream = coll.watch(None, change_stream_options).await.unwrap();
 
     let coll_ref = coll.clone();
     RUNTIME.spawn(async move {
-        coll_ref
-            .insert_one(doc! { "_id": 0, "x": 0 }, None)
-            .await
-            .unwrap();
-
         let filter = doc! { "x": 0 };
         coll_ref.delete_one(filter, None).await.unwrap();
     });
 
-    let _insert_document = change_stream.next().await.unwrap().unwrap();
     let delete_document = change_stream.next().await.unwrap().unwrap();
     assert_eq!(delete_document.operation_type, OperationType::Delete);
     assert_eq!(
@@ -521,7 +504,7 @@ async fn change_stream_drop() {
     };
 
     let client = TestClient::new().await;
-    if client.server_version_lt(4, 0) || client.is_standalone() {
+    if client.is_standalone() {
         return;
     }
 
@@ -539,7 +522,7 @@ async fn change_stream_drop() {
         .full_document(FullDocumentType::UpdateLookup)
         .build();
 
-    let mut change_stream = coll.watch(None, Some(change_stream_options)).await.unwrap();
+    let mut change_stream = coll.watch(None, change_stream_options).await.unwrap();
 
     let coll_ref = coll.clone();
     RUNTIME.spawn(async move {
@@ -586,7 +569,7 @@ async fn change_stream_rename() {
     };
 
     let client = TestClient::new().await;
-    if client.server_version_lt(4, 0) || client.is_standalone() {
+    if client.is_standalone() {
         return;
     }
 

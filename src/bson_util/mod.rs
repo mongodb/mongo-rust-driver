@@ -227,6 +227,21 @@ fn num_decimal_digits(n: usize) -> usize {
     digits
 }
 
+pub(crate) fn deserialize_str_from_map<'de, D>(
+    deserializer: D,
+) -> std::result::Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    struct Db {
+        db: String,
+    }
+
+    let db_object: Db = Deserialize::deserialize(deserializer)?;
+    Ok(db_object.db)
+}
+
 #[cfg(test)]
 mod test {
     use crate::bson::{
