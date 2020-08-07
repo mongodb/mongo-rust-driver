@@ -15,6 +15,8 @@ lazy_static! {
     static ref SHUTTING_DOWN_CODES: Vec<i32> = vec![11600, 91];
     static ref RETRYABLE_READ_CODES: Vec<i32> =
         vec![11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001];
+    static ref RETRYABLE_WRITE_CODES: Vec<i32> =
+        vec![11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001, 262];
 }
 
 /// The result type for all methods that can return an error in the `mongodb` crate.
@@ -29,9 +31,17 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub struct Error {
     /// The type of error that occurred.
     pub kind: Arc<ErrorKind>,
+    labels: Vec<String>,
 }
 
 impl Error {
+    pub(crate) fn new(e: Arc<ErrorKind>) -> Error {
+        Error {
+            kind: e,
+            labels: Vec::new(),
+        }
+    }
+
     /// Creates an `AuthenticationError` for the given mechanism with the provided reason.
     pub(crate) fn authentication_error(mechanism_name: &str, reason: &str) -> Self {
         ErrorKind::AuthenticationError {
@@ -61,7 +71,7 @@ impl Error {
                 let error: Error = other_error_kind.into();
                 std::io::Error::new(std::io::ErrorKind::Other, Box::new(error))
             }
-            Err(e) => std::io::Error::new(std::io::ErrorKind::Other, Box::new(Error { kind: e })),
+            Err(e) => std::io::Error::new(std::io::ErrorKind::Other, Box::new(Error::new(e))),
         }
     }
 
@@ -73,7 +83,7 @@ impl Error {
         }
     }
 
-    /// Whether a read operation should be retried if this error occurs
+    /// Whether a read operation should be retried if this error occurs.
     pub(crate) fn is_read_retryable(&self) -> bool {
         if self.is_network_error() {
             return true;
@@ -92,7 +102,28 @@ impl Error {
         }
     }
 
-    /// Whether an error originated from the server
+    pub(crate) fn is_write_retryable(&self) -> bool {
+        self.contains_label("RetryableWriteError")
+    }
+
+    /// Whether a "RetryableWriteError" label should be added to this error. If max_wire_version
+    /// indicates a 4.4+ server, a label should only be added if the error is a network error.
+    /// Otherwise, a label should be added if the error is a network error or the error code
+    /// matches one of the retryable write codes.
+    pub(crate) fn should_add_retryable_write_label(&self, max_wire_version: i32) -> bool {
+        if max_wire_version > 8 {
+            return self.is_network_error();
+        }
+        if self.is_network_error() {
+            return true;
+        }
+        match &self.kind.code_and_message() {
+            Some((code, _)) => RETRYABLE_WRITE_CODES.contains(&code),
+            None => false,
+        }
+    }
+
+    /// Whether an error originated from the server.
     pub(crate) fn is_server_error(&self) -> bool {
         match self.kind.as_ref() {
             ErrorKind::AuthenticationError { .. }
@@ -100,6 +131,67 @@ impl Error {
             | ErrorKind::CommandError(_)
             | ErrorKind::WriteError(_) => true,
             _ => false,
+        }
+    }
+
+    /// Returns the labels for this error.
+    pub fn labels(&self) -> &[String] {
+        match self.kind.as_ref() {
+            ErrorKind::CommandError(err) => &err.labels,
+            ErrorKind::WriteError(err) => match err {
+                WriteFailure::WriteError(_) => &self.labels,
+                WriteFailure::WriteConcernError(err) => &err.labels,
+            },
+            ErrorKind::BulkWriteError(err) => match err.write_concern_error {
+                Some(ref err) => &err.labels,
+                None => &self.labels,
+            },
+            _ => &self.labels,
+        }
+    }
+
+    /// Whether this error contains the specified label.
+    pub fn contains_label<T: AsRef<str>>(&self, label: T) -> bool {
+        self.labels().iter().any(|actual_label| actual_label.as_str() == label.as_ref())
+    }
+
+    /// Returns a copy of this Error with the specified label added.
+    pub(crate) fn with_label<T: AsRef<str>>(mut self, label: T) -> Self {
+        let label = label.as_ref().to_string();
+        match self.kind.as_ref() {
+            ErrorKind::CommandError(err) => {
+                let mut err = err.clone();
+                err.labels.push(label);
+                ErrorKind::CommandError(err).into()
+            }
+            ErrorKind::WriteError(err) => match err {
+                WriteFailure::WriteError(_) => {
+                    self.labels.push(label);
+                    self
+                }
+                WriteFailure::WriteConcernError(err) => {
+                    let mut err = err.clone();
+                    err.labels.push(label);
+                    ErrorKind::WriteError(WriteFailure::WriteConcernError(err)).into()
+                }
+            },
+            ErrorKind::BulkWriteError(err) => match err.write_concern_error {
+                Some(ref write_concern_error) => {
+                    let mut err = err.clone();
+                    let mut write_concern_error = write_concern_error.clone();
+                    write_concern_error.labels.push(label);
+                    err.write_concern_error = Some(write_concern_error);
+                    ErrorKind::BulkWriteError(err).into()
+                }
+                None => {
+                    self.labels.push(label);
+                    self
+                }
+            },
+            _ => {
+                self.labels.push(label);
+                self
+            }
         }
     }
 }
@@ -111,6 +203,7 @@ where
     fn from(err: E) -> Self {
         Self {
             kind: Arc::new(err.into()),
+            labels: Vec::new(),
         }
     }
 }
@@ -376,7 +469,7 @@ pub struct WriteConcernError {
     pub code: i32,
 
     /// The name associated with the error code.
-    #[serde(rename = "codeName")]
+    #[serde(rename = "codeName", default)]
     pub code_name: String,
 
     /// A description of the error that occurred.
@@ -386,6 +479,10 @@ pub struct WriteConcernError {
     /// A document identifying the write concern setting related to the error.
     #[serde(rename = "errInfo")]
     pub details: Option<Document>,
+
+    /// The error labels that the server returned.
+    #[serde(rename = "errorLabels", default)]
+    pub labels: Vec<String>,
 }
 
 /// An error that occurred during a write operation that wasn't due to being unable to satisfy a

@@ -9,6 +9,7 @@ use serde::Deserialize;
 use self::{event::TestEvent, operation::*};
 use crate::{
     bson::{Bson, Document},
+    options::ClientOptions,
     test::{assert_matches, util::TestClient, EventClient, LOCK},
 };
 
@@ -82,7 +83,8 @@ async fn run_command_monitoring_test(test_file: TestFile) {
             .await
             .expect("insert many error");
 
-        let client = EventClient::new().await;
+        let options = ClientOptions::builder().retry_writes(false).build();
+        let client = EventClient::with_additional_options(Some(options), None, Some(false)).await;
 
         let events: Vec<TestEvent> = client
             .run_operation_with_events(

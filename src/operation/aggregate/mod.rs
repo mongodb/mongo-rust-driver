@@ -7,7 +7,7 @@ use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
-    operation::{append_options, CursorBody, Operation, WriteConcernOnlyBody},
+    operation::{append_options, CursorBody, Operation, Retryability, WriteConcernOnlyBody},
     options::{AggregateOptions, SelectionCriteria, WriteConcern},
     Namespace,
 };
@@ -93,8 +93,12 @@ impl Operation for Aggregate {
             .and_then(|opts| opts.write_concern.as_ref())
     }
 
-    fn is_read_retryable(&self) -> bool {
-        !self.is_out_or_merge()
+    fn retryability(&self) -> Retryability {
+        if self.is_out_or_merge() {
+            Retryability::None
+        } else {
+            Retryability::Read
+        }
     }
 }
 

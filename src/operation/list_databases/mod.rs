@@ -7,7 +7,7 @@ use crate::{
     bson::{doc, Document},
     cmap::{Command, CommandResponse, StreamDescription},
     error::Result,
-    operation::{append_options, Operation},
+    operation::{append_options, Operation, Retryability},
     options::ListDatabasesOptions,
     selection_criteria::{ReadPreference, SelectionCriteria},
 };
@@ -73,8 +73,8 @@ impl Operation for ListDatabases {
         Some(SelectionCriteria::ReadPreference(ReadPreference::Primary)).as_ref()
     }
 
-    fn is_read_retryable(&self) -> bool {
-        true
+    fn retryability(&self) -> Retryability {
+        Retryability::Read
     }
 }
 

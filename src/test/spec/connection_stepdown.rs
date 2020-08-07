@@ -7,6 +7,7 @@ use crate::{
     error::{CommandError, ErrorKind},
     options::{
         Acknowledgment,
+        ClientOptions,
         CreateCollectionOptions,
         DropCollectionOptions,
         FindOptions,
@@ -21,8 +22,8 @@ use crate::{
 async fn run_test<F: Future>(name: &str, test: impl Fn(EventClient, Database, Collection) -> F) {
     let _guard = LOCK.run_exclusively().await;
 
-    // TODO RUST-51: Disable retryable writes once they're implemented.
-    let client = EventClient::new().await;
+    let options = ClientOptions::builder().retry_writes(false).build();
+    let client = EventClient::with_additional_options(Some(options), None, None).await;
 
     if !client.is_replica_set() {
         return;

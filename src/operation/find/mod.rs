@@ -6,7 +6,7 @@ use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::{ErrorKind, Result},
-    operation::{append_options, CursorBody, Operation},
+    operation::{append_options, CursorBody, Operation, Retryability},
     options::{CursorType, FindOptions, SelectionCriteria},
     Namespace,
 };
@@ -114,7 +114,7 @@ impl Operation for Find {
             .and_then(|opts| opts.selection_criteria.as_ref())
     }
 
-    fn is_read_retryable(&self) -> bool {
-        true
+    fn retryability(&self) -> Retryability {
+        Retryability::Read
     }
 }

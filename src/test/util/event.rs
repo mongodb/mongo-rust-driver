@@ -1,6 +1,7 @@
 use std::{
     collections::VecDeque,
     sync::{Arc, RwLock},
+    time::Duration,
 };
 
 use super::TestClient;
@@ -16,7 +17,7 @@ use crate::{
         },
     },
     options::ClientOptions,
-    test::LOCK,
+    test::{CLIENT_OPTIONS, LOCK},
 };
 
 pub type EventQueue<T> = Arc<RwLock<VecDeque<T>>>;
@@ -141,6 +142,26 @@ impl EventClient {
             command_events,
             pool_cleared_events,
         }
+    }
+
+    pub async fn with_additional_options(
+        options: Option<ClientOptions>,
+        heartbeat_freq: Option<Duration>,
+        use_multiple_mongoses: Option<bool>,
+    ) -> Self {
+        let mut options = match options {
+            Some(mut options) => {
+                options.hosts = CLIENT_OPTIONS.hosts.clone();
+                options.merge(CLIENT_OPTIONS.clone());
+                options
+            }
+            None => CLIENT_OPTIONS.clone(),
+        };
+        options.heartbeat_freq_test = heartbeat_freq;
+        if TestClient::new().await.is_sharded() && use_multiple_mongoses != Some(true) {
+            options.hosts = options.hosts.iter().cloned().take(1).collect();
+        }
+        EventClient::with_options(options).await
     }
 
     /// Gets the first started/succeeded pair of events for the given command name, popping off all

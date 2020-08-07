@@ -8,9 +8,9 @@ use time::PreciseTime;
 use crate::{
     bson::Document,
     cmap::Connection,
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
-    operation::Operation,
+    operation::{Operation, Retryability},
     options::SelectionCriteria,
     sdam::{Server, SessionSupportStatus},
 };
@@ -93,8 +93,17 @@ impl Client {
             }
         };
 
+        let retryability = self.get_retryability(&conn, &op).await?;
+
+        let txn_number = match session {
+            Some(ref mut session) if retryability == Retryability::Write => {
+                Some(session.get_and_increment_txn_number())
+            }
+            _ => None,
+        };
+
         let first_error = match self
-            .execute_operation_on_connection(&op, &mut conn, &mut session)
+            .execute_operation_on_connection(&op, &mut conn, &mut session, txn_number)
             .await
         {
             Ok(result) => {
@@ -103,16 +112,36 @@ impl Client {
             Err(err) => {
                 self.inner
                     .topology
-                    .handle_post_handshake_error(err.clone(), conn, server)
+                    .handle_post_handshake_error(err.clone(), &conn, server)
                     .await;
-                // TODO RUST-90: Do not retry if session is in a transaction
-                if self.inner.options.retry_reads == Some(false)
-                    || !op.is_read_retryable()
-                    || !err.is_read_retryable()
+
+                // Retryable writes are only supported by storage engines with document-level
+                // locking, so users need to disable retryable writes if using mmapv1.
+                if let ErrorKind::CommandError(ref err) = err.kind.as_ref() {
+                    if err.code == 20 && err.message.starts_with("Transaction numbers") {
+                        let mut err = err.clone();
+                        err.message = "This MongoDB deployment does not support retryable writes. \
+                                       Please add retryWrites=false to your connection string."
+                            .to_string();
+                        return Err(ErrorKind::CommandError(err).into());
+                    }
+                }
+
+                // For a pre-4.4 connection, an error label should be added to any write-retryable
+                // error as long as the retry_writes client option is not set to false. For a 4.4+
+                // connection, a label should be added only to network errors.
+                let err = match retryability {
+                    Retryability::Write => get_error_with_retryable_write_label(&conn, err).await?,
+                    _ => err,
+                };
+
+                // TODO RUST-90: Do not retry read if session is in a transaction
+                if retryability == Retryability::Read && err.is_read_retryable()
+                    || retryability == Retryability::Write && err.is_write_retryable()
                 {
-                    return Err(err);
-                } else {
                     err
+                } else {
+                    return Err(err);
                 }
             }
         };
@@ -135,17 +164,28 @@ impl Client {
             }
         };
 
+        let retryability = self.get_retryability(&conn, &op).await?;
+        if retryability == Retryability::None {
+            return Err(first_error);
+        }
+
         match self
-            .execute_operation_on_connection(&op, &mut conn, &mut session)
+            .execute_operation_on_connection(&op, &mut conn, &mut session, txn_number)
             .await
         {
             Ok(result) => Ok(result),
             Err(err) => {
                 self.inner
                     .topology
-                    .handle_post_handshake_error(err.clone(), conn, server)
+                    .handle_post_handshake_error(err.clone(), &conn, server)
                     .await;
-                if err.is_server_error() || err.is_read_retryable() {
+
+                let err = match retryability {
+                    Retryability::Write => get_error_with_retryable_write_label(&conn, err).await?,
+                    _ => err,
+                };
+
+                if err.is_server_error() || err.is_read_retryable() || err.is_write_retryable() {
                     Err(err)
                 } else {
                     Err(first_error)
@@ -160,6 +200,7 @@ impl Client {
         op: &T,
         connection: &mut Connection,
         session: &mut Option<&mut ClientSession>,
+        txn_number: Option<u64>,
     ) -> Result<T::O> {
         if let Some(wc) = op.write_concern() {
             wc.validate()?;
@@ -174,6 +215,9 @@ impl Client {
         match session {
             Some(ref mut session) if op.supports_sessions() && op.is_acknowledged() => {
                 cmd.set_session(session);
+                if let Some(txn_number) = txn_number {
+                    cmd.set_txn_number(txn_number);
+                }
                 session.update_last_use();
             }
             Some(ref session) if !op.supports_sessions() && !session.is_implicit() => {
@@ -318,4 +362,37 @@ impl Client {
             _ => Ok(initial_status),
         }
     }
+
+    /// Returns the retryability level for the execution of this operation.
+    async fn get_retryability<T: Operation>(
+        &self,
+        conn: &Connection,
+        op: &T,
+    ) -> Result<Retryability> {
+        match op.retryability() {
+            Retryability::Read if self.inner.options.retry_reads != Some(false) => {
+                Ok(Retryability::Read)
+            }
+            Retryability::Write
+                if self.inner.options.retry_writes != Some(false)
+                    && conn.stream_description()?.supports_retryable_writes() =>
+            {
+                Ok(Retryability::Write)
+            }
+            _ => Ok(Retryability::None),
+        }
+    }
+}
+
+/// Returns an Error with a "RetryableWriteError" label added if necessary. On a pre-4.4
+/// connection, a label should be added to any write-retryable error. On a 4.4+ connection, a
+/// label should only be added to network errors. Regardless of server version, a label should
+/// only be added if the `retry_writes` client option is not set to `false`.
+async fn get_error_with_retryable_write_label(conn: &Connection, err: Error) -> Result<Error> {
+    if let Some(max_wire_version) = conn.stream_description()?.max_wire_version {
+        if err.should_add_retryable_write_label(max_wire_version) {
+            return Ok(err.with_label("RetryableWriteError"));
+        }
+    }
+    Ok(err)
 }

@@ -287,7 +287,7 @@ pub struct DeleteOptions {
 /// Specifies the options to a
 /// [`Collection::find_one_and_delete`](../struct.Collection.html#method.find_one_and_delete)
 /// operation.
-#[derive(Clone, Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[non_exhaustive]
 pub struct FindOneAndDeleteOptions {
     /// The maximum amount of time to allow the query to run.
@@ -325,7 +325,7 @@ pub struct FindOneAndDeleteOptions {
 /// Specifies the options to a
 /// [`Collection::find_one_and_replace`](../struct.Collection.html#method.find_one_and_replace)
 /// operation.
-#[derive(Debug, Default, TypedBuilder)]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[non_exhaustive]
 pub struct FindOneAndReplaceOptions {
     /// Opt out of document-level validation.

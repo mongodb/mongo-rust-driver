@@ -6,6 +6,7 @@ mod crud_v2;
 mod initial_dns_seedlist_discovery;
 mod read_write_concern;
 mod retryable_reads;
+mod retryable_writes;
 mod runner;
 
 use std::{
@@ -20,6 +21,7 @@ pub use self::runner::{
     run_v2_test,
     AnyTestOperation,
     OperationObject,
+    RunOn,
     TestData,
     TestEvent,
     TestFile,

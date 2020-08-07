@@ -316,8 +316,11 @@ pub struct ClientOptions {
     #[builder(default)]
     pub retry_reads: Option<bool>,
 
+    /// Whether or not the client should retry a write operation if the operation fails.
+    ///
+    /// The default value is true.
     #[builder(default)]
-    pub(crate) retry_writes: Option<bool>,
+    pub retry_writes: Option<bool>,
 
     /// The default selection criteria for operations performed on the Client. See the
     /// SelectionCriteria type documentation for more details.
@@ -370,6 +373,10 @@ pub struct ClientOptions {
     #[builder(default)]
     #[serde(skip)]
     pub(crate) resolver_config: Option<ResolverConfig>,
+
+    /// Used by tests to override MIN_HEARTBEAT_FREQUENCY.
+    #[builder(default)]
+    pub(crate) heartbeat_freq_test: Option<Duration>,
 }
 
 fn default_hosts() -> Vec<StreamAddress> {
@@ -585,6 +592,7 @@ impl From<ClientOptionsParser> for ClientOptions {
             original_srv_hostname: None,
             original_uri: Some(parser.original_uri),
             resolver_config: None,
+            heartbeat_freq_test: None,
         }
     }
 }
@@ -758,6 +766,43 @@ impl ClientOptions {
             write_concern.validate()?;
         }
         Ok(())
+    }
+
+    /// Applies the options in other to these options if a value is not already present
+    #[cfg(test)]
+    pub(crate) fn merge(&mut self, other: ClientOptions) {
+        merge_options!(
+            other,
+            self,
+            [
+                app_name,
+                compressors,
+                cmap_event_handler,
+                command_event_handler,
+                connect_timeout,
+                credential,
+                direct_connection,
+                driver_info,
+                heartbeat_freq,
+                local_threshold,
+                max_idle_time,
+                max_pool_size,
+                min_pool_size,
+                read_concern,
+                repl_set_name,
+                retry_reads,
+                retry_writes,
+                selection_criteria,
+                server_selection_timeout,
+                socket_timeout,
+                tls,
+                wait_queue_timeout,
+                write_concern,
+                zlib_compression,
+                original_srv_hostname,
+                original_uri
+            ]
+        );
     }
 }
 
