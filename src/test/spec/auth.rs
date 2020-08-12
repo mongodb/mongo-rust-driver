@@ -50,13 +50,7 @@ async fn run_auth_test(test_file: TestFile) {
     for mut test_case in test_file.tests {
         test_case.description = test_case.description.replace('$', "%");
 
-        let skipped_mechanisms = [
-            "GSSAPI",
-            "MONGODB-X509",
-            "PLAIN",
-            "MONGODB-CR",
-            "MONGODB-AWS",
-        ];
+        let skipped_mechanisms = ["GSSAPI", "MONGODB-X509", "PLAIN", "MONGODB-CR"];
 
         // TODO: X509 (RUST-147)
         // TODO: GSSAPI (RUST-196)
@@ -84,7 +78,11 @@ async fn run_auth_test(test_file: TestFile) {
                     None => assert!(options.credential.is_none(), "{}", test_case.description),
                 }
             }
-            Err(_) => assert!(!test_case.valid, "{}", test_case.description),
+            Err(e) => assert!(
+                !test_case.valid,
+                "got error {:?}: {}",
+                e, test_case.description
+            ),
         };
     }
 }
