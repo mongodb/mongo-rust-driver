@@ -277,6 +277,22 @@ functions:
 
           cat setup.js
           mongo --nodb setup.js aws_e2e_ecs.js
+
+  "run x509 tests":
+    - command: shell.exec
+      params:
+        shell: bash
+        working_dir: "src"
+        script: |
+          ${PREPARE_SHELL}
+
+          export MONGODB_URI="${MONGODB_URI}"
+          export SSL="${SSL}"
+          . .evergreen/generate-uri.sh
+          
+          export CERT_PATH=$DRIVERS_TOOLS/.evergreen/x509gen/client.pem
+
+          .evergreen/run-x509-tests.sh
             
   "prepare resources":
     - command: shell.exec
@@ -639,6 +655,14 @@ tasks:
     commands:
       - func: "run atlas tests"
 
+  - name: "test-x509-auth"
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: "4.4"
+          TOPOLOGY: "server"
+      - func: "run x509 tests"
+
   - name: "compile-only"
     commands:
       - func: "compile only"
@@ -765,6 +789,16 @@ buildvariants:
      - ".4.2"
      - ".4.0"
      - ".3.6"
+- matrix_name: "x509-auth"
+  matrix_spec:
+    os:
+      - ubuntu-16.04
+    auth-and-tls: "auth-and-tls"
+    async-runtime: "*"
+  display_name: "X.509 auth with ${async-runtime}"
+  tasks:
+    - "test-x509-auth"
+    
 - matrix_name: "atlas-connect"
   matrix_spec:
     os:

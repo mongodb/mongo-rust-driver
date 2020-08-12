@@ -7,6 +7,7 @@ mod sasl;
 mod scram;
 #[cfg(test)]
 mod test;
+mod x509;
 
 use std::{borrow::Cow, str::FromStr};
 
@@ -55,8 +56,6 @@ pub enum AuthMechanism {
     /// where the distinguished subject name of the client certificate acts as the username.
     ///
     /// See the [MongoDB documentation](https://docs.mongodb.com/manual/core/security-x.509/) for more information.
-    ///
-    /// Note: This mechanism is not currently supported by this driver but will be in the future.
     MongoDbX509,
 
     /// Kerberos authentication mechanism as defined in [RFC 4752](http://tools.ietf.org/html/rfc4752).
@@ -122,6 +121,25 @@ impl AuthMechanism {
                 };
                 Ok(())
             }
+            AuthMechanism::MongoDbX509 => {
+                if credential.password.is_some() {
+                    return Err(ErrorKind::ArgumentError {
+                        message: "A password cannot be specified with MONGODB-X509".to_string(),
+                    }
+                    .into());
+                }
+
+                if credential.source.as_deref().unwrap_or("$external") != "$external" {
+                    return Err(ErrorKind::ArgumentError {
+                        message: "only $external may be specified as an auth source for \
+                                  MONGODB-X509"
+                            .to_string(),
+                    }
+                    .into());
+                }
+
+                Ok(())
+            }
             #[cfg(feature = "tokio-runtime")]
             AuthMechanism::MongoDbAws => {
                 if credential.username.is_some() && credential.password.is_none() {
@@ -132,6 +150,7 @@ impl AuthMechanism {
                     }
                     .into());
                 }
+
                 Ok(())
             }
             _ => Ok(()),
@@ -159,6 +178,7 @@ impl AuthMechanism {
             AuthMechanism::ScramSha1 | AuthMechanism::ScramSha256 | AuthMechanism::MongoDbCr => {
                 uri_db.unwrap_or("admin")
             }
+            AuthMechanism::MongoDbX509 => "$external",
             #[cfg(feature = "tokio-runtime")]
             AuthMechanism::MongoDbAws => "$external",
             _ => "",
@@ -171,6 +191,8 @@ impl AuthMechanism {
         credential: &Credential,
         #[cfg_attr(not(feature = "tokio-runtime"), allow(unused))] http_client: &HttpClient,
     ) -> Result<()> {
+        self.validate_credential(credential)?;
+
         match self {
             AuthMechanism::ScramSha1 => {
                 ScramVersion::Sha1
@@ -182,6 +204,7 @@ impl AuthMechanism {
                     .authenticate_stream(stream, credential)
                     .await
             }
+            AuthMechanism::MongoDbX509 => x509::authenticate_stream(stream, credential).await,
             #[cfg(feature = "tokio-runtime")]
             AuthMechanism::MongoDbAws => {
                 aws::authenticate_stream(stream, credential, http_client).await
