@@ -126,7 +126,7 @@ impl AuthMechanism {
             AuthMechanism::MongoDbAws => {
                 if credential.username.is_some() && credential.password.is_none() {
                     return Err(ErrorKind::ArgumentError {
-                        message: "Username cannot be provided with password for MONGODB-AWS \
+                        message: "Username cannot be provided without password for MONGODB-AWS \
                                   authentication"
                             .to_string(),
                     }
