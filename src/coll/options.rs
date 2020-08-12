@@ -5,7 +5,7 @@ use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    bson::{doc, Bson, Document},
+    bson::{doc, Bson, Document, },
     bson_util::{
         deserialize_duration_from_u64_millis,
         serialize_batch_size,
@@ -16,6 +16,8 @@ use crate::{
     options::Collation,
     selection_criteria::SelectionCriteria,
 };
+
+use either::Either;
 
 /// These are the valid options for creating a [`Collection`](../struct.Collection.html) with
 /// [`Database::collection_with_options`](../struct.Database.html#method.collection_with_options).
@@ -878,27 +880,37 @@ pub struct FindOneOptions {
 }
 
 /// Specifies an index to create.
-#[derive(Debug, TypedBuilder)]
+#[derive(Debug, TypedBuilder, Serialize)]
 #[non_exhaustive]
-#[deprecated]
-pub struct IndexModel {
+#[serde(rename_all = "camelCase")]
+pub struct CreateIndex {
     /// The fields to index, along with their sort order.
     pub keys: Document,
 
     /// Extra options to use when creating the index.
-    #[builder(default)]
     pub options: Option<Document>,
+
+    /// Either integer or string
+    #[serde(with = "either::serde_untagged_optional")]
+    pub commit_quorum: Option<Either<String, i32>>,
 }
 
 /// Specifies the options to a [`Collection::create_index`](../struct.Collection.html#method.create_index)
 /// operation.
-/// See the [documentation](https://docs.mongodb.com/manual/reference/method/db.collection.createIndex/#options-for-all-index-types) for more
-/// information on how to use this option.
+/// See the
+/// [documentation](https://docs.mongodb.com/manual/reference/method/db.collection.createIndex/#options-for-all-index-types)
+/// for more information on how to use this option.
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CreateIndexOptions {
-    /// Optional. Creates a unique index so that the collection will not accept insertion or update of documents where the index key value matches an existing value in the index.
+    /// Optional. Deprecated in MongoDB 4.2.
+    #[deprecated]
+    #[builder(default)]
+    pub background: bool,
+
+    /// Optional. Creates a unique index so that the collection will not accept insertion or update of documents
+    /// where the index key value matches an existing value in the index.
     ///
     /// Specify true to create a unique index. The default value is false.
     ///
@@ -912,7 +924,8 @@ pub struct CreateIndexOptions {
     #[builder(default)]
     pub name: Option<String>,
 
-    /// Optional. If specified, the index only references documents that match the filter expression. See Partial Indexes for more information.
+    /// Optional. If specified, the index only references documents that match the filter expression. See Partial Indexes for
+    /// more information.
     ///
     /// See the [documentation](https://docs.mongodb.com/manual/core/index-partial/) for more
     /// information on how to use this option.
@@ -921,21 +934,35 @@ pub struct CreateIndexOptions {
 
     /// Optional. If true, the index only references documents with the specified field.
     ///
-    /// These indexes use less space but behave differently in some situations (particularly sorts). The default value is false.
+    /// These indexes use less space but behave differently in some situations (particularly sorts).
+    /// 
+    /// The default value is false.
     ///
-    /// See the [documentation](https://docs.mongodb.com/manual/core/index-sparse/) for more
-    /// information on how to use this option.
+    /// See the [documentation](https://docs.mongodb.com/manual/core/index-sparse/)
+    /// for more information on how to use this option.
     #[builder(default)]
     pub sparse: Option<bool>,
 
     /// Optional. Specifies a value, in seconds, as a TTL to control how long MongoDB retains documents in this collection.
     ///
-    /// See the [documentation](https://docs.mongodb.com/manual/tutorial/expire-data/) for more
-    /// information on how to use this option.
+    /// See the [documentation](https://docs.mongodb.com/manual/tutorial/expire-data/)
+    /// for more information on how to use this option.
     ///
     /// This applies only to [TTL](https://docs.mongodb.com/manual/reference/glossary/#term-ttl) indexes.
     #[builder(default)]
+    #[serde(serialize_with = "serialize_u32_as_i32")]
     pub expire_after_seconds: Option<u32>,
+
+    /// Optional. A flag that determines whether the index is hidden from the query planner. A hidden index is not evaluated as 
+    /// part of the query plan selection.
+    ///
+    /// Default is false.
+    /// 
+    /// See the
+    /// [documentation](https://docs.mongodb.com/manual/reference/method/db.collection.createIndex/#method-createindex-hidden)
+    /// for more information on how to use this option.
+    #[builder(default)]
+    pub hidden: Option<bool>,
 
     /// Optional. Allows users to configure the storage engine on a per-index basis when creating an index.
     ///
@@ -944,6 +971,115 @@ pub struct CreateIndexOptions {
     /// storageEngine: { <storage-engine-name>: <options> }
     #[builder(default)]
     pub storage_engine: Option<Document>,
+}
+
+
+#[derive(Debug, Default, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct TextIndexOptions {
+    /// Optional. For text indexes, a document that contains field and weight pairs.
+    /// 
+    /// The weight is an integer ranging from 1 to 99,999 and denotes the significance of the field relative to the other
+    /// indexed fields in terms of the score.
+    /// You can specify weights for some or all the indexed fields.
+    /// See [Control Search Results with Weights](https://docs.mongodb.com/manual/tutorial/control-results-of-text-search/)
+    /// to adjust the scores.
+    /// 
+    /// The default value is 1.
+    #[builder(default)]
+    pub weights: Option<Document>,
+
+    /// Optional. For text indexes, the language that determines the list of stop words and the rules for the stemmer and
+    /// tokenizer.
+    /// 
+    /// See [Text Search Languages](https://docs.mongodb.com/manual/reference/text-search-languages/#text-search-languages)
+    /// for the available languages and
+    /// [Specify a Language for Text Index](https://docs.mongodb.com/manual/tutorial/specify-language-for-text-index/) for
+    /// more information and examples.
+    /// 
+    /// The default value is english.
+    #[builder(default)]
+    pub default_language: Option<String>,
+
+    /// Optional. For text indexes, the name of the field, in the collection’s documents, that contains the override language
+    /// for the document. The default value is language. See
+    /// [Use any Field to Specify the Language for a Document](https://docs.mongodb.com/manual/tutorial/specify-language-for-text-index/#specify-language-field-text-index-example) for an example.
+    #[builder(default)]
+    pub language_override: Option<String>,
+
+    /// Optional. The text index version number. Users can use this option to override the default version number.
+    #[serde(serialize_with = "serialize_u32_as_i32")]
+    #[builder(default)]
+    pub text_index_version: Option<u32>,
+}
+
+#[derive(Debug, Default, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct Sphere2dOptions {
+    /// Optional. The 2dsphere index version number. Users can use this option to override the default version number.
+    #[builder(default)]
+    #[serde(serialize_with = "serialize_u32_as_i32")]
+    #[serde(rename = "2dsphereIndexVersion")]
+    pub sphere2d_index_version: Option<u32>,
+}
+
+#[derive(Debug, Default, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+// naming is a problem here
+pub struct D2Options {
+    /// Optional. For 2d indexes, the number of precision of the stored geohash value of the location data.
+    /// The bits value ranges from 1 to 32 inclusive.
+    /// 
+    /// The default value is 26.
+    #[builder(default)]
+    #[serde(serialize_with = "serialize_u32_as_i32")]
+    #[serde(rename = "2dsphereIndexVersion")]
+    pub bits: Option<u32>,
+
+    /// Optional. For 2d indexes, the lower inclusive boundary for the longitude and latitude values.
+    /// 
+    /// The default value is -180.0.
+    #[builder(default)]
+    pub min: Option<f64>,
+
+    /// Optional. For 2d indexes, the upper inclusive boundary for the longitude and latitude values.
+    /// 
+    /// The default value is -180.0.
+    #[builder(default)]
+    pub max: Option<f64>,
+}
+
+#[derive(Debug, Default, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct GeoHayStackptions {
+    /// For geoHaystack indexes, specify the number of units within which to group the location values;
+    /// i.e. group in the same bucket those location values that are within the specified number of units to each other.
+    /// 
+    /// The value must be greater than 0.
+    bucket_size: Option<f64>,
+}
+
+#[derive(Debug, Default, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct WildCardptions {
+    /// Optional. Allows users to include or exclude specific field paths from a
+    /// [wildcard index](https://docs.mongodb.com/manual/core/index-wildcard/#wildcard-index-core)
+    /// using the { "$**" : 1} key pattern.
+    pub wildcard_projection: Option<Document>,
+}
+
+enum IndexType {
+    SingleField,
+    Compound,
+    MultiKey,
+    GeoSpacial,
+    Text,
+    Hashed,
 }
 
 /// Specifies the options to a [`Collection::drop`](../struct.Collection.html#method.drop)
