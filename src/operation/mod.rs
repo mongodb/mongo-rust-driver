@@ -13,6 +13,7 @@ mod list_collections;
 mod list_databases;
 mod run_command;
 mod update;
+mod create_indexes;
 
 use std::{collections::VecDeque, fmt::Debug, ops::Deref};
 

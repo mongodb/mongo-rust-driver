@@ -1,11 +1,14 @@
-use std::time::Duration;
+use std::{
+    time::Duration,
+    collections::HashMap,
+};
 
 use serde::{Deserialize, Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    bson::{doc, Bson, Document, },
+    bson::{doc, Bson, Document},
     bson_util::{
         deserialize_duration_from_u64_millis,
         serialize_batch_size,
@@ -882,17 +885,36 @@ pub struct FindOneOptions {
 /// Specifies an index to create.
 #[derive(Debug, TypedBuilder, Serialize)]
 #[non_exhaustive]
-#[serde(rename_all = "camelCase")]
-pub struct CreateIndex {
+//#[serde(rename_all = "camelCase")]
+pub struct CreateIndexesOptions {
     /// The fields to index, along with their sort order.
-    pub keys: Document,
+    pub indexes: Vec<IndexOptions>,
 
-    /// Extra options to use when creating the index.
-    pub options: Option<Document>,
+    /// The write concern for the operation.
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
 
     /// Either integer or string
     #[serde(with = "either::serde_untagged_optional")]
     pub commit_quorum: Option<Either<String, i32>>,
+
+    /// Tags the query with an arbitrary string to help trace the operation through the database
+    /// profiler, currentOp and logs.
+    #[builder(default)]
+    pub comment: Option<String>,
+}
+
+/// We must implement serialize on this
+#[derive(Debug)]
+pub enum IndexType {
+    Descending, // -1
+    Ascending, // 1
+    Hashed, // "hashed"
+    Sphere2d(Sphere2dOptions), // "2dsphere"
+    D2(D2Options), // "2d"
+    #[deprecated]
+    GeoSpacial(GeoHayStackptions), // "geoHaystack"
+    Text(TextIndexOptions), // "text"
 }
 
 /// Specifies the options to a [`Collection::create_index`](../struct.Collection.html#method.create_index)
@@ -903,7 +925,9 @@ pub struct CreateIndex {
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-pub struct CreateIndexOptions {
+pub struct IndexOptions {
+    pub key: HashMap<String, IndexType>,
+
     /// Optional. Deprecated in MongoDB 4.2.
     #[deprecated]
     #[builder(default)]
@@ -1012,6 +1036,20 @@ pub struct TextIndexOptions {
     #[serde(serialize_with = "serialize_u32_as_i32")]
     #[builder(default)]
     pub text_index_version: Option<u32>,
+
+    /// Optional. Allows users to include or exclude specific field paths from a
+    /// [wildcard index](https://docs.mongodb.com/manual/core/index-wildcard/#wildcard-index-core)
+    /// using the { "$**" : 1} key pattern.
+    /// 
+    /// This is only used when you specific a wildcard index field
+    pub wildcard_projection: Option<Document>,
+
+    /// Optional. Specifies the collation for the index.
+    /// 
+    /// [Collation](https://docs.mongodb.com/manual/reference/collation/) allows users to specify language-specific rules for
+    /// string comparison, such as rules for lettercase and accent marks.
+    #[builder(default)]
+    pub collation: Option<Collation>,
 }
 
 #[derive(Debug, Default, TypedBuilder, Serialize)]
@@ -1061,25 +1099,6 @@ pub struct GeoHayStackptions {
     /// 
     /// The value must be greater than 0.
     bucket_size: Option<f64>,
-}
-
-#[derive(Debug, Default, TypedBuilder, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct WildCardptions {
-    /// Optional. Allows users to include or exclude specific field paths from a
-    /// [wildcard index](https://docs.mongodb.com/manual/core/index-wildcard/#wildcard-index-core)
-    /// using the { "$**" : 1} key pattern.
-    pub wildcard_projection: Option<Document>,
-}
-
-enum IndexType {
-    SingleField,
-    Compound,
-    MultiKey,
-    GeoSpacial,
-    Text,
-    Hashed,
 }
 
 /// Specifies the options to a [`Collection::drop`](../struct.Collection.html#method.drop)
