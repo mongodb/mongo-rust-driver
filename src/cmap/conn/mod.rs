@@ -263,30 +263,34 @@ impl Connection {
 
 impl Drop for Connection {
     fn drop(&mut self) {
-        if self.command_executing {
-            self.close(ConnectionClosedReason::Dropped);
-        } else {
-            // If the connection has a weak reference to a pool, that means that the connection is
-            // being dropped when it's checked out. If the pool is still alive, it
-            // should check itself back in. Otherwise, the connection should close
-            // itself and emit a ConnectionClosed event (because the `close_and_drop`
-            // helper was not called explicitly).
-            //
-            // If the connection does not have a weak reference to a pool, then the connection is
-            // being dropped while it's not checked out. This means that the pool called
-            // the `close_and_drop` helper explicitly, so we don't add it back to the
-            // pool or emit any events.
-            if let Some(ref weak_pool_ref) = self.pool {
-                if let Some(strong_pool_ref) = weak_pool_ref.upgrade() {
-                    let dropped_connection_state = self.take();
-                    RUNTIME.execute(async move {
+        let command_executing = self.command_executing;
+
+        // If the connection has a weak reference to a pool, that means that the connection is
+        // being dropped when it's checked out. If the pool is still alive, it
+        // should check itself back in. Otherwise, the connection should close
+        // itself and emit a ConnectionClosed event (because the `close_and_drop`
+        // helper was not called explicitly).
+        //
+        // If the connection does not have a weak reference to a pool, then the connection is
+        // being dropped while it's not checked out. This means that the pool called
+        // the `close_and_drop` helper explicitly, so we don't add it back to the
+        // pool or emit any events.
+        if let Some(ref weak_pool_ref) = self.pool {
+            if let Some(strong_pool_ref) = weak_pool_ref.upgrade() {
+                let dropped_connection_state = self.take();
+                RUNTIME.execute(async move {
+                    if command_executing {
+                        strong_pool_ref
+                            .dropped(dropped_connection_state.into())
+                            .await;
+                    } else {
                         strong_pool_ref
                             .check_in(dropped_connection_state.into())
                             .await;
-                    });
-                } else {
-                    self.close(ConnectionClosedReason::PoolClosed);
-                }
+                    }
+                });
+            } else {
+                self.close(ConnectionClosedReason::PoolClosed);
             }
         }
     }

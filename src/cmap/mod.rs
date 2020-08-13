@@ -300,6 +300,14 @@ impl ConnectionPoolInner {
         }
     }
 
+    async fn dropped(&self, conn: Connection) {
+        let mut connection_manager = self.connection_manager.lock().await;
+
+        connection_manager.close_connection(conn, ConnectionClosedReason::Dropped);
+
+        self.wait_queue.wake_front();
+    }
+
     async fn check_in(&self, mut conn: Connection) {
         self.emit_event(|handler| {
             handler.handle_connection_checked_in_event(conn.checked_in_event());
