@@ -15,6 +15,7 @@ use crate::{
     operation::{
         Aggregate,
         Count,
+        CreateIndexes,
         Delete,
         Distinct,
         DropCollection,
@@ -23,7 +24,7 @@ use crate::{
         Insert,
         Update,
     },
-    results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
+    results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult, CreateIndexesResult},
     selection_criteria::SelectionCriteria,
     Client,
     Cursor,
@@ -271,6 +272,28 @@ impl Collection {
             }
             .into()
         })
+    }
+
+    /// Builds one or more indexes on a collection.
+    pub async fn create_indexes(
+        &self,
+        indexes: impl IntoIterator<Item = Index>,
+        options: impl Into<Option<CreateIndexesOptions>>,
+    ) -> Result<CreateIndexesResult> {
+        let mut options = options.into();
+        resolve_options!(self, options, [write_concern]);
+        let indexes: Vec<Index> = indexes.into_iter().collect();
+
+        if indexes.is_empty() {
+            return Err(ErrorKind::ArgumentError {
+                message: "No indexes provided to create_indexes".to_string(),
+            }
+            .into());
+        }
+
+
+        let create_indexes = CreateIndexes::new(self.namespace(), indexes, options);
+        self.client().execute_operation(create_indexes).await
     }
 
     /// Deletes all documents stored in the collection matching `query`.

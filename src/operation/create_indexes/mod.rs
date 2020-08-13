@@ -6,17 +6,19 @@ use crate::{
     cmap::{Command, CommandResponse, StreamDescription},
     error::Result,
     operation::{append_options, Operation, WriteConcernOnlyBody},
-    options::{CreateIndexesOptions, WriteConcern},
+    options::{CreateIndexesOptions, WriteConcern, Index},
     Namespace,
+    results::CreateIndexesResult,
 };
 
 #[derive(Debug)]
-pub(crate) struct Create {
+pub(crate) struct CreateIndexes {
     ns: Namespace,
+    indexes: Vec<Index>,
     options: Option<CreateIndexesOptions>,
 }
 
-impl Create {
+impl CreateIndexes {
     #[cfg(test)]
     fn empty() -> Self {
         Self::new(
@@ -24,22 +26,25 @@ impl Create {
                 db: String::new(),
                 coll: String::new(),
             },
+            Vec::new(),
             None,
         )
     }
 
-    pub(crate) fn new(ns: Namespace, options: Option<CreateIndexesOptions>) -> Self {
-        Self { ns, options }
+    pub(crate) fn new(ns: Namespace, indexes: Vec<Index>, options: Option<CreateIndexesOptions>) -> Self {
+        Self { ns, indexes, options }
     }
 }
 
-impl Operation for Create {
-    type O = ();
-    const NAME: &'static str = "create";
+impl Operation for CreateIndexes {
+    type O = CreateIndexesResult;
+    const NAME: &'static str = "createIndexes";
 
     fn build(&self, _description: &StreamDescription) -> Result<Command> {
+        let indexes = bson::to_bson(&self.indexes)?;
         let mut body = doc! {
             Self::NAME: self.ns.coll.clone(),
+            "indexes": indexes,
         };
         append_options(&mut body, self.options.as_ref())?;
 
@@ -51,7 +56,8 @@ impl Operation for Create {
     }
 
     fn handle_response(&self, response: CommandResponse) -> Result<Self::O> {
-        response.body::<WriteConcernOnlyBody>()?.validate()
+        response.body::<WriteConcernOnlyBody>()?.validate()?;
+        todo!();
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

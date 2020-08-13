@@ -1,6 +1,7 @@
 mod aggregate;
 mod count;
 mod create;
+mod create_indexes;
 mod delete;
 mod distinct;
 mod drop_collection;
@@ -13,7 +14,6 @@ mod list_collections;
 mod list_databases;
 mod run_command;
 mod update;
-mod create_indexes;
 
 use std::{collections::VecDeque, fmt::Debug, ops::Deref};
 
@@ -39,6 +39,7 @@ use crate::{
 pub(crate) use aggregate::Aggregate;
 pub(crate) use count::Count;
 pub(crate) use create::Create;
+pub(crate) use create_indexes::CreateIndexes;
 pub(crate) use delete::Delete;
 pub(crate) use distinct::Distinct;
 pub(crate) use drop_collection::DropCollection;

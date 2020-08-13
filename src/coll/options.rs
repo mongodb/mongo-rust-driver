@@ -882,39 +882,58 @@ pub struct FindOneOptions {
     pub sort: Option<Document>,
 }
 
-/// Specifies an index to create.
-#[derive(Debug, TypedBuilder, Serialize)]
+/// Specifies indexes to create.
+/// 
+/// [See](https://docs.mongodb.com/manual/reference/command/createIndexes/) for more.
+#[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
 #[non_exhaustive]
 //#[serde(rename_all = "camelCase")]
 pub struct CreateIndexesOptions {
-    /// The fields to index, along with their sort order.
-    pub indexes: Vec<IndexOptions>,
-
     /// The write concern for the operation.
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 
     /// Either integer or string
+    /// Optional. The minimum number of data-bearing voting replica set members
+    /// 
+    /// [See](https://docs.mongodb.com/manual/reference/command/createIndexes/#createindexes-cmd-commitquorum) for more.
     #[serde(with = "either::serde_untagged_optional")]
+    #[builder(default)]
     pub commit_quorum: Option<Either<String, i32>>,
 
     /// Tags the query with an arbitrary string to help trace the operation through the database
     /// profiler, currentOp and logs.
     #[builder(default)]
-    pub comment: Option<String>,
+    pub comment: Option<Document>,
 }
 
 /// We must implement serialize on this
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum IndexType {
     Descending, // -1
     Ascending, // 1
     Hashed, // "hashed"
-    Sphere2d(Sphere2dOptions), // "2dsphere"
-    D2(D2Options), // "2d"
+    Sphere2d, // "2dsphere"
+    D2, // "2d"
     #[deprecated]
-    GeoSpacial(GeoHayStackptions), // "geoHaystack"
-    Text(TextIndexOptions), // "text"
+    GeoSpacial, // "geoHaystack"
+    Text, // "text"
+}
+
+impl Serialize for IndexType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer {
+            match self {
+                IndexType::Descending => serializer.serialize_i8(-1),
+                IndexType::Ascending => serializer.serialize_i8(1),
+                IndexType::Hashed => serializer.serialize_str("hashed"),
+                IndexType::Sphere2d => serializer.serialize_str("2dsphere"),
+                IndexType::D2 => serializer.serialize_str("2d"),
+                #[allow(deprecated)] IndexType::GeoSpacial => serializer.serialize_str("geoHaystack"),
+                IndexType::Text => serializer.serialize_str("text"),
+            }
+    }
 }
 
 /// Specifies the options to a [`Collection::create_index`](../struct.Collection.html#method.create_index)
@@ -925,7 +944,10 @@ pub enum IndexType {
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-pub struct IndexOptions {
+pub struct Index {
+    /// Specifies the index’s fields. For each field, specify a key-value pair in which the key is the name of the field to
+    /// index and the value is index type.
+    #[builder(default)]
     pub key: HashMap<String, IndexType>,
 
     /// Optional. Deprecated in MongoDB 4.2.
@@ -995,13 +1017,16 @@ pub struct IndexOptions {
     /// storageEngine: { <storage-engine-name>: <options> }
     #[builder(default)]
     pub storage_engine: Option<Document>,
-}
 
+    /// Optional. Specifies the collation for the index.
+    /// 
+    /// [Collation](https://docs.mongodb.com/manual/reference/collation/) allows users to specify language-specific rules for
+    /// string comparison, such as rules for lettercase and accent marks.
+    #[builder(default)]
+    pub collation: Option<Collation>,
 
-#[derive(Debug, Default, TypedBuilder, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct TextIndexOptions {
+    // text
+
     /// Optional. For text indexes, a document that contains field and weight pairs.
     /// 
     /// The weight is an integer ranging from 1 to 99,999 and denotes the significance of the field relative to the other
@@ -1037,44 +1062,24 @@ pub struct TextIndexOptions {
     #[builder(default)]
     pub text_index_version: Option<u32>,
 
+    // wildcard
+
     /// Optional. Allows users to include or exclude specific field paths from a
     /// [wildcard index](https://docs.mongodb.com/manual/core/index-wildcard/#wildcard-index-core)
     /// using the { "$**" : 1} key pattern.
     /// 
     /// This is only used when you specific a wildcard index field
+    #[builder(default)]
     pub wildcard_projection: Option<Document>,
 
-    /// Optional. Specifies the collation for the index.
-    /// 
-    /// [Collation](https://docs.mongodb.com/manual/reference/collation/) allows users to specify language-specific rules for
-    /// string comparison, such as rules for lettercase and accent marks.
-    #[builder(default)]
-    pub collation: Option<Collation>,
-}
+    // 2d
 
-#[derive(Debug, Default, TypedBuilder, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct Sphere2dOptions {
-    /// Optional. The 2dsphere index version number. Users can use this option to override the default version number.
-    #[builder(default)]
-    #[serde(serialize_with = "serialize_u32_as_i32")]
-    #[serde(rename = "2dsphereIndexVersion")]
-    pub sphere2d_index_version: Option<u32>,
-}
-
-#[derive(Debug, Default, TypedBuilder, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-// naming is a problem here
-pub struct D2Options {
     /// Optional. For 2d indexes, the number of precision of the stored geohash value of the location data.
     /// The bits value ranges from 1 to 32 inclusive.
     /// 
     /// The default value is 26.
     #[builder(default)]
     #[serde(serialize_with = "serialize_u32_as_i32")]
-    #[serde(rename = "2dsphereIndexVersion")]
     pub bits: Option<u32>,
 
     /// Optional. For 2d indexes, the lower inclusive boundary for the longitude and latitude values.
@@ -1088,16 +1093,23 @@ pub struct D2Options {
     /// The default value is -180.0.
     #[builder(default)]
     pub max: Option<f64>,
-}
 
-#[derive(Debug, Default, TypedBuilder, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct GeoHayStackptions {
+    // 2dsphere
+
+    /// Optional. The 2dsphere index version number.
+    /// Users can use this option to override the default version number.
+    #[builder(default)]
+    #[serde(serialize_with = "serialize_u32_as_i32")]
+    #[serde(rename = "2dsphereIndexVersion")]
+    pub sphere2d_index_version: Option<u32>,
+
+    // GeoHayStack
+
     /// For geoHaystack indexes, specify the number of units within which to group the location values;
     /// i.e. group in the same bucket those location values that are within the specified number of units to each other.
     /// 
     /// The value must be greater than 0.
+    #[builder(default)]
     bucket_size: Option<f64>,
 }
 

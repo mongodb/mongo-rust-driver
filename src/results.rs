@@ -75,3 +75,28 @@ pub(crate) struct GetMoreResult {
     pub(crate) batch: VecDeque<Document>,
     pub(crate) exhausted: bool,
 }
+
+/// The result of a [`Collection::create_indexes`](../struct.Collection.html#method.create_indexes)
+/// operation.
+/// https://docs.mongodb.com/manual/reference/command/createIndexes/#output
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct CreateIndexesResult {
+    /// If true, then the collection didn’t exist and was created in the process of creating the index.
+    pub created_collection_automatically: Option<bool>,
+    /// The number of indexes at the start of the command.
+    pub num_indexes_before: Option<u32>,
+    /// The number of indexes at the end of the command.
+    pub num_indexes_after: Option<u32>,
+    /// A value of 1 indicates the indexes are in place. A value of 0 indicates an error.
+    pub ok: Result<(), ()>,
+    /// This note is returned if an existing index or indexes already exist. This indicates that the index was not created or changed.
+    pub note: Option<String>,
+    /// Returns information about any errors.
+    pub errmsg: Option<String>,
+    /// The error code representing the type of error.
+    pub code: Option<u32>,
+    // look like this exist but not documented
+    pub code_name: Option<String>,
+}
