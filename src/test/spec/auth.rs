@@ -50,7 +50,14 @@ async fn run_auth_test(test_file: TestFile) {
     for mut test_case in test_file.tests {
         test_case.description = test_case.description.replace('$', "%");
 
-        let skipped_mechanisms = ["GSSAPI", "MONGODB-X509", "PLAIN", "MONGODB-CR"];
+        let skipped_mechanisms = [
+            "GSSAPI",
+            "MONGODB-X509",
+            "PLAIN",
+            "MONGODB-CR",
+            #[cfg(not(feature = "tokio-runtime"))]
+            "MONGODB-AWS",
+        ];
 
         // TODO: X509 (RUST-147)
         // TODO: GSSAPI (RUST-196)
