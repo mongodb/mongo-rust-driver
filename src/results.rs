@@ -4,7 +4,7 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::bson::{Bson, Document};
 
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 
 /// The result of a [`Collection::insert_one`](../struct.Collection.html#method.insert_one)
 /// operation.
@@ -79,7 +79,7 @@ pub(crate) struct GetMoreResult {
 /// The result of a [`Collection::create_indexes`](../struct.Collection.html#method.create_indexes)
 /// operation.
 /// https://docs.mongodb.com/manual/reference/command/createIndexes/#output
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CreateIndexesResult {

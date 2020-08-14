@@ -885,9 +885,10 @@ pub struct FindOneOptions {
 /// Specifies indexes to create.
 /// 
 /// [See](https://docs.mongodb.com/manual/reference/command/createIndexes/) for more.
+#[skip_serializing_none]
 #[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
 #[non_exhaustive]
-//#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct CreateIndexesOptions {
     /// The write concern for the operation.
     #[builder(default)]
@@ -941,6 +942,7 @@ impl Serialize for IndexType {
 /// See the
 /// [documentation](https://docs.mongodb.com/manual/reference/method/db.collection.createIndex/#options-for-all-index-types)
 /// for more information on how to use this option.
+#[skip_serializing_none]
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -948,12 +950,13 @@ pub struct Index {
     /// Specifies the index’s fields. For each field, specify a key-value pair in which the key is the name of the field to
     /// index and the value is index type.
     #[builder(default)]
-    pub key: HashMap<String, IndexType>,
+    #[serde(rename = "key")]
+    pub keys: HashMap<String, IndexType>,
 
     /// Optional. Deprecated in MongoDB 4.2.
     #[deprecated]
     #[builder(default)]
-    pub background: bool,
+    pub background: Option<bool>,
 
     /// Optional. Creates a unique index so that the collection will not accept insertion or update of documents
     /// where the index key value matches an existing value in the index.

@@ -5,7 +5,7 @@ use crate::{
     bson::doc,
     cmap::{Command, CommandResponse, StreamDescription},
     error::Result,
-    operation::{append_options, Operation, WriteConcernOnlyBody},
+    operation::{append_options, Operation, WriteResponseBody},
     options::{CreateIndexesOptions, WriteConcern, Index},
     Namespace,
     results::CreateIndexesResult,
@@ -56,8 +56,9 @@ impl Operation for CreateIndexes {
     }
 
     fn handle_response(&self, response: CommandResponse) -> Result<Self::O> {
-        response.body::<WriteConcernOnlyBody>()?.validate()?;
-        todo!();
+        let body = response.body::<WriteResponseBody<Self::O>>()?;
+        body.validate()?;
+        Ok(body.body)
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

@@ -296,6 +296,20 @@ impl Collection {
         self.client().execute_operation(create_indexes).await
     }
 
+        /// Builds one index on a collection.
+        // This is a wrapper of `create_indexes` because create only one index is likely to be the most use case
+        pub async fn create_index(
+            &self,
+            index: Index,
+            options: impl Into<Option<CreateIndexesOptions>>,
+        ) -> Result<CreateIndexesResult> {
+            let mut options = options.into();
+            resolve_options!(self, options, [write_concern]);
+    
+            let create_indexes = CreateIndexes::new(self.namespace(), vec![index], options);
+            self.client().execute_operation(create_indexes).await
+        }
+
     /// Deletes all documents stored in the collection matching `query`.
     pub async fn delete_many(
         &self,
