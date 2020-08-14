@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use futures::stream::StreamExt;
 use lazy_static::lazy_static;
@@ -10,6 +10,9 @@ use crate::{
     event::command::CommandStartedEvent,
     options::{
         AggregateOptions,
+        CreateIndexesOptions,
+        Index,
+        IndexType,
         DeleteOptions,
         FindOneAndDeleteOptions,
         FindOneOptions,
@@ -752,4 +755,29 @@ async fn no_read_preference_to_standalone() {
     let command_started = client.get_successful_command_execution("find").0;
 
     assert!(!command_started.command.contains_key("$readPreference"));
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn create_indexes() {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
+    coll
+        .insert_many((0i32..5).map(|i| doc! { "x": i }).collect::<Vec<_>>(), None)
+        .await
+        .unwrap();
+
+    let mut indexes = Vec::new();
+
+    let mut keys = HashMap::new();
+    keys.insert("test".to_string(), IndexType::Ascending);
+
+    indexes.push(Index::builder().keys(keys).name("test".to_string()).build());
+
+    coll.create_indexes(indexes, None).await.unwrap();
 }

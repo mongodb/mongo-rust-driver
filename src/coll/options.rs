@@ -949,9 +949,11 @@ impl Serialize for IndexType {
 pub struct Index {
     /// Specifies the index’s fields. For each field, specify a key-value pair in which the key is the name of the field to
     /// index and the value is index type.
-    #[builder(default)]
     #[serde(rename = "key")]
     pub keys: HashMap<String, IndexType>,
+
+    /// The name of the index.
+    pub name: String,
 
     /// Optional. Deprecated in MongoDB 4.2.
     #[deprecated]
@@ -966,12 +968,6 @@ pub struct Index {
     /// The option is unavailable for [hashed](https://docs.mongodb.com/manual/core/index-hashed/) indexes.
     #[builder(default)]
     pub unique: Option<bool>,
-
-    /// Optional. The name of the index.
-    ///
-    /// If unspecified, MongoDB generates an index name by concatenating the names of the indexed fields and the sort order.
-    #[builder(default)]
-    pub name: Option<String>,
 
     /// Optional. If specified, the index only references documents that match the filter expression. See Partial Indexes for
     /// more information.

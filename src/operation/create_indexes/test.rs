@@ -25,7 +25,7 @@ async fn build_one() {
     let mut keys = HashMap::new();
     keys.insert("test".to_string(), IndexType::Ascending);
 
-    indexes.push(Index::builder().keys(keys).build());
+    indexes.push(Index::builder().keys(keys).name("test".to_string()).build());
 
     let wc = WriteConcern {
         w: Some(Acknowledgment::Majority),
@@ -44,7 +44,7 @@ async fn build_one() {
 
     let mut expected_body = doc! {
         "createIndexes": "test_coll",
-        "indexes": [{"key": {"test": 1}}],
+        "indexes": [{"key": {"test": 1}, "name": "test"}],
         "writeConcern": {
             "w": "majority",
         }
