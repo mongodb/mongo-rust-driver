@@ -56,9 +56,8 @@ impl Operation for CreateIndexes {
     }
 
     fn handle_response(&self, response: CommandResponse) -> Result<Self::O> {
-        let body = response.body::<WriteResponseBody<Self::O>>()?;
-        body.validate()?;
-        Ok(body.body)
+        let body = response.body::<Self::O>()?;
+        Ok(body)
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

@@ -47,6 +47,7 @@ typed-builder = "0.3.0"
 version_check = "0.9.1"
 webpki = "0.21.0"
 webpki-roots = "0.18.0"
+num-traits = "0.2.12"
 
 [dependencies.either]
 version = "1.6"

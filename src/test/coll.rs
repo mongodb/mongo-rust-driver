@@ -767,16 +767,10 @@ async fn create_indexes() {
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
-    coll
-        .insert_many((0i32..5).map(|i| doc! { "x": i }).collect::<Vec<_>>(), None)
-        .await
-        .unwrap();
 
     let mut indexes = Vec::new();
-
     let mut keys = HashMap::new();
     keys.insert("test".to_string(), IndexType::Ascending);
-
     indexes.push(Index::builder().keys(keys).name("test".to_string()).build());
 
     coll.create_indexes(indexes, None).await.unwrap();
