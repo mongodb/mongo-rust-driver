@@ -10,7 +10,7 @@ use crate::{
         deserialize_duration_from_u64_millis,
         serialize_batch_size,
         serialize_duration_as_int_millis,
-        serialize_u32_as_i32,
+        serialize_option_u32_as_i32,
     },
     concern::{ReadConcern, WriteConcern},
     options::Collation,
@@ -651,7 +651,7 @@ pub struct FindOptions {
     /// number of round trips needed to return the entire set of documents returned by the
     /// query.
     #[builder(default)]
-    #[serde(serialize_with = "serialize_u32_as_i32")]
+    #[serde(serialize_with = "serialize_option_u32_as_i32")]
     pub batch_size: Option<u32>,
 
     /// Tags the query with an arbitrary string to help trace the operation through the database

@@ -1,6 +1,6 @@
 pub(crate) mod async_encoding;
 
-use std::time::Duration;
+use std::{time::Duration, convert::TryInto};
 
 use serde::{ser, Deserialize, Deserializer, Serialize, Serializer};
 
@@ -87,14 +87,40 @@ where
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
-pub(crate) fn serialize_u32_as_i32<S: Serializer>(
+pub(crate) fn serialize_option_u32_as_i32<S: Serializer>(
     val: &Option<u32>,
     serializer: S,
 ) -> std::result::Result<S::Ok, S::Error> {
     match val {
-        Some(val) if { *val <= std::i32::MAX as u32 } => serializer.serialize_i32(*val as i32),
+        Some(val) => serialize_u32_as_i32(val, serializer),
         None => serializer.serialize_none(),
-        _ => Err(ser::Error::custom("u32 specified does not fit into an i32")),
+    }
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+pub(crate) fn serialize_u32_as_i32<S: Serializer>(
+    val: &u32,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    if let Ok(val) = (*val).try_into() {
+        serializer.serialize_i32(val)
+    }
+    else {
+        Err(ser::Error::custom("u32 specified does not fit into an i32"))
+    }
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+#[cfg(feature = "gridfs")]
+pub(crate) fn serialize_u64_as_i64<S: Serializer>(
+    val: &u64,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    if let Ok(val) = (*val).try_into() {
+        serializer.serialize_i64(val)
+    }
+    else {
+        Err(ser::Error::custom("u32 specified does not fit into an i32"))
     }
 }
 
