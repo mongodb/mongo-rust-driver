@@ -161,6 +161,11 @@ impl Connection {
         self.generation != current_generation
     }
 
+    /// Checks if the connection is currently executing an operation.
+    pub(super) fn is_executing(&self) -> bool {
+        self.command_executing
+    }
+
     /// Helper to create a `ConnectionCheckedOutEvent` for the connection.
     pub(super) fn checked_out_event(&self) -> ConnectionCheckedOutEvent {
         ConnectionCheckedOutEvent {
@@ -257,14 +262,13 @@ impl Connection {
             stream: std::mem::replace(&mut self.stream, AsyncStream::Null),
             handler: self.handler.take(),
             stream_description: self.stream_description.take(),
+            command_executing: self.command_executing,
         }
     }
 }
 
 impl Drop for Connection {
     fn drop(&mut self) {
-        let command_executing = self.command_executing;
-
         // If the connection has a weak reference to a pool, that means that the connection is
         // being dropped when it's checked out. If the pool is still alive, it
         // should check itself back in. Otherwise, the connection should close
@@ -279,15 +283,9 @@ impl Drop for Connection {
             if let Some(strong_pool_ref) = weak_pool_ref.upgrade() {
                 let dropped_connection_state = self.take();
                 RUNTIME.execute(async move {
-                    if command_executing {
-                        strong_pool_ref
-                            .dropped(dropped_connection_state.into())
-                            .await;
-                    } else {
-                        strong_pool_ref
-                            .check_in(dropped_connection_state.into())
-                            .await;
-                    }
+                    strong_pool_ref
+                        .check_in(dropped_connection_state.into())
+                        .await;
                 });
             } else {
                 self.close(ConnectionClosedReason::PoolClosed);
@@ -315,6 +313,7 @@ struct DroppedConnectionState {
     #[derivative(Debug = "ignore")]
     handler: Option<Arc<dyn CmapEventHandler>>,
     stream_description: Option<StreamDescription>,
+    command_executing: bool,
 }
 
 impl Drop for DroppedConnectionState {
@@ -338,7 +337,7 @@ impl From<DroppedConnectionState> for Connection {
             id: state.id,
             address: state.address.clone(),
             generation: state.generation,
-            command_executing: false,
+            command_executing: state.command_executing,
             stream: std::mem::replace(&mut state.stream, AsyncStream::Null),
             handler: state.handler.take(),
             stream_description: state.stream_description.take(),

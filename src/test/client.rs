@@ -64,7 +64,8 @@ async fn metadata_sent_in_handshake() {
 async fn connection_drop_during_read() {
     let _guard = LOCK.run_concurrently().await;
 
-    let options = CLIENT_OPTIONS.clone();
+    let mut options = CLIENT_OPTIONS.clone();
+    options.max_pool_size = Some(1);
 
     let client = Client::with_options(options.clone()).unwrap();
     let db = client.database("test");
