@@ -55,6 +55,7 @@ async fn run_auth_test(test_file: TestFile) {
             "MONGODB-X509",
             "PLAIN",
             "MONGODB-CR",
+            #[cfg(not(feature = "tokio-runtime"))]
             "MONGODB-AWS",
         ];
 
@@ -84,7 +85,11 @@ async fn run_auth_test(test_file: TestFile) {
                     None => assert!(options.credential.is_none(), "{}", test_case.description),
                 }
             }
-            Err(_) => assert!(!test_case.valid, "{}", test_case.description),
+            Err(e) => assert!(
+                !test_case.valid,
+                "got error {:?}: {}",
+                e, test_case.description
+            ),
         };
     }
 }

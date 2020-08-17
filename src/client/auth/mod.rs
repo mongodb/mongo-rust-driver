@@ -122,6 +122,18 @@ impl AuthMechanism {
                 };
                 Ok(())
             }
+            #[cfg(feature = "tokio-runtime")]
+            AuthMechanism::MongoDbAws => {
+                if credential.username.is_some() && credential.password.is_none() {
+                    return Err(ErrorKind::ArgumentError {
+                        message: "Username cannot be provided without password for MONGODB-AWS \
+                                  authentication"
+                            .to_string(),
+                    }
+                    .into());
+                }
+                Ok(())
+            }
             _ => Ok(()),
         }
     }

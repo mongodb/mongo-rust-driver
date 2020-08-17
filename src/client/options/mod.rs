@@ -834,6 +834,19 @@ fn validate_userinfo(s: &str, userinfo_type: &str) -> Result<()> {
         }
         .into());
     }
+
+    // All instances of '%' in the username must be part of an percent-encoded substring. This means
+    // that there must be two hexidecimal digits following any '%' in the username.
+    if s.split('%')
+        .skip(1)
+        .any(|part| part.len() < 2 || part[0..2].chars().any(|c| !c.is_ascii_hexdigit()))
+    {
+        return Err(ErrorKind::ArgumentError {
+            message: "username/password cannot contain unescaped %".to_string(),
+        }
+        .into());
+    }
+
     Ok(())
 }
 
@@ -1018,12 +1031,6 @@ impl ClientOptionsParser {
             let mut credential = options.credential.get_or_insert_with(Default::default);
             validate_userinfo(u, "username")?;
             let decoded_u = percent_decode(u, "username must be URL encoded")?;
-            if decoded_u.chars().any(|c| c == '%') {
-                return Err(ErrorKind::ArgumentError {
-                    message: "username/passowrd cannot contain unescaped %".to_string(),
-                }
-                .into());
-            }
 
             credential.username = Some(decoded_u);
 
