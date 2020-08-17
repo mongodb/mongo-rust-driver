@@ -152,7 +152,7 @@ impl Collection {
         self.inner.write_concern.as_ref()
     }
 
-    /// Drops the collection, deleting all data, users, and indexes stored in it.
+    /// Drops the collection, deleting all data and indexes stored in it.
     pub async fn drop(&self, options: impl Into<Option<DropCollectionOptions>>) -> Result<()> {
         let mut options = options.into();
         resolve_options!(self, options, [write_concern]);

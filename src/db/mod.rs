@@ -145,7 +145,7 @@ impl Database {
         Collection::new(self.clone(), name, Some(options))
     }
 
-    /// Drops the database, deleting all data, collections, users, and indexes stored in it.
+    /// Drops the database, deleting all data, collections, and indexes stored in it.
     pub async fn drop(&self, options: impl Into<Option<DropDatabaseOptions>>) -> Result<()> {
         let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
