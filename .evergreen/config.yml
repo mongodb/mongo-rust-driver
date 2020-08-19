@@ -395,7 +395,7 @@ functions:
       params:
         script: |
           cd ${DRIVERS_TOOLS}/.evergreen/ocsp
-          ${PYTHON} -m venv ./venv
+          ${PYTHON} -m virtualenv ./venv
           ./venv/${VENV_BIN_DIR}/python -m pip install -r mock-ocsp-responder-requirements.txt
     - command: shell.exec
       params:
@@ -416,7 +416,7 @@ functions:
       params:
         script: |
           cd ${DRIVERS_TOOLS}/.evergreen/ocsp
-          ${PYTHON} -m venv ./venv
+          ${PYTHON} -m virtualenv ./venv
           ./venv/${VENV_BIN_DIR}/python -m pip install -r mock-ocsp-responder-requirements.txt
     - command: shell.exec
       params:
@@ -435,7 +435,7 @@ functions:
       params:
         script: |
           cd ${DRIVERS_TOOLS}/.evergreen/ocsp
-          ${PYTHON} -m venv ./venv
+          ${PYTHON} -m virtualenv ./venv
           ./venv/${VENV_BIN_DIR}/python -m pip install -r mock-ocsp-responder-requirements.txt
     - command: shell.exec
       params:
