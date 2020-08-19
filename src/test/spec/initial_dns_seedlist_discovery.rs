@@ -49,6 +49,15 @@ async fn run() {
             ClientOptions::parse(&test_file.uri).await
         };
 
+        // "encoded-userinfo-and-db.json" specifies a database name with a question mark which is
+        // disallowed on Windows. See
+        // https://docs.mongodb.com/manual/reference/limits/#restrictions-on-db-names
+        if let Some(ref mut options) = test_file.parsed_options {
+            if options.db.as_deref() == Some("mydb?") && cfg!(target_os = "windows") {
+                options.db = Some("mydb".to_string());
+            }
+        }
+
         if let Some(true) = test_file.error {
             assert!(matches!(result, Err(_)), test_file.comment.unwrap());
             return;
@@ -101,15 +110,12 @@ async fn run() {
             }
 
             let mut options_with_tls = options.clone();
-            let tls = if requires_tls {
+            if requires_tls {
                 let tls_options = TlsOptions::builder()
                     .allow_invalid_certificates(true)
                     .build();
-                Some(Tls::Enabled(tls_options))
-            } else {
-                None
-            };
-            options_with_tls.tls = tls;
+                options_with_tls.tls = Some(Tls::Enabled(tls_options));
+            }
             let client = TestClient::with_options(Some(options_with_tls)).await;
             let mut actual_hosts = client.server_info.hosts.unwrap();
 
