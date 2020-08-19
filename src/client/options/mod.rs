@@ -435,16 +435,6 @@ pub enum Tls {
     Disabled,
 }
 
-impl Tls {
-    #[cfg(test)]
-    pub fn options(&self) -> Option<&TlsOptions> {
-        match self {
-            Tls::Enabled(ref options) => Some(options),
-            Tls::Disabled => None,
-        }
-    }
-}
-
 impl From<TlsOptions> for Tls {
     fn from(options: TlsOptions) -> Self {
         Self::Enabled(options)
