@@ -794,9 +794,11 @@ buildvariants:
   matrix_spec:
     os:
       - ubuntu-16.04
+      - macos-10.14
+      - windows-64-vs2017-small
     auth-and-tls: "auth-and-tls"
     async-runtime: "*"
-  display_name: "X.509 auth with ${async-runtime}"
+  display_name: "${os} X.509 auth with ${async-runtime}"
   tasks:
     - "test-x509-auth"
     
