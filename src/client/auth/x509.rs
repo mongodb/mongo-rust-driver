@@ -23,7 +23,7 @@ pub(super) async fn authenticate_stream(
     let server_response = conn.send_command(auth_command, None).await?;
 
     if !server_response.is_success()
-        || server_response.raw_response.get_str("dbname") == Ok("$external")
+        || server_response.raw_response.get_str("dbname") != Ok("$external")
     {
         return Err(Error::authentication_error(
             "MONGODB-X509",

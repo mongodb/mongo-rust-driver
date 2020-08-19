@@ -280,6 +280,7 @@ functions:
 
   "run x509 tests":
     - command: shell.exec
+      type: test
       params:
         shell: bash
         working_dir: "src"
