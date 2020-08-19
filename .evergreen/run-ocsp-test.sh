@@ -14,6 +14,8 @@ set -o errexit  # Exit the script with error if any of the commands fail
 #                            "async-std".
 # OCSP_TLS_SHOULD_SUCCEED    Whether the connection attempt should succeed or not with the
 #                            given configuration.
+# OCSP_ALGORITHM             Specify the cyptographic algorithm used to sign the server's
+#                            certificate. Must be either "rsa" or "ecdsa".
 
 echo "Running OCSP test"
 
