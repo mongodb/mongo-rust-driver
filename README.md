@@ -29,6 +29,7 @@ This repository contains the officially supported MongoDB Rust driver, a client 
 | Driver Version | Required Rust Version |
 |:--------------:|:---------------------:|
 | master         | 1.43+                 |
+| 1.1.x          | 1.43+                 |
 | 1.0.x          | 1.43+                 |
 | 0.11.x         | 1.43+                 |
 | 0.10.x         | 1.43+                 |
@@ -39,7 +40,7 @@ This repository contains the officially supported MongoDB Rust driver, a client 
 The driver is available on [crates.io](https://crates.io/crates/mongodb). To use the driver in your application, simply add it to your project's `Cargo.toml`.
 ```toml
 [dependencies]
-mongodb = "1.0.0"
+mongodb = "1.1.0"
 ```
 
 #### Configuring the async runtime
@@ -48,7 +49,7 @@ The driver supports both of the most popular async runtime crates, namely [`toki
 For example, to instruct the driver to work with [`async-std`](https://crates.io/crates/async-std), add the following to your `Cargo.toml`:
 ```toml
 [dependencies.mongodb]
-version = "1.0.0"
+version = "1.1.0"
 default-features = false
 features = ["async-std-runtime"]
 ```
@@ -57,7 +58,7 @@ features = ["async-std-runtime"]
 The driver also provides a blocking sync API. To enable this, add the `"sync"` feature to your `Cargo.toml`:
 ```toml
 [dependencies.mongodb]
-version = "1.0.0"
+version = "1.1.0"
 default-features = false
 features = ["sync"]
 ```
