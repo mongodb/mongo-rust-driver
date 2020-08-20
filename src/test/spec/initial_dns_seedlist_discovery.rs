@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 use crate::{
     bson::doc,
-    client::auth::AuthMechanism,
+    client::{auth::AuthMechanism, Client},
     options::{ClientOptions, ResolverConfig, Tls, TlsOptions},
     test::{run_spec_test, TestClient},
 };
@@ -117,11 +117,10 @@ async fn run() {
                     .build();
                 options_with_tls.tls = Some(Tls::Enabled(tls_options));
             }
-            let mut client = TestClient::with_options(Some(options_with_tls)).await;
-            let mut actual_hosts = client.server_info.hosts.unwrap();
-            if let Some(ref mut arbiters) = client.server_info.arbiters {
-                actual_hosts.append(arbiters);
-            }
+
+            let client = Client::with_options(options_with_tls).unwrap();
+            client.database("db").run_command(doc! { "ping" : 1 }, None).await.unwrap();
+            let mut actual_hosts = client.get_hosts().await;
 
             test_file.hosts.sort();
             actual_hosts.sort();

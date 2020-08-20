@@ -134,7 +134,7 @@ impl Topology {
 
     /// Gets the addresses of the servers in the cluster.
     #[cfg(test)]
-    pub(super) async fn servers(&self) -> HashSet<StreamAddress> {
+    pub(crate) async fn servers(&self) -> HashSet<StreamAddress> {
         self.state.read().await.servers.keys().cloned().collect()
     }
 
