@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use crate::{
     bson::{doc, Bson},
-    error::{Error, ErrorKind},
+    error::{CommandError, Error, ErrorKind},
     options::{AuthMechanism, ClientOptions, Credential, ListDatabasesOptions},
     selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria},
     test::{util::TestClient, CLIENT_OPTIONS, LOCK},
@@ -257,6 +257,7 @@ async fn list_authorized_databases() {
                 "pwd",
                 &[Bson::from(doc! { "role": "readWrite", "db": name })],
                 &[AuthMechanism::ScramSha256],
+                None,
             )
             .await
             .unwrap();
@@ -436,6 +437,7 @@ async fn scram_sha1() {
             "sha1",
             &[Bson::from("root")],
             &[AuthMechanism::ScramSha1],
+            None,
         )
         .await
         .unwrap();
@@ -455,6 +457,7 @@ async fn scram_sha256() {
             "sha256",
             &[Bson::from("root")],
             &[AuthMechanism::ScramSha256],
+            None,
         )
         .await
         .unwrap();
@@ -474,6 +477,7 @@ async fn scram_both() {
             "both",
             &[Bson::from("root")],
             &[AuthMechanism::ScramSha1, AuthMechanism::ScramSha256],
+            None,
         )
         .await
         .unwrap();
@@ -521,6 +525,7 @@ async fn saslprep() {
             "IX",
             &[Bson::from("root")],
             &[AuthMechanism::ScramSha256],
+            None,
         )
         .await
         .unwrap();
@@ -530,6 +535,7 @@ async fn saslprep() {
             "\u{2163}",
             &[Bson::from("root")],
             &[AuthMechanism::ScramSha256],
+            None,
         )
         .await
         .unwrap();
@@ -543,4 +549,53 @@ async fn saslprep() {
     auth_test_uri("IX", "I%C2%ADX", None, true).await;
     auth_test_uri("%E2%85%A8", "IV", None, true).await;
     auth_test_uri("%E2%85%A8", "I%C2%ADV", None, true).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn x509_auth() {
+    let username = match std::env::var("MONGO_X509_USER") {
+        Ok(user) => user,
+        Err(_) => return,
+    };
+
+    let client = TestClient::new().await;
+    let drop_user_result = client
+        .database("$external")
+        .run_command(doc! { "dropUser": &username }, None)
+        .await;
+
+    match drop_user_result.as_ref().map_err(|e| e.as_ref()) {
+        Err(ErrorKind::CommandError(CommandError { code: 11, .. })) | Ok(_) => {}
+        e @ Err(_) => {
+            e.unwrap();
+        }
+    };
+
+    client
+        .create_user(
+            &username,
+            None,
+            &[doc! { "role": "readWrite", "db": function_name!() }.into()],
+            &[AuthMechanism::MongoDbX509],
+            "$external",
+        )
+        .await
+        .unwrap();
+
+    let mut options = CLIENT_OPTIONS.clone();
+    options.credential = Some(
+        Credential::builder()
+            .mechanism(AuthMechanism::MongoDbX509)
+            .build(),
+    );
+
+    let client = TestClient::with_options(Some(options)).await;
+    client
+        .database(function_name!())
+        .collection(function_name!())
+        .find_one(None, None)
+        .await
+        .unwrap();
 }

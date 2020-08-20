@@ -118,16 +118,24 @@ impl TestClient {
     pub async fn create_user(
         &self,
         user: &str,
-        pwd: &str,
+        pwd: impl Into<Option<&str>>,
         roles: &[Bson],
         mechanisms: &[AuthMechanism],
+        db: impl Into<Option<&str>>,
     ) -> Result<()> {
-        let mut cmd = doc! { "createUser": user, "pwd": pwd, "roles": roles };
+        let mut cmd = doc! { "createUser": user, "roles": roles };
+
+        if let Some(pwd) = pwd.into() {
+            cmd.insert("pwd", pwd);
+        }
+
         if self.server_version_gte(4, 0) {
             let ms: bson::Array = mechanisms.iter().map(|s| Bson::from(s.as_str())).collect();
             cmd.insert("mechanisms", ms);
         }
-        self.database("admin").run_command(cmd, None).await?;
+        self.database(db.into().unwrap_or("admin"))
+            .run_command(cmd, None)
+            .await?;
         Ok(())
     }
 
