@@ -119,7 +119,11 @@ async fn run() {
             }
 
             let client = Client::with_options(options_with_tls).unwrap();
-            client.database("db").run_command(doc! { "ping" : 1 }, None).await.unwrap();
+            client
+                .database("db")
+                .run_command(doc! { "ping" : 1 }, None)
+                .await
+                .unwrap();
             let mut actual_hosts = client.get_hosts().await;
 
             test_file.hosts.sort();
