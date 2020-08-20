@@ -10,6 +10,10 @@ use crate::{
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
+    if std::env::var_os("MONGO_OCSP_TESTS").is_none() {
+        return;
+    }
+
     let _guard = LOCK.run_exclusively().await;
 
     let should_succeed = std::env::var("OCSP_TLS_SHOULD_SUCCEED")

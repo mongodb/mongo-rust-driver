@@ -369,6 +369,7 @@ functions:
           MONGODB_URI=${MONGODB_URI} \
           OCSP_TLS_SHOULD_SUCCEED=${OCSP_TLS_SHOULD_SUCCEED} \
           OCSP_ALGORITHM=${OCSP_ALGORITHM} \
+          MONGO_OCSP_TESTS=1 \
           .evergreen/run-ocsp-test.sh
 
   run-valid-ocsp-server:
