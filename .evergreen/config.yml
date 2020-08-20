@@ -1255,44 +1255,45 @@ buildvariants:
   display_name: "AWS Auth ${os} with ${async-runtime}"
   tasks:
     - ".aws-auth"
-- matrix_name: "ocsp"
-  matrix_spec:
-    os:
-      - ubuntu-18.04
-    async-runtime: "*"
-    mongodb-version:
-      - latest
-      - 4.4
-  display_name: "OCSP ${os} ${mongodb-version} with ${async-runtime}"
-  batchtime: 20160 # 14 days
-  tasks:
-    - ".ocsp"
-- matrix_name: "ocsp-macos"
-  matrix_spec:
-    os:
-      - macos-10.14
-    async-runtime: "*"
-    mongodb-version:
-      - latest
-      - 4.4
-  display_name: "OCSP ${os} ${mongodb-version} with ${async-runtime}"
-  batchtime: 20160 # 14 days
-  tasks:
-      # macOS MongoDB servers do not staple OCSP responses and only support RSA.
-      - name: ".ocsp-rsa !.ocsp-staple"
-- matrix_name: "ocsp-windows"
-  matrix_spec:
-    os:
-      - windows-64-vs2017-small
-    async-runtime: "*"
-    mongodb-version:
-      - latest
-      - 4.4
-  display_name: "OCSP ${os} ${mongodb-version} with ${async-runtime}"
-  batchtime: 20160 # 14 days
-  tasks:
-      # Windows MongoDB servers do not staple OCSP responses and only support RSA.
-      - name: ".ocsp-rsa !.ocsp-staple"
+# TODO: RUST-361 enable these tests once OCSP support is implemented
+# - matrix_name: "ocsp"
+#   matrix_spec:
+#     os:
+#       - ubuntu-18.04
+#     async-runtime: "*"
+#     mongodb-version:
+#       - latest
+#       - 4.4
+#   display_name: "OCSP ${os} ${mongodb-version} with ${async-runtime}"
+#   batchtime: 20160 # 14 days
+#   tasks:
+#     - ".ocsp"
+# - matrix_name: "ocsp-macos"
+#   matrix_spec:
+#     os:
+#       - macos-10.14
+#     async-runtime: "*"
+#     mongodb-version:
+#       - latest
+#       - 4.4
+#   display_name: "OCSP ${os} ${mongodb-version} with ${async-runtime}"
+#   batchtime: 20160 # 14 days
+#   tasks:
+#       # macOS MongoDB servers do not staple OCSP responses and only support RSA.
+#       - name: ".ocsp-rsa !.ocsp-staple"
+# - matrix_name: "ocsp-windows"
+#   matrix_spec:
+#     os:
+#       - windows-64-vs2017-small
+#     async-runtime: "*"
+#     mongodb-version:
+#       - latest
+#       - 4.4
+#   display_name: "OCSP ${os} ${mongodb-version} with ${async-runtime}"
+#   batchtime: 20160 # 14 days
+#   tasks:
+#       # Windows MongoDB servers do not staple OCSP responses and only support RSA.
+#       - name: ".ocsp-rsa !.ocsp-staple"
 - matrix_name: "compile-only"
   matrix_spec:
     os:
