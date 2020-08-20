@@ -117,8 +117,11 @@ async fn run() {
                     .build();
                 options_with_tls.tls = Some(Tls::Enabled(tls_options));
             }
-            let client = TestClient::with_options(Some(options_with_tls)).await;
+            let mut client = TestClient::with_options(Some(options_with_tls)).await;
             let mut actual_hosts = client.server_info.hosts.unwrap();
+            if let Some(ref mut arbiters) = client.server_info.arbiters {
+                actual_hosts.append(arbiters);
+            }
 
             test_file.hosts.sort();
             actual_hosts.sort();
