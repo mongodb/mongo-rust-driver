@@ -11,6 +11,15 @@ use crate::{
     is_master::IsMasterReply,
 };
 
+#[cfg(feature = "tokio-runtime")]
+const RUNTIME_NAME: &str = "tokio";
+
+#[cfg(all(feature = "async-std-runtime", not(feature = "sync")))]
+const RUNTIME_NAME: &str = "async-std";
+
+#[cfg(feature = "sync")]
+const RUNTIME_NAME: &str = "sync (with async-std)";
+
 #[derive(Clone, Debug)]
 struct ClientMetadata {
     application: Option<AppMetadata>,
@@ -114,7 +123,7 @@ lazy_static! {
 
         if let Some((version, channel, date)) = version_check::triple() {
             metadata.platform =
-                Some(format!("rustc {} {} ({})", version, channel, date));
+                Some(format!("rustc {} {} ({}) with {}", version, channel, date, RUNTIME_NAME));
         }
 
         metadata
