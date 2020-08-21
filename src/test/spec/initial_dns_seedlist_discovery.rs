@@ -86,6 +86,7 @@ async fn run() {
             None => true,
         };
         let client = TestClient::new().await;
+        // TODO RUST-395: log this test skip
         if requires_tls == client.options.tls_options().is_some()
             && client.is_replica_set()
             && client.options.repl_set_name.as_deref() == Some("repl0")
