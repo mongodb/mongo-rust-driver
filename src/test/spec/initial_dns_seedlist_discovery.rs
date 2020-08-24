@@ -1,8 +1,10 @@
 use serde::Deserialize;
 
 use crate::{
-    options::{ClientOptions, ResolverConfig},
-    test::run_spec_test,
+    bson::doc,
+    client::{auth::AuthMechanism, Client},
+    options::{ClientOptions, ResolverConfig, Tls, TlsOptions},
+    test::{run_spec_test, TestClient},
 };
 
 #[derive(Debug, Deserialize)]
@@ -40,6 +42,16 @@ async fn run() {
             return;
         }
 
+        // "encoded-userinfo-and-db.json" specifies a database name with a question mark which is
+        // disallowed on Windows. See
+        // https://docs.mongodb.com/manual/reference/limits/#restrictions-on-db-names
+        if let Some(ref mut options) = test_file.parsed_options {
+            if options.db.as_deref() == Some("mydb?") && cfg!(target_os = "windows") {
+                options.db = Some("mydb".to_string());
+                test_file.uri = test_file.uri.replace("%3F", "");
+            }
+        }
+
         let result = if cfg!(target_os = "windows") {
             ClientOptions::parse_with_resolver_config(&test_file.uri, ResolverConfig::cloudflare())
                 .await
@@ -68,44 +80,70 @@ async fn run() {
 
         assert_eq!(expected_seeds, actual_seeds,);
 
-        // The spec tests use two fields to compare against for the authentication database. In the
-        // `parsed_options` field, there is a `db` field which is populated with the database
-        // between the `/` and the querystring of the URI, and in the `options` field, there is an
-        // `authSource` field that is populated with whatever the driver should resolve `authSource`
-        // to from both the URI and the TXT options. Because we don't keep track of where we found
-        // the auth source in ClientOptions and the point of testing this behavior in this spec is
-        // to ensure that the right database is chosen based on both the URI and TXT options, we
-        // just determine what that should be and stick that in all of the options parsed from the
-        // spec JSON.
-        let resolved_db = test_file
-            .options
-            .as_ref()
-            .and_then(|opts| opts.auth_source.clone())
-            .or_else(|| {
-                test_file
-                    .parsed_options
-                    .as_ref()
-                    .and_then(|opts| opts.db.clone())
-            });
+        // "txt-record-with-overridden-ssl-option.json" requires SSL be disabled; see DRIVERS-1324.
+        let requires_tls = match test_file.options {
+            Some(ref options) => options.ssl,
+            None => true,
+        };
+        let client = TestClient::new().await;
+        // TODO RUST-395: log this test skip
+        if requires_tls == client.options.tls_options().is_some()
+            && client.is_replica_set()
+            && client.options.repl_set_name.as_deref() == Some("repl0")
+        {
+            // If the connection URI provides authentication information, manually create the user
+            // before connecting.
+            if let Some(ParsedOptions {
+                user: Some(ref user),
+                password: Some(ref pwd),
+                ref db,
+            }) = test_file.parsed_options
+            {
+                client
+                    .drop_and_create_user(
+                        user,
+                        pwd,
+                        &[],
+                        &[AuthMechanism::ScramSha1, AuthMechanism::ScramSha256],
+                        db.as_deref(),
+                    )
+                    .await
+                    .unwrap();
+            }
 
-        if let Some(ref mut resolved_options) = test_file.options {
-            resolved_options.auth_source = resolved_db.clone();
+            let mut options_with_tls = options.clone();
+            if requires_tls {
+                let tls_options = TlsOptions::builder()
+                    .allow_invalid_certificates(true)
+                    .build();
+                options_with_tls.tls = Some(Tls::Enabled(tls_options));
+            }
 
-            let actual_options = ResolvedOptions {
-                replica_set: options.repl_set_name.clone(),
-                auth_source: options
-                    .credential
-                    .as_ref()
-                    .and_then(|cred| cred.source.clone()),
-                ssl: options.tls_options().is_some(),
-            };
+            let client = Client::with_options(options_with_tls).unwrap();
+            client
+                .database("db")
+                .run_command(doc! { "ping" : 1 }, None)
+                .await
+                .unwrap();
+            let mut actual_hosts = client.get_hosts().await;
 
-            assert_eq!(&actual_options, resolved_options);
+            test_file.hosts.sort();
+            actual_hosts.sort();
+
+            assert_eq!(test_file.hosts, actual_hosts);
         }
 
-        if let Some(mut parsed_options) = test_file.parsed_options {
-            parsed_options.db = resolved_db;
+        if let Some(ref mut resolved_options) = test_file.options {
+            // When an `authSource` is provided without any other authentication information, we do
+            // not keep track of it within a Credential. The options present in the spec tests
+            // expect the `authSource` be present regardless of whether a Credential should be
+            // created, so the value of the `authSource` is not asserted on to avoid this
+            // discrepancy.
+            assert_eq!(resolved_options.replica_set, options.repl_set_name);
+            assert_eq!(resolved_options.ssl, options.tls_options().is_some());
+        }
 
+        if let Some(parsed_options) = test_file.parsed_options {
             let actual_options = options
                 .credential
                 .map(|cred| ParsedOptions {

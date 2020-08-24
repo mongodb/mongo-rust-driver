@@ -710,10 +710,9 @@ impl ClientOptions {
             // supposed to be overriden by authSource.
             if !auth_source_present {
                 if let Some(auth_source) = config.auth_source.take() {
-                    options
-                        .credential
-                        .get_or_insert_with(Default::default)
-                        .source = Some(auth_source);
+                    if let Some(ref mut credential) = options.credential {
+                        credential.source = Some(auth_source);
+                    }
                 }
             }
 

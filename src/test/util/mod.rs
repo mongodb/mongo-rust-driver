@@ -139,6 +139,29 @@ impl TestClient {
         Ok(())
     }
 
+    pub async fn drop_and_create_user(
+        &self,
+        user: &str,
+        pwd: &str,
+        roles: &[Bson],
+        mechanisms: &[AuthMechanism],
+        db: Option<&str>,
+    ) -> Result<()> {
+        let drop_user_result = self
+            .database(db.unwrap_or("admin"))
+            .run_command(doc! { "dropUser": user }, None)
+            .await;
+
+        match drop_user_result.as_ref().map_err(|e| e.as_ref()) {
+            Err(ErrorKind::CommandError(CommandError { code: 11, .. })) | Ok(_) => {}
+            e @ Err(_) => {
+                e.unwrap();
+            }
+        };
+
+        self.create_user(user, pwd, roles, mechanisms, db).await
+    }
+
     pub fn get_coll(&self, db_name: &str, coll_name: &str) -> Collection {
         self.database(db_name).collection(coll_name)
     }
