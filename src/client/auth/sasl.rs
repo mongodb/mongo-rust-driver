@@ -23,11 +23,16 @@ impl SaslStart {
     }
 
     pub(super) fn into_command(self) -> Command {
-        let body = doc! {
+        let mut body = doc! {
             "saslStart": 1,
             "mechanism": self.mechanism.as_str(),
             "payload": Binary { subtype: BinarySubtype::Generic, bytes: self.payload },
         };
+        if self.mechanism == AuthMechanism::ScramSha1
+            || self.mechanism == AuthMechanism::ScramSha256
+        {
+            body.insert("options", doc! { "skipEmptyExchange": true });
+        }
 
         Command::new("saslStart".into(), self.source, body)
     }
