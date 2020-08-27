@@ -59,13 +59,20 @@ impl SrvPollingMonitor {
     }
 
     async fn execute(&mut self) {
-        while let Some(topology) = self.topology.upgrade() {
+        while self.topology.is_alive() {
+            let topology = match self.topology.upgrade() {
+                Some(topology) => topology,
+                None => break,
+            };
+
             let state = topology.clone_state().await;
 
             if state.is_sharded() || state.is_unknown() {
                 let hosts = self.lookup_hosts().await;
-                self.update_hosts(hosts, topology, state).await;
+                self.update_hosts(hosts, topology.clone(), state).await;
             }
+
+            std::mem::drop(topology);
 
             RUNTIME
                 .delay_for(self.rescan_interval.unwrap_or(DEFAULT_RESCAN_SRV_INTERVAL))
