@@ -555,6 +555,8 @@ async fn saslprep() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn x509_auth() {
+    let _guard = LOCK.run_concurrently().await;
+
     let username = match std::env::var("MONGO_X509_USER") {
         Ok(user) => user,
         Err(_) => return,

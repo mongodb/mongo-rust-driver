@@ -3,7 +3,7 @@ use std::time::Duration;
 use serde::Deserialize;
 
 use crate::{
-    bson::{oid::ObjectId, DateTime, Timestamp},
+    bson::{oid::ObjectId, DateTime, Document, Timestamp},
     client::ClusterTime,
     sdam::ServerType,
     selection_criteria::TagSet,
@@ -42,6 +42,7 @@ pub(crate) struct IsMasterCommandResponse {
     pub election_id: Option<ObjectId>,
     pub primary: Option<String>,
     pub sasl_supported_mechs: Option<Vec<String>>,
+    pub speculative_authenticate: Option<Document>,
 }
 
 impl PartialEq for IsMasterCommandResponse {

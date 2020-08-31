@@ -1,14 +1,24 @@
 #[cfg(test)]
 mod test;
 
+use time::PreciseTime;
+
 use lazy_static::lazy_static;
 use os_info::{Type, Version};
 
 use crate::{
     bson::{doc, Bson, Document},
-    cmap::{options::ConnectionPoolOptions, Command, Connection, StreamDescription},
+    client::auth::{ClientFirst, FirstRound},
+    cmap::{
+        options::ConnectionPoolOptions,
+        Command,
+        CommandResponse,
+        Connection,
+        StreamDescription,
+    },
     error::Result,
-    is_master::IsMasterReply,
+    is_master::{IsMasterCommandResponse, IsMasterReply},
+    options::{AuthMechanism, Credential},
 };
 
 #[cfg(feature = "tokio-runtime")]
@@ -184,18 +194,82 @@ impl Handshaker {
     }
 
     /// Handshakes a connection.
-    pub(super) async fn handshake(&self, conn: &mut Connection) -> Result<()> {
-        let response = conn.send_command(self.command.clone(), None).await?;
-        let command_response = response.body()?;
+    pub(super) async fn handshake(
+        &self,
+        conn: &mut Connection,
+        credential: Option<&Credential>,
+    ) -> Result<Option<FirstRound>> {
+        let mut command = self.command.clone();
 
-        // TODO RUST-192: Calculate round trip time.
+        // Update the command document with the speculative authentication info.
+        let client_first = set_client_first(&mut command.body, credential)?;
+
+        let start_time = PreciseTime::now();
+        let response = conn.send_command(command, None).await?;
+        let end_time = PreciseTime::now();
+
+        let mut command_response: IsMasterCommandResponse = response.body()?;
+
+        // Record the client's message and the server's response from speculative authentication if
+        // the server did send a response.
+        let first_round = client_first.and_then(|client_first| {
+            command_response
+                .speculative_authenticate
+                .take()
+                .map(|server_first| {
+                    let command_response = CommandResponse::with_document_and_address(
+                        conn.address().clone(),
+                        server_first,
+                    );
+
+                    client_first.into_first_round(command_response)
+                })
+        });
+
         let is_master_reply = IsMasterReply {
             command_response,
-            round_trip_time: None,
+            round_trip_time: Some(start_time.to(end_time).to_std().unwrap()),
             cluster_time: None,
         };
 
         conn.stream_description = Some(StreamDescription::from_is_master(is_master_reply));
-        Ok(())
+        Ok(first_round)
     }
+}
+
+/// Updates the handshake command document with the speculative authenitication info.
+fn set_client_first(
+    command: &mut Document,
+    credential: Option<&Credential>,
+) -> Result<Option<ClientFirst>> {
+    let credential = match credential {
+        Some(credential) => credential,
+        None => return Ok(None),
+    };
+
+    // The spec indicates that SCRAM-SHA-256 should be assumed for speculative authentication if no
+    // mechanism is provided. This doesn't cause issues with servers where SCRAM-SHA-256 is not the
+    // default due to them being too old to support speculative authentication at all.
+    let auth_mechanism = credential
+        .mechanism
+        .as_ref()
+        .unwrap_or(&AuthMechanism::ScramSha256);
+
+    let client_first = match auth_mechanism.build_client_first(credential)? {
+        Some(client_first) => client_first,
+        None => return Ok(None),
+    };
+
+    let mut client_first_doc = client_first.to_document();
+
+    // Since the first round of the SCRAM handshake isn't being sent as an OP_MSG to the server, the
+    // database containing the user needs to be specified in the document. This isn't an issue for
+    // X.509 due to it always being used with the $external database.
+    if auth_mechanism.is_scram() {
+        client_first_doc.insert("db", credential.resolved_source());
+    }
+
+    command.insert("speculativeAuthenticate", client_first_doc);
+
+    Ok(Some(client_first))
 }

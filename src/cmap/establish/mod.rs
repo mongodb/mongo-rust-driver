@@ -1,4 +1,6 @@
 mod handshake;
+#[cfg(test)]
+mod test;
 
 use self::handshake::Handshaker;
 use super::{options::ConnectionPoolOptions, Connection};
@@ -28,11 +30,14 @@ impl ConnectionEstablisher {
 
     /// Establishes a connection.
     pub(super) async fn establish_connection(&self, connection: &mut Connection) -> Result<()> {
-        self.handshaker.handshake(connection).await?;
+        let first_round = self
+            .handshaker
+            .handshake(connection, self.credential.as_ref())
+            .await?;
 
         if let Some(ref credential) = self.credential {
             credential
-                .authenticate_stream(connection, &self.http_client)
+                .authenticate_stream(connection, &self.http_client, first_round)
                 .await?;
         }
 

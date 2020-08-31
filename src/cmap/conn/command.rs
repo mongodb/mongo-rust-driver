@@ -70,7 +70,6 @@ pub(crate) struct CommandResponse {
 }
 
 impl CommandResponse {
-    #[cfg(test)]
     pub(crate) fn with_document_and_address(source: StreamAddress, doc: Document) -> Self {
         Self {
             source,

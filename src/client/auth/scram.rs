@@ -21,7 +21,7 @@ use crate::{
         AuthMechanism,
         Credential,
     },
-    cmap::{Command, Connection},
+    cmap::{Command, CommandResponse, Connection},
     error::{Error, Result},
 };
 
@@ -57,19 +57,32 @@ struct CacheEntry {
 }
 
 /// The versions of SCRAM supported by the driver (classified according to hash function used).
-#[derive(Hash, Eq, PartialEq, Clone)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub(crate) enum ScramVersion {
     Sha1,
     Sha256,
 }
 
+/// Contains the authentication info derived from a Credential.
+pub(crate) struct ClientAuthInfo<'a> {
+    pub(crate) username: &'a str,
+    pub(crate) password: &'a str,
+    pub(crate) source: &'a str,
+}
+
+/// The contents of the first round of a SCRAM handshake.
+#[derive(Debug)]
+pub(crate) struct FirstRound {
+    pub(crate) client_first: ClientFirst,
+    pub(crate) server_first: CommandResponse,
+}
+
 impl ScramVersion {
-    /// Perform SCRAM authentication for a given stream.
-    pub(crate) async fn authenticate_stream(
+    /// Derives the authentication info from a credential.
+    pub(crate) fn client_auth_info<'a>(
         &self,
-        conn: &mut Connection,
-        credential: &Credential,
-    ) -> Result<()> {
+        credential: &'a Credential,
+    ) -> Result<ClientAuthInfo<'a>> {
         let username = credential
             .username
             .as_ref()
@@ -92,15 +105,61 @@ impl ScramVersion {
             ));
         };
 
-        let nonce = auth::generate_nonce();
+        Ok(ClientAuthInfo {
+            username,
+            password,
+            source,
+        })
+    }
 
-        let client_first = ClientFirst::new(source, username, nonce.as_str());
+    /// Constructs the first client message in the SCRAM handshake.
+    pub(crate) fn build_client_first(&self, credential: &Credential) -> Result<ClientFirst> {
+        let info = self.client_auth_info(credential)?;
+
+        Ok(ClientFirst::new(info.source, info.username))
+    }
+
+    /// Sends the first client message in the SCRAM handshake.
+    async fn send_client_first(
+        &self,
+        conn: &mut Connection,
+        credential: &Credential,
+    ) -> Result<FirstRound> {
+        let client_first = self.build_client_first(credential)?;
 
         let command = client_first.to_command(self);
 
-        let server_first_response = conn.send_command(command, None).await?;
-        let server_first = ServerFirst::parse(server_first_response.raw_response)?;
-        server_first.validate(nonce.as_str())?;
+        let server_first = conn.send_command(command, None).await?;
+
+        Ok(FirstRound {
+            client_first,
+            server_first,
+        })
+    }
+
+    /// Perform SCRAM authentication for a given stream.
+    pub(crate) async fn authenticate_stream(
+        &self,
+        conn: &mut Connection,
+        credential: &Credential,
+        first_round: impl Into<Option<FirstRound>>,
+    ) -> Result<()> {
+        let FirstRound {
+            client_first,
+            server_first,
+        } = match first_round.into() {
+            Some(first_round) => first_round,
+            None => self.send_client_first(conn, credential).await?,
+        };
+
+        let ClientAuthInfo {
+            username,
+            password,
+            source,
+        } = self.client_auth_info(credential)?;
+
+        let server_first = ServerFirst::parse(server_first.raw_response)?;
+        server_first.validate(client_first.nonce.as_str())?;
 
         let cache_entry_key = CacheEntry {
             password: password.to_string(),
@@ -304,7 +363,8 @@ fn parse_kvp(str: &str, expected_key: char) -> Result<String> {
 }
 
 /// Model of the first message sent by the client.
-struct ClientFirst {
+#[derive(Debug)]
+pub(crate) struct ClientFirst {
     source: String,
 
     message: String,
@@ -312,10 +372,13 @@ struct ClientFirst {
     gs2_header: Range<usize>,
 
     bare: Range<usize>,
+
+    nonce: String,
 }
 
 impl ClientFirst {
-    fn new(source: &str, username: &str, nonce: &str) -> Self {
+    fn new(source: &str, username: &str) -> Self {
+        let nonce = auth::generate_nonce();
         let gs2_header = format!("{},,", NO_CHANNEL_BINDING);
         let bare = format!("{}={},{}={}", USERNAME_KEY, username, NONCE_KEY, nonce);
         let full = format!("{}{}", &gs2_header, &bare);
@@ -331,6 +394,7 @@ impl ClientFirst {
                 start: gs2_header.len(),
                 end,
             },
+            nonce,
         }
     }
 
@@ -346,7 +410,7 @@ impl ClientFirst {
         &self.message[..]
     }
 
-    fn to_command(&self, scram: &ScramVersion) -> Command {
+    pub(super) fn to_command(&self, scram: &ScramVersion) -> Command {
         let payload = self.message().as_bytes().to_vec();
         let auth_mech = AuthMechanism::from_scram_version(scram);
         let sasl_start = SaslStart::new(self.source.clone(), auth_mech, payload);

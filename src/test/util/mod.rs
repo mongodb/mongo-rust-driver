@@ -129,7 +129,7 @@ impl TestClient {
             cmd.insert("pwd", pwd);
         }
 
-        if self.server_version_gte(4, 0) {
+        if self.server_version_gte(4, 0) && !mechanisms.is_empty() {
             let ms: bson::Array = mechanisms.iter().map(|s| Bson::from(s.as_str())).collect();
             cmd.insert("mechanisms", ms);
         }
@@ -142,7 +142,7 @@ impl TestClient {
     pub async fn drop_and_create_user(
         &self,
         user: &str,
-        pwd: &str,
+        pwd: impl Into<Option<&str>>,
         roles: &[Bson],
         mechanisms: &[AuthMechanism],
         db: Option<&str>,
