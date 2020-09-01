@@ -82,6 +82,12 @@ struct ClientInner {
     session_pool: ServerSessionPool,
 }
 
+impl Drop for ClientInner {
+    fn drop(&mut self) {
+        self.topology.mark_closed()
+    }
+}
+
 impl Client {
     /// Creates a new `Client` connected to the cluster specified by `uri`. `uri` must be a valid
     /// MongoDB connection string.

@@ -2,7 +2,11 @@ pub(super) mod server;
 
 use std::{
     collections::{HashMap, HashSet},
-    sync::{Arc, Weak},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+        Weak,
+    },
     time::Duration,
 };
 
@@ -47,6 +51,7 @@ pub(crate) struct WeakTopology {
 /// manager and the client options.
 #[derive(Clone, Debug)]
 struct Common {
+    is_alive: Arc<AtomicBool>,
     message_manager: TopologyMessageManager,
     options: ClientOptions,
 }
@@ -71,6 +76,7 @@ impl Topology {
         let description = TopologyDescription::new_from_hosts(hosts.clone());
 
         let common = Common {
+            is_alive: Arc::new(AtomicBool::new(true)),
             message_manager: TopologyMessageManager::new(),
             options: ClientOptions::new_srv(),
         };
@@ -106,6 +112,7 @@ impl Topology {
         let hosts: Vec<_> = options.hosts.drain(..).collect();
 
         let common = Common {
+            is_alive: Arc::new(AtomicBool::new(true)),
             message_manager: TopologyMessageManager::new(),
             options: options.clone(),
         };
@@ -130,6 +137,10 @@ impl Topology {
         SrvPollingMonitor::start(topology.downgrade());
 
         Ok(topology)
+    }
+
+    pub(crate) fn mark_closed(&self) {
+        self.common.is_alive.store(false, Ordering::SeqCst);
     }
 
     /// Gets the addresses of the servers in the cluster.
@@ -358,6 +369,10 @@ impl WeakTopology {
             state: self.state.upgrade()?,
             common: self.common.clone(),
         })
+    }
+
+    pub(crate) fn is_alive(&self) -> bool {
+        self.common.is_alive.load(Ordering::SeqCst)
     }
 
     pub(crate) fn client_options(&self) -> &ClientOptions {

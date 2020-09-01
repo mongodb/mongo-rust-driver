@@ -79,6 +79,7 @@
     )
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(test, type_length_limit = "6000000")]
 
 macro_rules! define_if_single_runtime_enabled {
     ( $( $def:item )+ ) => {
