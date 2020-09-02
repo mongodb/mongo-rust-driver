@@ -3,6 +3,7 @@ use std::cmp::Ord;
 use approx::assert_ulps_eq;
 use futures::stream::TryStreamExt;
 use serde::Deserialize;
+use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, Bson, Document},
@@ -57,7 +58,7 @@ async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<Collectio
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn is_master() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let db = client.database("test");
@@ -72,7 +73,7 @@ async fn is_master() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn list_collections() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let db = client.database(function_name!());
@@ -118,7 +119,7 @@ async fn list_collections() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn list_collections_filter() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let db = client.database(function_name!());
@@ -166,7 +167,7 @@ async fn list_collections_filter() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn list_collection_names() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let db = client.database(function_name!());
@@ -197,7 +198,7 @@ async fn list_collection_names() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn collection_management() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let db = client.database(function_name!());
@@ -241,7 +242,7 @@ async fn db_aggregate() {
         return;
     }
 
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let db = client.database("admin");
 
@@ -285,7 +286,7 @@ async fn db_aggregate_disk_use() {
         return;
     }
 
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let db = client.database("admin");
 
@@ -340,7 +341,7 @@ async fn create_index_options_defaults_not_specified() {
 }
 
 async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>, name: &str) {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = EventClient::new().await;
     let db = client.database(name);

@@ -1,6 +1,7 @@
 use std::future::Future;
 
 use futures::stream::StreamExt;
+use tokio::sync::RwLockWriteGuard;
 
 use crate::{
     bson::doc,
@@ -20,7 +21,7 @@ use crate::{
 };
 
 async fn run_test<F: Future>(name: &str, test: impl Fn(EventClient, Database, Collection) -> F) {
-    let _guard = LOCK.run_exclusively().await;
+    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
     let options = ClientOptions::builder().retry_writes(false).build();
     let client = EventClient::with_additional_options(Some(options), None, None).await;

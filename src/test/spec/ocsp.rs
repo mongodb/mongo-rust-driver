@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use bson::doc;
+use tokio::sync::RwLockWriteGuard;
 
 use crate::{
     test::{CLIENT_OPTIONS, LOCK},
@@ -14,7 +15,7 @@ async fn run() {
         return;
     }
 
-    let _guard = LOCK.run_exclusively().await;
+    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
     let should_succeed = std::env::var("OCSP_TLS_SHOULD_SUCCEED")
         .unwrap()

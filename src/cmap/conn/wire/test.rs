@@ -1,3 +1,5 @@
+use tokio::sync::RwLockReadGuard;
+
 use super::message::{Message, MessageFlags, MessageSection};
 use crate::{
     bson::{doc, Bson},
@@ -13,7 +15,7 @@ async fn basic() {
         return;
     }
 
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let message = Message {
         response_to: 0,

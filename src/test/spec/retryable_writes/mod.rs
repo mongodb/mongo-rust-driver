@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use futures::stream::TryStreamExt;
 use semver::VersionReq;
+use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use test_file::{Result, TestFile};
 
@@ -157,7 +158,7 @@ async fn run_spec_tests() {
         }
     }
 
-    let _guard = LOCK.run_exclusively().await;
+    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_spec_test(&["retryable-writes"], run_test).await;
 }
 
@@ -165,7 +166,7 @@ async fn run_spec_tests() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn transaction_ids_excluded() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = EventClient::new().await;
 
@@ -218,7 +219,7 @@ async fn transaction_ids_excluded() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn transaction_ids_included() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = EventClient::new().await;
 
@@ -279,7 +280,7 @@ async fn transaction_ids_included() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn mmapv1_error_raised() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
 
@@ -320,14 +321,14 @@ async fn mmapv1_error_raised() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn label_not_added_first_read_error() {
-    let _guard = LOCK.run_exclusively().await;
+    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     label_not_added(false).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn label_not_added_second_read_error() {
-    let _guard = LOCK.run_exclusively().await;
+    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     label_not_added(true).await;
 }
 

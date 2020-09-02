@@ -1,6 +1,7 @@
 use std::{borrow::Cow, collections::HashMap, time::Duration};
 
 use serde::Deserialize;
+use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, Bson},
@@ -62,7 +63,7 @@ async fn metadata_sent_in_handshake() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn connection_drop_during_read() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let mut options = CLIENT_OPTIONS.clone();
     options.max_pool_size = Some(1);
@@ -104,7 +105,7 @@ async fn connection_drop_during_read() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn server_selection_timeout_message() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     if !CLIENT_OPTIONS.repl_set_name.is_some() {
         return;
@@ -142,7 +143,7 @@ async fn server_selection_timeout_message() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn list_databases() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let expected_dbs = &[
         format!("{}1", function_name!()),
@@ -195,7 +196,7 @@ async fn list_databases() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn list_database_names() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
 
@@ -233,7 +234,7 @@ async fn list_database_names() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn list_authorized_databases() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     if client.server_version_lt(4, 0) || !client.auth_enabled() {
@@ -403,7 +404,7 @@ async fn scram_test(
     password: &str,
     mechanisms: &[AuthMechanism],
 ) {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     for mechanism in mechanisms {
         auth_test_uri(username, password, Some(mechanism.clone()), true).await;
@@ -555,7 +556,7 @@ async fn saslprep() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn x509_auth() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
 
     let username = match std::env::var("MONGO_X509_USER") {
         Ok(user) => user,

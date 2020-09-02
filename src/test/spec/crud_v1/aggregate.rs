@@ -1,5 +1,6 @@
 use futures::stream::TryStreamExt;
 use serde::Deserialize;
+use tokio::sync::RwLockReadGuard;
 
 use super::{Outcome, TestFile};
 use crate::{
@@ -27,7 +28,7 @@ async fn run_aggregate_test(test_file: TestFile) {
             continue;
         }
 
-        let _guard = LOCK.run_concurrently().await;
+        let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
         let coll = client
             .init_db_and_coll(

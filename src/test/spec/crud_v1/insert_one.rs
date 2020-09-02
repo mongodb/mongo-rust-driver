@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use tokio::sync::RwLockReadGuard;
 
 use super::{Outcome, TestFile};
 use crate::{
@@ -27,7 +28,7 @@ async fn run_insert_one_test(test_file: TestFile) {
             continue;
         }
 
-        let _guard = LOCK.run_concurrently().await;
+        let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
         test_case.description = test_case.description.replace('$', "%");
 
