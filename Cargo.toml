@@ -10,6 +10,14 @@ readme = "README.md"
 name = "mongodb"
 version = "1.1.1"
 
+exclude = [
+    "etc/**",
+    "rustfmt.toml",
+    ".evergreen/**",
+    ".gitignore",
+    "src/test/**"
+]
+
 [features]
 default = ["tokio-runtime"]
 tokio-runtime = ["tokio/dns", "tokio/macros", "tokio/rt-core", "tokio/tcp", "tokio/rt-threaded", "tokio/time", "reqwest", "serde_bytes"]
