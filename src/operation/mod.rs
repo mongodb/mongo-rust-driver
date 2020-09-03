@@ -51,6 +51,9 @@ pub(crate) use list_databases::ListDatabases;
 pub(crate) use run_command::RunCommand;
 pub(crate) use update::Update;
 
+#[cfg(test)]
+pub(crate) use get_more::GetMoreResponseBody;
+
 /// A trait modeling the behavior of a server side operation.
 pub(crate) trait Operation {
     /// The output type of this operation.
@@ -96,6 +99,10 @@ pub(crate) trait Operation {
     /// The level of retryability the operation supports.
     fn retryability(&self) -> Retryability {
         Retryability::None
+    }
+
+    fn request_exhaust(&self) -> bool {
+        false
     }
 }
 

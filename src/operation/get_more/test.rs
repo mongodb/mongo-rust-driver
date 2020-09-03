@@ -26,7 +26,7 @@ fn build_test(
         batch_size,
         max_time,
     };
-    let get_more = GetMore::new(info);
+    let get_more = GetMore::new(info, false);
 
     let build_result = get_more.build(&StreamDescription::new_testing());
     assert!(build_result.is_ok());
@@ -118,7 +118,7 @@ async fn build_batch_size() {
         batch_size: Some((std::i32::MAX as u32) + 1),
         max_time: None,
     };
-    let op = GetMore::new(info);
+    let op = GetMore::new(info, false);
     assert!(op.build(&StreamDescription::new_testing()).is_err())
 }
 
@@ -137,7 +137,7 @@ async fn op_selection_criteria() {
         batch_size: None,
         max_time: None,
     };
-    let get_more = GetMore::new(info);
+    let get_more = GetMore::new(info, false);
     let server_description = ServerDescription {
         address,
         server_type: ServerType::Unknown,
@@ -182,7 +182,7 @@ async fn handle_success() {
         batch_size: None,
         max_time: None,
     };
-    let get_more = GetMore::new(info);
+    let get_more = GetMore::new(info, false);
 
     let batch = vec![doc! { "_id": 1 }, doc! { "_id": 2 }, doc! { "_id": 3 }];
 

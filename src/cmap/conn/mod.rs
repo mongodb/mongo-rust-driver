@@ -9,8 +9,8 @@ use std::{
 
 use derivative::Derivative;
 
-use self::wire::Message;
-use super::manager::PoolManager;
+pub(crate) use self::wire::Message;
+use super::PoolManager;
 use crate::{
     cmap::options::{ConnectionOptions, StreamOptions},
     error::{ErrorKind, Result},
@@ -246,11 +246,26 @@ impl Connection {
         self.error = write_result.is_err();
         write_result?;
 
+        self.read_response().await
+    }
+
+    /// Reads a response from the server and returns a `CommandResponse`.
+    ///
+    /// An `Ok(...)` result simply means the server received the command and that the driver
+    /// driver received the response; it does not imply anything about the success of the command
+    /// itself.
+    pub(crate) async fn read_response(&mut self) -> Result<CommandResponse> {
         let response_message_result = Message::read_from(&mut self.stream).await;
         self.command_executing = false;
         self.error = response_message_result.is_err();
 
-        CommandResponse::new(self.address.clone(), response_message_result?)
+        let response_message = response_message_result?;
+
+        if !response_message.more_to_come() {
+            self.command_executing = false;
+        }
+
+        CommandResponse::new(self.address.clone(), response_message)
     }
 
     /// Gets the connection's StreamDescription.

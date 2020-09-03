@@ -18,6 +18,7 @@ pub(crate) struct Command {
     pub(crate) target_db: String,
     pub(crate) read_pref: Option<ReadPreference>,
     pub(crate) body: Document,
+    pub(crate) exhaust: bool,
 }
 
 impl Command {
@@ -33,6 +34,7 @@ impl Command {
             target_db,
             read_pref,
             body,
+            exhaust: false,
         }
     }
 
@@ -43,6 +45,7 @@ impl Command {
             target_db,
             read_pref: None,
             body,
+            exhaust: false,
         }
     }
 
@@ -60,6 +63,10 @@ impl Command {
     pub(crate) fn set_txn_number(&mut self, txn_number: u64) {
         self.body.insert("txnNumber", txn_number);
     }
+
+    pub(crate) fn enable_exhaust(&mut self) {
+        self.exhaust = true;
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -67,6 +74,7 @@ pub(crate) struct CommandResponse {
     source: StreamAddress,
     pub(crate) raw_response: Document,
     cluster_time: Option<ClusterTime>,
+    pub(crate) more_to_come: bool,
 }
 
 impl CommandResponse {
@@ -76,6 +84,7 @@ impl CommandResponse {
             source,
             raw_response: doc,
             cluster_time: None,
+            more_to_come: false,
         }
     }
 
@@ -92,6 +101,7 @@ impl CommandResponse {
     }
 
     pub(crate) fn new(source: StreamAddress, message: Message) -> Result<Self> {
+        let more_to_come = message.more_to_come();
         let raw_response = message.single_document_response()?;
         let cluster_time = raw_response
             .get("$clusterTime")
@@ -101,6 +111,7 @@ impl CommandResponse {
             source,
             raw_response,
             cluster_time,
+            more_to_come,
         })
     }
 

@@ -59,7 +59,7 @@ impl CommandEvent {
         }
     }
 
-    fn as_command_succeeded(&self) -> Option<&CommandSucceededEvent> {
+    pub(crate) fn as_command_succeeded(&self) -> Option<&CommandSucceededEvent> {
         match self {
             CommandEvent::CommandSucceededEvent(e) => Some(e),
             _ => None,
@@ -104,7 +104,7 @@ impl CommandEventHandler for EventHandler {
 
 #[derive(Clone)]
 pub struct EventClient {
-    client: TestClient,
+    pub client: TestClient,
     pub command_events: EventQueue<CommandEvent>,
     pub pool_cleared_events: EventQueue<PoolClearedEvent>,
 }

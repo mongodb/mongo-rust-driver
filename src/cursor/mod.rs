@@ -2,6 +2,8 @@ mod common;
 // TODO: RUST-52 use this
 #[allow(dead_code)]
 mod session;
+#[cfg(test)]
+mod test;
 
 use std::{
     pin::Pin,
@@ -13,15 +15,16 @@ use serde::de::DeserializeOwned;
 
 use crate::{
     bson::{from_document, Document},
-    client::ClientSession,
+    client::{ClientSession, OperationResult},
+    cmap::Connection,
     error::Result,
     operation::GetMore,
     results::GetMoreResult,
     Client,
     RUNTIME,
 };
+use common::{read_exhaust_get_more, GenericCursor, GetMoreProvider, GetMoreProviderResult};
 pub(crate) use common::{CursorInformation, CursorSpecification};
-use common::{GenericCursor, GetMoreProvider, GetMoreProviderResult};
 
 /// A `Cursor` streams the result of a query. When a query is made, a `Cursor` will be returned with
 /// the first batch of results from the server; the documents will be returned as the `Cursor` is
@@ -98,14 +101,23 @@ where
 {
     pub(crate) fn new(
         client: Client,
-        spec: CursorSpecification,
+        spec: OperationResult<CursorSpecification>,
         session: Option<ClientSession>,
+        request_exhaust: bool,
     ) -> Self {
-        let provider = ImplicitSessionGetMoreProvider::new(&spec, session);
+        let provider =
+            ImplicitSessionGetMoreProvider::new(&spec.response, session, request_exhaust);
 
         Self {
             client: client.clone(),
-            wrapped_cursor: ImplicitSessionCursor::new(client, spec, provider),
+
+            wrapped_cursor: ImplicitSessionCursor::new(
+                client,
+                spec.response,
+                spec.connection,
+                provider,
+            ),
+
             _phantom: Default::default(),
         }
     }
@@ -151,34 +163,55 @@ where
 /// This is to be used by cursors associated with implicit sessions.
 type ImplicitSessionCursor = GenericCursor<ImplicitSessionGetMoreProvider>;
 
+#[derive(Debug)]
 struct ImplicitSessionGetMoreResult {
     get_more_result: Result<GetMoreResult>,
     session: Option<ClientSession>,
+    exhaust_cursor: Option<Connection>,
 }
 
 impl GetMoreProviderResult for ImplicitSessionGetMoreResult {
     fn as_mut(&mut self) -> Result<&mut GetMoreResult> {
         self.get_more_result.as_mut().map_err(|e| e.clone())
     }
+
     fn as_ref(&self) -> Result<&GetMoreResult> {
         self.get_more_result.as_ref().map_err(|e| e.clone())
+    }
+
+    fn take_exhaust_conn(&mut self) -> Option<Connection> {
+        self.exhaust_cursor.take()
     }
 }
 
 /// A `GetMoreProvider` that optionally owns its own session.
 /// This is to be used with cursors associated with implicit sessions.
-enum ImplicitSessionGetMoreProvider {
+struct ImplicitSessionGetMoreProvider {
+    state: ImplicitSessionGetMoreProviderState,
+    request_exhaust: bool,
+}
+
+enum ImplicitSessionGetMoreProviderState {
     Executing(BoxFuture<'static, ImplicitSessionGetMoreResult>),
     Idle(Option<ClientSession>),
     Done,
 }
 
 impl ImplicitSessionGetMoreProvider {
-    fn new(spec: &CursorSpecification, session: Option<ClientSession>) -> Self {
-        if spec.id() == 0 {
-            Self::Done
+    fn new(
+        spec: &CursorSpecification,
+        session: Option<ClientSession>,
+        request_exhaust: bool,
+    ) -> Self {
+        let state = if spec.id() == 0 {
+            ImplicitSessionGetMoreProviderState::Done
         } else {
-            Self::Idle(session)
+            ImplicitSessionGetMoreProviderState::Idle(session)
+        };
+
+        Self {
+            state,
+            request_exhaust,
         }
     }
 }
@@ -188,42 +221,57 @@ impl GetMoreProvider for ImplicitSessionGetMoreProvider {
     type GetMoreFuture = BoxFuture<'static, ImplicitSessionGetMoreResult>;
 
     fn executing_future(&mut self) -> Option<&mut Self::GetMoreFuture> {
-        match self {
-            Self::Executing(ref mut future) => Some(future),
-            Self::Idle(_) | Self::Done => None,
+        match self.state {
+            ImplicitSessionGetMoreProviderState::Executing(ref mut future) => Some(future),
+            ImplicitSessionGetMoreProviderState::Idle(_)
+            | ImplicitSessionGetMoreProviderState::Done => None,
         }
     }
 
     fn clear_execution(&mut self, result: Self::GetMoreResult) {
         // If cursor is exhausted, immediately return implicit session to the pool.
         if result.get_more_result.map(|r| r.exhausted).unwrap_or(false) {
-            *self = Self::Done;
+            self.state = ImplicitSessionGetMoreProviderState::Done;
         } else {
-            *self = Self::Idle(result.session)
+            self.state = ImplicitSessionGetMoreProviderState::Idle(result.session)
         }
     }
 
-    fn start_execution(&mut self, info: CursorInformation, client: Client) {
-        take_mut::take(self, |self_| match self_ {
-            Self::Idle(mut session) => {
+    fn start_execution(
+        &mut self,
+        info: CursorInformation,
+        exhaust_conn: Option<Connection>,
+        client: Client,
+    ) {
+        let request_exhaust = self.request_exhaust;
+
+        take_mut::take(&mut self.state, |state| match state {
+            ImplicitSessionGetMoreProviderState::Idle(mut session) => {
                 let future = Box::pin(async move {
-                    let get_more = GetMore::new(info);
-                    let get_more_result = match session {
-                        Some(ref mut session) => {
+                    let get_more = GetMore::new(info, request_exhaust);
+
+                    let mut result = match (exhaust_conn, &mut session) {
+                        // Since we don't send any commands in the case of an exhaust cursor, the
+                        // presence or absence of a session is irrelevant.
+                        (Some(conn), _) => read_exhaust_get_more(conn).await,
+                        (None, Some(session)) => {
                             client
                                 .execute_operation_with_session(get_more, session)
                                 .await
                         }
-                        None => client.execute_operation(get_more).await,
+                        (None, None) => client.execute_operation(get_more).await,
                     };
+
                     ImplicitSessionGetMoreResult {
-                        get_more_result,
+                        exhaust_cursor: result.as_mut().ok().and_then(|r| r.connection.take()),
+                        get_more_result: result.map(|r| r.response),
                         session,
                     }
                 });
-                Self::Executing(future)
+                ImplicitSessionGetMoreProviderState::Executing(future)
             }
-            Self::Executing(_) | Self::Done => self_,
+            ImplicitSessionGetMoreProviderState::Executing(_)
+            | ImplicitSessionGetMoreProviderState::Done => state,
         })
     }
 }

@@ -1,6 +1,6 @@
 use super::{Client, ClientSession};
 
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, fmt::Debug, sync::Arc};
 
 use lazy_static::lazy_static;
 use time::PreciseTime;
@@ -31,13 +31,37 @@ lazy_static! {
     };
 }
 
+/// The result of executing an operation.
+#[derive(Debug)]
+pub(crate) struct OperationResult<T: Debug> {
+    /// The response from the server.
+    pub(crate) response: T,
+
+    /// The connection used for the operation. This will _only_ be present if the server's response
+    /// contained the `moreToCome` flag.
+    pub(crate) connection: Option<Connection>,
+}
+
+/// A wrapped response to an operation.
+#[derive(Debug)]
+pub(crate) struct OperationResponse<T: Debug> {
+    /// The response from the server.
+    pub(crate) response: T,
+
+    /// Whether or not the `moreToCome` flag was present in the server's response.
+    pub(crate) more_to_come: bool,
+}
+
 impl Client {
     /// Execute the given operation.
     ///
     /// Server selection will performed using the criteria specified on the operation, if any, and
     /// an implicit session will be created if the operation and write concern are compatible with
     /// sessions.
-    pub(crate) async fn execute_operation<T: Operation>(&self, op: T) -> Result<T::O> {
+    pub(crate) async fn execute_operation<T: Operation>(
+        &self,
+        op: T,
+    ) -> Result<OperationResult<T::O>> {
         // TODO RUST-9: allow unacknowledged write concerns
         if !op.is_acknowledged() {
             return Err(ErrorKind::ArgumentError {
@@ -56,7 +80,7 @@ impl Client {
     pub(crate) async fn execute_cursor_operation<T: Operation>(
         &self,
         op: T,
-    ) -> Result<(T::O, Option<ClientSession>)> {
+    ) -> Result<(OperationResult<T::O>, Option<ClientSession>)> {
         let mut implicit_session = self.start_implicit_session(&op).await?;
         self.execute_operation_with_retry(op, implicit_session.as_mut())
             .await
@@ -69,7 +93,7 @@ impl Client {
         &self,
         op: T,
         session: &mut ClientSession,
-    ) -> Result<T::O> {
+    ) -> Result<OperationResult<T::O>> {
         self.execute_operation_with_retry(op, Some(session)).await
     }
 
@@ -79,7 +103,7 @@ impl Client {
         &self,
         op: T,
         mut session: Option<&mut ClientSession>,
-    ) -> Result<T::O> {
+    ) -> Result<OperationResult<T::O>> {
         let server = self.select_server(op.selection_criteria()).await?;
 
         let mut conn = match server.checkout_connection().await {
@@ -106,8 +130,23 @@ impl Client {
             .execute_operation_on_connection(&op, &mut conn, &mut session, txn_number)
             .await
         {
-            Ok(result) => {
-                return Ok(result);
+            Ok(OperationResponse {
+                response,
+                more_to_come: false,
+            }) => {
+                return Ok(OperationResult {
+                    response,
+                    connection: None,
+                });
+            }
+            Ok(OperationResponse {
+                response,
+                more_to_come: true,
+            }) => {
+                return Ok(OperationResult {
+                    response,
+                    connection: Some(conn),
+                });
             }
             Err(err) => {
                 self.inner
@@ -173,7 +212,24 @@ impl Client {
             .execute_operation_on_connection(&op, &mut conn, &mut session, txn_number)
             .await
         {
-            Ok(result) => Ok(result),
+            Ok(OperationResponse {
+                response,
+                more_to_come: false,
+            }) => {
+                return Ok(OperationResult {
+                    response,
+                    connection: None,
+                });
+            }
+            Ok(OperationResponse {
+                response,
+                more_to_come: true,
+            }) => {
+                return Ok(OperationResult {
+                    response,
+                    connection: Some(conn),
+                });
+            }
             Err(err) => {
                 self.inner
                     .topology
@@ -201,12 +257,19 @@ impl Client {
         connection: &mut Connection,
         session: &mut Option<&mut ClientSession>,
         txn_number: Option<u64>,
-    ) -> Result<T::O> {
+    ) -> Result<OperationResponse<T::O>> {
         if let Some(wc) = op.write_concern() {
             wc.validate()?;
         }
 
+        let request_exhaust = op.request_exhaust();
+
         let mut cmd = op.build(connection.stream_description()?)?;
+
+        if request_exhaust {
+            cmd.enable_exhaust();
+        }
+
         self.inner
             .topology
             .update_command_with_read_pref(connection.address(), &mut cmd, op.selection_criteria())
@@ -303,7 +366,10 @@ impl Client {
                     }
                 }
 
-                op.handle_error(error)
+                op.handle_error(error).map(|response| OperationResponse {
+                    response,
+                    more_to_come: false,
+                })
             }
             Ok(response) => {
                 self.emit_command_event(|handler| {
@@ -325,7 +391,13 @@ impl Client {
                     handler.handle_command_succeeded_event(command_succeeded_event);
                 });
 
-                op.handle_response(response)
+                let more_to_come = response.more_to_come;
+                let response = op.handle_response(response)?;
+
+                Ok(OperationResponse {
+                    response,
+                    more_to_come,
+                })
             }
         }
     }

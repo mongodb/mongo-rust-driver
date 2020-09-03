@@ -183,7 +183,10 @@ where
         resolve_options!(self, options, [write_concern]);
 
         let drop = DropCollection::new(self.namespace(), options);
-        self.client().execute_operation(drop).await
+        self.client()
+            .execute_operation(drop)
+            .await
+            .map(|r| r.response)
     }
 
     /// Runs an aggregation operation.
@@ -207,7 +210,7 @@ where
         client
             .execute_cursor_operation(aggregate)
             .await
-            .map(|(spec, session)| Cursor::new(client.clone(), spec, session))
+            .map(|(spec, session)| Cursor::new(client.clone(), spec, session, false))
     }
 
     /// Estimates the number of documents in the collection using collection metadata.
@@ -219,7 +222,10 @@ where
         resolve_options!(self, options, [read_concern, selection_criteria]);
 
         let op = Count::new(self.namespace(), options);
-        self.client().execute_operation(op).await
+        self.client()
+            .execute_operation(op)
+            .await
+            .map(|r| r.response)
     }
 
     /// Gets the number of documents matching `filter`.
@@ -308,7 +314,10 @@ where
         resolve_options!(self, options, [write_concern]);
 
         let delete = Delete::new(self.namespace(), query, None, options);
-        self.client().execute_operation(delete).await
+        self.client()
+            .execute_operation(delete)
+            .await
+            .map(|r| r.response)
     }
 
     /// Deletes up to one document found matching `query`.
@@ -326,7 +335,10 @@ where
         resolve_options!(self, options, [write_concern]);
 
         let delete = Delete::new(self.namespace(), query, Some(1), options);
-        self.client().execute_operation(delete).await
+        self.client()
+            .execute_operation(delete)
+            .await
+            .map(|r| r.response)
     }
 
     /// Finds the distinct values of the field specified by `field_name` across the collection.
@@ -345,7 +357,10 @@ where
             filter.into(),
             options,
         );
-        self.client().execute_operation(op).await
+        self.client()
+            .execute_operation(op)
+            .await
+            .map(|r| r.response)
     }
 
     /// Finds the documents in the collection matching `filter`.
@@ -360,7 +375,7 @@ where
         client
             .execute_cursor_operation(find)
             .await
-            .map(|(result, session)| Cursor::new(client.clone(), result, session))
+            .map(|(result, session)| Cursor::new(client.clone(), result, session, false))
     }
 
     /// Finds a single document in the collection matching `filter`.
@@ -393,7 +408,10 @@ where
         resolve_options!(self, options, [write_concern]);
 
         let op = FindAndModify::<T>::with_delete(self.namespace(), filter, options);
-        self.client().execute_operation(op).await
+        self.client()
+            .execute_operation(op)
+            .await
+            .map(|r| r.response)
     }
 
     /// Atomically finds up to one document in the collection matching `filter` and replaces it with
@@ -415,7 +433,10 @@ where
         resolve_options!(self, options, [write_concern]);
 
         let op = FindAndModify::<T>::with_replace(self.namespace(), filter, replacement, options)?;
-        self.client().execute_operation(op).await
+        self.client()
+            .execute_operation(op)
+            .await
+            .map(|r| r.response)
     }
 
     /// Atomically finds up to one document in the collection matching `filter` and updates it.
@@ -438,7 +459,10 @@ where
         resolve_options!(self, options, [write_concern]);
 
         let op = FindAndModify::<T>::with_update(self.namespace(), filter, update, options)?;
-        self.client().execute_operation(op).await
+        self.client()
+            .execute_operation(op)
+            .await
+            .map(|r| r.response)
     }
 
     /// Inserts the data in `docs` into the collection.
@@ -485,7 +509,12 @@ where
             n_attempted += current_batch_size;
 
             let insert = Insert::new(self.namespace(), current_batch, options.clone());
-            match self.client().execute_operation(insert).await {
+            match self
+                .client()
+                .execute_operation(insert)
+                .await
+                .map(|r| r.response)
+            {
                 Ok(result) => {
                     if cumulative_failure.is_none() {
                         let cumulative_result =
@@ -556,7 +585,7 @@ where
         self.client()
             .execute_operation(insert)
             .await
-            .map(InsertOneResult::from_insert_many_result)
+            .map(|r| InsertOneResult::from_insert_many_result(r.response))
             .map_err(convert_bulk_errors)
     }
 
@@ -585,7 +614,10 @@ where
             false,
             options.map(UpdateOptions::from_replace_options),
         );
-        self.client().execute_operation(update).await
+        self.client()
+            .execute_operation(update)
+            .await
+            .map(|r| r.response)
     }
 
     /// Updates all documents matching `query` in the collection.
@@ -610,7 +642,10 @@ where
         resolve_options!(self, options, [write_concern]);
 
         let update = Update::new(self.namespace(), query, update, true, options);
-        self.client().execute_operation(update).await
+        self.client()
+            .execute_operation(update)
+            .await
+            .map(|r| r.response)
     }
 
     /// Updates up to one document matching `query` in the collection.
@@ -634,7 +669,10 @@ where
         resolve_options!(self, options, [write_concern]);
 
         let update = Update::new(self.namespace(), query, update.into(), false, options);
-        self.client().execute_operation(update).await
+        self.client()
+            .execute_operation(update)
+            .await
+            .map(|r| r.response)
     }
 
     /// Kill the server side cursor that id corresponds to.

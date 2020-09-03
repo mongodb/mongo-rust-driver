@@ -10,7 +10,10 @@ use futures::{Future, Stream};
 
 use crate::{
     bson::Document,
+    client::OperationResult,
+    cmap::Connection,
     error::{ErrorKind, Result},
+    operation::GetMore,
     options::StreamAddress,
     results::GetMoreResult,
     Client,
@@ -27,10 +30,16 @@ pub(super) struct GenericCursor<T: GetMoreProvider> {
     info: CursorInformation,
     buffer: VecDeque<Document>,
     exhausted: bool,
+    exhaust_conn: Option<Connection>,
 }
 
 impl<T: GetMoreProvider> GenericCursor<T> {
-    pub(super) fn new(client: Client, spec: CursorSpecification, get_more_provider: T) -> Self {
+    pub(super) fn new(
+        client: Client,
+        spec: CursorSpecification,
+        exhaust_conn: Option<Connection>,
+        get_more_provider: T,
+    ) -> Self {
         let exhausted = spec.id() == 0;
         Self {
             exhausted,
@@ -38,6 +47,7 @@ impl<T: GetMoreProvider> GenericCursor<T> {
             provider: get_more_provider,
             buffer: spec.initial_buffer,
             info: spec.info,
+            exhaust_conn,
         }
     }
 
@@ -47,6 +57,10 @@ impl<T: GetMoreProvider> GenericCursor<T> {
 
     pub(super) fn is_exhausted(&self) -> bool {
         self.exhausted
+    }
+
+    pub(super) fn take_exhaust_conn(&mut self) -> Option<Connection> {
+        self.exhaust_conn.take()
     }
 
     pub(super) fn id(&self) -> i64 {
@@ -60,7 +74,8 @@ impl<T: GetMoreProvider> GenericCursor<T> {
     fn start_get_more(&mut self) {
         let info = self.info.clone();
         let client = self.client.clone();
-        self.provider.start_execution(info, client);
+        self.provider
+            .start_execution(info, self.exhaust_conn.take(), client);
     }
 }
 
@@ -76,6 +91,7 @@ impl<T: GetMoreProvider> Stream for GenericCursor<T> {
                     Poll::Ready(mut get_more_result) => {
                         let buffer_result = get_more_result.take_buffer();
                         self.exhausted = get_more_result.exhausted();
+                        self.exhaust_conn = get_more_result.take_exhaust_conn();
 
                         self.provider.clear_execution(get_more_result);
                         self.buffer = buffer_result?;
@@ -116,16 +132,23 @@ pub(super) trait GetMoreProvider: Unpin {
     fn clear_execution(&mut self, result: Self::GetMoreResult);
 
     /// Start executing a new getMore if one isn't already in flight.
-    fn start_execution(&mut self, spec: CursorInformation, client: Client);
+    fn start_execution(
+        &mut self,
+        spec: CursorInformation,
+        exhaust_conn: Option<Connection>,
+        client: Client,
+    );
 }
 
 /// Trait describing results returned from a `GetMoreProvider`.
-pub(super) trait GetMoreProviderResult {
+pub(super) trait GetMoreProviderResult: std::fmt::Debug {
     /// A result containing a mutable reference to the raw getMore result.
     fn as_mut(&mut self) -> Result<&mut GetMoreResult>;
 
     /// A result containing a reference to the raw getMore result.
     fn as_ref(&self) -> Result<&GetMoreResult>;
+
+    fn take_exhaust_conn(&mut self) -> Option<Connection>;
 
     /// Take the buffer from the getMore result.
     fn take_buffer(&mut self) -> Result<VecDeque<Document>> {
@@ -199,4 +222,24 @@ pub(crate) struct CursorInformation {
     pub(crate) id: i64,
     pub(crate) batch_size: Option<u32>,
     pub(crate) max_time: Option<Duration>,
+}
+
+/// Reads a `getMore` response form the server without sending a `getMore` command.
+pub(super) async fn read_exhaust_get_more(
+    mut conn: Connection,
+) -> Result<OperationResult<GetMoreResult>> {
+    let response = conn.read_response().await?;
+
+    let connection = if response.more_to_come {
+        Some(conn)
+    } else {
+        None
+    };
+
+    let get_more_result = GetMore::handle_response(response)?;
+
+    Ok(OperationResult {
+        response: get_more_result,
+        connection,
+    })
 }

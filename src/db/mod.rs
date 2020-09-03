@@ -182,7 +182,10 @@ impl Database {
         resolve_options!(self, options, [write_concern]);
 
         let drop_database = DropDatabase::new(self.name().to_string(), options);
-        self.client().execute_operation(drop_database).await
+        self.client()
+            .execute_operation(drop_database)
+            .await
+            .map(|r| r.response)
     }
 
     /// Gets information about each of the collections in the database. The cursor will yield a
@@ -201,7 +204,7 @@ impl Database {
         self.client()
             .execute_cursor_operation(list_collections)
             .await
-            .map(|(spec, session)| Cursor::new(self.client().clone(), spec, session))
+            .map(|(spec, session)| Cursor::new(self.client().clone(), spec, session, false))
     }
 
     /// Gets the names of the collections in the database.
@@ -215,7 +218,7 @@ impl Database {
             .client()
             .execute_cursor_operation(list_collections)
             .await
-            .map(|(spec, session)| Cursor::new(self.client().clone(), spec, session))?;
+            .map(|(spec, session)| Cursor::new(self.client().clone(), spec, session, false))?;
 
         cursor
             .and_then(|doc| match doc.get("name").and_then(Bson::as_str) {
@@ -251,7 +254,10 @@ impl Database {
             },
             options,
         );
-        self.client().execute_operation(create).await
+        self.client()
+            .execute_operation(create)
+            .await
+            .map(|r| r.response)
     }
 
     /// Runs a database-level command.
@@ -265,7 +271,10 @@ impl Database {
         selection_criteria: impl Into<Option<SelectionCriteria>>,
     ) -> Result<Document> {
         let operation = RunCommand::new(self.name().into(), command, selection_criteria.into())?;
-        self.client().execute_operation(operation).await
+        self.client()
+            .execute_operation(operation)
+            .await
+            .map(|r| r.response)
     }
 
     /// Runs an aggregation operation.
@@ -289,6 +298,6 @@ impl Database {
         client
             .execute_cursor_operation(aggregate)
             .await
-            .map(|(spec, session)| Cursor::new(client.clone(), spec, session))
+            .map(|(spec, session)| Cursor::new(client.clone(), spec, session, false))
     }
 }

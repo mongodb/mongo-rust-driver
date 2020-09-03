@@ -79,7 +79,8 @@ impl TestClient {
             client
                 .execute_operation_with_session(is_master, &mut session)
                 .await
-                .unwrap(),
+                .unwrap()
+                .response,
         ))
         .unwrap();
 
@@ -88,7 +89,8 @@ impl TestClient {
         let response = client
             .execute_operation_with_session(build_info, &mut session)
             .await
-            .unwrap();
+            .unwrap()
+            .response;
 
         let info: BuildInfo = bson::from_bson(Bson::Document(response)).unwrap();
         let server_version = info.version.split('-').next().unwrap();
@@ -117,6 +119,10 @@ impl TestClient {
             options.hosts = options.hosts.iter().cloned().take(1).collect();
         }
         Self::with_options(Some(options)).await
+    }
+
+    pub fn into_client(self) -> Client {
+        self.client
     }
 
     pub async fn create_user(

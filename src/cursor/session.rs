@@ -2,10 +2,17 @@ use std::collections::VecDeque;
 
 use futures::future::BoxFuture;
 
-use super::common::{CursorInformation, GenericCursor, GetMoreProvider, GetMoreProviderResult};
+use super::common::{
+    read_exhaust_get_more,
+    CursorInformation,
+    GenericCursor,
+    GetMoreProvider,
+    GetMoreProviderResult,
+};
 use crate::{
     bson::Document,
-    client::ClientSession,
+    client::{ClientSession, OperationResult},
+    cmap::Connection,
     cursor::CursorSpecification,
     error::Result,
     operation::GetMore,
@@ -21,17 +28,25 @@ pub(crate) struct SessionCursor {
     client: Client,
     info: CursorInformation,
     buffer: VecDeque<Document>,
+    exhaust_conn: Option<Connection>,
+    request_exhaust: bool,
 }
 
 impl SessionCursor {
-    fn new(client: Client, spec: CursorSpecification) -> Self {
-        let exhausted = spec.id() == 0;
+    fn new(
+        client: Client,
+        spec: OperationResult<CursorSpecification>,
+        request_exhaust: bool,
+    ) -> Self {
+        let exhausted = spec.response.id() == 0;
 
         Self {
             exhausted,
             client,
-            info: spec.info,
-            buffer: spec.initial_buffer,
+            info: spec.response.info,
+            buffer: spec.response.initial_buffer,
+            exhaust_conn: spec.connection,
+            request_exhaust,
         }
     }
 
@@ -39,7 +54,7 @@ impl SessionCursor {
         &mut self,
         session: &'session mut ClientSession,
     ) -> SessionCursorHandle<'_, 'session> {
-        let get_more_provider = ExplicitSessionGetMoreProvider::new(session);
+        let get_more_provider = ExplicitSessionGetMoreProvider::new(session, self.request_exhaust);
 
         // Pass the buffer into this cursor handle for iteration.
         // It will be returned in the handle's `Drop` implementation.
@@ -51,6 +66,7 @@ impl SessionCursor {
             generic_cursor: ExplicitSessionCursor::new(
                 self.client.clone(),
                 spec,
+                self.exhaust_conn.take(),
                 get_more_provider,
             ),
             session_cursor: self,
@@ -92,12 +108,18 @@ impl<'cursor, 'session> Drop for SessionCursorHandle<'cursor, 'session> {
         // Update the parent cursor's state based on any iteration performed on this handle.
         self.session_cursor.buffer = self.generic_cursor.take_buffer();
         self.session_cursor.exhausted = self.generic_cursor.is_exhausted();
+        self.session_cursor.exhaust_conn = self.generic_cursor.take_exhaust_conn();
     }
 }
 
 /// Enum determining whether a `SessionCursorHandle` is excuting a getMore or not.
 /// In charge of maintaining ownership of the session reference.
-enum ExplicitSessionGetMoreProvider<'session> {
+struct ExplicitSessionGetMoreProvider<'session> {
+    state: ExplicitSessionGetMoreProviderState<'session>,
+    request_exhaust: bool,
+}
+
+enum ExplicitSessionGetMoreProviderState<'session> {
     /// The handle is currently executing a getMore via the future.
     ///
     /// This future owns the reference to the session and will return it on completion.
@@ -111,8 +133,15 @@ enum ExplicitSessionGetMoreProvider<'session> {
 }
 
 impl<'session> ExplicitSessionGetMoreProvider<'session> {
-    fn new(session: &'session mut ClientSession) -> Self {
-        Self::Idle(MutableSessionReference { reference: session })
+    fn new(session: &'session mut ClientSession, request_exhaust: bool) -> Self {
+        let state = ExplicitSessionGetMoreProviderState::Idle(MutableSessionReference {
+            reference: session,
+        });
+
+        Self {
+            state,
+            request_exhaust,
+        }
     }
 }
 
@@ -121,43 +150,59 @@ impl<'session> GetMoreProvider for ExplicitSessionGetMoreProvider<'session> {
     type GetMoreFuture = BoxFuture<'session, ExecutionResult<'session>>;
 
     fn executing_future(&mut self) -> Option<&mut Self::GetMoreFuture> {
-        match self {
-            Self::Executing(future) => Some(future),
-            Self::Idle(_) => None,
+        match self.state {
+            ExplicitSessionGetMoreProviderState::Executing(ref mut future) => Some(future),
+            ExplicitSessionGetMoreProviderState::Idle(_) => None,
         }
     }
 
     fn clear_execution(&mut self, result: Self::GetMoreResult) {
-        *self = Self::Idle(MutableSessionReference {
+        self.state = ExplicitSessionGetMoreProviderState::Idle(MutableSessionReference {
             reference: result.session,
         })
     }
 
-    fn start_execution(&mut self, info: CursorInformation, client: Client) {
-        take_mut::take(self, |self_| {
-            if let ExplicitSessionGetMoreProvider::Idle(session) = self_ {
+    fn start_execution(
+        &mut self,
+        info: CursorInformation,
+        exhaust_conn: Option<Connection>,
+        client: Client,
+    ) {
+        let request_exhaust = self.request_exhaust;
+
+        take_mut::take(&mut self.state, |state| {
+            if let ExplicitSessionGetMoreProviderState::Idle(session) = state {
                 let future = Box::pin(async move {
-                    let get_more = GetMore::new(info);
-                    let get_more_result = client
-                        .execute_operation_with_session(get_more, session.reference)
-                        .await;
+                    let get_more = GetMore::new(info, request_exhaust);
+
+                    let mut result = if let Some(conn) = exhaust_conn {
+                        read_exhaust_get_more(conn).await
+                    } else {
+                        client
+                            .execute_operation_with_session(get_more, session.reference)
+                            .await
+                    };
+
                     ExecutionResult {
-                        get_more_result,
+                        exhaust_conn: result.as_mut().ok().and_then(|r| r.connection.take()),
+                        get_more_result: result.map(|r| r.response),
                         session: session.reference,
                     }
                 });
-                return ExplicitSessionGetMoreProvider::Executing(future);
+                return ExplicitSessionGetMoreProviderState::Executing(future);
             }
-            self_
+            state
         });
     }
 }
 
 /// Struct returned from awaiting on a `GetMoreFuture` containing the result of the getMore as
 /// well as the reference to the `ClientSession` used for the getMore.
+#[derive(Debug)]
 struct ExecutionResult<'session> {
     get_more_result: Result<GetMoreResult>,
     session: &'session mut ClientSession,
+    exhaust_conn: Option<Connection>,
 }
 
 impl<'session> GetMoreProviderResult for ExecutionResult<'session> {
@@ -167,6 +212,10 @@ impl<'session> GetMoreProviderResult for ExecutionResult<'session> {
 
     fn as_ref(&self) -> Result<&GetMoreResult> {
         self.get_more_result.as_ref().map_err(|e| e.clone())
+    }
+
+    fn take_exhaust_conn(&mut self) -> Option<Connection> {
+        self.exhaust_conn.take()
     }
 }
 

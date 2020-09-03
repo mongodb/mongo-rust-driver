@@ -23,17 +23,27 @@ pub(crate) struct GetMore {
     selection_criteria: SelectionCriteria,
     batch_size: Option<u32>,
     max_time: Option<Duration>,
+    request_exhaust: bool,
 }
 
 impl GetMore {
-    pub(crate) fn new(info: CursorInformation) -> Self {
+    pub(crate) fn new(info: CursorInformation, request_exhaust: bool) -> Self {
         Self {
             ns: info.ns,
             cursor_id: info.id,
             selection_criteria: SelectionCriteria::from_address(info.address),
             batch_size: info.batch_size,
             max_time: info.max_time,
+            request_exhaust,
         }
+    }
+
+    pub(crate) fn handle_response(response: CommandResponse) -> Result<GetMoreResult> {
+        let body: GetMoreResponseBody = response.body()?;
+        Ok(GetMoreResult {
+            batch: body.cursor.next_batch,
+            exhausted: body.cursor.id == 0,
+        })
     }
 }
 
@@ -70,26 +80,26 @@ impl Operation for GetMore {
     }
 
     fn handle_response(&self, response: CommandResponse) -> Result<Self::O> {
-        let body: GetMoreResponseBody = response.body()?;
-        Ok(GetMoreResult {
-            batch: body.cursor.next_batch,
-            exhausted: body.cursor.id == 0,
-        })
+        GetMore::handle_response(response)
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         Some(&self.selection_criteria)
     }
+
+    fn request_exhaust(&self) -> bool {
+        self.request_exhaust
+    }
 }
 
 #[derive(Debug, Deserialize)]
-struct GetMoreResponseBody {
-    cursor: NextBatchBody,
+pub(crate) struct GetMoreResponseBody {
+    pub(crate) cursor: NextBatchBody,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct NextBatchBody {
+pub(crate) struct NextBatchBody {
     id: i64,
-    next_batch: VecDeque<Document>,
+    pub(crate) next_batch: VecDeque<Document>,
 }

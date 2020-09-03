@@ -36,9 +36,15 @@ impl Message {
                 .insert("$readPreference", read_pref.into_document());
         };
 
+        let mut flags = MessageFlags::empty();
+
+        if command.exhaust {
+            flags |= MessageFlags::EXHAUST_ALLOWED;
+        }
+
         Self {
             response_to: 0,
-            flags: MessageFlags::empty(),
+            flags,
             sections: vec![MessageSection::Document(command.body)],
             checksum: None,
             request_id,
@@ -60,6 +66,10 @@ impl Message {
                 }
                 .into()
             })
+    }
+
+    pub(crate) fn more_to_come(&self) -> bool {
+        self.flags.intersects(MessageFlags::MORE_TO_COME)
     }
 
     /// Gets all documents contained in this Message flattened to a single Vec.
@@ -172,6 +182,12 @@ pub(crate) enum MessageSection {
         identifier: String,
         documents: Vec<Document>,
     },
+}
+
+impl From<Document> for MessageSection {
+    fn from(doc: Document) -> Self {
+        Self::Document(doc)
+    }
 }
 
 impl MessageSection {
