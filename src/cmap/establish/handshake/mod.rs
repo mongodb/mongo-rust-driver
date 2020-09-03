@@ -201,8 +201,7 @@ impl Handshaker {
     ) -> Result<Option<FirstRound>> {
         let mut command = self.command.clone();
 
-        // Update the command document with the speculative authentication info.
-        let client_first = set_client_first(&mut command.body, credential)?;
+        let client_first = set_speculative_auth_info(&mut command.body, credential)?;
 
         let start_time = PreciseTime::now();
         let response = conn.send_command(command, None).await?;
@@ -238,7 +237,7 @@ impl Handshaker {
 }
 
 /// Updates the handshake command document with the speculative authenitication info.
-fn set_client_first(
+fn set_speculative_auth_info(
     command: &mut Document,
     credential: Option<&Credential>,
 ) -> Result<Option<ClientFirst>> {

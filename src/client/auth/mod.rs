@@ -200,16 +200,14 @@ impl AuthMechanism {
     ) -> Result<Option<ClientFirst>> {
         match self {
             Self::ScramSha1 => {
-                let scram = ScramVersion::Sha1;
-                let client_first = scram.build_client_first(credential)?;
+                let client_first = ScramVersion::Sha1.build_client_first(credential)?;
 
-                Ok(Some(ClientFirst::Scram(scram, client_first)))
+                Ok(Some(ClientFirst::Scram(ScramVersion::Sha1, client_first)))
             }
             Self::ScramSha256 => {
-                let scram = ScramVersion::Sha256;
                 let client_first = ScramVersion::Sha256.build_client_first(credential)?;
 
-                Ok(Some(ClientFirst::Scram(scram, client_first)))
+                Ok(Some(ClientFirst::Scram(ScramVersion::Sha256, client_first)))
             }
             Self::MongoDbX509 => Ok(Some(ClientFirst::X509(x509::build_client_first(
                 credential,
