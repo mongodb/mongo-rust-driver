@@ -226,11 +226,11 @@ impl From<String> for Acknowledgment {
     }
 }
 
-#[cfg(test)]
-use crate::bson::Bson;
+#[cfg(all(test, not(feature = "sync")))]
+use bson::Bson;
 
 impl Acknowledgment {
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "sync")))]
     pub(crate) fn to_bson(&self) -> Bson {
         match self {
             Acknowledgment::Nodes(i) => Bson::Int32(*i),

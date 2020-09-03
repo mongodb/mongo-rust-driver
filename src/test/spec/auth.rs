@@ -67,7 +67,7 @@ async fn run_auth_test(test_file: TestFile) {
             continue;
         }
 
-        match ClientOptions::parse(test_case.uri.as_str()).await {
+        match ClientOptions::parse_uri(test_case.uri.as_str(), None).await {
             Ok(options) => {
                 assert!(test_case.valid, "{}", test_case.description);
                 match test_case.credential {

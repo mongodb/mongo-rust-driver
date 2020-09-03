@@ -71,7 +71,7 @@ fn server_type_from_str(s: &str) -> Option<ServerType> {
 }
 
 async fn run_test(test_file: TestFile) {
-    let options = ClientOptions::parse(&test_file.uri)
+    let options = ClientOptions::parse_uri(&test_file.uri, None)
         .await
         .expect(&test_file.description);
 
