@@ -1,11 +1,16 @@
 use crate::{
     bson::{doc, Bson},
-    cmap::{establish::Handshaker, Connection, ConnectionPoolOptions},
+    cmap::{establish::Handshaker, Command, Connection, ConnectionPoolOptions},
     options::{AuthMechanism, Credential},
     test::{TestClient, CLIENT_OPTIONS, LOCK},
 };
 
-async fn speculative_auth_test(client: &TestClient, credential: Credential, role: impl Into<Bson>) {
+async fn speculative_auth_test(
+    client: &TestClient,
+    credential: Credential,
+    role: impl Into<Bson>,
+    authorized_db_name: &str,
+) {
     if !client.auth_enabled() {
         return;
     }
@@ -53,6 +58,16 @@ async fn speculative_auth_test(client: &TestClient, credential: Credential, role
         .authenticate_stream(&mut conn, &Default::default(), first_round)
         .await
         .unwrap();
+
+    let command = Command::new(
+        "find".into(),
+        authorized_db_name.into(),
+        doc! { "find": "foo", "limit": 1  },
+    );
+
+    let response = conn.send_command(command, None).await.unwrap();
+
+    assert!(response.is_success());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -69,7 +84,7 @@ async fn speculative_auth_default() {
         .password("12345".to_string())
         .build();
 
-    speculative_auth_test(&client, credential, "root").await;
+    speculative_auth_test(&client, credential, "root", function_name!()).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -87,7 +102,7 @@ async fn speculative_auth_scram_sha_1() {
         .mechanism(AuthMechanism::ScramSha1)
         .build();
 
-    speculative_auth_test(&client, credential, "root").await;
+    speculative_auth_test(&client, credential, "root", function_name!()).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -109,7 +124,7 @@ async fn speculative_auth_scram_sha_256() {
         .mechanism(AuthMechanism::ScramSha256)
         .build();
 
-    speculative_auth_test(&client, credential, "root").await;
+    speculative_auth_test(&client, credential, "root", function_name!()).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -136,6 +151,7 @@ async fn speculative_auth_x509() {
         &client,
         credential,
         doc! { "role": "readWrite", "db": function_name!() },
+        function_name!(),
     )
     .await;
 }

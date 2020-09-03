@@ -254,21 +254,12 @@ fn set_speculative_auth_info(
         .as_ref()
         .unwrap_or(&AuthMechanism::ScramSha256);
 
-    let client_first = match auth_mechanism.build_client_first(credential)? {
+    let client_first = match auth_mechanism.build_speculative_client_first(credential)? {
         Some(client_first) => client_first,
         None => return Ok(None),
     };
 
-    let mut client_first_doc = client_first.to_document();
-
-    // Since the first round of the SCRAM handshake isn't being sent as an OP_MSG to the server, the
-    // database containing the user needs to be specified in the document. This isn't an issue for
-    // X.509 due to it always being used with the $external database.
-    if auth_mechanism.is_scram() {
-        client_first_doc.insert("db", credential.resolved_source());
-    }
-
-    command.insert("speculativeAuthenticate", client_first_doc);
+    command.insert("speculativeAuthenticate", client_first.to_document());
 
     Ok(Some(client_first))
 }

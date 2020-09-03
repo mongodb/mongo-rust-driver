@@ -108,13 +108,6 @@ impl AuthMechanism {
         }
     }
 
-    pub(crate) fn is_scram(&self) -> bool {
-        match self {
-            Self::ScramSha1 | Self::ScramSha256 => true,
-            _ => false,
-        }
-    }
-
     /// Determines if the provided credentials have the required information to perform
     /// authentication.
     pub fn validate_credential(&self, credential: &Credential) -> Result<()> {
@@ -194,18 +187,19 @@ impl AuthMechanism {
 
     /// Constructs the first message to be sent to the server as part of the authentication
     /// handshake, which can be used for speculative authentication.
-    pub(crate) fn build_client_first(
+    pub(crate) fn build_speculative_client_first(
         &self,
         credential: &Credential,
     ) -> Result<Option<ClientFirst>> {
         match self {
             Self::ScramSha1 => {
-                let client_first = ScramVersion::Sha1.build_client_first(credential)?;
+                let client_first = ScramVersion::Sha1.build_speculative_client_first(credential)?;
 
                 Ok(Some(ClientFirst::Scram(ScramVersion::Sha1, client_first)))
             }
             Self::ScramSha256 => {
-                let client_first = ScramVersion::Sha256.build_client_first(credential)?;
+                let client_first =
+                    ScramVersion::Sha256.build_speculative_client_first(credential)?;
 
                 Ok(Some(ClientFirst::Scram(ScramVersion::Sha256, client_first)))
             }

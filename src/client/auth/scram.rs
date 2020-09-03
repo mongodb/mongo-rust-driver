@@ -112,11 +112,18 @@ impl ScramVersion {
         })
     }
 
+    pub(super) fn build_speculative_client_first(
+        &self,
+        credential: &Credential,
+    ) -> Result<ClientFirst> {
+        self.build_client_first(credential, true)
+    }
+
     /// Constructs the first client message in the SCRAM handshake.
-    pub(crate) fn build_client_first(&self, credential: &Credential) -> Result<ClientFirst> {
+    fn build_client_first(&self, credential: &Credential, include_db: bool) -> Result<ClientFirst> {
         let info = self.client_auth_info(credential)?;
 
-        Ok(ClientFirst::new(info.source, info.username))
+        Ok(ClientFirst::new(info.source, info.username, include_db))
     }
 
     /// Sends the first client message in the SCRAM handshake.
@@ -125,7 +132,7 @@ impl ScramVersion {
         conn: &mut Connection,
         credential: &Credential,
     ) -> Result<FirstRound> {
-        let client_first = self.build_client_first(credential)?;
+        let client_first = self.build_client_first(credential, false)?;
 
         let command = client_first.to_command(self);
 
@@ -374,10 +381,12 @@ pub(crate) struct ClientFirst {
     bare: Range<usize>,
 
     nonce: String,
+
+    include_db: bool,
 }
 
 impl ClientFirst {
-    fn new(source: &str, username: &str) -> Self {
+    fn new(source: &str, username: &str, include_db: bool) -> Self {
         let nonce = auth::generate_nonce();
         let gs2_header = format!("{},,", NO_CHANNEL_BINDING);
         let bare = format!("{}={},{}={}", USERNAME_KEY, username, NONCE_KEY, nonce);
@@ -395,6 +404,7 @@ impl ClientFirst {
                 end,
             },
             nonce,
+            include_db,
         }
     }
 
@@ -415,7 +425,13 @@ impl ClientFirst {
         let auth_mech = AuthMechanism::from_scram_version(scram);
         let sasl_start = SaslStart::new(self.source.clone(), auth_mech, payload);
 
-        sasl_start.into_command()
+        let mut cmd = sasl_start.into_command();
+
+        if self.include_db {
+            cmd.body.insert("db", self.source.clone());
+        }
+
+        cmd
     }
 }
 
