@@ -21,7 +21,7 @@ use crate::{
         AuthMechanism,
         Credential,
     },
-    cmap::{Command, CommandResponse, Connection},
+    cmap::{Command, Connection},
     error::{Error, Result},
 };
 
@@ -74,7 +74,7 @@ pub(crate) struct ClientAuthInfo<'a> {
 #[derive(Debug)]
 pub(crate) struct FirstRound {
     pub(crate) client_first: ClientFirst,
-    pub(crate) server_first: CommandResponse,
+    pub(crate) server_first: Document,
 }
 
 impl ScramVersion {
@@ -140,7 +140,7 @@ impl ScramVersion {
 
         Ok(FirstRound {
             client_first,
-            server_first,
+            server_first: server_first.raw_response,
         })
     }
 
@@ -165,7 +165,7 @@ impl ScramVersion {
             source,
         } = self.client_auth_info(credential)?;
 
-        let server_first = ServerFirst::parse(server_first.raw_response)?;
+        let server_first = ServerFirst::parse(server_first)?;
         server_first.validate(client_first.nonce.as_str())?;
 
         let cache_entry_key = CacheEntry {

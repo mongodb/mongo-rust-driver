@@ -9,13 +9,7 @@ use os_info::{Type, Version};
 use crate::{
     bson::{doc, Bson, Document},
     client::auth::{ClientFirst, FirstRound},
-    cmap::{
-        options::ConnectionPoolOptions,
-        Command,
-        CommandResponse,
-        Connection,
-        StreamDescription,
-    },
+    cmap::{options::ConnectionPoolOptions, Command, Connection, StreamDescription},
     error::Result,
     is_master::{IsMasterCommandResponse, IsMasterReply},
     options::{AuthMechanism, Credential},
@@ -215,14 +209,7 @@ impl Handshaker {
             command_response
                 .speculative_authenticate
                 .take()
-                .map(|server_first| {
-                    let command_response = CommandResponse::with_document_and_address(
-                        conn.address().clone(),
-                        server_first,
-                    );
-
-                    client_first.into_first_round(command_response)
-                })
+                .map(|server_first| client_first.into_first_round(server_first))
         });
 
         let is_master_reply = IsMasterReply {

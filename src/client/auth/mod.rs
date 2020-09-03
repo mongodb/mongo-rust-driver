@@ -19,7 +19,7 @@ use typed_builder::TypedBuilder;
 use self::scram::ScramVersion;
 use crate::{
     bson::Document,
-    cmap::{Command, CommandResponse, Connection, StreamDescription},
+    cmap::{Command, Connection, StreamDescription},
     error::{Error, ErrorKind, Result},
     runtime::HttpClient,
 };
@@ -413,7 +413,7 @@ impl ClientFirst {
         }
     }
 
-    pub(crate) fn into_first_round(self, server_first: CommandResponse) -> FirstRound {
+    pub(crate) fn into_first_round(self, server_first: Document) -> FirstRound {
         match self {
             Self::Scram(version, client_first) => FirstRound::Scram(
                 version,
@@ -432,7 +432,7 @@ impl ClientFirst {
 #[derive(Debug)]
 pub(crate) enum FirstRound {
     Scram(ScramVersion, scram::FirstRound),
-    X509(CommandResponse),
+    X509(Document),
 }
 
 pub(crate) fn generate_nonce_bytes() -> [u8; 32] {

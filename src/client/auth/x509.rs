@@ -1,5 +1,5 @@
 use crate::{
-    bson::doc,
+    bson::{doc, Document},
     cmap::{Command, CommandResponse, Connection},
     error::{Error, Result},
     options::Credential,
@@ -33,14 +33,14 @@ pub(crate) async fn send_client_first(
 pub(super) async fn authenticate_stream(
     conn: &mut Connection,
     credential: &Credential,
-    server_first: impl Into<Option<CommandResponse>>,
+    server_first: impl Into<Option<Document>>,
 ) -> Result<()> {
     let server_response = match server_first.into() {
         Some(server_first) => server_first,
-        None => send_client_first(conn, credential).await?,
+        None => send_client_first(conn, credential).await?.raw_response,
     };
 
-    if server_response.raw_response.get_str("dbname") != Ok("$external") {
+    if server_response.get_str("dbname") != Ok("$external") {
         return Err(Error::authentication_error(
             "MONGODB-X509",
             "Authentication failed",

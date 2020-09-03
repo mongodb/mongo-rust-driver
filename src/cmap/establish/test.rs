@@ -74,8 +74,7 @@ async fn speculative_auth_test(
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn speculative_auth_default() {
-    // Since these tests all drop and create the same user, they run exclusively.
-    let _guard = LOCK.run_exclusively().await;
+    let _guard = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
 
@@ -91,8 +90,7 @@ async fn speculative_auth_default() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn speculative_auth_scram_sha_1() {
-    // Since these tests all drop and create the same user, they run exclusively.
-    let _guard = LOCK.run_exclusively().await;
+    let _guard = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
 
@@ -109,8 +107,7 @@ async fn speculative_auth_scram_sha_1() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn speculative_auth_scram_sha_256() {
-    // Since these tests all drop and create the same user, they run exclusively.
-    let _guard = LOCK.run_exclusively().await;
+    let _guard = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
 
@@ -131,7 +128,8 @@ async fn speculative_auth_scram_sha_256() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn speculative_auth_x509() {
-    // Since these tests all drop and create the same user, they run exclusively.
+    // Since this test drops and creates the same user as our other X.509 test, we run it
+    // exclusively.
     let _guard = LOCK.run_exclusively().await;
 
     let client = TestClient::new().await;
