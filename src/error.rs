@@ -368,7 +368,7 @@ impl ErrorKind {
 
     /// Gets the code/message tuple from this error, if applicable. In the case of write errors, the
     /// code and message are taken from the write concern error, if there is one.
-    fn code_and_message(&self) -> Option<(i32, &str)> {
+    pub(crate) fn code_and_message(&self) -> Option<(i32, &str)> {
         match self {
             ErrorKind::CommandError(ref cmd_err) => Some((cmd_err.code, cmd_err.message.as_str())),
             ErrorKind::WriteError(WriteFailure::WriteConcernError(ref wc_err)) => {

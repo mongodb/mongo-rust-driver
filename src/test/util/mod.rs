@@ -281,6 +281,16 @@ impl TestClient {
         let coll = self.get_coll(db_name, coll_name);
         drop_collection(&coll).await;
     }
+
+    pub fn topology(&self) -> String {
+        if self.is_sharded() {
+            String::from("sharded")
+        } else if self.is_replica_set() {
+            String::from("replicaset")
+        } else {
+            String::from("single")
+        }
+    }
 }
 
 pub async fn drop_collection<T>(coll: &Collection<T>)

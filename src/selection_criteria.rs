@@ -86,7 +86,7 @@ pub type Predicate = Arc<dyn Send + Sync + Fn(&ServerInfo) -> bool>;
 /// option and will be sent to the server as an integer number of seconds.
 ///
 /// See the [MongoDB docs](https://docs.mongodb.com/manual/core/read-preference) for more details.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 // TODO RUST-495: implement Deserialize for ReadPreference
 pub enum ReadPreference {
     /// Only route this operation to the primary.
