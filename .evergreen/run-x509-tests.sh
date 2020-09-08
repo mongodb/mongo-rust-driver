@@ -13,4 +13,4 @@ export SUBJECT=${SUBJECT#"subject="}
 # Remove any leading or trailing whitespace
 export SUBJECT=`echo "$SUBJECT" | awk '{$1=$1;print}'`
 
-RUST_BACKTRACE=1 MONGO_X509_USER="$SUBJECT" cargo test x509_auth
+RUST_BACKTRACE=1 MONGO_X509_USER="$SUBJECT" cargo test x509

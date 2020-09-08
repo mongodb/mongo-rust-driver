@@ -67,9 +67,11 @@ impl SaslContinue {
 
 /// Validates that a `saslStart` or `saslContinue` command response is successful.
 fn validate_command_success(auth_mechanism: &str, response: &Document) -> Result<()> {
-    let ok = response
-        .get("ok")
-        .ok_or_else(|| Error::invalid_authentication_response(auth_mechanism))?;
+    let ok = match response.get("ok") {
+        Some(ok) => ok,
+        None => return Ok(()),
+    };
+
     match bson_util::get_int(ok) {
         Some(1) => Ok(()),
         Some(_) => Err(Error::authentication_error(

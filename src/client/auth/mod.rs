@@ -19,7 +19,7 @@ use typed_builder::TypedBuilder;
 use self::scram::ScramVersion;
 use crate::{
     bson::Document,
-    cmap::{Connection, StreamDescription},
+    cmap::{Command, Connection, StreamDescription},
     error::{Error, ErrorKind, Result},
     runtime::HttpClient,
 };
@@ -185,6 +185,42 @@ impl AuthMechanism {
         }
     }
 
+    /// Constructs the first message to be sent to the server as part of the authentication
+    /// handshake, which can be used for speculative authentication.
+    pub(crate) fn build_speculative_client_first(
+        &self,
+        credential: &Credential,
+    ) -> Result<Option<ClientFirst>> {
+        match self {
+            Self::ScramSha1 => {
+                let client_first = ScramVersion::Sha1.build_speculative_client_first(credential)?;
+
+                Ok(Some(ClientFirst::Scram(ScramVersion::Sha1, client_first)))
+            }
+            Self::ScramSha256 => {
+                let client_first =
+                    ScramVersion::Sha256.build_speculative_client_first(credential)?;
+
+                Ok(Some(ClientFirst::Scram(ScramVersion::Sha256, client_first)))
+            }
+            Self::MongoDbX509 => Ok(Some(ClientFirst::X509(x509::build_client_first(
+                credential,
+            )))),
+            #[cfg(feature = "tokio-runtime")]
+            AuthMechanism::MongoDbAws => Ok(None),
+            AuthMechanism::MongoDbCr => Err(ErrorKind::AuthenticationError {
+                message: "MONGODB-CR is deprecated and not supported by this driver. Use SCRAM \
+                          for password-based authentication instead"
+                    .into(),
+            }
+            .into()),
+            _ => Err(ErrorKind::AuthenticationError {
+                message: format!("Authentication mechanism {:?} not yet implemented.", self),
+            }
+            .into()),
+        }
+    }
+
     pub(crate) async fn authenticate_stream(
         &self,
         stream: &mut Connection,
@@ -196,15 +232,15 @@ impl AuthMechanism {
         match self {
             AuthMechanism::ScramSha1 => {
                 ScramVersion::Sha1
-                    .authenticate_stream(stream, credential)
+                    .authenticate_stream(stream, credential, None)
                     .await
             }
             AuthMechanism::ScramSha256 => {
                 ScramVersion::Sha256
-                    .authenticate_stream(stream, credential)
+                    .authenticate_stream(stream, credential, None)
                     .await
             }
-            AuthMechanism::MongoDbX509 => x509::authenticate_stream(stream, credential).await,
+            AuthMechanism::MongoDbX509 => x509::authenticate_stream(stream, credential, None).await,
             #[cfg(feature = "tokio-runtime")]
             AuthMechanism::MongoDbAws => {
                 aws::authenticate_stream(stream, credential, http_client).await
@@ -331,6 +367,7 @@ impl Credential {
         &self,
         conn: &mut Connection,
         http_client: &HttpClient,
+        first_round: Option<FirstRound>,
     ) -> Result<()> {
         let stream_description = conn.stream_description()?;
 
@@ -338,6 +375,19 @@ impl Credential {
         if !stream_description.initial_server_type.can_auth() {
             return Ok(());
         };
+
+        // If speculative authentication returned a response, then short-circuit the authentication
+        // logic and use the first round from the handshake.
+        if let Some(first_round) = first_round {
+            return match first_round {
+                FirstRound::Scram(version, first_round) => {
+                    version.authenticate_stream(conn, self, first_round).await
+                }
+                FirstRound::X509(server_first) => {
+                    x509::authenticate_stream(conn, self, server_first).await
+                }
+            };
+        }
 
         let mechanism = match self.mechanism {
             None => Cow::Owned(AuthMechanism::from_stream_description(stream_description)),
@@ -347,6 +397,42 @@ impl Credential {
         // Authenticate according to the chosen mechanism.
         mechanism.authenticate_stream(conn, self, http_client).await
     }
+}
+
+/// Contains the first client message sent as part of the authentication handshake.
+pub(crate) enum ClientFirst {
+    Scram(ScramVersion, scram::ClientFirst),
+    X509(Command),
+}
+
+impl ClientFirst {
+    pub(crate) fn to_document(&self) -> Document {
+        match self {
+            Self::Scram(version, client_first) => client_first.to_command(&version).body,
+            Self::X509(command) => command.body.clone(),
+        }
+    }
+
+    pub(crate) fn into_first_round(self, server_first: Document) -> FirstRound {
+        match self {
+            Self::Scram(version, client_first) => FirstRound::Scram(
+                version,
+                scram::FirstRound {
+                    client_first,
+                    server_first,
+                },
+            ),
+            Self::X509(..) => FirstRound::X509(server_first),
+        }
+    }
+}
+
+/// Contains the complete first round of the authentication handshake, including the client message
+/// and the server response.
+#[derive(Debug)]
+pub(crate) enum FirstRound {
+    Scram(ScramVersion, scram::FirstRound),
+    X509(Document),
 }
 
 pub(crate) fn generate_nonce_bytes() -> [u8; 32] {

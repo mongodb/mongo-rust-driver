@@ -102,7 +102,7 @@ async fn run() {
                 client
                     .drop_and_create_user(
                         user,
-                        pwd,
+                        pwd.as_str(),
                         &[],
                         &[AuthMechanism::ScramSha1, AuthMechanism::ScramSha256],
                         db.as_deref(),
