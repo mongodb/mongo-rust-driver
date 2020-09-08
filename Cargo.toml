@@ -15,7 +15,8 @@ exclude = [
     "rustfmt.toml",
     ".evergreen/**",
     ".gitignore",
-    "src/test/**"
+    "src/test/**",
+    "tests/**"
 ]
 
 [features]
