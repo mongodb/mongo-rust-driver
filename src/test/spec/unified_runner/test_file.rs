@@ -35,7 +35,12 @@ fn deserialize_schema_version<'de, D>(deserializer: D) -> std::result::Result<Ve
 where
     D: Deserializer<'de>,
 {
-    let schema_version = String::deserialize(deserializer)?;
+    let mut schema_version = String::deserialize(deserializer)?;
+    // if the schema version only contains a major and minor version (e.g. 1.0), append a ".0" to
+    // ensure correct parsing into a semver::Version
+    if schema_version.split('.').count() == 2 {
+        schema_version.push_str(".0");
+    }
     Version::parse(&schema_version).map_err(|e| serde::de::Error::custom(format!("{}", e)))
 }
 
@@ -135,6 +140,7 @@ pub struct Stream {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CollectionOrDatabaseOptions {
+    // TODO properly implement Deserialize for ReadConcern
     pub read_concern: Option<ReadConcern>,
     pub read_preference: Option<ReadPreference>,
     pub write_concern: Option<WriteConcern>,
@@ -180,7 +186,7 @@ pub struct TestCase {
     pub skip_reason: Option<String>,
     pub operations: Vec<Operation>,
     pub expect_events: Option<Vec<ExpectedEvents>>,
-    pub outcome: Option<CollectionData>,
+    pub outcome: Option<Vec<CollectionData>>,
 }
 
 #[derive(Debug, Deserialize)]

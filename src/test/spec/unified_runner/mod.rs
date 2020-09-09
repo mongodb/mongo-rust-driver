@@ -5,13 +5,21 @@ mod test_file;
 
 use std::collections::HashMap;
 
+use futures::stream::TryStreamExt;
 use lazy_static::lazy_static;
 use semver::Version;
 
 use crate::{
     bson::{doc, Document},
     concern::{Acknowledgment, WriteConcern},
-    options::{CollectionOptions, InsertManyOptions, ReadPreference, SelectionCriteria},
+    options::{
+        CollectionOptions,
+        FindOptions,
+        InsertManyOptions,
+        ReadConcern,
+        ReadPreference,
+        SelectionCriteria,
+    },
     test::{assert_matches, util::EventClient, TestClient},
 };
 
@@ -184,6 +192,33 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                 .run_command(fail_point, None)
                 .await
                 .unwrap();
+        }
+
+        if let Some(outcome) = test_case.outcome {
+            for expected_data in outcome {
+                let db_name = &expected_data.database_name;
+                let coll_name = &expected_data.collection_name;
+
+                let selection_criteria = SelectionCriteria::ReadPreference(ReadPreference::Primary);
+                let read_concern = ReadConcern::local();
+
+                let options = CollectionOptions::builder()
+                    .selection_criteria(selection_criteria)
+                    .read_concern(read_concern)
+                    .build();
+                let collection = client.get_coll_with_options(db_name, coll_name, options);
+
+                let options = FindOptions::builder().sort(doc! { "_id": 1 }).build();
+                let actual_data: Vec<Document> = collection
+                    .find(doc! {}, options)
+                    .await
+                    .unwrap()
+                    .try_collect()
+                    .await
+                    .unwrap();
+
+                assert_eq!(expected_data.documents, actual_data);
+            }
         }
     }
 }
