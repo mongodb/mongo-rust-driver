@@ -1,7 +1,7 @@
 use crate::{
     bson::{doc, Bson},
     cmap::{establish::Handshaker, Command, Connection, ConnectionPoolOptions},
-    options::{AuthMechanism, Credential},
+    options::{AuthMechanism, Credential, ReadPreference},
     test::{TestClient, CLIENT_OPTIONS, LOCK},
 };
 
@@ -59,9 +59,12 @@ async fn speculative_auth_test(
         .await
         .unwrap();
 
-    let command = Command::new(
+    let command = Command::new_read(
         "find".into(),
         authorized_db_name.into(),
+        Some(ReadPreference::PrimaryPreferred {
+            options: Default::default(),
+        }),
         doc! { "find": "foo", "limit": 1  },
     );
 
