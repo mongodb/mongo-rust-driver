@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use futures::stream::TryStreamExt;
 use serde::Deserialize;
 
-use super::{ExpectedError, Operation};
+use super::{Entity, ExpectError, Operation};
 
 use crate::{
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
@@ -53,8 +53,8 @@ pub struct EntityOperation {
     operation: Box<dyn TestOperation>,
     pub name: String,
     pub object: String,
-    pub expected_error: Option<ExpectedError>,
-    pub expected_result: Option<Bson>,
+    pub expect_error: Option<ExpectError>,
+    pub expect_result: Option<Bson>,
     pub save_result_as_entity: Option<String>,
 }
 
@@ -116,10 +116,26 @@ impl EntityOperation {
             operation: boxed_op,
             name: operation.name,
             object: operation.object,
-            expected_error: operation.expected_error,
-            expected_result: operation.expected_result,
+            expect_error: operation.expect_error,
+            expect_result: operation.expect_result,
             save_result_as_entity: operation.save_result_as_entity,
         })
+    }
+
+    pub async fn execute(&self, entities: &HashMap<String, Entity>) -> Result<Option<Bson>> {
+        if self.object.starts_with("client") {
+            let client = entities.get(&self.object).unwrap().as_client();
+            self.execute_on_client(client).await
+        } else if self.object.starts_with("database") {
+            // TODO implement runCommand
+            let database = entities.get(&self.object).unwrap().as_database();
+            self.execute_on_database(database).await
+        } else if self.object.starts_with("collection") {
+            let collection = entities.get(&self.object).unwrap().as_collection();
+            self.execute_on_collection(collection).await
+        } else {
+            panic!("{} is not present in entity map", self.name)
+        }
     }
 }
 

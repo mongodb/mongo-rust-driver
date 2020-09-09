@@ -19,7 +19,7 @@ use crate::{
         },
     },
     options::ClientOptions,
-    test::{CLIENT_OPTIONS, LOCK, TestEvent},
+    test::{TestEvent, CLIENT_OPTIONS, LOCK},
 };
 
 pub type EventQueue<T> = Arc<RwLock<VecDeque<T>>>;
@@ -253,17 +253,6 @@ impl EventClient {
                         None
                     }
                 }
-                _ => None,
-            })
-            .collect()
-    }
-
-    pub fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
-        let events = self.command_events.read().unwrap();
-        events
-            .iter()
-            .filter_map(|event| match event {
-                CommandEvent::CommandStartedEvent(event) => Some(event.clone()),
                 _ => None,
             })
             .collect()

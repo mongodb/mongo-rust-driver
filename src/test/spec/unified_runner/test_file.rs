@@ -5,6 +5,7 @@ use serde::{Deserialize, Deserializer};
 
 use crate::{
     bson::{Bson, Document},
+    error::Error,
     options::{
         ClientOptions,
         CollectionOptions,
@@ -20,14 +21,13 @@ use crate::{
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TestFile {
+    pub description: String,
     #[serde(deserialize_with = "deserialize_schema_version")]
     pub schema_version: Version,
-    pub run_on: Option<Vec<RunOn>>,
+    pub run_on_requirements: Option<Vec<RunOnRequirement>>,
     pub allow_multiple_mongoses: Option<bool>,
     pub create_entities: Option<Vec<Entity>>,
-    pub collection_name: String,
-    pub database_name: String,
-    pub initial_data: Option<CollectionData>,
+    pub initial_data: Option<Vec<CollectionData>>,
     pub tests: Vec<TestCase>,
 }
 
@@ -41,13 +41,13 @@ where
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RunOn {
+pub struct RunOnRequirement {
     pub min_server_version: Option<String>,
     pub max_server_version: Option<String>,
     pub topology: Option<Vec<String>>,
 }
 
-impl RunOn {
+impl RunOnRequirement {
     pub fn can_run_on(&self, client: &TestClient) -> bool {
         if let Some(ref min_version) = self.min_server_version {
             let req = VersionReq::parse(&format!(">= {}", &min_version)).unwrap();
@@ -78,6 +78,7 @@ pub enum Entity {
     Collection(Collection),
     Session(Session),
     Bucket(Bucket),
+    Stream(Stream),
 }
 
 #[derive(Debug, Deserialize)]
@@ -87,6 +88,7 @@ pub struct Client {
     pub uri_options: Option<ClientOptions>,
     pub use_multiple_mongoses: Option<bool>,
     pub observe_events: Option<Vec<Document>>,
+    pub ignore_command_monitoring_events: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -105,7 +107,6 @@ pub struct Collection {
     pub database: String,
     pub collection_name: String,
     pub collection_options: Option<CollectionOrDatabaseOptions>,
-    pub create_on_server: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -122,6 +123,13 @@ pub struct Bucket {
     pub id: String,
     pub database: String,
     pub bucket_options: Option<Document>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Stream {
+    pub id: String,
+    pub hex_bytes: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -168,7 +176,7 @@ pub struct CollectionData {
 #[serde(rename_all = "camelCase")]
 pub struct TestCase {
     pub description: String,
-    pub run_on: Option<Vec<RunOn>>,
+    pub run_on_requirements: Option<Vec<RunOnRequirement>>,
     pub skip_reason: Option<String>,
     pub operations: Vec<Operation>,
     pub expect_events: Option<Vec<ExpectedEvents>>,
@@ -181,8 +189,8 @@ pub struct Operation {
     pub name: String,
     pub object: String,
     pub arguments: Option<Document>,
-    pub expected_error: Option<ExpectedError>,
-    pub expected_result: Option<Bson>,
+    pub expect_error: Option<ExpectError>,
+    pub expect_result: Option<Bson>,
     pub save_result_as_entity: Option<String>,
 }
 
@@ -194,19 +202,45 @@ pub struct ExpectedEvents {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ExpectedError {
-    #[serde(rename = "type")]
-    pub error_type: Option<ErrorType>,
+pub struct ExpectError {
+    pub is_error: Option<bool>,
+    pub is_client_error: Option<bool>,
     pub error_contains: Option<String>,
-    pub error_code_name: Option<String>,
+    pub error_code: Option<i32>,
     pub error_labels_contain: Option<Vec<String>>,
     pub error_labels_omit: Option<Vec<String>>,
     pub expected_result: Option<Bson>,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub enum ErrorType {
-    Client,
-    Server,
+impl ExpectError {
+    pub fn verify_result(self, error: Error) {
+        if let Some(is_client_error) = self.is_client_error {
+            assert_eq!(is_client_error, !error.is_server_error());
+        }
+        if let Some(error_contains) = self.error_contains {
+            match &error.kind.code_and_message() {
+                Some((_, msg)) => assert!(msg.contains(&error_contains)),
+                None => panic!("error should include message field"),
+            }
+        }
+        if let Some(error_code) = self.error_code {
+            match &error.kind.code_and_message() {
+                Some((code, _)) => assert_eq!(*code, error_code),
+                None => panic!("error should include code"),
+            }
+        }
+        if let Some(error_labels_contain) = self.error_labels_contain {
+            for label in error_labels_contain {
+                assert!(error.labels().contains(&label));
+            }
+        }
+        if let Some(error_labels_omit) = self.error_labels_omit {
+            for label in error_labels_omit {
+                assert!(!error.labels().contains(&label));
+            }
+        }
+        if self.expected_result.is_some() {
+            panic!("Bulk write not implemented");
+        }
+    }
 }

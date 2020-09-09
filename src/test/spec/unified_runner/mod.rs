@@ -1,5 +1,5 @@
 mod entity;
-mod matchable;
+mod matcher;
 mod operation;
 mod test_file;
 
@@ -9,7 +9,7 @@ use lazy_static::lazy_static;
 use semver::Version;
 
 use crate::{
-    bson::{doc, Bson},
+    bson::{doc, Document},
     concern::{Acknowledgment, WriteConcern},
     options::{CollectionOptions, InsertManyOptions, ReadPreference, SelectionCriteria},
     test::{assert_matches, util::EventClient, TestClient},
@@ -17,9 +17,9 @@ use crate::{
 
 pub use self::{
     entity::Entity,
-    matchable::assert_results_match,
+    matcher::results_match,
     operation::EntityOperation,
-    test_file::{Entity as TestFileEntity, ErrorType, ExpectedError, Operation, TestFile},
+    test_file::{CollectionData, Entity as TestFileEntity, ExpectError, Operation, TestFile},
 };
 
 lazy_static! {
@@ -47,8 +47,11 @@ pub async fn run_unified_format_test(test_file: TestFile) {
     }
 
     let client = TestClient::new().await;
-    if let Some(run_on) = test_file.run_on {
-        if !run_on.iter().any(|run_on| run_on.can_run_on(&client)) {
+    if let Some(requirements) = test_file.run_on_requirements {
+        if !requirements
+            .iter()
+            .any(|requirement| requirement.can_run_on(&client))
+        {
             println!("Client topology not compatible with test");
             return;
         }
@@ -60,8 +63,11 @@ pub async fn run_unified_format_test(test_file: TestFile) {
             return;
         }
 
-        if let Some(run_on) = test_case.run_on {
-            if !run_on.iter().any(|run_on| run_on.can_run_on(&client)) {
+        if let Some(requirements) = test_case.run_on_requirements {
+            if !requirements
+                .iter()
+                .any(|requirement| requirement.can_run_on(&client))
+            {
                 println!(
                     "{}: client topology not compatible with test",
                     &test_case.description
@@ -71,209 +77,94 @@ pub async fn run_unified_format_test(test_file: TestFile) {
         }
 
         if let Some(ref initial_data) = test_file.initial_data {
-            let write_concern = WriteConcern::builder().w(Acknowledgment::Majority).build();
-            let collection_options = CollectionOptions::builder()
-                .write_concern(write_concern.clone())
-                .build();
-            let coll = client
-                .init_db_and_coll_with_options(
-                    &initial_data.database_name,
-                    &initial_data.collection_name,
-                    collection_options,
-                )
-                .await;
-
-            let insert_options = InsertManyOptions::builder()
-                .write_concern(write_concern)
-                .build();
-            if !initial_data.documents.is_empty() {
-                coll.insert_many(initial_data.documents.clone(), insert_options)
-                    .await
-                    .expect(&format!(
-                        "{}: inserting initial data should succeed",
-                        &test_case.description
-                    ));
+            for data in initial_data {
+                insert_initial_data(data, &client).await;
             }
         }
 
         let mut entities: HashMap<String, Entity> = HashMap::new();
         if let Some(ref create_entities) = test_file.create_entities {
-            for entity in create_entities {
-                match entity {
-                    TestFileEntity::Client(client) => {
-                        let id = client.id.clone();
-                        let client = EventClient::unified_with_additional_options(
-                            client.uri_options.clone(),
-                            client.use_multiple_mongoses,
-                        )
-                        .await;
-                        entities.insert(id, client.into());
-                    }
-                    TestFileEntity::Database(database) => {
-                        let id = database.id.clone();
-                        let client = entities.get(&database.client).unwrap().as_client();
-                        let database = if let Some(ref options) = database.database_options {
-                            let options = options.as_database_options();
-                            client.database_with_options(&database.database_name, options)
-                        } else {
-                            client.database(&database.database_name)
+            populate_entity_map(&mut entities, create_entities).await;
+        }
+
+        let mut fail_points: Vec<Document> = Vec::new();
+        for operation in test_case.operations {
+            if operation.object.as_str() == "testRunner" {
+                match operation.name.as_str() {
+                    "failPoint" => {
+                        let arguments = operation.arguments.unwrap();
+                        let fail_point = arguments.get_document("failPoint").unwrap();
+
+                        let disable = doc! {
+                            "configureFailPoint": fail_point.get_str("configureFailPoint").unwrap(),
+                            "mode": "off",
                         };
-                        entities.insert(id, database.into());
+                        fail_points.push(disable);
+
+                        let client_id = arguments.get_str("client").unwrap();
+                        let client = entities.get(client_id).unwrap().as_client();
+
+                        let selection_criteria =
+                            SelectionCriteria::ReadPreference(ReadPreference::Primary);
+                        client
+                            .database("admin")
+                            .run_command(fail_point.clone(), selection_criteria)
+                            .await
+                            .unwrap();
                     }
-                    TestFileEntity::Collection(collection) => {
-                        let id = collection.id.clone();
-                        let database = entities.get(&collection.database).unwrap().as_database();
-                        let collection = if let Some(ref options) = collection.collection_options {
-                            let options = options.as_collection_options();
-                            database.collection_with_options(&collection.collection_name, options)
-                        } else {
-                            database.collection(&collection.collection_name)
-                        };
-                        entities.insert(id, collection.into());
+                    "targetedFailPoint"
+                    | "assertSessionTransactionState"
+                    | "assertSessionPinned"
+                    | "assertSessionUnpinned" => panic!("Transactions not implemented"),
+                    "assertDifferentLsidOnLastTwoCommands"
+                    | "assertSameLsidOnLastTwoCommands"
+                    | "assertSessionNotDirty" => panic!("Explicit sessions not implemented"),
+                    "assertCollectionExists" => {
+                        let arguments = operation.arguments.unwrap();
+                        let collection_name = arguments.get_str("collectionName").unwrap();
+                        assert!(get_collection_names(&arguments, &client)
+                            .await
+                            .contains(&collection_name.to_string()));
                     }
-                    TestFileEntity::Session(_) => {
-                        panic!(
-                            "{}: Explicit sessions not implemented",
-                            &test_case.description
-                        );
+                    "assertCollectionNotExists" => {
+                        let arguments = operation.arguments.unwrap();
+                        let collection_name = arguments.get_str("collectionName").unwrap();
+                        assert!(!get_collection_names(&arguments, &client)
+                            .await
+                            .contains(&collection_name.to_string()));
                     }
-                    TestFileEntity::Bucket(_) => {
-                        panic!("{}: GridFS not implemented", &test_case.description);
+                    "assertIndexExists" | "assertIndexNotExists" => {
+                        panic!("Index management not implemented")
                     }
+                    other => panic!("Unknown test runner operation: {}", other),
+                }
+            } else {
+                let operation = EntityOperation::from_operation(operation).unwrap();
+
+                let result = operation.execute(&entities).await;
+
+                if let Some(id) = operation.save_result_as_entity {
+                    let result = result.clone().unwrap();
+                    entities.insert(id, result.into());
+                }
+
+                if let Some(expect_result) = operation.expect_result {
+                    let result = result.unwrap_or_else(|_| panic!("operation should succeed"));
+                    match result {
+                        Some(result) => {
+                            assert!(results_match(Some(&result), &expect_result));
+                        }
+                        None => {
+                            panic!("expected {}, got {:?}", &expect_result, &result);
+                        }
+                    }
+                } else if let Some(expect_error) = operation.expect_error {
+                    let error = result.unwrap_err();
+                    expect_error.verify_result(error);
                 }
             }
         }
 
-        for operation in test_case.operations {
-            match operation.object.as_str() {
-                "testRunner" => {
-                    match operation.name.as_str() {
-                        "failPoint" => {
-                            // isabeltodo keep track of this failpoint to unset at end -- teardown
-                            // struct?
-                            let arguments = operation.arguments.unwrap();
-                            let fail_point = arguments.get_document("failPoint").unwrap();
-                            let client_id = arguments.get_str("client").unwrap();
-                            let client = entities.get(client_id).unwrap().as_client();
-                            let selection_criteria =
-                                SelectionCriteria::ReadPreference(ReadPreference::Primary);
-                            client
-                                .database("admin")
-                                .run_command(fail_point.clone(), selection_criteria)
-                                .await
-                                .unwrap();
-                        }
-                        "targetedFailPoint" => panic!("Transactions not implemented"),
-                        "assertSessionTransactionState" => panic!("Transactions not implemented"),
-                        "assertSessionPinned" => panic!("Transactions not implemented"),
-                        "assertSessionUnpinned" => panic!("Transactions not implemented"),
-                        "assertDifferentLsidOnLastTwoCommands" => {
-                            let lsids = get_lsids(&operation, &entities);
-                            assert_ne!(lsids.0, lsids.1);
-                        }
-                        "assertSameLsidOnLastTwoCommands" => {
-                            let lsids = get_lsids(&operation, &entities);
-                            assert_ne!(lsids.0, lsids.1);
-                        }
-                        "assertSessionDirty" => {
-                            panic!("Explicit sessions not implemented");
-                        }
-                        "assertSessionNotDirty" => {
-                            panic!("Explicit sessions not implemented");
-                        }
-                        "assertCollectionExists" => {
-                            let arguments = operation.arguments.unwrap();
-                            let database_name = arguments.get_str("databaseName").unwrap();
-                            let collection_name = arguments.get_str("collectionName").unwrap();
-                            let collections = client
-                                .database(database_name)
-                                .list_collection_names(doc! {})
-                                .await
-                                .unwrap();
-                            assert!(collections.contains(&collection_name.to_string()));
-                        }
-                        "assertCollectionNotExists" => {
-                            let arguments = operation.arguments.unwrap();
-                            let database_name = arguments.get_str("databaseName").unwrap();
-                            let collection_name = arguments.get_str("collectionName").unwrap();
-                            let collections = client
-                                .database(database_name)
-                                .list_collection_names(doc! {})
-                                .await
-                                .unwrap();
-                            assert!(!collections.contains(&collection_name.to_string()));
-                        }
-                        "assertIndexExists" => panic!("Index management not implemented"),
-                        "assertIndexNotExists" => panic!("Index management not implemented"),
-                        _ => {
-                            let operation = EntityOperation::from_operation(operation).unwrap();
-                            let result = if operation.object.starts_with("client") {
-                                let client = entities.get(&operation.object).unwrap().as_client();
-                                operation.execute_on_client(client).await
-                            } else if operation.object.starts_with("database") {
-                                let database =
-                                    entities.get(&operation.object).unwrap().as_database();
-                                operation.execute_on_database(database).await
-                            } else if operation.object.starts_with("collection") {
-                                let collection =
-                                    entities.get(&operation.object).unwrap().as_collection();
-                                operation.execute_on_collection(collection).await
-                            } else {
-                                panic!(
-                                    "{}: {} not in entity map",
-                                    &test_case.description, operation.name
-                                );
-                            };
-                            if let Some(expected_result) = operation.expected_result {
-                                let result =
-                                    result.unwrap_or_else(|_| panic!("operation should succeed"));
-                                match result {
-                                    Some(result) => {
-                                        assert_results_match(Some(&result), &expected_result)
-                                    }
-                                    None => {
-                                        panic!("expected {}, got {:?}", &expected_result, &result);
-                                    }
-                                }
-                            } else if let Some(expected_error) = operation.expected_error {
-                                let error = result.unwrap_err();
-                                if let Some(error_type) = expected_error.error_type {
-                                    assert_eq!(
-                                        error_type == ErrorType::Server,
-                                        error.is_server_error()
-                                    );
-                                }
-                                if let Some(error_contains) = expected_error.error_contains {
-                                    match &error.kind.code_and_message() {
-                                        Some((_, msg)) => assert!(msg.contains(&error_contains)),
-                                        None => panic!("error should include message field"),
-                                    }
-                                }
-                                if let Some(_error_code_name) = expected_error.error_code_name {
-                                    // TODO parse error code names
-                                }
-                                if let Some(error_labels_contain) =
-                                    expected_error.error_labels_contain
-                                {
-                                    for label in error_labels_contain {
-                                        assert!(error.labels().contains(&label));
-                                    }
-                                }
-                                if let Some(error_labels_omit) = expected_error.error_labels_omit {
-                                    for label in error_labels_omit {
-                                        assert!(!error.labels().contains(&label));
-                                    }
-                                }
-                                if expected_error.expected_result.is_some() {
-                                    panic!("Bulk write not implemented");
-                                }
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
         if let Some(expect_events) = test_case.expect_events {
             for expected in expect_events {
                 let mut expected_events = expected.events.iter();
@@ -286,18 +177,93 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                 }
             }
         }
+
+        for fail_point in fail_points {
+            client
+                .database("admin")
+                .run_command(fail_point, None)
+                .await
+                .unwrap();
+        }
     }
 }
 
-fn get_lsids(operation: &Operation, entities: &HashMap<String, Entity>) -> (Bson, Bson) {
-    let arguments = operation.arguments.as_ref().unwrap();
-    let client_id = arguments.get_str("client").unwrap();
-    let client = entities.get(client_id).unwrap().as_client();
-    let events = client.get_all_command_started_events();
-    assert!(events.len() >= 2);
-    let last = events.last().unwrap();
-    let second_last = events.get(events.len() - 2).unwrap();
-    let lsid1 = last.command.get("lsid").unwrap().clone();
-    let lsid2 = second_last.command.get("lsid").unwrap().clone();
-    (lsid1, lsid2)
+async fn populate_entity_map(
+    entities: &mut HashMap<String, Entity>,
+    create_entities: &[TestFileEntity],
+) {
+    for entity in create_entities {
+        match entity {
+            TestFileEntity::Client(client) => {
+                let id = client.id.clone();
+                let client = EventClient::unified_with_additional_options(
+                    client.uri_options.clone(),
+                    client.use_multiple_mongoses,
+                )
+                .await;
+                entities.insert(id, client.into());
+            }
+            TestFileEntity::Database(database) => {
+                let id = database.id.clone();
+                let client = entities.get(&database.client).unwrap().as_client();
+                let database = if let Some(ref options) = database.database_options {
+                    let options = options.as_database_options();
+                    client.database_with_options(&database.database_name, options)
+                } else {
+                    client.database(&database.database_name)
+                };
+                entities.insert(id, database.into());
+            }
+            TestFileEntity::Collection(collection) => {
+                let id = collection.id.clone();
+                let database = entities.get(&collection.database).unwrap().as_database();
+                let collection = if let Some(ref options) = collection.collection_options {
+                    let options = options.as_collection_options();
+                    database.collection_with_options(&collection.collection_name, options)
+                } else {
+                    database.collection(&collection.collection_name)
+                };
+                entities.insert(id, collection.into());
+            }
+            TestFileEntity::Session(_) => {
+                panic!("Explicit sessions not implemented");
+            }
+            TestFileEntity::Bucket(_) | TestFileEntity::Stream(_) => {
+                panic!("GridFS not implemented");
+            }
+        }
+    }
+}
+
+async fn insert_initial_data(data: &CollectionData, client: &TestClient) {
+    let write_concern = WriteConcern::builder().w(Acknowledgment::Majority).build();
+    let collection_options = CollectionOptions::builder()
+        .write_concern(write_concern.clone())
+        .build();
+    let coll = client
+        .init_db_and_coll_with_options(
+            &data.database_name,
+            &data.collection_name,
+            collection_options,
+        )
+        .await;
+
+    let insert_options = InsertManyOptions::builder()
+        .write_concern(write_concern)
+        .build();
+    if !data.documents.is_empty() {
+        coll.insert_many(data.documents.clone(), insert_options)
+            .await
+            .unwrap();
+    }
+}
+
+async fn get_collection_names(arguments: &Document, client: &TestClient) -> Vec<String> {
+    let database_name = arguments.get_str("databaseName").unwrap();
+    let collection_name = arguments.get_str("collectionName").unwrap();
+    client
+        .database(database_name)
+        .list_collection_names(doc! { "name": collection_name })
+        .await
+        .unwrap()
 }
