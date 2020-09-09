@@ -1,3 +1,5 @@
+mod entity;
+mod matchable;
 mod operation;
 mod test_file;
 
@@ -7,66 +9,36 @@ use lazy_static::lazy_static;
 use semver::Version;
 
 use crate::{
-    bson::{doc, spec::ElementType, Bson},
+    bson::{doc, Bson},
     concern::{Acknowledgment, WriteConcern},
     options::{CollectionOptions, InsertManyOptions, ReadPreference, SelectionCriteria},
-    test::{util::EventClient, TestClient},
-    Collection,
-    Database,
+    test::{assert_matches, util::EventClient, TestClient},
 };
 
 pub use self::{
+    entity::Entity,
+    matchable::assert_results_match,
     operation::EntityOperation,
-    test_file::{Entity, ErrorType, ExpectedError, Operation, TestFile},
+    test_file::{Entity as TestFileEntity, ErrorType, ExpectedError, Operation, TestFile},
 };
 
 lazy_static! {
-    static ref SPEC_VERSION: Version = Version::parse("1.0.0").unwrap();
-}
-
-struct EntityMap {
-    pub clients: HashMap<String, EventClient>,
-    pub databases: HashMap<String, Database>,
-    pub collections: HashMap<String, Collection>,
-}
-
-impl EntityMap {
-    fn new() -> Self {
-        EntityMap {
-            clients: HashMap::new(),
-            databases: HashMap::new(),
-            collections: HashMap::new(),
-        }
-    }
-
-    fn add_client(&mut self, id: String, client: EventClient) {
-        self.clients.insert(id, client);
-    }
-
-    fn get_client(&self, id: &str) -> &EventClient {
-        self.clients.get(id).expect("")
-    }
-
-    fn add_database(&mut self, id: String, database: Database) {
-        self.databases.insert(id, database);
-    }
-
-    fn get_database(&self, id: &str) -> &Database {
-        self.databases.get(id).expect("")
-    }
-
-    fn add_collection(&mut self, id: String, collection: Collection) {
-        self.collections.insert(id, collection);
-    }
-
-    fn get_collection(&self, id: &str) -> &Collection {
-        self.collections.get(id).expect("")
-    }
+    static ref SPEC_VERSIONS: Vec<Version> = vec![Version::parse("1.0.0").unwrap()];
 }
 
 #[allow(dead_code)]
 pub async fn run_unified_format_test(test_file: TestFile) {
-    if !test_file.schema_version.matches(&SPEC_VERSION) {
+    let version_matches = SPEC_VERSIONS.iter().any(|req| {
+        if req.major != test_file.schema_version.major {
+            return false;
+        }
+        if req.minor < test_file.schema_version.minor {
+            return false;
+        }
+        // patch versions do not affect the test file format
+        true
+    });
+    if !version_matches {
         println!(
             "Test runner not compatible with specification version {}",
             &test_file.schema_version
@@ -124,51 +96,48 @@ pub async fn run_unified_format_test(test_file: TestFile) {
             }
         }
 
-        let mut entities = EntityMap::new();
+        let mut entities: HashMap<String, Entity> = HashMap::new();
         if let Some(ref create_entities) = test_file.create_entities {
             for entity in create_entities {
                 match entity {
-                    Entity::Client(client) => {
+                    TestFileEntity::Client(client) => {
                         let id = client.id.clone();
-                        let client = EventClient::with_additional_options(
+                        let client = EventClient::unified_with_additional_options(
                             client.uri_options.clone(),
-                            None,
-                            // isabeltodo update use_multiple_mongoses to fit spec within
-                            // with_additional_options
                             client.use_multiple_mongoses,
                         )
                         .await;
-                        entities.add_client(id, client);
+                        entities.insert(id, client.into());
                     }
-                    Entity::Database(database) => {
+                    TestFileEntity::Database(database) => {
                         let id = database.id.clone();
-                        let client = entities.get_client(&database.client);
+                        let client = entities.get(&database.client).unwrap().as_client();
                         let database = if let Some(ref options) = database.database_options {
                             let options = options.as_database_options();
                             client.database_with_options(&database.database_name, options)
                         } else {
                             client.database(&database.database_name)
                         };
-                        entities.add_database(id, database);
+                        entities.insert(id, database.into());
                     }
-                    Entity::Collection(collection) => {
+                    TestFileEntity::Collection(collection) => {
                         let id = collection.id.clone();
-                        let database = entities.get_database(&collection.database);
+                        let database = entities.get(&collection.database).unwrap().as_database();
                         let collection = if let Some(ref options) = collection.collection_options {
                             let options = options.as_collection_options();
                             database.collection_with_options(&collection.collection_name, options)
                         } else {
                             database.collection(&collection.collection_name)
                         };
-                        entities.add_collection(id, collection);
+                        entities.insert(id, collection.into());
                     }
-                    Entity::Session(_) => {
+                    TestFileEntity::Session(_) => {
                         panic!(
-                            "{}: explicit sessions not implemented",
+                            "{}: Explicit sessions not implemented",
                             &test_case.description
                         );
                     }
-                    Entity::Bucket(_) => {
+                    TestFileEntity::Bucket(_) => {
                         panic!("{}: GridFS not implemented", &test_case.description);
                     }
                 }
@@ -185,7 +154,7 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                             let arguments = operation.arguments.unwrap();
                             let fail_point = arguments.get_document("failPoint").unwrap();
                             let client_id = arguments.get_str("client").unwrap();
-                            let client = entities.get_client(client_id);
+                            let client = entities.get(client_id).unwrap().as_client();
                             let selection_criteria =
                                 SelectionCriteria::ReadPreference(ReadPreference::Primary);
                             client
@@ -199,35 +168,18 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                         "assertSessionPinned" => panic!("Transactions not implemented"),
                         "assertSessionUnpinned" => panic!("Transactions not implemented"),
                         "assertDifferentLsidOnLastTwoCommands" => {
-                            let arguments = operation.arguments.unwrap();
-                            let client_id = arguments.get_str("client").unwrap();
-                            let client = entities.get_client(client_id);
-                            let events = client.get_all_command_started_events();
-                            assert!(events.len() >= 2);
-                            let last = events.last().unwrap();
-                            let second_last = events.get(events.len() - 2).unwrap();
-                            let lsid1 = last.command.get("lsid").unwrap();
-                            let lsid2 = second_last.command.get("lsid").unwrap();
-                            assert_ne!(lsid1, lsid2);
+                            let lsids = get_lsids(&operation, &entities);
+                            assert_ne!(lsids.0, lsids.1);
                         }
                         "assertSameLsidOnLastTwoCommands" => {
-                            // isabeltodo make method for this
-                            let arguments = operation.arguments.unwrap();
-                            let client_id = arguments.get_str("client").unwrap();
-                            let client = entities.get_client(client_id);
-                            let events = client.get_all_command_started_events();
-                            assert!(events.len() >= 2);
-                            let last = events.last().unwrap();
-                            let second_last = events.get(events.len() - 2).unwrap();
-                            let lsid1 = last.command.get("lsid").unwrap();
-                            let lsid2 = second_last.command.get("lsid").unwrap();
-                            assert_eq!(lsid1, lsid2);
+                            let lsids = get_lsids(&operation, &entities);
+                            assert_ne!(lsids.0, lsids.1);
                         }
                         "assertSessionDirty" => {
-                            // isabeltodo add sessions to entity map
+                            panic!("Explicit sessions not implemented");
                         }
                         "assertSessionNotDirty" => {
-                            // isabeltodo add sessions to entity map
+                            panic!("Explicit sessions not implemented");
                         }
                         "assertCollectionExists" => {
                             let arguments = operation.arguments.unwrap();
@@ -256,13 +208,15 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                         _ => {
                             let operation = EntityOperation::from_operation(operation).unwrap();
                             let result = if operation.object.starts_with("client") {
-                                let client = entities.get_client(&operation.object);
+                                let client = entities.get(&operation.object).unwrap().as_client();
                                 operation.execute_on_client(client).await
                             } else if operation.object.starts_with("database") {
-                                let database = entities.get_database(&operation.object);
+                                let database =
+                                    entities.get(&operation.object).unwrap().as_database();
                                 operation.execute_on_database(database).await
                             } else if operation.object.starts_with("collection") {
-                                let collection = entities.get_collection(&operation.object);
+                                let collection =
+                                    entities.get(&operation.object).unwrap().as_collection();
                                 operation.execute_on_collection(collection).await
                             } else {
                                 panic!(
@@ -296,7 +250,7 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                                     }
                                 }
                                 if let Some(_error_code_name) = expected_error.error_code_name {
-                                    // isabeltodo figure out how to get error code names
+                                    // TODO parse error code names
                                 }
                                 if let Some(error_labels_contain) =
                                     expected_error.error_labels_contain
@@ -310,8 +264,8 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                                         assert!(!error.labels().contains(&label));
                                     }
                                 }
-                                if let Some(_expected_result) = expected_error.expected_result {
-                                    panic!("bulk write not implemented");
+                                if expected_error.expected_result.is_some() {
+                                    panic!("Bulk write not implemented");
                                 }
                             }
                         }
@@ -320,107 +274,30 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                 _ => {}
             }
         }
-    }
-}
-
-fn assert_results_match(actual: Option<&Bson>, expected: &Bson) {
-    match expected {
-        Bson::Document(expected_doc) => {
-            if let Some(special_op) = expected_doc.iter().next() {
-                if special_op.0.starts_with("$$") {
-                    assert_special_operator_matches(special_op, actual);
+        if let Some(expect_events) = test_case.expect_events {
+            for expected in expect_events {
+                let mut expected_events = expected.events.iter();
+                let client = entities.get(&expected.client).unwrap().as_client();
+                let actual_events = client.get_test_events();
+                for event in actual_events {
+                    // TODO check to see if the event should be ignored based on its name
+                    let expected_event = expected_events.next().unwrap();
+                    assert_matches(&event, expected_event, None);
                 }
             }
-            let actual_doc = actual.unwrap().as_document().unwrap();
-            for (key, value) in expected_doc {
-                assert_results_match(actual_doc.get(key), value);
-            }
         }
-        Bson::Array(expected_array) => {
-            let actual_array = actual.unwrap().as_array().unwrap();
-            assert_eq!(expected_array.len(), actual_array.len());
-            for i in 0..expected_array.len() {
-                assert_results_match(Some(&actual_array[i]), &expected_array[i]);
-            }
-        }
-        _ => assert_eq!(actual.unwrap(), expected),
     }
 }
 
-fn assert_special_operator_matches(special_op: (&String, &Bson), actual: Option<&Bson>) {
-    match special_op.0.as_ref() {
-        "$$exists" => {
-            assert_eq!(special_op.1.as_bool().unwrap(), actual.is_some());
-        }
-        "$$type" => {
-            assert!(type_matches(special_op.1, actual.unwrap()));
-        }
-        "$$unsetOrMatches" => if let Some(bson) = actual {
-            assert_results_match(Some(special_op.1), bson);
-        }
-        "$$sessionLsid" => {
-            // isabeltodo figure out how to do this with the entity map
-        }
-        other => panic!("unknown special operator: {}", other),
-    }
-}
-
-fn type_matches(types: &Bson, actual: &Bson) -> bool {
-    match types {
-        Bson::Array(types) => {
-            types.iter().any(|t| type_matches(t, actual))
-        }
-        Bson::String(str) => match str.as_ref() {
-            "double" => actual.element_type() == ElementType::Double,
-            "string" => actual.element_type() == ElementType::String,
-            "object" => actual.element_type() == ElementType::EmbeddedDocument,
-            "array" => actual.element_type() == ElementType::Array,
-            "binData" => actual.element_type() == ElementType::Binary,
-            "undefined" => actual.element_type() == ElementType::Undefined,
-            "objectId" => actual.element_type() == ElementType::ObjectId,
-            "bool" => actual.element_type() == ElementType::Boolean,
-            "date" => actual.element_type() == ElementType::DateTime,
-            "null" => actual.element_type() == ElementType::Null,
-            "regex" => actual.element_type() == ElementType::RegularExpression,
-            "dbPointer" => actual.element_type() == ElementType::DbPointer,
-            "javascript" => actual.element_type() == ElementType::JavaScriptCode,
-            "symbol" => actual.element_type() == ElementType::Symbol,
-            "javascriptWithScope" => {
-                actual.element_type() == ElementType::JavaScriptCodeWithScope
-            }
-            "int" => actual.element_type() == ElementType::Int32,
-            "timestamp" => actual.element_type() == ElementType::Timestamp,
-            "long" => actual.element_type() == ElementType::Int64,
-            "decimal" => actual.element_type() == ElementType::Decimal128,
-            "minKey" => actual.element_type() == ElementType::MinKey,
-            "maxKey" => actual.element_type() == ElementType::MaxKey,
-            other => panic!("unrecognized type: {}", other),
-        },
-        // isabeltodo verify that the number gets serialized into an i32
-        Bson::Int32(n) => match n {
-            1 => actual.element_type() == ElementType::Double,
-            2 => actual.element_type() == ElementType::String,
-            3 => actual.element_type() == ElementType::EmbeddedDocument,
-            4 => actual.element_type() == ElementType::Array,
-            5 => actual.element_type() == ElementType::Binary,
-            6 => actual.element_type() == ElementType::Undefined,
-            7 => actual.element_type() == ElementType::ObjectId,
-            8 => actual.element_type() == ElementType::Boolean,
-            9 => actual.element_type() == ElementType::DateTime,
-            10 => actual.element_type() == ElementType::Null,
-            11 => actual.element_type() == ElementType::RegularExpression,
-            12 => actual.element_type() == ElementType::DbPointer,
-            13 => actual.element_type() == ElementType::JavaScriptCode,
-            14 => actual.element_type() == ElementType::Symbol,
-            15 => actual.element_type() == ElementType::JavaScriptCodeWithScope,
-            16 => actual.element_type() == ElementType::Int32,
-            17 => actual.element_type() == ElementType::Timestamp,
-            18 => actual.element_type() == ElementType::Int64,
-            19 => actual.element_type() == ElementType::Decimal128,
-            -1 => actual.element_type() == ElementType::MinKey,
-            127 => actual.element_type() == ElementType::MaxKey,
-            other => panic!("unrecognized type: {}", other),
-        },
-        other => panic!("unrecognized type: {}", other),
-    }
+fn get_lsids(operation: &Operation, entities: &HashMap<String, Entity>) -> (Bson, Bson) {
+    let arguments = operation.arguments.as_ref().unwrap();
+    let client_id = arguments.get_str("client").unwrap();
+    let client = entities.get(client_id).unwrap().as_client();
+    let events = client.get_all_command_started_events();
+    assert!(events.len() >= 2);
+    let last = events.last().unwrap();
+    let second_last = events.get(events.len() - 2).unwrap();
+    let lsid1 = last.command.get("lsid").unwrap().clone();
+    let lsid2 = second_last.command.get("lsid").unwrap().clone();
+    (lsid1, lsid2)
 }

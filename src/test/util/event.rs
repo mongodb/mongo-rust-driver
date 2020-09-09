@@ -19,12 +19,12 @@ use crate::{
         },
     },
     options::ClientOptions,
-    test::{CLIENT_OPTIONS, LOCK},
+    test::{CLIENT_OPTIONS, LOCK, TestEvent},
 };
 
 pub type EventQueue<T> = Arc<RwLock<VecDeque<T>>>;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum CommandEvent {
     CommandStartedEvent(CommandStartedEvent),
     CommandSucceededEvent(CommandSucceededEvent),
@@ -164,6 +164,32 @@ impl EventClient {
         EventClient::with_options(options).await
     }
 
+    pub async fn unified_with_additional_options(
+        options: Option<ClientOptions>,
+        use_multiple_mongoses: Option<bool>,
+    ) -> Self {
+        let mut options = match options {
+            Some(mut options) => {
+                options.hosts = CLIENT_OPTIONS.hosts.clone();
+                options.merge(CLIENT_OPTIONS.clone());
+                options
+            }
+            None => CLIENT_OPTIONS.clone(),
+        };
+        match use_multiple_mongoses {
+            Some(true) => {
+                if options.hosts.len() <= 1 {
+                    panic!("Test requires multiple mongos hosts");
+                }
+            }
+            Some(false) => {
+                options.hosts = options.hosts.iter().cloned().take(1).collect();
+            }
+            None => {}
+        }
+        EventClient::with_options(options).await
+    }
+
     /// Gets the first started/succeeded pair of events for the given command name, popping off all
     /// events before and between them.
     ///
@@ -234,11 +260,23 @@ impl EventClient {
 
     pub fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
         let events = self.command_events.read().unwrap();
-        events.iter().filter_map(|event| match event {
-            CommandEvent::CommandStartedEvent(event) => Some(event.clone()),
-            _ => None
-        })
-        .collect()
+        events
+            .iter()
+            .filter_map(|event| match event {
+                CommandEvent::CommandStartedEvent(event) => Some(event.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    pub fn get_test_events(&self) -> Vec<TestEvent> {
+        self.command_events
+            .read()
+            .unwrap()
+            .iter()
+            .cloned()
+            .map(Into::into)
+            .collect()
     }
 }
 

@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use semver::VersionReq;
+use semver::{Version, VersionReq};
 use serde::{Deserialize, Deserializer};
 
 use crate::{
@@ -14,14 +14,14 @@ use crate::{
         SelectionCriteria,
         WriteConcern,
     },
-    test::TestClient,
+    test::{TestClient, TestEvent},
 };
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TestFile {
     #[serde(deserialize_with = "deserialize_schema_version")]
-    pub schema_version: VersionReq,
+    pub schema_version: Version,
     pub run_on: Option<Vec<RunOn>>,
     pub allow_multiple_mongoses: Option<bool>,
     pub create_entities: Option<Vec<Entity>>,
@@ -31,12 +31,12 @@ pub struct TestFile {
     pub tests: Vec<TestCase>,
 }
 
-fn deserialize_schema_version<'de, D>(deserializer: D) -> std::result::Result<VersionReq, D::Error>
+fn deserialize_schema_version<'de, D>(deserializer: D) -> std::result::Result<Version, D::Error>
 where
     D: Deserializer<'de>,
 {
     let schema_version = String::deserialize(deserializer)?;
-    VersionReq::parse(&schema_version).map_err(|e| serde::de::Error::custom(format!("{}", e)))
+    Version::parse(&schema_version).map_err(|e| serde::de::Error::custom(format!("{}", e)))
 }
 
 #[derive(Debug, Deserialize)]
@@ -171,8 +171,7 @@ pub struct TestCase {
     pub run_on: Option<Vec<RunOn>>,
     pub skip_reason: Option<String>,
     pub operations: Vec<Operation>,
-    // isabeltodo convert to defined type
-    pub expected_events: Option<Vec<Document>>,
+    pub expect_events: Option<Vec<ExpectedEvents>>,
     pub outcome: Option<CollectionData>,
 }
 
@@ -185,6 +184,12 @@ pub struct Operation {
     pub expected_error: Option<ExpectedError>,
     pub expected_result: Option<Bson>,
     pub save_result_as_entity: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ExpectedEvents {
+    pub client: String,
+    pub events: Vec<TestEvent>,
 }
 
 #[derive(Debug, Deserialize)]
