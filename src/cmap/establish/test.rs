@@ -77,7 +77,7 @@ async fn speculative_auth_test(
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn speculative_auth_default() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard = LOCK.run_exclusively().await;
 
     let client = TestClient::new().await;
 
@@ -93,7 +93,7 @@ async fn speculative_auth_default() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn speculative_auth_scram_sha_1() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard = LOCK.run_exclusively().await;
 
     let client = TestClient::new().await;
 
@@ -110,7 +110,7 @@ async fn speculative_auth_scram_sha_1() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn speculative_auth_scram_sha_256() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard = LOCK.run_exclusively().await;
 
     let client = TestClient::new().await;
 
