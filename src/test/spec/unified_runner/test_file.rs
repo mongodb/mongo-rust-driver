@@ -3,6 +3,8 @@
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Deserializer};
 
+use super::TestEvent;
+
 use crate::{
     bson::{Bson, Document},
     error::Error,
@@ -15,7 +17,7 @@ use crate::{
         SelectionCriteria,
         WriteConcern,
     },
-    test::{TestClient, TestEvent},
+    test::TestClient,
 };
 
 #[derive(Debug, Deserialize)]
@@ -92,7 +94,7 @@ pub struct Client {
     pub id: String,
     pub uri_options: Option<ClientOptions>,
     pub use_multiple_mongoses: Option<bool>,
-    pub observe_events: Option<Vec<Document>>,
+    pub observe_events: Option<Vec<String>>,
     pub ignore_command_monitoring_events: Option<Vec<String>>,
 }
 

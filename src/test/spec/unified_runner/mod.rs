@@ -1,6 +1,7 @@
 mod entity;
 mod matcher;
 mod operation;
+mod test_event;
 mod test_file;
 
 use std::collections::HashMap;
@@ -20,13 +21,14 @@ use crate::{
         ReadPreference,
         SelectionCriteria,
     },
-    test::{assert_matches, util::EventClient, TestClient},
+    test::{run_spec_test, util::EventClient, TestClient, LOCK},
 };
 
 pub use self::{
     entity::Entity,
     matcher::results_match,
     operation::EntityOperation,
+    test_event::TestEvent,
     test_file::{CollectionData, Entity as TestFileEntity, ExpectError, Operation, TestFile},
 };
 
@@ -34,7 +36,6 @@ lazy_static! {
     static ref SPEC_VERSIONS: Vec<Version> = vec![Version::parse("1.0.0").unwrap()];
 }
 
-#[allow(dead_code)]
 pub async fn run_unified_format_test(test_file: TestFile) {
     let version_matches = SPEC_VERSIONS.iter().any(|req| {
         if req.major != test_file.schema_version.major {
@@ -173,17 +174,8 @@ pub async fn run_unified_format_test(test_file: TestFile) {
             }
         }
 
-        if let Some(expect_events) = test_case.expect_events {
-            for expected in expect_events {
-                let mut expected_events = expected.events.iter();
-                let client = entities.get(&expected.client).unwrap().as_client();
-                let actual_events = client.get_test_events();
-                for event in actual_events {
-                    // TODO check to see if the event should be ignored based on its name
-                    let expected_event = expected_events.next().unwrap();
-                    assert_matches(&event, expected_event, None);
-                }
-            }
+        if let Some(_expect_events) = test_case.expect_events {
+            // TODO implement the spec for command monitoring
         }
 
         for fail_point in fail_points {
@@ -301,4 +293,11 @@ async fn get_collection_names(arguments: &Document, client: &TestClient) -> Vec<
         .list_collection_names(doc! { "name": collection_name })
         .await
         .unwrap()
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn test_examples() {
+    let _guard = LOCK.run_exclusively().await;
+    run_spec_test(&["unified-runner-examples"], run_unified_format_test).await;
 }

@@ -19,7 +19,7 @@ use crate::{
         },
     },
     options::ClientOptions,
-    test::{TestEvent, CLIENT_OPTIONS, LOCK},
+    test::{CLIENT_OPTIONS, LOCK},
 };
 
 pub type EventQueue<T> = Arc<RwLock<VecDeque<T>>>;
@@ -255,16 +255,6 @@ impl EventClient {
                 }
                 _ => None,
             })
-            .collect()
-    }
-
-    pub fn get_test_events(&self) -> Vec<TestEvent> {
-        self.command_events
-            .read()
-            .unwrap()
-            .iter()
-            .cloned()
-            .map(Into::into)
             .collect()
     }
 }
