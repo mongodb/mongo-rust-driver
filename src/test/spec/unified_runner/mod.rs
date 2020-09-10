@@ -96,7 +96,7 @@ pub async fn run_unified_format_test(test_file: TestFile) {
             populate_entity_map(&mut entities, create_entities).await;
         }
 
-        let mut fail_points: Vec<Document> = Vec::new();
+        let mut failpoint_disable_commands: Vec<Document> = Vec::new();
         for operation in test_case.operations {
             if operation.object.as_str() == "testRunner" {
                 match operation.name.as_str() {
@@ -104,11 +104,11 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                         let arguments = operation.arguments.unwrap();
                         let fail_point = arguments.get_document("failPoint").unwrap();
 
-                        let disable = doc! {
+                        let disable_command = doc! {
                             "configureFailPoint": fail_point.get_str("configureFailPoint").unwrap(),
                             "mode": "off",
                         };
-                        fail_points.push(disable);
+                        failpoint_disable_commands.push(disable_command);
 
                         let client_id = arguments.get_str("client").unwrap();
                         let client = entities.get(client_id).unwrap().as_client();
@@ -179,10 +179,10 @@ pub async fn run_unified_format_test(test_file: TestFile) {
         }
 
         // Disable any fail points that were set when running the operations.
-        for fail_point in fail_points {
+        for disable_command in failpoint_disable_commands {
             client
                 .database("admin")
-                .run_command(fail_point, None)
+                .run_command(disable_command, None)
                 .await
                 .unwrap();
         }

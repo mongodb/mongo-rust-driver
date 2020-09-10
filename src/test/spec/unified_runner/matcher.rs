@@ -3,9 +3,9 @@ use crate::bson::{doc, spec::ElementType, Bson};
 pub fn results_match(actual: Option<&Bson>, expected: &Bson) -> bool {
     match expected {
         Bson::Document(expected_doc) => {
-            if let Some(special_op) = expected_doc.iter().next() {
-                if special_op.0.starts_with("$$") {
-                    return special_operator_matches(special_op, actual);
+            if let Some((key, value)) = expected_doc.iter().next() {
+                if key.starts_with("$$") {
+                    return special_operator_matches((key, value), actual);
                 }
             }
             let actual = match actual {
@@ -43,13 +43,13 @@ pub fn results_match(actual: Option<&Bson>, expected: &Bson) -> bool {
     }
 }
 
-fn special_operator_matches(special_op: (&String, &Bson), actual: Option<&Bson>) -> bool {
-    match special_op.0.as_ref() {
-        "$$exists" => special_op.1.as_bool().unwrap() == actual.is_some(),
-        "$$type" => type_matches(special_op.1, actual.unwrap()),
+fn special_operator_matches((key, value): (&String, &Bson), actual: Option<&Bson>) -> bool {
+    match key.as_ref() {
+        "$$exists" => value.as_bool().unwrap() == actual.is_some(),
+        "$$type" => type_matches(value, actual.unwrap()),
         "$$unsetOrMatches" => {
             if let Some(bson) = actual {
-                results_match(Some(special_op.1), bson)
+                results_match(Some(value), bson)
             } else {
                 true
             }
@@ -86,30 +86,20 @@ fn type_matches(types: &Bson, actual: &Bson) -> bool {
             "maxKey" => actual.element_type() == ElementType::MaxKey,
             other => panic!("unrecognized type: {}", other),
         },
-        Bson::Int32(n) => match n {
-            1 => actual.element_type() == ElementType::Double,
-            2 => actual.element_type() == ElementType::String,
-            3 => actual.element_type() == ElementType::EmbeddedDocument,
-            4 => actual.element_type() == ElementType::Array,
-            5 => actual.element_type() == ElementType::Binary,
-            6 => actual.element_type() == ElementType::Undefined,
-            7 => actual.element_type() == ElementType::ObjectId,
-            8 => actual.element_type() == ElementType::Boolean,
-            9 => actual.element_type() == ElementType::DateTime,
-            10 => actual.element_type() == ElementType::Null,
-            11 => actual.element_type() == ElementType::RegularExpression,
-            12 => actual.element_type() == ElementType::DbPointer,
-            13 => actual.element_type() == ElementType::JavaScriptCode,
-            14 => actual.element_type() == ElementType::Symbol,
-            15 => actual.element_type() == ElementType::JavaScriptCodeWithScope,
-            16 => actual.element_type() == ElementType::Int32,
-            17 => actual.element_type() == ElementType::Timestamp,
-            18 => actual.element_type() == ElementType::Int64,
-            19 => actual.element_type() == ElementType::Decimal128,
-            -1 => actual.element_type() == ElementType::MinKey,
-            127 => actual.element_type() == ElementType::MaxKey,
-            other => panic!("unrecognized type: {}", other),
-        },
+        Bson::Int32(n) => {
+            let n = *n;
+            // -1 cannot be converted to a u8
+            if n == -1 {
+                return actual.element_type() == ElementType::MinKey;
+            }
+            if n < 0 || n > u8::MAX as i32 {
+                panic!("unrecognized type: {}", n);
+            }
+            match ElementType::from(n as u8) {
+                Some(element_type) => element_type == actual.element_type(),
+                None => panic!("unrecognized type: {}", n),
+            }
+        }
         other => panic!("unrecognized type: {}", other),
     }
 }
