@@ -178,6 +178,7 @@ pub async fn run_unified_format_test(test_file: TestFile) {
             // TODO implement the spec for command monitoring
         }
 
+        // Disable any fail points that were set when running the operations.
         for fail_point in fail_points {
             client
                 .database("admin")

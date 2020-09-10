@@ -10,6 +10,8 @@ pub fn results_match(actual: Option<&Bson>, expected: &Bson) -> bool {
             }
             let actual = match actual {
                 Some(actual) => actual,
+                // The only case in which None is an acceptable value is if the expected document
+                // is a special operator; otherwise, the two documents do not match.
                 None => return false,
             };
             let actual_doc = actual.as_document().unwrap();
