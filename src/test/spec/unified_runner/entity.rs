@@ -4,7 +4,8 @@ pub enum Entity {
     Client(EventClient),
     Database(Database),
     Collection(Collection),
-    Result(Option<Bson>),
+    Result(Bson),
+    None,
 }
 
 impl From<EventClient> for Entity {
@@ -27,7 +28,10 @@ impl From<Collection> for Entity {
 
 impl From<Option<Bson>> for Entity {
     fn from(result: Option<Bson>) -> Self {
-        Self::Result(result)
+        match result {
+            Some(result) => Self::Result(result),
+            None => Self::None,
+        }
     }
 }
 
