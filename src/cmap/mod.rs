@@ -20,21 +20,17 @@ use self::{
     wait_queue::WaitQueue,
 };
 use crate::{
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     event::cmap::{
-        CmapEventHandler,
-        ConnectionCheckoutFailedEvent,
-        ConnectionCheckoutFailedReason,
-        ConnectionCheckoutStartedEvent,
-        ConnectionClosedReason,
-        PoolClearedEvent,
-        PoolClosedEvent,
+        CmapEventHandler, ConnectionCheckoutFailedEvent, ConnectionCheckoutFailedReason,
+        ConnectionCheckoutStartedEvent, ConnectionClosedReason, PoolClearedEvent, PoolClosedEvent,
         PoolCreatedEvent,
     },
     options::StreamAddress,
     runtime::HttpClient,
     RUNTIME,
 };
+use conn::PendingConnection;
 
 const DEFAULT_MAX_POOL_SIZE: u32 = 100;
 
@@ -58,10 +54,10 @@ struct ConnectionManager {
     /// The set of available connections in the pool. Because the CMAP spec requires that
     /// connections are checked out in a FIFO manner, connections are pushed/popped from the back
     /// of the Vec.
-    checked_in_connections: Vec<Connection>,
+    available_connections: Vec<Connection>,
 
     /// The total number of connections managed by the pool, including connections which are
-    /// currently checked out of the pool.
+    /// currently checked out of the pool or have yet to be established.
     total_connection_count: u32,
 
     /// The ID of the next connection created by the pool.
@@ -94,7 +90,7 @@ impl ConnectionManager {
             .map(|pool_options| ConnectionOptions::from(pool_options.clone()));
 
         Self {
-            checked_in_connections: Vec::new(),
+            available_connections: Vec::new(),
             total_connection_count: 0,
             next_connection_id: 1,
             generation: 0,
@@ -141,35 +137,20 @@ impl ConnectionManager {
     }
 
     /// Create a connection, incrementing the total connection count and emitting the appropriate
-    /// monitoring events.
-    async fn create_connection(&mut self) -> Result<Connection> {
-        let mut connection = Connection::new(
-            self.next_connection_id(),
-            self.address.clone(),
-            self.generation,
-            self.connection_options.clone(),
-        )
-        .await?;
-
+    /// monitoring events. This DOES NOT establish the returned `Connection`.
+    fn create_connection(&mut self) -> PendingConnection {
+        let connection = PendingConnection {
+            id: self.next_connection_id(),
+            address: self.address.clone(),
+            generation: self.generation,
+            options: self.connection_options.clone(),
+        };
         self.emit_event(|handler| {
             handler.handle_connection_created_event(connection.created_event())
         });
 
-        let establish_result = self.establisher.establish_connection(&mut connection).await;
-
-        if let Err(e) = establish_result {
-            if e.is_authentication_error() {
-                // auth spec requires that the pool be cleared when encountering an auth error
-                // during establishment.
-                self.clear();
-            }
-            return Err(e);
-        }
-
         self.total_connection_count += 1;
-        self.emit_event(|handler| handler.handle_connection_ready_event(connection.ready_event()));
-
-        Ok(connection)
+        connection
     }
 
     /// Close a connection, emit the event for it being closed, and decrement the
@@ -177,6 +158,13 @@ impl ConnectionManager {
     fn close_connection(&mut self, connection: Connection, reason: ConnectionClosedReason) {
         connection.close_and_drop(reason);
         self.total_connection_count -= 1;
+    }
+
+    fn handle_establish_error(&mut self, error: &Error) {
+        self.total_connection_count -= 1;
+        if error.is_authentication_error() {
+            self.clear();
+        }
     }
 }
 
@@ -189,6 +177,10 @@ pub(crate) struct ConnectionPoolInner {
 
     /// The structure used to manage connection creation, closing, storage, and generation.
     connection_manager: Arc<Mutex<ConnectionManager>>,
+
+    /// Contains the logic for "establishing" a connection. This includes handshaking and
+    /// authenticating a connection when it's first created.
+    establisher: ConnectionEstablisher,
 
     /// The event handler specified by the user to process CMAP events.
     #[derivative(Debug = "ignore")]
@@ -220,8 +212,9 @@ impl ConnectionPool {
         options: Option<ConnectionPoolOptions>,
     ) -> Self {
         let connection_manager =
-            ConnectionManager::new(address.clone(), http_client, options.clone());
+            ConnectionManager::new(address.clone(), http_client.clone(), options.clone());
 
+        let establisher = ConnectionEstablisher::new(http_client, options.as_ref());
         let event_handler = options.as_ref().and_then(|opts| opts.event_handler.clone());
 
         // The CMAP spec indicates that a max idle time of zero means that connections should not be
@@ -244,6 +237,7 @@ impl ConnectionPool {
             event_handler,
             max_idle_time,
             min_pool_size,
+            establisher,
             connection_manager: Arc::new(Mutex::new(connection_manager)),
             wait_queue: WaitQueue::new(address.clone(), max_pool_size, wait_queue_timeout),
         };
@@ -315,7 +309,7 @@ impl ConnectionPoolInner {
         } else if conn.is_executing() {
             connection_manager.close_connection(conn, ConnectionClosedReason::Dropped)
         } else {
-            connection_manager.checked_in_connections.push(conn);
+            connection_manager.available_connections.push(conn);
         }
 
         self.wait_queue.wake_front();
@@ -369,17 +363,17 @@ impl ConnectionPoolInner {
         let mut wait_queue_handle = self.wait_queue.wait_until_at_front().await?;
 
         // Try to get the most recent available connection.
-        let mut connection_manager = self.connection_manager.lock().await;
-        while let Some(conn) = connection_manager.checked_in_connections.pop() {
+        let mut connection_manager_lock = self.connection_manager.lock().await;
+        while let Some(conn) = connection_manager_lock.available_connections.pop() {
             // Close the connection if it's stale.
-            if conn.is_stale(connection_manager.generation) {
-                connection_manager.close_connection(conn, ConnectionClosedReason::Stale);
+            if conn.is_stale(connection_manager_lock.generation) {
+                connection_manager_lock.close_connection(conn, ConnectionClosedReason::Stale);
                 continue;
             }
 
             // Close the connection if it's idle.
             if conn.is_idle(self.max_idle_time) {
-                connection_manager.close_connection(conn, ConnectionClosedReason::Idle);
+                connection_manager_lock.close_connection(conn, ConnectionClosedReason::Idle);
                 continue;
             }
 
@@ -389,9 +383,23 @@ impl ConnectionPoolInner {
         }
 
         // There are no connections in the pool, so open a new one.
-        let connection = connection_manager.create_connection().await?;
-        wait_queue_handle.disarm();
-        Ok(connection)
+        let connection = connection_manager_lock.create_connection();
+        // drop the lock while the connection is established to allow other connections to exit the wait queue.
+        drop(connection_manager_lock);
+
+        let establish_result = self.establisher.establish_connection(connection).await;
+        match establish_result {
+            Ok(_) => {
+                wait_queue_handle.disarm();
+            }
+            Err(ref e) => {
+                self.connection_manager
+                    .lock()
+                    .await
+                    .handle_establish_error(e);
+            }
+        };
+        establish_result
     }
 
     async fn clear(&self) {
@@ -410,7 +418,7 @@ impl Drop for ConnectionPoolInner {
 
         RUNTIME.execute(async move {
             let mut connection_manager = connection_manager.lock().await;
-            while let Some(connection) = connection_manager.checked_in_connections.pop() {
+            while let Some(connection) = connection_manager.available_connections.pop() {
                 connection_manager.close_connection(connection, ConnectionClosedReason::PoolClosed);
             }
 

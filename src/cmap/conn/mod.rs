@@ -15,12 +15,8 @@ use crate::{
     cmap::options::{ConnectionOptions, StreamOptions},
     error::{ErrorKind, Result},
     event::cmap::{
-        CmapEventHandler,
-        ConnectionCheckedInEvent,
-        ConnectionCheckedOutEvent,
-        ConnectionClosedEvent,
-        ConnectionClosedReason,
-        ConnectionCreatedEvent,
+        CmapEventHandler, ConnectionCheckedInEvent, ConnectionCheckedOutEvent,
+        ConnectionClosedEvent, ConnectionClosedReason, ConnectionCreatedEvent,
         ConnectionReadyEvent,
     },
     options::{StreamAddress, TlsOptions},
@@ -73,28 +69,31 @@ pub(crate) struct Connection {
 }
 
 impl Connection {
-    /// Constructs a new connection.
-    pub(crate) async fn new(
-        id: u32,
-        address: StreamAddress,
-        generation: u32,
-        options: Option<ConnectionOptions>,
-    ) -> Result<Self> {
+    /// Constructs and connects a new connection.
+    pub(crate) async fn connect(pending_connection: PendingConnection) -> Result<Self> {
         let stream_options = StreamOptions {
-            address: address.clone(),
-            connect_timeout: options.as_ref().and_then(|opts| opts.connect_timeout),
-            tls_options: options.as_ref().and_then(|opts| opts.tls_options.clone()),
+            address: pending_connection.address.clone(),
+            connect_timeout: pending_connection
+                .options
+                .as_ref()
+                .and_then(|opts| opts.connect_timeout),
+            tls_options: pending_connection
+                .options
+                .as_ref()
+                .and_then(|opts| opts.tls_options.clone()),
         };
 
         let conn = Self {
-            id,
-            generation,
+            id: pending_connection.id,
+            generation: pending_connection.generation,
             pool: None,
             command_executing: false,
             ready_and_available_time: None,
             stream: AsyncStream::connect(stream_options).await?,
-            address,
-            handler: options.and_then(|options| options.event_handler),
+            address: pending_connection.address.clone(),
+            handler: pending_connection
+                .options
+                .and_then(|options| options.event_handler),
             stream_description: None,
         };
 
@@ -106,17 +105,17 @@ impl Connection {
         connect_timeout: Option<Duration>,
         tls_options: Option<TlsOptions>,
     ) -> Result<Self> {
-        Self::new(
-            0,
-            address,
-            0,
-            Some(ConnectionOptions {
-                connect_timeout,
-                tls_options,
-                event_handler: None,
-            }),
-        )
-        .await
+        todo!()
+        // Ok(Self::connect(
+        //     0,
+        //     address,
+        //     0,
+        //     Some(ConnectionOptions {
+        //         connect_timeout,
+        //         tls_options,
+        //         event_handler: None,
+        //     }),
+        // ))
     }
 
     pub(crate) fn info(&self) -> ConnectionInfo {
@@ -185,14 +184,6 @@ impl Connection {
     /// Helper to create a `ConnectionReadyEvent` for the connection.
     pub(super) fn ready_event(&self) -> ConnectionReadyEvent {
         ConnectionReadyEvent {
-            address: self.address.clone(),
-            connection_id: self.id,
-        }
-    }
-
-    /// Helper to create a `ConnectionReadyEvent` for the connection.
-    pub(super) fn created_event(&self) -> ConnectionCreatedEvent {
-        ConnectionCreatedEvent {
             address: self.address.clone(),
             connection_id: self.id,
         }
@@ -343,6 +334,24 @@ impl From<DroppedConnectionState> for Connection {
             stream_description: state.stream_description.take(),
             ready_and_available_time: None,
             pool: None,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct PendingConnection {
+    pub(crate) id: u32,
+    pub(crate) address: StreamAddress,
+    pub(crate) generation: u32,
+    pub(crate) options: Option<ConnectionOptions>,
+}
+
+impl PendingConnection {
+    /// Helper to create a `ConnectionCreatedEvent` for the connection.
+    pub(super) fn created_event(&self) -> ConnectionCreatedEvent {
+        ConnectionCreatedEvent {
+            address: self.address.clone(),
+            connection_id: self.id,
         }
     }
 }

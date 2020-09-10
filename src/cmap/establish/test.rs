@@ -41,7 +41,7 @@ async fn speculative_auth_test(
 
     let handshaker = Handshaker::new(Some(&pool_options));
 
-    let mut conn = Connection::new(1, Default::default(), 1, Some(pool_options.into()))
+    let mut conn = Connection::connect(1, Default::default(), 1, Some(pool_options.into()))
         .await
         .unwrap();
 

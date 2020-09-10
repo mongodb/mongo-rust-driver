@@ -34,14 +34,13 @@ impl ConnectionPool {
         let mut connection_manager = self.inner.connection_manager.lock().await;
 
         let mut i = 0;
-        while i < connection_manager.checked_in_connections.len() {
-            if connection_manager.checked_in_connections[i].is_stale(connection_manager.generation)
-            {
-                let connection = connection_manager.checked_in_connections.remove(i);
+        while i < connection_manager.available_connections.len() {
+            if connection_manager.available_connections[i].is_stale(connection_manager.generation) {
+                let connection = connection_manager.available_connections.remove(i);
                 connection_manager.close_connection(connection, ConnectionClosedReason::Stale);
-            } else if connection_manager.checked_in_connections[i].is_idle(self.inner.max_idle_time)
+            } else if connection_manager.available_connections[i].is_idle(self.inner.max_idle_time)
             {
-                let connection = connection_manager.checked_in_connections.remove(i);
+                let connection = connection_manager.available_connections.remove(i);
                 connection_manager.close_connection(connection, ConnectionClosedReason::Idle);
             } else {
                 i += 1;
@@ -58,9 +57,7 @@ impl ConnectionPool {
                 let mut connection_manager = self.inner.connection_manager.lock().await;
                 if connection_manager.total_connection_count < min_pool_size {
                     match connection_manager.create_connection().await {
-                        Ok(connection) => {
-                            connection_manager.checked_in_connections.push(connection)
-                        }
+                        Ok(connection) => connection_manager.available_connections.push(connection),
                         Err(_) => {
                             // Since we encountered an error, we return early from this function and
                             // put the background thread back to sleep. Next time it wakes up, any
