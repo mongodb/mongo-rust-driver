@@ -1,12 +1,9 @@
 use crate::{bson::Bson, test::util::EventClient, Collection, Database};
 
-#[allow(dead_code)]
 pub enum Entity {
     Client(EventClient),
     Database(Database),
     Collection(Collection),
-    Session,
-    Bucket,
     Result(Option<Bson>),
 }
 

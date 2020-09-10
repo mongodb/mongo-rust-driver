@@ -223,7 +223,7 @@ async fn populate_entity_map(
         match entity {
             TestFileEntity::Client(client) => {
                 let id = client.id.clone();
-                let client = EventClient::unified_with_additional_options(
+                let client = EventClient::with_additional_and_mongos_options(
                     client.uri_options.clone(),
                     client.use_multiple_mongoses,
                 )

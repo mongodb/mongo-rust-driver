@@ -164,7 +164,7 @@ impl EventClient {
         EventClient::with_options(options).await
     }
 
-    pub async fn unified_with_additional_options(
+    pub async fn with_additional_and_mongos_options(
         options: Option<ClientOptions>,
         use_multiple_mongoses: Option<bool>,
     ) -> Self {

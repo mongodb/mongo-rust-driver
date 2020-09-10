@@ -25,11 +25,13 @@ pub fn results_match(actual: Option<&Bson>, expected: &Bson) -> bool {
             if expected_array.len() != actual_array.len() {
                 return false;
             }
-            for i in 0..expected_array.len() {
-                if !results_match(Some(&actual_array[i]), &expected_array[i]) {
+
+            for (actual, expected) in actual_array.iter().zip(expected_array) {
+                if !results_match(Some(actual), expected) {
                     return false;
                 }
             }
+
             true
         }
         _ => match actual {
