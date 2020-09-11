@@ -72,10 +72,10 @@ pub(crate) struct Connection {
 }
 
 impl Connection {
-    async fn new(
+    pub(super) async fn new(
         id: u32,
-        generation: u32,
         address: StreamAddress,
+        generation: u32,
         options: Option<ConnectionOptions>,
     ) -> Result<Self> {
         let stream_options = StreamOptions {
@@ -103,8 +103,8 @@ impl Connection {
     pub(super) async fn connect(pending_connection: PendingConnection) -> Result<Self> {
         Self::new(
             pending_connection.id,
-            pending_connection.generation,
             pending_connection.address.clone(),
+            pending_connection.generation,
             pending_connection.options,
         )
         .await
@@ -118,8 +118,8 @@ impl Connection {
     ) -> Result<Self> {
         Self::new(
             0,
-            0,
             address,
+            0,
             Some(ConnectionOptions {
                 connect_timeout,
                 tls_options,

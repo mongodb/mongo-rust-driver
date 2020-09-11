@@ -209,7 +209,7 @@ impl Operation {
                 }
                 Operation::Clear => {
                     if let Some(pool) = state.pool.write().await.deref() {
-                        pool.clear().await;
+                        pool.clear();
                     }
                 }
                 Operation::Close => {
