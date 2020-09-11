@@ -1,4 +1,7 @@
-use std::{sync::Weak, time::Duration};
+use std::{
+    sync::{atomic::Ordering, Weak},
+    time::Duration,
+};
 
 use super::{ConnectionPool, ConnectionPoolInner};
 use crate::{event::cmap::ConnectionClosedReason, RUNTIME};
@@ -24,24 +27,24 @@ pub(crate) fn start_background_task(pool: Weak<ConnectionPoolInner>) {
 async fn perform_checks(pool: ConnectionPool) {
     // We remove the perished connections first to ensure that the number of connections does not
     // dip under the min pool size due to the removals.
-    pool.remove_perished_connections().await;
-    pool.ensure_min_connections().await;
+    pool.inner.remove_perished_connections().await;
+    pool.inner.ensure_min_connections().await;
 }
 
-impl ConnectionPool {
+impl ConnectionPoolInner {
     /// Iterate over the connections and remove any that are stale or idle.
     async fn remove_perished_connections(&self) {
-        let mut connection_manager = self.inner.connection_manager.lock().await;
+        let mut available_connections = self.available_connections.lock().await;
 
         let mut i = 0;
-        while i < connection_manager.available_connections.len() {
-            if connection_manager.available_connections[i].is_stale(connection_manager.generation) {
-                let connection = connection_manager.available_connections.remove(i);
-                connection_manager.close_connection(connection, ConnectionClosedReason::Stale);
-            } else if connection_manager.available_connections[i].is_idle(self.inner.max_idle_time)
-            {
-                let connection = connection_manager.available_connections.remove(i);
-                connection_manager.close_connection(connection, ConnectionClosedReason::Idle);
+        while i < available_connections.len() {
+            let connection = &available_connections[i];
+            if connection.is_stale(self.generation.load(Ordering::SeqCst)) {
+                let connection = available_connections.remove(i);
+                self.close_connection(connection, ConnectionClosedReason::Stale);
+            } else if connection.is_idle(self.max_idle_time) {
+                let connection = available_connections.remove(i);
+                self.close_connection(connection, ConnectionClosedReason::Idle);
             } else {
                 i += 1;
             }
@@ -52,12 +55,29 @@ impl ConnectionPool {
     /// each iteration and acquire it again during the next one to ensure that the this method
     /// doesn't block other threads from acquiring connections.
     async fn ensure_min_connections(&self) {
-        if let Some(min_pool_size) = self.inner.min_pool_size {
+        if let Some(min_pool_size) = self.min_pool_size {
             loop {
-                let mut connection_manager = self.inner.connection_manager.lock().await;
-                if connection_manager.total_connection_count < min_pool_size {
-                    match connection_manager.create_connection().await {
-                        Ok(connection) => connection_manager.available_connections.push(connection),
+                if self.total_connection_count.load(Ordering::SeqCst) < min_pool_size {
+                    // Reserve a spot via the wait queue. This will prevent too many threads from
+                    // concurrently creating connections such that max_pool_size is exceeded.
+                    let _wait_queue_handle = match self.wait_queue.try_skip_queue() {
+                        None => {
+                            // This branch is rarely taken because it was just verified that
+                            // total_connection_count < min_pool_size, and min_pool_size <= max_pool_size.
+                            // A connection could have been created by an operation thread between the check
+                            // and the attempt to reserve a spot, in which case we just return early because
+                            // total_connection_count == max_pool_size.
+                            return;
+                        }
+                        Some(handle) => handle,
+                    };
+
+                    let connection = self.create_pending_connection();
+                    match self.establish_connection(connection).await {
+                        Ok(connection) => {
+                            let mut available_connections = self.available_connections.lock().await;
+                            available_connections.push(connection)
+                        }
                         Err(_) => {
                             // Since we encountered an error, we return early from this function and
                             // put the background thread back to sleep. Next time it wakes up, any

@@ -3,16 +3,8 @@ mod handshake;
 mod test;
 
 use self::handshake::Handshaker;
-use super::{
-    conn::PendingConnection,
-    options::{ConnectionPoolOptions, StreamOptions},
-    Connection,
-};
-use crate::{
-    client::auth::Credential,
-    error::Result,
-    runtime::{AsyncStream, HttpClient},
-};
+use super::{conn::PendingConnection, options::ConnectionPoolOptions, Connection};
+use crate::{client::auth::Credential, error::Result, runtime::HttpClient};
 
 /// Contains the logic to establish a connection, including handshaking, authenticating, and
 /// potentially more.

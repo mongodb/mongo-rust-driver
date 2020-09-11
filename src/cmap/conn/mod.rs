@@ -17,7 +17,6 @@ use crate::{
     event::cmap::{
         CmapEventHandler, ConnectionCheckedInEvent, ConnectionCheckedOutEvent,
         ConnectionClosedEvent, ConnectionClosedReason, ConnectionCreatedEvent,
-        ConnectionReadyEvent,
     },
     options::{StreamAddress, TlsOptions},
     runtime::AsyncStream,
@@ -69,53 +68,61 @@ pub(crate) struct Connection {
 }
 
 impl Connection {
-    /// Constructs and connects a new connection.
-    pub(crate) async fn connect(pending_connection: PendingConnection) -> Result<Self> {
+    async fn new(
+        id: u32,
+        generation: u32,
+        address: StreamAddress,
+        options: Option<ConnectionOptions>,
+    ) -> Result<Self> {
         let stream_options = StreamOptions {
-            address: pending_connection.address.clone(),
-            connect_timeout: pending_connection
-                .options
-                .as_ref()
-                .and_then(|opts| opts.connect_timeout),
-            tls_options: pending_connection
-                .options
-                .as_ref()
-                .and_then(|opts| opts.tls_options.clone()),
+            address: address.clone(),
+            connect_timeout: options.as_ref().and_then(|opts| opts.connect_timeout),
+            tls_options: options.as_ref().and_then(|opts| opts.tls_options.clone()),
         };
 
         let conn = Self {
-            id: pending_connection.id,
-            generation: pending_connection.generation,
+            id,
+            generation,
             pool: None,
             command_executing: false,
             ready_and_available_time: None,
             stream: AsyncStream::connect(stream_options).await?,
-            address: pending_connection.address.clone(),
-            handler: pending_connection
-                .options
-                .and_then(|options| options.event_handler),
+            address: address.clone(),
+            handler: options.and_then(|options| options.event_handler),
             stream_description: None,
         };
 
         Ok(conn)
     }
 
-    pub(crate) async fn new_monitoring(
+    /// Constructs and connects a new connection.
+    pub(super) async fn connect(pending_connection: PendingConnection) -> Result<Self> {
+        Self::new(
+            pending_connection.id,
+            pending_connection.generation,
+            pending_connection.address.clone(),
+            pending_connection.options,
+        )
+        .await
+    }
+
+    /// Construct and connect a new connection used for monitoring.
+    pub(crate) async fn connect_monitoring(
         address: StreamAddress,
         connect_timeout: Option<Duration>,
         tls_options: Option<TlsOptions>,
     ) -> Result<Self> {
-        todo!()
-        // Ok(Self::connect(
-        //     0,
-        //     address,
-        //     0,
-        //     Some(ConnectionOptions {
-        //         connect_timeout,
-        //         tls_options,
-        //         event_handler: None,
-        //     }),
-        // ))
+        Self::new(
+            0,
+            0,
+            address,
+            Some(ConnectionOptions {
+                connect_timeout,
+                tls_options,
+                event_handler: None,
+            }),
+        )
+        .await
     }
 
     pub(crate) fn info(&self) -> ConnectionInfo {
@@ -176,14 +183,6 @@ impl Connection {
     /// Helper to create a `ConnectionCheckedInEvent` for the connection.
     pub(super) fn checked_in_event(&self) -> ConnectionCheckedInEvent {
         ConnectionCheckedInEvent {
-            address: self.address.clone(),
-            connection_id: self.id,
-        }
-    }
-
-    /// Helper to create a `ConnectionReadyEvent` for the connection.
-    pub(super) fn ready_event(&self) -> ConnectionReadyEvent {
-        ConnectionReadyEvent {
             address: self.address.clone(),
             connection_id: self.id,
         }
@@ -339,7 +338,7 @@ impl From<DroppedConnectionState> for Connection {
 }
 
 #[derive(Debug)]
-pub(crate) struct PendingConnection {
+pub(super) struct PendingConnection {
     pub(crate) id: u32,
     pub(crate) address: StreamAddress,
     pub(crate) generation: u32,
