@@ -4,7 +4,8 @@ use std::{
     collections::{HashMap, HashSet},
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Weak,
+        Arc,
+        Weak,
     },
     time::Duration,
 };

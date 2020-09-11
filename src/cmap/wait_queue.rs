@@ -49,8 +49,9 @@ impl WaitQueue {
         }
     }
 
-    /// Attempt to skip the queue and reserve a spot immediately. If there is a queue, then this will fail and
-    /// return None. If there is no queue, this will succeed immediately without blocking.
+    /// Attempt to skip the queue and reserve a spot immediately. If there is a queue, then this
+    /// will fail and return None. If there is no queue, this will succeed immediately without
+    /// blocking.
     pub(super) fn try_skip_queue(&self) -> Option<WaitQueueHandle<'_>> {
         self.semaphore
             .try_acquire(1)

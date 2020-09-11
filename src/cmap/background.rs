@@ -62,11 +62,12 @@ impl ConnectionPoolInner {
                     // concurrently creating connections such that max_pool_size is exceeded.
                     let _wait_queue_handle = match self.wait_queue.try_skip_queue() {
                         None => {
-                            // This branch is rarely taken because it was just verified that
-                            // total_connection_count < min_pool_size, and min_pool_size <= max_pool_size.
-                            // A connection could have been created by an operation thread between the check
-                            // and the attempt to reserve a spot, in which case we just return early because
-                            // total_connection_count == max_pool_size.
+                            // This branch is rarely taken because we just verified that
+                            // total_connection_count < min_pool_size, which implies min_pool_size
+                            // <= max_pool_size. A connection could have been created by an
+                            // operation thread between the check and the attempt to reserve a spot,
+                            // in which case we just return early because total_connection_count ==
+                            // max_pool_size.
                             return;
                         }
                         Some(handle) => handle,

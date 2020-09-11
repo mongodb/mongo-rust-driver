@@ -8,8 +8,10 @@ pub(crate) mod options;
 mod wait_queue;
 
 use std::{
-    sync::atomic::{AtomicU32, Ordering},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
     time::Duration,
 };
 
@@ -26,8 +28,13 @@ use self::{
 use crate::{
     error::{ErrorKind, Result},
     event::cmap::{
-        CmapEventHandler, ConnectionCheckoutFailedEvent, ConnectionCheckoutFailedReason,
-        ConnectionCheckoutStartedEvent, ConnectionClosedReason, PoolClosedEvent, PoolCreatedEvent,
+        CmapEventHandler,
+        ConnectionCheckoutFailedEvent,
+        ConnectionCheckoutFailedReason,
+        ConnectionCheckoutStartedEvent,
+        ConnectionClosedReason,
+        PoolClosedEvent,
+        PoolCreatedEvent,
     },
     options::StreamAddress,
     runtime::HttpClient,
@@ -285,7 +292,8 @@ impl ConnectionPoolInner {
             return Ok(conn);
         }
 
-        // drop the lock before we create a new connection to allow other connections to stop waiting.
+        // drop the lock before we create a new connection to allow other connections to stop
+        // waiting.
         drop(available_connections_lock);
 
         // There are no connections in the pool, so open a new one.
@@ -297,8 +305,8 @@ impl ConnectionPoolInner {
         establish_result
     }
 
-    /// Create a connection that has not been established, incrementing the total connection count and emitting the
-    /// appropriate events. This method performs no I/O.
+    /// Create a connection that has not been established, incrementing the total connection count
+    /// and emitting the appropriate events. This method performs no I/O.
     fn create_pending_connection(&self) -> PendingConnection {
         self.total_connection_count.fetch_add(1, Ordering::SeqCst);
 
@@ -315,7 +323,8 @@ impl ConnectionPoolInner {
         connection
     }
 
-    /// Connect and handshake the given pending connection, returning an error if establishment was unsuccessful.
+    /// Connect and handshake the given pending connection, returning an error if establishment was
+    /// unsuccessful.
     async fn establish_connection(
         &self,
         pending_connection: PendingConnection,
@@ -330,7 +339,8 @@ impl ConnectionPoolInner {
                 // auth spec requires pool is cleared after encountering auth error.
                 self.clear();
             }
-            // Establishing a pending connection failed, so that must be reflected in to total connection count.
+            // Establishing a pending connection failed, so that must be reflected in to total
+            // connection count.
             self.total_connection_count.fetch_sub(1, Ordering::SeqCst);
         }
 
