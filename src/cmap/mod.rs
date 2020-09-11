@@ -33,6 +33,7 @@ use crate::{
         ConnectionCheckoutFailedReason,
         ConnectionCheckoutStartedEvent,
         ConnectionClosedReason,
+        PoolClearedEvent,
         PoolClosedEvent,
         PoolCreatedEvent,
     },
@@ -145,7 +146,7 @@ impl ConnectionPool {
             min_pool_size,
             establisher,
             wait_queue: WaitQueue::new(address.clone(), max_pool_size, wait_queue_timeout),
-            next_connection_id: AtomicU32::new(0),
+            next_connection_id: AtomicU32::new(1),
             total_connection_count: AtomicU32::new(0),
             generation: AtomicU32::new(0),
             connection_options,
@@ -356,6 +357,13 @@ impl ConnectionPoolInner {
 
     fn clear(&self) {
         self.generation.fetch_add(1, Ordering::SeqCst);
+        self.emit_event(|handler| {
+            let event = PoolClearedEvent {
+                address: self.address.clone(),
+            };
+
+            handler.handle_pool_cleared_event(event);
+        });
     }
 }
 
