@@ -91,7 +91,7 @@ impl Connection {
             command_executing: false,
             ready_and_available_time: None,
             stream: AsyncStream::connect(stream_options).await?,
-            address: address.clone(),
+            address,
             handler: options.and_then(|options| options.event_handler),
             stream_description: None,
         };
