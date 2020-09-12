@@ -351,12 +351,17 @@ impl From<DroppedConnectionState> for Connection {
     }
 }
 
+/// Struct encapsulating the information needed to establish a `Connection`.
+///
+/// Creating a `PendingConnection` contributes towards the total connection count of a pool, despite
+/// not actually making a TCP connection to the pool's endpoint. This models a "pending" Connection
+/// from the CMAP specification.
 #[derive(Debug)]
 pub(super) struct PendingConnection {
-    pub(crate) id: u32,
-    pub(crate) address: StreamAddress,
-    pub(crate) generation: u32,
-    pub(crate) options: Option<ConnectionOptions>,
+    pub(super) id: u32,
+    pub(super) address: StreamAddress,
+    pub(super) generation: u32,
+    pub(super) options: Option<ConnectionOptions>,
 }
 
 impl PendingConnection {
