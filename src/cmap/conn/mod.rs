@@ -72,7 +72,7 @@ pub(crate) struct Connection {
 }
 
 impl Connection {
-    pub(super) async fn new(
+    async fn new(
         id: u32,
         address: StreamAddress,
         generation: u32,
@@ -127,6 +127,16 @@ impl Connection {
             }),
         )
         .await
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn new_testing(
+        id: u32,
+        address: StreamAddress,
+        generation: u32,
+        options: Option<ConnectionOptions>,
+    ) -> Result<Self> {
+        Self::new(id, address, generation, options).await
     }
 
     pub(crate) fn info(&self) -> ConnectionInfo {
