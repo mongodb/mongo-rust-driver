@@ -76,8 +76,9 @@ impl ConnectionPoolInner {
 
                     let connection = self.create_pending_connection();
                     match self.establish_connection(connection).await {
-                        Ok(connection) => {
+                        Ok(mut connection) => {
                             let mut available_connections = self.available_connections.lock().await;
+                            connection.mark_as_available();
                             available_connections.push(connection)
                         }
                         Err(_) => {

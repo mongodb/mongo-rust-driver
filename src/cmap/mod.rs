@@ -173,7 +173,7 @@ impl ConnectionPool {
     /// blocks for longer than `wait_queue_timeout`, a `WaitQueueTimeoutError` will be returned.
     pub(crate) async fn check_out(&self) -> Result<Connection> {
         let mut conn = self.inner.check_out().await?;
-        conn.mark_checked_out(Arc::downgrade(&self.inner));
+        conn.mark_as_in_use(Arc::downgrade(&self.inner));
         Ok(conn)
     }
 
@@ -210,7 +210,7 @@ impl ConnectionPoolInner {
             handler.handle_connection_checked_in_event(conn.checked_in_event());
         });
 
-        conn.mark_checked_in();
+        conn.mark_as_available();
 
         let mut available_connections = self.available_connections.lock().await;
 
