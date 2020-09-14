@@ -21,7 +21,7 @@ use crate::{
         ReadPreference,
         SelectionCriteria,
     },
-    test::{run_spec_test, util::EventClient, TestClient, LOCK},
+    test::{assert_matches, run_spec_test, util::EventClient, TestClient, LOCK},
 };
 
 pub use self::{
@@ -174,8 +174,27 @@ pub async fn run_unified_format_test(test_file: TestFile) {
             }
         }
 
-        if let Some(_expect_events) = test_case.expect_events {
-            // TODO implement the spec for command monitoring
+        if let Some(ref events) = test_case.expect_events {
+            for expected in events {
+                let entity = entities.get(&expected.client).unwrap();
+                let client = entity.as_client();
+                let observe_events = entity.get_observe_events();
+                let ignore_events = entity.get_ignore_events();
+
+                let actual_events: Vec<TestEvent> = client
+                    .get_filtered_events(observe_events, ignore_events)
+                    .into_iter()
+                    .map(Into::into)
+                    .collect();
+
+                let expected_events = &expected.events;
+
+                assert_eq!(actual_events.len(), expected_events.len());
+
+                for (actual, expected) in actual_events.iter().zip(expected_events) {
+                    assert_matches(actual, expected, None);
+                }
+            }
         }
 
         // Disable any fail points that were set when running the operations.
@@ -187,7 +206,7 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                 .unwrap();
         }
 
-        if let Some(outcome) = test_case.outcome {
+        if let Some(ref outcome) = test_case.outcome {
             for expected_data in outcome {
                 let db_name = &expected_data.database_name;
                 let coll_name = &expected_data.collection_name;
@@ -224,12 +243,17 @@ async fn populate_entity_map(
         match entity {
             TestFileEntity::Client(client) => {
                 let id = client.id.clone();
+                let observe_events = client.observe_events.clone();
+                let ignore_events = client.ignore_command_monitoring_events.clone();
                 let client = EventClient::with_additional_and_mongos_options(
                     client.uri_options.clone(),
                     client.use_multiple_mongoses,
                 )
                 .await;
-                entities.insert(id, client.into());
+                entities.insert(
+                    id,
+                    Entity::from_client(client, observe_events, ignore_events),
+                );
             }
             TestFileEntity::Database(database) => {
                 let id = database.id.clone();

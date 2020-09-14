@@ -1,17 +1,17 @@
 use crate::{bson::Bson, test::util::EventClient, Collection, Database};
 
 pub enum Entity {
-    Client(EventClient),
+    Client(Client),
     Database(Database),
     Collection(Collection),
     Result(Bson),
     None,
 }
 
-impl From<EventClient> for Entity {
-    fn from(client: EventClient) -> Self {
-        Self::Client(client)
-    }
+pub struct Client {
+    client: EventClient,
+    observe_events: Option<Vec<String>>,
+    ignore_events: Option<Vec<String>>,
 }
 
 impl From<Database> for Entity {
@@ -36,9 +36,35 @@ impl From<Option<Bson>> for Entity {
 }
 
 impl Entity {
+    pub fn from_client(
+        client: EventClient,
+        observe_events: Option<Vec<String>>,
+        ignore_events: Option<Vec<String>>,
+    ) -> Self {
+        Self::Client(Client {
+            client,
+            observe_events,
+            ignore_events,
+        })
+    }
+
     pub fn as_client(&self) -> &EventClient {
         match self {
-            Self::Client(event_client) => event_client,
+            Self::Client(client) => &client.client,
+            _ => panic!("Entity not a client"),
+        }
+    }
+
+    pub fn get_observe_events(&self) -> &Option<Vec<String>> {
+        match self {
+            Self::Client(client) => &client.observe_events,
+            _ => panic!("Entity not a client"),
+        }
+    }
+
+    pub fn get_ignore_events(&self) -> &Option<Vec<String>> {
+        match self {
+            Self::Client(client) => &client.ignore_events,
             _ => panic!("Entity not a client"),
         }
     }

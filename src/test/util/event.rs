@@ -257,6 +257,44 @@ impl EventClient {
             })
             .collect()
     }
+
+    pub fn get_filtered_events(
+        &self,
+        observe_events: &Option<Vec<String>>,
+        ignore_events: &Option<Vec<String>>,
+    ) -> Vec<CommandEvent> {
+        let events = self.command_events.read().unwrap();
+        events
+            .iter()
+            .cloned()
+            .filter(|event| {
+                if let Some(observe_events) = observe_events {
+                    if !observe_events.iter().any(|name| match event {
+                        CommandEvent::CommandStartedEvent(_) => {
+                            name.as_str() == "commandStartedEvent"
+                        }
+                        CommandEvent::CommandSucceededEvent(_) => {
+                            name.as_str() == "commandSucceededEvent"
+                        }
+                        CommandEvent::CommandFailedEvent(_) => {
+                            name.as_str() == "commandFailedEvent"
+                        }
+                    }) {
+                        return false;
+                    }
+                }
+                if let Some(ignore_events) = ignore_events {
+                    if ignore_events
+                        .iter()
+                        .any(|name| event.command_name() == name)
+                    {
+                        return false;
+                    }
+                }
+                true
+            })
+            .collect()
+    }
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
