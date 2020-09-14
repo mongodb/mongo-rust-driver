@@ -5,6 +5,7 @@ use std::convert::Into;
 
 use semver::VersionReq;
 use serde::Deserialize;
+use tokio::sync::RwLockWriteGuard;
 
 use self::{event::TestEvent, operation::*};
 use crate::{
@@ -33,7 +34,7 @@ struct TestCase {
 }
 
 async fn run_command_monitoring_test(test_file: TestFile) {
-    let _guard = LOCK.run_exclusively().await;
+    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
     let client = TestClient::new().await;
 

@@ -4,6 +4,8 @@ use std::{
     time::Duration,
 };
 
+use tokio::sync::RwLockReadGuard;
+
 use super::TestClient;
 use crate::{
     bson::doc,
@@ -236,7 +238,7 @@ impl EventClient {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn command_started_event_count() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = EventClient::new().await;
     let coll = client.database("foo").collection("bar");

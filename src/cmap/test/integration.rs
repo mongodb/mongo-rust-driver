@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::doc,
@@ -20,7 +21,7 @@ struct DatabaseEntry {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn acquire_connection_and_send_command() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client_options = CLIENT_OPTIONS.clone();
     let pool_options = ConnectionPoolOptions::from_client_options(&client_options);

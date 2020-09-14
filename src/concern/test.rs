@@ -1,4 +1,5 @@
 use std::time::Duration;
+use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, Bson},
@@ -91,7 +92,7 @@ fn write_concern_deserialize() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn inconsistent_write_concern_rejected() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let db = client.database(function_name!());
@@ -126,7 +127,7 @@ async fn inconsistent_write_concern_rejected() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn unacknowledged_write_concern_rejected() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let db = client.database(function_name!());

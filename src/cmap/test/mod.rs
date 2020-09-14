@@ -6,7 +6,7 @@ use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 
 use futures::future::{BoxFuture, FutureExt};
 
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, RwLockReadGuard};
 
 use self::{
     event::{Event, EventHandler},
@@ -295,7 +295,7 @@ async fn cmap_spec_tests() {
             return;
         }
 
-        let _guard = LOCK.run_concurrently().await;
+        let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
         let executor = Executor::new(test_file);
         executor.execute_test().await;

@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use futures::{future::Either, StreamExt};
+use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::doc,
@@ -13,7 +14,7 @@ use crate::{
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn tailable_cursor() {
-    let _guard = LOCK.run_concurrently().await;
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
     let coll = client
