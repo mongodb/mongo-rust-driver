@@ -92,9 +92,9 @@ async fn concurrent_connections() {
         .expect("failpoint should succeed");
 
     let handler = Arc::new(EventHandler::new());
-    let options = ConnectionPoolOptions::builder()
-        .event_handler(handler.clone() as Arc<dyn crate::cmap::CmapEventHandler>)
-        .build();
+    let client_options = CLIENT_OPTIONS.clone();
+    let mut options = ConnectionPoolOptions::from_client_options(&client_options);
+    options.event_handler = Some(handler.clone() as Arc<dyn crate::cmap::CmapEventHandler>);
     let pool = ConnectionPool::new(
         CLIENT_OPTIONS.hosts[0].clone(),
         Default::default(),
