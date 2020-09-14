@@ -10,6 +10,7 @@ use crate::{
     test::{TestClient, CLIENT_OPTIONS, LOCK},
     RUNTIME,
 };
+use semver::VersionReq;
 use std::sync::Arc;
 
 #[derive(Debug, Deserialize)]
@@ -68,13 +69,22 @@ async fn acquire_connection_and_send_command() {
 async fn concurrent_connections() {
     let _guard = LOCK.run_exclusively().await;
 
+    let client = TestClient::new().await;
+    let version = VersionReq::parse(">= 4.2.9").unwrap();
+    // blockConnection failpoint option only added in 4.4.
+    if !version.matches(&client.server_version) {
+        println!(
+            "skipping concurrent_connections test due to server not supporting failpoint option"
+        );
+        return;
+    }
+
     // stall creating connections for a while
     let failpoint = doc! {
         "configureFailPoint": "failCommand",
         "mode": "alwaysOn",
         "data": { "failCommands": [ "isMaster" ], "blockConnection": true, "blockTimeMS": 1000 }
     };
-    let client = TestClient::new().await;
     client
         .database("admin")
         .run_command(failpoint, None)
