@@ -335,14 +335,21 @@ impl ConnectionPoolInner {
             .establish_connection(pending_connection)
             .await;
 
-        if let Err(ref e) = establish_result {
-            if e.is_authentication_error() {
-                // auth spec requires pool is cleared after encountering auth error.
-                self.clear();
+        match establish_result {
+            Err(ref e) => {
+                if e.is_authentication_error() {
+                    // auth spec requires pool is cleared after encountering auth error.
+                    self.clear();
+                }
+                // Establishing a pending connection failed, so that must be reflected in to total
+                // connection count.
+                self.total_connection_count.fetch_sub(1, Ordering::SeqCst);
             }
-            // Establishing a pending connection failed, so that must be reflected in to total
-            // connection count.
-            self.total_connection_count.fetch_sub(1, Ordering::SeqCst);
+            Ok(ref connection) => {
+                self.emit_event(|handler| {
+                    handler.handle_connection_ready_event(connection.ready_event())
+                });
+            }
         }
 
         establish_result

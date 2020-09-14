@@ -21,6 +21,7 @@ use crate::{
         ConnectionClosedEvent,
         ConnectionClosedReason,
         ConnectionCreatedEvent,
+        ConnectionReadyEvent,
     },
     options::{StreamAddress, TlsOptions},
     runtime::AsyncStream,
@@ -203,6 +204,14 @@ impl Connection {
     }
 
     /// Helper to create a `ConnectionReadyEvent` for the connection.
+    pub(super) fn ready_event(&self) -> ConnectionReadyEvent {
+        ConnectionReadyEvent {
+            address: self.address.clone(),
+            connection_id: self.id,
+        }
+    }
+
+    /// Helper to create a `ConnectionClosedEvent` for the connection.
     pub(super) fn closed_event(&self, reason: ConnectionClosedReason) -> ConnectionClosedEvent {
         ConnectionClosedEvent {
             address: self.address.clone(),
