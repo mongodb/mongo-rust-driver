@@ -86,20 +86,6 @@ fn type_matches(types: &Bson, actual: &Bson) -> bool {
             "maxKey" => actual.element_type() == ElementType::MaxKey,
             other => panic!("unrecognized type: {}", other),
         },
-        Bson::Int32(n) => {
-            let n = *n;
-            // -1 cannot be converted to a u8
-            if n == -1 {
-                return actual.element_type() == ElementType::MinKey;
-            }
-            if n < 0 || n > u8::MAX as i32 {
-                panic!("unrecognized type: {}", n);
-            }
-            match ElementType::from(n as u8) {
-                Some(element_type) => element_type == actual.element_type(),
-                None => panic!("unrecognized type: {}", n),
-            }
-        }
         other => panic!("unrecognized type: {}", other),
     }
 }
@@ -184,20 +170,6 @@ async fn special_operators() {
     let actual = doc! { "x": 1 };
     let expected = doc! { "x": { "$$type": [ "int", "long" ] } };
     assert!(results_match(
-        Some(&Bson::Document(actual)),
-        &Bson::Document(expected)
-    ));
-
-    let actual = doc! { "x": 1 };
-    let expected = doc! { "x": { "$$type": 16 } };
-    assert!(results_match(
-        Some(&Bson::Document(actual)),
-        &Bson::Document(expected)
-    ));
-
-    let actual = doc! { "x": "one" };
-    let expected = doc! { "x": { "$$type": 16 } };
-    assert!(!results_match(
         Some(&Bson::Document(actual)),
         &Bson::Document(expected)
     ));
