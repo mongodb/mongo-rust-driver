@@ -385,7 +385,7 @@ impl Drop for ConnectionPoolInner {
         let event_handler = self.event_handler.clone();
 
         RUNTIME.execute(async move {
-            // this lock attempt will always succeed.
+            // this lock attempt will always immediately succeed.
             let mut available_connections = available_connections.lock().await;
             while let Some(connection) = available_connections.pop() {
                 connection.close_and_drop(ConnectionClosedReason::PoolClosed);
