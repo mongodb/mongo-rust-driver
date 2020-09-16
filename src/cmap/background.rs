@@ -34,19 +34,39 @@ async fn perform_checks(pool: ConnectionPool) {
 impl ConnectionPoolInner {
     /// Iterate over the connections and remove any that are stale or idle.
     async fn remove_perished_connections(&self) {
-        let mut available_connections = self.available_connections.lock().await;
+        // re-acquire the lock between loop iterations to allow other threads to use the pool.
+        loop {
+            let mut available_connections = self.available_connections.lock().await;
 
-        let mut i = 0;
-        while i < available_connections.len() {
-            let connection = &available_connections[i];
-            if connection.is_stale(self.generation.load(Ordering::SeqCst)) {
-                let connection = available_connections.remove(i);
-                self.close_connection(connection, ConnectionClosedReason::Stale);
+            if available_connections.len() == 0 {
+                break;
+            }
+
+            let connection = &available_connections[0];
+
+            let close_request = if connection.is_stale(self.generation.load(Ordering::SeqCst)) {
+                Some((
+                    available_connections.remove(0),
+                    ConnectionClosedReason::Stale,
+                ))
             } else if connection.is_idle(self.max_idle_time) {
-                let connection = available_connections.remove(i);
-                self.close_connection(connection, ConnectionClosedReason::Idle);
+                Some((
+                    available_connections.remove(0),
+                    ConnectionClosedReason::Idle,
+                ))
             } else {
-                i += 1;
+                None
+            };
+
+            // Drop the lock while we process closing the connection.
+            drop(available_connections);
+            match close_request {
+                Some((connection, close_reason)) => {
+                    self.close_connection(connection, close_reason);
+                }
+                // All subsequent connections are either not idle or not stale since they were
+                // checked into the pool later, so we can just quit early.
+                None => break,
             }
         }
     }
