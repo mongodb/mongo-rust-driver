@@ -52,13 +52,12 @@ async fn run() {
             }
         }
 
-        let config = if cfg!(target_os = "windows") {
-            Some(ResolverConfig::cloudflare())
+        let result = if cfg!(target_os = "windows") {
+            ClientOptions::parse_with_resolver_config(&test_file.uri, ResolverConfig::cloudflare())
+                .await
         } else {
-            None
+            ClientOptions::parse(&test_file.uri).await
         };
-
-        let result = ClientOptions::parse_uri(&test_file.uri, config).await;
 
         if let Some(true) = test_file.error {
             assert!(matches!(result, Err(_)), test_file.comment.unwrap());

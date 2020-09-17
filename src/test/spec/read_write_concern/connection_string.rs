@@ -31,7 +31,7 @@ fn normalize_write_concern_doc(mut write_concern_doc: Document) -> Document {
 
 async fn run_connection_string_test(test_file: TestFile) {
     for test_case in test_file.tests {
-        match ClientOptions::parse_uri(&test_case.uri, None).await {
+        match ClientOptions::parse(&test_case.uri).await {
             Ok(options) => {
                 assert!(test_case.valid);
 
