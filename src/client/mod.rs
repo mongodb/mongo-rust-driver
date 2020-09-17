@@ -293,7 +293,7 @@ impl Client {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "sync")))]
     pub(crate) async fn get_hosts(&self) -> Vec<String> {
         let servers = self.inner.topology.servers().await;
         servers

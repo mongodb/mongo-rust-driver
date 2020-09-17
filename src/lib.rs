@@ -121,7 +121,7 @@ define_if_single_runtime_enabled! {
     #[cfg(any(feature = "sync", docsrs))]
     #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
     pub mod sync;
-    #[cfg(all(test, not(feature = "sync")))]
+    #[cfg(test)]
     mod test;
 
     #[cfg(test)]

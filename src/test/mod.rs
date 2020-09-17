@@ -1,3 +1,4 @@
+#[cfg(not(feature = "sync"))]
 mod atlas_connectivity;
 mod auth_aws;
 mod client;
