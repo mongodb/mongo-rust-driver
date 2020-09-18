@@ -49,9 +49,20 @@ where
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunOnRequirement {
-    pub min_server_version: Option<String>,
-    pub max_server_version: Option<String>,
-    pub topology: Option<Vec<String>>,
+    min_server_version: Option<String>,
+    max_server_version: Option<String>,
+    topology: Option<Vec<Topology>>,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+#[serde(untagged)]
+pub enum Topology {
+    Single,
+    ReplicaSet,
+    Sharded,
+    #[serde(rename = "sharded-replicaset")]
+    ShardedReplicaSet,
 }
 
 impl RunOnRequirement {
@@ -248,7 +259,7 @@ impl ExpectError {
             }
         }
         if self.expected_result.is_some() {
-            panic!("Bulk write not implemented");
+            // TODO RUST-260: match against partial results
         }
     }
 }

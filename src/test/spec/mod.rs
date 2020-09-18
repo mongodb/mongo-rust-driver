@@ -22,14 +22,17 @@ use std::{
     path::PathBuf,
 };
 
-pub use self::runner::{
-    run_v2_test,
-    AnyTestOperation,
-    OperationObject,
-    RunOn,
-    TestData,
-    TestEvent,
-    TestFile,
+pub use self::{
+    runner::{
+        run_v2_test,
+        AnyTestOperation,
+        OperationObject,
+        RunOn,
+        TestData,
+        TestEvent,
+        TestFile,
+    },
+    unified_runner::Topology,
 };
 
 use serde::de::DeserializeOwned;

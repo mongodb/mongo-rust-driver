@@ -29,7 +29,14 @@ pub use self::{
     matcher::results_match,
     operation::EntityOperation,
     test_event::TestEvent,
-    test_file::{CollectionData, Entity as TestFileEntity, ExpectError, Operation, TestFile},
+    test_file::{
+        CollectionData,
+        Entity as TestFileEntity,
+        ExpectError,
+        Operation,
+        TestFile,
+        Topology,
+    },
 };
 
 lazy_static! {
@@ -178,11 +185,9 @@ pub async fn run_unified_format_test(test_file: TestFile) {
             for expected in events {
                 let entity = entities.get(&expected.client).unwrap();
                 let client = entity.as_client();
-                let observe_events = entity.get_observe_events();
-                let ignore_events = entity.get_ignore_events();
 
                 let actual_events: Vec<TestEvent> = client
-                    .get_filtered_events(observe_events, ignore_events)
+                    .get_filtered_events(&client.observe_events, &client.ignore_command_names)
                     .into_iter()
                     .map(Into::into)
                     .collect();
@@ -244,7 +249,7 @@ async fn populate_entity_map(
             TestFileEntity::Client(client) => {
                 let id = client.id.clone();
                 let observe_events = client.observe_events.clone();
-                let ignore_events = client.ignore_command_monitoring_events.clone();
+                let ignore_command_names = client.ignore_command_monitoring_events.clone();
                 let client = EventClient::with_additional_and_mongos_options(
                     client.uri_options.clone(),
                     client.use_multiple_mongoses,
@@ -252,7 +257,7 @@ async fn populate_entity_map(
                 .await;
                 entities.insert(
                     id,
-                    Entity::from_client(client, observe_events, ignore_events),
+                    Entity::from_client(client, observe_events, ignore_command_names),
                 );
             }
             TestFileEntity::Database(database) => {

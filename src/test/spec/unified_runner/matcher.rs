@@ -8,13 +8,12 @@ pub fn results_match(actual: Option<&Bson>, expected: &Bson) -> bool {
                     return special_operator_matches((key, value), actual);
                 }
             }
-            let actual = match actual {
-                Some(actual) => actual,
+            let actual_doc = match actual {
+                Some(Bson::Document(actual)) => actual,
                 // The only case in which None is an acceptable value is if the expected document
                 // is a special operator; otherwise, the two documents do not match.
-                None => return false,
+                _ => return false,
             };
-            let actual_doc = actual.as_document().unwrap();
             for (key, value) in expected_doc {
                 if !results_match(actual_doc.get(key), value) {
                     return false;

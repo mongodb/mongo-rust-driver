@@ -1,17 +1,19 @@
+use std::ops::Deref;
+
 use crate::{bson::Bson, test::util::EventClient, Collection, Database};
 
 pub enum Entity {
-    Client(Client),
+    Client(ClientEntity),
     Database(Database),
     Collection(Collection),
     Result(Bson),
     None,
 }
 
-pub struct Client {
+pub struct ClientEntity {
     client: EventClient,
-    observe_events: Option<Vec<String>>,
-    ignore_events: Option<Vec<String>>,
+    pub observe_events: Option<Vec<String>>,
+    pub ignore_command_names: Option<Vec<String>>,
 }
 
 impl From<Database> for Entity {
@@ -35,36 +37,30 @@ impl From<Option<Bson>> for Entity {
     }
 }
 
+impl Deref for ClientEntity {
+    type Target = EventClient;
+
+    fn deref(&self) -> &Self::Target {
+        &self.client
+    }
+}
+
 impl Entity {
     pub fn from_client(
         client: EventClient,
         observe_events: Option<Vec<String>>,
-        ignore_events: Option<Vec<String>>,
+        ignore_command_names: Option<Vec<String>>,
     ) -> Self {
-        Self::Client(Client {
+        Self::Client(ClientEntity {
             client,
             observe_events,
-            ignore_events,
+            ignore_command_names,
         })
     }
 
-    pub fn as_client(&self) -> &EventClient {
+    pub fn as_client(&self) -> &ClientEntity {
         match self {
-            Self::Client(client) => &client.client,
-            _ => panic!("Entity not a client"),
-        }
-    }
-
-    pub fn get_observe_events(&self) -> &Option<Vec<String>> {
-        match self {
-            Self::Client(client) => &client.observe_events,
-            _ => panic!("Entity not a client"),
-        }
-    }
-
-    pub fn get_ignore_events(&self) -> &Option<Vec<String>> {
-        match self {
-            Self::Client(client) => &client.ignore_events,
+            Self::Client(client) => client,
             _ => panic!("Entity not a client"),
         }
     }

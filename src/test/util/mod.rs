@@ -22,6 +22,7 @@ use crate::{
     error::{CommandError, ErrorKind, Result},
     operation::RunCommand,
     options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
+    test::Topology,
     Client,
     Collection,
 };
@@ -282,14 +283,15 @@ impl TestClient {
         drop_collection(&coll).await;
     }
 
-    pub fn topology(&self) -> String {
+    pub fn topology(&self) -> Topology {
         if self.is_sharded() {
-            String::from("sharded")
+            Topology::Sharded
         } else if self.is_replica_set() {
-            String::from("replicaset")
+            Topology::ReplicaSet
         } else {
-            String::from("single")
+            Topology::Single
         }
+        // TODO parse out sharded replica set
     }
 }
 

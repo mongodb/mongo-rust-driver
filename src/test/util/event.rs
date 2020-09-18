@@ -261,7 +261,7 @@ impl EventClient {
     pub fn get_filtered_events(
         &self,
         observe_events: &Option<Vec<String>>,
-        ignore_events: &Option<Vec<String>>,
+        ignore_command_names: &Option<Vec<String>>,
     ) -> Vec<CommandEvent> {
         let events = self.command_events.read().unwrap();
         events
@@ -283,8 +283,8 @@ impl EventClient {
                         return false;
                     }
                 }
-                if let Some(ignore_events) = ignore_events {
-                    if ignore_events
+                if let Some(ignore_command_names) = ignore_command_names {
+                    if ignore_command_names
                         .iter()
                         .any(|name| event.command_name() == name)
                     {
