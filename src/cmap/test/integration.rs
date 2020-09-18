@@ -5,7 +5,6 @@ use super::event::{Event, EventHandler};
 use crate::{
     bson::doc,
     cmap::{options::ConnectionPoolOptions, Command, ConnectionPool},
-    runtime::AsyncJoinHandle,
     selection_criteria::ReadPreference,
     test::{TestClient, CLIENT_OPTIONS, LOCK},
     RUNTIME,
@@ -101,26 +100,20 @@ async fn concurrent_connections() {
         Some(options),
     );
 
-    let mut tasks: Vec<AsyncJoinHandle<()>> = Default::default();
-    for _ in 0..3 {
+    let tasks = (0..3).map(|_| {
         let pool_clone = pool.clone();
-        tasks.push(
-            RUNTIME
-                .spawn(async move {
-                    pool_clone.check_out().await.unwrap();
-                })
-                .unwrap(),
-        );
-    }
-
-    while let Some(handle) = tasks.pop() {
-        let _ = handle.await;
-    }
+        RUNTIME
+            .spawn(async move {
+                pool_clone.check_out().await.unwrap();
+            })
+            .unwrap()
+    });
+    futures::future::join_all(tasks).await;
 
     // ensure all three ConnectionCreatedEvents were emitted before one ConnectionReadyEvent.
     let mut events = handler.events.write().unwrap();
     let mut consecutive_creations = 0;
-    while let Some(event) = events.pop_front() {
+    for event in events.drain(..) {
         match event {
             Event::ConnectionCreated(_) => {
                 consecutive_creations += 1;
