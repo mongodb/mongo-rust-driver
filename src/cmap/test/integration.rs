@@ -71,7 +71,7 @@ async fn concurrent_connections() {
 
     let client = TestClient::new().await;
     let version = VersionReq::parse(">= 4.2.9").unwrap();
-    // blockConnection failpoint option only added in 4.4.
+    // blockConnection failpoint option only supported in 4.2.9+.
     if !version.matches(&client.server_version) {
         println!(
             "skipping concurrent_connections test due to server not supporting failpoint option"
