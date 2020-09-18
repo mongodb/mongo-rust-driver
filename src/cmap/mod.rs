@@ -42,6 +42,7 @@ use crate::{
     RUNTIME,
 };
 use conn::PendingConnection;
+use wait_queue::WaitQueueHandle;
 
 const DEFAULT_MAX_POOL_SIZE: u32 = 100;
 
@@ -298,7 +299,7 @@ impl ConnectionPoolInner {
         drop(available_connections_lock);
 
         // There are no connections in the pool, so open a new one.
-        let pending_connection = self.create_pending_connection();
+        let pending_connection = self.create_pending_connection(&wait_queue_handle);
         let establish_result = self.establish_connection(pending_connection).await;
         if establish_result.is_ok() {
             wait_queue_handle.disarm();
@@ -308,7 +309,9 @@ impl ConnectionPoolInner {
 
     /// Create a connection that has not been established, incrementing the total connection count
     /// and emitting the appropriate events. This method performs no I/O.
-    fn create_pending_connection(&self) -> PendingConnection {
+    ///
+    /// This MUST ONLY be called while holding a handle to the wait queue.
+    fn create_pending_connection(&self, _wait_queue_handle: &WaitQueueHandle) -> PendingConnection {
         self.total_connection_count.fetch_add(1, Ordering::SeqCst);
 
         let connection = PendingConnection {

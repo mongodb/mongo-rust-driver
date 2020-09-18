@@ -80,7 +80,7 @@ impl ConnectionPoolInner {
                 if self.total_connection_count.load(Ordering::SeqCst) < min_pool_size {
                     // Reserve a spot via the wait queue. This will prevent too many threads from
                     // concurrently creating connections such that max_pool_size is exceeded.
-                    let _wait_queue_handle = match self.wait_queue.try_skip_queue() {
+                    let wait_queue_handle = match self.wait_queue.try_skip_queue() {
                         None => {
                             // This branch is rarely taken because we _just_ verified that
                             // total_connection_count < min_pool_size, which implies
@@ -94,7 +94,7 @@ impl ConnectionPoolInner {
                         Some(handle) => handle,
                     };
 
-                    let connection = self.create_pending_connection();
+                    let connection = self.create_pending_connection(&wait_queue_handle);
                     match self.establish_connection(connection).await {
                         Ok(mut connection) => {
                             let mut available_connections = self.available_connections.lock().await;
