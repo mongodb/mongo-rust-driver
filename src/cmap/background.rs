@@ -44,30 +44,26 @@ impl ConnectionPoolInner {
 
             let connection = &available_connections[0];
 
-            let close_request = if connection.is_stale(self.generation.load(Ordering::SeqCst)) {
-                Some((
-                    available_connections.remove(0),
-                    ConnectionClosedReason::Stale,
-                ))
-            } else if connection.is_idle(self.max_idle_time) {
-                Some((
-                    available_connections.remove(0),
-                    ConnectionClosedReason::Idle,
-                ))
-            } else {
-                None
-            };
+            let (connection, close_reason) =
+                if connection.is_stale(self.generation.load(Ordering::SeqCst)) {
+                    (
+                        available_connections.remove(0),
+                        ConnectionClosedReason::Stale,
+                    )
+                } else if connection.is_idle(self.max_idle_time) {
+                    (
+                        available_connections.remove(0),
+                        ConnectionClosedReason::Idle,
+                    )
+                } else {
+                    // All subsequent connections are either not idle or not stale since they were
+                    // checked into the pool later, so we can just quit early.
+                    break;
+                };
 
             // Drop the lock while we process closing the connection.
             drop(available_connections);
-            match close_request {
-                Some((connection, close_reason)) => {
-                    self.close_connection(connection, close_reason);
-                }
-                // All subsequent connections are either not idle or not stale since they were
-                // checked into the pool later, so we can just quit early.
-                None => break,
-            }
+            self.close_connection(connection, close_reason);
         }
     }
 
