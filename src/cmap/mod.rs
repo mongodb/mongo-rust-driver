@@ -8,6 +8,7 @@ pub(crate) mod options;
 mod wait_queue;
 
 use std::{
+    collections::VecDeque,
     sync::{
         atomic::{AtomicU32, Ordering},
         Arc,
@@ -80,7 +81,7 @@ pub(crate) struct ConnectionPoolInner {
 
     /// The established connections that are currently checked into the pool and awaiting usage in
     /// future operations.
-    available_connections: Mutex<Vec<Connection>>,
+    available_connections: Mutex<VecDeque<Connection>>,
 
     /// Contains the logic for "establishing" a connection. This includes handshaking and
     /// authenticating a connection when it's first created.
@@ -151,7 +152,7 @@ impl ConnectionPool {
             total_connection_count: AtomicU32::new(0),
             generation: AtomicU32::new(0),
             connection_options,
-            available_connections: Mutex::new(Vec::new()),
+            available_connections: Mutex::new(VecDeque::new()),
         };
 
         let pool = Self {
@@ -221,7 +222,7 @@ impl ConnectionPoolInner {
         } else if conn.is_executing() {
             self.close_connection(conn, ConnectionClosedReason::Dropped)
         } else {
-            available_connections.push(conn);
+            available_connections.push_back(conn);
         }
 
         self.wait_queue.wake_front();
@@ -276,7 +277,7 @@ impl ConnectionPoolInner {
 
         // Try to get the most recent available connection.
         let mut available_connections_lock = self.available_connections.lock().await;
-        while let Some(conn) = available_connections_lock.pop() {
+        while let Some(conn) = available_connections_lock.pop_back() {
             // Close the connection if it's stale.
             if conn.is_stale(self.generation.load(Ordering::SeqCst)) {
                 self.close_connection(conn, ConnectionClosedReason::Stale);
@@ -384,13 +385,13 @@ impl Drop for ConnectionPoolInner {
     fn drop(&mut self) {
         let address = self.address.clone();
         let available_connections =
-            std::mem::replace(&mut self.available_connections, Mutex::new(Vec::new()));
+            std::mem::replace(&mut self.available_connections, Mutex::new(VecDeque::new()));
         let event_handler = self.event_handler.clone();
 
         RUNTIME.execute(async move {
             // this lock attempt will always immediately succeed.
             let mut available_connections = available_connections.lock().await;
-            while let Some(connection) = available_connections.pop() {
+            while let Some(connection) = available_connections.pop_front() {
                 connection.close_and_drop(ConnectionClosedReason::PoolClosed);
             }
 

@@ -46,13 +46,15 @@ impl ConnectionPoolInner {
 
             let (connection, close_reason) =
                 if connection.is_stale(self.generation.load(Ordering::SeqCst)) {
+                    // the following unwrap is okay becaue we asserted the pool was nonempty
                     (
-                        available_connections.remove(0),
+                        available_connections.pop_front().unwrap(),
                         ConnectionClosedReason::Stale,
                     )
                 } else if connection.is_idle(self.max_idle_time) {
+                    // the following unwrap is okay becaue we asserted the pool was nonempty
                     (
-                        available_connections.remove(0),
+                        available_connections.pop_front().unwrap(),
                         ConnectionClosedReason::Idle,
                     )
                 } else {
@@ -95,7 +97,7 @@ impl ConnectionPoolInner {
                         Ok(mut connection) => {
                             let mut available_connections = self.available_connections.lock().await;
                             connection.mark_as_available();
-                            available_connections.push(connection)
+                            available_connections.push_back(connection)
                         }
                         Err(_) => {
                             // Since we encountered an error, we return early from this function and
