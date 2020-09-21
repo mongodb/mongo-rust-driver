@@ -95,7 +95,7 @@ impl Client {
     /// See the documentation on
     /// [`ClientOptions::parse`](options/struct.ClientOptions.html#method.parse) for more details.
     pub async fn with_uri_str(uri: &str) -> Result<Self> {
-        let options = ClientOptions::parse(uri).await?;
+        let options = ClientOptions::parse_uri(uri, None).await?;
 
         Client::with_options(options)
     }
@@ -293,7 +293,7 @@ impl Client {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "sync")))]
     pub(crate) async fn get_hosts(&self) -> Vec<String> {
         let servers = self.inner.topology.servers().await;
         servers

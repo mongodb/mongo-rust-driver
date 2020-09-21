@@ -1,4 +1,4 @@
-#[cfg(test)]
+#[cfg(all(test, not(feature = "sync")))]
 mod test;
 
 use std::{
@@ -165,7 +165,7 @@ impl StreamAddress {
         })
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "sync")))]
     pub(crate) fn into_document(mut self) -> Document {
         let mut doc = Document::new();
 
@@ -657,8 +657,20 @@ impl ClientOptions {
     ///   * `waitQueueTimeoutMS`: maps to the `wait_queue_timeout` field
     ///   * `wTimeoutMS`: maps to the `w_timeout` field of the `write_concern` field
     ///   * `zlibCompressionLevel`: not yet implemented
+    ///
+    /// Note: if the `sync` feature is enabled, then this method will be replaced with [the sync
+    /// version](#method.parse-1).
+    #[cfg(not(feature = "sync"))]
     pub async fn parse(s: &str) -> Result<Self> {
         Self::parse_uri(s, None).await
+    }
+
+    /// This method will be present if the `sync` feature is enabled. It's otherwise identical to
+    /// [the async version](#method.parse)
+    #[cfg(any(feature = "sync", docsrs))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+    pub fn parse(s: &str) -> Result<Self> {
+        crate::RUNTIME.block_on(Self::parse_uri(s, None))
     }
 
     /// Parses a MongoDB connection string into a `ClientOptions` struct.
@@ -672,6 +684,10 @@ impl ClientOptions {
     ///
     /// See the docstring on `ClientOptions::parse` for information on how the various URI options
     /// map to fields on `ClientOptions`.
+    ///
+    /// Note: if the `sync` feature is enabled, then this method will be replaced with [the sync
+    /// version](#method.parse_with_resolver_config-1).
+    #[cfg(not(feature = "sync"))]
     pub async fn parse_with_resolver_config(
         uri: &str,
         resolver_config: ResolverConfig,
@@ -679,9 +695,20 @@ impl ClientOptions {
         Self::parse_uri(uri, Some(resolver_config)).await
     }
 
+    /// This method will be present if the `sync` feature is enabled. It's otherwise identical to
+    /// [the async version](#method.parse_with_resolver_config)
+    #[cfg(any(feature = "sync", docsrs))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+    pub fn parse_with_resolver_config(uri: &str, resolver_config: ResolverConfig) -> Result<Self> {
+        crate::RUNTIME.block_on(Self::parse_uri(uri, Some(resolver_config)))
+    }
+
     /// Populate this `ClientOptions` from the given URI, optionally using the resolver config for
     /// DNS lookups.
-    async fn parse_uri(uri: &str, resolver_config: Option<ResolverConfig>) -> Result<Self> {
+    pub(crate) async fn parse_uri(
+        uri: &str,
+        resolver_config: Option<ResolverConfig>,
+    ) -> Result<Self> {
         let parser = ClientOptionsParser::parse(uri)?;
         let srv = parser.srv;
         let auth_source_present = parser.auth_source.is_some();
@@ -1585,7 +1612,7 @@ impl ClientOptionsParser {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "sync")))]
 mod tests {
     use std::time::Duration;
 

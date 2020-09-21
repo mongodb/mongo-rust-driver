@@ -1,10 +1,13 @@
+#[cfg(not(feature = "sync"))]
 mod auth;
 mod command_monitoring;
 mod connection_stepdown;
 mod crud_v1;
 mod crud_v2;
+#[cfg(not(feature = "sync"))]
 mod initial_dns_seedlist_discovery;
 mod ocsp;
+#[cfg(not(feature = "sync"))]
 mod read_write_concern;
 mod retryable_reads;
 mod retryable_writes;

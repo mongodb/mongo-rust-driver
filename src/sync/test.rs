@@ -1,7 +1,17 @@
+use pretty_assertions::assert_eq;
+
 use crate::{
     bson::{doc, Document},
     error::{CommandError, ErrorKind, Result},
-    options::{Acknowledgment, CollectionOptions, DatabaseOptions, FindOptions, WriteConcern},
+    options::{
+        Acknowledgment,
+        ClientOptions,
+        CollectionOptions,
+        DatabaseOptions,
+        FindOptions,
+        StreamAddress,
+        WriteConcern,
+    },
     sync::{Client, Collection},
     test::CLIENT_OPTIONS,
 };
@@ -19,6 +29,23 @@ pub fn drop_collection(coll: &Collection) {
             e.unwrap();
         }
     };
+}
+
+#[test]
+fn client_options() {
+    let mut options = ClientOptions::parse("mongodb://localhost:27017/").unwrap();
+
+    options.original_uri.take();
+
+    assert_eq!(
+        options,
+        ClientOptions::builder()
+            .hosts(vec![StreamAddress {
+                hostname: "localhost".into(),
+                port: Some(27017)
+            }])
+            .build()
+    );
 }
 
 #[test]
