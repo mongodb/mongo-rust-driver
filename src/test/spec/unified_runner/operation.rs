@@ -2,9 +2,9 @@ use std::{collections::HashMap, fmt::Debug, ops::Deref};
 
 use async_trait::async_trait;
 use futures::stream::TryStreamExt;
-use serde::Deserialize;
+use serde::{de::Deserializer, Deserialize};
 
-use super::{Entity, ExpectError, Operation};
+use super::{Entity, ExpectError};
 
 use crate::{
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
@@ -24,11 +24,13 @@ use crate::{
         InsertOneOptions,
         ListCollectionsOptions,
         ListDatabasesOptions,
+        ReadPreference,
         ReplaceOptions,
+        SelectionCriteria,
         UpdateModifications,
         UpdateOptions,
     },
-    test::util::EventClient,
+    test::{util::EventClient, TestClient},
     Collection,
     Database,
 };
@@ -46,100 +48,159 @@ pub trait TestOperation: Debug {
     async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>>;
 
     async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>>;
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    );
 }
 
 #[derive(Debug)]
-pub struct EntityOperation {
+pub struct Operation {
     operation: Box<dyn TestOperation>,
+    pub arguments: Document,
     pub name: String,
-    pub object: String,
+    pub object: OperationObject,
     pub expect_error: Option<ExpectError>,
     pub expect_result: Option<Bson>,
     pub save_result_as_entity: Option<String>,
 }
 
-impl EntityOperation {
-    pub fn from_operation(operation: Operation) -> Result<Self> {
-        let arguments = match operation.arguments {
-            Some(arguments) => Bson::from(arguments),
-            None => Bson::from(doc! {}),
-        };
-        let boxed_op = match operation.name.as_str() {
-            "insertOne" => InsertOne::deserialize(BsonDeserializer::new(arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "insertMany" => InsertMany::deserialize(BsonDeserializer::new(arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "updateOne" => UpdateOne::deserialize(BsonDeserializer::new(arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "updateMany" => UpdateMany::deserialize(BsonDeserializer::new(arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "deleteMany" => DeleteMany::deserialize(BsonDeserializer::new(arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "deleteOne" => DeleteOne::deserialize(BsonDeserializer::new(arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "find" => Find::deserialize(BsonDeserializer::new(arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "aggregate" => Aggregate::deserialize(BsonDeserializer::new(arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "distinct" => Distinct::deserialize(BsonDeserializer::new(arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "countDocuments" => CountDocuments::deserialize(BsonDeserializer::new(arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "estimatedDocumentCount" => {
-                EstimatedDocumentCount::deserialize(BsonDeserializer::new(arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "findOne" => FindOne::deserialize(BsonDeserializer::new(arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "listDatabases" => ListDatabases::deserialize(BsonDeserializer::new(arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "listDatabaseNames" => ListDatabaseNames::deserialize(BsonDeserializer::new(arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "listCollections" => ListCollections::deserialize(BsonDeserializer::new(arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "listCollectionNames" => {
-                ListCollectionNames::deserialize(BsonDeserializer::new(arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "replaceOne" => ReplaceOne::deserialize(BsonDeserializer::new(arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "findOneAndUpdate" => FindOneAndUpdate::deserialize(BsonDeserializer::new(arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "findOneAndReplace" => FindOneAndReplace::deserialize(BsonDeserializer::new(arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "findOneAndDelete" => FindOneAndDelete::deserialize(BsonDeserializer::new(arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
-        }?;
+#[derive(Debug)]
+pub enum OperationObject {
+    TestRunner,
+    Entity(String),
+}
 
-        Ok(EntityOperation {
-            operation: boxed_op,
-            name: operation.name,
-            object: operation.object,
-            expect_error: operation.expect_error,
-            expect_result: operation.expect_result,
-            save_result_as_entity: operation.save_result_as_entity,
-        })
-    }
-
-    pub async fn execute(&self, entities: &HashMap<String, Entity>) -> Result<Option<Bson>> {
-        if self.object.starts_with("client") {
-            let client = entities.get(&self.object).unwrap().as_client();
-            self.execute_on_client(client).await
-        } else if self.object.starts_with("database") {
-            // TODO implement runCommand
-            let database = entities.get(&self.object).unwrap().as_database();
-            self.execute_on_database(database).await
-        } else if self.object.starts_with("collection") {
-            let collection = entities.get(&self.object).unwrap().as_collection();
-            self.execute_on_collection(collection).await
+impl<'de> Deserialize<'de> for OperationObject {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        let object = String::deserialize(deserializer)?;
+        if object.as_str() == "testRunner" {
+            Ok(OperationObject::TestRunner)
         } else {
-            panic!("{} is not present in entity map", self.name)
+            Ok(OperationObject::Entity(object))
         }
     }
 }
 
-impl Deref for EntityOperation {
+impl<'de> Deserialize<'de> for Operation {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        #[derive(Debug, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct OperationDefinition {
+            pub name: String,
+            pub object: OperationObject,
+            #[serde(default = "default_arguments")]
+            pub arguments: Bson,
+            pub expect_error: Option<ExpectError>,
+            pub expect_result: Option<Bson>,
+            pub save_result_as_entity: Option<String>,
+        }
+
+        fn default_arguments() -> Bson {
+            Bson::Document(doc! {})
+        }
+
+        let definition = OperationDefinition::deserialize(deserializer)?;
+        let original_arguments = definition.arguments.as_document().cloned().unwrap();
+        let boxed_op = match definition.name.as_str() {
+            "insertOne" => InsertOne::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "insertMany" => InsertMany::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "updateOne" => UpdateOne::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "updateMany" => UpdateMany::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "deleteMany" => DeleteMany::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "deleteOne" => DeleteOne::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "find" => Find::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "aggregate" => Aggregate::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "distinct" => Distinct::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "countDocuments" => {
+                CountDocuments::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "estimatedDocumentCount" => {
+                EstimatedDocumentCount::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "findOne" => FindOne::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "listDatabases" => {
+                ListDatabases::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "listDatabaseNames" => {
+                ListDatabaseNames::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "listCollections" => {
+                ListCollections::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "listCollectionNames" => {
+                ListCollectionNames::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "replaceOne" => ReplaceOne::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "findOneAndUpdate" => {
+                FindOneAndUpdate::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "findOneAndReplace" => {
+                FindOneAndReplace::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "findOneAndDelete" => {
+                FindOneAndDelete::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "failPoint" => FailPoint::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "assertCollectionExists" => {
+                AssertCollectionExists::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "assertCollectionNotExists" => {
+                AssertCollectionNotExists::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
+        }
+        .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
+
+        Ok(Operation {
+            operation: boxed_op,
+            arguments: original_arguments,
+            name: definition.name,
+            object: definition.object,
+            expect_error: definition.expect_error,
+            expect_result: definition.expect_result,
+            save_result_as_entity: definition.save_result_as_entity,
+        })
+    }
+}
+
+impl Entity {
+    pub async fn execute_operation(&self, operation: &Operation) -> Result<Option<Bson>> {
+        match self {
+            Entity::Client(client) => operation.execute_on_client(client).await,
+            Entity::Database(db) => operation.execute_on_database(db).await,
+            Entity::Collection(coll) => operation.execute_on_collection(coll).await,
+            _ => panic!("Cannot execute operation on entity"),
+        }
+    }
+}
+
+impl Deref for Operation {
     type Target = Box<dyn TestOperation>;
 
     fn deref(&self) -> &Box<dyn TestOperation> {
@@ -175,6 +236,14 @@ impl TestOperation for DeleteMany {
     async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -205,6 +274,14 @@ impl TestOperation for DeleteOne {
     async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -233,6 +310,14 @@ impl TestOperation for Find {
     }
 
     async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
         unimplemented!()
     }
 }
@@ -270,6 +355,14 @@ impl TestOperation for InsertMany {
     async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -298,6 +391,14 @@ impl TestOperation for InsertOne {
     }
 
     async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
         unimplemented!()
     }
 }
@@ -335,6 +436,14 @@ impl TestOperation for UpdateMany {
     async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -368,6 +477,14 @@ impl TestOperation for UpdateOne {
     }
 
     async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
         unimplemented!()
     }
 }
@@ -405,6 +522,14 @@ impl TestOperation for Aggregate {
         let result = cursor.try_collect::<Vec<Document>>().await?;
         Ok(Some(Bson::from(result)))
     }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -436,6 +561,14 @@ impl TestOperation for Distinct {
     async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -465,6 +598,14 @@ impl TestOperation for CountDocuments {
     async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -491,6 +632,14 @@ impl TestOperation for EstimatedDocumentCount {
     }
 
     async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
         unimplemented!()
     }
 }
@@ -525,6 +674,14 @@ impl TestOperation for FindOne {
     async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -553,6 +710,14 @@ impl TestOperation for ListDatabases {
     }
 
     async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
         unimplemented!()
     }
 }
@@ -585,6 +750,14 @@ impl TestOperation for ListDatabaseNames {
     async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -615,6 +788,14 @@ impl TestOperation for ListCollections {
         let result = cursor.try_collect::<Vec<Document>>().await?;
         Ok(Some(Bson::from(result)))
     }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -640,6 +821,14 @@ impl TestOperation for ListCollectionNames {
         let result = database.list_collection_names(self.filter.clone()).await?;
         let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
         Ok(Some(Bson::from(result)))
+    }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
+        unimplemented!()
     }
 }
 
@@ -674,6 +863,14 @@ impl TestOperation for ReplaceOne {
     }
 
     async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
         unimplemented!()
     }
 }
@@ -711,6 +908,14 @@ impl TestOperation for FindOneAndUpdate {
     async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -746,6 +951,14 @@ impl TestOperation for FindOneAndReplace {
     async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -776,6 +989,126 @@ impl TestOperation for FindOneAndDelete {
     async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
         unimplemented!()
     }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct FailPoint {
+    fail_point: Document,
+    client_id: String,
+}
+
+#[async_trait]
+impl TestOperation for FailPoint {
+    fn command_names(&self) -> &[&str] {
+        unimplemented!()
+    }
+
+    async fn execute_on_collection(&self, _collection: &Collection) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        entities: &HashMap<String, Entity>,
+    ) {
+        let client = entities.get(&self.client_id).unwrap().as_client();
+        let selection_criteria = SelectionCriteria::ReadPreference(ReadPreference::Primary);
+        client
+            .database("admin")
+            .run_command(self.fail_point.clone(), selection_criteria)
+            .await
+            .unwrap();
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct AssertCollectionExists {
+    collection_name: String,
+    database_name: String,
+}
+
+#[async_trait]
+impl TestOperation for AssertCollectionExists {
+    fn command_names(&self) -> &[&str] {
+        unimplemented!()
+    }
+
+    async fn execute_on_collection(&self, _collection: &Collection) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_test_runner(
+        &self,
+        client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
+        let db = client.database(&self.database_name);
+        let names = db.list_collection_names(None).await.unwrap();
+        assert!(names.contains(&self.collection_name));
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct AssertCollectionNotExists {
+    collection_name: String,
+    database_name: String,
+}
+
+#[async_trait]
+impl TestOperation for AssertCollectionNotExists {
+    fn command_names(&self) -> &[&str] {
+        unimplemented!()
+    }
+
+    async fn execute_on_collection(&self, _collection: &Collection) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_test_runner(
+        &self,
+        client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
+        let db = client.database(&self.database_name);
+        let names = db.list_collection_names(None).await.unwrap();
+        assert!(!names.contains(&self.collection_name));
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -796,6 +1129,14 @@ impl TestOperation for UnimplementedOperation {
     }
 
     async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_test_runner(
+        &self,
+        _client: &TestClient,
+        _entities: &HashMap<String, Entity>,
+    ) {
         unimplemented!()
     }
 }

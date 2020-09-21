@@ -27,16 +27,9 @@ use crate::{
 pub use self::{
     entity::Entity,
     matcher::results_match,
-    operation::EntityOperation,
+    operation::{Operation, OperationObject},
     test_event::TestEvent,
-    test_file::{
-        CollectionData,
-        Entity as TestFileEntity,
-        ExpectError,
-        Operation,
-        TestFile,
-        Topology,
-    },
+    test_file::{CollectionData, Entity as TestFileEntity, ExpectError, TestFile, Topology},
 };
 
 lazy_static! {
@@ -105,78 +98,41 @@ pub async fn run_unified_format_test(test_file: TestFile) {
 
         let mut failpoint_disable_commands: Vec<Document> = Vec::new();
         for operation in test_case.operations {
-            if operation.object.as_str() == "testRunner" {
-                match operation.name.as_str() {
-                    "failPoint" => {
-                        let arguments = operation.arguments.unwrap();
-                        let fail_point = arguments.get_document("failPoint").unwrap();
-
-                        let disable_command = doc! {
+            match operation.object {
+                OperationObject::TestRunner => {
+                    operation.execute_on_test_runner(&client, &entities).await;
+                    if operation.name.as_str() == "failPoint" {
+                        let fail_point = operation.arguments.get_document("failPoint").unwrap();
+                        let disable = doc! {
                             "configureFailPoint": fail_point.get_str("configureFailPoint").unwrap(),
                             "mode": "off",
                         };
-                        failpoint_disable_commands.push(disable_command);
-
-                        let client_id = arguments.get_str("client").unwrap();
-                        let client = entities.get(client_id).unwrap().as_client();
-
-                        let selection_criteria =
-                            SelectionCriteria::ReadPreference(ReadPreference::Primary);
-                        client
-                            .database("admin")
-                            .run_command(fail_point.clone(), selection_criteria)
-                            .await
-                            .unwrap();
+                        failpoint_disable_commands.push(disable);
                     }
-                    "targetedFailPoint"
-                    | "assertSessionTransactionState"
-                    | "assertSessionPinned"
-                    | "assertSessionUnpinned" => panic!("Transactions not implemented"),
-                    "assertDifferentLsidOnLastTwoCommands"
-                    | "assertSameLsidOnLastTwoCommands"
-                    | "assertSessionNotDirty" => panic!("Explicit sessions not implemented"),
-                    "assertCollectionExists" => {
-                        let arguments = operation.arguments.unwrap();
-                        let collection_name = arguments.get_str("collectionName").unwrap();
-                        assert!(get_collection_names(&arguments, &client)
-                            .await
-                            .contains(&collection_name.to_string()));
-                    }
-                    "assertCollectionNotExists" => {
-                        let arguments = operation.arguments.unwrap();
-                        let collection_name = arguments.get_str("collectionName").unwrap();
-                        assert!(!get_collection_names(&arguments, &client)
-                            .await
-                            .contains(&collection_name.to_string()));
-                    }
-                    "assertIndexExists" | "assertIndexNotExists" => {
-                        panic!("Index management not implemented")
-                    }
-                    other => panic!("Unknown test runner operation: {}", other),
                 }
-            } else {
-                let operation = EntityOperation::from_operation(operation).unwrap();
+                OperationObject::Entity(ref id) => {
+                    let entity = entities.get(id).unwrap();
+                    let result = entity.execute_operation(&operation).await;
 
-                let result = operation.execute(&entities).await;
-
-                if let Some(id) = operation.save_result_as_entity {
-                    let result = result.clone().unwrap();
-                    entities.insert(id, result.into());
-                }
-
-                if let Some(expect_result) = operation.expect_result {
-                    let result = result.unwrap_or_else(|_| panic!("operation should succeed"));
-                    match result {
-                        Some(result) => {
-                            assert!(results_match(Some(&result), &expect_result));
-                        }
-                        None => {
-                            panic!("expected {}, got {:?}", &expect_result, &result);
-                        }
+                    if let Some(id) = operation.save_result_as_entity {
+                        let result = result.clone().unwrap();
+                        entities.insert(id, result.into());
                     }
-                } else if let Some(expect_error) = operation.expect_error {
-                    let error = result.unwrap_err();
-                    expect_error.verify_result(error);
+
+                    if let Some(expect_result) = operation.expect_result {
+                        let result = result.unwrap_or_else(|_| panic!("operation should succeed"));
+                        match result {
+                            Some(result) => {
+                                assert!(results_match(Some(&result), &expect_result));
+                            }
+                            None => {
+                                panic!("expected {}, got {:?}", &expect_result, &result);
+                            }
+                        }
+                    } else if let Some(expect_error) = operation.expect_error {
+                        let error = result.unwrap_err();
+                        expect_error.verify_result(error);
+                    }
                 }
             }
         }
@@ -313,16 +269,6 @@ async fn insert_initial_data(data: &CollectionData, client: &TestClient) {
             .await
             .unwrap();
     }
-}
-
-async fn get_collection_names(arguments: &Document, client: &TestClient) -> Vec<String> {
-    let database_name = arguments.get_str("databaseName").unwrap();
-    let collection_name = arguments.get_str("collectionName").unwrap();
-    client
-        .database(database_name)
-        .list_collection_names(doc! { "name": collection_name })
-        .await
-        .unwrap()
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

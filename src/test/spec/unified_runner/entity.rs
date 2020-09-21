@@ -71,11 +71,4 @@ impl Entity {
             _ => panic!("Entity not a database"),
         }
     }
-
-    pub fn as_collection(&self) -> &Collection {
-        match self {
-            Self::Collection(collection) => collection,
-            _ => panic!("Entity not a collection"),
-        }
-    }
 }

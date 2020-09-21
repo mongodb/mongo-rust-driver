@@ -3,7 +3,7 @@
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Deserializer};
 
-use super::TestEvent;
+use super::{Operation, TestEvent};
 
 use crate::{
     bson::{Bson, Document},
@@ -200,17 +200,6 @@ pub struct TestCase {
     pub operations: Vec<Operation>,
     pub expect_events: Option<Vec<ExpectedEvents>>,
     pub outcome: Option<Vec<CollectionData>>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Operation {
-    pub name: String,
-    pub object: String,
-    pub arguments: Option<Document>,
-    pub expect_error: Option<ExpectError>,
-    pub expect_result: Option<Bson>,
-    pub save_result_as_entity: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
