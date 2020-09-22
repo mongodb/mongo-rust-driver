@@ -100,14 +100,10 @@ pub async fn run_unified_format_test(test_file: TestFile) {
         for operation in test_case.operations {
             match operation.object {
                 OperationObject::TestRunner => {
-                    operation.execute_on_test_runner(&client, &entities).await;
-                    if operation.name.as_str() == "failPoint" {
-                        let fail_point = operation.arguments.get_document("failPoint").unwrap();
-                        let disable = doc! {
-                            "configureFailPoint": fail_point.get_str("configureFailPoint").unwrap(),
-                            "mode": "off",
-                        };
-                        failpoint_disable_commands.push(disable);
+                    if let Some(disable_command) =
+                        operation.execute_on_test_runner(&client, &entities).await
+                    {
+                        failpoint_disable_commands.push(disable_command);
                     }
                 }
                 OperationObject::Entity(ref id) => {

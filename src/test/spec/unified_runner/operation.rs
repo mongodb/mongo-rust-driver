@@ -53,13 +53,12 @@ pub trait TestOperation: Debug {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    );
+    ) -> Option<Document>;
 }
 
 #[derive(Debug)]
 pub struct Operation {
     operation: Box<dyn TestOperation>,
-    pub arguments: Document,
     pub name: String,
     pub object: OperationObject,
     pub expect_error: Option<ExpectError>,
@@ -103,7 +102,6 @@ impl<'de> Deserialize<'de> for Operation {
         }
 
         let definition = OperationDefinition::deserialize(deserializer)?;
-        let original_arguments = definition.arguments.as_document().cloned().unwrap();
         let boxed_op = match definition.name.as_str() {
             "insertOne" => InsertOne::deserialize(BsonDeserializer::new(definition.arguments))
                 .map(|op| Box::new(op) as Box<dyn TestOperation>),
@@ -179,7 +177,6 @@ impl<'de> Deserialize<'de> for Operation {
 
         Ok(Operation {
             operation: boxed_op,
-            arguments: original_arguments,
             name: definition.name,
             object: definition.object,
             expect_error: definition.expect_error,
@@ -241,7 +238,7 @@ impl TestOperation for DeleteMany {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         unimplemented!()
     }
 }
@@ -279,7 +276,7 @@ impl TestOperation for DeleteOne {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         unimplemented!()
     }
 }
@@ -317,7 +314,7 @@ impl TestOperation for Find {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         unimplemented!()
     }
 }
@@ -360,7 +357,7 @@ impl TestOperation for InsertMany {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         unimplemented!()
     }
 }
@@ -398,7 +395,7 @@ impl TestOperation for InsertOne {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         unimplemented!()
     }
 }
@@ -441,7 +438,7 @@ impl TestOperation for UpdateMany {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         unimplemented!()
     }
 }
@@ -484,7 +481,7 @@ impl TestOperation for UpdateOne {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         unimplemented!()
     }
 }
@@ -527,7 +524,7 @@ impl TestOperation for Aggregate {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         unimplemented!()
     }
 }
@@ -566,7 +563,7 @@ impl TestOperation for Distinct {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         unimplemented!()
     }
 }
@@ -603,7 +600,7 @@ impl TestOperation for CountDocuments {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         unimplemented!()
     }
 }
@@ -639,7 +636,7 @@ impl TestOperation for EstimatedDocumentCount {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         unimplemented!()
     }
 }
@@ -679,7 +676,7 @@ impl TestOperation for FindOne {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         unimplemented!()
     }
 }
@@ -717,7 +714,7 @@ impl TestOperation for ListDatabases {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         unimplemented!()
     }
 }
@@ -755,7 +752,7 @@ impl TestOperation for ListDatabaseNames {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         unimplemented!()
     }
 }
@@ -793,7 +790,7 @@ impl TestOperation for ListCollections {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         unimplemented!()
     }
 }
@@ -827,7 +824,7 @@ impl TestOperation for ListCollectionNames {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         unimplemented!()
     }
 }
@@ -870,7 +867,7 @@ impl TestOperation for ReplaceOne {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         unimplemented!()
     }
 }
@@ -913,7 +910,7 @@ impl TestOperation for FindOneAndUpdate {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         unimplemented!()
     }
 }
@@ -956,7 +953,7 @@ impl TestOperation for FindOneAndReplace {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         unimplemented!()
     }
 }
@@ -994,7 +991,7 @@ impl TestOperation for FindOneAndDelete {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         unimplemented!()
     }
 }
@@ -1028,7 +1025,7 @@ impl TestOperation for FailPoint {
         &self,
         _client: &TestClient,
         entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         let client = entities.get(&self.client_id).unwrap().as_client();
         let selection_criteria = SelectionCriteria::ReadPreference(ReadPreference::Primary);
         client
@@ -1036,6 +1033,11 @@ impl TestOperation for FailPoint {
             .run_command(self.fail_point.clone(), selection_criteria)
             .await
             .unwrap();
+        let disable = doc! {
+            "configureFailPoint": self.fail_point.get_str("configureFailPoint").unwrap(),
+            "mode": "off",
+        };
+        Some(disable)
     }
 }
 
@@ -1068,10 +1070,11 @@ impl TestOperation for AssertCollectionExists {
         &self,
         client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         let db = client.database(&self.database_name);
         let names = db.list_collection_names(None).await.unwrap();
         assert!(names.contains(&self.collection_name));
+        None
     }
 }
 
@@ -1104,10 +1107,11 @@ impl TestOperation for AssertCollectionNotExists {
         &self,
         client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         let db = client.database(&self.database_name);
         let names = db.list_collection_names(None).await.unwrap();
         assert!(!names.contains(&self.collection_name));
+        None
     }
 }
 
@@ -1136,7 +1140,7 @@ impl TestOperation for UnimplementedOperation {
         &self,
         _client: &TestClient,
         _entities: &HashMap<String, Entity>,
-    ) {
+    ) -> Option<Document> {
         unimplemented!()
     }
 }
