@@ -115,7 +115,7 @@ pub struct Client {
 }
 
 fn default_uri() -> String {
-    std::env::var("MONGODB_URI").unwrap_or_else(|_| "mongodb://localhost:27017".to_string())
+    std::env::var("MONGODB_URI").unwrap_or_else(|_| "mongodb://localhost:27017/".to_string())
 }
 
 fn deserialize_uri_options_to_uri_string<'de, D>(
@@ -124,38 +124,37 @@ fn deserialize_uri_options_to_uri_string<'de, D>(
 where
     D: Deserializer<'de>,
 {
-    let mut uri = default_uri();
     let uri_options = Document::deserialize(deserializer)?;
-    if !uri.contains('?') {
-        uri.push('?');
-    }
-    for (key, value) in uri_options {
-        if !is_key(&key, &uri) {
-            // Several URI options specify a number/bool
-            let value = match value {
-                Bson::String(value) => value,
-                Bson::Int32(value) => value.to_string(),
-                Bson::Int64(value) => value.to_string(),
-                Bson::Boolean(value) => value.to_string(),
-                _ => {
-                    return Err(serde::de::Error::custom(
-                        "Cannot convert URI option value to string",
-                    ))
-                }
-            };
-            uri.push_str(&format!("{}={}&", &key, &value));
+
+    let uri = default_uri();
+    let mut split_uri = uri.split('?');
+
+    let mut uri = String::from(split_uri.next().unwrap());
+    uri.push('?');
+
+    if let Some(options) = split_uri.next() {
+        let options = options.split('&');
+        for option in options {
+            let key = option.split('=').next().unwrap();
+            // The provided URI options should override any existing options in the connection
+            // string
+            if !uri_options.contains_key(key) {
+                uri.push_str(option);
+            }
         }
     }
+
+    for (key, value) in uri_options {
+        let value = value.to_string();
+        // to_string() wraps quotations around Bson strings
+        let value = value.trim_start_matches('\"').trim_end_matches('\"');
+        uri.push_str(&format!("{}={}&", &key, value));
+    }
+
     // remove the trailing '&' from the URI
     uri.pop();
-    Ok(uri)
-}
 
-// Returns whether a specified string is an option key within a URI. A key is preceded by either
-// '?' (first key in the options list) or '&' (any other key in the options list) and followed by
-// '='.
-fn is_key(key: &str, uri: &str) -> bool {
-    uri.contains(&format!("?{}=", &key)) || uri.contains(&format!("&{}=", &key))
+    Ok(uri)
 }
 
 #[derive(Debug, Deserialize)]
