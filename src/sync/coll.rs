@@ -1,3 +1,7 @@
+use std::marker::{Send, Sync};
+
+use serde::Serialize;
+
 use super::Cursor;
 use crate::{
     bson::{Bson, Document},
@@ -66,12 +70,12 @@ use crate::{
 /// ```
 
 #[derive(Clone, Debug)]
-pub struct Collection {
-    async_collection: AsyncCollection,
+pub struct Collection<T = Document> where T: Serialize + Send + Sync {
+    async_collection: AsyncCollection<T>,
 }
 
-impl Collection {
-    pub(crate) fn new(async_collection: AsyncCollection) -> Self {
+impl<T> Collection<T> where T: Serialize + Send + Sync {
+    pub(crate) fn new(async_collection: AsyncCollection<T>) -> Self {
         Self { async_collection }
     }
 
@@ -237,7 +241,7 @@ impl Collection {
     pub fn find_one_and_replace(
         &self,
         filter: Document,
-        replacement: Document,
+        replacement: T,
         options: impl Into<Option<FindOneAndReplaceOptions>>,
     ) -> Result<Option<Document>> {
         RUNTIME.block_on(self.async_collection.find_one_and_replace(
@@ -277,10 +281,10 @@ impl Collection {
     /// retryable writes.
     pub fn insert_many(
         &self,
-        docs: impl IntoIterator<Item = Document>,
+        docs: impl IntoIterator<Item = T>,
         options: impl Into<Option<InsertManyOptions>>,
     ) -> Result<InsertManyResult> {
-        let docs: Vec<Document> = docs.into_iter().collect();
+        let docs: Vec<T> = docs.into_iter().collect();
         RUNTIME.block_on(self.async_collection.insert_many(docs, options.into()))
     }
 
@@ -292,7 +296,7 @@ impl Collection {
     /// retryable writes.
     pub fn insert_one(
         &self,
-        doc: Document,
+        doc: T,
         options: impl Into<Option<InsertOneOptions>>,
     ) -> Result<InsertOneResult> {
         RUNTIME.block_on(self.async_collection.insert_one(doc, options.into()))
@@ -307,7 +311,7 @@ impl Collection {
     pub fn replace_one(
         &self,
         query: Document,
-        replacement: Document,
+        replacement: T,
         options: impl Into<Option<ReplaceOptions>>,
     ) -> Result<UpdateResult> {
         RUNTIME.block_on(

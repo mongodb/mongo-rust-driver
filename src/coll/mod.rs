@@ -4,11 +4,11 @@ pub mod options;
 use std::{fmt, sync::Arc};
 
 use futures::StreamExt;
-use serde::{de::Error, Deserialize, Deserializer};
+use serde::{de::Error, Deserialize, Deserializer, Serialize};
 
 use self::options::*;
 use crate::{
-    bson::{doc, Bson, Document},
+    bson::{doc, to_document, Bson, Document},
     bson_util,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, ErrorKind, Result},
@@ -75,8 +75,12 @@ const MAX_INSERT_DOCS_BYTES: usize = 16 * 1000 * 1000;
 /// ```
 
 #[derive(Debug, Clone)]
-pub struct Collection {
+pub struct Collection<T = Document>
+where
+    T: Serialize,
+{
     inner: Arc<CollectionInner>,
+    _phantom: std::marker::PhantomData<T>,
 }
 
 #[derive(Debug)]
@@ -89,7 +93,10 @@ struct CollectionInner {
     write_concern: Option<WriteConcern>,
 }
 
-impl Collection {
+impl<T> Collection<T>
+where
+    T: Serialize,
+{
     pub(crate) fn new(db: Database, name: &str, options: Option<CollectionOptions>) -> Self {
         let options = options.unwrap_or_default();
         let selection_criteria = options
@@ -111,7 +118,17 @@ impl Collection {
                 read_concern,
                 write_concern,
             }),
+            _phantom: Default::default(),
         }
+    }
+
+    pub fn clone_with_type<U>(&self) -> Collection<U> where U: Serialize {
+        let mut options = CollectionOptions::builder().build();
+        options.selection_criteria = self.inner.selection_criteria.clone();
+        options.read_concern = self.inner.read_concern.clone();
+        options.write_concern = self.inner.write_concern.clone();
+
+        self.inner.db.collection_with_type_and_options(&self.inner.name, options)
     }
 
     /// Get the `Client` that this collection descended from.
@@ -381,9 +398,11 @@ impl Collection {
     pub async fn find_one_and_replace(
         &self,
         filter: Document,
-        replacement: Document,
+        replacement: T,
         options: impl Into<Option<FindOneAndReplaceOptions>>,
     ) -> Result<Option<Document>> {
+        let replacement = to_document(&replacement)?;
+
         let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
@@ -422,13 +441,18 @@ impl Collection {
     /// retryable writes.
     pub async fn insert_many(
         &self,
-        docs: impl IntoIterator<Item = Document>,
+        docs: impl IntoIterator<Item = T>,
         options: impl Into<Option<InsertManyOptions>>,
     ) -> Result<InsertManyResult> {
+        let mut translated_docs = Vec::new();
+        for doc in docs {
+            let doc = to_document(&doc)?;
+            translated_docs.push(doc);
+        }
+        let mut docs = translated_docs;
+
         let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
-
-        let mut docs: Vec<Document> = docs.into_iter().collect();
 
         if docs.is_empty() {
             return Err(ErrorKind::ArgumentError {
@@ -509,9 +533,11 @@ impl Collection {
     /// retryable writes.
     pub async fn insert_one(
         &self,
-        doc: Document,
+        doc: T,
         options: impl Into<Option<InsertOneOptions>>,
     ) -> Result<InsertOneResult> {
+        let doc = to_document(&doc)?;
+
         let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
@@ -536,9 +562,10 @@ impl Collection {
     pub async fn replace_one(
         &self,
         query: Document,
-        replacement: Document,
+        replacement: T,
         options: impl Into<Option<ReplaceOptions>>,
     ) -> Result<UpdateResult> {
+        let replacement = to_document(&replacement)?;
         bson_util::replacement_document_check(&replacement)?;
 
         let mut options = options.into();
