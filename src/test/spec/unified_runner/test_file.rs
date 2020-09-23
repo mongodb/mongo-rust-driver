@@ -10,6 +10,7 @@ use crate::{
     concern::Acknowledgment,
     error::Error,
     options::{
+        ClientOptions,
         CollectionOptions,
         DatabaseOptions,
         ReadConcern,
@@ -130,6 +131,12 @@ where
     let mut split_uri = uri.split('?');
 
     let mut uri = String::from(split_uri.next().unwrap());
+    // A connection string has two slashes before the host list and one slash before the auth db
+    // name. If an auth db name is not provided the latter slash might not be present, so it needs
+    // to be added manually.
+    if uri.chars().filter(|c| *c == '/').count() < 3 {
+        uri.push('/');
+    }
     uri.push('?');
 
     if let Some(options) = split_uri.next() {
@@ -140,6 +147,7 @@ where
             // string
             if !uri_options.contains_key(key) {
                 uri.push_str(option);
+                uri.push('&');
             }
         }
     }
@@ -311,7 +319,7 @@ async fn deserialize_uri_options() {
     };
     let d = BsonDeserializer::new(options.into());
     let uri = deserialize_uri_options_to_uri_string(d).unwrap();
-    let options = crate::options::ClientOptions::parse(&uri).await.unwrap();
+    let options = ClientOptions::parse(&uri).await.unwrap();
 
     assert!(options.tls_options().is_some());
 
