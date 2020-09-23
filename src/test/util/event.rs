@@ -164,18 +164,11 @@ impl EventClient {
         EventClient::with_options(options).await
     }
 
-    pub async fn with_additional_and_mongos_options(
-        options: Option<ClientOptions>,
+    pub async fn with_uri_and_mongos_options(
+        uri: &str,
         use_multiple_mongoses: Option<bool>,
     ) -> Self {
-        let mut options = match options {
-            Some(mut options) => {
-                options.hosts = CLIENT_OPTIONS.hosts.clone();
-                options.merge(CLIENT_OPTIONS.clone());
-                options
-            }
-            None => CLIENT_OPTIONS.clone(),
-        };
+        let mut options = ClientOptions::parse(uri).await.unwrap();
         match use_multiple_mongoses {
             Some(true) => {
                 if options.hosts.len() <= 1 {

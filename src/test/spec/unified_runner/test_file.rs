@@ -6,10 +6,10 @@ use serde::{Deserialize, Deserializer};
 use super::{Operation, TestEvent};
 
 use crate::{
-    bson::{Bson, Document},
+    bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
+    concern::Acknowledgment,
     error::Error,
     options::{
-        ClientOptions,
         CollectionOptions,
         DatabaseOptions,
         ReadConcern,
@@ -103,10 +103,59 @@ pub enum Entity {
 #[serde(rename_all = "camelCase")]
 pub struct Client {
     pub id: String,
-    pub uri_options: Option<ClientOptions>,
+    #[serde(
+        default = "default_uri",
+        deserialize_with = "deserialize_uri_options_to_uri_string",
+        rename = "uriOptions"
+    )]
+    pub uri: String,
     pub use_multiple_mongoses: Option<bool>,
     pub observe_events: Option<Vec<String>>,
     pub ignore_command_monitoring_events: Option<Vec<String>>,
+}
+
+fn default_uri() -> String {
+    std::env::var("MONGODB_URI").unwrap_or_else(|_| "mongodb://localhost:27017".to_string())
+}
+
+fn deserialize_uri_options_to_uri_string<'de, D>(
+    deserializer: D,
+) -> std::result::Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let mut uri = default_uri();
+    let uri_options = Document::deserialize(deserializer)?;
+    if !uri.contains('?') {
+        uri.push('?');
+    }
+    for (key, value) in uri_options {
+        if !is_key(&key, &uri) {
+            // Several URI options specify a number/bool
+            let value = match value {
+                Bson::String(value) => value,
+                Bson::Int32(value) => value.to_string(),
+                Bson::Int64(value) => value.to_string(),
+                Bson::Boolean(value) => value.to_string(),
+                _ => {
+                    return Err(serde::de::Error::custom(
+                        "Cannot convert URI option value to string",
+                    ))
+                }
+            };
+            uri.push_str(&format!("{}={}&", &key, &value));
+        }
+    }
+    // remove the trailing '&' from the URI
+    uri.pop();
+    Ok(uri)
+}
+
+// Returns whether a specified string is an option key within a URI. A key is preceded by either
+// '?' (first key in the options list) or '&' (any other key in the options list) and followed by
+// '='.
+fn is_key(key: &str, uri: &str) -> bool {
+    uri.contains(&format!("?{}=", &key)) || uri.contains(&format!("&{}=", &key))
 }
 
 #[derive(Debug, Deserialize)]
@@ -251,4 +300,25 @@ impl ExpectError {
             // TODO RUST-260: match against partial results
         }
     }
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn deserialize_uri_options() {
+    let options = doc! {
+        "ssl": true,
+        "w": 2,
+        "readconcernlevel": "local",
+    };
+    let d = BsonDeserializer::new(options.into());
+    let uri = deserialize_uri_options_to_uri_string(d).unwrap();
+    let options = crate::options::ClientOptions::parse(&uri).await.unwrap();
+
+    assert!(options.tls_options().is_some());
+
+    let write_concern = WriteConcern::builder().w(Acknowledgment::from(2)).build();
+    assert_eq!(options.write_concern.unwrap(), write_concern);
+
+    let read_concern = ReadConcern::local();
+    assert_eq!(options.read_concern.unwrap(), read_concern);
 }
