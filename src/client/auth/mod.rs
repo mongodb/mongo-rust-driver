@@ -3,6 +3,7 @@
 
 #[cfg(feature = "tokio-runtime")]
 mod aws;
+mod plain;
 mod sasl;
 mod scram;
 #[cfg(test)]
@@ -71,8 +72,6 @@ pub enum AuthMechanism {
     /// for authentication.
     ///
     /// See the [MongoDB documentation](https://docs.mongodb.com/manual/core/security-ldap/#ldap-proxy-authentication) for more information on LDAP authentication.
-    ///
-    /// Note: This mechanism is not currently supported by this driver but will be in the future.
     Plain,
 
     /// MONGODB-AWS authenticates using AWS IAM credentials (an access key ID and a secret access
@@ -140,6 +139,30 @@ impl AuthMechanism {
 
                 Ok(())
             }
+            AuthMechanism::Plain => {
+                if credential.username.is_none() {
+                    return Err(ErrorKind::ArgumentError {
+                        message: "No username provided for PLAIN authentication".to_string(),
+                    }
+                    .into());
+                }
+
+                if credential.username.as_deref() == Some("") {
+                    return Err(ErrorKind::ArgumentError {
+                        message: "Username for PLAIN authentication must be non-empty".to_string(),
+                    }
+                    .into());
+                }
+
+                if credential.password.is_none() {
+                    return Err(ErrorKind::ArgumentError {
+                        message: "No password provided for PLAIN authentication".to_string(),
+                    }
+                    .into());
+                }
+
+                Ok(())
+            }
             #[cfg(feature = "tokio-runtime")]
             AuthMechanism::MongoDbAws => {
                 if credential.username.is_some() && credential.password.is_none() {
@@ -179,6 +202,7 @@ impl AuthMechanism {
                 uri_db.unwrap_or("admin")
             }
             AuthMechanism::MongoDbX509 => "$external",
+            AuthMechanism::Plain => "$external",
             #[cfg(feature = "tokio-runtime")]
             AuthMechanism::MongoDbAws => "$external",
             _ => "",
@@ -206,6 +230,7 @@ impl AuthMechanism {
             Self::MongoDbX509 => Ok(Some(ClientFirst::X509(x509::build_client_first(
                 credential,
             )))),
+            Self::Plain => Ok(None),
             #[cfg(feature = "tokio-runtime")]
             AuthMechanism::MongoDbAws => Ok(None),
             AuthMechanism::MongoDbCr => Err(ErrorKind::AuthenticationError {
@@ -241,6 +266,7 @@ impl AuthMechanism {
                     .await
             }
             AuthMechanism::MongoDbX509 => x509::authenticate_stream(stream, credential, None).await,
+            AuthMechanism::Plain => plain::authenticate_stream(stream, credential).await,
             #[cfg(feature = "tokio-runtime")]
             AuthMechanism::MongoDbAws => {
                 aws::authenticate_stream(stream, credential, http_client).await

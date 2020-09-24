@@ -6,7 +6,7 @@ use tokio::sync::RwLockReadGuard;
 use crate::{
     bson::{doc, Bson},
     error::{CommandError, Error, ErrorKind},
-    options::{AuthMechanism, ClientOptions, Credential, ListDatabasesOptions},
+    options::{AuthMechanism, ClientOptions, Credential, ListDatabasesOptions, StreamAddress},
     selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria},
     test::{util::TestClient, CLIENT_OPTIONS, LOCK},
     Client,
@@ -601,4 +601,50 @@ async fn x509_auth() {
         .find_one(None, None)
         .await
         .unwrap();
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn plain_auth() {
+    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
+
+    if std::env::var("MONGO_PLAIN_AUTH_TEST").is_err() {
+        return;
+    }
+
+    let options = ClientOptions::builder()
+        .hosts(vec![StreamAddress {
+            hostname: "ldaptest.10gen.cc".into(),
+            port: None,
+        }])
+        .credential(
+            Credential::builder()
+                .mechanism(AuthMechanism::Plain)
+                .username("drivers-team".to_string())
+                .password("mongor0x$xgen".to_string())
+                .build(),
+        )
+        .build();
+
+    let client = Client::with_options(options).unwrap();
+    let coll = client.database("ldap").collection("test");
+
+    let doc = coll.find_one(None, None).await.unwrap().unwrap();
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct TestDocument {
+        ldap: bool,
+        authenticated: String,
+    }
+
+    let doc: TestDocument = bson::from_document(doc).unwrap();
+
+    assert_eq!(
+        doc,
+        TestDocument {
+            ldap: true,
+            authenticated: "yeah".into()
+        }
+    );
 }
