@@ -126,6 +126,30 @@ pub struct ReadPreferenceOptions {
     /// specified for an operation, the operation will return an error.
     #[builder(default)]
     pub max_staleness: Option<Duration>,
+
+    /// Specifies hedging behavior for reads.
+    ///
+    /// See the [MongoDB docs](https://docs.mongodb.com/manual/core/read-preference-hedge-option/) for more details.
+    #[builder(default)]
+    pub hedge: Option<HedgedRead>,
+}
+
+/// Specifies hedging behavior for reads.
+///
+/// See the [MongoDB docs](https://docs.mongodb.com/manual/core/read-preference-hedge-option/) for more details.
+#[derive(Clone, Debug, Deserialize, PartialEq, TypedBuilder)]
+#[non_exhaustive]
+pub struct HedgedRead {
+    /// Whether or not to allow reads from a sharded cluster to be "hedged" across two replica
+    /// set members per shard, with the results from the first response received back from either
+    /// being returned.
+    pub enabled: bool,
+}
+
+impl HedgedRead {
+    pub fn with_enabled(enabled: bool) -> Self {
+        Self { enabled }
+    }
 }
 
 impl ReadPreference {
@@ -182,22 +206,32 @@ impl ReadPreference {
     }
 
     pub(crate) fn into_document(self) -> Document {
-        let (mode, tag_sets, max_staleness) = match self {
-            ReadPreference::Primary => ("primary", None, None),
-            ReadPreference::PrimaryPreferred { options } => {
-                ("primaryPreferred", options.tag_sets, options.max_staleness)
-            }
-            ReadPreference::Secondary { options } => {
-                ("secondary", options.tag_sets, options.max_staleness)
-            }
+        let (mode, tag_sets, max_staleness, hedge) = match self {
+            ReadPreference::Primary => ("primary", None, None, None),
+            ReadPreference::PrimaryPreferred { options } => (
+                "primaryPreferred",
+                options.tag_sets,
+                options.max_staleness,
+                options.hedge,
+            ),
+            ReadPreference::Secondary { options } => (
+                "secondary",
+                options.tag_sets,
+                options.max_staleness,
+                options.hedge,
+            ),
             ReadPreference::SecondaryPreferred { options } => (
                 "secondaryPreferred",
                 options.tag_sets,
                 options.max_staleness,
+                options.hedge,
             ),
-            ReadPreference::Nearest { options } => {
-                ("nearest", options.tag_sets, options.max_staleness)
-            }
+            ReadPreference::Nearest { options } => (
+                "nearest",
+                options.tag_sets,
+                options.max_staleness,
+                options.hedge,
+            ),
         };
 
         let mut doc = doc! { "mode": mode };
@@ -216,9 +250,34 @@ impl ReadPreference {
             doc.insert("tags", tags);
         }
 
+        if let Some(hedge) = hedge {
+            doc.insert("hedge", doc! { "enabled": hedge.enabled });
+        }
+
         doc
     }
 }
 
 /// A read preference tag set. See the documentation [here](https://docs.mongodb.com/manual/tutorial/configure-replica-set-tag-sets/) for more details.
 pub type TagSet = HashMap<String, String>;
+
+#[cfg(test)]
+mod test {
+    use super::{HedgedRead, ReadPreference, ReadPreferenceOptions};
+    use crate::bson::doc;
+
+    #[test]
+    fn hedged_read_included_in_document() {
+        let options = ReadPreferenceOptions::builder()
+            .hedge(HedgedRead { enabled: true })
+            .build();
+
+        let read_pref = ReadPreference::Secondary { options };
+        let doc = read_pref.into_document();
+
+        assert_eq!(
+            doc,
+            doc! { "mode": "secondary", "hedge": { "enabled": true } }
+        );
+    }
+}
