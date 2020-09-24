@@ -12,7 +12,7 @@ use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
 
 use crate::bson::{doc, oid::ObjectId, Bson};
 use semver::Version;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use self::event::EventHandler;
 use super::CLIENT_OPTIONS;
@@ -169,6 +169,17 @@ impl TestClient {
     pub async fn init_db_and_coll(&self, db_name: &str, coll_name: &str) -> Collection {
         let coll = self.get_coll(db_name, coll_name);
         drop_collection(&coll).await;
+        coll
+    }
+
+    pub async fn init_db_and_coll_with_type<T>(&self, db_name: &str, coll_name: &str) -> Collection<T> where T: Serialize {
+        let coll: Collection<T> = self.database(db_name).collection_with_type(coll_name);
+        match coll.drop(None).await.as_ref().map_err(|e| e.as_ref()) {
+            Err(ErrorKind::CommandError(CommandError { code: 26, .. })) | Ok(_) => {}
+            e @ Err(_) => {
+                e.unwrap();
+            }
+        }
         coll
     }
 

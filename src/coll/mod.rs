@@ -41,6 +41,9 @@ const MAX_INSERT_DOCS_BYTES: usize = 16 * 1000 * 1000;
 /// [`Database::collection`](struct.Database.html#method.collection) or
 /// [`Database::collection_with_options`](struct.Database.html#method.collection_with_options).
 ///
+/// `Collection` is generic over `T` which defines the data type that can be inserted into a
+/// `Collection`. `T` defaults to `Document`.
+///
 /// `Collection` uses [`std::sync::Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html) internally,
 /// so it can safely be shared across threads or async tasks. For example:
 ///
@@ -122,6 +125,8 @@ where
         }
     }
 
+    // isabeltodo this comment sucks
+    // Returns a clone of the `Collection` with a different type `T`.
     pub fn clone_with_type<U>(&self) -> Collection<U> where U: Serialize {
         let mut options = CollectionOptions::builder().build();
         options.selection_criteria = self.inner.selection_criteria.clone();

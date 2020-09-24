@@ -1,12 +1,13 @@
 use std::time::Duration;
 
-use futures::stream::StreamExt;
+use futures::stream::{StreamExt, TryStreamExt};
 use lazy_static::lazy_static;
 use semver::VersionReq;
+use serde::{Deserialize, Serialize};
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
-    bson::{doc, Bson, Document},
+    bson::{doc, from_document, Bson, Document},
     error::{ErrorKind, Result, WriteFailure},
     event::command::CommandStartedEvent,
     options::{
@@ -753,4 +754,145 @@ async fn no_read_preference_to_standalone() {
     let command_started = client.get_successful_command_execution("find").0;
 
     assert!(!command_started.command.contains_key("$readPreference"));
+}
+
+#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
+struct UserType {
+    x: i32,
+    str: String,
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn typed_insert_one() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+    let coll = client
+        .init_db_and_coll_with_type(function_name!(), function_name!())
+        .await;
+
+    let insert_data = UserType {
+        x: 1,
+        str: "a".into(),
+    };
+    coll.insert_one(insert_data.clone(), None)
+        .await
+        .unwrap_or_else(|_| panic!("insert_one should succeed"));
+
+    let result = coll
+        .find_one(None, None)
+        .await
+        .unwrap_or_else(|_| panic!("find_one should succeed"));
+    match result {
+        Some(actual) => {
+            let actual: UserType = from_document(actual).unwrap();
+            assert_eq!(actual, insert_data);
+        }
+        None => panic!("find_one should return a value"),
+    }
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn typed_insert_many() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+    let coll = client
+        .init_db_and_coll_with_type(function_name!(), function_name!())
+        .await;
+
+    let insert_data = vec![
+        UserType {
+            x: 2,
+            str: "a".into(),
+        },
+        UserType {
+            x: 2,
+            str: "b".into(),
+        },
+    ];
+    coll.insert_many(insert_data.clone(), None)
+        .await
+        .unwrap_or_else(|_| panic!("insert_many should succeed"));
+
+    let options = FindOptions::builder().sort(doc! { "x": 1 }).build();
+    let docs: Vec<Document> = coll
+        .find(doc! { "x": 2 }, options)
+        .await
+        .unwrap()
+        .try_collect()
+        .await
+        .unwrap();
+    let actual: Vec<UserType> = docs
+        .iter()
+        .map(|doc| from_document(doc.clone()).unwrap())
+        .collect();
+    assert_eq!(actual, insert_data);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn typed_find_one_and_replace() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+    let coll = client
+        .init_db_and_coll_with_type(function_name!(), function_name!())
+        .await;
+
+    let insert_data = UserType {
+        x: 1,
+        str: "a".into(),
+    };
+    coll.insert_one(insert_data.clone(), None).await.unwrap();
+
+    let replacement = UserType {
+        x: 2,
+        str: "b".into(),
+    };
+    let result = coll
+        .find_one_and_replace(doc! { "x": 1 }, replacement.clone(), None)
+        .await
+        .unwrap()
+        .unwrap();
+    let result: UserType = from_document(result).unwrap();
+    assert_eq!(result, insert_data);
+
+    let result = coll.find_one(doc! { "x": 2 }, None).await.unwrap().unwrap();
+    let result: UserType = from_document(result).unwrap();
+    assert_eq!(result, replacement);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn typed_replace_one() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+    let coll = client
+        .init_db_and_coll_with_type(function_name!(), function_name!())
+        .await;
+
+    let insert_data = UserType {
+        x: 1,
+        str: "a".into(),
+    };
+    let replacement = UserType {
+        x: 2,
+        str: "b".into(),
+    };
+    coll.insert_one(insert_data, None).await.unwrap();
+    coll.replace_one(doc! { "x": 1 }, replacement.clone(), None)
+        .await
+        .unwrap();
+
+    let result = coll.find_one(doc! { "x": 2 }, None).await.unwrap().unwrap();
+    let result: UserType = from_document(result).unwrap();
+    assert_eq!(result, replacement);
 }
