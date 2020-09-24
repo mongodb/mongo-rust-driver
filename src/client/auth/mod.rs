@@ -147,6 +147,13 @@ impl AuthMechanism {
                     .into());
                 }
 
+                if credential.username.as_deref() == Some("") {
+                    return Err(ErrorKind::ArgumentError {
+                        message: "Username for PLAIN authentication must be non-empty".to_string(),
+                    }
+                    .into());
+                }
+
                 if credential.password.is_none() {
                     return Err(ErrorKind::ArgumentError {
                         message: "No password provided for PLAIN authentication".to_string(),
