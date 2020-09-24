@@ -3,29 +3,24 @@ mod stream_description;
 mod wire;
 
 use std::{
-    sync::{Arc, Weak},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
 use derivative::Derivative;
 
 use self::wire::Message;
-use super::ConnectionPoolInner;
+use super::manager::PoolManager;
 use crate::{
     cmap::options::{ConnectionOptions, StreamOptions},
     error::{ErrorKind, Result},
     event::cmap::{
-        CmapEventHandler,
-        ConnectionCheckedInEvent,
-        ConnectionCheckedOutEvent,
-        ConnectionClosedEvent,
-        ConnectionClosedReason,
-        ConnectionCreatedEvent,
+        CmapEventHandler, ConnectionCheckedInEvent, ConnectionCheckedOutEvent,
+        ConnectionClosedEvent, ConnectionClosedReason, ConnectionCreatedEvent,
         ConnectionReadyEvent,
     },
     options::{StreamAddress, TlsOptions},
     runtime::AsyncStream,
-    RUNTIME,
 };
 pub(crate) use command::{Command, CommandResponse};
 pub(crate) use stream_description::StreamDescription;
@@ -56,10 +51,9 @@ pub(crate) struct Connection {
     /// to detect if the connection is idle.
     ready_and_available_time: Option<Instant>,
 
-    /// The connection will have a weak reference to its pool when it's checked out. When it's
-    /// A reference to the pool that maintains the connection. If the connection is currently
-    /// currently checked into the pool, this will be None.
-    pub(super) pool: Option<Weak<ConnectionPoolInner>>,
+    /// PoolManager used to check this connection back in when dropped.
+    /// None when checked into the pool.
+    pub(super) pool_manager: Option<PoolManager>,
 
     /// Whether or not a command is currently being run on this connection. This is set to `true`
     /// right before sending bytes to the server and set back to `false` once a full response has
@@ -93,7 +87,7 @@ impl Connection {
         let conn = Self {
             id,
             generation,
-            pool: None,
+            pool_manager: None,
             command_executing: false,
             ready_and_available_time: None,
             stream: AsyncStream::connect(stream_options).await?,
@@ -160,15 +154,15 @@ impl Connection {
     /// Helper to mark the time that the connection was checked into the pool for the purpose of
     /// detecting when it becomes idle.
     pub(super) fn mark_as_available(&mut self) {
-        self.pool.take();
+        self.pool_manager.take();
         self.ready_and_available_time = Some(Instant::now());
     }
 
     /// Helper to mark that the connection has been checked out of the pool. This ensures that the
     /// connection is not marked as idle based on the time that it's checked out and that it has a
     /// reference to the pool.
-    pub(super) fn mark_as_in_use(&mut self, pool: Weak<ConnectionPoolInner>) {
-        self.pool = Some(pool);
+    pub(super) fn mark_as_in_use(&mut self, manager: PoolManager) {
+        self.pool_manager = Some(manager);
         self.ready_and_available_time.take();
     }
 
@@ -272,17 +266,16 @@ impl Connection {
 
     /// Close this connection, emitting a `ConnectionClosedEvent` with the supplied reason.
     fn close(&mut self, reason: ConnectionClosedReason) {
-        self.pool.take();
+        self.pool_manager.take();
         if let Some(ref handler) = self.handler {
             handler.handle_connection_closed_event(self.closed_event(reason));
         }
     }
 
-    /// Nullify the inner state and return it in a `DroppedConnectionState` for checking back in to
-    /// the pool in a background task.
-    fn take(&mut self) -> DroppedConnectionState {
-        self.pool.take();
-        DroppedConnectionState {
+    /// Nullify the inner state and return it in a new `Connection` for checking back in to
+    /// the pool.
+    fn take(&mut self) -> Connection {
+        Connection {
             id: self.id,
             address: self.address.clone(),
             generation: self.generation,
@@ -291,93 +284,31 @@ impl Connection {
             stream_description: self.stream_description.take(),
             command_executing: self.command_executing,
             error: self.error,
+            pool_manager: self.pool_manager.take(),
+            ready_and_available_time: self.ready_and_available_time,
         }
     }
 }
 
 impl Drop for Connection {
     fn drop(&mut self) {
-        // If the connection has a weak reference to a pool, that means that the connection is
+        // If the connection has a pool manager, that means that the connection is
         // being dropped when it's checked out. If the pool is still alive, it
         // should check itself back in. Otherwise, the connection should close
         // itself and emit a ConnectionClosed event (because the `close_and_drop`
         // helper was not called explicitly).
         //
-        // If the connection does not have a weak reference to a pool, then the connection is
+        // If the connection does not have a pool manager, then the connection is
         // being dropped while it's not checked out. This means that the pool called
         // the `close_and_drop` helper explicitly, so we don't add it back to the
         // pool or emit any events.
-        if let Some(ref weak_pool_ref) = self.pool {
-            if let Some(strong_pool_ref) = weak_pool_ref.upgrade() {
-                let dropped_connection_state = self.take();
-                RUNTIME.execute(async move {
-                    strong_pool_ref
-                        .check_in(dropped_connection_state.into())
-                        .await;
-                });
-            } else {
-                self.close(ConnectionClosedReason::PoolClosed);
+        if let Some(pool_manager) = self.pool_manager.take() {
+            let dropped_connection = self.take();
+            if let Err(mut conn) = pool_manager.check_in(dropped_connection) {
+                // the check in failed because the pool has been dropped, so we emit the event
+                // here and drop the connection.
+                conn.close(ConnectionClosedReason::PoolClosed);
             }
-        }
-    }
-}
-
-/// Struct encapsulating the state of a connection that has been dropped.
-///
-/// Because `Drop::drop` cannot be async, we package the internal state of a dropped connection into
-/// this struct, and move it into an async task that will attempt to check the reconstructed
-/// connection back into the pool.
-///
-/// If the async runtime has been dropped, that task will not execute, and this state will be
-/// dropped. From there, we simply emit a connection closed event and do not attempt to reconstruct
-/// the `Connection`.
-#[derive(Derivative)]
-#[derivative(Debug)]
-struct DroppedConnectionState {
-    pub(super) id: u32,
-    pub(super) address: StreamAddress,
-    pub(super) generation: u32,
-    stream: AsyncStream,
-    #[derivative(Debug = "ignore")]
-    handler: Option<Arc<dyn CmapEventHandler>>,
-    stream_description: Option<StreamDescription>,
-    command_executing: bool,
-    error: bool,
-}
-
-impl Drop for DroppedConnectionState {
-    /// If this drop is called, that means the async runtime itself was dropped before the
-    /// connection could be checked back in to the pool. Instead of checking back into the pool
-    /// again, we just close the connection directly.
-    fn drop(&mut self) {
-        if let Some(ref handler) = self.handler {
-            let reason = if self.error {
-                ConnectionClosedReason::Error
-            } else {
-                ConnectionClosedReason::PoolClosed
-            };
-            handler.handle_connection_closed_event(ConnectionClosedEvent {
-                address: self.address.clone(),
-                connection_id: self.id,
-                reason,
-            });
-        }
-    }
-}
-
-impl From<DroppedConnectionState> for Connection {
-    fn from(mut state: DroppedConnectionState) -> Self {
-        Self {
-            id: state.id,
-            address: state.address.clone(),
-            generation: state.generation,
-            command_executing: state.command_executing,
-            stream: std::mem::replace(&mut state.stream, AsyncStream::Null),
-            handler: state.handler.take(),
-            stream_description: state.stream_description.take(),
-            ready_and_available_time: None,
-            pool: None,
-            error: state.error,
         }
     }
 }

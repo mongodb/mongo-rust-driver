@@ -3,12 +3,14 @@ use std::collections::VecDeque;
 use serde::Deserialize;
 
 use super::event::Event;
-use crate::{cmap::options::ConnectionPoolOptions, error::ErrorKind};
+use crate::{cmap::options::ConnectionPoolOptions, error::ErrorKind, test::RunOn};
+use bson::Document;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TestFile {
     version: u8,
+    style: TestStyle,
     pub description: String,
     pub pool_options: Option<ConnectionPoolOptions>,
     operations: VecDeque<ThreadedOperation>,
@@ -16,6 +18,15 @@ pub struct TestFile {
     pub events: Vec<Event>,
     #[serde(default)]
     pub ignore: Vec<String>,
+    pub fail_point: Option<Document>,
+    pub run_on: Option<Vec<RunOn>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum TestStyle {
+    Unit,
+    Integration,
 }
 
 #[derive(Debug, Deserialize)]

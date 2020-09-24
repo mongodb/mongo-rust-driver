@@ -6,7 +6,7 @@ use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 
 use futures::future::{BoxFuture, FutureExt};
 
-use tokio::sync::{RwLock, RwLockReadGuard};
+use tokio::sync::{Mutex, RwLock, RwLockReadGuard};
 
 use self::{
     event::{Event, EventHandler},
@@ -18,7 +18,7 @@ use crate::{
     error::{Error, Result},
     options::TlsOptions,
     runtime::AsyncJoinHandle,
-    test::{assert_matches, run_spec_test, Matchable, CLIENT_OPTIONS, LOCK},
+    test::{assert_matches, run_spec_test, EventClient, Matchable, CLIENT_OPTIONS, LOCK},
     RUNTIME,
 };
 
@@ -52,6 +52,7 @@ struct Executor {
 struct State {
     handler: Arc<EventHandler>,
     connections: RwLock<HashMap<String, Connection>>,
+    unlabeled_connections: Mutex<Vec<Connection>>,
     threads: RwLock<HashMap<String, AsyncJoinHandle<Result<()>>>>,
 
     // In order to drop the pool when performing a `close` operation, we use an `Option` so that we
@@ -89,6 +90,7 @@ impl Executor {
             pool: RwLock::new(None),
             connections: Default::default(),
             threads: Default::default(),
+            unlabeled_connections: Mutex::new(Default::default()),
         };
 
         Self {
@@ -184,14 +186,9 @@ impl Operation {
                     state.threads.write().await.insert(target, task.unwrap());
                 }
                 Operation::Wait { ms } => RUNTIME.delay_for(Duration::from_millis(ms)).await,
-                Operation::WaitForThread { target } => state
-                    .threads
-                    .write()
-                    .await
-                    .remove(&target)
-                    .unwrap()
-                    .await
-                    .expect("polling the future should not fail")?,
+                Operation::WaitForThread { target } => {
+                    state.threads.write().await.remove(&target).unwrap().await?
+                }
                 Operation::WaitForEvent { event, count } => {
                     while state.count_events(&event) < count {
                         RUNTIME.delay_for(Duration::from_millis(100)).await;
@@ -199,12 +196,12 @@ impl Operation {
                 }
                 Operation::CheckOut { label } => {
                     if let Some(pool) = state.pool.read().await.deref() {
-                        let mut conn = pool.check_out().await?;
+                        let conn = pool.check_out().await?;
 
                         if let Some(label) = label {
                             state.connections.write().await.insert(label, conn);
                         } else {
-                            conn.pool.take();
+                            state.unlabeled_connections.lock().await.push(conn);
                         }
                     }
                 }
@@ -232,6 +229,8 @@ impl Operation {
                 Operation::Clear => {
                     if let Some(pool) = state.pool.write().await.deref() {
                         pool.clear();
+                        // give some time for clear to happen.
+                        RUNTIME.delay_for(Duration::from_millis(500)).await;
                     }
                 }
                 Operation::Close => {
@@ -323,11 +322,30 @@ impl Matchable for Event {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn cmap_spec_tests() {
     async fn run_cmap_spec_tests(test_file: TestFile) {
+        if test_file.description.contains("maxConnecting") {
+            return;
+        }
         if TEST_DESCRIPTIONS_TO_SKIP.contains(&test_file.description.as_str()) {
             return;
         }
 
         let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
+        let client = EventClient::new().await;
+        if let Some(ref run_on) = test_file.run_on {
+            let can_run_on = run_on.iter().any(|run_on| run_on.can_run_on(&client));
+            if !can_run_on {
+                return;
+            }
+        }
+
+        if let Some(ref fail_point) = test_file.fail_point {
+            client
+                .database("admin")
+                .run_command(fail_point.clone(), None)
+                .await
+                .unwrap();
+        }
 
         let executor = Executor::new(test_file);
         executor.execute_test().await;
