@@ -34,6 +34,7 @@ struct Executor {
     error: Option<self::file::Error>,
     events: Vec<Event>,
     state: Arc<State>,
+    ignored_event_names: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -69,7 +70,7 @@ impl State {
 impl Executor {
     fn new(mut test_file: TestFile) -> Self {
         let operations = test_file.process_operations();
-        let handler = Arc::new(EventHandler::new(test_file.ignore));
+        let handler = Arc::new(EventHandler::new());
         let error = test_file.error;
 
         test_file
@@ -101,12 +102,15 @@ impl Executor {
             events: test_file.events,
             operations,
             state: Arc::new(state),
+            ignored_event_names: test_file.ignore,
         }
     }
 
     async fn execute_test(self) {
         let mut error: Option<Error> = None;
         let operations = self.operations;
+
+        println!("Executing {}", self.description);
 
         for operation in operations {
             let err = operation.execute(self.state.clone()).await.err();
@@ -142,9 +146,20 @@ impl Executor {
         if self.state.count_all_events() < self.events.len() {
             RUNTIME.delay_for(Duration::from_millis(250)).await;
         }
-        let actual_events = self.state.handler.events.read().unwrap();
 
-        assert!(actual_events.len() >= self.events.len(), self.description);
+        let ignored_event_names = self.ignored_event_names;
+        let mut actual_events = self.state.handler.events.write().unwrap();
+        actual_events.retain(|e| !ignored_event_names.iter().any(|name| e.name() == name));
+
+        if actual_events.len() < self.events.len() {
+            panic!(
+                "{}: more events expected than were actually received. expected: {:?}, actual: \
+                 {:?}",
+                self.description,
+                self.events,
+                actual_events.deref()
+            )
+        }
         for i in 0..self.events.len() {
             assert_matches(
                 &actual_events[i],
@@ -209,7 +224,7 @@ impl Operation {
                 }
                 Operation::Clear => {
                     if let Some(pool) = state.pool.write().await.deref() {
-                        pool.clear().await;
+                        pool.clear();
                     }
                 }
                 Operation::Close => {

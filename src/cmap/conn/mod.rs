@@ -73,8 +73,7 @@ pub(crate) struct Connection {
 }
 
 impl Connection {
-    /// Constructs a new connection.
-    pub(crate) async fn new(
+    async fn new(
         id: u32,
         address: StreamAddress,
         generation: u32,
@@ -101,7 +100,19 @@ impl Connection {
         Ok(conn)
     }
 
-    pub(crate) async fn new_monitoring(
+    /// Constructs and connects a new connection.
+    pub(super) async fn connect(pending_connection: PendingConnection) -> Result<Self> {
+        Self::new(
+            pending_connection.id,
+            pending_connection.address.clone(),
+            pending_connection.generation,
+            pending_connection.options,
+        )
+        .await
+    }
+
+    /// Construct and connect a new connection used for monitoring.
+    pub(crate) async fn connect_monitoring(
         address: StreamAddress,
         connect_timeout: Option<Duration>,
         tls_options: Option<TlsOptions>,
@@ -119,6 +130,16 @@ impl Connection {
         .await
     }
 
+    #[cfg(test)]
+    pub(crate) async fn new_testing(
+        id: u32,
+        address: StreamAddress,
+        generation: u32,
+        options: Option<ConnectionOptions>,
+    ) -> Result<Self> {
+        Self::new(id, address, generation, options).await
+    }
+
     pub(crate) fn info(&self) -> ConnectionInfo {
         ConnectionInfo {
             id: self.id,
@@ -132,7 +153,7 @@ impl Connection {
 
     /// Helper to mark the time that the connection was checked into the pool for the purpose of
     /// detecting when it becomes idle.
-    pub(super) fn mark_checked_in(&mut self) {
+    pub(super) fn mark_as_available(&mut self) {
         self.pool.take();
         self.ready_and_available_time = Some(Instant::now());
     }
@@ -140,7 +161,7 @@ impl Connection {
     /// Helper to mark that the connection has been checked out of the pool. This ensures that the
     /// connection is not marked as idle based on the time that it's checked out and that it has a
     /// reference to the pool.
-    pub(super) fn mark_checked_out(&mut self, pool: Weak<ConnectionPoolInner>) {
+    pub(super) fn mark_as_in_use(&mut self, pool: Weak<ConnectionPoolInner>) {
         self.pool = Some(pool);
         self.ready_and_available_time.take();
     }
@@ -190,15 +211,7 @@ impl Connection {
         }
     }
 
-    /// Helper to create a `ConnectionReadyEvent` for the connection.
-    pub(super) fn created_event(&self) -> ConnectionCreatedEvent {
-        ConnectionCreatedEvent {
-            address: self.address.clone(),
-            connection_id: self.id,
-        }
-    }
-
-    /// Helper to create a `ConnectionReadyEvent` for the connection.
+    /// Helper to create a `ConnectionClosedEvent` for the connection.
     pub(super) fn closed_event(&self, reason: ConnectionClosedReason) -> ConnectionClosedEvent {
         ConnectionClosedEvent {
             address: self.address.clone(),
@@ -343,6 +356,29 @@ impl From<DroppedConnectionState> for Connection {
             stream_description: state.stream_description.take(),
             ready_and_available_time: None,
             pool: None,
+        }
+    }
+}
+
+/// Struct encapsulating the information needed to establish a `Connection`.
+///
+/// Creating a `PendingConnection` contributes towards the total connection count of a pool, despite
+/// not actually making a TCP connection to the pool's endpoint. This models a "pending" Connection
+/// from the CMAP specification.
+#[derive(Debug)]
+pub(super) struct PendingConnection {
+    pub(super) id: u32,
+    pub(super) address: StreamAddress,
+    pub(super) generation: u32,
+    pub(super) options: Option<ConnectionOptions>,
+}
+
+impl PendingConnection {
+    /// Helper to create a `ConnectionCreatedEvent` for the connection.
+    pub(super) fn created_event(&self) -> ConnectionCreatedEvent {
+        ConnectionCreatedEvent {
+            address: self.address.clone(),
+            connection_id: self.id,
         }
     }
 }

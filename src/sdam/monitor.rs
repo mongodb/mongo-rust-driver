@@ -130,7 +130,7 @@ impl Monitor {
             return Ok(connection);
         }
 
-        let connection = Connection::new_monitoring(
+        let connection = Connection::connect_monitoring(
             self.address.clone(),
             self.topology.client_options().connect_timeout,
             self.topology.client_options().tls_options(),
@@ -144,7 +144,7 @@ impl Monitor {
 
     async fn clear_connection_pool(&self) {
         if let Some(server) = self.server.upgrade() {
-            server.clear_connection_pool().await;
+            server.clear_connection_pool();
         }
     }
 }

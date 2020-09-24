@@ -37,7 +37,7 @@ impl Server {
     }
 
     /// Clears the connection pool associated with the server.
-    pub(crate) async fn clear_connection_pool(&self) {
-        self.pool.clear().await;
+    pub(crate) fn clear_connection_pool(&self) {
+        self.pool.clear();
     }
 }

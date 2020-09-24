@@ -3,7 +3,7 @@ mod handshake;
 mod test;
 
 use self::handshake::Handshaker;
-use super::{options::ConnectionPoolOptions, Connection};
+use super::{conn::PendingConnection, options::ConnectionPoolOptions, Connection};
 use crate::{client::auth::Credential, error::Result, runtime::HttpClient};
 
 /// Contains the logic to establish a connection, including handshaking, authenticating, and
@@ -29,18 +29,23 @@ impl ConnectionEstablisher {
     }
 
     /// Establishes a connection.
-    pub(super) async fn establish_connection(&self, connection: &mut Connection) -> Result<()> {
+    pub(super) async fn establish_connection(
+        &self,
+        pending_connection: PendingConnection,
+    ) -> Result<Connection> {
+        let mut connection = Connection::connect(pending_connection).await?;
+
         let first_round = self
             .handshaker
-            .handshake(connection, self.credential.as_ref())
+            .handshake(&mut connection, self.credential.as_ref())
             .await?;
 
         if let Some(ref credential) = self.credential {
             credential
-                .authenticate_stream(connection, &self.http_client, first_round)
+                .authenticate_stream(&mut connection, &self.http_client, first_round)
                 .await?;
         }
 
-        Ok(())
+        Ok(connection)
     }
 }
