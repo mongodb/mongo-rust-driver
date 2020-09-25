@@ -246,11 +246,11 @@ async fn cluster_time_in_commands() {
         options.heartbeat_freq = Some(Duration::from_secs(1000));
         let client = EventClient::with_options(options).await;
 
-        operation(client.clone())
+        operation(client.clone_inner())
             .await
             .expect("operation should succeed");
 
-        operation(client.clone())
+        operation(client.clone_inner())
             .await
             .expect("operation should succeed");
 
@@ -330,7 +330,7 @@ async fn session_usage() {
         G: Future<Output = ()>,
     {
         let client = EventClient::new().await;
-        operation(client.clone()).await;
+        operation(client.clone_inner()).await;
         let (command_started, _) = client.get_successful_command_execution(command_name);
         assert!(
             command_started.command.get("lsid").is_some(),

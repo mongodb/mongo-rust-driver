@@ -18,7 +18,7 @@ use crate::{
         SelectionCriteria,
         WriteConcern,
     },
-    test::TestClient,
+    test::{TestClient, DEFAULT_URI},
 };
 
 #[derive(Debug, Deserialize)]
@@ -116,7 +116,7 @@ pub struct Client {
 }
 
 fn default_uri() -> String {
-    std::env::var("MONGODB_URI").unwrap_or_else(|_| "mongodb://localhost:27017/".to_string())
+    DEFAULT_URI.to_string()
 }
 
 fn deserialize_uri_options_to_uri_string<'de, D>(
@@ -127,10 +127,9 @@ where
 {
     let uri_options = Document::deserialize(deserializer)?;
 
-    let uri = default_uri();
-    let mut split_uri = uri.split('?');
+    let mut default_uri_parts = DEFAULT_URI.split('?');
 
-    let mut uri = String::from(split_uri.next().unwrap());
+    let mut uri = String::from(default_uri_parts.next().unwrap());
     // A connection string has two slashes before the host list and one slash before the auth db
     // name. If an auth db name is not provided the latter slash might not be present, so it needs
     // to be added manually.
@@ -139,7 +138,7 @@ where
     }
     uri.push('?');
 
-    if let Some(options) = split_uri.next() {
+    if let Some(options) = default_uri_parts.next() {
         let options = options.split('&');
         for option in options {
             let key = option.split('=').next().unwrap();
@@ -159,7 +158,7 @@ where
         uri.push_str(&format!("{}={}&", &key, value));
     }
 
-    // remove the trailing '&' from the URI
+    // remove the trailing '&' from the URI (or '?' if no options are present)
     uri.pop();
 
     Ok(uri)

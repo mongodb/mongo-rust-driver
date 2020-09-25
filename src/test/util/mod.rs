@@ -120,6 +120,10 @@ impl TestClient {
         Self::with_options(Some(options)).await
     }
 
+    pub fn clone_inner(&self) -> Client {
+        self.client.clone()
+    }
+
     pub async fn create_user(
         &self,
         user: &str,

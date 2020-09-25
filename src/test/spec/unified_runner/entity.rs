@@ -1,15 +1,29 @@
-use std::ops::Deref;
+use std::{fmt, ops::Deref};
 
 use crate::{bson::Bson, test::util::EventClient, Collection, Database};
 
+#[derive(Clone)]
 pub enum Entity {
     Client(ClientEntity),
     Database(Database),
     Collection(Collection),
-    Result(Bson),
+    Bson(Bson),
     None,
 }
 
+impl fmt::Debug for Entity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Client(_) => f.write_str("client"),
+            Self::Database(_) => f.write_str("database"),
+            Self::Collection(_) => f.write_str("collection"),
+            Self::Bson(_) => f.write_str("bson"),
+            Self::None => f.write_str("none"),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct ClientEntity {
     client: EventClient,
     pub observe_events: Option<Vec<String>>,
@@ -28,12 +42,9 @@ impl From<Collection> for Entity {
     }
 }
 
-impl From<Option<Bson>> for Entity {
-    fn from(result: Option<Bson>) -> Self {
-        match result {
-            Some(result) => Self::Result(result),
-            None => Self::None,
-        }
+impl From<Bson> for Entity {
+    fn from(bson: Bson) -> Self {
+        Self::Bson(bson)
     }
 }
 
@@ -69,6 +80,13 @@ impl Entity {
         match self {
             Self::Database(database) => database,
             _ => panic!("Entity not a database"),
+        }
+    }
+
+    pub fn as_collection(&self) -> &Collection {
+        match self {
+            Self::Collection(collection) => collection,
+            _ => panic!("Entity not a collection"),
         }
     }
 }

@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use futures::stream::TryStreamExt;
 use serde::{de::Deserializer, Deserialize};
 
-use super::{Entity, ExpectError};
+use super::{ClientEntity, Entity, ExpectError, TestRunner};
 
 use crate::{
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
@@ -30,30 +30,17 @@ use crate::{
         UpdateModifications,
         UpdateOptions,
     },
-    test::{util::EventClient, TestClient},
     Collection,
     Database,
 };
 
 #[async_trait]
 pub trait TestOperation: Debug {
-    /// The command names to monitor as part of this test.
-    fn command_names(&self) -> &[&str];
-
-    // The linked issue causes a warning that cannot be suppressed when providing a default
-    // implementation for these functions.
-    // <https://github.com/rust-lang/rust/issues/51443>
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>>;
-
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>>;
-
-    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>>;
-
-    async fn execute_on_test_runner(
+    async fn execute<'a>(
         &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document>;
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>>;
 }
 
 #[derive(Debug)]
@@ -70,6 +57,29 @@ pub struct Operation {
 pub enum OperationObject {
     TestRunner,
     Entity(String),
+}
+
+impl OperationObject {
+    pub fn as_client<'a>(&self, entities: &'a HashMap<String, Entity>) -> &'a ClientEntity {
+        match self {
+            Self::Entity(id) => entities.get(id).unwrap().as_client(),
+            Self::TestRunner => panic!("cannot convert TestRunner object to Client"),
+        }
+    }
+
+    pub fn as_database<'a>(&self, entities: &'a HashMap<String, Entity>) -> &'a Database {
+        match self {
+            Self::Entity(id) => entities.get(id).unwrap().as_database(),
+            Self::TestRunner => panic!("cannot convert TestRunner to Database"),
+        }
+    }
+
+    pub fn as_collection<'a>(&self, entities: &'a HashMap<String, Entity>) -> &'a Collection {
+        match self {
+            Self::Entity(id) => entities.get(id).unwrap().as_collection(),
+            Self::TestRunner => panic!("cannot convert TestRunner to Collection"),
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for OperationObject {
@@ -186,17 +196,6 @@ impl<'de> Deserialize<'de> for Operation {
     }
 }
 
-impl Entity {
-    pub async fn execute_operation(&self, operation: &Operation) -> Result<Option<Bson>> {
-        match self {
-            Entity::Client(client) => operation.execute_on_client(client).await,
-            Entity::Database(db) => operation.execute_on_database(db).await,
-            Entity::Collection(coll) => operation.execute_on_collection(coll).await,
-            _ => panic!("Cannot execute operation on entity"),
-        }
-    }
-}
-
 impl Deref for Operation {
     type Target = Box<dyn TestOperation>;
 
@@ -214,32 +213,17 @@ pub(super) struct DeleteMany {
 
 #[async_trait]
 impl TestOperation for DeleteMany {
-    fn command_names(&self) -> &[&str] {
-        &["delete"]
-    }
-
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+    async fn execute<'a>(
+        &self,
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let collection = object.as_collection(&test_runner.entities);
         let result = collection
             .delete_many(self.filter.clone(), self.options.clone())
             .await?;
         let result = bson::to_bson(&result)?;
-        Ok(Some(result))
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_test_runner(
-        &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        unimplemented!()
+        Ok(Some(result.into()))
     }
 }
 
@@ -252,32 +236,17 @@ pub(super) struct DeleteOne {
 
 #[async_trait]
 impl TestOperation for DeleteOne {
-    fn command_names(&self) -> &[&str] {
-        &["delete"]
-    }
-
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+    async fn execute<'a>(
+        &self,
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let collection = object.as_collection(&test_runner.entities);
         let result = collection
             .delete_one(self.filter.clone(), self.options.clone())
             .await?;
         let result = bson::to_bson(&result)?;
-        Ok(Some(result))
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_test_runner(
-        &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        unimplemented!()
+        Ok(Some(result.into()))
     }
 }
 
@@ -290,32 +259,17 @@ pub(super) struct Find {
 
 #[async_trait]
 impl TestOperation for Find {
-    fn command_names(&self) -> &[&str] {
-        &["find", "getMore"]
-    }
-
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+    async fn execute<'a>(
+        &self,
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let collection = object.as_collection(&test_runner.entities);
         let cursor = collection
             .find(self.filter.clone(), self.options.clone())
             .await?;
         let result = cursor.try_collect::<Vec<Document>>().await?;
-        Ok(Some(Bson::from(result)))
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_test_runner(
-        &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        unimplemented!()
+        Ok(Some(Bson::from(result).into()))
     }
 }
 
@@ -328,11 +282,12 @@ pub(super) struct InsertMany {
 
 #[async_trait]
 impl TestOperation for InsertMany {
-    fn command_names(&self) -> &[&str] {
-        &["insert"]
-    }
-
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+    async fn execute<'a>(
+        &self,
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let collection = object.as_collection(&test_runner.entities);
         let result = collection
             .insert_many(self.documents.clone(), self.options.clone())
             .await?;
@@ -342,23 +297,7 @@ impl TestOperation for InsertMany {
             .map(|(k, v)| (k.to_string(), v))
             .collect();
         let ids = bson::to_bson(&ids)?;
-        Ok(Some(Bson::from(doc! { "insertedIds": ids })))
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_test_runner(
-        &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        unimplemented!()
+        Ok(Some(Bson::from(doc! { "insertedIds": ids }).into()))
     }
 }
 
@@ -371,32 +310,17 @@ pub(super) struct InsertOne {
 
 #[async_trait]
 impl TestOperation for InsertOne {
-    fn command_names(&self) -> &[&str] {
-        &["insert"]
-    }
-
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+    async fn execute<'a>(
+        &self,
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let collection = object.as_collection(&test_runner.entities);
         let result = collection
             .insert_one(self.document.clone(), self.options.clone())
             .await?;
         let result = bson::to_bson(&result)?;
-        Ok(Some(result))
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_test_runner(
-        &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        unimplemented!()
+        Ok(Some(result.into()))
     }
 }
 
@@ -410,11 +334,12 @@ pub(super) struct UpdateMany {
 
 #[async_trait]
 impl TestOperation for UpdateMany {
-    fn command_names(&self) -> &[&str] {
-        &["update"]
-    }
-
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+    async fn execute<'a>(
+        &self,
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let collection = object.as_collection(&test_runner.entities);
         let result = collection
             .update_many(
                 self.filter.clone(),
@@ -423,23 +348,7 @@ impl TestOperation for UpdateMany {
             )
             .await?;
         let result = bson::to_bson(&result)?;
-        Ok(Some(result))
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_test_runner(
-        &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        unimplemented!()
+        Ok(Some(result.into()))
     }
 }
 
@@ -453,11 +362,12 @@ pub(super) struct UpdateOne {
 
 #[async_trait]
 impl TestOperation for UpdateOne {
-    fn command_names(&self) -> &[&str] {
-        &["update"]
-    }
-
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+    async fn execute<'a>(
+        &self,
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let collection = object.as_collection(&test_runner.entities);
         let result = collection
             .update_one(
                 self.filter.clone(),
@@ -466,23 +376,7 @@ impl TestOperation for UpdateOne {
             )
             .await?;
         let result = bson::to_bson(&result)?;
-        Ok(Some(result))
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_test_runner(
-        &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        unimplemented!()
+        Ok(Some(result.into()))
     }
 }
 
@@ -496,36 +390,30 @@ pub(super) struct Aggregate {
 
 #[async_trait]
 impl TestOperation for Aggregate {
-    fn command_names(&self) -> &[&str] {
-        &["aggregate"]
-    }
-
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
-        let cursor = collection
-            .aggregate(self.pipeline.clone(), self.options.clone())
-            .await?;
-        let result = cursor.try_collect::<Vec<Document>>().await?;
-        Ok(Some(Bson::from(result)))
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
-        let cursor = database
-            .aggregate(self.pipeline.clone(), self.options.clone())
-            .await?;
-        let result = cursor.try_collect::<Vec<Document>>().await?;
-        Ok(Some(Bson::from(result)))
-    }
-
-    async fn execute_on_test_runner(
+    async fn execute<'a>(
         &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        unimplemented!()
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        match object {
+            OperationObject::Entity(id) => {
+                let cursor = match test_runner.entities.get(id).unwrap() {
+                    Entity::Collection(collection) => {
+                        collection
+                            .aggregate(self.pipeline.clone(), self.options.clone())
+                            .await?
+                    }
+                    Entity::Database(db) => {
+                        db.aggregate(self.pipeline.clone(), self.options.clone())
+                            .await?
+                    }
+                    other => panic!("cannot execute aggregate on {:?}", &other),
+                };
+                let result = cursor.try_collect::<Vec<Document>>().await?;
+                Ok(Some(Bson::from(result).into()))
+            }
+            OperationObject::TestRunner => panic!("cannot execute aggregate on the test runner"),
+        }
     }
 }
 
@@ -540,31 +428,16 @@ pub(super) struct Distinct {
 
 #[async_trait]
 impl TestOperation for Distinct {
-    fn command_names(&self) -> &[&str] {
-        &["distinct"]
-    }
-
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+    async fn execute<'a>(
+        &self,
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let collection = object.as_collection(&test_runner.entities);
         let result = collection
             .distinct(&self.field_name, self.filter.clone(), self.options.clone())
             .await?;
-        Ok(Some(Bson::Array(result)))
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_test_runner(
-        &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        unimplemented!()
+        Ok(Some(Bson::Array(result).into()))
     }
 }
 
@@ -577,31 +450,16 @@ pub(super) struct CountDocuments {
 
 #[async_trait]
 impl TestOperation for CountDocuments {
-    fn command_names(&self) -> &[&str] {
-        &["aggregate"]
-    }
-
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+    async fn execute<'a>(
+        &self,
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let collection = object.as_collection(&test_runner.entities);
         let result = collection
             .count_documents(self.filter.clone(), self.options.clone())
             .await?;
-        Ok(Some(Bson::from(result)))
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_test_runner(
-        &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        unimplemented!()
+        Ok(Some(Bson::from(result).into()))
     }
 }
 
@@ -613,31 +471,16 @@ pub(super) struct EstimatedDocumentCount {
 
 #[async_trait]
 impl TestOperation for EstimatedDocumentCount {
-    fn command_names(&self) -> &[&str] {
-        &["count"]
-    }
-
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+    async fn execute<'a>(
+        &self,
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let collection = object.as_collection(&test_runner.entities);
         let result = collection
             .estimated_document_count(self.options.clone())
             .await?;
-        Ok(Some(Bson::from(result)))
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_test_runner(
-        &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        unimplemented!()
+        Ok(Some(Bson::from(result).into()))
     }
 }
 
@@ -650,34 +493,19 @@ pub(super) struct FindOne {
 
 #[async_trait]
 impl TestOperation for FindOne {
-    fn command_names(&self) -> &[&str] {
-        &["find"]
-    }
-
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+    async fn execute<'a>(
+        &self,
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let collection = object.as_collection(&test_runner.entities);
         let result = collection
             .find_one(self.filter.clone(), self.options.clone())
             .await?;
         match result {
-            Some(result) => Ok(Some(Bson::from(result))),
-            None => Ok(None),
+            Some(result) => Ok(Some(Bson::from(result).into())),
+            None => Ok(Some(Entity::None)),
         }
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_test_runner(
-        &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        unimplemented!()
     }
 }
 
@@ -690,32 +518,17 @@ pub(super) struct ListDatabases {
 
 #[async_trait]
 impl TestOperation for ListDatabases {
-    fn command_names(&self) -> &[&str] {
-        &["listDatabases"]
-    }
-
-    async fn execute_on_collection(&self, _collection: &Collection) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute<'a>(
+        &self,
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let client = object.as_client(&test_runner.entities);
         let result = client
             .list_databases(self.filter.clone(), self.options.clone())
             .await?;
         let result: Vec<Bson> = result.iter().map(Bson::from).collect();
-        Ok(Some(Bson::Array(result)))
-    }
-
-    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_test_runner(
-        &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        unimplemented!()
+        Ok(Some(Bson::Array(result).into()))
     }
 }
 
@@ -728,32 +541,17 @@ pub(super) struct ListDatabaseNames {
 
 #[async_trait]
 impl TestOperation for ListDatabaseNames {
-    fn command_names(&self) -> &[&str] {
-        &["listDatabases"]
-    }
-
-    async fn execute_on_collection(&self, _collection: &Collection) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute<'a>(
+        &self,
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let client = object.as_client(&test_runner.entities);
         let result = client
             .list_database_names(self.filter.clone(), self.options.clone())
             .await?;
         let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
-        Ok(Some(Bson::Array(result)))
-    }
-
-    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_test_runner(
-        &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        unimplemented!()
+        Ok(Some(Bson::Array(result).into()))
     }
 }
 
@@ -766,32 +564,17 @@ pub(super) struct ListCollections {
 
 #[async_trait]
 impl TestOperation for ListCollections {
-    fn command_names(&self) -> &[&str] {
-        &["listCollections"]
-    }
-
-    async fn execute_on_collection(&self, _collection: &Collection) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
+    async fn execute<'a>(
+        &self,
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let database = object.as_database(&test_runner.entities);
         let cursor = database
             .list_collections(self.filter.clone(), self.options.clone())
             .await?;
         let result = cursor.try_collect::<Vec<Document>>().await?;
-        Ok(Some(Bson::from(result)))
-    }
-
-    async fn execute_on_test_runner(
-        &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        unimplemented!()
+        Ok(Some(Bson::from(result).into()))
     }
 }
 
@@ -802,30 +585,15 @@ pub(super) struct ListCollectionNames {
 
 #[async_trait]
 impl TestOperation for ListCollectionNames {
-    fn command_names(&self) -> &[&str] {
-        &["listCollections"]
-    }
-
-    async fn execute_on_collection(&self, _collection: &Collection) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, database: &Database) -> Result<Option<Bson>> {
+    async fn execute<'a>(
+        &self,
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let database = object.as_database(&test_runner.entities);
         let result = database.list_collection_names(self.filter.clone()).await?;
         let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
-        Ok(Some(Bson::from(result)))
-    }
-
-    async fn execute_on_test_runner(
-        &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        unimplemented!()
+        Ok(Some(Bson::from(result).into()))
     }
 }
 
@@ -839,11 +607,12 @@ pub(super) struct ReplaceOne {
 
 #[async_trait]
 impl TestOperation for ReplaceOne {
-    fn command_names(&self) -> &[&str] {
-        &["update"]
-    }
-
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+    async fn execute<'a>(
+        &self,
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let collection = object.as_collection(&test_runner.entities);
         let result = collection
             .replace_one(
                 self.filter.clone(),
@@ -852,23 +621,7 @@ impl TestOperation for ReplaceOne {
             )
             .await?;
         let result = bson::to_bson(&result)?;
-        Ok(Some(result))
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_test_runner(
-        &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        unimplemented!()
+        Ok(Some(result.into()))
     }
 }
 
@@ -882,11 +635,12 @@ pub(super) struct FindOneAndUpdate {
 
 #[async_trait]
 impl TestOperation for FindOneAndUpdate {
-    fn command_names(&self) -> &[&str] {
-        &["findAndModify"]
-    }
-
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+    async fn execute<'a>(
+        &self,
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let collection = object.as_collection(&test_runner.entities);
         let result = collection
             .find_one_and_update(
                 self.filter.clone(),
@@ -895,23 +649,7 @@ impl TestOperation for FindOneAndUpdate {
             )
             .await?;
         let result = bson::to_bson(&result)?;
-        Ok(Some(result))
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_test_runner(
-        &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        unimplemented!()
+        Ok(Some(result.into()))
     }
 }
 
@@ -925,11 +663,12 @@ pub(super) struct FindOneAndReplace {
 
 #[async_trait]
 impl TestOperation for FindOneAndReplace {
-    fn command_names(&self) -> &[&str] {
-        &["findAndModify"]
-    }
-
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+    async fn execute<'a>(
+        &self,
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let collection = object.as_collection(&test_runner.entities);
         let result = collection
             .find_one_and_replace(
                 self.filter.clone(),
@@ -938,23 +677,7 @@ impl TestOperation for FindOneAndReplace {
             )
             .await?;
         let result = bson::to_bson(&result)?;
-        Ok(Some(result))
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_test_runner(
-        &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        unimplemented!()
+        Ok(Some(result.into()))
     }
 }
 
@@ -967,32 +690,17 @@ pub(super) struct FindOneAndDelete {
 
 #[async_trait]
 impl TestOperation for FindOneAndDelete {
-    fn command_names(&self) -> &[&str] {
-        &["findAndModify"]
-    }
-
-    async fn execute_on_collection(&self, collection: &Collection) -> Result<Option<Bson>> {
+    async fn execute<'a>(
+        &self,
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let collection = object.as_collection(&test_runner.entities);
         let result = collection
             .find_one_and_delete(self.filter.clone(), self.options.clone())
             .await?;
         let result = bson::to_bson(&result)?;
-        Ok(Some(result))
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_test_runner(
-        &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        unimplemented!()
+        Ok(Some(result.into()))
     }
 }
 
@@ -1005,39 +713,26 @@ pub(super) struct FailPoint {
 
 #[async_trait]
 impl TestOperation for FailPoint {
-    fn command_names(&self) -> &[&str] {
-        unimplemented!()
-    }
-
-    async fn execute_on_collection(&self, _collection: &Collection) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_test_runner(
+    async fn execute<'a>(
         &self,
-        _client: &TestClient,
-        entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        let client = entities.get(&self.client_id).unwrap().as_client();
+        _object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
         let selection_criteria = SelectionCriteria::ReadPreference(ReadPreference::Primary);
-        client
+        test_runner
+            .internal_client
             .database("admin")
             .run_command(self.fail_point.clone(), selection_criteria)
             .await
             .unwrap();
+
         let disable = doc! {
             "configureFailPoint": self.fail_point.get_str("configureFailPoint").unwrap(),
             "mode": "off",
         };
-        Some(disable)
+        test_runner.failpoint_disable_commands.push(disable);
+
+        Ok(None)
     }
 }
 
@@ -1050,31 +745,15 @@ pub(super) struct AssertCollectionExists {
 
 #[async_trait]
 impl TestOperation for AssertCollectionExists {
-    fn command_names(&self) -> &[&str] {
-        unimplemented!()
-    }
-
-    async fn execute_on_collection(&self, _collection: &Collection) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_test_runner(
+    async fn execute<'a>(
         &self,
-        client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        let db = client.database(&self.database_name);
+        _object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let db = test_runner.internal_client.database(&self.database_name);
         let names = db.list_collection_names(None).await.unwrap();
         assert!(names.contains(&self.collection_name));
-        None
+        Ok(None)
     }
 }
 
@@ -1087,31 +766,15 @@ pub(super) struct AssertCollectionNotExists {
 
 #[async_trait]
 impl TestOperation for AssertCollectionNotExists {
-    fn command_names(&self) -> &[&str] {
-        unimplemented!()
-    }
-
-    async fn execute_on_collection(&self, _collection: &Collection) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_test_runner(
+    async fn execute<'a>(
         &self,
-        client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
-        let db = client.database(&self.database_name);
+        _object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let db = test_runner.internal_client.database(&self.database_name);
         let names = db.list_collection_names(None).await.unwrap();
         assert!(!names.contains(&self.collection_name));
-        None
+        Ok(None)
     }
 }
 
@@ -1120,27 +783,11 @@ pub(super) struct UnimplementedOperation;
 
 #[async_trait]
 impl TestOperation for UnimplementedOperation {
-    fn command_names(&self) -> &[&str] {
-        unimplemented!()
-    }
-
-    async fn execute_on_collection(&self, _collection: &Collection) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(&self, _database: &Database) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_test_runner(
+    async fn execute<'a>(
         &self,
-        _client: &TestClient,
-        _entities: &HashMap<String, Entity>,
-    ) -> Option<Document> {
+        _object: &OperationObject,
+        _test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
         unimplemented!()
     }
 }
