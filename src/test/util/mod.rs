@@ -172,7 +172,14 @@ impl TestClient {
         coll
     }
 
-    pub async fn init_db_and_coll_with_type<T>(&self, db_name: &str, coll_name: &str) -> Collection<T> where T: Serialize {
+    pub async fn init_db_and_coll_with_type<T>(
+        &self,
+        db_name: &str,
+        coll_name: &str,
+    ) -> Collection<T>
+    where
+        T: Serialize,
+    {
         let coll: Collection<T> = self.database(db_name).collection_with_type(coll_name);
         match coll.drop(None).await.as_ref().map_err(|e| e.as_ref()) {
             Err(ErrorKind::CommandError(CommandError { code: 26, .. })) | Ok(_) => {}

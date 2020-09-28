@@ -127,13 +127,18 @@ where
 
     // isabeltodo this comment sucks
     // Returns a clone of the `Collection` with a different type `T`.
-    pub fn clone_with_type<U>(&self) -> Collection<U> where U: Serialize {
+    pub fn clone_with_type<U>(&self) -> Collection<U>
+    where
+        U: Serialize,
+    {
         let mut options = CollectionOptions::builder().build();
         options.selection_criteria = self.inner.selection_criteria.clone();
         options.read_concern = self.inner.read_concern.clone();
         options.write_concern = self.inner.write_concern.clone();
 
-        self.inner.db.collection_with_type_and_options(&self.inner.name, options)
+        self.inner
+            .db
+            .collection_with_type_and_options(&self.inner.name, options)
     }
 
     /// Get the `Client` that this collection descended from.

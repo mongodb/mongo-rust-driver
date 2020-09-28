@@ -70,11 +70,17 @@ use crate::{
 /// ```
 
 #[derive(Clone, Debug)]
-pub struct Collection<T = Document> where T: Serialize + Send + Sync {
+pub struct Collection<T = Document>
+where
+    T: Serialize + Send + Sync,
+{
     async_collection: AsyncCollection<T>,
 }
 
-impl<T> Collection<T> where T: Serialize + Send + Sync {
+impl<T> Collection<T>
+where
+    T: Serialize + Send + Sync,
+{
     pub(crate) fn new(async_collection: AsyncCollection<T>) -> Self {
         Self { async_collection }
     }
