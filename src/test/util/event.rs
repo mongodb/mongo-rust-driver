@@ -168,7 +168,7 @@ impl EventClient {
         uri: &str,
         use_multiple_mongoses: Option<bool>,
     ) -> Self {
-        let mut options = ClientOptions::parse(uri).await.unwrap();
+        let mut options = ClientOptions::parse_uri(uri, None).await.unwrap();
         match use_multiple_mongoses {
             Some(true) => {
                 if options.hosts.len() <= 1 {

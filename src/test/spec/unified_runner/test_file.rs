@@ -318,7 +318,7 @@ async fn deserialize_uri_options() {
     };
     let d = BsonDeserializer::new(options.into());
     let uri = deserialize_uri_options_to_uri_string(d).unwrap();
-    let options = ClientOptions::parse(&uri).await.unwrap();
+    let options = ClientOptions::parse_uri(&uri, None).await.unwrap();
 
     assert!(options.tls_options().is_some());
 
