@@ -116,7 +116,7 @@ pub struct Client {
 }
 
 fn default_uri() -> String {
-    DEFAULT_URI.to_string()
+    DEFAULT_URI.clone()
 }
 
 fn deserialize_uri_options_to_uri_string<'de, D>(

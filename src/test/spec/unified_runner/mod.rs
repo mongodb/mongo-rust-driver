@@ -13,14 +13,7 @@ use semver::Version;
 use crate::{
     bson::{doc, Document},
     concern::{Acknowledgment, WriteConcern},
-    options::{
-        CollectionOptions,
-        FindOptions,
-        InsertManyOptions,
-        ReadConcern,
-        ReadPreference,
-        SelectionCriteria,
-    },
+    options::{CollectionOptions, FindOptions, ReadConcern, ReadPreference, SelectionCriteria},
     test::{assert_matches, run_spec_test, util::EventClient, TestClient, LOCK},
 };
 
@@ -54,7 +47,7 @@ impl TestRunner {
     pub async fn insert_initial_data(&self, data: &CollectionData) {
         let write_concern = WriteConcern::builder().w(Acknowledgment::Majority).build();
         let collection_options = CollectionOptions::builder()
-            .write_concern(write_concern.clone())
+            .write_concern(write_concern)
             .build();
         let coll = self
             .internal_client
@@ -65,11 +58,8 @@ impl TestRunner {
             )
             .await;
 
-        let insert_options = InsertManyOptions::builder()
-            .write_concern(write_concern)
-            .build();
         if !data.documents.is_empty() {
-            coll.insert_many(data.documents.clone(), insert_options)
+            coll.insert_many(data.documents.clone(), None)
                 .await
                 .unwrap();
         }

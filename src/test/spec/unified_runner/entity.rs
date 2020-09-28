@@ -1,8 +1,8 @@
-use std::{fmt, ops::Deref};
+use std::ops::Deref;
 
 use crate::{bson::Bson, test::util::EventClient, Collection, Database};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Entity {
     Client(ClientEntity),
     Database(Database),
@@ -11,19 +11,7 @@ pub enum Entity {
     None,
 }
 
-impl fmt::Debug for Entity {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Client(_) => f.write_str("client"),
-            Self::Database(_) => f.write_str("database"),
-            Self::Collection(_) => f.write_str("collection"),
-            Self::Bson(_) => f.write_str("bson"),
-            Self::None => f.write_str("none"),
-        }
-    }
-}
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ClientEntity {
     client: EventClient,
     pub observe_events: Option<Vec<String>>,

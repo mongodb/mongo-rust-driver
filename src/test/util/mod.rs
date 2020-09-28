@@ -28,7 +28,7 @@ use crate::{
 };
 use failpoint::FailPointGuard;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TestClient {
     client: Client,
     pub options: ClientOptions,

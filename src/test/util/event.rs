@@ -102,7 +102,7 @@ impl CommandEventHandler for EventHandler {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EventClient {
     client: TestClient,
     pub command_events: EventQueue<CommandEvent>,
