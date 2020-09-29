@@ -771,7 +771,7 @@ async fn typed_insert_one() {
     let client = TestClient::new().await;
 
     let coll = client
-        .init_db_and_coll_with_type(function_name!(), function_name!())
+        .init_db_and_typed_coll(function_name!(), function_name!())
         .await;
     let insert_data = UserType {
         x: 1,
@@ -819,7 +819,7 @@ async fn typed_insert_many() {
 
     let client = TestClient::new().await;
     let coll = client
-        .init_db_and_coll_with_type(function_name!(), function_name!())
+        .init_db_and_typed_coll(function_name!(), function_name!())
         .await;
 
     let insert_data = vec![
@@ -857,7 +857,7 @@ async fn typed_find_one_and_replace() {
 
     let client = TestClient::new().await;
     let coll = client
-        .init_db_and_coll_with_type(function_name!(), function_name!())
+        .init_db_and_typed_coll(function_name!(), function_name!())
         .await;
 
     let insert_data = UserType {
@@ -891,7 +891,7 @@ async fn typed_replace_one() {
 
     let client = TestClient::new().await;
     let coll = client
-        .init_db_and_coll_with_type(function_name!(), function_name!())
+        .init_db_and_typed_coll(function_name!(), function_name!())
         .await;
 
     let insert_data = UserType {

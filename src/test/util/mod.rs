@@ -167,12 +167,12 @@ impl TestClient {
     }
 
     pub async fn init_db_and_coll(&self, db_name: &str, coll_name: &str) -> Collection {
-        let coll = self.get_coll(db_name, coll_name);
+        let coll: Collection = self.get_coll(db_name, coll_name);
         drop_collection(&coll).await;
         coll
     }
 
-    pub async fn init_db_and_coll_with_type<T>(
+    pub async fn init_db_and_typed_coll<T>(
         &self,
         db_name: &str,
         coll_name: &str,
@@ -181,12 +181,7 @@ impl TestClient {
         T: Serialize,
     {
         let coll: Collection<T> = self.database(db_name).collection_with_type(coll_name);
-        match coll.drop(None).await.as_ref().map_err(|e| e.as_ref()) {
-            Err(ErrorKind::CommandError(CommandError { code: 26, .. })) | Ok(_) => {}
-            e @ Err(_) => {
-                e.unwrap();
-            }
-        }
+        drop_collection(&coll).await;
         coll
     }
 
@@ -275,7 +270,7 @@ impl TestClient {
     }
 }
 
-pub async fn drop_collection(coll: &Collection) {
+pub async fn drop_collection<T>(coll: &Collection<T>) where T: Serialize {
     match coll.drop(None).await.as_ref().map_err(|e| e.as_ref()) {
         Err(ErrorKind::CommandError(CommandError { code: 26, .. })) | Ok(_) => {}
         e @ Err(_) => {
