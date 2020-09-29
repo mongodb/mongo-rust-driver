@@ -1,6 +1,10 @@
 use crate::bson::{doc, spec::ElementType, Bson};
 
 pub fn results_match(actual: Option<&Bson>, expected: &Bson) -> bool {
+    return results_match_inner(actual, expected, true);
+}
+
+pub fn results_match_inner(actual: Option<&Bson>, expected: &Bson, root: bool) -> bool {
     match expected {
         Bson::Document(expected_doc) => {
             if let Some((key, value)) = expected_doc.iter().next() {
@@ -8,17 +12,25 @@ pub fn results_match(actual: Option<&Bson>, expected: &Bson) -> bool {
                     return special_operator_matches((key, value), actual);
                 }
             }
+
             let actual_doc = match actual {
                 Some(Bson::Document(actual)) => actual,
                 // The only case in which None is an acceptable value is if the expected document
                 // is a special operator; otherwise, the two documents do not match.
                 _ => return false,
             };
+
+            // Extra fields are only allowed in the top-level document.
+            if !root && actual_doc.len() != expected_doc.len() {
+                return false;
+            }
+
             for (key, value) in expected_doc {
-                if !results_match(actual_doc.get(key), value) {
+                if !results_match_inner(actual_doc.get(key), value, false) {
                     return false;
                 }
             }
+
             true
         }
         Bson::Array(expected_array) => {
@@ -28,7 +40,7 @@ pub fn results_match(actual: Option<&Bson>, expected: &Bson) -> bool {
             }
 
             for (actual, expected) in actual_array.iter().zip(expected_array) {
-                if !results_match(Some(actual), expected) {
+                if !results_match_inner(Some(actual), expected, false) {
                     return false;
                 }
             }
@@ -48,7 +60,7 @@ fn special_operator_matches((key, value): (&String, &Bson), actual: Option<&Bson
         "$$type" => type_matches(value, actual.unwrap()),
         "$$unsetOrMatches" => {
             if let Some(bson) = actual {
-                results_match(Some(value), bson)
+                results_match_inner(Some(value), bson, false)
             } else {
                 true
             }
@@ -96,14 +108,14 @@ async fn basic_matching() {
     let expected = doc! { "x": 1 };
     assert!(results_match(
         Some(&Bson::Document(actual)),
-        &Bson::Document(expected)
+        &Bson::Document(expected),
     ));
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "x": 1, "y": 1 };
     assert!(!results_match(
         Some(&Bson::Document(actual)),
-        &Bson::Document(expected)
+        &Bson::Document(expected),
     ));
 }
 
@@ -120,7 +132,7 @@ async fn array_matching() {
     }
     assert!(!results_match(
         Some(&Bson::Array(actual)),
-        &Bson::Array(expected)
+        &Bson::Array(expected),
     ));
 
     let mut actual: Vec<Bson> = Vec::new();
@@ -131,7 +143,7 @@ async fn array_matching() {
     expected.push(Bson::Document(doc! { "x": 2 }));
     assert!(results_match(
         Some(&Bson::Array(actual)),
-        &Bson::Array(expected)
+        &Bson::Array(expected),
     ));
 }
 
@@ -142,55 +154,55 @@ async fn special_operators() {
     let expected = doc! { "x": { "$$exists": true } };
     assert!(results_match(
         Some(&Bson::Document(actual)),
-        &Bson::Document(expected)
+        &Bson::Document(expected),
     ));
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "x": { "$$exists": false } };
     assert!(!results_match(
         Some(&Bson::Document(actual)),
-        &Bson::Document(expected)
+        &Bson::Document(expected),
     ));
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "y": { "$$exists": false } };
     assert!(results_match(
         Some(&Bson::Document(actual)),
-        &Bson::Document(expected)
+        &Bson::Document(expected),
     ));
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "y": { "$$exists": true } };
     assert!(!results_match(
         Some(&Bson::Document(actual)),
-        &Bson::Document(expected)
+        &Bson::Document(expected),
     ));
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "x": { "$$type": [ "int", "long" ] } };
     assert!(results_match(
         Some(&Bson::Document(actual)),
-        &Bson::Document(expected)
+        &Bson::Document(expected),
     ));
 
     let actual = doc! {};
     let expected = doc! { "x": { "$$unsetOrMatches": 1 } };
     assert!(results_match(
         Some(&Bson::Document(actual)),
-        &Bson::Document(expected)
+        &Bson::Document(expected),
     ));
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "x": { "$$unsetOrMatches": 1 } };
     assert!(results_match(
         Some(&Bson::Document(actual)),
-        &Bson::Document(expected)
+        &Bson::Document(expected),
     ));
 
     let actual = doc! { "x": 2 };
     let expected = doc! { "x": { "$$unsetOrMatches": 1 } };
     assert!(!results_match(
         Some(&Bson::Document(actual)),
-        &Bson::Document(expected)
+        &Bson::Document(expected),
     ));
 }
