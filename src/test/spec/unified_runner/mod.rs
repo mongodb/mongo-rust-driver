@@ -76,6 +76,8 @@ impl TestRunner {
     }
 
     pub async fn populate_entity_map(&mut self, create_entities: &[TestFileEntity]) {
+        self.entities.clear();
+
         for entity in create_entities {
             match entity {
                 TestFileEntity::Client(client) => {
