@@ -1,13 +1,13 @@
-use std::time::Duration;
+use std::{fmt::Debug, time::Duration};
 
 use futures::stream::{StreamExt, TryStreamExt};
 use lazy_static::lazy_static;
 use semver::VersionReq;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
-    bson::{doc, from_document, Bson, Document},
+    bson::{doc, from_document, to_document, Bson, Document},
     error::{ErrorKind, Result, WriteFailure},
     event::command::CommandStartedEvent,
     options::{
@@ -27,6 +27,7 @@ use crate::{
         util::{drop_collection, CommandEvent, EventClient, TestClient},
         LOCK,
     },
+    Collection,
     RUNTIME,
 };
 
@@ -767,27 +768,43 @@ struct UserType {
 #[function_name::named]
 async fn typed_insert_one() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     let client = TestClient::new().await;
+
     let coll = client
         .init_db_and_coll_with_type(function_name!(), function_name!())
         .await;
-
     let insert_data = UserType {
         x: 1,
         str: "a".into(),
     };
-    coll.insert_one(insert_data.clone(), None)
-        .await
-        .unwrap_or_else(|_| panic!("insert_one should succeed"));
+    insert_one_and_find(&coll, insert_data).await;
 
+    #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
+    struct OtherType {
+        b: bool,
+        nums: Vec<i32>,
+    }
+
+    let coll = coll.clone_with_type();
+    let insert_data = OtherType {
+        b: true,
+        nums: vec![1, 2, 3],
+    };
+    insert_one_and_find(&coll, insert_data).await;
+}
+
+async fn insert_one_and_find<T>(coll: &Collection<T>, insert_data: T)
+where
+    T: Serialize + DeserializeOwned + Clone + PartialEq + Debug,
+{
+    coll.insert_one(insert_data.clone(), None).await.unwrap();
     let result = coll
-        .find_one(None, None)
+        .find_one(to_document(&insert_data).unwrap(), None)
         .await
-        .unwrap_or_else(|_| panic!("find_one should succeed"));
+        .unwrap();
     match result {
         Some(actual) => {
-            let actual: UserType = from_document(actual).unwrap();
+            let actual: T = from_document(actual).unwrap();
             assert_eq!(actual, insert_data);
         }
         None => panic!("find_one should return a value"),
@@ -815,9 +832,7 @@ async fn typed_insert_many() {
             str: "b".into(),
         },
     ];
-    coll.insert_many(insert_data.clone(), None)
-        .await
-        .unwrap_or_else(|_| panic!("insert_many should succeed"));
+    coll.insert_many(insert_data.clone(), None).await.unwrap();
 
     let options = FindOptions::builder().sort(doc! { "x": 1 }).build();
     let docs: Vec<Document> = coll

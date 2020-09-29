@@ -41,9 +41,6 @@ const MAX_INSERT_DOCS_BYTES: usize = 16 * 1000 * 1000;
 /// [`Database::collection`](struct.Database.html#method.collection) or
 /// [`Database::collection_with_options`](struct.Database.html#method.collection_with_options).
 ///
-/// `Collection` is generic over `T` which defines the data type that can be inserted into a
-/// `Collection`. `T` defaults to `Document`.
-///
 /// `Collection` uses [`std::sync::Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html) internally,
 /// so it can safely be shared across threads or async tasks. For example:
 ///
@@ -125,8 +122,7 @@ where
         }
     }
 
-    // isabeltodo this comment sucks
-    // Returns a clone of the `Collection` with a different type `T`.
+    /// Gets a clone of the `Collection` with a different type `U`.
     pub fn clone_with_type<U>(&self) -> Collection<U>
     where
         U: Serialize,
@@ -443,7 +439,7 @@ where
         self.client().execute_operation(op).await
     }
 
-    /// Inserts the documents in `docs` into the collection.
+    /// Inserts the data in `docs` into the collection.
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
@@ -459,12 +455,11 @@ where
             let doc = to_document(&doc)?;
             translated_docs.push(doc);
         }
-        let mut docs = translated_docs;
 
         let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
-        if docs.is_empty() {
+        if translated_docs.is_empty() {
             return Err(ErrorKind::ArgumentError {
                 message: "No documents provided to insert_many".to_string(),
             }
@@ -478,10 +473,13 @@ where
 
         let mut n_attempted = 0;
 
-        while !docs.is_empty() {
-            let mut remaining_docs =
-                batch::split_off_batch(&mut docs, MAX_INSERT_DOCS_BYTES, bson_util::doc_size_bytes);
-            std::mem::swap(&mut docs, &mut remaining_docs);
+        while !translated_docs.is_empty() {
+            let mut remaining_docs = batch::split_off_batch(
+                &mut translated_docs,
+                MAX_INSERT_DOCS_BYTES,
+                bson_util::doc_size_bytes,
+            );
+            std::mem::swap(&mut translated_docs, &mut remaining_docs);
             let current_batch = remaining_docs;
 
             let current_batch_size = current_batch.len();

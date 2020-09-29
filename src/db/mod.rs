@@ -136,7 +136,7 @@ impl Database {
         Collection::new(self.clone(), name, None)
     }
 
-    /// Gets a handle to a collection of type `T` specified by `name` of the database. The
+    /// Gets a handle to a collection with type `T` specified by `name` of the database. The
     /// `Collection` options (e.g. read preference and write concern) will default to those of the
     /// `Database`.
     ///
@@ -159,7 +159,7 @@ impl Database {
         Collection::new(self.clone(), name, Some(options))
     }
 
-    /// Gets a handle to a collection of type `T` specified by `name` in the cluster the `Client`
+    /// Gets a handle to a collection with type `T` specified by `name` in the cluster the `Client`
     /// is connected to. Operations done with this `Collection` will use the options specified by
     /// `options` by default and will otherwise default to those of the `Database`.
     ///
