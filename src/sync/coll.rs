@@ -85,6 +85,14 @@ where
         Self { async_collection }
     }
 
+    /// Gets a clone of the `Collection` with a different type `U`.
+    pub fn clone_with_type<U>(&self) -> Collection<U>
+    where
+        U: Serialize + Send + Sync,
+    {
+        Collection::new(self.async_collection.clone_with_type())
+    }
+
     /// Gets the name of the `Collection`.
     pub fn name(&self) -> &str {
         self.async_collection.name()

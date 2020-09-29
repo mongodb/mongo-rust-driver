@@ -1,4 +1,7 @@
+use std::marker::{Send, Sync};
+
 use pretty_assertions::assert_eq;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     bson::{doc, Document},
@@ -22,7 +25,19 @@ fn init_db_and_coll(client: &Client, db_name: &str, coll_name: &str) -> Collecti
     coll
 }
 
-pub fn drop_collection(coll: &Collection) {
+fn init_db_and_typed_coll<T>(client: &Client, db_name: &str, coll_name: &str) -> Collection<T>
+where
+    T: Serialize + Send + Sync,
+{
+    let coll = client.database(db_name).collection_with_type(coll_name);
+    drop_collection(&coll);
+    coll
+}
+
+pub fn drop_collection<T>(coll: &Collection<T>)
+where
+    T: Serialize + Send + Sync,
+{
     match coll.drop(None).as_ref().map_err(|e| e.as_ref()) {
         Err(ErrorKind::CommandError(CommandError { code: 26, .. })) | Ok(_) => {}
         e @ Err(_) => {
@@ -158,4 +173,24 @@ fn collection() {
         .database(function_name!())
         .collection_with_options(function_name!(), coll_options);
     assert_eq!(coll.write_concern(), Some(&wc));
+}
+
+#[test]
+#[function_name::named]
+fn typed_collection() {
+    let options = CLIENT_OPTIONS.clone();
+    let client = Client::with_options(options).expect("client creation should succeed");
+    let coll = init_db_and_typed_coll(&client, function_name!(), function_name!());
+
+    #[derive(Serialize, Deserialize)]
+    struct MyType {
+        x: i32,
+        str: String,
+    }
+    let my_type = MyType {
+        x: 1,
+        str: "hello".into(),
+    };
+
+    assert!(coll.insert_one(my_type, None).is_ok());
 }
