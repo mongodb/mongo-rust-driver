@@ -8,7 +8,7 @@ use serde::{de::Error, Deserialize, Deserializer, Serialize};
 
 use self::options::*;
 use crate::{
-    bson::{doc, to_document, Bson, Document},
+    bson::{doc, ser, to_document, Bson, Document},
     bson_util,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, ErrorKind, Result},
@@ -123,18 +123,13 @@ where
     }
 
     /// Gets a clone of the `Collection` with a different type `U`.
-    pub fn clone_with_type<U>(&self) -> Collection<U>
-    where
-        U: Serialize,
-    {
+    pub fn clone_with_type<U: Serialize>(&self) -> Collection<U> {
         let mut options = CollectionOptions::builder().build();
         options.selection_criteria = self.inner.selection_criteria.clone();
         options.read_concern = self.inner.read_concern.clone();
         options.write_concern = self.inner.write_concern.clone();
 
-        self.inner
-            .db
-            .collection_with_type_and_options(&self.inner.name, options)
+        Collection::new(self.inner.db.clone(), &self.inner.name, Some(options))
     }
 
     /// Get the `Client` that this collection descended from.
@@ -450,16 +445,16 @@ where
         docs: impl IntoIterator<Item = T>,
         options: impl Into<Option<InsertManyOptions>>,
     ) -> Result<InsertManyResult> {
-        let mut translated_docs = Vec::new();
-        for doc in docs {
-            let doc = to_document(&doc)?;
-            translated_docs.push(doc);
-        }
+        let docs: ser::Result<Vec<Document>> = docs
+            .into_iter()
+            .map(|doc| bson::to_document(&doc))
+            .collect();
+        let mut docs: Vec<Document> = docs?;
 
         let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
-        if translated_docs.is_empty() {
+        if docs.is_empty() {
             return Err(ErrorKind::ArgumentError {
                 message: "No documents provided to insert_many".to_string(),
             }
@@ -473,13 +468,10 @@ where
 
         let mut n_attempted = 0;
 
-        while !translated_docs.is_empty() {
-            let mut remaining_docs = batch::split_off_batch(
-                &mut translated_docs,
-                MAX_INSERT_DOCS_BYTES,
-                bson_util::doc_size_bytes,
-            );
-            std::mem::swap(&mut translated_docs, &mut remaining_docs);
+        while !docs.is_empty() {
+            let mut remaining_docs =
+                batch::split_off_batch(&mut docs, MAX_INSERT_DOCS_BYTES, bson_util::doc_size_bytes);
+            std::mem::swap(&mut docs, &mut remaining_docs);
             let current_batch = remaining_docs;
 
             let current_batch_size = current_batch.len();
