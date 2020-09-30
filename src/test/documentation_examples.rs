@@ -312,7 +312,7 @@ async fn query_embedded_documents_examples(collection: &Collection) -> Result<()
         .find(
             doc! {
                 "size": {
-                    "h":14,
+                    "h": 14,
                     "w": 21,
                     "uom": "cm",
                 },
