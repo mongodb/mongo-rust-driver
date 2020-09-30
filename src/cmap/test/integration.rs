@@ -141,26 +141,34 @@ async fn concurrent_connections() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(threaded_scheduler))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
 async fn connection_establishment_error() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
 
     let mut client_options = CLIENT_OPTIONS.clone();
+    client_options.heartbeat_freq = Duration::from_secs(300).into(); // high so that monitors dont trip failpoint
     client_options.hosts.drain(1..);
-    client_options.heartbeat_freq = Duration::from_secs(30).into(); // high so that monitors dont trip failpoint
+    client_options.direct_connection = Some(true);
+    client_options.repl_set_name = None;
+
+    let client = TestClient::with_options(Some(client_options.clone())).await;
+    if !client.supports_fail_command().await {
+        println!(
+            "skipping {} due to failCommand not being supported",
+            function_name!()
+        );
+        return;
+    }
 
     let options = FailCommandOptions::builder().error_code(1234).build();
     let failpoint = FailPoint::fail_command(&["isMaster"], FailPointMode::Times(1), Some(options));
-    let _fp_guard = TestClient::with_options(Some(client_options.clone()))
-        .await
-        .enable_failpoint(failpoint)
-        .await
-        .unwrap();
+    let _fp_guard = client.enable_failpoint(failpoint).await.unwrap();
 
     let handler = Arc::new(EventHandler::new());
     let mut options = ConnectionPoolOptions::from_client_options(&client_options);
     options.event_handler = Some(handler.clone() as Arc<dyn crate::cmap::CmapEventHandler>);
     let pool = ConnectionPool::new(
-        CLIENT_OPTIONS.hosts[0].clone(),
+        client_options.hosts[0].clone(),
         Default::default(),
         Some(options),
     );
@@ -177,14 +185,23 @@ async fn connection_establishment_error() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(threaded_scheduler))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
 async fn connection_error_during_operation() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
 
     let mut options = CLIENT_OPTIONS.clone();
     let handler = Arc::new(EventHandler::new());
     options.cmap_event_handler = Some(handler.clone() as Arc<dyn CmapEventHandler>);
+    options.hosts.drain(1..);
 
     let client = TestClient::with_options(options.into()).await;
+    if !client.supports_fail_command().await {
+        println!(
+            "skipping {} due to failCommand not being supported",
+            function_name!()
+        );
+        return;
+    }
 
     let options = FailCommandOptions::builder().close_connection(true).build();
     let failpoint = FailPoint::fail_command(&["ping"], FailPointMode::Times(1), Some(options));

@@ -13,7 +13,7 @@ pub use self::{
 use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
 
 use crate::bson::{doc, oid::ObjectId, Bson};
-use semver::Version;
+use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
 
 use self::event::EventHandler;
@@ -22,8 +22,7 @@ use crate::{
     error::{CommandError, ErrorKind, Result},
     operation::RunCommand,
     options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
-    Client,
-    Collection,
+    Client, Collection,
 };
 use failpoint::FailPointGuard;
 
@@ -219,6 +218,15 @@ impl TestClient {
             .unwrap();
 
         self.get_coll(db_name, coll_name)
+    }
+
+    pub async fn supports_fail_command(&self) -> bool {
+        let version = if self.is_sharded() {
+            VersionReq::parse(">= 4.1.5").unwrap()
+        } else {
+            VersionReq::parse(">= 4.0").unwrap()
+        };
+        version.matches(&self.server_version)
     }
 
     pub async fn enable_failpoint(&self, fp: FailPoint) -> Result<FailPointGuard> {
