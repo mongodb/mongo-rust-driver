@@ -1,16 +1,17 @@
 use serde::Deserialize;
-use tokio::sync::RwLockReadGuard;
+use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use super::event::{Event, EventHandler};
 use crate::{
     bson::doc,
     cmap::{options::ConnectionPoolOptions, Command, ConnectionPool},
+    event::cmap::{CmapEventHandler, ConnectionClosedReason},
     selection_criteria::ReadPreference,
-    test::{TestClient, CLIENT_OPTIONS, LOCK},
+    test::{FailCommandOptions, FailPoint, FailPointMode, TestClient, CLIENT_OPTIONS, LOCK},
     RUNTIME,
 };
 use semver::VersionReq;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 #[derive(Debug, Deserialize)]
 struct ListDatabasesResponse {
@@ -136,4 +137,74 @@ async fn concurrent_connections() {
         )
         .await
         .expect("disabling fail point should succeed");
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(threaded_scheduler))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn connection_establishment_error() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+
+    let mut client_options = CLIENT_OPTIONS.clone();
+    client_options.hosts.drain(1..);
+    client_options.heartbeat_freq = Duration::from_secs(30).into(); // high so that monitors dont trip failpoint
+
+    let options = FailCommandOptions::builder().error_code(1234).build();
+    let failpoint = FailPoint::fail_command(&["isMaster"], FailPointMode::Times(1), Some(options));
+    let _fp_guard = TestClient::with_options(Some(client_options.clone()))
+        .await
+        .enable_failpoint(failpoint)
+        .await
+        .unwrap();
+
+    let handler = Arc::new(EventHandler::new());
+    let mut options = ConnectionPoolOptions::from_client_options(&client_options);
+    options.event_handler = Some(handler.clone() as Arc<dyn crate::cmap::CmapEventHandler>);
+    let pool = ConnectionPool::new(
+        CLIENT_OPTIONS.hosts[0].clone(),
+        Default::default(),
+        Some(options),
+    );
+
+    pool.check_out().await.expect_err("check out should fail");
+    let event_emitted = handler.events.read().unwrap().iter().any(|e| match e {
+        Event::ConnectionClosed(event) => {
+            event.connection_id == 1 && event.reason == ConnectionClosedReason::Error
+        }
+        _ => false,
+    });
+    assert!(event_emitted);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(threaded_scheduler))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn connection_error_during_operation() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+
+    let mut options = CLIENT_OPTIONS.clone();
+    let handler = Arc::new(EventHandler::new());
+    options.cmap_event_handler = Some(handler.clone() as Arc<dyn CmapEventHandler>);
+
+    let client = TestClient::with_options(options.into()).await;
+
+    let options = FailCommandOptions::builder().close_connection(true).build();
+    let failpoint = FailPoint::fail_command(&["ping"], FailPointMode::Times(1), Some(options));
+    let _fp_guard = client.enable_failpoint(failpoint).await.unwrap();
+
+    let mut subscriber = handler.subscribe();
+
+    client
+        .database("test")
+        .run_command(doc! { "ping": 1 }, None)
+        .await
+        .expect_err("ping should fail due to fail point");
+
+    subscriber
+        .wait_for_event(Duration::from_millis(500), |e| match e {
+            Event::ConnectionClosed(event) => {
+                event.connection_id == 1 && event.reason == ConnectionClosedReason::Error
+            }
+            _ => false,
+        })
+        .await
+        .expect("closed event with error reason should have been seen");
 }

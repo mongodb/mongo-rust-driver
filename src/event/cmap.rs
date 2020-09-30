@@ -19,7 +19,7 @@ fn empty_address() -> StreamAddress {
 }
 
 /// Event emitted when a connection pool is created.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 #[non_exhaustive]
 pub struct PoolCreatedEvent {
     /// The address of the server that the pool's connections will connect to.
@@ -32,7 +32,7 @@ pub struct PoolCreatedEvent {
 }
 
 /// Event emitted when a connection pool is cleared.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 #[non_exhaustive]
 pub struct PoolClearedEvent {
     /// The address of the server that the pool's connections will connect to.
@@ -42,7 +42,7 @@ pub struct PoolClearedEvent {
 }
 
 /// Event emitted when a connection pool is cleared.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 #[non_exhaustive]
 pub struct PoolClosedEvent {
     /// The address of the server that the pool's connections will connect to.
@@ -52,7 +52,7 @@ pub struct PoolClosedEvent {
 }
 
 /// Event emitted when a connection is created.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ConnectionCreatedEvent {
@@ -69,7 +69,7 @@ pub struct ConnectionCreatedEvent {
 
 /// Event emitted when a connection is ready to be used. This indicates that all the necessary
 /// prerequisites for using a connection (handshake, authentication, etc.) have been completed.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ConnectionReadyEvent {
@@ -85,7 +85,7 @@ pub struct ConnectionReadyEvent {
 }
 
 /// Event emitted when a connection is closed.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ConnectionClosedEvent {
@@ -104,7 +104,7 @@ pub struct ConnectionClosedEvent {
 }
 
 /// The reasons that a connection may be closed.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum ConnectionClosedReason {
@@ -125,7 +125,7 @@ pub enum ConnectionClosedReason {
 }
 
 /// Event emitted when a thread begins checking out a connection to use for an operation.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 #[non_exhaustive]
 pub struct ConnectionCheckoutStartedEvent {
     /// The address of the server that the connection will connect to.
@@ -135,7 +135,7 @@ pub struct ConnectionCheckoutStartedEvent {
 }
 
 /// Event emitted when a thread is unable to check out a connection.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 #[non_exhaustive]
 pub struct ConnectionCheckoutFailedEvent {
     /// The address of the server that the connection would have connected to.
@@ -148,7 +148,7 @@ pub struct ConnectionCheckoutFailedEvent {
 }
 
 /// The reasons a connection may not be able to be checked out.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum ConnectionCheckoutFailedReason {
@@ -161,7 +161,7 @@ pub enum ConnectionCheckoutFailedReason {
 }
 
 /// Event emitted when a connection is successfully checked out.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ConnectionCheckedOutEvent {
@@ -177,7 +177,7 @@ pub struct ConnectionCheckedOutEvent {
 }
 
 /// Event emitted when a connection is checked back into a connection pool.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ConnectionCheckedInEvent {

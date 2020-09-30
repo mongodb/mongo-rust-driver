@@ -201,6 +201,7 @@ impl Handshaker {
         let response = conn.send_command(command, None).await?;
         let end_time = PreciseTime::now();
 
+        response.validate()?;
         let mut command_response: IsMasterCommandResponse = response.body()?;
 
         // Record the client's message and the server's response from speculative authentication if

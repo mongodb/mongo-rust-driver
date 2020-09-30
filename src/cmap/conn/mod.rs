@@ -66,6 +66,11 @@ pub(crate) struct Connection {
     /// been read.
     command_executing: bool,
 
+    /// Whether or not this connection has experienced a network error while reading or writing.
+    /// Once the connection has received an error, it should not be used again or checked back
+    /// into a pool.
+    error: bool,
+
     stream: AsyncStream,
 
     #[derivative(Debug = "ignore")]
@@ -95,6 +100,7 @@ impl Connection {
             address,
             handler: options.and_then(|options| options.event_handler),
             stream_description: None,
+            error: false,
         };
 
         Ok(conn)
@@ -187,6 +193,11 @@ impl Connection {
         self.command_executing
     }
 
+    /// Checks if the connection experienced a network error and should be closed.
+    pub(super) fn is_errored(&self) -> bool {
+        self.error
+    }
+
     /// Helper to create a `ConnectionCheckedOutEvent` for the connection.
     pub(super) fn checked_out_event(&self) -> ConnectionCheckedOutEvent {
         ConnectionCheckedOutEvent {
@@ -233,12 +244,15 @@ impl Connection {
         let message = Message::with_command(command, request_id.into());
 
         self.command_executing = true;
-        message.write_to(&mut self.stream).await?;
+        let write_result = message.write_to(&mut self.stream).await;
+        self.error = write_result.is_err();
+        write_result?;
 
-        let response_message = Message::read_from(&mut self.stream).await?;
+        let response_message_result = Message::read_from(&mut self.stream).await;
         self.command_executing = false;
+        self.error = response_message_result.is_err();
 
-        CommandResponse::new(self.address.clone(), response_message)
+        CommandResponse::new(self.address.clone(), response_message_result?)
     }
 
     /// Gets the connection's StreamDescription.
@@ -276,6 +290,7 @@ impl Connection {
             handler: self.handler.take(),
             stream_description: self.stream_description.take(),
             command_executing: self.command_executing,
+            error: self.error,
         }
     }
 }
@@ -327,6 +342,7 @@ struct DroppedConnectionState {
     handler: Option<Arc<dyn CmapEventHandler>>,
     stream_description: Option<StreamDescription>,
     command_executing: bool,
+    error: bool,
 }
 
 impl Drop for DroppedConnectionState {
@@ -335,10 +351,15 @@ impl Drop for DroppedConnectionState {
     /// again, we just close the connection directly.
     fn drop(&mut self) {
         if let Some(ref handler) = self.handler {
+            let reason = if self.error {
+                ConnectionClosedReason::Error
+            } else {
+                ConnectionClosedReason::PoolClosed
+            };
             handler.handle_connection_closed_event(ConnectionClosedEvent {
                 address: self.address.clone(),
                 connection_id: self.id,
-                reason: ConnectionClosedReason::PoolClosed,
+                reason,
             });
         }
     }
@@ -356,6 +377,7 @@ impl From<DroppedConnectionState> for Connection {
             stream_description: state.stream_description.take(),
             ready_and_available_time: None,
             pool: None,
+            error: state.error,
         }
     }
 }

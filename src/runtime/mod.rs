@@ -71,7 +71,7 @@ impl AsyncRuntime {
     /// Run a future in the foreground, blocking on it completing.
     ///
     /// This will panic if called from a sychronous context when tokio is being used.
-    #[cfg(feature = "sync")]
+    #[cfg(any(feature = "sync", test))]
     pub(crate) fn block_on<F, T>(self, fut: F) -> T
     where
         F: Future<Output = T> + Send,
@@ -80,8 +80,8 @@ impl AsyncRuntime {
         #[cfg(all(feature = "tokio-runtime", not(feature = "async-std-runtime")))]
         {
             match TokioCallingContext::current() {
-                TokioCallingContext::Async(handle) => {
-                    handle.enter(|| futures::executor::block_on(fut))
+                TokioCallingContext::Async(_handle) => {
+                    tokio::task::block_in_place(|| futures::executor::block_on(fut))
                 }
                 TokioCallingContext::Sync => {
                     panic!("block_on called from tokio outside of async context")

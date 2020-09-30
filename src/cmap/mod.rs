@@ -33,6 +33,7 @@ use crate::{
         ConnectionCheckoutFailedEvent,
         ConnectionCheckoutFailedReason,
         ConnectionCheckoutStartedEvent,
+        ConnectionClosedEvent,
         ConnectionClosedReason,
         PoolClearedEvent,
         PoolClosedEvent,
@@ -216,8 +217,9 @@ impl ConnectionPoolInner {
 
         let mut available_connections = self.available_connections.lock().await;
 
-        // Close the connection if it's stale.
-        if conn.is_stale(self.generation.load(Ordering::SeqCst)) {
+        if conn.is_errored() {
+            self.close_connection(conn, ConnectionClosedReason::Error);
+        } else if conn.is_stale(self.generation.load(Ordering::SeqCst)) {
             self.close_connection(conn, ConnectionClosedReason::Stale);
         } else if conn.is_executing() {
             self.close_connection(conn, ConnectionClosedReason::Dropped)
@@ -334,6 +336,9 @@ impl ConnectionPoolInner {
         &self,
         pending_connection: PendingConnection,
     ) -> Result<Connection> {
+        let address = pending_connection.address.clone();
+        let id = pending_connection.id;
+
         let establish_result = self
             .establisher
             .establish_connection(pending_connection)
@@ -348,6 +353,14 @@ impl ConnectionPoolInner {
                 // Establishing a pending connection failed, so that must be reflected in to total
                 // connection count.
                 self.total_connection_count.fetch_sub(1, Ordering::SeqCst);
+                self.emit_event(|handler| {
+                    let event = ConnectionClosedEvent {
+                        address,
+                        reason: ConnectionClosedReason::Error,
+                        connection_id: id,
+                    };
+                    handler.handle_connection_closed_event(event);
+                });
             }
             Ok(ref connection) => {
                 self.emit_event(|handler| {
