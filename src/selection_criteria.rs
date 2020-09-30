@@ -127,11 +127,13 @@ pub struct ReadPreferenceOptions {
     #[builder(default)]
     pub max_staleness: Option<Duration>,
 
-    /// Specifies hedging behavior for reads.
+    /// Specifies hedging behavior for reads. These options only apply to sharded clusters on
+    /// servers that are at least version 4.4. Note that hedged reads are automatically enabled for
+    /// read preference mode "nearest".
     ///
     /// See the [MongoDB docs](https://docs.mongodb.com/manual/core/read-preference-hedge-option/) for more details.
     #[builder(default)]
-    pub hedge: Option<HedgedRead>,
+    pub hedge: Option<HedgedReadOptions>,
 }
 
 /// Specifies hedging behavior for reads.
@@ -139,14 +141,14 @@ pub struct ReadPreferenceOptions {
 /// See the [MongoDB docs](https://docs.mongodb.com/manual/core/read-preference-hedge-option/) for more details.
 #[derive(Clone, Debug, Deserialize, PartialEq, TypedBuilder)]
 #[non_exhaustive]
-pub struct HedgedRead {
+pub struct HedgedReadOptions {
     /// Whether or not to allow reads from a sharded cluster to be "hedged" across two replica
     /// set members per shard, with the results from the first response received back from either
     /// being returned.
     pub enabled: bool,
 }
 
-impl HedgedRead {
+impl HedgedReadOptions {
     pub fn with_enabled(enabled: bool) -> Self {
         Self { enabled }
     }
@@ -263,13 +265,13 @@ pub type TagSet = HashMap<String, String>;
 
 #[cfg(test)]
 mod test {
-    use super::{HedgedRead, ReadPreference, ReadPreferenceOptions};
+    use super::{HedgedReadOptions, ReadPreference, ReadPreferenceOptions};
     use crate::bson::doc;
 
     #[test]
     fn hedged_read_included_in_document() {
         let options = ReadPreferenceOptions::builder()
-            .hedge(HedgedRead { enabled: true })
+            .hedge(HedgedReadOptions { enabled: true })
             .build();
 
         let read_pref = ReadPreference::Secondary { options };
