@@ -1364,7 +1364,8 @@ async fn delete_examples(collection: &Collection) -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn test() {
     let client = TestClient::new().await;
     let coll = client
