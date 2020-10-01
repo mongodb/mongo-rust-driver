@@ -21,8 +21,9 @@ impl FailPoint {
     pub fn fail_command(
         fail_commands: &[&str],
         mode: FailPointMode,
-        options: Option<FailCommandOptions>,
+        options: impl Into<Option<FailCommandOptions>>,
     ) -> FailPoint {
+        let options = options.into();
         let mut data = doc! {
             "failCommands": fail_commands.iter().map(|s| s.to_string()).collect::<Vec<String>>(),
         };
