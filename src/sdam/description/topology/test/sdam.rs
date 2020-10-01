@@ -1,6 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 
 use serde::Deserialize;
+use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
     bson::{doc, oid::ObjectId},
@@ -19,6 +20,7 @@ use crate::{
         FailPointMode,
         TestClient,
         CLIENT_OPTIONS,
+        LOCK,
     },
     RUNTIME,
 };
@@ -262,6 +264,8 @@ async fn sharded() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn direct_connection() {
+    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
+
     let test_client = TestClient::new().await;
     if !test_client.is_replica_set() {
         println!("Skipping due to non-replica set topology");
@@ -312,10 +316,12 @@ async fn direct_connection() {
         .expect("write should succeed with directConnection unspecified");
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(threaded_scheduler))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn heartbeat_frequency() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+
     let mut options = CLIENT_OPTIONS.clone();
     options.hosts.drain(1..);
 
