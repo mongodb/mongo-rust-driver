@@ -148,7 +148,7 @@ impl Executor {
         let description = self.description;
         for expected_event in self.events {
             let actual_event = subscriber
-                .wait_for_event(Duration::from_millis(250), |e| {
+                .wait_for_event(EVENT_TIMEOUT, |e| {
                     !ignored_event_names.iter().any(|name| e.name() == name)
                 })
                 .await
@@ -209,11 +209,25 @@ impl Operation {
                     }
                 }
                 Operation::CheckIn { connection } => {
+                    let mut subscriber = state.handler.subscribe();
                     let conn = state.connections.write().await.remove(&connection).unwrap();
+                    let id = conn.id;
+                    // connections are checked in via tasks spawned in their drop implementation,
+                    // they are not checked in explicitly.
+                    drop(conn);
 
-                    if let Some(pool) = state.pool.read().await.deref() {
-                        pool.check_in(conn).await;
-                    }
+                    // wait for event to be emitted to ensure check in has completed.
+                    subscriber
+                        .wait_for_event(EVENT_TIMEOUT, |e| {
+                            matches!(e, Event::ConnectionCheckedIn(event) if event.connection_id == id)
+                        })
+                        .await
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "did not receive checkin event after dropping connection (id={})",
+                                connection
+                            )
+                        });
                 }
                 Operation::Clear => {
                     if let Some(pool) = state.pool.write().await.deref() {
@@ -221,8 +235,18 @@ impl Operation {
                     }
                 }
                 Operation::Close => {
-                    state.connections.write().await.clear();
+                    let mut subscriber = state.handler.subscribe();
+
+                    // pools are closed via their drop implementation
                     state.pool.write().await.take();
+
+                    // wait for event to be emitted to ensure drop has completed.
+                    subscriber
+                        .wait_for_event(EVENT_TIMEOUT, |e| {
+                            matches!(e, Event::ConnectionPoolClosed(_))
+                        })
+                        .await
+                        .expect("did not receive ConnectionPoolClosed event after closing pool");
                 }
 
                 // We replace all instances of `Start` with `StartHelper` when we preprocess the
