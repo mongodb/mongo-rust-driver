@@ -35,6 +35,7 @@ struct Executor {
     events: Vec<Event>,
     state: Arc<State>,
     ignored_event_names: Vec<String>,
+    pool_options: ConnectionPoolOptions,
 }
 
 #[derive(Debug)]
@@ -51,10 +52,6 @@ struct State {
 }
 
 impl State {
-    fn count_all_events(&self) -> usize {
-        self.handler.events.read().unwrap().len()
-    }
-
     // Counts the number of events of the given type that have occurred so far.
     fn count_events(&self, event_type: &str) -> usize {
         self.handler
@@ -73,25 +70,13 @@ impl Executor {
         let handler = Arc::new(EventHandler::new());
         let error = test_file.error;
 
-        test_file
-            .pool_options
-            .get_or_insert_with(Default::default)
-            .tls_options = CLIENT_OPTIONS.tls_options();
-
-        test_file
-            .pool_options
-            .get_or_insert_with(Default::default)
-            .event_handler = Some(handler.clone());
-
-        let pool = ConnectionPool::new(
-            CLIENT_OPTIONS.hosts[0].clone(),
-            Default::default(),
-            test_file.pool_options,
-        );
+        let mut pool_options = test_file.pool_options.unwrap_or_else(Default::default);
+        pool_options.tls_options = CLIENT_OPTIONS.tls_options();
+        pool_options.event_handler = Some(handler.clone());
 
         let state = State {
             handler,
-            pool: RwLock::new(Some(pool)),
+            pool: RwLock::new(None),
             connections: Default::default(),
             threads: Default::default(),
         };
@@ -103,10 +88,20 @@ impl Executor {
             operations,
             state: Arc::new(state),
             ignored_event_names: test_file.ignore,
+            pool_options,
         }
     }
 
     async fn execute_test(self) {
+        let mut subscriber = self.state.handler.subscribe();
+
+        let pool = ConnectionPool::new(
+            CLIENT_OPTIONS.hosts[0].clone(),
+            Default::default(),
+            Some(self.pool_options),
+        );
+        *self.state.pool.write().await = Some(pool);
+
         let mut error: Option<Error> = None;
         let operations = self.operations;
 
@@ -139,33 +134,21 @@ impl Executor {
             (None, None) => {}
         }
 
-        // The `Drop` implementation for `Connection` and `ConnectionPool` spawn background async
-        // tasks that emit certain events. If the tasks haven't been scheduled yet, we may
-        // not see the events here. To account for this, we wait for a small amount of time
-        // before checking again.
-        if self.state.count_all_events() < self.events.len() {
-            RUNTIME.delay_for(Duration::from_millis(250)).await;
-        }
-
         let ignored_event_names = self.ignored_event_names;
-        let mut actual_events = self.state.handler.events.write().unwrap();
-        actual_events.retain(|e| !ignored_event_names.iter().any(|name| e.name() == name));
-
-        if actual_events.len() < self.events.len() {
-            panic!(
-                "{}: more events expected than were actually received. expected: {:?}, actual: \
-                 {:?}",
-                self.description,
-                self.events,
-                actual_events.deref()
-            )
-        }
-        for i in 0..self.events.len() {
-            assert_matches(
-                &actual_events[i],
-                &self.events[i],
-                Some(self.description.as_str()),
-            );
+        let description = self.description;
+        for expected_event in self.events {
+            let actual_event = subscriber
+                .wait_for_event(Duration::from_millis(250), |e| {
+                    !ignored_event_names.iter().any(|name| e.name() == name)
+                })
+                .await
+                .unwrap_or_else(|| {
+                    panic!(
+                        "{}: did not receive expected event: {:?}",
+                        description, expected_event
+                    )
+                });
+            assert_matches(&actual_event, &expected_event, Some(description.as_str()));
         }
     }
 }
