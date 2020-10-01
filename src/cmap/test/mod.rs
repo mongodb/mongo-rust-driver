@@ -27,6 +27,16 @@ const TEST_DESCRIPTIONS_TO_SKIP: &[&str] = &[
     "must throw error if checkOut is called on a closed pool",
 ];
 
+/// Many different types of CMAP events are emitted from tasks spawned in the drop
+/// implementations of various types (Connections, pools, etc.). Sometimes it takes
+/// a longer amount of time for these tasks to get scheduled and thus their associated
+/// events to get emitted, requiring the runner to wait for a little bit before asserting
+/// the events were actually fired.
+///
+/// This value was purposefully chosen to be large to prevent test failures, though it is not
+/// expected that the 3s timeout will regularly or ever be hit.
+const EVENT_TIMEOUT: Duration = Duration::from_secs(3);
+
 #[derive(Debug)]
 struct Executor {
     description: String,

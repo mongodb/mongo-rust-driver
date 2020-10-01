@@ -1,7 +1,10 @@
 use serde::Deserialize;
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
-use super::event::{Event, EventHandler};
+use super::{
+    event::{Event, EventHandler},
+    EVENT_TIMEOUT,
+};
 use crate::{
     bson::doc,
     cmap::{options::ConnectionPoolOptions, Command, ConnectionPool},
@@ -165,6 +168,7 @@ async fn connection_establishment_error() {
     let _fp_guard = client.enable_failpoint(failpoint).await.unwrap();
 
     let handler = Arc::new(EventHandler::new());
+    let mut subscriber = handler.subscribe();
     let mut options = ConnectionPoolOptions::from_client_options(&client_options);
     options.event_handler = Some(handler.clone() as Arc<dyn crate::cmap::CmapEventHandler>);
     let pool = ConnectionPool::new(
@@ -174,13 +178,16 @@ async fn connection_establishment_error() {
     );
 
     pool.check_out().await.expect_err("check out should fail");
-    let event_emitted = handler.events.read().unwrap().iter().any(|e| match e {
-        Event::ConnectionClosed(event) => {
-            event.connection_id == 1 && event.reason == ConnectionClosedReason::Error
-        }
-        _ => false,
-    });
-    assert!(event_emitted);
+
+    subscriber
+        .wait_for_event(EVENT_TIMEOUT, |e| match e {
+            Event::ConnectionClosed(event) => {
+                event.connection_id == 1 && event.reason == ConnectionClosedReason::Error
+            }
+            _ => false,
+        })
+        .await
+        .expect("closed event with error reason should have been seen");
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(threaded_scheduler))]
@@ -216,7 +223,7 @@ async fn connection_error_during_operation() {
         .expect_err("ping should fail due to fail point");
 
     subscriber
-        .wait_for_event(Duration::from_millis(500), |e| match e {
+        .wait_for_event(EVENT_TIMEOUT, |e| match e {
             Event::ConnectionClosed(event) => {
                 event.connection_id == 1 && event.reason == ConnectionClosedReason::Error
             }
