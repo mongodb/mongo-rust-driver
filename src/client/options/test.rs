@@ -79,6 +79,14 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
         doc.insert("maxidletimems", i.as_millis() as i32);
     }
 
+    if let Some(i) = options.max_pool_size.take() {
+        doc.insert("maxpoolsize", i as i32);
+    }
+
+    if let Some(i) = options.min_pool_size.take() {
+        doc.insert("minpoolsize", i as i32);
+    }
+
     if let Some(s) = options.repl_set_name.take() {
         doc.insert("replicaset", s);
     }

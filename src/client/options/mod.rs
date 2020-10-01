@@ -1370,7 +1370,7 @@ impl ClientOptionsParser {
                 self.max_pool_size = Some(get_u32!(value, k));
             }
             k @ "minpoolsize" => {
-                self.max_pool_size = Some(get_u32!(value, k));
+                self.min_pool_size = Some(get_u32!(value, k));
             }
             "readconcernlevel" => {
                 self.read_concern = Some(ReadConcernLevel::from_str(value).into());
