@@ -12,7 +12,15 @@ use crate::{
         server::{ServerDescription, ServerType},
         topology::{TopologyDescription, TopologyType},
     },
-    test::{run_spec_test, TestClient, CLIENT_OPTIONS},
+    test::{
+        run_spec_test,
+        FailCommandOptions,
+        FailPoint,
+        FailPointMode,
+        TestClient,
+        CLIENT_OPTIONS,
+    },
+    RUNTIME,
 };
 
 #[derive(Debug, Deserialize)]
@@ -302,4 +310,41 @@ async fn direct_connection() {
         .insert_one(doc! {}, None)
         .await
         .expect("write should succeed with directConnection unspecified");
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn heartbeat_frequency() {
+    let mut options = CLIENT_OPTIONS.clone();
+    options.hosts.drain(1..);
+
+    // set large heartbeat frequency
+    options.heartbeat_freq = Some(Duration::from_secs(30));
+
+    let client = TestClient::with_options(options.into()).await;
+
+    if !client.supports_fail_command().await {
+        println!(
+            "Skipping {} due to lack of failCommand support",
+            function_name!()
+        );
+        return;
+    }
+
+    // TODO: RUST-232 replace this with monitoring events. When using failPoints, this test
+    // merely ensures that monitors are waiting longer than minHeartbeatFrequencyMS, not that
+    // heratbeatFrequencyMS is correctly respected.
+    let fp_options = FailCommandOptions::builder().error_code(1234).build();
+    let fp = FailPoint::fail_command(&["isMaster"], FailPointMode::Times(1), fp_options);
+    let _fp_guard = client.enable_failpoint(fp).await.unwrap();
+
+    // wait for longer than minHeartbeatFrequencyMS
+    RUNTIME.delay_for(Duration::from_millis(1000)).await;
+
+    client
+        .database("admin")
+        .run_command(doc! { "isMaster": 1 }, None)
+        .await
+        .expect_err("failpoint should still be active");
 }

@@ -45,25 +45,21 @@ impl TopologyMessageManager {
     ///
     /// Returns `true` if a topology check has been requested or `false` if the timeout elapsed.
     pub(super) async fn wait_for_topology_check_request(&self, timeout: Duration) -> bool {
-        let mut listener = self.topology_check_listener.clone();
-
-        wait_for_notification(&mut listener, timeout).await
+        wait_for_notification(&self.topology_check_listener, timeout).await
     }
 
     /// Waits for either `timeout` to elapse or the topology to change.
     ///
     /// Returns `true` if the topology has changed or `false` if the timeout elapsed.
     pub(crate) async fn wait_for_topology_change(&self, timeout: Duration) -> bool {
-        let mut listener = self.topology_change_listener.clone();
-
-        // Per the tokio docs, the first call to `tokio::watch::Receiver::recv` will return
-        // immediately with the current value, so we skip over this and wait for the next message.
-        let _ = listener.recv().await;
-
-        wait_for_notification(&mut listener, timeout).await
+        wait_for_notification(&self.topology_change_listener, timeout).await
     }
 }
 
-async fn wait_for_notification(receiver: &mut Receiver<()>, timeout: Duration) -> bool {
+async fn wait_for_notification(listener: &Receiver<()>, timeout: Duration) -> bool {
+    let mut receiver = listener.clone();
+    // Per the tokio docs, the first call to `tokio::watch::Receiver::recv` will return
+    // immediately with the current value, so we skip over this and wait for the next message.
+    let _ = receiver.recv().await;
     RUNTIME.timeout(timeout, receiver.recv()).await.is_ok()
 }
