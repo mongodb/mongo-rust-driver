@@ -6,7 +6,7 @@ use std::{
 use serde::{de::Unexpected, Deserialize, Deserializer};
 
 use crate::{event::cmap::*, options::StreamAddress, RUNTIME};
-use tokio::sync::broadcast::SendError;
+use tokio::sync::broadcast::{RecvError, SendError};
 
 #[derive(Clone, Debug)]
 pub struct EventHandler {
@@ -16,7 +16,7 @@ pub struct EventHandler {
 
 impl EventHandler {
     pub fn new() -> Self {
-        let (channel_sender, _) = tokio::sync::broadcast::channel(100);
+        let (channel_sender, _) = tokio::sync::broadcast::channel(500);
         Self {
             events: Default::default(),
             channel_sender,
@@ -93,12 +93,15 @@ impl EventSubscriber<'_> {
     {
         RUNTIME
             .timeout(timeout, async {
-                while let Ok(event) = self.receiver.recv().await {
-                    if filter(&event) {
-                        return event.into();
+                loop {
+                    match self.receiver.recv().await {
+                        Ok(event) if filter(&event) => return event.into(),
+                        // the channel hit capacity and the channnel will skip a few to catch up.
+                        Err(RecvError::Lagged(_)) => continue,
+                        Err(_) => return None,
+                        _ => continue,
                     }
                 }
-                None
             })
             .await
             .ok()
