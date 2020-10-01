@@ -180,15 +180,6 @@ impl ConnectionPool {
         Ok(conn)
     }
 
-    /// Checks a connection back into the pool and notifies the wait queue that a connection is
-    /// ready. If the connection is stale, it will be closed instead of being added to the set of
-    /// available connections. The time that the connection is checked in will be marked to
-    /// facilitate detecting if the connection becomes idle.
-    #[cfg(test)]
-    pub(crate) async fn check_in(&self, conn: Connection) {
-        self.inner.check_in(conn).await;
-    }
-
     /// Increments the generation of the pool. Rather than eagerly removing stale connections from
     /// the pool, they are left for the background thread to clean up.
     pub(crate) fn clear(&self) {
@@ -208,6 +199,10 @@ impl ConnectionPoolInner {
         }
     }
 
+    /// Checks a connection back into the pool and notifies the wait queue that a connection is
+    /// ready. If the connection is stale, it will be closed instead of being added to the set of
+    /// available connections. The time that the connection is checked in will be marked to
+    /// facilitate detecting if the connection becomes idle.
     async fn check_in(&self, mut conn: Connection) {
         self.emit_event(|handler| {
             handler.handle_connection_checked_in_event(conn.checked_in_event());
