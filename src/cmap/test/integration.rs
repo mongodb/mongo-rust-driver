@@ -145,7 +145,7 @@ async fn concurrent_connections() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(threaded_scheduler))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-async fn connection_establishment_error() {
+async fn connection_error_during_establishment() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
 
     let mut client_options = CLIENT_OPTIONS.clone();
