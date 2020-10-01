@@ -200,6 +200,7 @@ async fn connection_error_during_operation() {
     let handler = Arc::new(EventHandler::new());
     options.cmap_event_handler = Some(handler.clone() as Arc<dyn CmapEventHandler>);
     options.hosts.drain(1..);
+    options.max_pool_size = Some(1);
 
     let client = TestClient::with_options(options.into()).await;
     if !client.supports_fail_command().await {
