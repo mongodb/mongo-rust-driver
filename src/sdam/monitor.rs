@@ -161,6 +161,7 @@ async fn is_master(connection: &mut Connection) -> Result<IsMasterReply> {
     let command_response = connection.send_command(command, None).await?;
     let end_time = PreciseTime::now();
 
+    command_response.validate()?;
     let is_master_response = command_response.body()?;
     Ok(IsMasterReply {
         command_response: is_master_response,
