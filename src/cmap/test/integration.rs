@@ -164,7 +164,7 @@ async fn connection_error_during_establishment() {
     }
 
     let options = FailCommandOptions::builder().error_code(1234).build();
-    let failpoint = FailPoint::fail_command(&["isMaster"], FailPointMode::Times(1), Some(options));
+    let failpoint = FailPoint::fail_command(&["isMaster"], FailPointMode::Times(10), Some(options));
     let _fp_guard = client.enable_failpoint(failpoint).await.unwrap();
 
     let handler = Arc::new(EventHandler::new());
@@ -212,7 +212,7 @@ async fn connection_error_during_operation() {
     }
 
     let options = FailCommandOptions::builder().close_connection(true).build();
-    let failpoint = FailPoint::fail_command(&["ping"], FailPointMode::Times(1), Some(options));
+    let failpoint = FailPoint::fail_command(&["ping"], FailPointMode::Times(10), Some(options));
     let _fp_guard = client.enable_failpoint(failpoint).await.unwrap();
 
     let mut subscriber = handler.subscribe();
