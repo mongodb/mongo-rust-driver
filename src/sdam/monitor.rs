@@ -66,16 +66,18 @@ impl Monitor {
                 topology.notify_topology_changed();
             }
 
+            let mut topology_check_requests_subscriber =
+                topology.subscribe_to_topology_check_requests().await;
+
             let min_frequency = self
                 .topology
                 .client_options()
                 .heartbeat_freq_test
                 .unwrap_or(MIN_HEARTBEAT_FREQUENCY);
-
             RUNTIME.delay_for(min_frequency).await;
 
-            topology
-                .wait_for_topology_check_request(heartbeat_frequency - min_frequency)
+            topology_check_requests_subscriber
+                .wait_for_message(heartbeat_frequency - min_frequency)
                 .await;
         }
     }

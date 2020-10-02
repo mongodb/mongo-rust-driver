@@ -269,18 +269,18 @@ impl Client {
                 return Ok(server);
             }
 
+            let mut topology_change_subscriber =
+                self.inner.topology.subscribe_to_topology_changes().await;
             self.inner.topology.request_topology_check();
 
             let time_passed = start_time.to(PreciseTime::now());
             let time_remaining = std::cmp::max(time::Duration::zero(), timeout - time_passed);
 
-            let message_received = self
-                .inner
-                .topology
-                .wait_for_topology_change(time_remaining.to_std()?)
+            let change_occurred = topology_change_subscriber
+                .wait_for_message(time_remaining.to_std()?)
                 .await;
 
-            if !message_received {
+            if !change_occurred {
                 return Err(ErrorKind::ServerSelectionError {
                     message: self
                         .inner
