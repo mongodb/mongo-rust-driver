@@ -5,6 +5,7 @@ mod client;
 mod coll;
 mod cursor;
 mod db;
+mod documentation_examples;
 mod spec;
 mod util;
 
