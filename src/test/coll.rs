@@ -731,6 +731,8 @@ async fn find_one_and_delete_hint_server_version() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn no_read_preference_to_standalone() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
     let client = EventClient::new().await;
 
     if !client.is_standalone() {
