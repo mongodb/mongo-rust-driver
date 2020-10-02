@@ -401,8 +401,6 @@ async fn scram_test(
     password: &str,
     mechanisms: &[AuthMechanism],
 ) {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     for mechanism in mechanisms {
         auth_test_uri(username, password, Some(mechanism.clone()), true).await;
         auth_test_uri(username, password, None, true).await;
