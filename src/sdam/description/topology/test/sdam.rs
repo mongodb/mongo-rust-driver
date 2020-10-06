@@ -1,7 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 
 use serde::Deserialize;
-use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
+use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, oid::ObjectId},
@@ -13,16 +13,7 @@ use crate::{
         server::{ServerDescription, ServerType},
         topology::{TopologyDescription, TopologyType},
     },
-    test::{
-        run_spec_test,
-        FailCommandOptions,
-        FailPoint,
-        FailPointMode,
-        TestClient,
-        CLIENT_OPTIONS,
-        LOCK,
-    },
-    RUNTIME,
+    test::{run_spec_test, TestClient, CLIENT_OPTIONS, LOCK},
 };
 
 #[derive(Debug, Deserialize)]
