@@ -105,7 +105,7 @@ impl ConnectionPoolWorker {
     /// Starts a worker and returns a manager and connection requester.
     /// Once all connection requesters are dropped, the worker will stop executing
     /// and close the pool.
-    pub(super) fn new(
+    pub(super) fn start(
         address: StreamAddress,
         http_client: HttpClient,
         options: Option<ConnectionPoolOptions>,
@@ -137,7 +137,7 @@ impl ConnectionPoolWorker {
         let (manager, management_receiver) = PoolManager::new();
 
         let worker = ConnectionPoolWorker {
-            address: address.clone(),
+            address,
             event_handler: event_handler.clone(),
             max_idle_time,
             min_pool_size,

@@ -51,7 +51,7 @@ impl ConnectionPool {
         options: Option<ConnectionPoolOptions>,
     ) -> Self {
         let (manager, connection_requester) =
-            ConnectionPoolWorker::new(address.clone(), http_client, options.clone());
+            ConnectionPoolWorker::start(address.clone(), http_client, options.clone());
 
         let event_handler = options.as_ref().and_then(|opts| opts.event_handler.clone());
         let wait_queue_timeout = options.as_ref().and_then(|opts| opts.wait_queue_timeout);
