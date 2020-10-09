@@ -404,7 +404,9 @@ impl ConnectionPoolWorker {
 
     fn ensure_min_connections(&mut self) {
         if let Some(min_pool_size) = self.min_pool_size {
-            while self.total_connection_count < min_pool_size {
+            while self.total_connection_count < min_pool_size
+                && self.pending_connection_count < MAX_CONNECTING
+            {
                 let pending_connection = self.create_pending_connection();
                 let event_handler = self.event_handler.clone();
                 let manager = self.manager.clone();
