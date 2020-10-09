@@ -10,6 +10,8 @@ use crate::{
 use std::time::Duration;
 
 /// Handle for requesting Connections from the pool.
+/// This requester will keep the pool alive. Once all requesters have been dropped,
+/// the pool will stop servicing requests, drop its available connections, and close.
 #[derive(Clone, Debug)]
 pub(super) struct ConnectionRequester {
     address: StreamAddress,
@@ -83,12 +85,15 @@ impl ConnectionRequestReceiver {
     }
 }
 
+/// Struct encapsulating a request for a connection.
 #[derive(Debug)]
 pub(super) struct ConnectionRequest {
     sender: oneshot::Sender<RequestedConnection>,
 }
 
 impl ConnectionRequest {
+    /// Respond to the connection request, either with a pooled connection or one that is
+    /// establishing asynchronously.
     pub(super) fn fulfill(
         self,
         conn: RequestedConnection,
@@ -99,7 +104,11 @@ impl ConnectionRequest {
 
 #[derive(Debug)]
 pub(super) enum RequestedConnection {
+    /// A connection that was already established and was simply checked out of the pool.
     Pooled(Connection),
+
+    /// A new connection in the process of being established.
+    /// The handle can be awaited upon to receive the established connection.
     Establishing(AsyncJoinHandle<Result<Connection>>),
 }
 

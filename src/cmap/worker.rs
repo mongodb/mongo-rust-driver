@@ -27,7 +27,7 @@ use tokio::sync::mpsc;
 
 const MAX_CONNECTING: u32 = 2;
 
-/// The internal state of a connection pool.
+/// A worker task that manages the shared state of the pool.
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub(crate) struct ConnectionPoolWorker {
@@ -97,7 +97,7 @@ pub(crate) struct ConnectionPoolWorker {
 
     /// An in-progress connection request that was not finished due to the pool being out of
     /// available connections but at max_pool_size. When a connection is checked back in, it will
-    /// be used to fulfill this request before processing newer ones.
+    /// be used to fulfill this request before newer ones are processed.
     unfinished_check_out: Option<ConnectionRequest>,
 }
 
@@ -223,8 +223,8 @@ impl ConnectionPoolWorker {
     }
 
     async fn check_out(&mut self, request: ConnectionRequest) {
-        let mut connection = None;
-        while let Some(conn) = self.available_connections.pop_back() {
+        // first attempt to check out an available connection
+        while let Some(mut conn) = self.available_connections.pop_back() {
             // Close the connection if it's stale.
             if conn.is_stale(self.generation) {
                 self.close_connection(conn, ConnectionClosedReason::Stale);
@@ -237,61 +237,58 @@ impl ConnectionPoolWorker {
                 continue;
             }
 
-            connection = Some(conn);
-            break;
+            conn.mark_as_in_use(self.manager.clone());
+            if let Err(request) = request.fulfill(RequestedConnection::Pooled(conn)) {
+                // checking out thread stopped listening, indicating it hit the WaitQueue
+                // timeout, so we put connection back into pool.
+                let mut connection = request.unwrap_pooled_connection();
+                connection.mark_as_available();
+                self.available_connections.push_back(connection);
+            }
+
+            return;
         }
 
-        match connection {
-            Some(mut conn) => {
-                conn.mark_as_in_use(self.manager.clone());
-                if let Err(request) = request.fulfill(RequestedConnection::Pooled(conn)) {
-                    // checking out thread stopped listening, indicating it hit the WaitQueue
-                    // timeout, so we put connection back into pool.
-                    let mut connection = request.unwrap_pooled_connection();
-                    connection.mark_as_available();
-                    self.available_connections.push_back(connection);
+        // otherwise, attempt to create a connection.
+        if self.total_connection_count < self.max_pool_size {
+            let event_handler = self.event_handler.clone();
+            let establisher = self.establisher.clone();
+            let pending_connection = self.create_pending_connection();
+            let manager = self.manager.clone();
+
+            let handle = RUNTIME.spawn(async move {
+                let mut establish_result = establish_connection(
+                    &establisher,
+                    pending_connection,
+                    &manager,
+                    event_handler.as_ref(),
+                )
+                .await;
+
+                if let Ok(ref mut c) = establish_result {
+                    c.mark_as_in_use(manager.clone());
+                    manager.handle_connection_succeeded(None);
                 }
-            }
-            None if self.total_connection_count < self.max_pool_size => {
-                let event_handler = self.event_handler.clone();
-                let establisher = self.establisher.clone();
-                let pending_connection = self.create_pending_connection();
-                let manager = self.manager.clone();
 
-                let handle = RUNTIME.spawn(async move {
-                    let mut establish_result = establish_connection(
-                        &establisher,
-                        pending_connection,
-                        &manager,
-                        event_handler.as_ref(),
-                    )
-                    .await;
+                establish_result
+            });
 
-                    if let Ok(ref mut c) = establish_result {
-                        c.mark_as_in_use(manager.clone());
-                        manager.handle_connection_succeeded(None);
-                    }
+            let handle = match handle {
+                Some(h) => h,
 
-                    establish_result
-                });
+                // The async runtime was dropped which means nothing will be waiting
+                // on the request, so we can just exit.
+                None => {
+                    return;
+                }
+            };
 
-                let handle = match handle {
-                    Some(h) => h,
-
-                    // The async runtime was dropped which means nothing will be waiting
-                    // on the request, so we can just exit.
-                    None => {
-                        return;
-                    }
-                };
-
-                // this only fails if the other end stopped listening (e.g. due to timeout), in
-                // which case we just let the connection establish in the
-                // background.
-                let _: std::result::Result<_, _> =
-                    request.fulfill(RequestedConnection::Establishing(handle));
-            }
-            None => self.unfinished_check_out = Some(request),
+            // this only fails if the other end stopped listening (e.g. due to timeout), in
+            // which case we just let the connection establish in the background.
+            let _: std::result::Result<_, _> =
+                request.fulfill(RequestedConnection::Establishing(handle));
+        } else {
+            self.unfinished_check_out = Some(request)
         }
     }
 
@@ -313,6 +310,7 @@ impl ConnectionPoolWorker {
         pending_connection
     }
 
+    /// Process a connection establishment failure.
     fn handle_connection_failed(&mut self, error: Error) {
         if error.is_authentication_error() {
             // auth spec requires pool is cleared after encountering auth error.
@@ -324,10 +322,13 @@ impl ConnectionPoolWorker {
         self.pending_connection_count -= 1;
     }
 
+    /// Process a successful connection establishment, optionally populating the pool with the
+    /// resulting connection.
     fn handle_connection_succeeded(&mut self, connection: Option<Connection>) {
         self.pending_connection_count -= 1;
-        if let Some(connection) = connection {
-            self.populate_connection(connection);
+        if let Some(mut connection) = connection {
+            connection.mark_as_available();
+            self.available_connections.push_back(connection);
         }
     }
 
@@ -346,11 +347,6 @@ impl ConnectionPoolWorker {
         } else {
             self.available_connections.push_back(conn);
         }
-    }
-
-    fn populate_connection(&mut self, mut conn: Connection) {
-        conn.mark_as_available();
-        self.available_connections.push_back(conn);
     }
 
     fn clear(&mut self) {
@@ -380,6 +376,8 @@ impl ConnectionPoolWorker {
         self.total_connection_count -= 1;
     }
 
+    /// Ensure all connections in the pool are valid and that the pool is managing at least
+    /// min_pool_size connections.
     fn perform_maintenance(&mut self) {
         self.remove_perished_connections();
         self.ensure_min_connections();
@@ -402,6 +400,7 @@ impl ConnectionPoolWorker {
         }
     }
 
+    /// Populate the the pool with enough connections to meet the min_pool_size_requirement.
     fn ensure_min_connections(&mut self) {
         if let Some(min_pool_size) = self.min_pool_size {
             while self.total_connection_count < min_pool_size
@@ -427,6 +426,9 @@ impl ConnectionPoolWorker {
     }
 }
 
+/// Helper covering the common connection establishment behavior between
+/// connections established in check_out and those established as part of
+/// satisfying min_pool_size.
 async fn establish_connection(
     establisher: &ConnectionEstablisher,
     pending_connection: PendingConnection,
