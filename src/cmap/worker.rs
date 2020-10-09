@@ -25,6 +25,8 @@ use crate::{
 use std::{collections::VecDeque, sync::Arc, time::Duration};
 use tokio::sync::mpsc;
 
+const MAX_CONNECTING: u32 = 2;
+
 /// The internal state of a connection pool.
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -35,6 +37,9 @@ pub(crate) struct ConnectionPoolWorker {
     /// The total number of connections managed by the pool, including connections which are
     /// currently checked out of the pool or have yet to be established.
     total_connection_count: u32,
+
+    /// The number of connections currently being established by this pool.
+    pending_connection_count: u32,
 
     /// The ID of the next connection created by the pool.
     next_connection_id: u32,
@@ -139,6 +144,7 @@ impl ConnectionPoolWorker {
             establisher,
             next_connection_id: 1,
             total_connection_count: 0,
+            pending_connection_count: 0,
             generation: 0,
             connection_options,
             available_connections: VecDeque::new(),
@@ -173,7 +179,7 @@ impl ConnectionPoolWorker {
             } else {
                 tokio::select! {
                     Some(result_sender) = self.request_receiver.recv(),
-                                        if self.unfinished_check_out.is_none() => PoolTask::CheckOut(result_sender),
+                                        if self.can_service_connection_request() => PoolTask::CheckOut(result_sender),
                     Some(request) = self.management_receiver.recv() => request.into(),
                     _ = self.handle_listener.listen() => {
                         // all worker handles have been dropped meaning this
@@ -193,9 +199,9 @@ impl ConnectionPoolWorker {
                 PoolTask::CheckOut(result_sender) => self.check_out(result_sender).await,
                 PoolTask::CheckIn(connection) => self.check_in(connection),
                 PoolTask::Clear => self.clear(),
+                PoolTask::HandleConnectionSucceeded(c) => self.handle_connection_succeeded(c),
                 PoolTask::HandleConnectionFailed(error) => self.handle_connection_failed(error),
                 PoolTask::Maintenance => self.perform_maintenance(),
-                PoolTask::Populate(connection) => self.populate_connection(connection),
             }
         }
 
@@ -211,7 +217,9 @@ impl ConnectionPoolWorker {
     }
 
     fn can_service_connection_request(&self) -> bool {
-        self.total_connection_count < self.max_pool_size || !self.available_connections.is_empty()
+        (self.total_connection_count < self.max_pool_size
+            && self.pending_connection_count < MAX_CONNECTING)
+            || !self.available_connections.is_empty()
     }
 
     async fn check_out(&mut self, request: ConnectionRequest) {
@@ -261,6 +269,7 @@ impl ConnectionPoolWorker {
 
                     if let Ok(ref mut c) = establish_result {
                         c.mark_as_in_use(manager.clone());
+                        manager.handle_connection_succeeded(None);
                     }
 
                     establish_result
@@ -288,6 +297,7 @@ impl ConnectionPoolWorker {
 
     fn create_pending_connection(&mut self) -> PendingConnection {
         self.total_connection_count += 1;
+        self.pending_connection_count += 1;
 
         let pending_connection = PendingConnection {
             id: self.next_connection_id,
@@ -311,6 +321,14 @@ impl ConnectionPoolWorker {
         // Establishing a pending connection failed, so that must be reflected in to total
         // connection count.
         self.total_connection_count -= 1;
+        self.pending_connection_count -= 1;
+    }
+
+    fn handle_connection_succeeded(&mut self, connection: Option<Connection>) {
+        self.pending_connection_count -= 1;
+        if let Some(connection) = connection {
+            self.populate_connection(connection);
+        }
     }
 
     fn check_in(&mut self, mut conn: Connection) {
@@ -400,9 +418,7 @@ impl ConnectionPoolWorker {
                     )
                     .await;
 
-                    if let Ok(connection) = connection {
-                        manager.populate_connection(connection);
-                    }
+                    manager.handle_connection_succeeded(connection.ok());
                 });
             }
         }
@@ -443,11 +459,12 @@ enum PoolTask {
     /// Fulfill the given connection request.
     CheckOut(ConnectionRequest),
 
-    /// Add this new connection to the pool without emitting events.
-    Populate(Connection),
-
     /// Update the pool state based on the given establishment error.
     HandleConnectionFailed(Error),
+
+    /// Update the pool state after a successful connection, optionally populating the pool
+    /// with the successful connection.
+    HandleConnectionSucceeded(Option<Connection>),
 
     /// Perform pool maintenance (ensure min connections, remove stale or idle connections).
     Maintenance,
@@ -461,7 +478,9 @@ impl From<PoolManagementRequest> for PoolTask {
             PoolManagementRequest::HandleConnectionFailed(error) => {
                 PoolTask::HandleConnectionFailed(error)
             }
-            PoolManagementRequest::Populate(c) => PoolTask::Populate(c),
+            PoolManagementRequest::HandleConnectionSucceeded(c) => {
+                PoolTask::HandleConnectionSucceeded(c)
+            }
         }
     }
 }

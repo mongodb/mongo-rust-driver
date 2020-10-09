@@ -6,9 +6,9 @@ use crate::error::Error;
 #[derive(Debug)]
 pub(super) enum PoolManagementRequest {
     Clear,
-    Populate(Connection),
     CheckIn(Connection),
     HandleConnectionFailed(Error),
+    HandleConnectionSucceeded(Option<Connection>),
 }
 
 impl PoolManagementRequest {
@@ -49,10 +49,10 @@ impl PoolManager {
             .send(PoolManagementRequest::HandleConnectionFailed(error));
     }
 
-    pub(super) fn populate_connection(&self, connection: Connection) {
+    pub(super) fn handle_connection_succeeded(&self, connection: Option<Connection>) {
         let _ = self
             .sender
-            .send(PoolManagementRequest::Populate(connection));
+            .send(PoolManagementRequest::HandleConnectionSucceeded(connection));
     }
 }
 

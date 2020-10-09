@@ -104,7 +104,7 @@ async fn concurrent_connections() {
         Some(options),
     );
 
-    let tasks = (0..3).map(|_| {
+    let tasks = (0..2).map(|_| {
         let pool_clone = pool.clone();
         RUNTIME
             .spawn(async move {
@@ -123,7 +123,7 @@ async fn concurrent_connections() {
                 consecutive_creations += 1;
             }
             Event::ConnectionReady(_) => {
-                if consecutive_creations < 3 {
+                if consecutive_creations < 2 {
                     panic!("connections not created concurrently");
                 }
             }
