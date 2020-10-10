@@ -118,6 +118,8 @@ impl Executor {
         let mut error: Option<Error> = None;
         let operations = self.operations;
 
+        println!("Executing {}", self.description);
+
         for operation in operations {
             let err = operation.execute(self.state.clone()).await.err();
             if error.is_none() {
