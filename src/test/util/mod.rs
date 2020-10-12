@@ -176,7 +176,7 @@ impl TestClient {
     where
         T: Serialize,
     {
-        let coll: Collection<T> = self.database(db_name).collection_with_type(coll_name);
+        let coll = self.database(db_name).collection_with_type(coll_name);
         drop_collection(&coll).await;
         coll
     }
