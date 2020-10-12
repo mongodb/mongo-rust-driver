@@ -63,10 +63,7 @@ impl SelectionCriteria {
     }
 
     pub(crate) fn is_read_pref_primary(&self) -> bool {
-        match self {
-            Self::ReadPreference(ReadPreference::Primary) => true,
-            _ => false,
-        }
+        matches!(self, Self::ReadPreference(ReadPreference::Primary))
     }
 
     pub(crate) fn max_staleness(&self) -> Option<Duration> {

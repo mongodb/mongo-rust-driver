@@ -30,13 +30,13 @@ pub enum ServerType {
 
 impl ServerType {
     pub(crate) fn can_auth(self) -> bool {
-        match self {
+        matches!(
+            self,
             ServerType::Standalone
-            | ServerType::RSPrimary
-            | ServerType::RSSecondary
-            | ServerType::Mongos => true,
-            _ => false,
-        }
+                | ServerType::RSPrimary
+                | ServerType::RSSecondary
+                | ServerType::Mongos
+        )
     }
 
     pub(crate) fn is_data_bearing(self) -> bool {
@@ -169,10 +169,7 @@ impl ServerDescription {
 
     /// Whether this server is "available" as per the definition in the server selection spec.
     pub(crate) fn is_available(&self) -> bool {
-        match self.server_type {
-            ServerType::Unknown => false,
-            _ => true,
-        }
+        !matches!(self.server_type, ServerType::Unknown)
     }
 
     pub(crate) fn compatibility_error_message(&self) -> Option<String> {

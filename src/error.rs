@@ -77,10 +77,7 @@ impl Error {
 
     /// Whether this error is an "ns not found" error or not.
     pub(crate) fn is_ns_not_found(&self) -> bool {
-        match self.kind.as_ref() {
-            ErrorKind::CommandError(err) if err.code == 26 => true,
-            _ => false,
-        }
+        matches!(self.kind.as_ref(), ErrorKind::CommandError(err) if err.code == 26)
     }
 
     /// Whether a read operation should be retried if this error occurs.
@@ -125,13 +122,10 @@ impl Error {
 
     /// Whether an error originated from the server.
     pub(crate) fn is_server_error(&self) -> bool {
-        match self.kind.as_ref() {
-            ErrorKind::AuthenticationError { .. }
-            | ErrorKind::BulkWriteError(_)
-            | ErrorKind::CommandError(_)
-            | ErrorKind::WriteError(_) => true,
-            _ => false,
-        }
+        matches!(self.kind.as_ref(), ErrorKind::AuthenticationError { .. }
+        | ErrorKind::BulkWriteError(_)
+        | ErrorKind::CommandError(_)
+        | ErrorKind::WriteError(_))
     }
 
     /// Returns the labels for this error.
@@ -361,24 +355,15 @@ impl From<trust_dns_resolver::error::ResolveError> for ErrorKind {
 
 impl ErrorKind {
     pub(crate) fn is_non_timeout_network_error(&self) -> bool {
-        match self {
-            ErrorKind::Io(ref io_err) if io_err.kind() != std::io::ErrorKind::TimedOut => true,
-            _ => false,
-        }
+        matches!(self, ErrorKind::Io(ref io_err) if io_err.kind() != std::io::ErrorKind::TimedOut)
     }
 
     pub(crate) fn is_network_error(&self) -> bool {
-        match self {
-            ErrorKind::Io(..) => true,
-            _ => false,
-        }
+        matches!(self, ErrorKind::Io(..))
     }
 
     pub(crate) fn is_authentication_error(&self) -> bool {
-        match self {
-            ErrorKind::AuthenticationError { .. } => true,
-            _ => false,
-        }
+        matches!(self, ErrorKind::Io(..))
     }
 
     /// Gets the code/message tuple from this error, if applicable. In the case of write errors, the
