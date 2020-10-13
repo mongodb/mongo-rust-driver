@@ -29,7 +29,7 @@ use typed_builder::TypedBuilder;
 use webpki_roots::TLS_SERVER_ROOTS;
 
 use crate::{
-    bson::{Bson, Document},
+    bson::{Bson, doc, Document},
     client::auth::{AuthMechanism, Credential},
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::{ErrorKind, Result},
@@ -202,6 +202,46 @@ impl fmt::Display for StreamAddress {
     }
 }
 
+#[derive(Clone, Derivative, Deserialize, TypedBuilder)]
+#[derivative(Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerApiVersion {
+    /// The version string of the declared API version
+    pub version: String,
+
+    /// Whether the server should return errors for features that are not part of the API version
+    pub strict: Option<bool>,
+
+    /// Whether the server should return errors for deprecated features
+    pub deprecation_errors: Option<bool>,
+}
+
+impl Default for ServerApiVersion {
+    fn default() -> Self {
+        Self {
+            version: String::from("1"),
+            strict: None,
+            deprecation_errors: None,
+        }
+    }
+}
+
+impl ServerApiVersion {
+    pub(crate) fn into_document(self) -> Document {
+        let mut doc = doc! { "apiVersion": self.version };
+
+        if let Some(strict) = self.strict {
+            doc.insert("apiStrict", strict);
+        }
+
+        if let Some(deprecation_errors) = self.deprecation_errors {
+            doc.insert("apiDeprecationErrors", deprecation_errors);
+        }
+
+        doc
+    }
+}
+
 /// Contains the options that can be used to create a new [`Client`](../struct.Client.html).
 #[derive(Clone, Derivative, Deserialize, TypedBuilder)]
 #[derivative(Debug, PartialEq)]
@@ -336,6 +376,12 @@ pub struct ClientOptions {
     /// SelectionCriteria type documentation for more details.
     #[builder(default)]
     pub selection_criteria: Option<SelectionCriteria>,
+
+    /// The declared API version
+    ///
+    /// The default value is to have no declared API version
+    #[builder(default)]
+    pub(crate) server_api_version: Option<ServerApiVersion>,
 
     /// The amount of time the Client should attempt to select a server for an operation before
     /// timing outs
@@ -603,6 +649,7 @@ impl From<ClientOptionsParser> for ClientOptions {
             original_uri: Some(parser.original_uri),
             resolver_config: None,
             heartbeat_freq_test: None,
+            server_api_version: None,
         }
     }
 }
