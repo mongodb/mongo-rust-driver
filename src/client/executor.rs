@@ -243,6 +243,10 @@ impl Client {
             cmd.set_cluster_time(cluster_time);
         }
 
+        if let Some(ref server_api_version) = self.inner.options.server_api_version {
+            cmd.set_server_api_version(server_api_version);
+        }
+
         let connection_info = connection.info();
         let request_id = crate::cmap::conn::next_request_id();
 

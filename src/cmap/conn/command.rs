@@ -6,7 +6,7 @@ use crate::{
     bson_util,
     client::{ClientSession, ClusterTime},
     error::{CommandError, ErrorKind, Result},
-    options::StreamAddress,
+    options::{ServerApiVersion, StreamAddress},
     selection_criteria::ReadPreference,
 };
 
@@ -59,6 +59,10 @@ impl Command {
 
     pub(crate) fn set_txn_number(&mut self, txn_number: u64) {
         self.body.insert("txnNumber", txn_number);
+    }
+
+    pub(crate) fn set_server_api_version(&mut self, server_api_version: &ServerApiVersion) {
+        self.body.extend(server_api_version.into_document());
     }
 }
 
