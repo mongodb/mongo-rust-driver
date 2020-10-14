@@ -1,0 +1,55 @@
+exec_timeout_secs: 3600 
+
+functions:
+  "fetch source":
+    - command: git.get_project
+      type: system
+      params:
+        directory: "src"
+
+  "install dependencies":
+    command: shell.exec
+    params:
+      working_dir: "src"
+      script: |
+        ${PREPARE_SHELL}
+        .evergreen/install-dependencies.sh
+
+  "publish release":
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: "src"
+        script: |
+          set +x
+
+          TAG=${GIT_TAG}           \
+          TOKEN=${CRATES_IO_TOKEN} \
+            bash .evergreen/release-danger-do-not-run-manually.sh
+
+tasks:
+  - name: "publish-release"
+    commands:
+      - func: "fetch source"
+      - func: "install dependencies"
+      - func: "publish release"
+        vars:
+          GIT_TAG: ${triggered_by_git_tag}
+
+axes:
+  - id: "os"
+    display_name: OS
+    values:
+      - id: ubuntu-16.04
+        display_name: "Ubuntu 16.04"
+        run_on: ubuntu1604-test
+
+buildvariants:
+-
+  matrix_name: "release"
+  matrix_spec:
+    os:
+      - ubuntu-16.04
+  display_name: "Publish driver release"
+  tasks:
+    - "publish-release"
