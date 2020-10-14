@@ -288,10 +288,7 @@ async fn list_authorized_databases() {
 }
 
 fn is_auth_error(error: Error) -> bool {
-    match error.kind.as_ref() {
-        ErrorKind::AuthenticationError { .. } => true,
-        _ => false,
-    }
+    matches!(error.kind.as_ref(), ErrorKind::AuthenticationError { .. })
 }
 
 /// Performs an operation that requires authentication and verifies that it either succeeded or

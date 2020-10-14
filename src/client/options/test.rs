@@ -238,10 +238,10 @@ async fn run_test(test_file: TestFile) {
             if let Some(mut json_hosts) = test_case.hosts.take() {
                 // skip over unsupported host types
                 is_unsupported_host_type = json_hosts.iter_mut().any(|h_json| {
-                    match h_json.remove("type").as_ref().and_then(Bson::as_str) {
-                        Some("ip_literal") | Some("unix") => true,
-                        _ => false,
-                    }
+                    matches!(
+                        h_json.remove("type").as_ref().and_then(Bson::as_str),
+                        Some("ip_literal") | Some("unix")
+                    )
                 });
 
                 if !is_unsupported_host_type {

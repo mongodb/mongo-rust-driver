@@ -136,11 +136,9 @@ pub(super) trait GetMoreProviderResult {
     fn exhausted(&self) -> bool {
         match self.as_ref() {
             Ok(res) => res.exhausted,
-            Err(e) => match e.kind.as_ref() {
-                // CursorNotFound and CursorKilled errors indicate the cursor is dead.
-                ErrorKind::CommandError(e) if e.code == 43 || e.code == 237 => true,
-                _ => false,
-            },
+            Err(e) => {
+                matches!(e.kind.as_ref(), ErrorKind::CommandError(e) if e.code == 43 || e.code == 237)
+            }
         }
     }
 }
