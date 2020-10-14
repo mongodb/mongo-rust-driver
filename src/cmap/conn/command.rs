@@ -62,7 +62,7 @@ impl Command {
     }
 
     pub(crate) fn set_server_api_version(&mut self, server_api_version: &ServerApiVersion) {
-        self.body.extend(server_api_version.into_document());
+        server_api_version.append_to_command(&mut self.body);
     }
 }
 

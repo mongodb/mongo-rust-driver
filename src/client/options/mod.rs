@@ -202,12 +202,18 @@ impl fmt::Display for StreamAddress {
     }
 }
 
-#[derive(Clone, Derivative, Deserialize, TypedBuilder)]
-#[derivative(Debug, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[non_exhaustive]
+pub enum ServerApiVersionNumber {
+    Version1,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ServerApiVersion {
     /// The version string of the declared API version
-    pub version: String,
+    pub version: ServerApiVersionNumber,
 
     /// Whether the server should return errors for features that are not part of the API version
     pub strict: Option<bool>,
@@ -216,29 +222,21 @@ pub struct ServerApiVersion {
     pub deprecation_errors: Option<bool>,
 }
 
-impl Default for ServerApiVersion {
-    fn default() -> Self {
-        Self {
-            version: String::from("1"),
-            strict: None,
-            deprecation_errors: None,
-        }
-    }
-}
-
 impl ServerApiVersion {
-    pub(crate) fn into_document(self) -> Document {
-        let mut doc = doc! { "apiVersion": self.version };
+    pub(crate) fn append_to_command(&self, command: &mut Document) {
+        let version = match self.version {
+            ServerApiVersionNumber::Version1 => String::from("1"),
+        };
+
+        command.insert("apiVersion", version);
 
         if let Some(strict) = self.strict {
-            doc.insert("apiStrict", strict);
+            command.insert("apiStrict", strict);
         }
 
         if let Some(deprecation_errors) = self.deprecation_errors {
-            doc.insert("apiDeprecationErrors", deprecation_errors);
+            command.insert("apiDeprecationErrors", deprecation_errors);
         }
-
-        doc
     }
 }
 
@@ -381,7 +379,7 @@ pub struct ClientOptions {
     ///
     /// The default value is to have no declared API version
     #[builder(default)]
-    pub(crate) server_api_version: Option<ServerApiVersion>,
+    pub server_api_version: Option<ServerApiVersion>,
 
     /// The amount of time the Client should attempt to select a server for an operation before
     /// timing outs
@@ -876,6 +874,7 @@ impl ClientOptions {
                 retry_reads,
                 retry_writes,
                 selection_criteria,
+                server_api_version,
                 server_selection_timeout,
                 socket_timeout,
                 tls,
