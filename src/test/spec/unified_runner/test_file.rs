@@ -22,7 +22,7 @@ use crate::{
 };
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TestFile {
     pub description: String,
     #[serde(deserialize_with = "deserialize_schema_version")]
@@ -48,16 +48,15 @@ where
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RunOnRequirement {
     min_server_version: Option<String>,
     max_server_version: Option<String>,
-    topology: Option<Vec<Topology>>,
+    topologies: Option<Vec<Topology>>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-#[serde(untagged)]
+#[serde(rename_all = "lowercase", deny_unknown_fields)]
 pub enum Topology {
     Single,
     ReplicaSet,
@@ -80,8 +79,8 @@ impl RunOnRequirement {
                 return false;
             }
         }
-        if let Some(ref topology) = self.topology {
-            if !topology.contains(&client.topology()) {
+        if let Some(ref topologies) = self.topologies {
+            if !topologies.contains(&client.topology()) {
                 return false;
             }
         }
@@ -90,7 +89,7 @@ impl RunOnRequirement {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub enum Entity {
     Client(Client),
     Database(Database),
@@ -101,7 +100,7 @@ pub enum Entity {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Client {
     pub id: String,
     #[serde(
@@ -143,7 +142,7 @@ where
         for option in options {
             let key = option.split('=').next().unwrap();
             // The provided URI options should override any existing options in the connection
-            // string
+            // string.
             if !uri_options.contains_key(key) {
                 uri.push_str(option);
                 uri.push('&');
@@ -165,7 +164,7 @@ where
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Database {
     pub id: String,
     pub client: String,
@@ -174,7 +173,7 @@ pub struct Database {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Collection {
     pub id: String,
     pub database: String,
@@ -183,7 +182,7 @@ pub struct Collection {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Session {
     pub id: String,
     pub client: String,
@@ -191,7 +190,7 @@ pub struct Session {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Bucket {
     pub id: String,
     pub database: String,
@@ -199,14 +198,14 @@ pub struct Bucket {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Stream {
     pub id: String,
     pub hex_bytes: String,
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CollectionOrDatabaseOptions {
     // TODO properly implement Deserialize for ReadConcern
     pub read_concern: Option<ReadConcern>,
@@ -239,7 +238,7 @@ impl CollectionOrDatabaseOptions {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CollectionData {
     pub collection_name: String,
     pub database_name: String,
@@ -247,7 +246,7 @@ pub struct CollectionData {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TestCase {
     pub description: String,
     pub run_on_requirements: Option<Vec<RunOnRequirement>>,
@@ -258,13 +257,14 @@ pub struct TestCase {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ExpectedEvents {
     pub client: String,
     pub events: Vec<TestEvent>,
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ExpectError {
     pub is_error: Option<bool>,
     pub is_client_error: Option<bool>,
@@ -272,7 +272,7 @@ pub struct ExpectError {
     pub error_code: Option<i32>,
     pub error_labels_contain: Option<Vec<String>>,
     pub error_labels_omit: Option<Vec<String>>,
-    pub expected_result: Option<Bson>,
+    pub expect_result: Option<Bson>,
 }
 
 impl ExpectError {
@@ -302,7 +302,7 @@ impl ExpectError {
                 assert!(!error.labels().contains(&label));
             }
         }
-        if self.expected_result.is_some() {
+        if self.expect_result.is_some() {
             // TODO RUST-260: match against partial results
         }
     }
