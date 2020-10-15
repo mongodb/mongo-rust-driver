@@ -208,6 +208,21 @@ pub enum ServerApiVersionNumber {
     Version1,
 }
 
+impl ServerApiVersionNumber {
+    pub fn from_string (version: String) -> Self {
+        match version.as_str() {
+            "1" => Self::Version1,
+            _ => panic!("Invalid server API version given")
+        }
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        match self {
+            Self::Version1 => "1",
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -224,11 +239,7 @@ pub struct ServerApiVersion {
 
 impl ServerApiVersion {
     pub(crate) fn append_to_command(&self, command: &mut Document) {
-        let version = match self.version {
-            ServerApiVersionNumber::Version1 => String::from("1"),
-        };
-
-        command.insert("apiVersion", version);
+        command.insert("apiVersion", self.version.as_str());
 
         if let Some(strict) = self.strict {
             command.insert("apiStrict", strict);
