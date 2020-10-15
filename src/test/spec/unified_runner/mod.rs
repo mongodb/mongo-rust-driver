@@ -29,6 +29,19 @@ lazy_static! {
     static ref SPEC_VERSIONS: Vec<Version> = vec![Version::parse("1.0.0").unwrap()];
 }
 
+const SKIPPED_OPERATIONS: &[&str] = &[
+    "bulkWrite",
+    "count",
+    "download",
+    "download_by_name",
+    "listCollectionObjects",
+    "listDatabaseObjects",
+    "listIndexNames",
+    "listIndexes",
+    "mapReduce",
+    "watch",
+];
+
 pub struct TestRunner {
     pub internal_client: TestClient,
     pub entities: HashMap<String, Entity>,
@@ -165,7 +178,12 @@ pub async fn run_unified_format_test(test_file: TestFile) {
     for test_case in test_file.tests {
         if let Some(skip_reason) = test_case.skip_reason {
             println!("skipping {}: {}", &test_case.description, skip_reason);
-            return;
+            continue;
+        }
+
+        if test_case.operations.iter().any(|op| SKIPPED_OPERATIONS.contains(&op.name.as_str())) {
+            println!("skipping {}", &test_case.description);
+            continue;
         }
 
         if let Some(requirements) = test_case.run_on_requirements {
