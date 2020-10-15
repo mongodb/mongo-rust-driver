@@ -209,8 +209,8 @@ pub enum ServerApiVersionNumber {
 }
 
 impl ServerApiVersionNumber {
-    pub fn from_string (version: String) -> Self {
-        match version.as_str() {
+    pub fn from_string (version: &str) -> Self {
+        match version {
             "1" => Self::Version1,
             _ => panic!("Invalid server API version given")
         }
