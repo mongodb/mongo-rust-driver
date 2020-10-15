@@ -4,11 +4,16 @@ pub mod options;
 use std::{fmt, sync::Arc};
 
 use futures::StreamExt;
-use serde::{de::Error, Deserialize, Deserializer, Serialize};
+use serde::{
+    de::{DeserializeOwned, Error},
+    Deserialize,
+    Deserializer,
+    Serialize,
+};
 
 use self::options::*;
 use crate::{
-    bson::{doc, ser, to_document, Bson, Document},
+    bson::{doc, from_document, ser, to_document, Bson, Document},
     bson_util,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, ErrorKind, Result},
@@ -77,7 +82,7 @@ const MAX_INSERT_DOCS_BYTES: usize = 16 * 1000 * 1000;
 #[derive(Debug, Clone)]
 pub struct Collection<T = Document>
 where
-    T: Serialize,
+    T: Serialize + DeserializeOwned + Unpin,
 {
     inner: Arc<CollectionInner>,
     _phantom: std::marker::PhantomData<T>,
@@ -95,7 +100,7 @@ struct CollectionInner {
 
 impl<T> Collection<T>
 where
-    T: Serialize,
+    T: Serialize + DeserializeOwned + Unpin,
 {
     pub(crate) fn new(db: Database, name: &str, options: Option<CollectionOptions>) -> Self {
         let options = options.unwrap_or_default();
@@ -123,7 +128,7 @@ where
     }
 
     /// Gets a clone of the `Collection` with a different type `U`.
-    pub fn clone_with_type<U: Serialize>(&self) -> Collection<U> {
+    pub fn clone_with_type<U: Serialize + DeserializeOwned + Unpin>(&self) -> Collection<U> {
         let mut options = CollectionOptions::builder().build();
         options.selection_criteria = self.inner.selection_criteria.clone();
         options.read_concern = self.inner.read_concern.clone();
@@ -346,7 +351,7 @@ where
         &self,
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<FindOptions>>,
-    ) -> Result<Cursor> {
+    ) -> Result<Cursor<T>> {
         let find = Find::new(self.namespace(), filter.into(), options.into());
         let client = self.client();
 
@@ -361,7 +366,7 @@ where
         &self,
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<FindOneOptions>>,
-    ) -> Result<Option<Document>> {
+    ) -> Result<Option<T>> {
         let mut options: FindOptions = options
             .into()
             .map(Into::into)
@@ -381,12 +386,17 @@ where
         &self,
         filter: Document,
         options: impl Into<Option<FindOneAndDeleteOptions>>,
-    ) -> Result<Option<Document>> {
+    ) -> Result<Option<T>> {
         let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
         let op = FindAndModify::with_delete(self.namespace(), filter, options);
-        self.client().execute_operation(op).await
+        let result = self.client().execute_operation(op).await;
+
+        result.and_then(|opt| {
+            opt.map(|doc| from_document(doc).map_err(Into::into))
+                .transpose()
+        })
     }
 
     /// Atomically finds up to one document in the collection matching `filter` and replaces it with
@@ -401,14 +411,19 @@ where
         filter: Document,
         replacement: T,
         options: impl Into<Option<FindOneAndReplaceOptions>>,
-    ) -> Result<Option<Document>> {
+    ) -> Result<Option<T>> {
         let replacement = to_document(&replacement)?;
 
         let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
         let op = FindAndModify::with_replace(self.namespace(), filter, replacement, options)?;
-        self.client().execute_operation(op).await
+        let result = self.client().execute_operation(op).await;
+
+        result.and_then(|opt| {
+            opt.map(|doc| from_document(doc).map_err(Into::into))
+                .transpose()
+        })
     }
 
     /// Atomically finds up to one document in the collection matching `filter` and updates it.
@@ -425,13 +440,18 @@ where
         filter: Document,
         update: impl Into<UpdateModifications>,
         options: impl Into<Option<FindOneAndUpdateOptions>>,
-    ) -> Result<Option<Document>> {
+    ) -> Result<Option<T>> {
         let update = update.into();
         let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
         let op = FindAndModify::with_update(self.namespace(), filter, update, options)?;
-        self.client().execute_operation(op).await
+        let result = self.client().execute_operation(op).await;
+
+        result.and_then(|opt| {
+            opt.map(|doc| from_document(doc).map_err(Into::into))
+                .transpose()
+        })
     }
 
     /// Inserts the data in `docs` into the collection.

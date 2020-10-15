@@ -1,6 +1,6 @@
 use std::marker::{Send, Sync};
 
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Serialize};
 
 use super::Cursor;
 use crate::{
@@ -72,14 +72,14 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct Collection<T = Document>
 where
-    T: Serialize + Send + Sync,
+    T: Serialize + DeserializeOwned + Unpin + Send + Sync,
 {
     async_collection: AsyncCollection<T>,
 }
 
 impl<T> Collection<T>
 where
-    T: Serialize + Send + Sync,
+    T: Serialize + DeserializeOwned + Unpin + Send + Sync,
 {
     pub(crate) fn new(async_collection: AsyncCollection<T>) -> Self {
         Self { async_collection }
@@ -88,7 +88,7 @@ where
     /// Gets a clone of the `Collection` with a different type `U`.
     pub fn clone_with_type<U>(&self) -> Collection<U>
     where
-        U: Serialize + Send + Sync,
+        U: Serialize + DeserializeOwned + Unpin + Send + Sync,
     {
         Collection::new(self.async_collection.clone_with_type())
     }
@@ -210,7 +210,7 @@ where
         &self,
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<FindOptions>>,
-    ) -> Result<Cursor> {
+    ) -> Result<Cursor<T>> {
         RUNTIME
             .block_on(self.async_collection.find(filter.into(), options.into()))
             .map(Cursor::new)
@@ -221,7 +221,7 @@ where
         &self,
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<FindOneOptions>>,
-    ) -> Result<Option<Document>> {
+    ) -> Result<Option<T>> {
         RUNTIME.block_on(
             self.async_collection
                 .find_one(filter.into(), options.into()),
@@ -238,7 +238,7 @@ where
         &self,
         filter: Document,
         options: impl Into<Option<FindOneAndDeleteOptions>>,
-    ) -> Result<Option<Document>> {
+    ) -> Result<Option<T>> {
         RUNTIME.block_on(
             self.async_collection
                 .find_one_and_delete(filter, options.into()),
@@ -257,7 +257,7 @@ where
         filter: Document,
         replacement: T,
         options: impl Into<Option<FindOneAndReplaceOptions>>,
-    ) -> Result<Option<Document>> {
+    ) -> Result<Option<T>> {
         RUNTIME.block_on(self.async_collection.find_one_and_replace(
             filter,
             replacement,
@@ -279,7 +279,7 @@ where
         filter: Document,
         update: impl Into<UpdateModifications>,
         options: impl Into<Option<FindOneAndUpdateOptions>>,
-    ) -> Result<Option<Document>> {
+    ) -> Result<Option<T>> {
         RUNTIME.block_on(self.async_collection.find_one_and_update(
             filter,
             update.into(),

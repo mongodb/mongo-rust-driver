@@ -1,7 +1,7 @@
 use std::marker::{Send, Sync};
 
 use pretty_assertions::assert_eq;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     bson::{doc, Document},
@@ -27,7 +27,7 @@ fn init_db_and_coll(client: &Client, db_name: &str, coll_name: &str) -> Collecti
 
 fn init_db_and_typed_coll<T>(client: &Client, db_name: &str, coll_name: &str) -> Collection<T>
 where
-    T: Serialize + Send + Sync,
+    T: Serialize + DeserializeOwned + Unpin + Send + Sync,
 {
     let coll = client.database(db_name).collection_with_type(coll_name);
     drop_collection(&coll);
@@ -36,7 +36,7 @@ where
 
 pub fn drop_collection<T>(coll: &Collection<T>)
 where
-    T: Serialize + Send + Sync,
+    T: Serialize + DeserializeOwned + Unpin + Send + Sync,
 {
     match coll.drop(None).as_ref().map_err(|e| e.as_ref()) {
         Err(ErrorKind::CommandError(CommandError { code: 26, .. })) | Ok(_) => {}

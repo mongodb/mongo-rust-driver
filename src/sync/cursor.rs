@@ -1,4 +1,5 @@
 use futures::StreamExt;
+use serde::de::DeserializeOwned;
 
 use crate::{bson::Document, error::Result, Cursor as AsyncCursor, RUNTIME};
 
@@ -60,18 +61,27 @@ use crate::{bson::Document, error::Result, Cursor as AsyncCursor, RUNTIME};
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Cursor {
-    async_cursor: AsyncCursor,
+pub struct Cursor<T = Document>
+where
+    T: DeserializeOwned + Unpin + Send,
+{
+    async_cursor: AsyncCursor<T>,
 }
 
-impl Cursor {
-    pub(crate) fn new(async_cursor: AsyncCursor) -> Self {
+impl<T> Cursor<T>
+where
+    T: DeserializeOwned + Unpin + Send,
+{
+    pub(crate) fn new(async_cursor: AsyncCursor<T>) -> Self {
         Self { async_cursor }
     }
 }
 
-impl Iterator for Cursor {
-    type Item = Result<Document>;
+impl<T> Iterator for Cursor<T>
+where
+    T: DeserializeOwned + Unpin + Send,
+{
+    type Item = Result<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         RUNTIME.block_on(self.async_cursor.next())
