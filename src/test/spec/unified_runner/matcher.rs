@@ -141,7 +141,7 @@ async fn array_matching() {
     let mut expected: Vec<Bson> = Vec::new();
     expected.push(Bson::Document(doc! { "x": 1 }));
     expected.push(Bson::Document(doc! { "x": 2 }));
-    assert!(results_match(
+    assert!(!results_match(
         Some(&Bson::Array(actual)),
         &Bson::Array(expected),
     ));
@@ -205,4 +205,16 @@ async fn special_operators() {
         Some(&Bson::Document(actual)),
         &Bson::Document(expected),
     ));
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn extra_fields() {
+    let actual = doc! { "x": 1, "y": 2 };
+    let expected = doc! { "x": 1 };
+    assert!(results_match(Some(&Bson::Document(actual)), &Bson::Document(expected)));
+
+    let actual = doc! { "doc": { "x": 1, "y": 2 } };
+    let expected = doc! { "doc": { "x": 1 } };
+    assert!(!results_match(Some(&Bson::Document(actual)), &Bson::Document(expected)));
 }
