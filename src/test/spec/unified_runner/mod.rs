@@ -45,7 +45,12 @@ const SKIPPED_OPERATIONS: &[&str] = &[
 pub struct TestRunner {
     pub internal_client: TestClient,
     pub entities: HashMap<String, Entity>,
-    pub failpoint_disable_commands: Vec<Document>,
+    pub failpoint_disable_commands: Vec<FailPointDisableCommand>,
+}
+
+pub struct FailPointDisableCommand {
+    pub command: Document,
+    pub client: String,
 }
 
 impl TestRunner {
@@ -80,9 +85,14 @@ impl TestRunner {
 
     pub async fn disable_fail_points(&self) {
         for disable_command in &self.failpoint_disable_commands {
-            self.internal_client
+            let client = self
+                .entities
+                .get(&disable_command.client)
+                .unwrap()
+                .as_client();
+            client
                 .database("admin")
-                .run_command(disable_command.clone(), None)
+                .run_command(disable_command.command.clone(), None)
                 .await
                 .unwrap();
         }
@@ -181,7 +191,11 @@ pub async fn run_unified_format_test(test_file: TestFile) {
             continue;
         }
 
-        if test_case.operations.iter().any(|op| SKIPPED_OPERATIONS.contains(&op.name.as_str())) {
+        if test_case
+            .operations
+            .iter()
+            .any(|op| SKIPPED_OPERATIONS.contains(&op.name.as_str()))
+        {
             println!("skipping {}", &test_case.description);
             continue;
         }

@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use futures::stream::TryStreamExt;
 use serde::{de::Deserializer, Deserialize};
 
-use super::{ClientEntity, Entity, ExpectError, TestRunner};
+use super::{ClientEntity, Entity, ExpectError, FailPointDisableCommand, TestRunner};
 
 use crate::{
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
@@ -705,10 +705,10 @@ impl TestOperation for FindOneAndDelete {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct FailPoint {
     fail_point: Document,
-    client_id: String,
+    client: String,
 }
 
 #[async_trait]
@@ -719,16 +719,19 @@ impl TestOperation for FailPoint {
         test_runner: &'a mut TestRunner,
     ) -> Result<Option<Entity>> {
         let selection_criteria = SelectionCriteria::ReadPreference(ReadPreference::Primary);
-        test_runner
-            .internal_client
+        let client = test_runner.entities.get(&self.client).unwrap().as_client();
+        client
             .database("admin")
             .run_command(self.fail_point.clone(), selection_criteria)
             .await
             .unwrap();
 
-        let disable = doc! {
-            "configureFailPoint": self.fail_point.get_str("configureFailPoint").unwrap(),
-            "mode": "off",
+        let disable = FailPointDisableCommand {
+            command: doc! {
+                "configureFailPoint": self.fail_point.get_str("configureFailPoint").unwrap(),
+                "mode": "off",
+            },
+            client: self.client.clone(),
         };
         test_runner.failpoint_disable_commands.push(disable);
 

@@ -1,7 +1,7 @@
 use crate::bson::{doc, spec::ElementType, Bson};
 
 pub fn results_match(actual: Option<&Bson>, expected: &Bson) -> bool {
-    return results_match_inner(actual, expected, true);
+    results_match_inner(actual, expected, true)
 }
 
 pub fn results_match_inner(actual: Option<&Bson>, expected: &Bson, root: bool) -> bool {
@@ -212,9 +212,15 @@ async fn special_operators() {
 async fn extra_fields() {
     let actual = doc! { "x": 1, "y": 2 };
     let expected = doc! { "x": 1 };
-    assert!(results_match(Some(&Bson::Document(actual)), &Bson::Document(expected)));
+    assert!(results_match(
+        Some(&Bson::Document(actual)),
+        &Bson::Document(expected)
+    ));
 
     let actual = doc! { "doc": { "x": 1, "y": 2 } };
     let expected = doc! { "doc": { "x": 1 } };
-    assert!(!results_match(Some(&Bson::Document(actual)), &Bson::Document(expected)));
+    assert!(!results_match(
+        Some(&Bson::Document(actual)),
+        &Bson::Document(expected)
+    ));
 }

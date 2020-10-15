@@ -22,6 +22,8 @@ use crate::{
     test::{CLIENT_OPTIONS, LOCK},
 };
 
+const IGNORED_EVENTS: &[&str] = &["configureFailPoint"];
+
 pub type EventQueue<T> = Arc<RwLock<VecDeque<T>>>;
 
 #[derive(Clone, Debug)]
@@ -261,6 +263,9 @@ impl EventClient {
             .iter()
             .cloned()
             .filter(|event| {
+                if IGNORED_EVENTS.contains(&event.command_name()) {
+                    return false;
+                }
                 if let Some(observe_events) = observe_events {
                     if !observe_events.iter().any(|name| match event {
                         CommandEvent::CommandStartedEvent(_) => {
