@@ -181,7 +181,7 @@ impl ConnectionPoolWorker {
                     Some(result_sender) = self.request_receiver.recv(),
                                         if self.can_service_connection_request() => PoolTask::CheckOut(result_sender),
                     Some(request) = self.management_receiver.recv() => request.into(),
-                    _ = self.handle_listener.listen() => {
+                    _ = self.handle_listener.wait_for_all_handle_drops() => {
                         // all worker handles have been dropped meaning this
                         // pool has no more references and can be dropped itself.
                         break
@@ -511,7 +511,7 @@ impl HandleListener {
     /// Listen until all handles are dropped.
     /// This will not return until all handles are dropped, so make sure to only poll this via
     /// select or with a timeout.
-    async fn listen(&mut self) {
+    async fn wait_for_all_handle_drops(&mut self) {
         self.receiver.recv().await;
     }
 }
