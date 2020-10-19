@@ -62,6 +62,13 @@ impl Command {
     }
 
     pub(crate) fn set_server_api_version(&mut self, server_api_version: &ServerApiVersion) {
+        // Don't include version fields for getMore commands
+        if self.name == "getMore" {
+            return;
+        }
+
+        // TODO RUST-90: Don't include version fields for commands run as part of a transaction
+
         server_api_version.append_to_command(&mut self.body);
     }
 }
