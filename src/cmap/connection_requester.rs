@@ -46,19 +46,20 @@ impl ConnectionRequester {
         // we own a handle to the worker, keeping it alive.
         self.sender.send(sender).unwrap();
 
-        // similarly, the receiver only returns an error if the sender is dropped, which
-        // can't happen due to the handle.
         let response = match wait_queue_timeout {
             Some(timeout) => RUNTIME
                 .timeout(timeout, receiver)
                 .await
-                .map(|r| r.unwrap())
+                .map(|r| r.unwrap()) // see comment below as to why this is safe
                 .map_err(|_| {
                     ErrorKind::WaitQueueTimeoutError {
                         address: self.address.clone(),
                     }
                     .into()
                 }),
+
+            // similarly, the receiver only returns an error if the sender is dropped, which
+            // can't happen due to the handle.
             None => Ok(receiver.await.unwrap()),
         };
 
