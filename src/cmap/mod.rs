@@ -81,7 +81,7 @@ impl ConnectionPool {
         }
     }
 
-    /// Checks out a connection from the pool. This method will block until this thread is at the
+    /// Checks out a connection from the pool. This method will yield until this thread is at the
     /// front of the wait queue, and then will block again if no available connections are in the
     /// pool and the total number of connections is not less than the max pool size. If the method
     /// blocks for longer than `wait_queue_timeout` waiting for an available connection or to
