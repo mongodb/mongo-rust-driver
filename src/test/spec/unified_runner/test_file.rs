@@ -21,6 +21,8 @@ use crate::{
     },
     test::{TestClient, DEFAULT_URI},
 };
+use crate::client::options::{ServerApiVersion, ServerApiVersionNumber};
+use bson::document::ValueAccessError;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -115,6 +117,9 @@ pub struct Client {
     pub use_multiple_mongoses: Option<bool>,
     pub observe_events: Option<Vec<String>>,
     pub ignore_command_monitoring_events: Option<Vec<String>>,
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_server_api_version")]
+    pub server_api_version: Option<ServerApiVersion>,
 }
 
 fn default_uri() -> String {
@@ -164,6 +169,34 @@ where
     uri.pop();
 
     Ok(uri)
+}
+
+fn deserialize_server_api_version<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<ServerApiVersion>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let server_api_version = Document::deserialize(deserializer)?;
+
+    let server_api_version = ServerApiVersion {
+        version: match server_api_version.get_str("version") {
+            Ok(v) => ServerApiVersionNumber::from_string(v),
+            _ => panic!("Invalid server API version given")
+        },
+        strict: match server_api_version.get_bool("strict") {
+            Ok(v) => Some(v),
+            Err(ValueAccessError::NotPresent) => None,
+            _ => panic!("Invalid strict value for server API given")
+        },
+        deprecation_errors: match server_api_version.get_bool("deprecationErrors") {
+            Ok(v) => Some(v),
+            Err(ValueAccessError::NotPresent) => None,
+            _ => panic!("Invalid deprecationErrors value for server API given")
+        },
+    };
+
+    Ok(Some(server_api_version))
 }
 
 #[derive(Debug, Deserialize)]

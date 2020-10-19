@@ -21,6 +21,7 @@ use crate::{
     options::ClientOptions,
     test::{CLIENT_OPTIONS, LOCK},
 };
+use crate::client::options::ServerApiVersion;
 
 pub type EventQueue<T> = Arc<RwLock<VecDeque<T>>>;
 
@@ -167,8 +168,11 @@ impl EventClient {
     pub async fn with_uri_and_mongos_options(
         uri: &str,
         use_multiple_mongoses: Option<bool>,
+        server_api_version: Option<ServerApiVersion>,
     ) -> Self {
         let mut options = ClientOptions::parse_uri(uri, None).await.unwrap();
+        options.server_api_version = server_api_version;
+
         match use_multiple_mongoses {
             Some(true) => {
                 if options.hosts.len() <= 1 {
