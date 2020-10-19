@@ -22,7 +22,8 @@ use crate::{
     error::{CommandError, ErrorKind, Result},
     operation::RunCommand,
     options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
-    Client, Collection,
+    Client,
+    Collection,
 };
 use failpoint::FailPointGuard;
 
