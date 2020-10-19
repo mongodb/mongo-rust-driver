@@ -82,6 +82,9 @@ impl CmapEventHandler for EventHandler {
 }
 
 pub struct EventSubscriber<'a> {
+    /// A reference to the handler this subscriber is receiving events from.
+    /// Stored here to ensure this subscriber cannot outlive the handler that is generating its
+    /// events.
     _handler: &'a EventHandler,
     receiver: tokio::sync::broadcast::Receiver<Event>,
 }
