@@ -1,0 +1,129 @@
+{
+  "description": "poc-versioned-api",
+  "schemaVersion": "1.0",
+  "createEntities": [
+    {
+      "client": {
+        "id": "client0",
+        "observeEvents": [
+          "commandStartedEvent"
+        ],
+        "serverApiVersion": {
+          "version": "1"
+        }
+      }
+    },
+    {
+      "database": {
+        "id": "database0",
+        "client": "client0",
+        "databaseName": "versioned-api-tests"
+      }
+    },
+    {
+      "collection": {
+        "id": "collection0",
+        "database": "database0",
+        "collectionName": "test"
+      }
+    }
+  ],
+  "initialData": [
+    {
+      "collectionName": "test",
+      "databaseName": "command-monitoring-tests",
+      "documents": [
+        {
+          "_id": 1,
+          "x": 11
+        },
+        {
+          "_id": 2,
+          "x": 22
+        },
+        {
+          "_id": 3,
+          "x": 33
+        },
+        {
+          "_id": 4,
+          "x": 44
+        },
+        {
+          "_id": 5,
+          "x": 55
+        }
+      ]
+    }
+  ],
+  "tests": [
+    {
+      "description": "find command with declared API version appends to the command, but getMore does not",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "3.1"
+        }
+      ],
+      "operations": [
+        {
+          "name": "find",
+          "object": "collection0",
+          "arguments": {
+            "filter": {
+              "_id": {
+                "$gte": 1
+              }
+            },
+            "sort": {
+              "_id": 1
+            },
+            "batchSize": 1,
+            "limit": 2
+          },
+          "expectResult": [
+            {
+              "_id": 1,
+              "x": 11
+            },
+            {
+              "_id": 2,
+              "x": 22
+            }
+          ]
+        }
+      ],
+      "expectEvents": [
+        {
+          "client": "client0",
+          "events": [
+            {
+              "commandStartedEvent": {
+                "command": {
+                  "find": "test",
+                  "apiVersion": "1"
+                },
+                "commandName": "find",
+                "databaseName": "command-monitoring-tests"
+              }
+            },
+            {
+              "commandStartedEvent": {
+                "command": {
+                  "getMore": {
+                    "$$type": [
+                      "int",
+                      "long"
+                    ]
+                  },
+                  "apiVersion": { "$$exists":  false }
+                },
+                "commandName": "getMore",
+                "databaseName": "command-monitoring-tests"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

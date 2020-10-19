@@ -1,0 +1,62 @@
+{
+  "description": "poc-versioned-api",
+  "schemaVersion": "1.0",
+  "createEntities": [
+    {
+      "client": {
+        "id": "client0",
+        "observeEvents": [
+          "commandStartedEvent"
+        ]
+      }
+    },
+    {
+      "database": {
+        "id": "database0",
+        "client": "client0",
+        "databaseName": "versioned-api-tests"
+      }
+    },
+    {
+      "collection": {
+        "id": "collection0",
+        "database": "database0",
+        "collectionName": "test"
+      }
+    }
+  ],
+  "tests": [
+    {
+      "description": "Running a command without a declared API version does not add versioned API fields to the command",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "3.1"
+        }
+      ],
+      "operations": [
+        {
+          "name": "find",
+          "object": "collection0",
+          "arguments": {}
+        }
+      ],
+      "expectEvents": [
+        {
+          "client": "client0",
+          "events": [
+            {
+              "commandStartedEvent": {
+                "command": {
+                  "find": "test",
+                  "apiVersion": { "$$exists": false }
+                },
+                "commandName": "find",
+                "databaseName": "command-monitoring-tests"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
