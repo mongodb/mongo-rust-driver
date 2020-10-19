@@ -212,7 +212,7 @@ impl ConnectionPoolInner {
 
         let mut available_connections = self.available_connections.lock().await;
 
-        if conn.is_errored() {
+        if conn.has_errored() {
             self.close_connection(conn, ConnectionClosedReason::Error);
         } else if conn.is_stale(self.generation.load(Ordering::SeqCst)) {
             self.close_connection(conn, ConnectionClosedReason::Stale);

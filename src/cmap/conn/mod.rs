@@ -194,7 +194,7 @@ impl Connection {
     }
 
     /// Checks if the connection experienced a network error and should be closed.
-    pub(super) fn is_errored(&self) -> bool {
+    pub(super) fn has_errored(&self) -> bool {
         self.error
     }
 
