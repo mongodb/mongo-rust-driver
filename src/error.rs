@@ -382,6 +382,22 @@ impl ErrorKind {
         }
     }
 
+    /// Gets the code name from this error, if applicable.
+    #[cfg(test)]
+    pub(crate) fn code_name(&self) -> Option<&str> {
+        match self {
+            ErrorKind::CommandError(ref cmd_err) => Some(cmd_err.code_name.as_str()),
+            ErrorKind::WriteError(ref failure) => {
+                match failure {
+                    WriteFailure::WriteConcernError(ref wce) => Some(wce.code_name.as_str()),
+                    WriteFailure::WriteError(ref we) => we.code_name.as_deref(),
+                }
+            }
+            ErrorKind::BulkWriteError(ref bwe) => bwe.write_concern_error.as_ref().map(|wce| wce.code_name.as_str()),
+            _ => None,
+        }
+    }
+
     /// If this error corresponds to a "not master" error as per the SDAM spec.
     pub(crate) fn is_not_master(&self) -> bool {
         self.code_and_message()

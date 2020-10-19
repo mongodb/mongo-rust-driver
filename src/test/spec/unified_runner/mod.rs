@@ -102,7 +102,7 @@ impl TestRunner {
         self.entities.clear();
 
         for entity in create_entities {
-            match entity {
+            let (id, entity) = match entity {
                 TestFileEntity::Client(client) => {
                     let id = client.id.clone();
                     let observe_events = client.observe_events.clone();
@@ -112,10 +112,10 @@ impl TestRunner {
                         client.use_multiple_mongoses,
                     )
                     .await;
-                    self.entities.insert(
+                    (
                         id,
                         Entity::from_client(client, observe_events, ignore_command_names),
-                    );
+                    )
                 }
                 TestFileEntity::Database(database) => {
                     let id = database.id.clone();
@@ -126,7 +126,7 @@ impl TestRunner {
                     } else {
                         client.database(&database.database_name)
                     };
-                    self.entities.insert(id, database.into());
+                    (id, database.into())
                 }
                 TestFileEntity::Collection(collection) => {
                     let id = collection.id.clone();
@@ -141,14 +141,17 @@ impl TestRunner {
                     } else {
                         database.collection(&collection.collection_name)
                     };
-                    self.entities.insert(id, collection.into());
+                    (id, collection.into())
                 }
                 TestFileEntity::Session(_) => {
                     panic!("Explicit sessions not implemented");
                 }
-                TestFileEntity::Bucket(_) | TestFileEntity::Stream(_) => {
+                TestFileEntity::Bucket(_) => {
                     panic!("GridFS not implemented");
                 }
+            };
+            if self.entities.insert(id.clone(), entity).is_some() {
+                panic!("Entity with id {} already present in entity map", id);
             }
         }
     }
@@ -166,11 +169,10 @@ pub async fn run_unified_format_test(test_file: TestFile) {
         true
     });
     if !version_matches {
-        println!(
+        panic!(
             "Test runner not compatible with specification version {}",
             &test_file.schema_version
         );
-        return;
     }
 
     let mut test_runner = TestRunner::new().await;

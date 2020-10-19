@@ -96,7 +96,6 @@ pub enum Entity {
     Collection(Collection),
     Session(Session),
     Bucket(Bucket),
-    Stream(Stream),
 }
 
 #[derive(Debug, Deserialize)]
@@ -270,6 +269,7 @@ pub struct ExpectError {
     pub is_client_error: Option<bool>,
     pub error_contains: Option<String>,
     pub error_code: Option<i32>,
+    pub error_code_name: Option<String>,
     pub error_labels_contain: Option<Vec<String>>,
     pub error_labels_omit: Option<Vec<String>>,
     pub expect_result: Option<Bson>,
@@ -290,6 +290,12 @@ impl ExpectError {
             match &error.kind.code_and_message() {
                 Some((code, _)) => assert_eq!(*code, error_code),
                 None => panic!("error should include code"),
+            }
+        }
+        if let Some(error_code_name) = self.error_code_name {
+            match &error.kind.code_name() {
+                Some(name) => assert_eq!(&error_code_name, name),
+                None => panic!("error should include code name"),
             }
         }
         if let Some(error_labels_contain) = self.error_labels_contain {
