@@ -1,29 +1,35 @@
 {
-  "description": "Only version string declared",
+  "description": "Enable deprecation errors",
   "schemaVersion": "1.1",
+  "runOnRequirements": [
+    {
+      "minServerVersion": "4.7"
+    }
+  ],
   "createEntities": [
     {
       "client": {
-        "id": "client0",
+        "id": "client",
         "observeEvents": [
           "commandStartedEvent"
         ],
         "serverApi": {
-          "version": "1"
+          "version": "1",
+          "deprecationErrors": true
         }
       }
     },
     {
       "database": {
-        "id": "database0",
-        "client": "client0",
+        "id": "database",
+        "client": "client",
         "databaseName": "versioned-api-tests"
       }
     },
     {
       "collection": {
-        "id": "collection0",
-        "database": "database0",
+        "id": "collection",
+        "database": "database",
         "collectionName": "test"
       }
     }
@@ -67,7 +73,7 @@
       "operations": [
         {
           "name": "find",
-          "object": "collection0",
+          "object": "collection",
           "arguments": {
             "filter": {},
             "sort": {
@@ -98,7 +104,7 @@
       ],
       "expectEvents": [
         {
-          "client": "client0",
+          "client": "client",
           "events": [
             {
               "commandStartedEvent": {
@@ -108,9 +114,7 @@
                   "apiStrict": {
                     "$$unsetOrMatches": false
                   },
-                  "apiDeprecationErrors": {
-                    "$$unsetOrMatches": false
-                  }
+                  "apiDeprecationErrors": true
                 },
                 "commandName": "find",
                 "databaseName": "versioned-api-tests"

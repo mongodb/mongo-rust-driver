@@ -1,10 +1,15 @@
 {
-  "description": "poc-versioned-api",
-  "schemaVersion": "1.0",
+  "description": "No API version declared",
+  "schemaVersion": "1.1",
+  "runOnRequirements": [
+    {
+      "minServerVersion": "4.7"
+    }
+  ],
   "createEntities": [
     {
       "client": {
-        "id": "client0",
+        "id": "client",
         "observeEvents": [
           "commandStartedEvent"
         ]
@@ -12,46 +17,211 @@
     },
     {
       "database": {
-        "id": "database0",
-        "client": "client0",
+        "id": "database",
+        "client": "client",
         "databaseName": "versioned-api-tests"
       }
     },
     {
       "collection": {
-        "id": "collection0",
-        "database": "database0",
+        "id": "collection",
+        "database": "database",
         "collectionName": "test"
       }
     }
   ],
+  "initialData": [
+    {
+      "collectionName": "test",
+      "databaseName": "versioned-api-tests",
+      "documents": [
+        {
+          "_id": 1,
+          "x": 11
+        },
+        {
+          "_id": 2,
+          "x": 22
+        },
+        {
+          "_id": 3,
+          "x": 33
+        },
+        {
+          "_id": 4,
+          "x": 44
+        },
+        {
+          "_id": 5,
+          "x": 55
+        }
+      ]
+    }
+  ],
   "tests": [
     {
-      "description": "Running a command without a declared API version does not add versioned API fields to the command",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "3.1"
-        }
-      ],
+      "description": "Find does not send an API version when no version was declared",
       "operations": [
         {
           "name": "find",
-          "object": "collection0",
-          "arguments": {}
+          "object": "collection",
+          "arguments": {
+            "filter": {},
+            "sort": {
+              "_id": 1
+            },
+            "batchSize": 3,
+            "limit": 4
+          },
+          "expectResult": [
+            {
+              "_id": 1,
+              "x": 11
+            },
+            {
+              "_id": 2,
+              "x": 22
+            },
+            {
+              "_id": 3,
+              "x": 33
+            },
+            {
+              "_id": 4,
+              "x": 44
+            }
+          ]
         }
       ],
       "expectEvents": [
         {
-          "client": "client0",
+          "client": "client",
           "events": [
             {
               "commandStartedEvent": {
                 "command": {
                   "find": "test",
-                  "apiVersion": { "$$exists": false }
+                  "apiVersion": {
+                    "$$exists": false
+                  },
+                  "apiStrict": {
+                    "$$exists": false
+                  },
+                  "apiDeprecationErrors": {
+                    "$$exists": false
+                  }
                 },
                 "commandName": "find",
-                "databaseName": "command-monitoring-tests"
+                "databaseName": "versioned-api-tests"
+              }
+            },
+            {
+              "commandStartedEvent": {
+                "command": {
+                  "getMore": {
+                    "$$type": [
+                      "int",
+                      "long"
+                    ]
+                  },
+                  "apiVersion": {
+                    "$$exists": false
+                  },
+                  "apiStrict": {
+                    "$$exists": false
+                  },
+                  "apiDeprecationErrors": {
+                    "$$exists": false
+                  }
+                },
+                "commandName": "getMore",
+                "databaseName": "versioned-api-tests"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "runCommand does not inspect or change the command document",
+      "operations": [
+        {
+          "name": "runCommand",
+          "object": "database",
+          "arguments": {
+            "commandName": "ping",
+            "command": {
+              "ping": 1,
+              "apiVersion": "server_will_never_support_this_api_version"
+            }
+          },
+          "expectError": {
+            "isError": true,
+            "isClientError": false
+          }
+        }
+      ],
+      "expectEvents": [
+        {
+          "client": "client",
+          "events": [
+            {
+              "commandStartedEvent": {
+                "command": {
+                  "ping": 1,
+                  "apiVersion": "server_will_never_support_this_api_version",
+                  "apiStrict": {
+                    "$$exists": false
+                  },
+                  "apiDeprecationErrors": {
+                    "$$exists": false
+                  }
+                },
+                "commandName": "ping",
+                "databaseName": "versioned-api-tests"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "runCommand does not prevent sending invalid API version declarations",
+      "operations": [
+        {
+          "name": "runCommand",
+          "object": "database",
+          "arguments": {
+            "commandName": "ping",
+            "command": {
+              "ping": 1,
+              "apiStrict": true
+            }
+          },
+          "expectError": {
+            "isError": true,
+            "isClientError": false
+          }
+        }
+      ],
+      "expectEvents": [
+        {
+          "client": "client",
+          "events": [
+            {
+              "commandStartedEvent": {
+                "command": {
+                  "ping": 1,
+                  "apiVersion": {
+                    "$$exists": false
+                  },
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
+                    "$$exists": false
+                  }
+                },
+                "commandName": "ping",
+                "databaseName": "versioned-api-tests"
               }
             }
           ]

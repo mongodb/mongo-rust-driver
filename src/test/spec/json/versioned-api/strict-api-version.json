@@ -1,29 +1,35 @@
 {
-  "description": "Only version string declared",
+  "description": "Declare a strict API version",
   "schemaVersion": "1.1",
+  "runOnRequirements": [
+    {
+      "minServerVersion": "4.7"
+    }
+  ],
   "createEntities": [
     {
       "client": {
-        "id": "client0",
+        "id": "client",
         "observeEvents": [
           "commandStartedEvent"
         ],
         "serverApi": {
-          "version": "1"
+          "version": "1",
+          "strict": true
         }
       }
     },
     {
       "database": {
-        "id": "database0",
-        "client": "client0",
+        "id": "database",
+        "client": "client",
         "databaseName": "versioned-api-tests"
       }
     },
     {
       "collection": {
-        "id": "collection0",
-        "database": "database0",
+        "id": "collection",
+        "database": "database",
         "collectionName": "test"
       }
     }
@@ -67,7 +73,7 @@
       "operations": [
         {
           "name": "find",
-          "object": "collection0",
+          "object": "collection",
           "arguments": {
             "filter": {},
             "sort": {
@@ -98,16 +104,14 @@
       ],
       "expectEvents": [
         {
-          "client": "client0",
+          "client": "client",
           "events": [
             {
               "commandStartedEvent": {
                 "command": {
                   "find": "test",
                   "apiVersion": "1",
-                  "apiStrict": {
-                    "$$unsetOrMatches": false
-                  },
+                  "apiStrict": true,
                   "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
                   }
@@ -136,6 +140,47 @@
                   }
                 },
                 "commandName": "getMore",
+                "databaseName": "versioned-api-tests"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "description": "Running a command that is not part of the versioned API results in an error",
+      "operations": [
+        {
+          "name": "runCommand",
+          "object": "database",
+          "arguments": {
+            "commandName": "ping",
+            "command": {
+              "getnonce": 1
+            }
+          },
+          "expectError": {
+            "isError": true,
+            "errorContains": "command getnonce is not in API Version 1",
+            "errorCodeName": "APIStrictError"
+          }
+        }
+      ],
+      "expectEvents": [
+        {
+          "client": "client",
+          "events": [
+            {
+              "commandStartedEvent": {
+                "command": {
+                  "getnonce": 1,
+                  "apiVersion": "1",
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
+                    "$$unsetOrMatches": false
+                  }
+                },
+                "commandName": "getnonce",
                 "databaseName": "versioned-api-tests"
               }
             }
