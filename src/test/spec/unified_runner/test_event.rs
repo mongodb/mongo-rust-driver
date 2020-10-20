@@ -1,8 +1,10 @@
 use crate::{
-    bson::Document,
+    bson::{Bson, Document},
     test::{CommandEvent, Matchable},
 };
 use serde::Deserialize;
+
+use super::results_match;
 
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -10,16 +12,16 @@ pub enum TestEvent {
     CommandStartedEvent {
         command_name: Option<String>,
         database_name: Option<String>,
-        command: Document,
+        command: Option<Document>,
     },
 
     CommandSucceededEvent {
-        command_name: String,
-        reply: Document,
+        command_name: Option<String>,
+        reply: Option<Document>,
     },
 
     CommandFailedEvent {
-        command_name: String,
+        command_name: Option<String>,
     },
 }
 
@@ -46,7 +48,17 @@ impl Matchable for TestEvent {
                 {
                     return false;
                 }
-                actual_command.matches(expected_command)
+                if let Some(expected_command) = expected_command {
+                    let actual_command = actual_command
+                        .as_ref()
+                        .map(|doc| Bson::Document(doc.clone()));
+                    results_match(
+                        actual_command.as_ref(),
+                        &Bson::Document(expected_command.clone()),
+                    )
+                } else {
+                    true
+                }
             }
             (
                 TestEvent::CommandSucceededEvent {
@@ -58,7 +70,18 @@ impl Matchable for TestEvent {
                     reply: expected_reply,
                 },
             ) => {
-                actual_command_name == expected_command_name && actual_reply.matches(expected_reply)
+                if expected_command_name.is_some() && actual_command_name != expected_command_name {
+                    return false;
+                }
+                if let Some(expected_reply) = expected_reply {
+                    let actual_reply = actual_reply.as_ref().map(|doc| Bson::Document(doc.clone()));
+                    results_match(
+                        actual_reply.as_ref(),
+                        &Bson::Document(expected_reply.clone()),
+                    )
+                } else {
+                    true
+                }
             }
             (
                 TestEvent::CommandFailedEvent {
@@ -67,7 +90,11 @@ impl Matchable for TestEvent {
                 TestEvent::CommandFailedEvent {
                     command_name: expected_command_name,
                 },
-            ) => actual_command_name == expected_command_name,
+            ) => match (expected_command_name, actual_command_name) {
+                (Some(expected), Some(actual)) => expected == actual,
+                (Some(_), None) => false,
+                _ => true,
+            },
             _ => false,
         }
     }
@@ -79,14 +106,14 @@ impl From<CommandEvent> for TestEvent {
             CommandEvent::CommandStartedEvent(event) => TestEvent::CommandStartedEvent {
                 command_name: Some(event.command_name),
                 database_name: Some(event.db),
-                command: event.command,
+                command: Some(event.command),
             },
             CommandEvent::CommandFailedEvent(event) => TestEvent::CommandFailedEvent {
-                command_name: event.command_name,
+                command_name: Some(event.command_name),
             },
             CommandEvent::CommandSucceededEvent(event) => TestEvent::CommandSucceededEvent {
-                command_name: event.command_name,
-                reply: event.reply,
+                command_name: Some(event.command_name),
+                reply: Some(event.reply),
             },
         }
     }

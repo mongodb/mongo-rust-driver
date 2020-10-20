@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+use std::time::Duration;
 
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Deserializer};
@@ -13,6 +13,7 @@ use crate::{
         ClientOptions,
         CollectionOptions,
         DatabaseOptions,
+        HedgedReadOptions,
         ReadConcern,
         ReadPreference,
         SelectionCriteria,
@@ -39,9 +40,13 @@ where
     D: Deserializer<'de>,
 {
     let mut schema_version = String::deserialize(deserializer)?;
-    // if the schema version only contains a major and minor version (e.g. 1.0), append a ".0" to
-    // ensure correct parsing into a semver::Version
-    if schema_version.split('.').count() == 2 {
+    // If the schema version does not contain a minor or patch version, append as necessary to
+    // ensure the String parses correctly into a semver::Version.
+    let count = schema_version.split('.').count();
+    if count == 1 {
+        schema_version.push_str(".0.0");
+    }
+    if count == 2 {
         schema_version.push_str(".0");
     }
     Version::parse(&schema_version).map_err(|e| serde::de::Error::custom(format!("{}", e)))
@@ -208,7 +213,8 @@ pub struct Stream {
 pub struct CollectionOrDatabaseOptions {
     // TODO properly implement Deserialize for ReadConcern
     pub read_concern: Option<ReadConcern>,
-    pub read_preference: Option<ReadPreference>,
+    #[serde(rename = "readPreference")]
+    pub selection_criteria: Option<SelectionCriteria>,
     pub write_concern: Option<WriteConcern>,
 }
 
@@ -216,10 +222,7 @@ impl CollectionOrDatabaseOptions {
     pub fn as_database_options(&self) -> DatabaseOptions {
         let mut database_options = DatabaseOptions::builder().build();
         database_options.read_concern = self.read_concern.clone();
-        if let Some(ref read_preference) = self.read_preference {
-            let selection_criteria = SelectionCriteria::ReadPreference(read_preference.clone());
-            database_options.selection_criteria = Some(selection_criteria);
-        }
+        database_options.selection_criteria = self.selection_criteria.clone();
         database_options.write_concern = self.write_concern.clone();
         database_options
     }
@@ -227,10 +230,7 @@ impl CollectionOrDatabaseOptions {
     pub fn as_collection_options(&self) -> CollectionOptions {
         let mut collection_options = CollectionOptions::builder().build();
         collection_options.read_concern = self.read_concern.clone();
-        if let Some(ref read_preference) = self.read_preference {
-            let selection_criteria = SelectionCriteria::ReadPreference(read_preference.clone());
-            collection_options.selection_criteria = Some(selection_criteria);
-        }
+        collection_options.selection_criteria = self.selection_criteria.clone();
         collection_options.write_concern = self.write_concern.clone();
         collection_options
     }
@@ -333,4 +333,32 @@ async fn deserialize_uri_options() {
 
     let read_concern = ReadConcern::local();
     assert_eq!(options.read_concern.unwrap(), read_concern);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn deserialize_selection_criteria() {
+    let read_preference = doc! {
+        "readPreference": {
+            "mode": "SecondaryPreferred",
+            "maxStalenessSeconds": 100,
+            "hedge": { "enabled": true },
+        }
+    };
+    let d = BsonDeserializer::new(read_preference.into());
+    let selection_criteria = SelectionCriteria::deserialize(d).unwrap();
+
+    match selection_criteria {
+        SelectionCriteria::ReadPreference(read_preference) => {
+            match read_preference {
+                ReadPreference::SecondaryPreferred { options } => {
+                    assert_eq!(options.max_staleness, Some(Duration::from_secs(100)));
+                    assert_eq!(options.hedge, Some(HedgedReadOptions::with_enabled(true)));
+                }
+                other => panic!("Expected mode SecondaryPreferred, got {:?}", other),
+            }
+        }
+        SelectionCriteria::Predicate(_) => panic!("Expected read preference, got predicate"),
+    }
+
 }

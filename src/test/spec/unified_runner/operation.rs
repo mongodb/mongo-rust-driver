@@ -7,7 +7,7 @@ use serde::{de::Deserializer, Deserialize};
 use super::{ClientEntity, Entity, ExpectError, FailPointDisableCommand, TestRunner};
 
 use crate::{
-    bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
+    bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
     error::Result,
     options::{
         AggregateOptions,
@@ -96,7 +96,7 @@ impl<'de> Deserialize<'de> for OperationObject {
 impl<'de> Deserialize<'de> for Operation {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
         #[derive(Debug, Deserialize)]
-        #[serde(rename_all = "camelCase")]
+        #[serde(rename_all = "camelCase", deny_unknown_fields)]
         struct OperationDefinition {
             pub name: String,
             pub object: OperationObject,
@@ -181,6 +181,8 @@ impl<'de> Deserialize<'de> for Operation {
                 AssertCollectionNotExists::deserialize(BsonDeserializer::new(definition.arguments))
                     .map(|op| Box::new(op) as Box<dyn TestOperation>)
             }
+            "runCommand" => RunCommand::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -205,6 +207,7 @@ impl Deref for Operation {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct DeleteMany {
     filter: Document,
     #[serde(flatten)]
@@ -222,12 +225,13 @@ impl TestOperation for DeleteMany {
         let result = collection
             .delete_many(self.filter.clone(), self.options.clone())
             .await?;
-        let result = bson::to_bson(&result)?;
+        let result = to_bson(&result)?;
         Ok(Some(result.into()))
     }
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct DeleteOne {
     filter: Document,
     #[serde(flatten)]
@@ -245,12 +249,13 @@ impl TestOperation for DeleteOne {
         let result = collection
             .delete_one(self.filter.clone(), self.options.clone())
             .await?;
-        let result = bson::to_bson(&result)?;
+        let result = to_bson(&result)?;
         Ok(Some(result.into()))
     }
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Find {
     filter: Option<Document>,
     #[serde(flatten)]
@@ -274,6 +279,7 @@ impl TestOperation for Find {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct InsertMany {
     documents: Vec<Document>,
     #[serde(flatten)]
@@ -296,12 +302,13 @@ impl TestOperation for InsertMany {
             .into_iter()
             .map(|(k, v)| (k.to_string(), v))
             .collect();
-        let ids = bson::to_bson(&ids)?;
+        let ids = to_bson(&ids)?;
         Ok(Some(Bson::from(doc! { "insertedIds": ids }).into()))
     }
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct InsertOne {
     document: Document,
     #[serde(flatten)]
@@ -319,12 +326,13 @@ impl TestOperation for InsertOne {
         let result = collection
             .insert_one(self.document.clone(), self.options.clone())
             .await?;
-        let result = bson::to_bson(&result)?;
+        let result = to_bson(&result)?;
         Ok(Some(result.into()))
     }
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct UpdateMany {
     filter: Document,
     update: UpdateModifications,
@@ -347,12 +355,13 @@ impl TestOperation for UpdateMany {
                 self.options.clone(),
             )
             .await?;
-        let result = bson::to_bson(&result)?;
+        let result = to_bson(&result)?;
         Ok(Some(result.into()))
     }
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct UpdateOne {
     filter: Document,
     update: UpdateModifications,
@@ -375,13 +384,13 @@ impl TestOperation for UpdateOne {
                 self.options.clone(),
             )
             .await?;
-        let result = bson::to_bson(&result)?;
+        let result = to_bson(&result)?;
         Ok(Some(result.into()))
     }
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Aggregate {
     pipeline: Vec<Document>,
     #[serde(flatten)]
@@ -418,7 +427,7 @@ impl TestOperation for Aggregate {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Distinct {
     field_name: String,
     filter: Option<Document>,
@@ -442,6 +451,7 @@ impl TestOperation for Distinct {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct CountDocuments {
     filter: Document,
     #[serde(flatten)]
@@ -464,6 +474,7 @@ impl TestOperation for CountDocuments {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct EstimatedDocumentCount {
     #[serde(flatten)]
     options: Option<EstimatedDocumentCountOptions>,
@@ -485,6 +496,7 @@ impl TestOperation for EstimatedDocumentCount {
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct FindOne {
     filter: Option<Document>,
     #[serde(flatten)]
@@ -510,6 +522,7 @@ impl TestOperation for FindOne {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ListDatabases {
     filter: Option<Document>,
     #[serde(flatten)]
@@ -533,6 +546,7 @@ impl TestOperation for ListDatabases {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ListDatabaseNames {
     filter: Option<Document>,
     #[serde(flatten)]
@@ -556,6 +570,7 @@ impl TestOperation for ListDatabaseNames {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ListCollections {
     filter: Option<Document>,
     #[serde(flatten)]
@@ -569,8 +584,8 @@ impl TestOperation for ListCollections {
         object: &OperationObject,
         test_runner: &'a mut TestRunner,
     ) -> Result<Option<Entity>> {
-        let database = object.as_database(&test_runner.entities);
-        let cursor = database
+        let db = object.as_database(&test_runner.entities);
+        let cursor = db
             .list_collections(self.filter.clone(), self.options.clone())
             .await?;
         let result = cursor.try_collect::<Vec<Document>>().await?;
@@ -579,6 +594,7 @@ impl TestOperation for ListCollections {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ListCollectionNames {
     filter: Option<Document>,
 }
@@ -590,14 +606,15 @@ impl TestOperation for ListCollectionNames {
         object: &OperationObject,
         test_runner: &'a mut TestRunner,
     ) -> Result<Option<Entity>> {
-        let database = object.as_database(&test_runner.entities);
-        let result = database.list_collection_names(self.filter.clone()).await?;
+        let db = object.as_database(&test_runner.entities);
+        let result = db.list_collection_names(self.filter.clone()).await?;
         let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
         Ok(Some(Bson::from(result).into()))
     }
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ReplaceOne {
     filter: Document,
     replacement: Document,
@@ -620,12 +637,13 @@ impl TestOperation for ReplaceOne {
                 self.options.clone(),
             )
             .await?;
-        let result = bson::to_bson(&result)?;
+        let result = to_bson(&result)?;
         Ok(Some(result.into()))
     }
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct FindOneAndUpdate {
     filter: Document,
     update: UpdateModifications,
@@ -648,12 +666,13 @@ impl TestOperation for FindOneAndUpdate {
                 self.options.clone(),
             )
             .await?;
-        let result = bson::to_bson(&result)?;
+        let result = to_bson(&result)?;
         Ok(Some(result.into()))
     }
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct FindOneAndReplace {
     filter: Document,
     replacement: Document,
@@ -676,12 +695,13 @@ impl TestOperation for FindOneAndReplace {
                 self.options.clone(),
             )
             .await?;
-        let result = bson::to_bson(&result)?;
+        let result = to_bson(&result)?;
         Ok(Some(result.into()))
     }
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct FindOneAndDelete {
     filter: Document,
     #[serde(flatten)]
@@ -699,7 +719,7 @@ impl TestOperation for FindOneAndDelete {
         let result = collection
             .find_one_and_delete(self.filter.clone(), self.options.clone())
             .await?;
-        let result = bson::to_bson(&result)?;
+        let result = to_bson(&result)?;
         Ok(Some(result.into()))
     }
 }
@@ -740,7 +760,7 @@ impl TestOperation for FailPoint {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct AssertCollectionExists {
     collection_name: String,
     database_name: String,
@@ -761,7 +781,7 @@ impl TestOperation for AssertCollectionExists {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct AssertCollectionNotExists {
     collection_name: String,
     database_name: String,
@@ -778,6 +798,41 @@ impl TestOperation for AssertCollectionNotExists {
         let names = db.list_collection_names(None).await.unwrap();
         assert!(!names.contains(&self.collection_name));
         Ok(None)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct RunCommand {
+    command: Document,
+    command_name: String,
+    read_concern: Option<Document>,
+    read_preference: Option<SelectionCriteria>,
+    session: Option<String>,
+    write_concern: Option<Document>,
+}
+
+#[async_trait]
+impl TestOperation for RunCommand {
+    async fn execute<'a>(
+        &self,
+        object: &OperationObject,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let mut command = self.command.clone();
+        if let Some(ref read_concern) = self.read_concern {
+            command.insert("readConcern", read_concern.clone());
+        }
+        if let Some(ref write_concern) = self.write_concern {
+            command.insert("writeConcern", write_concern.clone());
+        }
+
+        let db = object.as_database(&test_runner.entities);
+        let result = db
+            .run_command(command, self.read_preference.clone())
+            .await?;
+        let result = to_bson(&result)?;
+        Ok(Some(result.into()))
     }
 }
 
