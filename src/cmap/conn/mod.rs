@@ -29,6 +29,7 @@ use crate::{
 pub(crate) use command::{Command, CommandResponse};
 pub(crate) use stream_description::StreamDescription;
 pub(crate) use wire::next_request_id;
+use crate::client::options::ServerApiVersion;
 
 /// User-facing information about a connection to the database.
 #[derive(Clone, Debug)]
@@ -73,6 +74,8 @@ pub(crate) struct Connection {
 
     #[derivative(Debug = "ignore")]
     handler: Option<Arc<dyn CmapEventHandler>>,
+
+    server_api_version: Option<ServerApiVersion>,
 }
 
 impl Connection {
@@ -96,6 +99,7 @@ impl Connection {
             ready_and_available_time: None,
             stream: AsyncStream::connect(stream_options).await?,
             address,
+            server_api_version: options.as_ref().and_then(|options| options.server_api_version.clone()),
             handler: options.and_then(|options| options.event_handler),
             stream_description: None,
             error: false,
@@ -129,6 +133,7 @@ impl Connection {
                 connect_timeout,
                 tls_options,
                 event_handler: None,
+                server_api_version: None,
             }),
         )
         .await
@@ -239,6 +244,14 @@ impl Connection {
         command: Command,
         request_id: impl Into<Option<i32>>,
     ) -> Result<CommandResponse> {
+        let command = if command.has_server_api_version || self.server_api_version == None {
+            command
+        } else {
+            let mut command = command.clone();
+            command.set_server_api_version(self.server_api_version.as_ref().unwrap());
+            command
+        };
+
         let message = Message::with_command(command, request_id.into());
 
         self.command_executing = true;
@@ -290,6 +303,7 @@ impl Connection {
             error: self.error,
             pool_manager: None,
             ready_and_available_time: None,
+            server_api_version: self.server_api_version.take(),
         }
     }
 }
