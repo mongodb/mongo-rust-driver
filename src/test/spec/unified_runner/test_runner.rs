@@ -60,11 +60,11 @@ impl TestRunner {
                     let id = client.id.clone();
                     let observe_events = client.observe_events.clone();
                     let ignore_command_names = client.ignore_command_monitoring_events.clone();
-                    let server_api_version = client.server_api_version.clone();
+                    let server_api = client.server_api.clone();
                     let client = EventClient::with_uri_and_mongos_options(
                         &client.uri,
                         client.use_multiple_mongoses,
-                        server_api_version,
+                        server_api,
                     )
                     .await;
                     (

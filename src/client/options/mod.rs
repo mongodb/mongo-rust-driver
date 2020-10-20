@@ -204,11 +204,11 @@ impl fmt::Display for StreamAddress {
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[non_exhaustive]
-pub enum ServerApiVersionNumber {
+pub enum ServerApiVersion {
     Version1,
 }
 
-impl ServerApiVersionNumber {
+impl ServerApiVersion {
     pub fn from_string (version: &str) -> Self {
         match version {
             "1" => Self::Version1,
@@ -226,9 +226,9 @@ impl ServerApiVersionNumber {
 #[derive(Clone, Debug, Deserialize, PartialEq, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-pub struct ServerApiVersion {
+pub struct ServerApi {
     /// The version string of the declared API version
-    pub version: ServerApiVersionNumber,
+    pub version: ServerApiVersion,
 
     /// Whether the server should return errors for features that are not part of the API version
     pub strict: Option<bool>,
@@ -237,7 +237,7 @@ pub struct ServerApiVersion {
     pub deprecation_errors: Option<bool>,
 }
 
-impl ServerApiVersion {
+impl ServerApi {
     pub(crate) fn append_to_command(&self, command: &mut Document) {
         command.insert("apiVersion", self.version.as_str());
 
@@ -398,7 +398,7 @@ pub struct ClientOptions {
     ///
     /// The default value is to have no declared API version
     #[builder(default)]
-    pub server_api_version: Option<ServerApiVersion>,
+    pub server_api: Option<ServerApi>,
 
     /// The amount of time the Client should attempt to select a server for an operation before
     /// timing outs
@@ -666,7 +666,7 @@ impl From<ClientOptionsParser> for ClientOptions {
             original_uri: Some(parser.original_uri),
             resolver_config: None,
             heartbeat_freq_test: None,
-            server_api_version: None,
+            server_api: None,
         }
     }
 }
@@ -893,7 +893,7 @@ impl ClientOptions {
                 retry_reads,
                 retry_writes,
                 selection_criteria,
-                server_api_version,
+                server_api,
                 server_selection_timeout,
                 socket_timeout,
                 tls,

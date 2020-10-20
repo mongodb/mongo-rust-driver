@@ -25,7 +25,7 @@ pub use self::{
 };
 
 lazy_static! {
-    static ref SPEC_VERSIONS: Vec<Version> = vec![Version::parse("1.0.0").unwrap()];
+    static ref SPEC_VERSIONS: Vec<Version> = vec![Version::parse("1.0.0").unwrap(), Version::parse("1.1.0").unwrap()];
 }
 
 const SKIPPED_OPERATIONS: &[&str] = &[

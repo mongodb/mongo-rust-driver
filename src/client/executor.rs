@@ -254,9 +254,9 @@ impl Client {
             } else {
                 // Append versioned API fields
                 let mut body = cmd.body.clone();
-                if let Some(ref server_api_version) = self.inner.options.server_api_version {
-                    if server_api_version.applies_to_command(cmd.name.as_str()) {
-                        server_api_version.append_to_command(&mut body);
+                if let Some(ref server_api) = self.inner.options.server_api {
+                    if server_api.applies_to_command(cmd.name.as_str()) {
+                        server_api.append_to_command(&mut body);
                     }
                 }
 

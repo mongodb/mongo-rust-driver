@@ -10,7 +10,7 @@ use crate::{
     event::cmap::CmapEventHandler,
     options::{ClientOptions, DriverInfo, StreamAddress, TlsOptions},
 };
-use crate::client::options::ServerApiVersion;
+use crate::client::options::ServerApi;
 
 /// Contains the options for creating a connection pool. While these options are specified at the
 /// client-level, `ConnectionPoolOptions` is exposed for the purpose of CMAP event handling.
@@ -75,7 +75,7 @@ pub struct ConnectionPoolOptions {
     ///
     /// The default value is to have no declared API version
     #[builder(default)]
-    pub server_api_version: Option<ServerApiVersion>,
+    pub server_api: Option<ServerApi>,
 
     /// The options specifying how a TLS connection should be configured. If `tls_options` is
     /// `None`, then TLS will not be used for the connections.
@@ -107,7 +107,7 @@ impl ConnectionPoolOptions {
             .max_idle_time(options.max_idle_time)
             .max_pool_size(options.max_pool_size)
             .min_pool_size(options.min_pool_size)
-            .server_api_version(options.server_api_version.clone())
+            .server_api(options.server_api.clone())
             .tls_options(options.tls_options())
             .wait_queue_timeout(options.wait_queue_timeout)
             .build()
@@ -121,7 +121,7 @@ impl ConnectionPoolOptions {
 pub(crate) struct ConnectionOptions {
     pub(crate) connect_timeout: Option<Duration>,
 
-    pub(crate) server_api_version: Option<ServerApiVersion>,
+    pub(crate) server_api: Option<ServerApi>,
 
     pub(crate) tls_options: Option<TlsOptions>,
 
@@ -135,7 +135,7 @@ impl From<ConnectionPoolOptions> for ConnectionOptions {
             connect_timeout: pool_options.connect_timeout,
             tls_options: pool_options.tls_options,
             event_handler: pool_options.event_handler,
-            server_api_version: pool_options.server_api_version.clone(),
+            server_api: pool_options.server_api.clone(),
         }
     }
 }

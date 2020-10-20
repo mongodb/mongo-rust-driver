@@ -21,7 +21,7 @@ use crate::{
     },
     test::{TestClient, DEFAULT_URI},
 };
-use crate::client::options::{ServerApiVersion, ServerApiVersionNumber};
+use crate::client::options::{ServerApi, ServerApiVersion};
 use bson::document::ValueAccessError;
 
 #[derive(Debug, Deserialize)]
@@ -118,8 +118,8 @@ pub struct Client {
     pub observe_events: Option<Vec<String>>,
     pub ignore_command_monitoring_events: Option<Vec<String>>,
     #[serde(default)]
-    #[serde(deserialize_with = "deserialize_server_api_version")]
-    pub server_api_version: Option<ServerApiVersion>,
+    #[serde(deserialize_with = "deserialize_server_api")]
+    pub server_api: Option<ServerApi>,
 }
 
 fn default_uri() -> String {
@@ -171,32 +171,32 @@ where
     Ok(uri)
 }
 
-fn deserialize_server_api_version<'de, D>(
+fn deserialize_server_api<'de, D>(
     deserializer: D,
-) -> std::result::Result<Option<ServerApiVersion>, D::Error>
+) -> std::result::Result<Option<ServerApi>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let server_api_version = Document::deserialize(deserializer)?;
+    let server_api = Document::deserialize(deserializer)?;
 
-    let server_api_version = ServerApiVersion {
-        version: match server_api_version.get_str("version") {
-            Ok(v) => ServerApiVersionNumber::from_string(v),
+    let server_api = ServerApi {
+        version: match server_api.get_str("version") {
+            Ok(v) => ServerApiVersion::from_string(v),
             _ => panic!("Invalid server API version given")
         },
-        strict: match server_api_version.get_bool("strict") {
+        strict: match server_api.get_bool("strict") {
             Ok(v) => Some(v),
             Err(ValueAccessError::NotPresent) => None,
             _ => panic!("Invalid strict value for server API given")
         },
-        deprecation_errors: match server_api_version.get_bool("deprecationErrors") {
+        deprecation_errors: match server_api.get_bool("deprecationErrors") {
             Ok(v) => Some(v),
             Err(ValueAccessError::NotPresent) => None,
             _ => panic!("Invalid deprecationErrors value for server API given")
         },
     };
 
-    Ok(Some(server_api_version))
+    Ok(Some(server_api))
 }
 
 #[derive(Debug, Deserialize)]

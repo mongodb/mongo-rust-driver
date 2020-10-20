@@ -12,7 +12,7 @@ use crate::{
     error::{ErrorKind, Result},
     runtime::{AsyncLittleEndianRead, AsyncLittleEndianWrite, AsyncStream},
 };
-use crate::client::options::ServerApiVersion;
+use crate::client::options::ServerApi;
 
 /// Represents an OP_MSG wire protocol operation.
 #[derive(Debug)]
@@ -28,7 +28,7 @@ impl Message {
     /// Creates a `Message` from a given `Command`.
     ///
     /// Note that `response_to` will need to be set manually.
-    pub(crate) fn with_command(mut command: Command, request_id: Option<i32>, server_api_version: &Option<ServerApiVersion>) -> Self {
+    pub(crate) fn with_command(mut command: Command, request_id: Option<i32>, server_api: &Option<ServerApi>) -> Self {
         command.body.insert("$db", command.target_db);
 
         if let Some(read_pref) = command.read_pref {
@@ -37,9 +37,9 @@ impl Message {
                 .insert("$readPreference", read_pref.into_document());
         };
 
-        if let Some(server_api_version) = server_api_version {
-            if server_api_version.applies_to_command(command.name.as_str()) {
-                server_api_version.append_to_command(&mut command.body);
+        if let Some(server_api) = server_api {
+            if server_api.applies_to_command(command.name.as_str()) {
+                server_api.append_to_command(&mut command.body);
             }
         }
 
