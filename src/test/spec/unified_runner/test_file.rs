@@ -7,7 +7,7 @@ use super::{Operation, TestEvent};
 
 use crate::{
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
-    concern::Acknowledgment,
+    concern::{Acknowledgment, ReadConcernLevel},
     error::Error,
     options::{
         ClientOptions,
@@ -361,4 +361,25 @@ async fn deserialize_selection_criteria() {
         SelectionCriteria::Predicate(_) => panic!("Expected read preference, got predicate"),
     }
 
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn deserialize_read_concern() {
+    let read_concern = doc! {
+        "level": "local",
+    };
+    let d = BsonDeserializer::new(read_concern.into());
+    let read_concern = ReadConcern::deserialize(d).unwrap();
+    assert!(matches!(read_concern.level, ReadConcernLevel::Local));
+
+    let read_concern = doc! {
+        "level": "customlevel",
+    };
+    let d = BsonDeserializer::new(read_concern.into());
+    let read_concern = ReadConcern::deserialize(d).unwrap();
+    match read_concern.level {
+        ReadConcernLevel::Custom(level) => assert_eq!(level.as_str(), "customlevel"),
+        other => panic!("Expected custom read concern, got {:?}", other),
+    };
 }
