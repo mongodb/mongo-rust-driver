@@ -249,6 +249,14 @@ impl ServerApiVersion {
             command.insert("apiDeprecationErrors", deprecation_errors);
         }
     }
+
+    pub(crate) fn applies_to_command(&self, command_name: &str) -> bool {
+        // TODO RUST-90: Don't include version fields for commands run as part of a transaction
+        match command_name {
+            "getMore" => false,
+            _ => true
+        }
+    }
 }
 
 /// Contains the options that can be used to create a new [`Client`](../struct.Client.html).

@@ -243,10 +243,6 @@ impl Client {
             cmd.set_cluster_time(cluster_time);
         }
 
-        if let Some(ref server_api_version) = self.inner.options.server_api_version {
-            cmd.set_server_api_version(server_api_version);
-        }
-
         let connection_info = connection.info();
         let request_id = crate::cmap::conn::next_request_id();
 
@@ -256,7 +252,15 @@ impl Client {
             let command_body = if should_redact {
                 Document::new()
             } else {
-                cmd.body.clone()
+                // Append versioned API fields
+                let mut body = cmd.body.clone();
+                if let Some(ref server_api_version) = self.inner.options.server_api_version {
+                    if server_api_version.applies_to_command(cmd.name.as_str()) {
+                        server_api_version.append_to_command(&mut body);
+                    }
+                }
+
+                body
             };
             let command_started_event = CommandStartedEvent {
                 command: command_body,

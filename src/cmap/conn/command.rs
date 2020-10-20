@@ -6,7 +6,7 @@ use crate::{
     bson_util,
     client::{ClientSession, ClusterTime},
     error::{CommandError, ErrorKind, Result},
-    options::{ServerApiVersion, StreamAddress},
+    options::StreamAddress,
     selection_criteria::ReadPreference,
 };
 
@@ -18,7 +18,6 @@ pub(crate) struct Command {
     pub(crate) target_db: String,
     pub(crate) read_pref: Option<ReadPreference>,
     pub(crate) body: Document,
-    pub(crate) has_server_api_version: bool,
 }
 
 impl Command {
@@ -34,7 +33,6 @@ impl Command {
             target_db,
             read_pref,
             body,
-            has_server_api_version: false,
         }
     }
 
@@ -45,7 +43,6 @@ impl Command {
             target_db,
             read_pref: None,
             body,
-            has_server_api_version: false,
         }
     }
 
@@ -62,18 +59,6 @@ impl Command {
 
     pub(crate) fn set_txn_number(&mut self, txn_number: u64) {
         self.body.insert("txnNumber", txn_number);
-    }
-
-    pub(crate) fn set_server_api_version(&mut self, server_api_version: &ServerApiVersion) {
-        // Don't include version fields for getMore commands
-        if self.name == "getMore" {
-            return;
-        }
-
-        // TODO RUST-90: Don't include version fields for commands run as part of a transaction
-
-        server_api_version.append_to_command(&mut self.body);
-        self.has_server_api_version = true;
     }
 }
 

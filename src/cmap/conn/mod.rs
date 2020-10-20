@@ -244,15 +244,7 @@ impl Connection {
         command: Command,
         request_id: impl Into<Option<i32>>,
     ) -> Result<CommandResponse> {
-        let command = if command.has_server_api_version || self.server_api_version == None {
-            command
-        } else {
-            let mut command = command.clone();
-            command.set_server_api_version(self.server_api_version.as_ref().unwrap());
-            command
-        };
-
-        let message = Message::with_command(command, request_id.into());
+        let message = Message::with_command(command, request_id.into(), &self.server_api_version);
 
         self.command_executing = true;
         let write_result = message.write_to(&mut self.stream).await;
