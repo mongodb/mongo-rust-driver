@@ -8,7 +8,6 @@ use crate::{
     error::Result,
     options::{Acknowledgment, FindOptions, InsertOneOptions, ReadPreference, WriteConcern},
     test::{EventClient, TestClient, CLIENT_OPTIONS, LOCK},
-    Client,
     Collection,
     RUNTIME,
 };
@@ -240,7 +239,7 @@ async fn cluster_time_in_commands() {
 
     async fn cluster_time_test<F, G, R>(command_name: &str, operation: F)
     where
-        F: Fn(Client) -> G,
+        F: Fn(EventClient) -> G,
         G: Future<Output = Result<R>>,
     {
         let mut options = CLIENT_OPTIONS.clone();
@@ -327,7 +326,7 @@ async fn session_usage() {
 
     async fn session_usage_test<F, G>(command_name: &str, operation: F)
     where
-        F: Fn(Client) -> G,
+        F: Fn(EventClient) -> G,
         G: Future<Output = ()>,
     {
         let client = EventClient::new().await;

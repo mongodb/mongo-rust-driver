@@ -1,9 +1,11 @@
 mod event;
+mod failpoint;
 mod lock;
 mod matchable;
 
 pub use self::{
     event::{CommandEvent, EventClient},
+    failpoint::{FailCommandOptions, FailPoint, FailPointMode},
     lock::TestLock,
     matchable::{assert_matches, Matchable},
 };
@@ -11,7 +13,7 @@ pub use self::{
 use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
 
 use crate::bson::{doc, oid::ObjectId, Bson};
-use semver::Version;
+use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
 
 use self::event::EventHandler;
@@ -23,7 +25,9 @@ use crate::{
     Client,
     Collection,
 };
+use failpoint::FailPointGuard;
 
+#[derive(Clone)]
 pub struct TestClient {
     client: Client,
     pub options: ClientOptions,
@@ -217,6 +221,19 @@ impl TestClient {
         self.get_coll(db_name, coll_name)
     }
 
+    pub async fn supports_fail_command(&self) -> bool {
+        let version = if self.is_sharded() {
+            VersionReq::parse(">= 4.1.5").unwrap()
+        } else {
+            VersionReq::parse(">= 4.0").unwrap()
+        };
+        version.matches(&self.server_version)
+    }
+
+    pub async fn enable_failpoint(&self, fp: FailPoint) -> Result<FailPointGuard> {
+        fp.enable(self).await
+    }
+
     pub fn auth_enabled(&self) -> bool {
         self.options.credential.is_some()
     }
@@ -284,7 +301,7 @@ struct BuildInfo {
 }
 
 // Copy of the internal isMaster struct; fix this later.
-#[derive(Debug, Default, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct IsMasterCommandResponse {
     #[serde(rename = "ismaster")]

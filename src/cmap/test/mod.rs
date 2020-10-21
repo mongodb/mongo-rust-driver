@@ -27,6 +27,16 @@ const TEST_DESCRIPTIONS_TO_SKIP: &[&str] = &[
     "must throw error if checkOut is called on a closed pool",
 ];
 
+/// Many different types of CMAP events are emitted from tasks spawned in the drop
+/// implementations of various types (Connections, pools, etc.). Sometimes it takes
+/// a longer amount of time for these tasks to get scheduled and thus their associated
+/// events to get emitted, requiring the runner to wait for a little bit before asserting
+/// the events were actually fired.
+///
+/// This value was purposefully chosen to be large to prevent test failures, though it is not
+/// expected that the 3s timeout will regularly or ever be hit.
+const EVENT_TIMEOUT: Duration = Duration::from_secs(3);
+
 #[derive(Debug)]
 struct Executor {
     description: String,
@@ -35,6 +45,7 @@ struct Executor {
     events: Vec<Event>,
     state: Arc<State>,
     ignored_event_names: Vec<String>,
+    pool_options: ConnectionPoolOptions,
 }
 
 #[derive(Debug)]
@@ -51,10 +62,6 @@ struct State {
 }
 
 impl State {
-    fn count_all_events(&self) -> usize {
-        self.handler.events.read().unwrap().len()
-    }
-
     // Counts the number of events of the given type that have occurred so far.
     fn count_events(&self, event_type: &str) -> usize {
         self.handler
@@ -73,25 +80,13 @@ impl Executor {
         let handler = Arc::new(EventHandler::new());
         let error = test_file.error;
 
-        test_file
-            .pool_options
-            .get_or_insert_with(Default::default)
-            .tls_options = CLIENT_OPTIONS.tls_options();
-
-        test_file
-            .pool_options
-            .get_or_insert_with(Default::default)
-            .event_handler = Some(handler.clone());
-
-        let pool = ConnectionPool::new(
-            CLIENT_OPTIONS.hosts[0].clone(),
-            Default::default(),
-            test_file.pool_options,
-        );
+        let mut pool_options = test_file.pool_options.unwrap_or_else(Default::default);
+        pool_options.tls_options = CLIENT_OPTIONS.tls_options();
+        pool_options.event_handler = Some(handler.clone());
 
         let state = State {
             handler,
-            pool: RwLock::new(Some(pool)),
+            pool: RwLock::new(None),
             connections: Default::default(),
             threads: Default::default(),
         };
@@ -103,10 +98,20 @@ impl Executor {
             operations,
             state: Arc::new(state),
             ignored_event_names: test_file.ignore,
+            pool_options,
         }
     }
 
     async fn execute_test(self) {
+        let mut subscriber = self.state.handler.subscribe();
+
+        let pool = ConnectionPool::new(
+            CLIENT_OPTIONS.hosts[0].clone(),
+            Default::default(),
+            Some(self.pool_options),
+        );
+        *self.state.pool.write().await = Some(pool);
+
         let mut error: Option<Error> = None;
         let operations = self.operations;
 
@@ -139,33 +144,21 @@ impl Executor {
             (None, None) => {}
         }
 
-        // The `Drop` implementation for `Connection` and `ConnectionPool` spawn background async
-        // tasks that emit certain events. If the tasks haven't been scheduled yet, we may
-        // not see the events here. To account for this, we wait for a small amount of time
-        // before checking again.
-        if self.state.count_all_events() < self.events.len() {
-            RUNTIME.delay_for(Duration::from_millis(250)).await;
-        }
-
         let ignored_event_names = self.ignored_event_names;
-        let mut actual_events = self.state.handler.events.write().unwrap();
-        actual_events.retain(|e| !ignored_event_names.iter().any(|name| e.name() == name));
-
-        if actual_events.len() < self.events.len() {
-            panic!(
-                "{}: more events expected than were actually received. expected: {:?}, actual: \
-                 {:?}",
-                self.description,
-                self.events,
-                actual_events.deref()
-            )
-        }
-        for i in 0..self.events.len() {
-            assert_matches(
-                &actual_events[i],
-                &self.events[i],
-                Some(self.description.as_str()),
-            );
+        let description = self.description;
+        for expected_event in self.events {
+            let actual_event = subscriber
+                .wait_for_event(EVENT_TIMEOUT, |e| {
+                    !ignored_event_names.iter().any(|name| e.name() == name)
+                })
+                .await
+                .unwrap_or_else(|| {
+                    panic!(
+                        "{}: did not receive expected event: {:?}",
+                        description, expected_event
+                    )
+                });
+            assert_matches(&actual_event, &expected_event, Some(description.as_str()));
         }
     }
 }
@@ -216,11 +209,25 @@ impl Operation {
                     }
                 }
                 Operation::CheckIn { connection } => {
+                    let mut subscriber = state.handler.subscribe();
                     let conn = state.connections.write().await.remove(&connection).unwrap();
+                    let id = conn.id;
+                    // connections are checked in via tasks spawned in their drop implementation,
+                    // they are not checked in explicitly.
+                    drop(conn);
 
-                    if let Some(pool) = state.pool.read().await.deref() {
-                        pool.check_in(conn).await;
-                    }
+                    // wait for event to be emitted to ensure check in has completed.
+                    subscriber
+                        .wait_for_event(EVENT_TIMEOUT, |e| {
+                            matches!(e, Event::ConnectionCheckedIn(event) if event.connection_id == id)
+                        })
+                        .await
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "did not receive checkin event after dropping connection (id={})",
+                                connection
+                            )
+                        });
                 }
                 Operation::Clear => {
                     if let Some(pool) = state.pool.write().await.deref() {
@@ -228,8 +235,18 @@ impl Operation {
                     }
                 }
                 Operation::Close => {
-                    state.connections.write().await.clear();
+                    let mut subscriber = state.handler.subscribe();
+
+                    // pools are closed via their drop implementation
                     state.pool.write().await.take();
+
+                    // wait for event to be emitted to ensure drop has completed.
+                    subscriber
+                        .wait_for_event(EVENT_TIMEOUT, |e| {
+                            matches!(e, Event::ConnectionPoolClosed(_))
+                        })
+                        .await
+                        .expect("did not receive ConnectionPoolClosed event after closing pool");
                 }
 
                 // We replace all instances of `Start` with `StartHelper` when we preprocess the

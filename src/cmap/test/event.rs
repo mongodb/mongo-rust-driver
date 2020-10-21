@@ -1,24 +1,41 @@
-use std::sync::{Arc, RwLock};
+use std::{
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 
 use serde::{de::Unexpected, Deserialize, Deserializer};
 
-use crate::{event::cmap::*, options::StreamAddress};
+use crate::{event::cmap::*, options::StreamAddress, RUNTIME};
+use tokio::sync::broadcast::{RecvError, SendError};
 
 #[derive(Clone, Debug)]
 pub struct EventHandler {
     pub events: Arc<RwLock<Vec<Event>>>,
+    channel_sender: tokio::sync::broadcast::Sender<Event>,
 }
 
 impl EventHandler {
     pub fn new() -> Self {
+        let (channel_sender, _) = tokio::sync::broadcast::channel(500);
         Self {
             events: Default::default(),
+            channel_sender,
         }
     }
 
     fn handle<E: Into<Event>>(&self, event: E) {
         let event = event.into();
+        // this only errors if no receivers are listening which isn't a concern here.
+        let _: std::result::Result<usize, SendError<Event>> =
+            self.channel_sender.send(event.clone());
         self.events.write().unwrap().push(event);
+    }
+
+    pub fn subscribe(&self) -> EventSubscriber {
+        EventSubscriber {
+            _handler: self,
+            receiver: self.channel_sender.subscribe(),
+        }
     }
 }
 
@@ -64,8 +81,39 @@ impl CmapEventHandler for EventHandler {
     }
 }
 
+pub struct EventSubscriber<'a> {
+    /// A reference to the handler this subscriber is receiving events from.
+    /// Stored here to ensure this subscriber cannot outlive the handler that is generating its
+    /// events.
+    _handler: &'a EventHandler,
+    receiver: tokio::sync::broadcast::Receiver<Event>,
+}
+
+impl EventSubscriber<'_> {
+    pub async fn wait_for_event<F>(&mut self, timeout: Duration, filter: F) -> Option<Event>
+    where
+        F: Fn(&Event) -> bool,
+    {
+        RUNTIME
+            .timeout(timeout, async {
+                loop {
+                    match self.receiver.recv().await {
+                        Ok(event) if filter(&event) => return event.into(),
+                        // the channel hit capacity and the channnel will skip a few to catch up.
+                        Err(RecvError::Lagged(_)) => continue,
+                        Err(_) => return None,
+                        _ => continue,
+                    }
+                }
+            })
+            .await
+            .ok()
+            .flatten()
+    }
+}
+
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug, Deserialize, From, PartialEq)]
+#[derive(Clone, Debug, Deserialize, From, PartialEq)]
 #[serde(tag = "type")]
 pub enum Event {
     #[serde(deserialize_with = "self::deserialize_pool_created")]

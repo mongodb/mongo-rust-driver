@@ -1,6 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 
 use serde::Deserialize;
+use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, oid::ObjectId},
@@ -12,7 +13,7 @@ use crate::{
         server::{ServerDescription, ServerType},
         topology::{TopologyDescription, TopologyType},
     },
-    test::{run_spec_test, TestClient, CLIENT_OPTIONS},
+    test::{run_spec_test, TestClient, CLIENT_OPTIONS, LOCK},
 };
 
 #[derive(Debug, Deserialize)]
@@ -254,6 +255,8 @@ async fn sharded() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn direct_connection() {
+    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
+
     let test_client = TestClient::new().await;
     if !test_client.is_replica_set() {
         println!("Skipping due to non-replica set topology");

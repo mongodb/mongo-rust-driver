@@ -7,13 +7,16 @@ use std::{
         Arc,
         Weak,
     },
-    time::Duration,
 };
 
 use tokio::sync::RwLock;
 
 use self::server::Server;
-use super::{SessionSupportStatus, TopologyDescription};
+use super::{
+    message_manager::TopologyMessageSubscriber,
+    SessionSupportStatus,
+    TopologyDescription,
+};
 use crate::{
     client::ClusterTime,
     cmap::{Command, Connection},
@@ -195,25 +198,25 @@ impl Topology {
         self.common.message_manager.request_topology_check();
     }
 
-    /// Waits until either the `timeout` has elapsed or a topology check has been requested.
-    pub(crate) async fn wait_for_topology_check_request(&self, timeout: Duration) -> bool {
+    /// Subscribe to notifications of requests to perform a server check.
+    pub(crate) async fn subscribe_to_topology_check_requests(&self) -> TopologyMessageSubscriber {
         self.common
             .message_manager
-            .wait_for_topology_check_request(timeout)
+            .subscribe_to_topology_check_requests()
+            .await
+    }
+
+    /// Subscribe to notifications that the topology has been updated.
+    pub(crate) async fn subscribe_to_topology_changes(&self) -> TopologyMessageSubscriber {
+        self.common
+            .message_manager
+            .subscribe_to_topology_changes()
             .await
     }
 
     /// Wakes all tasks waiting for a topology change.
     pub(crate) fn notify_topology_changed(&self) {
         self.common.message_manager.notify_topology_changed();
-    }
-
-    /// Waits until either the `timeout` has elapsed or the topology has been updated.
-    pub(crate) async fn wait_for_topology_change(&self, timeout: Duration) -> bool {
-        self.common
-            .message_manager
-            .wait_for_topology_change(timeout)
-            .await
     }
 
     /// Handles an error that occurs before the handshake has completed during an operation.

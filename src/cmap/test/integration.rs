@@ -1,16 +1,20 @@
 use serde::Deserialize;
-use tokio::sync::RwLockReadGuard;
+use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
-use super::event::{Event, EventHandler};
+use super::{
+    event::{Event, EventHandler},
+    EVENT_TIMEOUT,
+};
 use crate::{
     bson::doc,
     cmap::{options::ConnectionPoolOptions, Command, ConnectionPool},
+    event::cmap::{CmapEventHandler, ConnectionClosedReason},
     selection_criteria::ReadPreference,
-    test::{TestClient, CLIENT_OPTIONS, LOCK},
+    test::{FailCommandOptions, FailPoint, FailPointMode, TestClient, CLIENT_OPTIONS, LOCK},
     RUNTIME,
 };
 use semver::VersionReq;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 #[derive(Debug, Deserialize)]
 struct ListDatabasesResponse {
@@ -136,4 +140,96 @@ async fn concurrent_connections() {
         )
         .await
         .expect("disabling fail point should succeed");
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(threaded_scheduler))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn connection_error_during_establishment() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+
+    let mut client_options = CLIENT_OPTIONS.clone();
+    client_options.heartbeat_freq = Duration::from_secs(300).into(); // high so that monitors dont trip failpoint
+    client_options.hosts.drain(1..);
+    client_options.direct_connection = Some(true);
+    client_options.repl_set_name = None;
+
+    let client = TestClient::with_options(Some(client_options.clone())).await;
+    if !client.supports_fail_command().await {
+        println!(
+            "skipping {} due to failCommand not being supported",
+            function_name!()
+        );
+        return;
+    }
+
+    let options = FailCommandOptions::builder().error_code(1234).build();
+    let failpoint = FailPoint::fail_command(&["isMaster"], FailPointMode::Times(10), Some(options));
+    let _fp_guard = client.enable_failpoint(failpoint).await.unwrap();
+
+    let handler = Arc::new(EventHandler::new());
+    let mut subscriber = handler.subscribe();
+    let mut options = ConnectionPoolOptions::from_client_options(&client_options);
+    options.event_handler = Some(handler.clone() as Arc<dyn crate::cmap::CmapEventHandler>);
+    let pool = ConnectionPool::new(
+        client_options.hosts[0].clone(),
+        Default::default(),
+        Some(options),
+    );
+
+    pool.check_out().await.expect_err("check out should fail");
+
+    subscriber
+        .wait_for_event(EVENT_TIMEOUT, |e| match e {
+            Event::ConnectionClosed(event) => {
+                event.connection_id == 1 && event.reason == ConnectionClosedReason::Error
+            }
+            _ => false,
+        })
+        .await
+        .expect("closed event with error reason should have been seen");
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(threaded_scheduler))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn connection_error_during_operation() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+
+    let mut options = CLIENT_OPTIONS.clone();
+    let handler = Arc::new(EventHandler::new());
+    options.cmap_event_handler = Some(handler.clone() as Arc<dyn CmapEventHandler>);
+    options.hosts.drain(1..);
+    options.max_pool_size = Some(1);
+
+    let client = TestClient::with_options(options.into()).await;
+    if !client.supports_fail_command().await {
+        println!(
+            "skipping {} due to failCommand not being supported",
+            function_name!()
+        );
+        return;
+    }
+
+    let options = FailCommandOptions::builder().close_connection(true).build();
+    let failpoint = FailPoint::fail_command(&["ping"], FailPointMode::Times(10), Some(options));
+    let _fp_guard = client.enable_failpoint(failpoint).await.unwrap();
+
+    let mut subscriber = handler.subscribe();
+
+    client
+        .database("test")
+        .run_command(doc! { "ping": 1 }, None)
+        .await
+        .expect_err("ping should fail due to fail point");
+
+    subscriber
+        .wait_for_event(EVENT_TIMEOUT, |e| match e {
+            Event::ConnectionClosed(event) => {
+                event.connection_id == 1 && event.reason == ConnectionClosedReason::Error
+            }
+            _ => false,
+        })
+        .await
+        .expect("closed event with error reason should have been seen");
 }

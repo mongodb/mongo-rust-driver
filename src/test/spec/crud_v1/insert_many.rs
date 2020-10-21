@@ -27,6 +27,8 @@ struct ResultDoc {
 
 #[function_name::named]
 async fn run_insert_many_test(test_file: TestFile) {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
     let client = TestClient::new().await;
     let data = test_file.data;
 
@@ -34,8 +36,6 @@ async fn run_insert_many_test(test_file: TestFile) {
         if test_case.operation.name != "insertMany" {
             continue;
         }
-
-        let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
         let coll = client
             .init_db_and_coll(function_name!(), &test_case.description)

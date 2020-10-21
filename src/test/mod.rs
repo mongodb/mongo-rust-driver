@@ -11,7 +11,16 @@ mod util;
 
 pub(crate) use self::{
     spec::{run_spec_test, run_v2_test, AnyTestOperation, OperationObject, TestEvent},
-    util::{assert_matches, CommandEvent, EventClient, Matchable, TestClient},
+    util::{
+        assert_matches,
+        CommandEvent,
+        EventClient,
+        FailCommandOptions,
+        FailPoint,
+        FailPointMode,
+        Matchable,
+        TestClient,
+    },
 };
 
 use lazy_static::lazy_static;

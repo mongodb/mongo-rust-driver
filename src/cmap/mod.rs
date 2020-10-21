@@ -33,6 +33,7 @@ use crate::{
         ConnectionCheckoutFailedEvent,
         ConnectionCheckoutFailedReason,
         ConnectionCheckoutStartedEvent,
+        ConnectionClosedEvent,
         ConnectionClosedReason,
         PoolClearedEvent,
         PoolClosedEvent,
@@ -179,15 +180,6 @@ impl ConnectionPool {
         Ok(conn)
     }
 
-    /// Checks a connection back into the pool and notifies the wait queue that a connection is
-    /// ready. If the connection is stale, it will be closed instead of being added to the set of
-    /// available connections. The time that the connection is checked in will be marked to
-    /// facilitate detecting if the connection becomes idle.
-    #[cfg(test)]
-    pub(crate) async fn check_in(&self, conn: Connection) {
-        self.inner.check_in(conn).await;
-    }
-
     /// Increments the generation of the pool. Rather than eagerly removing stale connections from
     /// the pool, they are left for the background thread to clean up.
     pub(crate) fn clear(&self) {
@@ -207,6 +199,10 @@ impl ConnectionPoolInner {
         }
     }
 
+    /// Checks a connection back into the pool and notifies the wait queue that a connection is
+    /// ready. If the connection is stale, it will be closed instead of being added to the set of
+    /// available connections. The time that the connection is checked in will be marked to
+    /// facilitate detecting if the connection becomes idle.
     async fn check_in(&self, mut conn: Connection) {
         self.emit_event(|handler| {
             handler.handle_connection_checked_in_event(conn.checked_in_event());
@@ -216,8 +212,9 @@ impl ConnectionPoolInner {
 
         let mut available_connections = self.available_connections.lock().await;
 
-        // Close the connection if it's stale.
-        if conn.is_stale(self.generation.load(Ordering::SeqCst)) {
+        if conn.has_errored() {
+            self.close_connection(conn, ConnectionClosedReason::Error);
+        } else if conn.is_stale(self.generation.load(Ordering::SeqCst)) {
             self.close_connection(conn, ConnectionClosedReason::Stale);
         } else if conn.is_executing() {
             self.close_connection(conn, ConnectionClosedReason::Dropped)
@@ -334,6 +331,9 @@ impl ConnectionPoolInner {
         &self,
         pending_connection: PendingConnection,
     ) -> Result<Connection> {
+        let address = pending_connection.address.clone();
+        let id = pending_connection.id;
+
         let establish_result = self
             .establisher
             .establish_connection(pending_connection)
@@ -348,6 +348,14 @@ impl ConnectionPoolInner {
                 // Establishing a pending connection failed, so that must be reflected in to total
                 // connection count.
                 self.total_connection_count.fetch_sub(1, Ordering::SeqCst);
+                self.emit_event(|handler| {
+                    let event = ConnectionClosedEvent {
+                        address,
+                        reason: ConnectionClosedReason::Error,
+                        connection_id: id,
+                    };
+                    handler.handle_connection_closed_event(event);
+                });
             }
             Ok(ref connection) => {
                 self.emit_event(|handler| {

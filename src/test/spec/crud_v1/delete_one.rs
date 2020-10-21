@@ -23,6 +23,8 @@ struct ResultDoc {
 
 #[function_name::named]
 async fn run_delete_one_test(test_file: TestFile) {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
     let client = TestClient::new().await;
     let data = test_file.data;
 
@@ -30,8 +32,6 @@ async fn run_delete_one_test(test_file: TestFile) {
         if test_case.operation.name != "deleteOne" {
             continue;
         }
-
-        let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
         test_case.description = test_case.description.replace('$', "%");
 

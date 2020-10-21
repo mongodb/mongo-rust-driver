@@ -1,7 +1,7 @@
 use std::{borrow::Cow, collections::HashMap, time::Duration};
 
 use serde::Deserialize;
-use tokio::sync::RwLockReadGuard;
+use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
     bson::{doc, Bson},
@@ -401,8 +401,6 @@ async fn scram_test(
     password: &str,
     mechanisms: &[AuthMechanism],
 ) {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
     for mechanism in mechanisms {
         auth_test_uri(username, password, Some(mechanism.clone()), true).await;
         auth_test_uri(username, password, None, true).await;
@@ -424,6 +422,8 @@ async fn scram_test(
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_sha1() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+
     let client = TestClient::new().await;
     if !client.auth_enabled() {
         return;
@@ -445,6 +445,8 @@ async fn scram_sha1() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_sha256() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+
     let client = TestClient::new().await;
     if client.server_version_lt(4, 0) || !client.auth_enabled() {
         return;
@@ -465,6 +467,8 @@ async fn scram_sha256() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_both() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+
     let client = TestClient::new().await;
     if client.server_version_lt(4, 0) || !client.auth_enabled() {
         return;
@@ -491,6 +495,8 @@ async fn scram_both() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_missing_user_uri() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+
     let client = TestClient::new().await;
     if !client.auth_enabled() {
         return;
@@ -501,6 +507,8 @@ async fn scram_missing_user_uri() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn scram_missing_user_options() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+
     let client = TestClient::new().await;
     if !client.auth_enabled() {
         return;
@@ -511,6 +519,8 @@ async fn scram_missing_user_options() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn saslprep() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+
     let client = TestClient::new().await;
 
     if client.server_version_lt(4, 0) || !client.auth_enabled() {

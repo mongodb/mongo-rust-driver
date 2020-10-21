@@ -236,13 +236,13 @@ async fn collection_management() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn db_aggregate() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
     let client = TestClient::new().await;
 
     if client.server_version_lt(4, 0) {
         return;
     }
-
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let db = client.database("admin");
 
@@ -280,13 +280,13 @@ async fn db_aggregate() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn db_aggregate_disk_use() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
     let client = TestClient::new().await;
 
     if client.server_version_lt(4, 0) {
         return;
     }
-
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let db = client.database("admin");
 

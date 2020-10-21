@@ -40,30 +40,29 @@ impl TopologyMessageManager {
         let _ = self.topology_change_notifier.broadcast(());
     }
 
-    /// Waits for either `timeout` to elapse or a topology check to be requested by SDAM background
-    /// tasks.
-    ///
-    /// Returns `true` if a topology check has been requested or `false` if the timeout elapsed.
-    pub(super) async fn wait_for_topology_check_request(&self, timeout: Duration) -> bool {
-        let mut listener = self.topology_check_listener.clone();
-
-        wait_for_notification(&mut listener, timeout).await
+    pub(super) async fn subscribe_to_topology_check_requests(&self) -> TopologyMessageSubscriber {
+        TopologyMessageSubscriber::new(&self.topology_check_listener).await
     }
 
-    /// Waits for either `timeout` to elapse or the topology to change.
-    ///
-    /// Returns `true` if the topology has changed or `false` if the timeout elapsed.
-    pub(crate) async fn wait_for_topology_change(&self, timeout: Duration) -> bool {
-        let mut listener = self.topology_change_listener.clone();
-
-        // Per the tokio docs, the first call to `tokio::watch::Receiver::recv` will return
-        // immediately with the current value, so we skip over this and wait for the next message.
-        let _ = listener.recv().await;
-
-        wait_for_notification(&mut listener, timeout).await
+    pub(super) async fn subscribe_to_topology_changes(&self) -> TopologyMessageSubscriber {
+        TopologyMessageSubscriber::new(&self.topology_change_listener).await
     }
 }
 
-async fn wait_for_notification(receiver: &mut Receiver<()>, timeout: Duration) -> bool {
-    RUNTIME.timeout(timeout, receiver.recv()).await.is_ok()
+pub(crate) struct TopologyMessageSubscriber {
+    receiver: Receiver<()>,
+}
+
+impl TopologyMessageSubscriber {
+    async fn new(receiver: &Receiver<()>) -> Self {
+        let mut receiver = receiver.clone();
+        receiver.recv().await;
+        Self { receiver }
+    }
+
+    /// Waits for either `timeout` to elapse or a message to be received.
+    /// Returns true if a message was received, false for a timeout.
+    pub(crate) async fn wait_for_message(&mut self, timeout: Duration) -> bool {
+        RUNTIME.timeout(timeout, self.receiver.recv()).await.is_ok()
+    }
 }

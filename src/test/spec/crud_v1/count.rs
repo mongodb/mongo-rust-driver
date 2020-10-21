@@ -18,6 +18,8 @@ struct Arguments {
 
 #[function_name::named]
 async fn run_count_test(test_file: TestFile) {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
     let client = TestClient::new().await;
     let data = test_file.data;
 
@@ -28,8 +30,6 @@ async fn run_count_test(test_file: TestFile) {
         if !test_case.operation.name.contains("count") || lower_description.contains("deprecated") {
             continue;
         }
-
-        let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
         test_case.description = test_case.description.replace('$', "%");
 
