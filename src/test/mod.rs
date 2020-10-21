@@ -12,8 +12,14 @@ mod util;
 pub(crate) use self::{
     spec::{run_spec_test, run_v2_test, AnyTestOperation, OperationObject, RunOn, TestEvent},
     util::{
-        assert_matches, CommandEvent, EventClient, FailCommandOptions, FailPoint, FailPointMode,
-        Matchable, TestClient,
+        assert_matches,
+        CommandEvent,
+        EventClient,
+        FailCommandOptions,
+        FailPoint,
+        FailPointMode,
+        Matchable,
+        TestClient,
     },
 };
 

@@ -18,8 +18,11 @@ use self::options::ConnectionPoolOptions;
 use crate::{
     error::{ErrorKind, Result},
     event::cmap::{
-        CmapEventHandler, ConnectionCheckoutFailedEvent, ConnectionCheckoutFailedReason,
-        ConnectionCheckoutStartedEvent, PoolCreatedEvent,
+        CmapEventHandler,
+        ConnectionCheckoutFailedEvent,
+        ConnectionCheckoutFailedReason,
+        ConnectionCheckoutStartedEvent,
+        PoolCreatedEvent,
     },
     options::StreamAddress,
     runtime::HttpClient,

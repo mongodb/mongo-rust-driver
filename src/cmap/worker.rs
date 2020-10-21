@@ -3,17 +3,24 @@ use derivative::Derivative;
 use super::{
     conn::PendingConnection,
     connection_requester::{
-        ConnectionRequest, ConnectionRequestReceiver, ConnectionRequester, RequestedConnection,
+        ConnectionRequest,
+        ConnectionRequestReceiver,
+        ConnectionRequester,
+        RequestedConnection,
     },
     establish::ConnectionEstablisher,
     manager::{ManagementRequestReceiver, PoolManagementRequest, PoolManager},
     options::{ConnectionOptions, ConnectionPoolOptions},
-    Connection, DEFAULT_MAX_POOL_SIZE,
+    Connection,
+    DEFAULT_MAX_POOL_SIZE,
 };
 use crate::{
     error::{Error, Result},
     event::cmap::{
-        CmapEventHandler, ConnectionClosedEvent, ConnectionClosedReason, PoolClearedEvent,
+        CmapEventHandler,
+        ConnectionClosedEvent,
+        ConnectionClosedReason,
+        PoolClearedEvent,
         PoolClosedEvent,
     },
     options::StreamAddress,
