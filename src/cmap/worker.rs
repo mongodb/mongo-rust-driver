@@ -3,20 +3,19 @@ use derivative::Derivative;
 use super::{
     conn::PendingConnection,
     connection_requester::{
-        ConnectionRequest,
-        ConnectionRequestReceiver,
-        ConnectionRequester,
-        RequestedConnection,
+        ConnectionRequest, ConnectionRequestReceiver, ConnectionRequester, RequestedConnection,
     },
     establish::ConnectionEstablisher,
     manager::{ManagementRequestReceiver, PoolManagementRequest, PoolManager},
     options::{ConnectionOptions, ConnectionPoolOptions},
-    Connection,
-    DEFAULT_MAX_POOL_SIZE,
+    Connection, DEFAULT_MAX_POOL_SIZE,
 };
 use crate::{
     error::{Error, Result},
-    event::cmap::{CmapEventHandler, ConnectionClosedReason, PoolClearedEvent, PoolClosedEvent},
+    event::cmap::{
+        CmapEventHandler, ConnectionClosedEvent, ConnectionClosedReason, PoolClearedEvent,
+        PoolClosedEvent,
+    },
     options::StreamAddress,
     runtime::HttpClient,
     RUNTIME,
@@ -328,8 +327,9 @@ impl ConnectionPoolWorker {
 
         conn.mark_as_available();
 
-        // Close the connection if it's stale.
-        if conn.is_stale(self.generation) {
+        if conn.has_errored() {
+            self.close_connection(conn, ConnectionClosedReason::Error);
+        } else if conn.is_stale(self.generation) {
             self.close_connection(conn, ConnectionClosedReason::Stale);
         } else if conn.is_executing() {
             self.close_connection(conn, ConnectionClosedReason::Dropped)
@@ -408,7 +408,9 @@ impl ConnectionPoolWorker {
                     )
                     .await;
 
-                    manager.handle_connection_succeeded(connection.ok());
+                    if let Ok(connection) = connection {
+                        manager.handle_connection_succeeded(Some(connection));
+                    }
                 });
             }
         }
@@ -424,10 +426,21 @@ async fn establish_connection(
     manager: &PoolManager,
     event_handler: Option<&Arc<dyn CmapEventHandler>>,
 ) -> Result<Connection> {
+    let connection_id = pending_connection.id;
+    let address = pending_connection.address.clone();
+
     let mut establish_result = establisher.establish_connection(pending_connection).await;
 
     match establish_result {
         Err(ref e) => {
+            if let Some(handler) = event_handler {
+                let event = ConnectionClosedEvent {
+                    address,
+                    reason: ConnectionClosedReason::Error,
+                    connection_id,
+                };
+                handler.handle_connection_closed_event(event);
+            }
             manager.handle_connection_failed(e.clone());
         }
         Ok(ref mut connection) => {

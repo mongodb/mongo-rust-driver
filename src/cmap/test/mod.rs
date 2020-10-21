@@ -228,10 +228,17 @@ impl Operation {
                         });
                 }
                 Operation::Clear => {
+                    let mut subscriber = state.handler.subscribe();
+
                     if let Some(pool) = state.pool.write().await.deref() {
                         pool.clear();
-                        // give some time for clear to happen.
-                        RUNTIME.delay_for(EVENT_DELAY).await;
+                        // wait for event to be emitted to ensure drop has completed.
+                        subscriber
+                            .wait_for_event(EVENT_TIMEOUT, |e| {
+                                matches!(e, Event::ConnectionPoolCleared(_))
+                            })
+                            .await
+                            .expect("did not receive ConnectionPoolCleared event after clearing pool");
                     }
                 }
                 Operation::Close => {
