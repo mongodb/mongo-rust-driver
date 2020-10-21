@@ -1,6 +1,6 @@
 pub mod options;
 
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
 use futures::stream::TryStreamExt;
 use serde::{de::DeserializeOwned, Serialize};
@@ -144,7 +144,7 @@ impl Database {
     /// used repeatedly without incurring any costs from I/O.
     pub fn collection_with_type<T>(&self, name: &str) -> Collection<T>
     where
-        T: Serialize + DeserializeOwned + Unpin,
+        T: Serialize + DeserializeOwned + Unpin + Debug,
     {
         Collection::new(self.clone(), name, None)
     }
@@ -171,7 +171,7 @@ impl Database {
         options: CollectionOptions,
     ) -> Collection<T>
     where
-        T: Serialize + DeserializeOwned + Unpin,
+        T: Serialize + DeserializeOwned + Unpin + Debug,
     {
         Collection::new(self.clone(), name, Some(options))
     }

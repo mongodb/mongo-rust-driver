@@ -2,11 +2,13 @@ mod options;
 #[cfg(test)]
 mod test;
 
-use serde::Deserialize;
+use std::fmt::Debug;
+
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use self::options::FindAndModifyOptions;
 use crate::{
-    bson::{doc, Bson, Document},
+    bson::{doc, from_document, Bson, Document},
     bson_util,
     cmap::{Command, CommandResponse, StreamDescription},
     coll::{
@@ -23,13 +25,20 @@ use crate::{
     options::WriteConcern,
 };
 
-pub(crate) struct FindAndModify {
+pub(crate) struct FindAndModify<T = Document>
+where
+    T: Serialize + DeserializeOwned + Unpin + Debug,
+{
     ns: Namespace,
     query: Document,
     options: FindAndModifyOptions,
+    _phantom: std::marker::PhantomData<T>,
 }
 
-impl FindAndModify {
+impl<T> FindAndModify<T>
+where
+    T: Serialize + DeserializeOwned + Unpin + Debug,
+{
     pub fn with_delete(
         ns: Namespace,
         query: Document,
@@ -37,7 +46,12 @@ impl FindAndModify {
     ) -> Self {
         let options =
             FindAndModifyOptions::from_find_one_and_delete_options(options.unwrap_or_default());
-        FindAndModify { ns, query, options }
+        FindAndModify {
+            ns,
+            query,
+            options,
+            _phantom: Default::default(),
+        }
     }
 
     pub fn with_replace(
@@ -51,7 +65,12 @@ impl FindAndModify {
             replacement,
             options.unwrap_or_default(),
         );
-        Ok(FindAndModify { ns, query, options })
+        Ok(FindAndModify {
+            ns,
+            query,
+            options,
+            _phantom: Default::default(),
+        })
     }
 
     pub fn with_update(
@@ -67,12 +86,20 @@ impl FindAndModify {
             update,
             options.unwrap_or_default(),
         );
-        Ok(FindAndModify { ns, query, options })
+        Ok(FindAndModify {
+            ns,
+            query,
+            options,
+            _phantom: Default::default(),
+        })
     }
 }
 
-impl Operation for FindAndModify {
-    type O = Option<Document>;
+impl<T> Operation for FindAndModify<T>
+where
+    T: Serialize + DeserializeOwned + Unpin + Debug,
+{
+    type O = Option<T>;
     const NAME: &'static str = "findAndModify";
 
     fn build(&self, description: &StreamDescription) -> Result<Command> {
@@ -113,7 +140,7 @@ impl Operation for FindAndModify {
     fn handle_response(&self, response: CommandResponse) -> Result<Self::O> {
         let body: ResponseBody = response.body()?;
         match body.value {
-            Bson::Document(doc) => Ok(Some(doc)),
+            Bson::Document(doc) => Ok(Some(from_document(doc)?)),
             Bson::Null => Ok(None),
             other => Err(ErrorKind::ResponseError {
                 message: format!(

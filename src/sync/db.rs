@@ -1,4 +1,7 @@
-use std::marker::{Send, Sync};
+use std::{
+    fmt::Debug,
+    marker::{Send, Sync},
+};
 
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -99,7 +102,7 @@ impl Database {
     /// used repeatedly without incurring any costs from I/O.
     pub fn collection_with_type<T>(&self, name: &str) -> Collection<T>
     where
-        T: Serialize + DeserializeOwned + Unpin + Send + Sync,
+        T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
     {
         Collection::new(self.async_database.collection_with_type(name))
     }
@@ -126,7 +129,7 @@ impl Database {
         options: CollectionOptions,
     ) -> Collection<T>
     where
-        T: Serialize + DeserializeOwned + Unpin + Send + Sync,
+        T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
     {
         Collection::new(
             self.async_database

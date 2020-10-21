@@ -1,4 +1,7 @@
-use std::marker::{Send, Sync};
+use std::{
+    fmt::Debug,
+    marker::{Send, Sync},
+};
 
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -72,14 +75,14 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct Collection<T = Document>
 where
-    T: Serialize + DeserializeOwned + Unpin + Send + Sync,
+    T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
 {
     async_collection: AsyncCollection<T>,
 }
 
 impl<T> Collection<T>
 where
-    T: Serialize + DeserializeOwned + Unpin + Send + Sync,
+    T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
 {
     pub(crate) fn new(async_collection: AsyncCollection<T>) -> Self {
         Self { async_collection }
@@ -88,7 +91,7 @@ where
     /// Gets a clone of the `Collection` with a different type `U`.
     pub fn clone_with_type<U>(&self) -> Collection<U>
     where
-        U: Serialize + DeserializeOwned + Unpin + Send + Sync,
+        U: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
     {
         Collection::new(self.async_collection.clone_with_type())
     }
