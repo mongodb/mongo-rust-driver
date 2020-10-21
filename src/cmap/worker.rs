@@ -2,6 +2,7 @@ use derivative::Derivative;
 
 use super::{
     conn::PendingConnection,
+    connection_requester,
     connection_requester::{
         ConnectionRequest,
         ConnectionRequestReceiver,
@@ -9,6 +10,7 @@ use super::{
         RequestedConnection,
     },
     establish::ConnectionEstablisher,
+    manager,
     manager::{ManagementRequestReceiver, PoolManagementRequest, PoolManager},
     options::{ConnectionOptions, ConnectionPoolOptions},
     Connection,
@@ -132,10 +134,10 @@ impl ConnectionPoolWorker {
             .as_ref()
             .map(|pool_options| ConnectionOptions::from(pool_options.clone()));
 
-        let (handle_listener, handle) = HandleListener::new();
+        let (handle, handle_listener) = handle_channel();
         let (connection_requester, request_receiver) =
-            ConnectionRequester::new(address.clone(), handle);
-        let (manager, management_receiver) = PoolManager::new();
+            connection_requester::channel(address.clone(), handle);
+        let (manager, management_receiver) = manager::channel();
 
         let worker = ConnectionPoolWorker {
             address,
@@ -498,11 +500,26 @@ impl From<PoolManagementRequest> for PoolTask {
     }
 }
 
+/// Constructs a new channel for for monitoring whether this pool still has references
+/// to it.
+fn handle_channel() -> (PoolWorkerHandle, HandleListener) {
+    let (sender, receiver) = mpsc::channel(1);
+    (PoolWorkerHandle { sender }, HandleListener { receiver })
+}
+
 /// Handle to the worker. Once all handles have been dropped, the worker
 /// will stop waiting for new requests and drop the pool itself.
 #[derive(Debug, Clone)]
 pub(super) struct PoolWorkerHandle {
     sender: mpsc::Sender<()>,
+}
+
+impl PoolWorkerHandle {
+    #[cfg(test)]
+    pub(super) fn new_mocked() -> Self {
+        let (s, _) = handle_channel();
+        s
+    }
 }
 
 /// Listener used to determine when all handles have been dropped.
@@ -512,11 +529,6 @@ struct HandleListener {
 }
 
 impl HandleListener {
-    fn new() -> (Self, PoolWorkerHandle) {
-        let (sender, receiver) = mpsc::channel(1);
-        (Self { receiver }, PoolWorkerHandle { sender })
-    }
-
     /// Listen until all handles are dropped.
     /// This will not return until all handles are dropped, so make sure to only poll this via
     /// select or with a timeout.

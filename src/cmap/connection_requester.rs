@@ -9,6 +9,22 @@ use crate::{
 };
 use std::time::Duration;
 
+/// Returns a new requester/receiver pair.
+pub(super) fn channel(
+    address: StreamAddress,
+    handle: PoolWorkerHandle,
+) -> (ConnectionRequester, ConnectionRequestReceiver) {
+    let (sender, receiver) = mpsc::unbounded_channel();
+    (
+        ConnectionRequester {
+            address,
+            sender,
+            handle,
+        },
+        ConnectionRequestReceiver::new(receiver),
+    )
+}
+
 /// Handle for requesting Connections from the pool.
 /// This requester will keep the pool alive. Once all requesters have been dropped,
 /// the pool will stop servicing requests, drop its available connections, and close.
@@ -20,22 +36,6 @@ pub(super) struct ConnectionRequester {
 }
 
 impl ConnectionRequester {
-    /// Returns a new requester/receiver pair.
-    pub(super) fn new(
-        address: StreamAddress,
-        handle: PoolWorkerHandle,
-    ) -> (Self, ConnectionRequestReceiver) {
-        let (sender, receiver) = mpsc::unbounded_channel();
-        (
-            Self {
-                address,
-                sender,
-                handle,
-            },
-            ConnectionRequestReceiver::new(receiver),
-        )
-    }
-
     /// Request a connection from the pool that owns the receiver end of this requester.
     /// Returns an error if it takes longer than wait_queue_timeout before either a connection is
     /// received or an establishment begins.

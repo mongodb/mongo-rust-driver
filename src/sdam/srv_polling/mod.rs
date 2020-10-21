@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use super::{
     monitor::DEFAULT_HEARTBEAT_FREQUENCY,
-    state::{Topology, TopologyState, WeakTopology},
+    state::{Topology, WeakTopology},
 };
 use crate::{
     error::{Error, Result},

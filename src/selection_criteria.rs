@@ -59,6 +59,7 @@ impl SelectionCriteria {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn is_read_pref_primary(&self) -> bool {
         matches!(self, Self::ReadPreference(ReadPreference::Primary))
     }

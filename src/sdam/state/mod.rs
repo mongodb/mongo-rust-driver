@@ -13,6 +13,7 @@ use tokio::sync::RwLock;
 
 use self::server::Server;
 use super::{
+    description::topology::server_selection::SelectedServer,
     message_manager::TopologyMessageSubscriber,
     SessionSupportStatus,
     TopologyDescription,
@@ -26,7 +27,7 @@ use crate::{
     sdam::{
         description::{
             server::{ServerDescription, ServerType},
-            topology::{TopologyDescriptionDiff, TopologyType},
+            topology::{server_selection, TopologyDescriptionDiff, TopologyType},
         },
         monitor::Monitor,
         srv_polling::SrvPollingMonitor,
@@ -164,22 +165,19 @@ impl Topology {
     /// Clones the underlying TopologyState. This will return a separate TopologyState than the one
     /// contained by this `Topology`, but it will share references to the same Servers (and by
     /// extension the connection pools).
-    pub(super) async fn clone_state(&self) -> TopologyState {
-        self.state.read().await.clone()
-    }
-
     /// Attempts to select a server with the given `criteria`, returning an error if the topology is
     /// not compatible with the driver.
     pub(crate) async fn attempt_to_select_server(
         &self,
         criteria: &SelectionCriteria,
-    ) -> Result<Option<Arc<Server>>> {
+    ) -> Result<Option<SelectedServer>> {
         let topology_state = self.state.read().await;
 
-        Ok(topology_state
-            .description
-            .select_server(criteria)?
-            .and_then(|server| topology_state.servers.get(&server.address).cloned()))
+        server_selection::attempt_to_select_server(
+            criteria,
+            &topology_state.description,
+            &topology_state.servers,
+        )
     }
 
     /// Creates a new server selection timeout error message given the `criteria`.
@@ -232,7 +230,7 @@ impl Topology {
         &self,
         error: Error,
         conn: &Connection,
-        server: Arc<Server>,
+        server: SelectedServer,
     ) {
         // If we encounter certain errors, we must update the topology as per the
         // SDAM spec.
@@ -283,7 +281,7 @@ impl Topology {
             &self.common.options,
             self.downgrade(),
         ) {
-            Ok(Some(diff)) => {
+            Ok(Some(_)) => {
                 self.common.message_manager.notify_topology_changed();
                 true
             }

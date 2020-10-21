@@ -11,7 +11,11 @@ pub use self::public::{ServerInfo, ServerType};
 #[cfg(test)]
 pub(crate) use self::description::server::ServerDescription;
 pub(crate) use self::{
-    description::topology::{SessionSupportStatus, TopologyDescription},
+    description::topology::{
+        server_selection::SelectedServer,
+        SessionSupportStatus,
+        TopologyDescription,
+    },
     message_manager::TopologyMessageManager,
     monitor::MIN_HEARTBEAT_FREQUENCY,
     state::{server::Server, Topology},

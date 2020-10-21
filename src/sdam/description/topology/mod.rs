@@ -1,4 +1,4 @@
-mod server_selection;
+pub(crate) mod server_selection;
 #[cfg(test)]
 mod test;
 

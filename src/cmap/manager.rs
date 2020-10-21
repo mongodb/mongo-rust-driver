@@ -3,19 +3,22 @@ use tokio::sync::mpsc;
 use super::Connection;
 use crate::error::Error;
 
+pub(super) fn channel() -> (PoolManager, ManagementRequestReceiver) {
+    let (sender, receiver) = mpsc::unbounded_channel();
+    (
+        PoolManager { sender },
+        ManagementRequestReceiver { receiver },
+    )
+}
+
 /// Struct used to make management requests to the pool (e.g. checking in a connection).
 /// A PoolManager will NOT keep a pool from going out of scope and closing.
 #[derive(Clone, Debug)]
 pub(super) struct PoolManager {
-    pub(super) sender: mpsc::UnboundedSender<PoolManagementRequest>,
+    sender: mpsc::UnboundedSender<PoolManagementRequest>,
 }
 
 impl PoolManager {
-    pub(super) fn new() -> (PoolManager, ManagementRequestReceiver) {
-        let (sender, receiver) = mpsc::unbounded_channel();
-        (Self { sender }, ManagementRequestReceiver { receiver })
-    }
-
     /// Lazily clear the pool.
     pub(super) fn clear(&self) {
         let _ = self.sender.send(PoolManagementRequest::Clear);

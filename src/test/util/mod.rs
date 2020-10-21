@@ -12,7 +12,10 @@ pub use self::{
 
 use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
 
-use crate::bson::{doc, oid::ObjectId, Bson};
+use crate::{
+    bson::{doc, oid::ObjectId, Bson},
+    selection_criteria::SelectionCriteria,
+};
 use semver::{Version, VersionReq};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -230,8 +233,12 @@ impl TestClient {
         version.matches(&self.server_version)
     }
 
-    pub async fn enable_failpoint(&self, fp: FailPoint) -> Result<FailPointGuard> {
-        fp.enable(self).await
+    pub async fn enable_failpoint(
+        &self,
+        fp: FailPoint,
+        criteria: impl Into<Option<SelectionCriteria>>,
+    ) -> Result<FailPointGuard> {
+        fp.enable(self, criteria).await
     }
 
     pub fn auth_enabled(&self) -> bool {

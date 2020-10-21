@@ -72,7 +72,11 @@ async fn acquire_connection_and_send_command() {
 async fn concurrent_connections() {
     let _guard = LOCK.run_exclusively().await;
 
-    let client = TestClient::new().await;
+    let mut options = CLIENT_OPTIONS.clone();
+    options.direct_connection = Some(true);
+    options.hosts.drain(1..);
+
+    let client = TestClient::with_options(Some(options)).await;
     let version = VersionReq::parse(">= 4.2.9").unwrap();
     // blockConnection failpoint option only supported in 4.2.9+.
     if !version.matches(&client.server_version) {
@@ -165,7 +169,7 @@ async fn connection_error_during_establishment() {
 
     let options = FailCommandOptions::builder().error_code(1234).build();
     let failpoint = FailPoint::fail_command(&["isMaster"], FailPointMode::Times(10), Some(options));
-    let _fp_guard = client.enable_failpoint(failpoint).await.unwrap();
+    let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
 
     let handler = Arc::new(EventHandler::new());
     let mut subscriber = handler.subscribe();
@@ -213,7 +217,7 @@ async fn connection_error_during_operation() {
 
     let options = FailCommandOptions::builder().close_connection(true).build();
     let failpoint = FailPoint::fail_command(&["ping"], FailPointMode::Times(10), Some(options));
-    let _fp_guard = client.enable_failpoint(failpoint).await.unwrap();
+    let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
 
     let mut subscriber = handler.subscribe();
 
