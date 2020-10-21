@@ -81,6 +81,10 @@ functions:
               export SSL=${SSL}
               export TOPOLOGY=${TOPOLOGY}
               export MONGODB_VERSION=${MONGODB_VERSION}
+
+              if [ "Windows_NT" != "$OS" ]; then
+                  ulimit -n 64000
+              fi
            EOT
            # See what we've done
            cat expansion.yml
