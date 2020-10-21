@@ -94,11 +94,6 @@ pub(crate) struct ConnectionPoolWorker {
 
     /// A pool manager that can be cloned and attached to connections checked out of the pool.
     manager: PoolManager,
-
-    /// An in-progress connection request that was not finished due to the pool being out of
-    /// available connections but at max_pool_size. When a connection is checked back in, it will
-    /// be used to fulfill this request before newer ones are processed.
-    unfinished_check_out: Option<ConnectionRequest>,
 }
 
 impl ConnectionPoolWorker {
@@ -152,7 +147,6 @@ impl ConnectionPoolWorker {
             request_receiver,
             management_receiver,
             manager: manager.clone(),
-            unfinished_check_out: None,
             handle_listener,
         };
 
@@ -170,28 +164,21 @@ impl ConnectionPoolWorker {
         let mut maintenance_interval = RUNTIME.interval(Duration::from_millis(500));
 
         loop {
-            // If there's an outstanding request and we can serve it, do so. Otherwise poll
-            // for a new request
-            let task = if self.unfinished_check_out.is_some()
-                && self.can_service_connection_request()
-            {
-                PoolTask::CheckOut(self.unfinished_check_out.take().unwrap())
-            } else {
-                tokio::select! {
-                    Some(result_sender) = self.request_receiver.recv(),
-                                        if self.can_service_connection_request() => PoolTask::CheckOut(result_sender),
-                    Some(request) = self.management_receiver.recv() => request.into(),
-                    _ = self.handle_listener.wait_for_all_handle_drops() => {
-                        // all worker handles have been dropped meaning this
-                        // pool has no more references and can be dropped itself.
-                        break
-                    },
-                    _ = maintenance_interval.tick() => {
-                        PoolTask::Maintenance
-                    },
-                    else => {
-                        break
-                    }
+            let task = tokio::select! {
+                Some(request) = self.request_receiver.recv(), if self.can_service_connection_request() => {
+                    PoolTask::CheckOut(request)
+                },
+                Some(request) = self.management_receiver.recv() => request.into(),
+                _ = self.handle_listener.wait_for_all_handle_drops() => {
+                    // all worker handles have been dropped meaning this
+                    // pool has no more references and can be dropped itself.
+                    break
+                },
+                _ = maintenance_interval.tick() => {
+                    PoolTask::Maintenance
+                },
+                else => {
+                    break
                 }
             };
 
@@ -288,7 +275,9 @@ impl ConnectionPoolWorker {
             let _: std::result::Result<_, _> =
                 request.fulfill(RequestedConnection::Establishing(handle));
         } else {
-            self.unfinished_check_out = Some(request)
+            // put the request in the receiver's cache so that it will be processed
+            // next time a request can be processed.
+            self.request_receiver.cache_request(request);
         }
     }
 
