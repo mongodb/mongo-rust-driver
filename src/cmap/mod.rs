@@ -31,6 +31,9 @@ use connection_requester::ConnectionRequester;
 use manager::PoolManager;
 use worker::ConnectionPoolWorker;
 
+#[cfg(test)]
+use self::worker::PoolWorkerHandle;
+
 const DEFAULT_MAX_POOL_SIZE: u32 = 100;
 
 /// A pool of connections implementing the CMAP spec. All state is kept internally in an `Arc`, and
@@ -41,6 +44,7 @@ pub(crate) struct ConnectionPool {
     address: StreamAddress,
     manager: PoolManager,
     connection_requester: ConnectionRequester,
+
     wait_queue_timeout: Option<Duration>,
 
     #[derivative(Debug = "ignore")]
@@ -72,6 +76,21 @@ impl ConnectionPool {
             connection_requester,
             wait_queue_timeout,
             event_handler,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn new_mocked(address: StreamAddress) -> Self {
+        let (manager, _) = manager::channel();
+        let handle = PoolWorkerHandle::new_mocked();
+        let (connection_requester, _) = connection_requester::channel(Default::default(), handle);
+
+        Self {
+            address,
+            manager,
+            connection_requester,
+            wait_queue_timeout: None,
+            event_handler: None,
         }
     }
 

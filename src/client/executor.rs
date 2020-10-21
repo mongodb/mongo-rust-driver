@@ -12,7 +12,7 @@ use crate::{
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
     operation::{Operation, Retryability},
     options::SelectionCriteria,
-    sdam::{Server, SessionSupportStatus},
+    sdam::{SelectedServer, SessionSupportStatus},
 };
 
 lazy_static! {
@@ -356,7 +356,7 @@ impl Client {
                 let criteria = SelectionCriteria::Predicate(Arc::new(move |server_info| {
                     server_info.server_type().is_data_bearing()
                 }));
-                let _: Arc<Server> = self.select_server(Some(&criteria)).await?;
+                let _: SelectedServer = self.select_server(Some(&criteria)).await?;
                 Ok(self.inner.topology.session_support_status().await)
             }
             _ => Ok(initial_status),

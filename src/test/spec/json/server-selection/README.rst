@@ -65,3 +65,45 @@ the TopologyDescription. Each YAML file contains a key for these stages of serve
 Drivers implementing server selection MUST test that their implementation
 correctly returns the set of servers in ``in_latency_window``. Drivers SHOULD also test
 against ``suitable_servers`` if possible.
+
+Selection Within Latency Window YAML Tests
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+These tests verify that servers select servers from within the latency
+window correctly. These tests MUST only be implemented by
+multi-threaded or async drivers.
+
+Each YAML file for these tests has the following format:
+
+- ``topology_description``: the state of a mocked cluster
+
+- ``mocked_topology_state``: array of objects containing the operationCounts for
+  each server included in ``topology_description``. Each element will have all
+  of the following fields:
+
+  - ``address``: a unique address identifying this server
+
+  - ``operation_count``: the ``operationCount`` for this server
+
+- ``iterations``: the number of selections that should be run as part of this
+   test
+
+- ``outcome``: an object describing the expected outcome of the selections
+
+  - ``tolerance``: the maximum difference between an observed frequency and an
+    expected one
+
+  - ``expected_frequencies``: a document whose keys are the server addresses
+    from the ``in_window`` array and values are numbers in [0, 1] indicating the
+    frequency at which the server should have been selected.
+
+For each file, create a new TopologyDescription object initialized with the
+values from ``topology_description`` and populate the operationCounts based on
+the information provided in ``mocked_topology_state``. Then, repeatedly select a
+server for a read operation using the mocked TopologyDescription and a "nearest"
+ReadPreference ``iterations`` times. Once ``iterations`` selections have been
+made, verify that each server was selected at a frequency within
+``outcome.tolerance`` of the expected frequency contained in
+``outcome.expected_frequencies`` for that server. If the expected frequency for
+a given server is 1 or 0, then the observed frequency MUST be exactly equal to
+the expected one.

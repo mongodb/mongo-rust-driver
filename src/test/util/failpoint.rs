@@ -7,7 +7,7 @@ use super::TestClient;
 use crate::{
     error::Result,
     operation::append_options,
-    options::{ReadPreference, SelectionCriteria},
+    selection_criteria::SelectionCriteria,
     RUNTIME,
 };
 
@@ -43,15 +43,20 @@ impl FailPoint {
         FailPoint { command }
     }
 
-    pub(super) async fn enable(self, client: &TestClient) -> Result<FailPointGuard> {
-        let selection_criteria = SelectionCriteria::ReadPreference(ReadPreference::Primary);
+    pub(super) async fn enable(
+        self,
+        client: &TestClient,
+        criteria: impl Into<Option<SelectionCriteria>>,
+    ) -> Result<FailPointGuard> {
+        let criteria = criteria.into();
         client
             .database("admin")
-            .run_command(self.command.clone(), selection_criteria)
+            .run_command(self.command.clone(), criteria.clone())
             .await?;
         Ok(FailPointGuard {
             failpoint_name: self.name().to_string(),
             client: client.clone(),
+            criteria,
         })
     }
 }
@@ -59,6 +64,7 @@ impl FailPoint {
 pub struct FailPointGuard {
     client: TestClient,
     failpoint_name: String,
+    criteria: Option<SelectionCriteria>,
 }
 
 impl Drop for FailPointGuard {
@@ -69,7 +75,10 @@ impl Drop for FailPointGuard {
         let result = RUNTIME.block_on(async move {
             client
                 .database("admin")
-                .run_command(doc! { "configureFailPoint": name, "mode": "off" }, None)
+                .run_command(
+                    doc! { "configureFailPoint": name, "mode": "off" },
+                    self.criteria.clone(),
+                )
                 .await
         });
 

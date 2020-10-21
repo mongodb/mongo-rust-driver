@@ -24,7 +24,7 @@ use crate::{
         ReadPreference,
         SelectionCriteria,
     },
-    sdam::{Server, SessionSupportStatus, Topology},
+    sdam::{SelectedServer, SessionSupportStatus, Topology},
 };
 pub(crate) use session::{ClientSession, ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS};
 use session::{ServerSession, ServerSessionPool};
@@ -246,7 +246,7 @@ impl Client {
 
     /// Select a server using the provided criteria. If none is provided, a primary read preference
     /// will be used instead.
-    async fn select_server(&self, criteria: Option<&SelectionCriteria>) -> Result<Arc<Server>> {
+    async fn select_server(&self, criteria: Option<&SelectionCriteria>) -> Result<SelectedServer> {
         let criteria =
             criteria.unwrap_or(&SelectionCriteria::ReadPreference(ReadPreference::Primary));
 
