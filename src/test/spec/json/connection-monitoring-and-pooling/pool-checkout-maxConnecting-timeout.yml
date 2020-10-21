@@ -8,7 +8,7 @@ runOn:
 failPoint:
   configureFailPoint: failCommand
   # high amount to ensure not interfered with by monitor checks.
-  mode: { times: 20 }
+  mode: { times: 50 }
   data:
     failCommands: ["isMaster"]
     closeConnection: false
@@ -16,6 +16,9 @@ failPoint:
     blockTimeMS: 750
 poolOptions:
   maxPoolSize: 10
+  # Drivers that limit connection establishment by waitQueueTimeoutMS may skip
+  # this test. While waitQueueTimeoutMS is technically not supposed to limit establishment time,
+  # it will soon be deprecated, so it is easier for those drivers to just skip this test.
   waitQueueTimeoutMS: 50
 operations:
   # start creating two connections simultaneously.
@@ -43,9 +46,6 @@ operations:
   # rejoin thread3, should experience error
   - name: waitForThread
     target: thread3
-  - name: waitForEvent
-    event: ConnectionReady
-    count: 2
 error:
   type: WaitQueueTimeoutError
   message: Timed out while checking out a connection from connection pool
@@ -58,10 +58,6 @@ events:
     address: 42
   - type: ConnectionCheckOutFailed
     reason: timeout
-    address: 42
-  - type: ConnectionReady
-    address: 42
-  - type: ConnectionReady
     address: 42
 ignore:
   - ConnectionCreated

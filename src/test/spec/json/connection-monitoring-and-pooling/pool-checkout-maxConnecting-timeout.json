@@ -10,7 +10,7 @@
   "failPoint": {
     "configureFailPoint": "failCommand",
     "mode": {
-      "times": 20
+      "times": 50
     },
     "data": {
       "failCommands": [
@@ -63,11 +63,6 @@
     {
       "name": "waitForThread",
       "target": "thread3"
-    },
-    {
-      "name": "waitForEvent",
-      "event": "ConnectionReady",
-      "count": 2
     }
   ],
   "error": {
@@ -90,14 +85,6 @@
     {
       "type": "ConnectionCheckOutFailed",
       "reason": "timeout",
-      "address": 42
-    },
-    {
-      "type": "ConnectionReady",
-      "address": 42
-    },
-    {
-      "type": "ConnectionReady",
       "address": 42
     }
   ],

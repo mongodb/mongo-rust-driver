@@ -8,7 +8,7 @@ runOn:
 failPoint:
   configureFailPoint: failCommand
   # high amount to ensure not interfered with by monitor checks.
-  mode: { times: 20 }
+  mode: { times: 50 }
   data:
     failCommands: ["isMaster"]
     closeConnection: false

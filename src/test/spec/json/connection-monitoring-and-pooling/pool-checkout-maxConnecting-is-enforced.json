@@ -10,7 +10,7 @@
   "failPoint": {
     "configureFailPoint": "failCommand",
     "mode": {
-      "times": 20
+      "times": 50
     },
     "data": {
       "failCommands": [
