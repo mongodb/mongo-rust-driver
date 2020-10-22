@@ -1,9 +1,9 @@
 pub mod options;
 
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
 use futures::stream::TryStreamExt;
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     bson::{Bson, Document},
@@ -144,7 +144,7 @@ impl Database {
     /// used repeatedly without incurring any costs from I/O.
     pub fn collection_with_type<T>(&self, name: &str) -> Collection<T>
     where
-        T: Serialize,
+        T: Serialize + DeserializeOwned + Unpin + Debug,
     {
         Collection::new(self.clone(), name, None)
     }
@@ -171,7 +171,7 @@ impl Database {
         options: CollectionOptions,
     ) -> Collection<T>
     where
-        T: Serialize,
+        T: Serialize + DeserializeOwned + Unpin + Debug,
     {
         Collection::new(self.clone(), name, Some(options))
     }
@@ -211,7 +211,7 @@ impl Database {
     ) -> Result<Vec<String>> {
         let list_collections =
             ListCollections::new(self.name().to_string(), filter.into(), true, None);
-        let cursor = self
+        let cursor: Cursor<Document> = self
             .client()
             .execute_cursor_operation(list_collections)
             .await

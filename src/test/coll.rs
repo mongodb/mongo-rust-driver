@@ -7,7 +7,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
-    bson::{doc, from_document, to_document, Bson, Document},
+    bson::{doc, to_document, Bson, Document},
     error::{ErrorKind, Result, WriteFailure},
     event::command::CommandStartedEvent,
     options::{
@@ -797,7 +797,7 @@ async fn typed_insert_one() {
 
 async fn insert_one_and_find<T>(coll: &Collection<T>, insert_data: T)
 where
-    T: Serialize + DeserializeOwned + Clone + PartialEq + Debug,
+    T: Serialize + DeserializeOwned + Clone + PartialEq + Debug + Unpin,
 {
     coll.insert_one(insert_data.clone(), None).await.unwrap();
     let result = coll
@@ -806,7 +806,6 @@ where
         .unwrap();
     match result {
         Some(actual) => {
-            let actual: T = from_document(actual).unwrap();
             assert_eq!(actual, insert_data);
         }
         None => panic!("find_one should return a value"),
@@ -837,17 +836,13 @@ async fn typed_insert_many() {
     coll.insert_many(insert_data.clone(), None).await.unwrap();
 
     let options = FindOptions::builder().sort(doc! { "x": 1 }).build();
-    let docs: Vec<Document> = coll
+    let actual: Vec<UserType> = coll
         .find(doc! { "x": 2 }, options)
         .await
         .unwrap()
         .try_collect()
         .await
         .unwrap();
-    let actual: Vec<UserType> = docs
-        .iter()
-        .map(|doc| from_document(doc.clone()).unwrap())
-        .collect();
     assert_eq!(actual, insert_data);
 }
 
@@ -877,11 +872,9 @@ async fn typed_find_one_and_replace() {
         .await
         .unwrap()
         .unwrap();
-    let result: UserType = from_document(result).unwrap();
     assert_eq!(result, insert_data);
 
     let result = coll.find_one(doc! { "x": 2 }, None).await.unwrap().unwrap();
-    let result: UserType = from_document(result).unwrap();
     assert_eq!(result, replacement);
 }
 
@@ -910,6 +903,43 @@ async fn typed_replace_one() {
         .unwrap();
 
     let result = coll.find_one(doc! { "x": 2 }, None).await.unwrap().unwrap();
-    let result: UserType = from_document(result).unwrap();
     assert_eq!(result, replacement);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn typed_returns() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+    let coll = client
+        .init_db_and_typed_coll(function_name!(), function_name!())
+        .await;
+
+    let insert_data = UserType {
+        x: 1,
+        str: "a".into(),
+    };
+    coll.insert_one(insert_data.clone(), None).await.unwrap();
+
+    let result = coll
+        .find_one_and_update(doc! { "x": 1 }, doc! { "$inc": { "x": 1 } }, None)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(result, insert_data);
+
+    let result = coll
+        .find_one_and_delete(doc! { "x": 2 }, None)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        result,
+        UserType {
+            x: 2,
+            str: "a".into()
+        }
+    );
 }

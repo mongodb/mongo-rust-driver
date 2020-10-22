@@ -14,7 +14,7 @@ use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
 
 use crate::bson::{doc, oid::ObjectId, Bson};
 use semver::{Version, VersionReq};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use self::event::EventHandler;
 use super::CLIENT_OPTIONS;
@@ -178,7 +178,7 @@ impl TestClient {
 
     pub async fn init_db_and_typed_coll<T>(&self, db_name: &str, coll_name: &str) -> Collection<T>
     where
-        T: Serialize,
+        T: Serialize + DeserializeOwned + Unpin + Debug,
     {
         let coll = self.database(db_name).collection_with_type(coll_name);
         drop_collection(&coll).await;
@@ -285,7 +285,7 @@ impl TestClient {
 
 pub async fn drop_collection<T>(coll: &Collection<T>)
 where
-    T: Serialize,
+    T: Serialize + DeserializeOwned + Unpin + Debug,
 {
     match coll.drop(None).await.as_ref().map_err(|e| e.as_ref()) {
         Err(ErrorKind::CommandError(CommandError { code: 26, .. })) | Ok(_) => {}

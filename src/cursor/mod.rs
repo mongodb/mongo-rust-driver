@@ -9,9 +9,10 @@ use std::{
 };
 
 use futures::{future::BoxFuture, Stream};
+use serde::de::DeserializeOwned;
 
 use crate::{
-    bson::Document,
+    bson::{from_document, Document},
     client::ClientSession,
     error::Result,
     operation::GetMore,
@@ -82,12 +83,19 @@ use common::{GenericCursor, GetMoreProvider, GetMoreProviderResult};
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Cursor {
+pub struct Cursor<T = Document>
+where
+    T: DeserializeOwned + Unpin,
+{
     client: Client,
     wrapped_cursor: ImplicitSessionCursor,
+    _phantom: std::marker::PhantomData<T>,
 }
 
-impl Cursor {
+impl<T> Cursor<T>
+where
+    T: DeserializeOwned + Unpin,
+{
     pub(crate) fn new(
         client: Client,
         spec: CursorSpecification,
@@ -98,19 +106,32 @@ impl Cursor {
         Self {
             client: client.clone(),
             wrapped_cursor: ImplicitSessionCursor::new(client, spec, provider),
+            _phantom: Default::default(),
         }
     }
 }
 
-impl Stream for Cursor {
-    type Item = Result<Document>;
+impl<T> Stream for Cursor<T>
+where
+    T: DeserializeOwned + Unpin,
+{
+    type Item = Result<T>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.wrapped_cursor).poll_next(cx)
+        let next = Pin::new(&mut self.wrapped_cursor).poll_next(cx);
+        match next {
+            Poll::Ready(opt) => Poll::Ready(
+                opt.map(|result| result.and_then(|doc| from_document(doc).map_err(Into::into))),
+            ),
+            Poll::Pending => Poll::Pending,
+        }
     }
 }
 
-impl Drop for Cursor {
+impl<T> Drop for Cursor<T>
+where
+    T: DeserializeOwned + Unpin,
+{
     fn drop(&mut self) {
         if self.wrapped_cursor.is_exhausted() {
             return;
