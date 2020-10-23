@@ -11,7 +11,7 @@ use super::common::{
 };
 use crate::{
     bson::Document,
-    client::{ClientSession, OperationResult},
+    client::{ClientSession, CursorResponse},
     cmap::Connection,
     cursor::CursorSpecification,
     error::Result,
@@ -35,7 +35,7 @@ pub(crate) struct SessionCursor {
 impl SessionCursor {
     fn new(
         client: Client,
-        spec: OperationResult<CursorSpecification>,
+        spec: CursorResponse<CursorSpecification>,
         request_exhaust: bool,
     ) -> Self {
         let exhausted = spec.response.id() == 0;

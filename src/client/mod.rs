@@ -26,7 +26,7 @@ use crate::{
     },
     sdam::{Server, SessionSupportStatus, Topology},
 };
-pub(crate) use executor::OperationResult;
+pub(crate) use executor::CursorResponse;
 pub(crate) use session::{ClientSession, ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS};
 use session::{ServerSession, ServerSessionPool};
 
@@ -162,7 +162,7 @@ impl Client {
         options: impl Into<Option<ListDatabasesOptions>>,
     ) -> Result<Vec<Document>> {
         let op = ListDatabases::new(filter.into(), false, options.into());
-        self.execute_operation(op).await.map(|r| r.response)
+        self.execute_operation(op).await
     }
 
     /// Gets the names of the databases present in the cluster the Client is connected to.
@@ -172,7 +172,7 @@ impl Client {
         options: impl Into<Option<ListDatabasesOptions>>,
     ) -> Result<Vec<String>> {
         let op = ListDatabases::new(filter.into(), true, options.into());
-        match self.execute_operation(op).await.map(|r| r.response) {
+        match self.execute_operation(op).await {
             Ok(databases) => databases
                 .into_iter()
                 .map(|doc| {

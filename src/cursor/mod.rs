@@ -15,7 +15,7 @@ use serde::de::DeserializeOwned;
 
 use crate::{
     bson::{from_document, Document},
-    client::{ClientSession, OperationResult},
+    client::{ClientSession, CursorResponse},
     cmap::Connection,
     error::Result,
     operation::GetMore,
@@ -101,12 +101,11 @@ where
 {
     pub(crate) fn new(
         client: Client,
-        spec: OperationResult<CursorSpecification>,
-        session: Option<ClientSession>,
+        spec: CursorResponse<CursorSpecification>,
         request_exhaust: bool,
     ) -> Self {
         let provider =
-            ImplicitSessionGetMoreProvider::new(&spec.response, session, request_exhaust);
+            ImplicitSessionGetMoreProvider::new(&spec.response, spec.session, request_exhaust);
 
         Self {
             client: client.clone(),
@@ -259,7 +258,7 @@ impl GetMoreProvider for ImplicitSessionGetMoreProvider {
                                 .execute_operation_with_session(get_more, session)
                                 .await
                         }
-                        (None, None) => client.execute_operation(get_more).await,
+                        (None, None) => client.execute_cursor_operation(get_more).await,
                     };
 
                     ImplicitSessionGetMoreResult {

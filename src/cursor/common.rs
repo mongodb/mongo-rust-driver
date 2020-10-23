@@ -10,7 +10,7 @@ use futures::{Future, Stream};
 
 use crate::{
     bson::Document,
-    client::OperationResult,
+    client::CursorResponse,
     cmap::Connection,
     error::{ErrorKind, Result},
     operation::GetMore,
@@ -227,7 +227,7 @@ pub(crate) struct CursorInformation {
 /// Reads a `getMore` response form the server without sending a `getMore` command.
 pub(super) async fn read_exhaust_get_more(
     mut conn: Connection,
-) -> Result<OperationResult<GetMoreResult>> {
+) -> Result<CursorResponse<GetMoreResult>> {
     let response = conn.read_response().await?;
 
     let connection = if response.more_to_come {
@@ -238,8 +238,9 @@ pub(super) async fn read_exhaust_get_more(
 
     let get_more_result = GetMore::handle_response(response)?;
 
-    Ok(OperationResult {
+    Ok(CursorResponse {
         response: get_more_result,
         connection,
+        session: None,
     })
 }

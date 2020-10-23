@@ -33,13 +33,15 @@ lazy_static! {
 
 /// The result of executing an operation.
 #[derive(Debug)]
-pub(crate) struct OperationResult<T: Debug> {
+pub(crate) struct CursorResponse<T: Debug> {
     /// The response from the server.
     pub(crate) response: T,
 
     /// The connection used for the operation. This will _only_ be present if the server's response
     /// contained the `moreToCome` flag.
     pub(crate) connection: Option<Connection>,
+
+    pub(crate) session: Option<ClientSession>,
 }
 
 /// A wrapped response to an operation.
@@ -58,10 +60,7 @@ impl Client {
     /// Server selection will performed using the criteria specified on the operation, if any, and
     /// an implicit session will be created if the operation and write concern are compatible with
     /// sessions.
-    pub(crate) async fn execute_operation<T: Operation>(
-        &self,
-        op: T,
-    ) -> Result<OperationResult<T::O>> {
+    pub(crate) async fn execute_operation<T: Operation>(&self, op: T) -> Result<T::O> {
         // TODO RUST-9: allow unacknowledged write concerns
         if !op.is_acknowledged() {
             return Err(ErrorKind::ArgumentError {
@@ -72,6 +71,7 @@ impl Client {
         let mut implicit_session = self.start_implicit_session(&op).await?;
         self.execute_operation_with_retry(op, implicit_session.as_mut())
             .await
+            .map(|r| r.response)
     }
 
     /// Execute the given operation, returning the implicit session created for it if one was.
@@ -80,11 +80,14 @@ impl Client {
     pub(crate) async fn execute_cursor_operation<T: Operation>(
         &self,
         op: T,
-    ) -> Result<(OperationResult<T::O>, Option<ClientSession>)> {
+    ) -> Result<CursorResponse<T::O>> {
         let mut implicit_session = self.start_implicit_session(&op).await?;
         self.execute_operation_with_retry(op, implicit_session.as_mut())
             .await
-            .map(|result| (result, implicit_session))
+            .map(|mut result| {
+                result.session = implicit_session;
+                result
+            })
     }
 
     /// Execute the given operation with the given session.
@@ -93,7 +96,7 @@ impl Client {
         &self,
         op: T,
         session: &mut ClientSession,
-    ) -> Result<OperationResult<T::O>> {
+    ) -> Result<CursorResponse<T::O>> {
         self.execute_operation_with_retry(op, Some(session)).await
     }
 
@@ -103,7 +106,7 @@ impl Client {
         &self,
         op: T,
         mut session: Option<&mut ClientSession>,
-    ) -> Result<OperationResult<T::O>> {
+    ) -> Result<CursorResponse<T::O>> {
         let server = self.select_server(op.selection_criteria()).await?;
 
         let mut conn = match server.checkout_connection().await {
@@ -132,22 +135,17 @@ impl Client {
         {
             Ok(OperationResponse {
                 response,
-                more_to_come: false,
+                more_to_come,
             }) => {
-                return Ok(OperationResult {
+                let connection = if more_to_come { Some(conn) } else { None };
+
+                return Ok(CursorResponse {
                     response,
-                    connection: None,
+                    connection,
+                    session: None,
                 });
             }
-            Ok(OperationResponse {
-                response,
-                more_to_come: true,
-            }) => {
-                return Ok(OperationResult {
-                    response,
-                    connection: Some(conn),
-                });
-            }
+
             Err(err) => {
                 self.inner
                     .topology
@@ -214,22 +212,17 @@ impl Client {
         {
             Ok(OperationResponse {
                 response,
-                more_to_come: false,
+                more_to_come,
             }) => {
-                return Ok(OperationResult {
+                let connection = if more_to_come { Some(conn) } else { None };
+
+                return Ok(CursorResponse {
                     response,
-                    connection: None,
+                    connection,
+                    session: None,
                 });
             }
-            Ok(OperationResponse {
-                response,
-                more_to_come: true,
-            }) => {
-                return Ok(OperationResult {
-                    response,
-                    connection: Some(conn),
-                });
-            }
+
             Err(err) => {
                 self.inner
                     .topology

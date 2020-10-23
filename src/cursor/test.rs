@@ -41,9 +41,9 @@ async fn exhaust_test() {
         ),
     );
 
-    let operation_result = client.execute_operation(op).await.unwrap();
+    let cursor_response = client.execute_cursor_operation(op).await.unwrap();
 
-    let mut cursor: Cursor = Cursor::new(client.client.into_client(), operation_result, None, true);
+    let mut cursor: Cursor = Cursor::new(client.client.into_client(), cursor_response, true);
 
     for i in 1i32..=20 {
         let doc = cursor.try_next().await.unwrap().unwrap();
