@@ -54,8 +54,6 @@ impl Operation for Aggregate {
             if let Ok(cursor_doc) = body.get_document_mut("cursor") {
                 cursor_doc.remove("batchSize");
             }
-        } else {
-            body.remove("writeConcern");
         }
 
         Ok(Command::new(

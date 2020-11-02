@@ -264,17 +264,19 @@ where
                 .build()
         });
 
-        let result = match self
-            .aggregate(pipeline, aggregate_options)
-            .await?
-            .next()
+        let aggregate = Aggregate::new(self.namespace(), pipeline, aggregate_options);
+        let client = self.client();
+        let result = client
+            .execute_operation(aggregate)
             .await
-        {
-            Some(doc) => doc?,
+            .map(|mut spec| spec.initial_buffer.pop_front())?;
+
+        let result_doc = match result {
+            Some(doc) => doc,
             None => return Ok(0),
         };
 
-        let n = match result.get("n") {
+        let n = match result_doc.get("n") {
             Some(n) => n,
             None => {
                 return Err(ErrorKind::ResponseError {
