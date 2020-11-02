@@ -1,6 +1,8 @@
 mod async_read_ext;
 mod async_write_ext;
 mod http;
+#[cfg(feature = "async-std-runtime")]
+mod interval;
 mod join_handle;
 mod resolver;
 mod stream;
@@ -19,6 +21,10 @@ use crate::{
     options::StreamAddress,
 };
 pub(crate) use http::HttpClient;
+#[cfg(feature = "async-std-runtime")]
+use interval::Interval;
+#[cfg(feature = "tokio-runtime")]
+use tokio::time::Interval;
 
 /// An abstract handle to the async runtime.
 #[derive(Clone, Copy, Debug)]
@@ -126,6 +132,18 @@ impl AsyncRuntime {
             async_std::future::timeout(timeout, future)
                 .await
                 .map_err(|_| ErrorKind::Io(std::io::ErrorKind::TimedOut.into()).into())
+        }
+    }
+
+    /// Create a new `Interval` that yields with interval of `duration`.
+    /// See: https://docs.rs/tokio/latest/tokio/time/fn.interval.html
+    pub(crate) fn interval(self, duration: Duration) -> Interval {
+        match self {
+            #[cfg(feature = "tokio-runtime")]
+            Self::Tokio => tokio::time::interval(duration),
+
+            #[cfg(feature = "async-std-runtime")]
+            Self::AsyncStd => Interval::new(duration),
         }
     }
 

@@ -10,7 +10,7 @@ mod spec;
 mod util;
 
 pub(crate) use self::{
-    spec::{run_spec_test, run_v2_test, AnyTestOperation, OperationObject, TestEvent},
+    spec::{run_spec_test, run_v2_test, AnyTestOperation, OperationObject, RunOn, TestEvent},
     util::{
         assert_matches,
         CommandEvent,

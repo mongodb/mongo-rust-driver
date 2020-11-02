@@ -8,7 +8,7 @@ use crate::{client::auth::Credential, error::Result, runtime::HttpClient};
 
 /// Contains the logic to establish a connection, including handshaking, authenticating, and
 /// potentially more.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(super) struct ConnectionEstablisher {
     /// Contains the logic for handshaking a connection.
     handshaker: Handshaker,

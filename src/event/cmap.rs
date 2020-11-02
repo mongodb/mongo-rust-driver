@@ -63,7 +63,7 @@ pub struct ConnectionCreatedEvent {
 
     /// The unique ID of the connection. This is not used for anything internally, but can be used
     /// to identify other events related to this connection.
-    #[serde(default)]
+    #[serde(default = "default_connection_id")]
     pub connection_id: u32,
 }
 
@@ -80,7 +80,7 @@ pub struct ConnectionReadyEvent {
 
     /// The unique ID of the connection. This is not used for anything internally, but can be used
     /// to identify other events related to this connection.
-    #[serde(default)]
+    #[serde(default = "default_connection_id")]
     pub connection_id: u32,
 }
 
@@ -172,7 +172,7 @@ pub struct ConnectionCheckedOutEvent {
 
     /// The unique ID of the connection. This is not used for anything internally, but can be used
     /// to identify other events related to this connection.
-    #[serde(default)]
+    #[serde(default = "default_connection_id")]
     pub connection_id: u32,
 }
 
@@ -188,8 +188,14 @@ pub struct ConnectionCheckedInEvent {
 
     /// The unique ID of the connection. This is not used for anything internally, but can be used
     /// to identify other events related to this connection.
-    #[serde(default)]
+    #[serde(default = "default_connection_id")]
     pub connection_id: u32,
+}
+
+/// The default connection ID to use for deserialization of events from test files.
+/// This value will "match" any connection ID.
+fn default_connection_id() -> u32 {
+    42
 }
 
 /// Applications can implement this trait to specify custom logic to run on each CMAP event sent

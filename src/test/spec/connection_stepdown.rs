@@ -1,4 +1,4 @@
-use std::future::Future;
+use std::{future::Future, time::Duration};
 
 use futures::stream::StreamExt;
 use tokio::sync::RwLockWriteGuard;
@@ -18,6 +18,7 @@ use crate::{
     test::{util::EventClient, LOCK},
     Collection,
     Database,
+    RUNTIME,
 };
 
 async fn run_test<F: Future>(name: &str, test: impl Fn(EventClient, Database, Collection) -> F) {
@@ -100,6 +101,7 @@ async fn get_more() {
                 .expect("cursor iteration should have succeeded");
         }
 
+        RUNTIME.delay_for(Duration::from_millis(250)).await;
         assert!(client.pool_cleared_events.read().unwrap().is_empty());
     }
 
@@ -145,6 +147,7 @@ async fn not_master_keep_pool() {
             .await
             .expect("insert should have succeeded");
 
+        RUNTIME.delay_for(Duration::from_millis(250)).await;
         assert!(client.pool_cleared_events.read().unwrap().is_empty());
     }
 
@@ -186,6 +189,7 @@ async fn not_master_reset_pool() {
             "insert should have failed"
         );
 
+        RUNTIME.delay_for(Duration::from_millis(250)).await;
         assert!(client.pool_cleared_events.read().unwrap().len() == 1);
 
         coll.insert_one(doc! { "test": 1 }, None)
@@ -230,6 +234,7 @@ async fn shutdown_in_progress() {
             "insert should have failed"
         );
 
+        RUNTIME.delay_for(Duration::from_millis(250)).await;
         assert!(client.pool_cleared_events.read().unwrap().len() == 1);
 
         coll.insert_one(doc! { "test": 1 }, None)
@@ -274,11 +279,14 @@ async fn interrupted_at_shutdown() {
             "insert should have failed"
         );
 
+        RUNTIME.delay_for(Duration::from_millis(250)).await;
         assert!(client.pool_cleared_events.read().unwrap().len() == 1);
 
         coll.insert_one(doc! { "test": 1 }, None)
             .await
             .expect("insert should have succeeded");
+
+        RUNTIME.delay_for(Duration::from_millis(250)).await;
     }
 
     run_test(function_name!(), interrupted_at_shutdown_test).await;

@@ -6,7 +6,7 @@ use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 
 use futures::future::{BoxFuture, FutureExt};
 
-use tokio::sync::{RwLock, RwLockReadGuard};
+use tokio::sync::{Mutex, RwLock, RwLockWriteGuard};
 
 use self::{
     event::{Event, EventHandler},
@@ -18,9 +18,10 @@ use crate::{
     error::{Error, Result},
     options::TlsOptions,
     runtime::AsyncJoinHandle,
-    test::{assert_matches, run_spec_test, Matchable, CLIENT_OPTIONS, LOCK},
+    test::{assert_matches, run_spec_test, EventClient, Matchable, CLIENT_OPTIONS, LOCK},
     RUNTIME,
 };
+use bson::doc;
 
 const TEST_DESCRIPTIONS_TO_SKIP: &[&str] = &[
     "must destroy checked in connection if pool has been closed",
@@ -52,6 +53,7 @@ struct Executor {
 struct State {
     handler: Arc<EventHandler>,
     connections: RwLock<HashMap<String, Connection>>,
+    unlabeled_connections: Mutex<Vec<Connection>>,
     threads: RwLock<HashMap<String, AsyncJoinHandle<Result<()>>>>,
 
     // In order to drop the pool when performing a `close` operation, we use an `Option` so that we
@@ -89,6 +91,7 @@ impl Executor {
             pool: RwLock::new(None),
             connections: Default::default(),
             threads: Default::default(),
+            unlabeled_connections: Mutex::new(Default::default()),
         };
 
         Self {
@@ -184,14 +187,9 @@ impl Operation {
                     state.threads.write().await.insert(target, task.unwrap());
                 }
                 Operation::Wait { ms } => RUNTIME.delay_for(Duration::from_millis(ms)).await,
-                Operation::WaitForThread { target } => state
-                    .threads
-                    .write()
-                    .await
-                    .remove(&target)
-                    .unwrap()
-                    .await
-                    .expect("polling the future should not fail")?,
+                Operation::WaitForThread { target } => {
+                    state.threads.write().await.remove(&target).unwrap().await?
+                }
                 Operation::WaitForEvent { event, count } => {
                     while state.count_events(&event) < count {
                         RUNTIME.delay_for(Duration::from_millis(100)).await;
@@ -199,12 +197,12 @@ impl Operation {
                 }
                 Operation::CheckOut { label } => {
                     if let Some(pool) = state.pool.read().await.deref() {
-                        let mut conn = pool.check_out().await?;
+                        let conn = pool.check_out().await?;
 
                         if let Some(label) = label {
                             state.connections.write().await.insert(label, conn);
                         } else {
-                            conn.pool.take();
+                            state.unlabeled_connections.lock().await.push(conn);
                         }
                     }
                 }
@@ -230,8 +228,17 @@ impl Operation {
                         });
                 }
                 Operation::Clear => {
+                    let mut subscriber = state.handler.subscribe();
+
                     if let Some(pool) = state.pool.write().await.deref() {
                         pool.clear();
+                        // wait for event to be emitted to ensure drop has completed.
+                        subscriber
+                            .wait_for_event(EVENT_TIMEOUT, |e| {
+                                matches!(e, Event::ConnectionPoolCleared(_))
+                            })
+                            .await
+                            .expect("did not receive ConnectionPoolCleared event after clearing pool");
                     }
                 }
                 Operation::Close => {
@@ -327,10 +334,44 @@ async fn cmap_spec_tests() {
             return;
         }
 
-        let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+        let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
+
+        let mut options = CLIENT_OPTIONS.clone();
+        options.hosts.drain(1..);
+        options.direct_connection = Some(true);
+        let client = EventClient::with_options(options).await;
+        if let Some(ref run_on) = test_file.run_on {
+            let can_run_on = run_on.iter().any(|run_on| run_on.can_run_on(&client));
+            if !can_run_on {
+                return;
+            }
+        }
+
+        let should_disable_fp = test_file.fail_point.is_some();
+        if let Some(ref fail_point) = test_file.fail_point {
+            client
+                .database("admin")
+                .run_command(fail_point.clone(), None)
+                .await
+                .unwrap();
+        }
 
         let executor = Executor::new(test_file);
         executor.execute_test().await;
+
+        if should_disable_fp {
+            client
+                .database("admin")
+                .run_command(
+                    doc! {
+                        "configureFailPoint": "failCommand",
+                        "mode": "off"
+                    },
+                    None,
+                )
+                .await
+                .unwrap();
+        }
     }
 
     run_spec_test(&["connection-monitoring-and-pooling"], run_cmap_spec_tests).await;
