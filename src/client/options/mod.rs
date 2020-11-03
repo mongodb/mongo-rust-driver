@@ -238,9 +238,11 @@ pub struct ServerApi {
     pub version: ServerApiVersion,
 
     /// Whether the server should return errors for features that are not part of the API version
+    #[builder(default)]
     pub strict: Option<bool>,
 
     /// Whether the server should return errors for deprecated features
+    #[builder(default)]
     pub deprecation_errors: Option<bool>,
 }
 
