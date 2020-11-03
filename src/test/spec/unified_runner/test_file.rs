@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use std::str::FromStr;
+
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Deserializer};
 
@@ -181,7 +183,8 @@ where
 
     let server_api = ServerApi {
         version: match server_api.get_str("version") {
-            Ok(v) => ServerApiVersion::from_string(v),
+            Ok(v) => ServerApiVersion::from_str(v).unwrap(),
+            Err(ValueAccessError::NotPresent) => panic!("Need to provide server API version"),
             _ => panic!("Invalid server API version given")
         },
         strict: match server_api.get_bool("strict") {

@@ -3,7 +3,7 @@ mod test;
 
 use std::{
     collections::HashSet,
-    fmt,
+    fmt::{self, Display, Formatter},
     fs::File,
     hash::{Hash, Hasher},
     io::{BufReader, Seek, SeekFrom},
@@ -208,17 +208,24 @@ pub enum ServerApiVersion {
     Version1,
 }
 
-impl ServerApiVersion {
-    pub fn from_string (version: &str) -> Self {
-        match version {
-            "1" => Self::Version1,
-            _ => panic!("Invalid server API version given")
+impl FromStr for ServerApiVersion {
+    type Err = crate::error::Error;
+
+    fn from_str(str: &str) -> Result<Self> {
+        match str {
+            "1" => Ok(Self::Version1),
+            _ => Err(ErrorKind::ArgumentError {
+                message: format!("invalid server api version string: {}", str),
+            }
+            .into())
         }
     }
+}
 
-    pub(crate) fn as_str(&self) -> &str {
+impl Display for ServerApiVersion {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Self::Version1 => "1",
+            Self::Version1 => write!(f, "1"),
         }
     }
 }
@@ -239,7 +246,7 @@ pub struct ServerApi {
 
 impl ServerApi {
     pub(crate) fn append_to_command(&self, command: &mut Document) {
-        command.insert("apiVersion", self.version.as_str());
+        command.insert("apiVersion", format!("{}", self.version));
 
         if let Some(strict) = self.strict {
             command.insert("apiStrict", strict);
