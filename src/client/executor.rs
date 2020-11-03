@@ -246,21 +246,17 @@ impl Client {
         let connection_info = connection.info();
         let request_id = crate::cmap::conn::next_request_id();
 
+        if let Some(ref server_api) = self.inner.options.server_api {
+            cmd.set_server_api(server_api);
+        }
+
         self.emit_command_event(|handler| {
             let should_redact = REDACTED_COMMANDS.contains(cmd.name.to_lowercase().as_str());
 
             let command_body = if should_redact {
                 Document::new()
             } else {
-                // Append versioned API fields
-                let mut body = cmd.body.clone();
-                if let Some(ref server_api) = self.inner.options.server_api {
-                    if server_api.applies_to_command(cmd.name.as_str()) {
-                        server_api.append_to_command(&mut body);
-                    }
-                }
-
-                body
+                cmd.body.clone()
             };
             let command_started_event = CommandStartedEvent {
                 command: command_body,

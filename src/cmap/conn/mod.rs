@@ -241,10 +241,14 @@ impl Connection {
     /// itself.
     pub(crate) async fn send_command(
         &mut self,
-        command: Command,
+        mut command: Command,
         request_id: impl Into<Option<i32>>,
     ) -> Result<CommandResponse> {
-        let message = Message::with_command(command, request_id.into(), &self.server_api);
+        if let Some(server_api) = &self.server_api {
+            command.set_server_api(&server_api);
+        }
+
+        let message = Message::with_command(command, request_id.into());
 
         self.command_executing = true;
         let write_result = message.write_to(&mut self.stream).await;
