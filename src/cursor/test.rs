@@ -18,6 +18,11 @@ fn doc_x(i: i32) -> Document {
 #[function_name::named]
 async fn exhaust_test() {
     let client = EventClient::new().await;
+
+    if client.server_version_lt(4, 2) {
+        return;
+    }
+
     let events = client.command_events.clone();
 
     let coll = client

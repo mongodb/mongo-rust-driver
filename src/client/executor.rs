@@ -216,11 +216,11 @@ impl Client {
             }) => {
                 let connection = if more_to_come { Some(conn) } else { None };
 
-                return Ok(CursorResponse {
+                Ok(CursorResponse {
                     response,
                     connection,
                     session: None,
-                });
+                })
             }
 
             Err(err) => {
