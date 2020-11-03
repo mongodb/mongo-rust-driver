@@ -4,7 +4,7 @@ use super::Cursor;
 use crate::{
     bson::{doc, Document},
     operation::{Find, GetMoreResponseBody},
-    options::FindOptions,
+    options::{Acknowledgment, FindOptions, InsertManyOptions, ReadConcern, WriteConcern},
     test::EventClient,
     Namespace,
 };
@@ -30,7 +30,14 @@ async fn exhaust_test() {
         .await;
 
     let docs = (1i32..=20).map(doc_x);
-    coll.insert_many(docs, None).await.unwrap();
+    coll.insert_many(
+        docs,
+        InsertManyOptions::builder()
+            .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
+            .build(),
+    )
+    .await
+    .unwrap();
 
     let op = Find::new(
         Namespace {
@@ -42,6 +49,7 @@ async fn exhaust_test() {
             FindOptions::builder()
                 .batch_size(5)
                 .sort(doc! { "x": 1 })
+                .read_concern(ReadConcern::majority())
                 .build(),
         ),
     );
