@@ -550,6 +550,17 @@ pub struct CountOptions {
     /// information on how to use this option.
     #[builder(default)]
     pub collation: Option<Collation>,
+
+    /// The criteria used to select a server for this operation.
+    ///
+    /// If none specified, the default set on the collection will be used.
+    #[builder(default)]
+    #[serde(skip_serializing)]
+    pub selection_criteria: Option<SelectionCriteria>,
+
+    /// The level of the read concern.
+    #[builder(default)]
+    pub read_concern: Option<ReadConcern>,
 }
 
 // rustfmt tries to split the link up when it's all on one line, which breaks the link, so we wrap
