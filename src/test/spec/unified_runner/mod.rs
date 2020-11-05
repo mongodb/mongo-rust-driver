@@ -201,7 +201,7 @@ pub async fn run_unified_format_test(test_file: TestFile) {
             }
         }
         if !can_run_on {
-            println!("Client topology not compatible with test",);
+            println!("Client topology not compatible with test");
             return;
         }
     }

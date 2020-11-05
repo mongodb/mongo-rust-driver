@@ -150,7 +150,7 @@ pub struct ReadPreferenceOptions {
     /// considered for the given operation. Any secondaries lagging behind more than
     /// `max_staleness` will not be considered for the operation.
     ///
-    /// `max_stalesness` must be at least 90 seconds. If a `max_staleness` less than 90 seconds is
+    /// `max_staleness` must be at least 90 seconds. If a `max_staleness` less than 90 seconds is
     /// specified for an operation, the operation will return an error.
     #[builder(default)]
     #[serde(rename = "maxStalenessSeconds", deserialize_with = "deserialize_duration_from_u64_seconds")]
