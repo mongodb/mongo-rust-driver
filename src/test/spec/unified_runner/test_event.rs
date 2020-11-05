@@ -55,6 +55,8 @@ impl Matchable for TestEvent {
                     results_match(
                         actual_command.as_ref(),
                         &Bson::Document(expected_command.clone()),
+                        false,
+                        None,
                     )
                 } else {
                     true
@@ -78,6 +80,8 @@ impl Matchable for TestEvent {
                     results_match(
                         actual_reply.as_ref(),
                         &Bson::Document(expected_reply.clone()),
+                        false,
+                        None,
                     )
                 } else {
                     true

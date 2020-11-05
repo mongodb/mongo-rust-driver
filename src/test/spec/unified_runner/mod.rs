@@ -42,9 +42,11 @@ const SKIPPED_OPERATIONS: &[&str] = &[
     "watch",
 ];
 
+pub type EntityMap = HashMap<String, Entity>;
+
 pub struct TestRunner {
     pub internal_client: TestClient,
-    pub entities: HashMap<String, Entity>,
+    pub entities: EntityMap,
     pub failpoint_disable_commands: Vec<FailPointDisableCommand>,
 }
 
@@ -178,18 +180,21 @@ pub async fn run_unified_format_test(test_file: TestFile) {
     let mut test_runner = TestRunner::new().await;
 
     if let Some(requirements) = test_file.run_on_requirements {
-        if !requirements
-            .iter()
-            .any(|requirement| requirement.can_run_on(&test_runner.internal_client))
-        {
-            println!("Client topology not compatible with test");
+        let mut can_run_on = false;
+        for requirement in requirements {
+            if requirement.can_run_on(&test_runner.internal_client).await {
+                can_run_on = true;
+            }
+        }
+        if !can_run_on {
+            println!("Client topology not compatible with test",);
             return;
         }
     }
 
     for test_case in test_file.tests {
         if let Some(skip_reason) = test_case.skip_reason {
-            println!("skipping {}: {}", &test_case.description, skip_reason);
+            println!("Skipping {}: {}", &test_case.description, skip_reason);
             continue;
         }
 
@@ -198,15 +203,20 @@ pub async fn run_unified_format_test(test_file: TestFile) {
             .iter()
             .any(|op| SKIPPED_OPERATIONS.contains(&op.name.as_str()))
         {
-            println!("skipping {}", &test_case.description);
+            println!("Skipping {}", &test_case.description);
             continue;
         }
 
+        println!("Running {}", &test_case.description);
+
         if let Some(requirements) = test_case.run_on_requirements {
-            if !requirements
-                .iter()
-                .any(|requirement| requirement.can_run_on(&test_runner.internal_client))
-            {
+            let mut can_run_on = false;
+            for requirement in requirements {
+                if requirement.can_run_on(&test_runner.internal_client).await {
+                    can_run_on = true;
+                }
+            }
+            if !can_run_on {
                 println!(
                     "{}: client topology not compatible with test",
                     &test_case.description
@@ -228,28 +238,39 @@ pub async fn run_unified_format_test(test_file: TestFile) {
         for operation in test_case.operations {
             let result = operation.execute(&operation.object, &mut test_runner).await;
 
-            if let Some(id) = operation.save_result_as_entity {
+            if let Some(ref id) = operation.save_result_as_entity {
                 match &result {
                     Ok(Some(entity)) => {
-                        test_runner.entities.insert(id, entity.clone());
+                        if test_runner
+                            .entities
+                            .insert(id.clone(), entity.clone())
+                            .is_some()
+                        {
+                            panic!("Entity with id {} already present in entity map", id);
+                        }
                     }
                     Ok(None) => panic!("{} did not return an entity", operation.name),
-                    Err(_) => panic!("operation should succeed"),
+                    Err(_) => panic!("{} should succeed", operation.name),
                 }
             }
 
-            if let Some(expect_result) = operation.expect_result {
+            if let Some(ref expect_result) = operation.expect_result {
                 let result = result
-                    .unwrap_or_else(|_| panic!("operation should succeed"))
-                    .unwrap_or_else(|| panic!("operation should return an entity"));
+                    .unwrap_or_else(|_| panic!("{} should succeed", operation.name))
+                    .unwrap_or_else(|| panic!("{} should return an entity", operation.name));
                 match result {
                     Entity::Bson(ref result) => {
-                        assert!(results_match(Some(result), &expect_result));
+                        assert!(results_match(
+                            Some(result),
+                            &expect_result,
+                            operation.returns_root_documents(),
+                            Some(&test_runner.entities),
+                        ));
                     }
-                    _ => panic!("incorrect entity type returned"),
+                    _ => panic!("Incorrect entity type returned from {}, expected BSON", operation.name),
                 }
             } else if let Some(expect_error) = operation.expect_error {
-                let error = result.expect_err("operation should return error");
+                let error = result.expect_err(&format!("{} should return an error", operation.name));
                 expect_error.verify_result(error);
             }
         }

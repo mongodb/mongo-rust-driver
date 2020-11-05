@@ -287,15 +287,28 @@ impl TestClient {
         drop_collection(&coll).await;
     }
 
-    pub fn topology(&self) -> Topology {
+    pub async fn topology(&self) -> Topology {
         if self.is_sharded() {
-            Topology::Sharded
+            let shard_info = self
+                .database("config")
+                .collection("shards")
+                .find_one(None, None)
+                .await
+                .unwrap()
+                .unwrap();
+            let hosts = shard_info.get_str("host").unwrap();
+            // If the host string has more than one host, a slash will separate the replica set name
+            // and list of hosts.
+            if hosts.contains('/') {
+                Topology::ShardedReplicaSet
+            } else {
+                Topology::Sharded
+            }
         } else if self.is_replica_set() {
             Topology::ReplicaSet
         } else {
             Topology::Single
         }
-        // TODO parse out sharded replica set
     }
 }
 

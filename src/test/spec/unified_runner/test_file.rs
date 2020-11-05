@@ -45,8 +45,7 @@ where
     let count = schema_version.split('.').count();
     if count == 1 {
         schema_version.push_str(".0.0");
-    }
-    if count == 2 {
+    } else if count == 2 {
         schema_version.push_str(".0");
     }
     Version::parse(&schema_version).map_err(|e| serde::de::Error::custom(format!("{}", e)))
@@ -71,7 +70,7 @@ pub enum Topology {
 }
 
 impl RunOnRequirement {
-    pub fn can_run_on(&self, client: &TestClient) -> bool {
+    pub async fn can_run_on(&self, client: &TestClient) -> bool {
         if let Some(ref min_version) = self.min_server_version {
             let req = VersionReq::parse(&format!(">= {}", &min_version)).unwrap();
             if !req.matches(&client.server_version) {
@@ -85,7 +84,7 @@ impl RunOnRequirement {
             }
         }
         if let Some(ref topologies) = self.topologies {
-            if !topologies.contains(&client.topology()) {
+            if !topologies.contains(&client.topology().await) {
                 return false;
             }
         }
@@ -283,19 +282,19 @@ impl ExpectError {
         if let Some(error_contains) = self.error_contains {
             match &error.kind.code_and_message() {
                 Some((_, msg)) => assert!(msg.contains(&error_contains)),
-                None => panic!("error should include message field"),
+                None => panic!("{} should include message field", error),
             }
         }
         if let Some(error_code) = self.error_code {
             match &error.kind.code_and_message() {
                 Some((code, _)) => assert_eq!(*code, error_code),
-                None => panic!("error should include code"),
+                None => panic!("{} should include code", error),
             }
         }
         if let Some(error_code_name) = self.error_code_name {
             match &error.kind.code_name() {
                 Some(name) => assert_eq!(&error_code_name, name),
-                None => panic!("error should include code name"),
+                None => panic!("{} should include code name", error),
             }
         }
         if let Some(error_labels_contain) = self.error_labels_contain {
@@ -349,18 +348,15 @@ async fn deserialize_selection_criteria() {
     let selection_criteria = SelectionCriteria::deserialize(d).unwrap();
 
     match selection_criteria {
-        SelectionCriteria::ReadPreference(read_preference) => {
-            match read_preference {
-                ReadPreference::SecondaryPreferred { options } => {
-                    assert_eq!(options.max_staleness, Some(Duration::from_secs(100)));
-                    assert_eq!(options.hedge, Some(HedgedReadOptions::with_enabled(true)));
-                }
-                other => panic!("Expected mode SecondaryPreferred, got {:?}", other),
+        SelectionCriteria::ReadPreference(read_preference) => match read_preference {
+            ReadPreference::SecondaryPreferred { options } => {
+                assert_eq!(options.max_staleness, Some(Duration::from_secs(100)));
+                assert_eq!(options.hedge, Some(HedgedReadOptions::with_enabled(true)));
             }
-        }
+            other => panic!("Expected mode SecondaryPreferred, got {:?}", other),
+        },
         SelectionCriteria::Predicate(_) => panic!("Expected read preference, got predicate"),
     }
-
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

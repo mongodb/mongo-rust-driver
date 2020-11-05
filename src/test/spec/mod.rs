@@ -67,6 +67,8 @@ where
         let json: Value =
             serde_json::from_reader(File::open(test_file_full_path.as_path()).unwrap()).unwrap();
 
+        println!("Running tests from {}", test_file_full_path.display().to_string());
+
         run_test_file(
             bson::from_bson(
                 Bson::try_from(json)

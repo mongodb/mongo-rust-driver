@@ -60,21 +60,28 @@ impl Entity {
     pub fn as_client(&self) -> &ClientEntity {
         match self {
             Self::Client(client) => client,
-            _ => panic!("Entity not a client"),
+            _ => panic!("Expected client entity, got {:?}", &self),
         }
     }
 
     pub fn as_database(&self) -> &Database {
         match self {
             Self::Database(database) => database,
-            _ => panic!("Entity not a database"),
+            _ => panic!("Expected database entity, got {:?}", &self),
         }
     }
 
     pub fn as_collection(&self) -> &Collection {
         match self {
             Self::Collection(collection) => collection,
-            _ => panic!("Entity not a collection"),
+            _ => panic!("Expected collection entity, got {:?}", &self),
+        }
+    }
+
+    pub fn as_bson(&self) -> &Bson {
+        match self {
+            Self::Bson(bson) => bson,
+            _ => panic!("Expected BSON entity, got {:?}", &self),
         }
     }
 }

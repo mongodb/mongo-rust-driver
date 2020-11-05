@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use futures::stream::TryStreamExt;
 use serde::{de::Deserializer, Deserialize};
 
-use super::{ClientEntity, Entity, ExpectError, FailPointDisableCommand, TestRunner};
+use super::{ClientEntity, Entity, EntityMap, ExpectError, FailPointDisableCommand, TestRunner};
 
 use crate::{
     bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
@@ -41,6 +41,13 @@ pub trait TestOperation: Debug {
         object: &OperationObject,
         test_runner: &'a mut TestRunner,
     ) -> Result<Option<Entity>>;
+
+    /// Whether or not this operation returns an array of root documents. This information is
+    /// necessary to determine how the return value of an operation should be compared to the
+    /// expected value.
+    fn returns_root_documents(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug)]
@@ -60,24 +67,24 @@ pub enum OperationObject {
 }
 
 impl OperationObject {
-    pub fn as_client<'a>(&self, entities: &'a HashMap<String, Entity>) -> &'a ClientEntity {
+    pub fn as_client<'a>(&self, entities: &'a EntityMap) -> &'a ClientEntity {
         match self {
             Self::Entity(id) => entities.get(id).unwrap().as_client(),
-            Self::TestRunner => panic!("cannot convert TestRunner object to Client"),
+            Self::TestRunner => panic!("Cannot convert TestRunner object to Client"),
         }
     }
 
-    pub fn as_database<'a>(&self, entities: &'a HashMap<String, Entity>) -> &'a Database {
+    pub fn as_database<'a>(&self, entities: &'a EntityMap) -> &'a Database {
         match self {
             Self::Entity(id) => entities.get(id).unwrap().as_database(),
-            Self::TestRunner => panic!("cannot convert TestRunner to Database"),
+            Self::TestRunner => panic!("Cannot convert TestRunner to Database"),
         }
     }
 
-    pub fn as_collection<'a>(&self, entities: &'a HashMap<String, Entity>) -> &'a Collection {
+    pub fn as_collection<'a>(&self, entities: &'a EntityMap) -> &'a Collection {
         match self {
             Self::Entity(id) => entities.get(id).unwrap().as_collection(),
-            Self::TestRunner => panic!("cannot convert TestRunner to Collection"),
+            Self::TestRunner => panic!("Cannot convert TestRunner to Collection"),
         }
     }
 }
@@ -276,6 +283,10 @@ impl TestOperation for Find {
         let result = cursor.try_collect::<Vec<Document>>().await?;
         Ok(Some(Bson::from(result).into()))
     }
+
+    fn returns_root_documents(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -416,13 +427,17 @@ impl TestOperation for Aggregate {
                         db.aggregate(self.pipeline.clone(), self.options.clone())
                             .await?
                     }
-                    other => panic!("cannot execute aggregate on {:?}", &other),
+                    other => panic!("Cannot execute aggregate on {:?}", &other),
                 };
                 let result = cursor.try_collect::<Vec<Document>>().await?;
                 Ok(Some(Bson::from(result).into()))
             }
-            OperationObject::TestRunner => panic!("cannot execute aggregate on the test runner"),
+            OperationObject::TestRunner => panic!("Cannot execute aggregate on the test runner"),
         }
+    }
+
+    fn returns_root_documents(&self) -> bool {
+        true
     }
 }
 
@@ -590,6 +605,10 @@ impl TestOperation for ListCollections {
             .await?;
         let result = cursor.try_collect::<Vec<Document>>().await?;
         Ok(Some(Bson::from(result).into()))
+    }
+
+    fn returns_root_documents(&self) -> bool {
+        true
     }
 }
 

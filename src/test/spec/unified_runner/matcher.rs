@@ -1,15 +1,30 @@
+use num::FromPrimitive;
+
 use crate::bson::{doc, spec::ElementType, Bson};
 
-pub fn results_match(actual: Option<&Bson>, expected: &Bson) -> bool {
-    results_match_inner(actual, expected, true)
+use super::EntityMap;
+
+pub fn results_match(
+    actual: Option<&Bson>,
+    expected: &Bson,
+    returns_root_documents: bool,
+    entities: Option<&EntityMap>,
+) -> bool {
+    results_match_inner(actual, expected, returns_root_documents, true, entities)
 }
 
-pub fn results_match_inner(actual: Option<&Bson>, expected: &Bson, root: bool) -> bool {
+pub fn results_match_inner(
+    actual: Option<&Bson>,
+    expected: &Bson,
+    returns_root_documents: bool,
+    root: bool,
+    entities: Option<&EntityMap>,
+) -> bool {
     match expected {
         Bson::Document(expected_doc) => {
             if let Some((key, value)) = expected_doc.iter().next() {
-                if key.starts_with("$$") {
-                    return special_operator_matches((key, value), actual);
+                if key.starts_with("$$") && expected_doc.len() == 1 {
+                    return special_operator_matches((key, value), actual, entities);
                 }
             }
 
@@ -20,14 +35,18 @@ pub fn results_match_inner(actual: Option<&Bson>, expected: &Bson, root: bool) -
                 _ => return false,
             };
 
-            // Extra fields are only allowed in the top-level document.
-            if !root && actual_doc.len() != expected_doc.len() {
-                return false;
+            for (key, value) in expected_doc {
+                if !results_match_inner(actual_doc.get(key), value, false, false, entities) {
+                    return false;
+                }
             }
 
-            for (key, value) in expected_doc {
-                if !results_match_inner(actual_doc.get(key), value, false) {
-                    return false;
+            // Documents that are not the root-level document should not contain extra keys.
+            if !root {
+                for (key, _) in actual_doc {
+                    if !expected_doc.contains_key(key) {
+                        return false;
+                    }
                 }
             }
 
@@ -39,13 +58,24 @@ pub fn results_match_inner(actual: Option<&Bson>, expected: &Bson, root: bool) -
                 return false;
             }
 
+            // Some operations return an array of documents that should be treated as root
+            // documents.
             for (actual, expected) in actual_array.iter().zip(expected_array) {
-                if !results_match_inner(Some(actual), expected, false) {
+                if !results_match_inner(
+                    Some(actual),
+                    expected,
+                    false,
+                    returns_root_documents,
+                    entities,
+                ) {
                     return false;
                 }
             }
 
             true
+        }
+        Bson::Int32(_) | Bson::Int64(_) | Bson::Double(_) => {
+            numbers_match(actual.unwrap(), expected)
         }
         _ => match actual {
             Some(actual) => actual == expected,
@@ -54,20 +84,68 @@ pub fn results_match_inner(actual: Option<&Bson>, expected: &Bson, root: bool) -
     }
 }
 
-fn special_operator_matches((key, value): (&String, &Bson), actual: Option<&Bson>) -> bool {
+fn numbers_match(actual: &Bson, expected: &Bson) -> bool {
+    if actual.element_type() == expected.element_type() {
+        return actual == expected;
+    }
+
+    match (actual, expected) {
+        (Bson::Int32(actual), Bson::Int64(expected)) => i32_matches_i64(*actual, *expected),
+        (Bson::Int64(actual), Bson::Int32(expected)) => i32_matches_i64(*expected, *actual),
+        (Bson::Int32(actual), Bson::Double(expected)) => i32_matches_f64(*actual, *expected),
+        (Bson::Double(actual), Bson::Int32(expected)) => i32_matches_f64(*expected, *actual),
+        (Bson::Int64(actual), Bson::Double(expected)) => i64_matches_f64(*actual, *expected),
+        (Bson::Double(actual), Bson::Int64(expected)) => i64_matches_f64(*expected, *actual),
+        _ => false,
+    }
+}
+
+fn i32_matches_i64(int: i32, long: i64) -> bool {
+    int as i64 == long
+}
+
+fn i32_matches_f64(int: i32, double: f64) -> bool {
+    match f64::from_i32(int) {
+        Some(n) => n == double,
+        None => false,
+    }
+}
+
+fn i64_matches_f64(long: i64, double: f64) -> bool {
+    match f64::from_i64(long) {
+        Some(n) => n == double,
+        None => false,
+    }
+}
+
+fn special_operator_matches(
+    (key, value): (&String, &Bson),
+    actual: Option<&Bson>,
+    entities: Option<&EntityMap>,
+) -> bool {
     match key.as_ref() {
         "$$exists" => value.as_bool().unwrap() == actual.is_some(),
         "$$type" => type_matches(value, actual.unwrap()),
         "$$unsetOrMatches" => {
             if let Some(bson) = actual {
-                results_match_inner(Some(value), bson, false)
+                results_match_inner(Some(value), bson, false, false, entities)
             } else {
                 true
             }
         }
+        "$$matchesEntity" => {
+            let id = value.as_str().unwrap();
+            entity_matches(id, actual, entities.unwrap())
+        }
+        "$$matchesHexBytes" => panic!("GridFS not implemented"),
         "$$sessionLsid" => panic!("Explicit sessions not implemented"),
         other => panic!("unknown special operator: {}", other),
     }
+}
+
+fn entity_matches(id: &str, actual: Option<&Bson>, entities: &EntityMap) -> bool {
+    let bson = entities.get(id).unwrap().as_bson();
+    results_match_inner(actual, bson, false, false, Some(entities))
 }
 
 fn type_matches(types: &Bson, actual: &Bson) -> bool {
@@ -109,6 +187,8 @@ async fn basic_matching() {
     assert!(results_match(
         Some(&Bson::Document(actual)),
         &Bson::Document(expected),
+        false,
+        None,
     ));
 
     let actual = doc! { "x": 1 };
@@ -116,6 +196,8 @@ async fn basic_matching() {
     assert!(!results_match(
         Some(&Bson::Document(actual)),
         &Bson::Document(expected),
+        false,
+        None,
     ));
 }
 
@@ -133,6 +215,8 @@ async fn array_matching() {
     assert!(!results_match(
         Some(&Bson::Array(actual)),
         &Bson::Array(expected),
+        false,
+        None,
     ));
 
     let mut actual: Vec<Bson> = Vec::new();
@@ -144,6 +228,8 @@ async fn array_matching() {
     assert!(!results_match(
         Some(&Bson::Array(actual)),
         &Bson::Array(expected),
+        false,
+        None,
     ));
 }
 
@@ -155,6 +241,8 @@ async fn special_operators() {
     assert!(results_match(
         Some(&Bson::Document(actual)),
         &Bson::Document(expected),
+        false,
+        None,
     ));
 
     let actual = doc! { "x": 1 };
@@ -162,6 +250,8 @@ async fn special_operators() {
     assert!(!results_match(
         Some(&Bson::Document(actual)),
         &Bson::Document(expected),
+        false,
+        None,
     ));
 
     let actual = doc! { "x": 1 };
@@ -169,6 +259,8 @@ async fn special_operators() {
     assert!(results_match(
         Some(&Bson::Document(actual)),
         &Bson::Document(expected),
+        false,
+        None,
     ));
 
     let actual = doc! { "x": 1 };
@@ -176,6 +268,8 @@ async fn special_operators() {
     assert!(!results_match(
         Some(&Bson::Document(actual)),
         &Bson::Document(expected),
+        false,
+        None,
     ));
 
     let actual = doc! { "x": 1 };
@@ -183,6 +277,8 @@ async fn special_operators() {
     assert!(results_match(
         Some(&Bson::Document(actual)),
         &Bson::Document(expected),
+        false,
+        None,
     ));
 
     let actual = doc! {};
@@ -190,6 +286,8 @@ async fn special_operators() {
     assert!(results_match(
         Some(&Bson::Document(actual)),
         &Bson::Document(expected),
+        false,
+        None,
     ));
 
     let actual = doc! { "x": 1 };
@@ -197,6 +295,8 @@ async fn special_operators() {
     assert!(results_match(
         Some(&Bson::Document(actual)),
         &Bson::Document(expected),
+        false,
+        None,
     ));
 
     let actual = doc! { "x": 2 };
@@ -204,6 +304,17 @@ async fn special_operators() {
     assert!(!results_match(
         Some(&Bson::Document(actual)),
         &Bson::Document(expected),
+        false,
+        None,
+    ));
+
+    let expected = doc! { "x": { "y": { "$$exists": false } } };
+    let actual = doc! { "x": {} };
+    assert!(results_match(
+        Some(&Bson::Document(actual)),
+        &Bson::Document(expected),
+        false,
+        None,
     ));
 }
 
@@ -214,13 +325,17 @@ async fn extra_fields() {
     let expected = doc! { "x": 1 };
     assert!(results_match(
         Some(&Bson::Document(actual)),
-        &Bson::Document(expected)
+        &Bson::Document(expected),
+        false,
+        None,
     ));
 
     let actual = doc! { "doc": { "x": 1, "y": 2 } };
     let expected = doc! { "doc": { "x": 1 } };
     assert!(!results_match(
         Some(&Bson::Document(actual)),
-        &Bson::Document(expected)
+        &Bson::Document(expected),
+        false,
+        None,
     ));
 }

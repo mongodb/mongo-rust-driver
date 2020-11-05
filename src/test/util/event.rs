@@ -22,8 +22,6 @@ use crate::{
     test::{CLIENT_OPTIONS, LOCK},
 };
 
-const IGNORED_EVENTS: &[&str] = &["configureFailPoint"];
-
 pub type EventQueue<T> = Arc<RwLock<VecDeque<T>>>;
 
 #[derive(Clone, Debug)]
@@ -253,6 +251,9 @@ impl EventClient {
             .collect()
     }
 
+    /// Gets a list of all of the events of the requested event types that occurred on this client.
+    /// Ignores any event with a name in the ignore list. Also ignores all configureFailPoint
+    /// events.
     pub fn get_filtered_events(
         &self,
         observe_events: &Option<Vec<String>>,
@@ -263,7 +264,7 @@ impl EventClient {
             .iter()
             .cloned()
             .filter(|event| {
-                if IGNORED_EVENTS.contains(&event.command_name()) {
+                if event.command_name() == "configureFailPoint" {
                     return false;
                 }
                 if let Some(observe_events) = observe_events {
