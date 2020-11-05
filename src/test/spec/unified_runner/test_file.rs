@@ -338,11 +338,9 @@ async fn deserialize_uri_options() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn deserialize_selection_criteria() {
     let read_preference = doc! {
-        "readPreference": {
-            "mode": "SecondaryPreferred",
-            "maxStalenessSeconds": 100,
-            "hedge": { "enabled": true },
-        }
+        "mode": "SecondaryPreferred",
+        "maxStalenessSeconds": 100,
+        "hedge": { "enabled": true },
     };
     let d = BsonDeserializer::new(read_preference.into());
     let selection_criteria = SelectionCriteria::deserialize(d).unwrap();

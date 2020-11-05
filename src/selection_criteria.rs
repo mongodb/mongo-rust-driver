@@ -13,9 +13,8 @@ use crate::{
 };
 
 /// Describes which servers are suitable for a given operation.
-#[derive(Clone, Derivative, Deserialize)]
+#[derive(Clone, Derivative)]
 #[derivative(Debug)]
-#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum SelectionCriteria {
     /// A read preference that describes the suitable servers based on the server type, max
@@ -26,7 +25,6 @@ pub enum SelectionCriteria {
 
     /// A predicate used to filter servers that are considered suitable. A `server` will be
     /// considered suitable by a `predicate` if `predicate(server)` returns true.
-    #[serde(skip)]
     Predicate(#[derivative(Debug = "ignore")] Predicate),
 }
 
@@ -71,6 +69,15 @@ impl SelectionCriteria {
 
     pub(crate) fn from_address(address: StreamAddress) -> Self {
         SelectionCriteria::Predicate(Arc::new(move |server| server.address() == &address))
+    }
+}
+
+impl<'de> Deserialize<'de> for SelectionCriteria {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(SelectionCriteria::ReadPreference(ReadPreference::deserialize(deserializer)?))
     }
 }
 

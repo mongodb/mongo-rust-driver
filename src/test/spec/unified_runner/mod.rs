@@ -11,11 +11,12 @@ use lazy_static::lazy_static;
 use semver::Version;
 
 use crate::{
-    Database, Collection,
     bson::{doc, Document},
     concern::{Acknowledgment, WriteConcern},
     options::{CollectionOptions, FindOptions, ReadConcern, ReadPreference, SelectionCriteria},
     test::{assert_matches, run_spec_test, util::EventClient, TestClient, LOCK},
+    Collection,
+    Database,
 };
 
 pub use self::{
@@ -251,10 +252,14 @@ pub async fn run_unified_format_test(test_file: TestFile) {
         for operation in test_case.operations {
             match operation.object {
                 OperationObject::TestRunner => {
-                    operation.execute_test_runner_operation(&mut test_runner).await;
+                    operation
+                        .execute_test_runner_operation(&mut test_runner)
+                        .await;
                 }
                 OperationObject::Entity(ref id) => {
-                    let result = operation.execute_entity_operation(id, &mut test_runner).await;
+                    let result = operation
+                        .execute_entity_operation(id, &mut test_runner)
+                        .await;
 
                     if let Some(ref id) = operation.save_result_as_entity {
                         match &result {
@@ -275,7 +280,9 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                     if let Some(ref expect_result) = operation.expect_result {
                         let result = result
                             .unwrap_or_else(|_| panic!("{} should succeed", operation.name))
-                            .unwrap_or_else(|| panic!("{} should return an entity", operation.name));
+                            .unwrap_or_else(|| {
+                                panic!("{} should return an entity", operation.name)
+                            });
                         match result {
                             Entity::Bson(ref result) => {
                                 assert!(results_match(
@@ -285,10 +292,14 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                                     Some(&test_runner.entities),
                                 ));
                             }
-                            _ => panic!("Incorrect entity type returned from {}, expected BSON", operation.name),
+                            _ => panic!(
+                                "Incorrect entity type returned from {}, expected BSON",
+                                operation.name
+                            ),
                         }
                     } else if let Some(expect_error) = operation.expect_error {
-                        let error = result.expect_err(&format!("{} should return an error", operation.name));
+                        let error = result
+                            .expect_err(&format!("{} should return an error", operation.name));
                         expect_error.verify_result(error);
                     }
                 }

@@ -823,7 +823,11 @@ impl TestOperation for FailPoint {
         test_runner.failpoint_disable_commands.push(disable);
     }
 
-    async fn execute_entity_operation<'a>(&self, _id: &str, _test_runner: &'a mut TestRunner) -> Result<Option<Entity>> {
+    async fn execute_entity_operation<'a>(
+        &self,
+        _id: &str,
+        _test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
         unimplemented!()
     }
 }
@@ -843,10 +847,13 @@ impl TestOperation for AssertCollectionExists {
         assert!(names.contains(&self.collection_name));
     }
 
-    async fn execute_entity_operation<'a>(&self, _id: &str, _test_runner: &'a mut TestRunner) -> Result<Option<Entity>> {
+    async fn execute_entity_operation<'a>(
+        &self,
+        _id: &str,
+        _test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
         unimplemented!()
     }
-
 }
 
 #[derive(Debug, Deserialize)]
@@ -864,7 +871,11 @@ impl TestOperation for AssertCollectionNotExists {
         assert!(!names.contains(&self.collection_name));
     }
 
-    async fn execute_entity_operation<'a>(&self, _id: &str, _test_runner: &'a mut TestRunner) -> Result<Option<Entity>> {
+    async fn execute_entity_operation<'a>(
+        &self,
+        _id: &str,
+        _test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
         unimplemented!()
     }
 }
@@ -882,7 +893,11 @@ pub(super) struct RunCommand {
 
 #[async_trait]
 impl TestOperation for RunCommand {
-    async fn execute_entity_operation<'a>(&self, id: &str, test_runner: &'a mut TestRunner) -> Result<Option<Entity>> {
+    async fn execute_entity_operation<'a>(
+        &self,
+        id: &str,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
         let mut command = self.command.clone();
         if let Some(ref read_concern) = self.read_concern {
             command.insert("readConcern", read_concern.clone());
@@ -909,7 +924,11 @@ pub(super) struct UnimplementedOperation;
 
 #[async_trait]
 impl TestOperation for UnimplementedOperation {
-    async fn execute_entity_operation<'a>(&self, _id: &str, _test_runner: &'a mut TestRunner) -> Result<Option<Entity>> {
+    async fn execute_entity_operation<'a>(
+        &self,
+        _id: &str,
+        _test_runner: &'a mut TestRunner,
+    ) -> Result<Option<Entity>> {
         unimplemented!()
     }
 
