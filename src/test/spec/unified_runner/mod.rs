@@ -11,6 +11,7 @@ use lazy_static::lazy_static;
 use semver::Version;
 
 use crate::{
+    Database, Collection,
     bson::{doc, Document},
     concern::{Acknowledgment, WriteConcern},
     options::{CollectionOptions, FindOptions, ReadConcern, ReadPreference, SelectionCriteria},
@@ -157,6 +158,18 @@ impl TestRunner {
             }
         }
     }
+
+    pub fn get_client(&self, id: &str) -> &ClientEntity {
+        self.entities.get(id).unwrap().as_client()
+    }
+
+    pub fn get_database(&self, id: &str) -> &Database {
+        self.entities.get(id).unwrap().as_database()
+    }
+
+    pub fn get_collection(&self, id: &str) -> &Collection {
+        self.entities.get(id).unwrap().as_collection()
+    }
 }
 
 pub async fn run_unified_format_test(test_file: TestFile) {
@@ -236,42 +249,49 @@ pub async fn run_unified_format_test(test_file: TestFile) {
         }
 
         for operation in test_case.operations {
-            let result = operation.execute(&operation.object, &mut test_runner).await;
+            match operation.object {
+                OperationObject::TestRunner => {
+                    operation.execute_test_runner_operation(&mut test_runner).await;
+                }
+                OperationObject::Entity(ref id) => {
+                    let result = operation.execute_entity_operation(id, &mut test_runner).await;
 
-            if let Some(ref id) = operation.save_result_as_entity {
-                match &result {
-                    Ok(Some(entity)) => {
-                        if test_runner
-                            .entities
-                            .insert(id.clone(), entity.clone())
-                            .is_some()
-                        {
-                            panic!("Entity with id {} already present in entity map", id);
+                    if let Some(ref id) = operation.save_result_as_entity {
+                        match &result {
+                            Ok(Some(entity)) => {
+                                if test_runner
+                                    .entities
+                                    .insert(id.clone(), entity.clone())
+                                    .is_some()
+                                {
+                                    panic!("Entity with id {} already present in entity map", id);
+                                }
+                            }
+                            Ok(None) => panic!("{} did not return an entity", operation.name),
+                            Err(_) => panic!("{} should succeed", operation.name),
                         }
                     }
-                    Ok(None) => panic!("{} did not return an entity", operation.name),
-                    Err(_) => panic!("{} should succeed", operation.name),
-                }
-            }
 
-            if let Some(ref expect_result) = operation.expect_result {
-                let result = result
-                    .unwrap_or_else(|_| panic!("{} should succeed", operation.name))
-                    .unwrap_or_else(|| panic!("{} should return an entity", operation.name));
-                match result {
-                    Entity::Bson(ref result) => {
-                        assert!(results_match(
-                            Some(result),
-                            &expect_result,
-                            operation.returns_root_documents(),
-                            Some(&test_runner.entities),
-                        ));
+                    if let Some(ref expect_result) = operation.expect_result {
+                        let result = result
+                            .unwrap_or_else(|_| panic!("{} should succeed", operation.name))
+                            .unwrap_or_else(|| panic!("{} should return an entity", operation.name));
+                        match result {
+                            Entity::Bson(ref result) => {
+                                assert!(results_match(
+                                    Some(result),
+                                    &expect_result,
+                                    operation.returns_root_documents(),
+                                    Some(&test_runner.entities),
+                                ));
+                            }
+                            _ => panic!("Incorrect entity type returned from {}, expected BSON", operation.name),
+                        }
+                    } else if let Some(expect_error) = operation.expect_error {
+                        let error = result.expect_err(&format!("{} should return an error", operation.name));
+                        expect_error.verify_result(error);
                     }
-                    _ => panic!("Incorrect entity type returned from {}, expected BSON", operation.name),
                 }
-            } else if let Some(expect_error) = operation.expect_error {
-                let error = result.expect_err(&format!("{} should return an error", operation.name));
-                expect_error.verify_result(error);
             }
         }
 
