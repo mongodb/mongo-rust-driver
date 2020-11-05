@@ -75,7 +75,10 @@ pub fn results_match_inner(
             true
         }
         Bson::Int32(_) | Bson::Int64(_) | Bson::Double(_) => {
-            numbers_match(actual.unwrap(), expected)
+            match actual {
+                Some(actual) => numbers_match(actual, expected),
+                None => false,
+            }
         }
         _ => match actual {
             Some(actual) => actual == expected,
