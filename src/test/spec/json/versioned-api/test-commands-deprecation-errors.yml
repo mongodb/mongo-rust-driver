@@ -1,0 +1,42 @@
+description: "Test commands: deprecation errors"
+
+schemaVersion: "1.1"
+
+runOnRequirements:
+  - minServerVersion: "4.7"
+
+createEntities:
+  - client:
+      id: &client client
+      observeEvents:
+        - commandStartedEvent
+      serverApi:
+        version: "2"
+        deprecationErrors: true
+  - database:
+      id: &database database
+      client: *client
+      databaseName: &databaseName versioned-api-tests
+
+tests:
+  - description: "Running a command that is deprecated raises a deprecation error"
+    operations:
+      - name: runCommand
+        object: *database
+        arguments:
+          commandName: testDeprecationInVersion2
+          command:
+            testDeprecationInVersion2: 1
+        expectError:
+          isError: true
+          errorContains: "command testDeprecationInVersion2 is deprecated in API Version 2"
+          errorCodeName: "APIDeprecationError"
+    expectEvents:
+      - client: *client
+        events:
+          - commandStartedEvent:
+              command:
+                testDeprecationInVersion2: 1
+                apiVersion: "2"
+                apiStrict: { $$unsetOrMatches: false }
+                apiDeprecationErrors: true

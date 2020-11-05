@@ -1,9 +1,13 @@
 {
-  "description": "No API version declared",
+  "description": "Transaction handling",
   "schemaVersion": "1.1",
   "runOnRequirements": [
     {
-      "minServerVersion": "4.7"
+      "minServerVersion": "4.7",
+      "topologies": [
+        "replicaset",
+        "sharded-replicaset"
+      ]
     }
   ],
   "createEntities": [
@@ -12,7 +16,10 @@
         "id": "client",
         "observeEvents": [
           "commandStartedEvent"
-        ]
+        ],
+        "serverApi": {
+          "version": "1"
+        }
       }
     },
     {
@@ -28,8 +35,36 @@
         "database": "database",
         "collectionName": "test"
       }
+    },
+    {
+      "session": {
+        "id": "session",
+        "client": "client"
+      }
     }
   ],
+  "context": {
+    "versions": [
+      {
+        "apiVersion": "1",
+        "apiStrict": {
+          "$$unsetOrMatches": false
+        },
+        "apiDeprecationErrors": true
+      },
+      {
+        "apiVersion": {
+          "$$exists": false
+        },
+        "apiStrict": {
+          "$$exists": false
+        },
+        "apiDeprecationErrors": {
+          "$$exists": false
+        }
+      }
+    ]
+  },
   "initialData": [
     {
       "collectionName": "test",
@@ -60,37 +95,59 @@
   ],
   "tests": [
     {
-      "description": "Find does not send an API version when no version was declared",
+      "description": "Only the first command in a transaction declares an API version",
+      "runOnRequirements": [
+        {
+          "topologies": [
+            "replicaset",
+            "sharded-replicaset"
+          ]
+        }
+      ],
       "operations": [
         {
-          "name": "find",
+          "name": "startTransaction",
+          "object": "session"
+        },
+        {
+          "name": "insertOne",
           "object": "collection",
           "arguments": {
-            "filter": {},
-            "sort": {
-              "_id": 1
-            },
-            "batchSize": 3,
-            "limit": 4
-          },
-          "expectResult": [
-            {
-              "_id": 1,
-              "x": 11
-            },
-            {
-              "_id": 2,
-              "x": 22
-            },
-            {
-              "_id": 3,
-              "x": 33
-            },
-            {
-              "_id": 4,
-              "x": 44
+            "session": "session",
+            "document": {
+              "_id": 6,
+              "x": 66
             }
-          ]
+          },
+          "expectResult": {
+            "$$unsetOrMatches": {
+              "insertedId": {
+                "$$unsetOrMatches": 6
+              }
+            }
+          }
+        },
+        {
+          "name": "insertOne",
+          "object": "collection",
+          "arguments": {
+            "session": "session",
+            "document": {
+              "_id": 7,
+              "x": 77
+            }
+          },
+          "expectResult": {
+            "$$unsetOrMatches": {
+              "insertedId": {
+                "$$unsetOrMatches": 7
+              }
+            }
+          }
+        },
+        {
+          "name": "commitTransaction",
+          "object": "session"
         }
       ],
       "expectEvents": [
@@ -100,29 +157,37 @@
             {
               "commandStartedEvent": {
                 "command": {
-                  "find": "test",
-                  "apiVersion": {
-                    "$$exists": false
+                  "insert": "test",
+                  "documents": [
+                    {
+                      "_id": 6,
+                      "x": 66
+                    }
+                  ],
+                  "lsid": {
+                    "$$sessionLsid": "session"
                   },
+                  "startTransaction": true,
+                  "apiVersion": "1",
                   "apiStrict": {
-                    "$$exists": false
+                    "$$unsetOrMatches": false
                   },
-                  "apiDeprecationErrors": {
-                    "$$exists": false
-                  }
-                },
-                "commandName": "find",
-                "databaseName": "versioned-api-tests"
+                  "apiDeprecationErrors": true
+                }
               }
             },
             {
               "commandStartedEvent": {
                 "command": {
-                  "getMore": {
-                    "$$type": [
-                      "int",
-                      "long"
-                    ]
+                  "insert": "test",
+                  "documents": [
+                    {
+                      "_id": 7,
+                      "x": 77
+                    }
+                  ],
+                  "lsid": {
+                    "$$sessionLsid": "session"
                   },
                   "apiVersion": {
                     "$$exists": false
@@ -133,9 +198,26 @@
                   "apiDeprecationErrors": {
                     "$$exists": false
                   }
-                },
-                "commandName": "getMore",
-                "databaseName": "versioned-api-tests"
+                }
+              }
+            },
+            {
+              "commandStartedEvent": {
+                "command": {
+                  "commitTransaction": 1,
+                  "lsid": {
+                    "$$sessionLsid": "session"
+                  },
+                  "apiVersion": {
+                    "$$exists": false
+                  },
+                  "apiStrict": {
+                    "$$exists": false
+                  },
+                  "apiDeprecationErrors": {
+                    "$$exists": false
+                  }
+                }
               }
             }
           ]
@@ -143,7 +225,7 @@
       ]
     },
     {
-      "description": "runCommand does not inspect or change the command document",
+      "description": "runCommand overrides an API version declared in the command",
       "operations": [
         {
           "name": "runCommand",
@@ -154,10 +236,6 @@
               "ping": 1,
               "apiVersion": "server_will_never_support_this_api_version"
             }
-          },
-          "expectError": {
-            "isError": true,
-            "isClientError": false
           }
         }
       ],
@@ -169,13 +247,11 @@
               "commandStartedEvent": {
                 "command": {
                   "ping": 1,
-                  "apiVersion": "server_will_never_support_this_api_version",
+                  "apiVersion": "1",
                   "apiStrict": {
-                    "$$exists": false
+                    "$$unsetOrMatches": false
                   },
-                  "apiDeprecationErrors": {
-                    "$$exists": false
-                  }
+                  "apiDeprecationErrors": true
                 },
                 "commandName": "ping",
                 "databaseName": "versioned-api-tests"
@@ -186,7 +262,7 @@
       ]
     },
     {
-      "description": "runCommand does not prevent sending invalid API version declarations",
+      "description": "runCommand only overrides specified options",
       "operations": [
         {
           "name": "runCommand",
@@ -197,10 +273,6 @@
               "ping": 1,
               "apiStrict": true
             }
-          },
-          "expectError": {
-            "isError": true,
-            "isClientError": false
           }
         }
       ],
@@ -212,12 +284,10 @@
               "commandStartedEvent": {
                 "command": {
                   "ping": 1,
-                  "apiVersion": {
-                    "$$exists": false
-                  },
+                  "apiVersion": "1",
                   "apiStrict": true,
                   "apiDeprecationErrors": {
-                    "$$exists": false
+                    "$$unsetOrMatches": false
                   }
                 },
                 "commandName": "ping",
