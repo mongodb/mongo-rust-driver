@@ -357,6 +357,8 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                 assert_eq!(expected_data.documents, actual_data);
             }
         }
+
+        println!("{} succeeded", &test_case.description);
     }
 }
 
