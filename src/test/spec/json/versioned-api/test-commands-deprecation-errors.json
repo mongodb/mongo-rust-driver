@@ -1,11 +1,12 @@
 {
-  "description": "Test commands: strict mode",
+  "description": "Test commands: deprecation errors",
   "schemaVersion": "1.1",
   "runOnRequirements": [
     {
       "minServerVersion": "4.7",
       "serverParameters": {
-        "enableTestCommands": true
+        "enableTestCommands": true,
+        "acceptAPIVersion2": true
       }
     }
   ],
@@ -15,11 +16,7 @@
         "id": "client",
         "observeEvents": [
           "commandStartedEvent"
-        ],
-        "serverApi": {
-          "version": "1",
-          "strict": true
-        }
+        ]
       }
     },
     {
@@ -32,21 +29,23 @@
   ],
   "tests": [
     {
-      "description": "Running a command that is not part of the versioned API results in an error",
+      "description": "Running a command that is deprecated raises a deprecation error",
       "operations": [
         {
           "name": "runCommand",
           "object": "database",
           "arguments": {
-            "commandName": "testVersion2",
+            "commandName": "testDeprecationInVersion2",
             "command": {
-              "testVersion2": 1
+              "testDeprecationInVersion2": 1,
+              "apiVersion": "2",
+              "apiDeprecationErrors": true
             }
           },
           "expectError": {
             "isError": true,
-            "errorContains": "command testVersion2 is not in API Version 1",
-            "errorCodeName": "APIStrictError"
+            "errorContains": "command testDeprecationInVersion2 is deprecated in API Version 2",
+            "errorCodeName": "APIDeprecationError"
           }
         }
       ],
@@ -57,12 +56,12 @@
             {
               "commandStartedEvent": {
                 "command": {
-                  "testVersion2": 1,
-                  "apiVersion": "1",
-                  "apiStrict": true,
-                  "apiDeprecationErrors": {
-                    "$$unsetOrMatches": false
-                  }
+                  "testDeprecationInVersion2": 1,
+                  "apiVersion": "2",
+                  "apiStrict": {
+                    "$$exists": false
+                  },
+                  "apiDeprecationErrors": true
                 }
               }
             }

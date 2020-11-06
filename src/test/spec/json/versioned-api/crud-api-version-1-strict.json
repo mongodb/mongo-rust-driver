@@ -1,5 +1,5 @@
 {
-  "description": "CRUD Api Version 1",
+  "description": "CRUD Api Version 1 (strict)",
   "schemaVersion": "1.1",
   "runOnRequirements": [
     {
@@ -15,7 +15,7 @@
         ],
         "serverApi": {
           "version": "1",
-          "deprecationErrors": true
+          "strict": true
         }
       }
     },
@@ -45,10 +45,10 @@
     "versions": [
       {
         "apiVersion": "1",
-        "apiStrict": {
+        "apiStrict": true,
+        "apiDeprecationErrors": {
           "$$unsetOrMatches": false
-        },
-        "apiDeprecationErrors": true
+        }
       }
     ]
   },
@@ -128,10 +128,10 @@
                     }
                   ],
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             }
@@ -168,10 +168,10 @@
                     }
                   ],
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             }
@@ -272,10 +272,10 @@
                     }
                   ],
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             },
@@ -296,10 +296,10 @@
                     }
                   ],
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             },
@@ -323,10 +323,10 @@
                     }
                   ],
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             },
@@ -348,10 +348,10 @@
                     }
                   ],
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             },
@@ -368,10 +368,10 @@
                     }
                   ],
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             },
@@ -392,10 +392,10 @@
                     }
                   ],
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             }
@@ -444,10 +444,10 @@
                     }
                   ],
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             }
@@ -495,10 +495,10 @@
                     }
                   ],
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             }
@@ -536,10 +536,10 @@
                     }
                   ],
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             }
@@ -555,6 +555,11 @@
           "object": "collection",
           "arguments": {
             "fieldName": "x"
+          },
+          "expectError": {
+            "isError": true,
+            "errorContains": "command distinct is not in API Version 1",
+            "errorCodeName": "APIStrictError"
           }
         }
       ],
@@ -568,10 +573,10 @@
                   "distinct": "test",
                   "key": "x",
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             }
@@ -585,7 +590,12 @@
         {
           "name": "estimatedDocumentCount",
           "object": "collection",
-          "arguments": {}
+          "arguments": {},
+          "expectError": {
+            "isError": true,
+            "errorContains": "command count is not in API Version 1",
+            "errorCodeName": "APIStrictError"
+          }
         }
       ],
       "expectEvents": [
@@ -597,10 +607,10 @@
                 "command": {
                   "count": "test",
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             }
@@ -651,10 +661,10 @@
                 "command": {
                   "find": "test",
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             },
@@ -709,10 +719,10 @@
                   },
                   "remove": true,
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             }
@@ -751,10 +761,10 @@
                     "x": 33
                   },
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             }
@@ -797,10 +807,10 @@
                     }
                   },
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             }
@@ -847,10 +857,10 @@
                     }
                   ],
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             }
@@ -887,10 +897,10 @@
                     }
                   ],
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             }
@@ -937,10 +947,10 @@
                     }
                   ],
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             }
@@ -994,10 +1004,10 @@
                     }
                   ],
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             }
@@ -1046,10 +1056,10 @@
                     }
                   ],
                   "apiVersion": "1",
-                  "apiStrict": {
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
                     "$$unsetOrMatches": false
-                  },
-                  "apiDeprecationErrors": true
+                  }
                 }
               }
             }
