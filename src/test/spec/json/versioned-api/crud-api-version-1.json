@@ -554,7 +554,8 @@
           "name": "distinct",
           "object": "collection",
           "arguments": {
-            "fieldName": "x"
+            "fieldName": "x",
+            "filter": {}
           }
         }
       ],
@@ -955,16 +956,14 @@
           "name": "updateMany",
           "object": "collection",
           "arguments": {
-            "requests": {
-              "filter": {
-                "_id": {
-                  "$gt": 1
-                }
-              },
-              "update": {
-                "$inc": {
-                  "x": 1
-                }
+            "filter": {
+              "_id": {
+                "$gt": 1
+              }
+            },
+            "update": {
+              "$inc": {
+                "x": 1
               }
             }
           }
@@ -1012,14 +1011,12 @@
           "name": "updateOne",
           "object": "collection",
           "arguments": {
-            "requests": {
-              "filter": {
-                "_id": 2
-              },
-              "update": {
-                "$inc": {
-                  "x": 1
-                }
+            "filter": {
+              "_id": 2
+            },
+            "update": {
+              "$inc": {
+                "x": 1
               }
             }
           }
