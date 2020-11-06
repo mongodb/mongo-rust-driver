@@ -126,14 +126,14 @@ impl std::ops::DerefMut for EventClient {
 
 impl EventClient {
     pub async fn new() -> Self {
-        EventClient::with_options(None).await
+        EventClient::with_options(None, true).await
     }
 
-    pub async fn with_options(options: impl Into<Option<ClientOptions>>) -> Self {
+    pub async fn with_options(options: impl Into<Option<ClientOptions>>, collect_build_info: bool) -> Self {
         let handler = EventHandler::default();
         let command_events = handler.command_events.clone();
         let pool_cleared_events = handler.pool_cleared_events.clone();
-        let client = TestClient::with_handler(Some(handler), options).await;
+        let client = TestClient::with_handler(Some(handler), options, collect_build_info).await;
 
         // clear events from commands used to set up client.
         command_events.write().unwrap().clear();
@@ -149,6 +149,7 @@ impl EventClient {
         options: Option<ClientOptions>,
         heartbeat_freq: Option<Duration>,
         use_multiple_mongoses: Option<bool>,
+        collect_build_info: bool,
     ) -> Self {
         let mut options = match options {
             Some(mut options) => {
@@ -162,13 +163,14 @@ impl EventClient {
         if TestClient::new().await.is_sharded() && use_multiple_mongoses != Some(true) {
             options.hosts = options.hosts.iter().cloned().take(1).collect();
         }
-        EventClient::with_options(options).await
+        EventClient::with_options(options, collect_build_info).await
     }
 
     pub async fn with_uri_and_mongos_options(
         uri: &str,
         use_multiple_mongoses: Option<bool>,
         server_api: Option<ServerApi>,
+        collect_build_info: bool,
     ) -> Self {
         let mut options = ClientOptions::parse_uri(uri, None).await.unwrap();
         options.server_api = server_api;
@@ -184,7 +186,7 @@ impl EventClient {
             }
             None => {}
         }
-        EventClient::with_options(options).await
+        EventClient::with_options(options, collect_build_info).await
     }
 
     /// Gets the first started/succeeded pair of events for the given command name, popping off all

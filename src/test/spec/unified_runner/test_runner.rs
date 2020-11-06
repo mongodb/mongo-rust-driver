@@ -65,6 +65,7 @@ impl TestRunner {
                         &client.uri,
                         client.use_multiple_mongoses,
                         server_api,
+                        false,
                     )
                     .await;
                     (
