@@ -256,7 +256,6 @@ impl Connection {
     /// itself.
     pub(crate) async fn read_response(&mut self) -> Result<CommandResponse> {
         let response_message_result = Message::read_from(&mut self.stream).await;
-        self.command_executing = false;
         self.error = response_message_result.is_err();
 
         let response_message = response_message_result?;

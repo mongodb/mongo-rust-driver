@@ -224,7 +224,7 @@ pub(crate) struct CursorInformation {
     pub(crate) max_time: Option<Duration>,
 }
 
-/// Reads a `getMore` response form the server without sending a `getMore` command.
+/// Reads a `getMore` response from the server without sending a `getMore` command.
 pub(super) async fn read_exhaust_get_more(
     mut conn: Connection,
 ) -> Result<CursorResponse<GetMoreResult>> {
