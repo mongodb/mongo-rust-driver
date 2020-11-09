@@ -51,14 +51,14 @@ impl TestClient {
         Self::with_options(None, true).await
     }
 
-    pub async fn with_options(options: Option<ClientOptions>, collect_build_info: bool) -> Self {
-        Self::with_handler(None, options, collect_build_info).await
+    pub async fn with_options(options: Option<ClientOptions>, collect_server_info: bool) -> Self {
+        Self::with_handler(None, options, collect_server_info).await
     }
 
     async fn with_handler(
         event_handler: Option<EventHandler>,
         options: impl Into<Option<ClientOptions>>,
-        collect_build_info: bool
+        collect_server_info: bool
     ) -> Self {
         let mut options = options.into().unwrap_or_else(|| CLIENT_OPTIONS.clone());
 
@@ -89,7 +89,7 @@ impl TestClient {
 
         let mut server_version = None;
 
-        if collect_build_info {
+        if collect_server_info {
             let build_info = RunCommand::new("test".into(), doc! { "buildInfo":  1 }, None).unwrap();
 
             let response = client
@@ -107,13 +107,14 @@ impl TestClient {
             options,
             server_info,
             server_version,
+            server_parameters,
         }
     }
 
     pub async fn with_additional_options(
         options: Option<ClientOptions>,
         use_multiple_mongoses: bool,
-        collect_build_info: bool,
+        collect_server_info: bool,
     ) -> Self {
         let mut options = match options {
             Some(mut options) => {
@@ -125,7 +126,7 @@ impl TestClient {
         if !use_multiple_mongoses && Self::new().await.is_sharded() {
             options.hosts = options.hosts.iter().cloned().take(1).collect();
         }
-        Self::with_options(Some(options), collect_build_info).await
+        Self::with_options(Some(options), collect_server_info).await
     }
 
     pub async fn create_user(
