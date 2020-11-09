@@ -319,7 +319,7 @@ async fn cluster_time_in_commands() {
 async fn session_usage() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
-    let client = EventClient::new().await;
+    let client = TestClient::new().await;
     if client.is_standalone() {
         return;
     }
