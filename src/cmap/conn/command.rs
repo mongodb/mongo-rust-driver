@@ -4,7 +4,7 @@ use super::wire::Message;
 use crate::{
     bson::{Bson, Document},
     bson_util,
-    client::{ClientSession, ClusterTime, options::ServerApi},
+    client::{options::ServerApi, ClientSession, ClusterTime},
     error::{CommandError, ErrorKind, Result},
     options::StreamAddress,
     selection_criteria::ReadPreference,

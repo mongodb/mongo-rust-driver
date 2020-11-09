@@ -59,7 +59,7 @@ impl TestClient {
     async fn with_handler(
         event_handler: Option<EventHandler>,
         options: impl Into<Option<ClientOptions>>,
-        collect_server_info: bool
+        collect_server_info: bool,
     ) -> Self {
         let mut options = options.into().unwrap_or_else(|| CLIENT_OPTIONS.clone());
 
@@ -92,7 +92,8 @@ impl TestClient {
         let mut server_parameters = None;
 
         if collect_server_info {
-            let build_info = RunCommand::new("test".into(), doc! { "buildInfo":  1 }, None).unwrap();
+            let build_info =
+                RunCommand::new("test".into(), doc! { "buildInfo":  1 }, None).unwrap();
 
             let response = client
                 .execute_operation_with_session(build_info, &mut session)
@@ -103,12 +104,10 @@ impl TestClient {
             let server_version_str = info.version.split('-').next().unwrap();
             server_version = Some(Version::parse(server_version_str).unwrap());
 
-            let get_parameters = RunCommand::new("admin".into(), doc! { "getParameter": "*" }, None).unwrap();
+            let get_parameters =
+                RunCommand::new("admin".into(), doc! { "getParameter": "*" }, None).unwrap();
 
-            let response = client
-                .execute_operation(get_parameters)
-                .await
-                .unwrap();
+            let response = client.execute_operation(get_parameters).await.unwrap();
 
             server_parameters = Some(Bson::Document(response));
         }
@@ -277,29 +276,34 @@ impl TestClient {
 
     #[allow(dead_code)]
     pub fn server_version_eq(&self, major: u64, minor: u64) -> bool {
-        self.server_version.as_ref().unwrap().major == major && self.server_version.as_ref().unwrap().minor == minor
+        self.server_version.as_ref().unwrap().major == major
+            && self.server_version.as_ref().unwrap().minor == minor
     }
 
     #[allow(dead_code)]
     pub fn server_version_gt(&self, major: u64, minor: u64) -> bool {
         self.server_version.as_ref().unwrap().major > major
-            || (self.server_version.as_ref().unwrap().major == major && self.server_version.as_ref().unwrap().minor > minor)
+            || (self.server_version.as_ref().unwrap().major == major
+                && self.server_version.as_ref().unwrap().minor > minor)
     }
 
     pub fn server_version_gte(&self, major: u64, minor: u64) -> bool {
         self.server_version.as_ref().unwrap().major > major
-            || (self.server_version.as_ref().unwrap().major == major && self.server_version.as_ref().unwrap().minor >= minor)
+            || (self.server_version.as_ref().unwrap().major == major
+                && self.server_version.as_ref().unwrap().minor >= minor)
     }
 
     pub fn server_version_lt(&self, major: u64, minor: u64) -> bool {
         self.server_version.as_ref().unwrap().major < major
-            || (self.server_version.as_ref().unwrap().major == major && self.server_version.as_ref().unwrap().minor < minor)
+            || (self.server_version.as_ref().unwrap().major == major
+                && self.server_version.as_ref().unwrap().minor < minor)
     }
 
     #[allow(dead_code)]
     pub fn server_version_lte(&self, major: u64, minor: u64) -> bool {
         self.server_version.as_ref().unwrap().major < major
-            || (self.server_version.as_ref().unwrap().major == major && self.server_version.as_ref().unwrap().minor <= minor)
+            || (self.server_version.as_ref().unwrap().major == major
+                && self.server_version.as_ref().unwrap().minor <= minor)
     }
 
     pub async fn drop_collection(&self, db_name: &str, coll_name: &str) {

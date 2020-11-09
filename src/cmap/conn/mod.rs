@@ -12,6 +12,7 @@ use derivative::Derivative;
 use self::wire::Message;
 use super::manager::PoolManager;
 use crate::{
+    client::options::ServerApi,
     cmap::options::{ConnectionOptions, StreamOptions},
     error::{ErrorKind, Result},
     event::cmap::{
@@ -29,7 +30,6 @@ use crate::{
 pub(crate) use command::{Command, CommandResponse};
 pub(crate) use stream_description::StreamDescription;
 pub(crate) use wire::next_request_id;
-use crate::client::options::ServerApi;
 
 /// User-facing information about a connection to the database.
 #[derive(Clone, Debug)]
@@ -99,7 +99,9 @@ impl Connection {
             ready_and_available_time: None,
             stream: AsyncStream::connect(stream_options).await?,
             address,
-            server_api: options.as_ref().and_then(|options| options.server_api.clone()),
+            server_api: options
+                .as_ref()
+                .and_then(|options| options.server_api.clone()),
             handler: options.and_then(|options| options.event_handler),
             stream_description: None,
             error: false,

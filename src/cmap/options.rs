@@ -6,11 +6,10 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     bson_util,
-    client::auth::Credential,
+    client::{auth::Credential, options::ServerApi},
     event::cmap::CmapEventHandler,
     options::{ClientOptions, DriverInfo, StreamAddress, TlsOptions},
 };
-use crate::client::options::ServerApi;
 
 /// Contains the options for creating a connection pool. While these options are specified at the
 /// client-level, `ConnectionPoolOptions` is exposed for the purpose of CMAP event handling.

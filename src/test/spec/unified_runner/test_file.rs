@@ -9,6 +9,7 @@ use super::{Operation, TestEvent};
 
 use crate::{
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
+    client::options::{ServerApi, ServerApiVersion},
     concern::{Acknowledgment, ReadConcernLevel},
     error::Error,
     options::{
@@ -23,7 +24,6 @@ use crate::{
     },
     test::{spec::unified_runner::results_match, TestClient, DEFAULT_URI},
 };
-use crate::client::options::{ServerApi, ServerApiVersion};
 use bson::document::ValueAccessError;
 
 #[derive(Debug, Deserialize)]
@@ -199,17 +199,17 @@ where
         version: match server_api.get_str("version") {
             Ok(v) => ServerApiVersion::from_str(v).unwrap(),
             Err(ValueAccessError::NotPresent) => panic!("Need to provide server API version"),
-            _ => panic!("Invalid server API version given")
+            _ => panic!("Invalid server API version given"),
         },
         strict: match server_api.get_bool("strict") {
             Ok(v) => Some(v),
             Err(ValueAccessError::NotPresent) => None,
-            _ => panic!("Invalid strict value for server API given")
+            _ => panic!("Invalid strict value for server API given"),
         },
         deprecation_errors: match server_api.get_bool("deprecationErrors") {
             Ok(v) => Some(v),
             Err(ValueAccessError::NotPresent) => None,
-            _ => panic!("Invalid deprecationErrors value for server API given")
+            _ => panic!("Invalid deprecationErrors value for server API given"),
         },
     };
 

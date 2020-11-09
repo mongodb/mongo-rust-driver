@@ -29,7 +29,7 @@ use typed_builder::TypedBuilder;
 use webpki_roots::TLS_SERVER_ROOTS;
 
 use crate::{
-    bson::{Bson, doc, Document},
+    bson::{doc, Bson, Document},
     client::auth::{AuthMechanism, Credential},
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::{ErrorKind, Result},
@@ -217,7 +217,7 @@ impl FromStr for ServerApiVersion {
             _ => Err(ErrorKind::ArgumentError {
                 message: format!("invalid server api version string: {}", str),
             }
-            .into())
+            .into()),
         }
     }
 }
@@ -261,10 +261,7 @@ impl ServerApi {
 
     pub(crate) fn applies_to_command(&self, command_name: &str) -> bool {
         // TODO RUST-90: Don't include version fields for commands run as part of a transaction
-        match command_name {
-            "getMore" => false,
-            _ => true
-        }
+        !matches!(command_name, "getMore")
     }
 }
 

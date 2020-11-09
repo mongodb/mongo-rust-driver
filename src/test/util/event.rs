@@ -9,6 +9,7 @@ use tokio::sync::RwLockReadGuard;
 use super::TestClient;
 use crate::{
     bson::doc,
+    client::options::ServerApi,
     event::{
         cmap::{CmapEventHandler, PoolClearedEvent},
         command::{
@@ -21,7 +22,6 @@ use crate::{
     options::ClientOptions,
     test::{CLIENT_OPTIONS, LOCK},
 };
-use crate::client::options::ServerApi;
 
 pub type EventQueue<T> = Arc<RwLock<VecDeque<T>>>;
 
@@ -129,7 +129,10 @@ impl EventClient {
         EventClient::with_options(None, true).await
     }
 
-    pub async fn with_options(options: impl Into<Option<ClientOptions>>, collect_server_info: bool) -> Self {
+    pub async fn with_options(
+        options: impl Into<Option<ClientOptions>>,
+        collect_server_info: bool,
+    ) -> Self {
         let handler = EventHandler::default();
         let command_events = handler.command_events.clone();
         let pool_cleared_events = handler.pool_cleared_events.clone();

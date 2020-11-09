@@ -85,7 +85,8 @@ async fn run_command_monitoring_test(test_file: TestFile) {
             .expect("insert many error");
 
         let options = ClientOptions::builder().retry_writes(false).build();
-        let client = EventClient::with_additional_options(Some(options), None, Some(false), true).await;
+        let client =
+            EventClient::with_additional_options(Some(options), None, Some(false), true).await;
 
         let events: Vec<TestEvent> = client
             .run_operation_with_events(
