@@ -30,7 +30,7 @@ pub struct TestFile {
     pub schema_version: Version,
     pub run_on_requirements: Option<Vec<RunOnRequirement>>,
     pub allow_multiple_mongoses: Option<bool>,
-    pub create_entities: Option<Vec<Entity>>,
+    pub create_entities: Option<Vec<TestFileEntity>>,
     pub initial_data: Option<Vec<CollectionData>>,
     pub tests: Vec<TestCase>,
 }
@@ -94,7 +94,7 @@ impl RunOnRequirement {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub enum Entity {
+pub enum TestFileEntity {
     Client(Client),
     Database(Database),
     Collection(Collection),
@@ -210,7 +210,6 @@ pub struct Stream {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CollectionOrDatabaseOptions {
-    // TODO properly implement Deserialize for ReadConcern
     pub read_concern: Option<ReadConcern>,
     #[serde(rename = "readPreference")]
     pub selection_criteria: Option<SelectionCriteria>,
