@@ -36,6 +36,7 @@ pub struct TestClient {
     pub options: ClientOptions,
     pub server_info: IsMasterCommandResponse,
     pub server_version: Option<Version>,
+    pub server_parameters: Option<Bson>,
 }
 
 impl std::ops::Deref for TestClient {
@@ -88,6 +89,7 @@ impl TestClient {
         .unwrap();
 
         let mut server_version = None;
+        let mut server_parameters = None;
 
         if collect_server_info {
             let build_info = RunCommand::new("test".into(), doc! { "buildInfo":  1 }, None).unwrap();
@@ -100,6 +102,15 @@ impl TestClient {
             let info: BuildInfo = bson::from_bson(Bson::Document(response)).unwrap();
             let server_version_str = info.version.split('-').next().unwrap();
             server_version = Some(Version::parse(server_version_str).unwrap());
+
+            let get_parameters = RunCommand::new("admin".into(), doc! { "getParameter": "*" }, None).unwrap();
+
+            let response = client
+                .execute_operation(get_parameters)
+                .await
+                .unwrap();
+
+            server_parameters = Some(Bson::Document(response));
         }
 
         Self {

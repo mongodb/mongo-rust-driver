@@ -21,7 +21,7 @@ use crate::{
         SelectionCriteria,
         WriteConcern,
     },
-    test::{TestClient, DEFAULT_URI},
+    test::{spec::unified_runner::results_match, TestClient, DEFAULT_URI},
 };
 use crate::client::options::{ServerApi, ServerApiVersion};
 use bson::document::ValueAccessError;
@@ -64,6 +64,7 @@ pub struct RunOnRequirement {
     min_server_version: Option<String>,
     max_server_version: Option<String>,
     topologies: Option<Vec<Topology>>,
+    server_parameters: Option<Document>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -92,6 +93,16 @@ impl RunOnRequirement {
         }
         if let Some(ref topologies) = self.topologies {
             if !topologies.contains(&client.topology().await) {
+                return false;
+            }
+        }
+        if let Some(ref actual_server_parameters) = self.server_parameters {
+            if !results_match(
+                Some(client.server_parameters.as_ref().unwrap()),
+                &Bson::Document(actual_server_parameters.clone()),
+                false,
+                None,
+            ) {
                 return false;
             }
         }
