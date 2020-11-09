@@ -19,7 +19,7 @@ fn doc_x(i: i32) -> Document {
 async fn exhaust_test() {
     let client = EventClient::new().await;
 
-    if client.server_version_lt(4, 2) || (client.server_version_gte(4, 4) && client.is_sharded()) {
+    if client.server_version_lt(4, 2) || client.is_sharded() {
         return;
     }
 
