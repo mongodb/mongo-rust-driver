@@ -11,6 +11,7 @@ use crate::{
     error::{ErrorKind, Result, WriteFailure},
     event::command::CommandStartedEvent,
     options::{
+        Acknowledgment,
         AggregateOptions,
         DeleteOptions,
         FindOneAndDeleteOptions,
@@ -21,10 +22,12 @@ use crate::{
         ReadPreference,
         SelectionCriteria,
         UpdateOptions,
+        WriteConcern,
     },
     results::DeleteResult,
     test::{
         util::{drop_collection, CommandEvent, EventClient, TestClient},
+        CLIENT_OPTIONS,
         LOCK,
     },
     Collection,
@@ -942,4 +945,29 @@ async fn typed_returns() {
             str: "a".into()
         }
     );
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn count_documents_with_wc() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
+    let mut options = CLIENT_OPTIONS.clone();
+    options.write_concern = WriteConcern::builder()
+        .w(Acknowledgment::Majority)
+        .journal(true)
+        .build()
+        .into();
+
+    let client = TestClient::with_options(Some(options)).await;
+    let coll = client
+        .database(function_name!())
+        .collection(function_name!());
+
+    coll.insert_one(doc! {}, None).await.unwrap();
+
+    coll.count_documents(doc! {}, None)
+        .await
+        .expect("count_documents should succeed");
 }

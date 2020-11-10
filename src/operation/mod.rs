@@ -1,5 +1,6 @@
 mod aggregate;
 mod count;
+mod count_documents;
 mod create;
 mod delete;
 mod distinct;
@@ -37,6 +38,7 @@ use crate::{
 
 pub(crate) use aggregate::Aggregate;
 pub(crate) use count::Count;
+pub(crate) use count_documents::CountDocuments;
 pub(crate) use create::Create;
 pub(crate) use delete::Delete;
 pub(crate) use distinct::Distinct;

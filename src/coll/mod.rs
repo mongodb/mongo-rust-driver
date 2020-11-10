@@ -20,6 +20,7 @@ use crate::{
     operation::{
         Aggregate,
         Count,
+        CountDocuments,
         Delete,
         Distinct,
         DropCollection,
@@ -232,70 +233,9 @@ where
         options: impl Into<Option<CountOptions>>,
     ) -> Result<i64> {
         let options = options.into();
-
-        let mut pipeline = vec![doc! {
-            "$match": filter.into().unwrap_or_default(),
-        }];
-
-        if let Some(skip) = options.as_ref().and_then(|opts| opts.skip) {
-            pipeline.push(doc! {
-                "$skip": skip
-            });
-        }
-
-        if let Some(limit) = options.as_ref().and_then(|opts| opts.limit) {
-            pipeline.push(doc! {
-                "$limit": limit
-            });
-        }
-
-        pipeline.push(doc! {
-            "$group": {
-                "_id": 1,
-                "n": { "$sum": 1 },
-            }
-        });
-
-        let aggregate_options = options.map(|opts| {
-            AggregateOptions::builder()
-                .hint(opts.hint)
-                .max_time(opts.max_time)
-                .collation(opts.collation)
-                .build()
-        });
-
-        let result = match self
-            .aggregate(pipeline, aggregate_options)
-            .await?
-            .next()
-            .await
-        {
-            Some(doc) => doc?,
-            None => return Ok(0),
-        };
-
-        let n = match result.get("n") {
-            Some(n) => n,
-            None => {
-                return Err(ErrorKind::ResponseError {
-                    message: "server response to count_documents aggregate did not contain the \
-                              'n' field"
-                        .into(),
-                }
-                .into())
-            }
-        };
-
-        bson_util::get_int(n).ok_or_else(|| {
-            ErrorKind::ResponseError {
-                message: format!(
-                    "server response to count_documents aggregate should have contained integer \
-                     'n', but instead had {:?}",
-                    n
-                ),
-            }
-            .into()
-        })
+        let filter = filter.into();
+        let op = CountDocuments::new(self.namespace(), filter, options);
+        self.client().execute_operation(op).await
     }
 
     /// Deletes all documents stored in the collection matching `query`.
