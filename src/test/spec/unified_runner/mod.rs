@@ -24,7 +24,7 @@ pub use self::{
     matcher::results_match,
     operation::{Operation, OperationObject},
     test_event::TestEvent,
-    test_file::{CollectionData, TestFileEntity, ExpectError, TestFile, Topology},
+    test_file::{CollectionData, ExpectError, TestFile, TestFileEntity, Topology},
 };
 
 lazy_static! {
