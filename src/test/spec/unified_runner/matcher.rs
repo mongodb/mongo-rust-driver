@@ -1,4 +1,7 @@
-use crate::{bson::{doc, spec::ElementType, Bson}, bson_util::get_int};
+use crate::{
+    bson::{doc, spec::ElementType, Bson},
+    bson_util::get_int,
+};
 
 use super::EntityMap;
 
@@ -314,4 +317,20 @@ async fn extra_fields() {
         false,
         None,
     ));
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn numbers() {
+    let actual = Bson::Int32(2);
+    let expected = Bson::Int64(2);
+    assert!(results_match(Some(&actual), &expected, false, None));
+
+    let actual = Bson::Double(2.5);
+    let expected = Bson::Int32(2);
+    assert!(!results_match(Some(&actual), &expected, false, None));
+
+    let actual = Bson::Double(2.0);
+    let expected = Bson::Int64(2);
+    assert!(results_match(Some(&actual), &expected, false, None));
 }
