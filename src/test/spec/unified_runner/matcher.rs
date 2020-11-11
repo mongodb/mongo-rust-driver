@@ -1,6 +1,4 @@
-use num::FromPrimitive;
-
-use crate::bson::{doc, spec::ElementType, Bson};
+use crate::{bson::{doc, spec::ElementType, Bson}, bson_util::get_int};
 
 use super::EntityMap;
 
@@ -90,32 +88,9 @@ fn numbers_match(actual: &Bson, expected: &Bson) -> bool {
         return actual == expected;
     }
 
-    match (actual, expected) {
-        (Bson::Int32(actual), Bson::Int64(expected)) => i32_matches_i64(*actual, *expected),
-        (Bson::Int64(actual), Bson::Int32(expected)) => i32_matches_i64(*expected, *actual),
-        (Bson::Int32(actual), Bson::Double(expected)) => i32_matches_f64(*actual, *expected),
-        (Bson::Double(actual), Bson::Int32(expected)) => i32_matches_f64(*expected, *actual),
-        (Bson::Int64(actual), Bson::Double(expected)) => i64_matches_f64(*actual, *expected),
-        (Bson::Double(actual), Bson::Int64(expected)) => i64_matches_f64(*expected, *actual),
+    match (get_int(actual), get_int(expected)) {
+        (Some(actual), Some(expected)) => actual == expected,
         _ => false,
-    }
-}
-
-fn i32_matches_i64(int: i32, long: i64) -> bool {
-    int as i64 == long
-}
-
-fn i32_matches_f64(int: i32, double: f64) -> bool {
-    match f64::from_i32(int) {
-        Some(n) => n == double,
-        None => false,
-    }
-}
-
-fn i64_matches_f64(long: i64, double: f64) -> bool {
-    match f64::from_i64(long) {
-        Some(n) => n == double,
-        None => false,
     }
 }
 
