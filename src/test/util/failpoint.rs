@@ -40,6 +40,7 @@ impl FailPoint {
             "mode": bson::to_bson(&mode).unwrap(),
             "data": data,
         };
+        println!("fp command: {}", command);
         FailPoint { command }
     }
 
@@ -101,6 +102,10 @@ pub enum FailPointMode {
 #[derive(Debug, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FailCommandOptions {
+    /// The appName that a client must use in order to hit this fail point.
+    #[builder(default)]
+    app_name: Option<String>,
+
     /// If non-null, how long the server should block the affected commands.
     /// Only available in 4.2.9+.
     #[serde(serialize_with = "serialize_block_connection")]

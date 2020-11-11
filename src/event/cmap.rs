@@ -31,6 +31,16 @@ pub struct PoolCreatedEvent {
     pub options: Option<ConnectionPoolOptions>,
 }
 
+/// Event emitted when a connection pool becomes ready.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[non_exhaustive]
+pub struct PoolReadyEvent {
+    /// The address of the server that the pool's connections will connect to.
+    #[serde(default = "self::empty_address")]
+    #[serde(skip)]
+    pub address: StreamAddress,
+}
+
 /// Event emitted when a connection pool is cleared.
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[non_exhaustive]
@@ -240,6 +250,10 @@ pub trait CmapEventHandler: Send + Sync {
     /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
     /// whenever a connection pool is created.
     fn handle_pool_created_event(&self, _event: PoolCreatedEvent) {}
+
+    /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
+    /// whenever a connection pool is cleared.
+    fn handle_pool_ready_event(&self, _event: PoolReadyEvent) {}
 
     /// A [`Client`](../../struct.Client.html) will call this method on each registered handler
     /// whenever a connection pool is cleared.

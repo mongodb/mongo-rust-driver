@@ -860,6 +860,7 @@ impl ClientOptions {
     /// Ensure the options set are valid, returning an error descirbing the problem if they are not.
     pub(crate) fn validate(&self) -> Result<()> {
         if let Some(true) = self.direct_connection {
+            println!("hosts: {:?}", self.hosts);
             if self.hosts.len() > 1 {
                 return Err(ErrorKind::ArgumentError {
                     message: "cannot specify multiple seeds with directConnection=true".to_string(),

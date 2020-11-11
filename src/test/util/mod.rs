@@ -4,7 +4,7 @@ mod lock;
 mod matchable;
 
 pub use self::{
-    event::{CommandEvent, EventClient},
+    event::{CmapEvent, CommandEvent, Event, EventClient},
     failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     lock::TestLock,
     matchable::{assert_matches, Matchable},

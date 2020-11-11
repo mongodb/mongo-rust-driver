@@ -13,7 +13,15 @@ use crate::{
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::ErrorKind,
     options::{ClientOptions, CollectionOptions, FindOptions, InsertManyOptions},
-    test::{assert_matches, run_spec_test, util::get_db_name, EventClient, TestClient, LOCK},
+    test::{
+        assert_matches,
+        run_spec_test,
+        util::get_db_name,
+        EventClient,
+        TestClient,
+        CLIENT_OPTIONS,
+        LOCK,
+    },
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -25,8 +33,12 @@ async fn run_spec_tests() {
                 continue;
             }
 
+            let options = test_case.client_options.map(|mut opts| {
+                opts.hosts = CLIENT_OPTIONS.hosts.clone();
+                opts
+            });
             let client = EventClient::with_additional_options(
-                test_case.client_options,
+                options,
                 Some(Duration::from_millis(50)),
                 test_case.use_multiple_mongoses,
                 true,

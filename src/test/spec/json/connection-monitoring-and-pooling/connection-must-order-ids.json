@@ -4,6 +4,9 @@
   "description": "must have IDs assigned in order of creation",
   "operations": [
     {
+      "name": "ready"
+    },
+    {
       "name": "checkOut"
     },
     {
@@ -42,6 +45,7 @@
   ],
   "ignore": [
     "ConnectionPoolCreated",
+    "ConnectionPoolReady",
     "ConnectionPoolClosed",
     "ConnectionReady"
   ]

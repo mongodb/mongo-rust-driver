@@ -32,7 +32,8 @@ async fn acquire_connection_and_send_command() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client_options = CLIENT_OPTIONS.clone();
-    let pool_options = ConnectionPoolOptions::from_client_options(&client_options);
+    let mut pool_options = ConnectionPoolOptions::from_client_options(&client_options);
+    pool_options.ready = Some(true);
 
     let pool = ConnectionPool::new(
         client_options.hosts[0].clone(),
@@ -106,6 +107,8 @@ async fn concurrent_connections() {
     let client_options = CLIENT_OPTIONS.clone();
     let mut options = ConnectionPoolOptions::from_client_options(&client_options);
     options.event_handler = Some(handler.clone() as Arc<dyn crate::cmap::CmapEventHandler>);
+    options.ready = Some(true);
+
     let pool = ConnectionPool::new(
         CLIENT_OPTIONS.hosts[0].clone(),
         Default::default(),
@@ -179,7 +182,9 @@ async fn connection_error_during_establishment() {
 
     let handler = Arc::new(EventHandler::new());
     let mut subscriber = handler.subscribe();
+
     let mut options = ConnectionPoolOptions::from_client_options(&client_options);
+    options.ready = Some(true);
     options.event_handler = Some(handler.clone() as Arc<dyn crate::cmap::CmapEventHandler>);
     let pool = ConnectionPool::new(
         client_options.hosts[0].clone(),

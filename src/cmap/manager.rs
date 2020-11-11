@@ -1,6 +1,6 @@
 use tokio::sync::mpsc;
 
-use super::Connection;
+use super::{worker::ConnectionCreationReason, Connection};
 use crate::error::Error;
 
 pub(super) fn channel() -> (PoolManager, ManagementRequestReceiver) {
@@ -24,6 +24,16 @@ impl PoolManager {
         let _ = self.sender.send(PoolManagementRequest::Clear);
     }
 
+    /// Open the pool.
+    pub(super) async fn open(&self) {
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        if let Ok(_) = self.sender.send(PoolManagementRequest::Open {
+            completion_handler: sender,
+        }) {
+            receiver.await;
+        }
+    }
+
     /// Check in the given connection to the pool.
     /// This returns an error containing the connection if the pool has been dropped already.
     pub(crate) fn check_in(&self, connection: Connection) -> std::result::Result<(), Connection> {
@@ -35,10 +45,17 @@ impl PoolManager {
     }
 
     /// Notify the pool that establishing a connection failed.
-    pub(super) fn handle_connection_failed(&self, error: Error) {
+    pub(super) fn handle_connection_failed(
+        &self,
+        error: Error,
+        creation_reason: ConnectionCreationReason,
+    ) {
         let _ = self
             .sender
-            .send(PoolManagementRequest::HandleConnectionFailed(error));
+            .send(PoolManagementRequest::HandleConnectionFailed {
+                error,
+                creation_reason,
+            });
     }
 
     /// Notify the pool that establishing a connection succeeded.
@@ -63,8 +80,14 @@ impl ManagementRequestReceiver {
 #[derive(Debug)]
 pub(super) enum PoolManagementRequest {
     Clear,
+    Open {
+        completion_handler: tokio::sync::oneshot::Sender<()>,
+    },
     CheckIn(Connection),
-    HandleConnectionFailed(Error),
+    HandleConnectionFailed {
+        error: Error,
+        creation_reason: ConnectionCreationReason,
+    },
     HandleConnectionSucceeded(Option<Connection>),
 }
 

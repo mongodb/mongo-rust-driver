@@ -87,6 +87,7 @@ Valid Unit Test Operations are the following:
 
 - ``pool.clear()``: call ``clear`` on Pool
 - ``pool.close()``: call ``close`` on Pool
+- ``pool.ready()``: call ``ready`` on Pool
 
 
 Integration Test Format

@@ -283,11 +283,6 @@ impl EventClient {
         let _: Result<_> = operation
             .execute(self.database(database_name).collection(collection_name))
             .await;
-        self.command_events
-            .write()
-            .unwrap()
-            .drain(..)
-            .filter(|event| operation.command_names().contains(&event.command_name()))
-            .collect()
+        self.get_command_events(operation.command_names())
     }
 }

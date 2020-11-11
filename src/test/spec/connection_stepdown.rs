@@ -15,7 +15,7 @@ use crate::{
         InsertManyOptions,
         WriteConcern,
     },
-    test::{util::EventClient, LOCK},
+    test::{util::EventClient, CLIENT_OPTIONS, LOCK},
     Collection,
     Database,
     RUNTIME,
@@ -24,7 +24,10 @@ use crate::{
 async fn run_test<F: Future>(name: &str, test: impl Fn(EventClient, Database, Collection) -> F) {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
-    let options = ClientOptions::builder().retry_writes(false).build();
+    let options = ClientOptions::builder()
+        .retry_writes(false)
+        .hosts(CLIENT_OPTIONS.hosts.clone())
+        .build();
     let client = EventClient::with_additional_options(Some(options), None, None, true).await;
 
     if !client.is_replica_set() {
@@ -102,7 +105,7 @@ async fn get_more() {
         }
 
         RUNTIME.delay_for(Duration::from_millis(250)).await;
-        assert!(client.pool_cleared_events.read().unwrap().is_empty());
+        assert!(client.get_pool_cleared_events().is_empty());
     }
 
     run_test(function_name!(), get_more_test).await;
@@ -148,7 +151,7 @@ async fn not_master_keep_pool() {
             .expect("insert should have succeeded");
 
         RUNTIME.delay_for(Duration::from_millis(250)).await;
-        assert!(client.pool_cleared_events.read().unwrap().is_empty());
+        assert!(client.get_pool_cleared_events().is_empty());
     }
 
     run_test(function_name!(), not_master_keep_pool_test).await;
@@ -190,7 +193,7 @@ async fn not_master_reset_pool() {
         );
 
         RUNTIME.delay_for(Duration::from_millis(250)).await;
-        assert!(client.pool_cleared_events.read().unwrap().len() == 1);
+        assert!(client.get_pool_cleared_events().len() == 1);
 
         coll.insert_one(doc! { "test": 1 }, None)
             .await
@@ -235,7 +238,7 @@ async fn shutdown_in_progress() {
         );
 
         RUNTIME.delay_for(Duration::from_millis(250)).await;
-        assert!(client.pool_cleared_events.read().unwrap().len() == 1);
+        assert!(client.get_pool_cleared_events().len() == 1);
 
         coll.insert_one(doc! { "test": 1 }, None)
             .await
@@ -280,7 +283,7 @@ async fn interrupted_at_shutdown() {
         );
 
         RUNTIME.delay_for(Duration::from_millis(250)).await;
-        assert!(client.pool_cleared_events.read().unwrap().len() == 1);
+        assert!(client.get_pool_cleared_events().len() == 1);
 
         coll.insert_one(doc! { "test": 1 }, None)
             .await

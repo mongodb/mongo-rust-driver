@@ -136,7 +136,7 @@ impl Topology {
         let topology = Topology { state, common };
 
         for (address, server) in servers {
-            Monitor::start(address, Arc::downgrade(&server), topology.downgrade());
+            Monitor::start(address, &server, topology.downgrade());
         }
 
         SrvPollingMonitor::start(topology.downgrade());
@@ -261,8 +261,12 @@ impl Topology {
 
     /// Marks a server in the cluster as unknown due to the given `error`.
     async fn mark_server_as_unknown(&self, error: Error, address: StreamAddress) {
+        let a = address.clone();
+        println!("{}: marking as unknown", address);
         let description = ServerDescription::new(address, Some(Err(error)));
         self.update(description).await;
+        println!("{}", self.state.read().await.description);
+        println!("{}: done marking as unknown", a);
     }
 
     /// Updates the topology using the given `ServerDescription`. Monitors for new servers will
@@ -347,6 +351,18 @@ impl Topology {
 
     pub(super) async fn is_unknown(&self) -> bool {
         self.state.read().await.description.topology_type() == TopologyType::Unknown
+    }
+
+    pub(crate) async fn get_server_description(
+        &self,
+        address: &StreamAddress,
+    ) -> Option<ServerDescription> {
+        self.state
+            .read()
+            .await
+            .description
+            .get_server_description(address)
+            .cloned()
     }
 }
 
@@ -462,7 +478,7 @@ impl TopologyState {
     /// Start a monitor for the server at the given address if it is part of the topology.
     fn start_monitoring_server(&self, address: StreamAddress, topology: WeakTopology) {
         if let Some(server) = self.servers.get(&address) {
-            Monitor::start(address, Arc::downgrade(&server), topology);
+            Monitor::start(address, server, topology);
         }
     }
 }

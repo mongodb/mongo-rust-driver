@@ -1,0 +1,80 @@
+use crate::error::Error;
+
+#[derive(Clone, Debug)]
+struct PoolStatus {
+    generation: u32,
+    background_establishment_error: Option<Error>,
+}
+
+impl Default for PoolStatus {
+    fn default() -> Self {
+        PoolStatus {
+            generation: 0,
+            background_establishment_error: None,
+        }
+    }
+}
+
+/// Create a channel for publishing and receiving updates to the pool's generation.
+pub(super) fn channel() -> (PoolGenerationPublisher, PoolGenerationSubscriber) {
+    let (sender, receiver) = tokio::sync::watch::channel(Default::default());
+    (
+        PoolGenerationPublisher { sender },
+        PoolGenerationSubscriber { receiver },
+    )
+}
+
+/// Struct used to publish updates to the pool's generation.
+#[derive(Debug)]
+pub(super) struct PoolGenerationPublisher {
+    sender: tokio::sync::watch::Sender<PoolStatus>,
+}
+
+impl PoolGenerationPublisher {
+    /// Publish a new generation.
+    /// If the clear was caused by a background connection establishment error, provide the error.
+    pub(super) fn publish(
+        &self,
+        new_generation: u32,
+        background_establishment_error: Option<Error>,
+    ) {
+        let mut new_status = PoolStatus {
+            generation: new_generation,
+            background_establishment_error,
+        };
+
+        // if nobody is listening, this will return an error, which we don't mind.
+        let _: std::result::Result<_, _> = self.sender.broadcast(new_status);
+    }
+}
+
+/// Subscriber used to get the latest generation of the pool.
+///
+/// This can also be used to listen for when the pool encounters an error during background
+/// establishment.
+#[derive(Clone, Debug)]
+pub(crate) struct PoolGenerationSubscriber {
+    receiver: tokio::sync::watch::Receiver<PoolStatus>,
+}
+
+impl PoolGenerationSubscriber {
+    /// Get a copy of the latest status.
+    pub(crate) fn generation(&self) -> u32 {
+        self.receiver.borrow().generation
+    }
+
+    /// Listen for a background establishment failure.
+    pub(crate) async fn listen_for_background_failure(&mut self) -> Option<Error> {
+        while let Some(status) = self.receiver.recv().await {
+            if let Some(error) = status.background_establishment_error {
+                return Some(error);
+            }
+        }
+        None
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn listen_for_generation_change(&mut self) -> Option<u32> {
+        self.receiver.recv().await.map(|status| status.generation)
+    }
+}

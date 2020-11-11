@@ -70,6 +70,12 @@ pub struct ConnectionPoolOptions {
     #[builder(default)]
     pub min_pool_size: Option<u32>,
 
+    /// Whether to start the pool as "ready" or not.
+    /// For tests only.
+    #[cfg(test)]
+    #[builder(default)]
+    pub ready: Option<bool>,
+
     /// The declared API version
     ///
     /// The default value is to have no declared API version

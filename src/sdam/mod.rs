@@ -5,6 +5,8 @@ mod monitor;
 pub mod public;
 mod srv_polling;
 mod state;
+#[cfg(test)]
+mod test;
 
 pub use self::public::{ServerInfo, ServerType};
 

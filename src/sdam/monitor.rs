@@ -1,4 +1,7 @@
-use std::{sync::Weak, time::Duration};
+use std::{
+    sync::{Arc, Weak},
+    time::Duration,
+};
 
 use super::{
     description::server::{ServerDescription, ServerType},
@@ -6,7 +9,7 @@ use super::{
 };
 use crate::{
     bson::doc,
-    cmap::{is_master, Command, Connection, Handshaker},
+    cmap::{is_master, Command, Connection, Handshaker, PoolGenerationSubscriber},
     error::Result,
     is_master::IsMasterReply,
     options::StreamAddress,
@@ -23,6 +26,7 @@ pub(super) struct Monitor {
     handshaker: Handshaker,
     server: Weak<Server>,
     server_type: ServerType,
+    generation_subscriber: PoolGenerationSubscriber,
     topology: WeakTopology,
 }
 
@@ -30,13 +34,14 @@ impl Monitor {
     /// Starts a monitoring thread associated with a given Server. A weak reference is used to
     /// ensure that the monitoring thread doesn't keep the server alive after it's been removed
     /// from the topology or the client has been dropped.
-    pub(super) fn start(address: StreamAddress, server: Weak<Server>, topology: WeakTopology) {
+    pub(super) fn start(address: StreamAddress, server: &Arc<Server>, topology: WeakTopology) {
         let handshaker = Handshaker::new(Some(topology.client_options().clone().into()));
         let mut monitor = Self {
             address,
             connection: None,
-            server,
+            server: Arc::downgrade(server),
             server_type: ServerType::Unknown,
+            generation_subscriber: server.pool.subscribe_to_generation_updates(),
             topology,
             handshaker,
         };
@@ -53,6 +58,8 @@ impl Monitor {
             .heartbeat_freq
             .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
 
+        let has_min_pool_size = self.topology.client_options().min_pool_size.is_some();
+
         while self.topology.is_alive() {
             if self.server.upgrade().is_none() {
                 break;
@@ -63,7 +70,7 @@ impl Monitor {
                 None => break,
             };
 
-            if self.check_if_topology_changed(&topology).await {
+            if self.check_server(&topology).await {
                 topology.notify_topology_changed();
             }
 
@@ -75,11 +82,27 @@ impl Monitor {
                 .client_options()
                 .heartbeat_freq_test
                 .unwrap_or(MIN_HEARTBEAT_FREQUENCY);
-            RUNTIME.delay_for(min_frequency).await;
+            let wait_for_next_check = async move {
+                RUNTIME.delay_for(min_frequency).await;
+                topology_check_requests_subscriber
+                    .wait_for_message(heartbeat_frequency - min_frequency)
+                    .await;
+            };
 
-            topology_check_requests_subscriber
-                .wait_for_message(heartbeat_frequency - min_frequency)
-                .await;
+            // drop strong reference to topology before going back to sleep in case it drops off
+            // in between checks.
+            drop(topology);
+
+            tokio::select! {
+                _ = wait_for_next_check => {},
+
+                // if the pool encounters an error populating min pool size, set server description to unknown
+                Some(err) = self.generation_subscriber.listen_for_background_failure(), if has_min_pool_size => {
+                    if let Some(topology) = self.topology.upgrade() {
+                        topology.handle_pre_handshake_error(err, self.address.clone()).await;
+                    }
+                },
+            };
         }
     }
 
@@ -87,29 +110,47 @@ impl Monitor {
     /// connection will replaced with a new one.
     ///
     /// Returns true if the topology has changed and false otherwise.
-    async fn check_if_topology_changed(&mut self, topology: &Topology) -> bool {
-        // Send an isMaster to the server.
-        let server_description = self.check_server().await;
+    async fn check_server(&mut self, topology: &Topology) -> bool {
+        let check_result = self
+            .perform_is_master()
+            .await
+            .map(|reply| ServerDescription::new(self.address.clone(), Some(Ok(reply))));
+
+        let mut previous_description = topology
+            .get_server_description(&self.address)
+            .await
+            .unwrap_or_else(|| ServerDescription::new(self.address.clone(), None));
+
+        let server_description = match check_result {
+            Ok(desc) => desc,
+            Err(e) => {
+                println!("failed {}", e);
+                self.clear_connection_pool();
+                let new_desc = ServerDescription::new(self.address.clone(), Some(Err(e.clone())));
+
+                if e.is_network_error() && previous_description.server_type != ServerType::Unknown {
+                    previous_description = new_desc;
+                    ServerDescription::new(
+                        self.address.clone(),
+                        Some(self.perform_is_master().await),
+                    )
+                } else {
+                    new_desc
+                }
+            }
+        };
+        println!("initial type: {:?}", self.server_type);
+        println!("new type: {:?}", server_description.server_type);
+        if previous_description.server_type == ServerType::Unknown
+            && server_description.server_type != ServerType::Unknown
+        {
+            println!("opening pool");
+            self.open_connection_pool().await;
+        }
+
         self.server_type = server_description.server_type;
 
         topology.update(server_description).await
-    }
-
-    async fn check_server(&mut self) -> ServerDescription {
-        let address = self.address.clone();
-
-        match self.perform_is_master().await {
-            Ok(reply) => ServerDescription::new(address, Some(Ok(reply))),
-            Err(e) => {
-                self.clear_connection_pool();
-
-                if self.server_type == ServerType::Unknown {
-                    return ServerDescription::new(address, Some(Err(e)));
-                }
-
-                ServerDescription::new(address, Some(self.perform_is_master().await))
-            }
-        }
     }
 
     async fn perform_is_master(&mut self) -> Result<IsMasterReply> {
@@ -158,7 +199,16 @@ impl Monitor {
 
     fn clear_connection_pool(&self) {
         if let Some(server) = self.server.upgrade() {
+            println!("clearing server pool");
             server.clear_connection_pool();
+        } else {
+            println!("server null");
+        }
+    }
+
+    async fn open_connection_pool(&self) {
+        if let Some(server) = self.server.upgrade() {
+            server.open_connection_pool().await;
         }
     }
 }

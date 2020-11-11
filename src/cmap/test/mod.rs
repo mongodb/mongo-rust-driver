@@ -1,4 +1,4 @@
-mod event;
+pub(crate) mod event;
 mod file;
 mod integration;
 
@@ -72,6 +72,13 @@ struct State {
 impl State {
     // Counts the number of events of the given type that have occurred so far.
     fn count_events(&self, event_type: &str) -> usize {
+        println!("counting {}", event_type);
+        for event in self.handler.events.read().unwrap().iter() {
+            if event.name() == event_type {
+                print!("match!");
+            }
+            println!("{:?}", event.name());
+        }
         self.handler
             .events
             .read()
@@ -262,6 +269,21 @@ impl Operation {
                         .await
                         .expect("did not receive ConnectionPoolCleared event after clearing pool");
                 }
+                Operation::Ready => {
+                    let mut subscriber = state.handler.subscribe();
+
+                    if let Some(pool) = state.pool.read().await.deref() {
+                        pool.ready().await;
+                    }
+
+                    // wait for event to be emitted to ensure pool is ready.
+                    subscriber
+                        .wait_for_event(EVENT_TIMEOUT, |e| {
+                            matches!(e, Event::ConnectionPoolReady(_))
+                        })
+                        .await
+                        .expect("did not receive ConnectionPoolReady event after marking pool as ready");
+                }
             }
             Operation::Close => {
                 let mut subscriber = state.handler.subscribe();
@@ -343,6 +365,7 @@ impl Matchable for Event {
             ) => actual.reason == expected.reason,
             (Event::ConnectionCheckOutStarted(_), Event::ConnectionCheckOutStarted(_)) => true,
             (Event::ConnectionPoolCleared(_), Event::ConnectionPoolCleared(_)) => true,
+            (Event::ConnectionPoolReady(_), Event::ConnectionPoolReady(_)) => true,
             (Event::ConnectionPoolClosed(_), Event::ConnectionPoolClosed(_)) => true,
             _ => false,
         }

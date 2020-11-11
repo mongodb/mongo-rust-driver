@@ -80,6 +80,7 @@ impl Client {
         op: T,
         mut session: Option<&mut ClientSession>,
     ) -> Result<T::O> {
+        println!("executing {}", T::NAME);
         let server = self.select_server(op.selection_criteria()).await?;
 
         let mut conn = match server.checkout_connection().await {

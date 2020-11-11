@@ -1,11 +1,11 @@
-#[cfg(not(feature = "sync"))]
-mod atlas_connectivity;
-mod auth_aws;
-mod client;
-mod coll;
-mod cursor;
-mod db;
-mod documentation_examples;
+// #[cfg(not(feature = "sync"))]
+// mod atlas_connectivity;
+// mod auth_aws;
+// mod client;
+// mod coll;
+// mod cursor;
+// mod db;
+// mod documentation_examples;
 mod spec;
 mod util;
 
@@ -21,7 +21,9 @@ pub(crate) use self::{
     },
     util::{
         assert_matches,
+        CmapEvent,
         CommandEvent,
+        Event,
         EventClient,
         FailCommandOptions,
         FailPoint,

@@ -42,6 +42,13 @@ impl Error {
         }
     }
 
+    pub(crate) fn pool_cleared_error(address: &StreamAddress) -> Self {
+        ErrorKind::PoolClearedError {
+            message: format!("Pool for {} cleared during operation execution", address)
+        }
+        .into()
+    }
+
     /// Creates an `AuthenticationError` for the given mechanism with the provided reason.
     pub(crate) fn authentication_error(mechanism_name: &str, reason: &str) -> Self {
         ErrorKind::AuthenticationError {
@@ -300,6 +307,11 @@ pub enum ErrorKind {
         file_path: String,
     },
 
+    /// The pool was cleared mid way through an operation execution.
+    #[error(display = "{}", message)]
+    #[non_exhaustive]
+    PoolClearedError { message: String },
+
     /// The server returned an invalid reply to a database operation.
     #[error(
         display = "The server returned an invalid reply to a database operation: {}",
@@ -359,7 +371,7 @@ impl ErrorKind {
     }
 
     pub(crate) fn is_network_error(&self) -> bool {
-        matches!(self, ErrorKind::Io(..))
+        matches!(self, ErrorKind::Io(..) | ErrorKind::PoolClearedError { .. })
     }
 
     pub(crate) fn is_authentication_error(&self) -> bool {

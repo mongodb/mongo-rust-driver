@@ -1,11 +1,12 @@
 #[cfg(test)]
-mod test;
+pub(crate) mod test;
 
 pub(crate) mod conn;
 mod connection_requester;
 mod establish;
 mod manager;
 pub(crate) mod options;
+mod status;
 mod worker;
 
 use std::{sync::Arc, time::Duration};
@@ -13,13 +14,14 @@ use std::{sync::Arc, time::Duration};
 use derivative::Derivative;
 
 pub use self::conn::ConnectionInfo;
-use self::options::ConnectionPoolOptions;
 pub(crate) use self::{
     conn::{Command, CommandResponse, Connection, StreamDescription},
     establish::handshake::{is_master, Handshaker},
+    status::PoolGenerationSubscriber,
 };
+use self::{connection_requester::ConnectionRequestResult, options::ConnectionPoolOptions};
 use crate::{
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     event::cmap::{
         CmapEventHandler,
         ConnectionCheckoutFailedEvent,
@@ -47,6 +49,7 @@ pub(crate) struct ConnectionPool {
     address: StreamAddress,
     manager: PoolManager,
     connection_requester: ConnectionRequester,
+    generation_subscriber: PoolGenerationSubscriber,
 
     wait_queue_timeout: Option<Duration>,
 
@@ -60,7 +63,7 @@ impl ConnectionPool {
         http_client: HttpClient,
         options: Option<ConnectionPoolOptions>,
     ) -> Self {
-        let (manager, connection_requester) =
+        let (manager, connection_requester, generation_subscriber) =
             ConnectionPoolWorker::start(address.clone(), http_client, options.clone());
 
         let event_handler = options.as_ref().and_then(|opts| opts.event_handler.clone());
@@ -79,6 +82,7 @@ impl ConnectionPool {
             connection_requester,
             wait_queue_timeout,
             event_handler,
+            generation_subscriber,
         }
     }
 
@@ -87,11 +91,13 @@ impl ConnectionPool {
         let (manager, _) = manager::channel();
         let handle = PoolWorkerHandle::new_mocked();
         let (connection_requester, _) = connection_requester::channel(Default::default(), handle);
+        let (_, generation_subscriber) = status::channel();
 
         Self {
             address,
             manager,
             connection_requester,
+            generation_subscriber,
             wait_queue_timeout: None,
             event_handler: None,
         }
@@ -120,10 +126,22 @@ impl ConnectionPool {
             handler.handle_connection_checkout_started_event(event);
         });
 
-        let conn = self
+        let response = self
             .connection_requester
             .request(self.wait_queue_timeout)
             .await;
+
+        let conn = match response {
+            Some(ConnectionRequestResult::Pooled(c)) => Ok(c),
+            Some(ConnectionRequestResult::Establishing(task)) => task.await,
+            Some(ConnectionRequestResult::PoolCleared) => {
+                Err(Error::pool_cleared_error(&self.address))
+            }
+            None => Err(ErrorKind::WaitQueueTimeoutError {
+                address: self.address.clone(),
+            }
+            .into()),
+        };
 
         match conn {
             Ok(ref conn) => {
@@ -155,5 +173,13 @@ impl ConnectionPool {
     /// the pool, they are left for the background thread to clean up.
     pub(crate) fn clear(&self) {
         self.manager.clear();
+    }
+
+    pub(crate) async fn ready(&self) {
+        self.manager.open().await;
+    }
+
+    pub(crate) fn subscribe_to_generation_updates(&self) -> PoolGenerationSubscriber {
+        self.generation_subscriber.clone()
     }
 }

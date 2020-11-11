@@ -13,7 +13,7 @@ pub(crate) struct Server {
     pub(crate) address: StreamAddress,
 
     /// The connection pool for the server.
-    pool: ConnectionPool,
+    pub(crate) pool: ConnectionPool,
 
     /// Number of operations currently using this server.
     operation_count: AtomicU32,
@@ -66,5 +66,10 @@ impl Server {
 
     pub(crate) fn operation_count(&self) -> u32 {
         self.operation_count.load(Ordering::SeqCst)
+    }
+
+    /// Opens the connection pool associated with the server.
+    pub(crate) async fn open_connection_pool(&self) {
+        self.pool.ready().await;
     }
 }

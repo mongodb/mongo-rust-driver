@@ -12,6 +12,7 @@ use crate::{
     test::{
         assert_matches,
         util::{get_db_name, EventClient},
+        CLIENT_OPTIONS,
     },
 };
 
@@ -49,8 +50,14 @@ pub async fn run_v2_test(test_file: TestFile) {
             continue;
         }
 
+        println!("executing {}", test_case.description);
+
+        let options = test_case.client_options.map(|mut opts| {
+            opts.hosts = CLIENT_OPTIONS.hosts.clone();
+            opts
+        });
         let client = EventClient::with_additional_options(
-            test_case.client_options,
+            options,
             Some(Duration::from_millis(50)),
             test_case.use_multiple_mongoses,
             true,
@@ -144,7 +151,7 @@ pub async fn run_v2_test(test_file: TestFile) {
                 }
             };
             let mut operation_events: Vec<TestEvent> = client
-                .collect_events(&operation)
+                .get_command_started_events(operation.command_names())
                 .into_iter()
                 .map(Into::into)
                 .collect();
@@ -172,9 +179,26 @@ pub async fn run_v2_test(test_file: TestFile) {
         }
 
         if let Some(expectations) = test_case.expectations {
-            assert_eq!(events.len(), expectations.len());
+            println!("=== actual below =====");
+            for actual_event in events.iter() {
+                println!("{:?}", actual_event);
+            }
+
+            println!("=== expected below =====");
+            for actual_event in expectations.iter() {
+                println!("{:?}", actual_event);
+            }
+            assert!(
+                events.len() >= expectations.len(),
+                "{}",
+                test_case.description
+            );
             for (actual_event, expected_event) in events.iter().zip(expectations.iter()) {
-                assert_matches(actual_event, expected_event, None);
+                assert_matches(
+                    actual_event,
+                    expected_event,
+                    Some(test_case.description.as_str()),
+                );
             }
         }
 
