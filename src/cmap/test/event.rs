@@ -6,7 +6,7 @@ use std::{
 use serde::{de::Unexpected, Deserialize, Deserializer};
 
 use crate::{event::cmap::*, options::StreamAddress, RUNTIME};
-use tokio::sync::broadcast::{RecvError, SendError};
+use tokio::sync::broadcast::error::{RecvError, SendError};
 
 #[derive(Clone, Debug)]
 pub struct EventHandler {

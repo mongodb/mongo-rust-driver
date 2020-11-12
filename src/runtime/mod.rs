@@ -53,12 +53,7 @@ impl AsyncRuntime {
     {
         match self {
             #[cfg(feature = "tokio-runtime")]
-            Self::Tokio => match TokioCallingContext::current() {
-                TokioCallingContext::Async(handle) => {
-                    Some(AsyncJoinHandle::Tokio(handle.spawn(fut)))
-                }
-                TokioCallingContext::Sync => None,
-            },
+            Self::Tokio => Some(AsyncJoinHandle::Tokio(tokio::task::spawn(fut))),
 
             #[cfg(feature = "async-std-runtime")]
             Self::AsyncStd => Some(AsyncJoinHandle::AsyncStd(async_std::task::spawn(fut))),
@@ -87,14 +82,7 @@ impl AsyncRuntime {
     {
         #[cfg(all(feature = "tokio-runtime", not(feature = "async-std-runtime")))]
         {
-            match TokioCallingContext::current() {
-                TokioCallingContext::Async(_handle) => {
-                    tokio::task::block_in_place(|| futures::executor::block_on(fut))
-                }
-                TokioCallingContext::Sync => {
-                    panic!("block_on called from tokio outside of async context")
-                }
-            }
+            tokio::task::block_in_place(|| futures::executor::block_on(fut))
         }
 
         #[cfg(feature = "async-std-runtime")]
@@ -118,7 +106,7 @@ impl AsyncRuntime {
     pub(crate) async fn delay_for(self, delay: Duration) {
         #[cfg(feature = "tokio-runtime")]
         {
-            tokio::time::delay_for(delay).await
+            tokio::time::sleep(delay).await
         }
 
         #[cfg(feature = "async-std-runtime")]
@@ -177,28 +165,6 @@ impl AsyncRuntime {
                 let socket_addrs = async_std::net::ToSocketAddrs::to_socket_addrs(&host).await?;
                 Ok(socket_addrs)
             }
-        }
-    }
-}
-
-/// Represents the context in which a given runtime method is being called from.
-#[cfg(feature = "tokio-runtime")]
-enum TokioCallingContext {
-    /// From a syncronous setting (i.e. not from a runtime thread).
-    Sync,
-
-    /// From an asyncronous setting (i.e. from an async block or function being run on a runtime).
-    /// Includes a handle to the current runtime.
-    Async(tokio::runtime::Handle),
-}
-
-#[cfg(feature = "tokio-runtime")]
-impl TokioCallingContext {
-    /// Get the current calling context.
-    fn current() -> Self {
-        match tokio::runtime::Handle::try_current() {
-            Ok(handle) => TokioCallingContext::Async(handle),
-            Err(_) => TokioCallingContext::Sync,
         }
     }
 }

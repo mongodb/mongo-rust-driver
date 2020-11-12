@@ -334,7 +334,7 @@ pub enum ErrorKind {
     /// A timeout occurred before a Tokio task could be completed.
     #[cfg(feature = "tokio-runtime")]
     #[error(display = "{}", _0)]
-    TokioTimeoutElapsed(#[error(source)] tokio::time::Elapsed),
+    TokioTimeoutElapsed(#[error(source)] tokio::time::error::Elapsed),
 
     #[error(display = "{}", _0)]
     RustlsConfig(#[error(source)] rustls::TLSError),

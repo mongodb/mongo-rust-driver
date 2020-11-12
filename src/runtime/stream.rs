@@ -62,27 +62,10 @@ impl From<async_std::net::TcpStream> for AsyncTcpStream {
 }
 
 impl AsyncTcpStream {
-    #[cfg(feature = "tokio-runtime")]
-    async fn try_connect(address: &SocketAddr, connect_timeout: Duration) -> Result<Self> {
-        use tokio::{net::TcpStream, time::timeout};
-
-        let stream_future = TcpStream::connect(address);
-
-        let stream = if connect_timeout == Duration::from_secs(0) {
-            stream_future.await?
-        } else {
-            timeout(connect_timeout, stream_future).await??
-        };
-
-        stream.set_keepalive(Some(KEEPALIVE_TIME))?;
-        stream.set_nodelay(true)?;
-
-        Ok(stream.into())
-    }
-
-    #[cfg(feature = "async-std-runtime")]
-    async fn try_connect(address: &SocketAddr, connect_timeout: Duration) -> Result<Self> {
-        use async_std::net::TcpStream;
+    fn try_connect_common(
+        address: &SocketAddr,
+        connect_timeout: Duration,
+    ) -> Result<std::net::TcpStream> {
         use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 
         let domain = match address {
@@ -98,10 +81,24 @@ impl AsyncTcpStream {
         } else {
             socket.connect_timeout(&address, connect_timeout)?;
         }
+        socket.set_nodelay(true)?;
 
-        let stream: TcpStream = socket.into_tcp_stream().into();
-        stream.set_nodelay(true)?;
+        Ok(socket.into_tcp_stream())
+    }
 
+    #[cfg(feature = "tokio-runtime")]
+    async fn try_connect(address: &SocketAddr, connect_timeout: Duration) -> Result<Self> {
+        use tokio::net::TcpStream;
+
+        let stream = TcpStream::from_std(Self::try_connect_common(address, connect_timeout)?)?;
+        Ok(stream.into())
+    }
+
+    #[cfg(feature = "async-std-runtime")]
+    async fn try_connect(address: &SocketAddr, connect_timeout: Duration) -> Result<Self> {
+        use async_std::net::TcpStream;
+
+        let stream: TcpStream = Self::try_connect_common(address, connect_timeout)?.into();
         Ok(stream.into())
     }
 
@@ -170,7 +167,12 @@ impl AsyncRead for AsyncStream {
         match self.deref_mut() {
             Self::Null => Poll::Ready(Ok(0)),
             Self::Tcp(ref mut inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
-            Self::Tls(ref mut inner) => Pin::new(inner).poll_read(cx, buf),
+            Self::Tls(ref mut inner) => {
+                let mut buf = tokio::io::ReadBuf::new(buf);
+                Pin::new(inner)
+                    .poll_read(cx, &mut buf)
+                    .map_ok(|_| buf.filled().len())
+            }
         }
     }
 }
@@ -214,9 +216,11 @@ impl AsyncRead for AsyncTcpStream {
         match self.deref_mut() {
             #[cfg(feature = "tokio-runtime")]
             Self::Tokio(ref mut stream) => {
-                use tokio::io::AsyncRead;
-
-                Pin::new(stream).poll_read(cx, buf)
+                // Is there a better way to do this?
+                let mut buf = tokio::io::ReadBuf::new(buf);
+                Pin::new(stream)
+                    .poll_read(cx, &mut buf)
+                    .map_ok(|_| buf.filled().len())
             }
 
             #[cfg(feature = "async-std-runtime")]
@@ -279,9 +283,16 @@ impl TokioAsyncRead for AsyncTcpStream {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<tokio::io::Result<usize>> {
-        AsyncRead::poll_read(self, cx, buf)
+        buf: &mut tokio::io::ReadBuf,
+    ) -> Poll<tokio::io::Result<()>> {
+        let s = buf.initialize_unfilled();
+        let bread = match AsyncRead::poll_read(self, cx, s) {
+            Poll::Pending => return Poll::Pending,
+            Poll::Ready(b) => b?,
+        };
+
+        buf.advance(bread);
+        Poll::Ready(Ok(()))
     }
 }
 
