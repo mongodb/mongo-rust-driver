@@ -4,7 +4,11 @@ mod test;
 
 use self::handshake::Handshaker;
 use super::{conn::PendingConnection, options::ConnectionPoolOptions, Connection};
-use crate::{client::auth::Credential, error::Result, runtime::HttpClient};
+use crate::{
+    client::{auth::Credential, options::ServerApi},
+    error::Result,
+    runtime::HttpClient,
+};
 
 /// Contains the logic to establish a connection, including handshaking, authenticating, and
 /// potentially more.
@@ -14,6 +18,7 @@ pub(super) struct ConnectionEstablisher {
     handshaker: Handshaker,
     http_client: HttpClient,
     credential: Option<Credential>,
+    server_api: Option<ServerApi>,
 }
 
 impl ConnectionEstablisher {
@@ -25,6 +30,7 @@ impl ConnectionEstablisher {
             handshaker,
             http_client,
             credential: options.and_then(|options| options.credential.clone()),
+            server_api: options.and_then(|options| options.server_api.clone()),
         }
     }
 
@@ -42,7 +48,12 @@ impl ConnectionEstablisher {
 
         if let Some(ref credential) = self.credential {
             credential
-                .authenticate_stream(&mut connection, &self.http_client, first_round)
+                .authenticate_stream(
+                    &mut connection,
+                    &self.http_client,
+                    self.server_api.as_ref(),
+                    first_round,
+                )
                 .await?;
         }
 

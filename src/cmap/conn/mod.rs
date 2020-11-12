@@ -12,7 +12,6 @@ use derivative::Derivative;
 use self::wire::Message;
 use super::manager::PoolManager;
 use crate::{
-    client::options::ServerApi,
     cmap::options::{ConnectionOptions, StreamOptions},
     error::{ErrorKind, Result},
     event::cmap::{
@@ -74,8 +73,6 @@ pub(crate) struct Connection {
 
     #[derivative(Debug = "ignore")]
     handler: Option<Arc<dyn CmapEventHandler>>,
-
-    server_api: Option<ServerApi>,
 }
 
 impl Connection {
@@ -99,9 +96,6 @@ impl Connection {
             ready_and_available_time: None,
             stream: AsyncStream::connect(stream_options).await?,
             address,
-            server_api: options
-                .as_ref()
-                .and_then(|options| options.server_api.clone()),
             handler: options.and_then(|options| options.event_handler),
             stream_description: None,
             error: false,
@@ -135,7 +129,6 @@ impl Connection {
                 connect_timeout,
                 tls_options,
                 event_handler: None,
-                server_api: None,
             }),
         )
         .await
@@ -243,13 +236,9 @@ impl Connection {
     /// itself.
     pub(crate) async fn send_command(
         &mut self,
-        mut command: Command,
+        command: Command,
         request_id: impl Into<Option<i32>>,
     ) -> Result<CommandResponse> {
-        if let Some(server_api) = &self.server_api {
-            command.set_server_api(&server_api);
-        }
-
         let message = Message::with_command(command, request_id.into());
 
         self.command_executing = true;
@@ -301,7 +290,6 @@ impl Connection {
             error: self.error,
             pool_manager: None,
             ready_and_available_time: None,
-            server_api: self.server_api.take(),
         }
     }
 }

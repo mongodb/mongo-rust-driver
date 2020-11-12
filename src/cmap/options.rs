@@ -120,8 +120,6 @@ impl ConnectionPoolOptions {
 pub(crate) struct ConnectionOptions {
     pub(crate) connect_timeout: Option<Duration>,
 
-    pub(crate) server_api: Option<ServerApi>,
-
     pub(crate) tls_options: Option<TlsOptions>,
 
     #[derivative(Debug = "ignore")]
@@ -134,7 +132,6 @@ impl From<ConnectionPoolOptions> for ConnectionOptions {
             connect_timeout: pool_options.connect_timeout,
             tls_options: pool_options.tls_options,
             event_handler: pool_options.event_handler,
-            server_api: pool_options.server_api.clone(),
         }
     }
 }

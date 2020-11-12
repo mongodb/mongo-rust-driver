@@ -160,6 +160,7 @@ async fn is_master(connection: &mut Connection) -> Result<IsMasterReply> {
     );
 
     let start_time = PreciseTime::now();
+    // TODO: will have to add versioned API options before running command
     let command_response = connection.send_command(command, None).await?;
     let end_time = PreciseTime::now();
 

@@ -5,11 +5,14 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     bson::{doc, spec::BinarySubtype, Binary, Bson, Document},
-    client::auth::{
-        self,
-        sasl::{SaslContinue, SaslResponse, SaslStart},
-        AuthMechanism,
-        Credential,
+    client::{
+        auth::{
+            self,
+            sasl::{SaslContinue, SaslResponse, SaslStart},
+            AuthMechanism,
+            Credential,
+        },
+        options::ServerApi,
     },
     cmap::Connection,
     error::{Error, Result},
@@ -24,6 +27,7 @@ const AWS_LONG_DATE_FMT: &str = "%Y%m%dT%H%M%SZ";
 pub(super) async fn authenticate_stream(
     conn: &mut Connection,
     credential: &Credential,
+    server_api: Option<&ServerApi>,
     http_client: &HttpClient,
 ) -> Result<()> {
     let source = match credential.source.as_deref() {
@@ -52,7 +56,10 @@ pub(super) async fn authenticate_stream(
         AuthMechanism::MongoDbAws,
         client_first_payload_bytes,
     );
-    let client_first = sasl_start.into_command();
+    let mut client_first = sasl_start.into_command();
+    if let Some(server_api) = server_api {
+        client_first.set_server_api(server_api);
+    }
 
     let server_first_response = conn.send_command(client_first, None).await?;
 
@@ -87,7 +94,10 @@ pub(super) async fn authenticate_stream(
         client_second_payload_bytes,
     );
 
-    let client_second = sasl_continue.into_command();
+    let mut client_second = sasl_continue.into_command();
+    if let Some(server_api) = server_api {
+        client_second.set_server_api(server_api);
+    }
 
     let server_second_response = conn.send_command(client_second, None).await?;
     let server_second = SaslResponse::parse("MONGODB-AWS", server_second_response.raw_response)?;

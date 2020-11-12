@@ -182,9 +182,12 @@ impl Handshaker {
             db = credential.resolved_source();
         }
 
-        Self {
-            command: Command::new_read("isMaster".to_string(), db.to_string(), None, body),
+        let mut command = Command::new_read("isMaster".to_string(), db.to_string(), None, body);
+        if let Some(server_api) = options.as_ref().and_then(|opts| opts.server_api.as_ref()) {
+            command.set_server_api(server_api)
         }
+
+        Self { command }
     }
 
     /// Handshakes a connection.

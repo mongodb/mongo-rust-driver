@@ -15,11 +15,14 @@ use sha2::Sha256;
 
 use crate::{
     bson::{doc, Bson, Document},
-    client::auth::{
-        self,
-        sasl::{SaslContinue, SaslResponse, SaslStart},
-        AuthMechanism,
-        Credential,
+    client::{
+        auth::{
+            self,
+            sasl::{SaslContinue, SaslResponse, SaslStart},
+            AuthMechanism,
+            Credential,
+        },
+        options::ServerApi,
     },
     cmap::{Command, Connection},
     error::{Error, Result},
@@ -131,10 +134,14 @@ impl ScramVersion {
         &self,
         conn: &mut Connection,
         credential: &Credential,
+        server_api: Option<&ServerApi>,
     ) -> Result<FirstRound> {
         let client_first = self.build_client_first(credential, false)?;
 
-        let command = client_first.to_command(self);
+        let mut command = client_first.to_command(self);
+        if let Some(server_api) = server_api {
+            command.set_server_api(server_api);
+        }
 
         let server_first = conn.send_command(command, None).await?;
 
@@ -149,6 +156,7 @@ impl ScramVersion {
         &self,
         conn: &mut Connection,
         credential: &Credential,
+        server_api: Option<&ServerApi>,
         first_round: impl Into<Option<FirstRound>>,
     ) -> Result<()> {
         let FirstRound {
@@ -156,7 +164,7 @@ impl ScramVersion {
             server_first,
         } = match first_round.into() {
             Some(first_round) => first_round,
-            None => self.send_client_first(conn, credential).await?,
+            None => self.send_client_first(conn, credential, server_api).await?,
         };
 
         let ClientAuthInfo {
@@ -196,7 +204,10 @@ impl ScramVersion {
             self,
         )?;
 
-        let command = client_final.to_command();
+        let mut command = client_final.to_command();
+        if let Some(server_api) = server_api {
+            command.set_server_api(server_api);
+        }
 
         let server_final_response = conn.send_command(command, None).await?;
         let server_final = ServerFinal::parse(server_final_response.raw_response)?;
@@ -211,7 +222,10 @@ impl ScramVersion {
                 server_final.conversation_id().clone(),
                 Vec::new(),
             );
-            let command = noop.into_command();
+            let mut command = noop.into_command();
+            if let Some(server_api) = server_api {
+                command.set_server_api(server_api);
+            }
 
             let server_noop_response = conn.send_command(command, None).await?;
 

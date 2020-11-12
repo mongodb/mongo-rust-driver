@@ -20,6 +20,7 @@ use typed_builder::TypedBuilder;
 use self::scram::ScramVersion;
 use crate::{
     bson::Document,
+    client::options::ServerApi,
     cmap::{Command, Connection, StreamDescription},
     error::{Error, ErrorKind, Result},
     runtime::HttpClient,
@@ -250,6 +251,7 @@ impl AuthMechanism {
         &self,
         stream: &mut Connection,
         credential: &Credential,
+        server_api: Option<&ServerApi>,
         #[cfg_attr(not(feature = "tokio-runtime"), allow(unused))] http_client: &HttpClient,
     ) -> Result<()> {
         self.validate_credential(credential)?;
@@ -257,19 +259,23 @@ impl AuthMechanism {
         match self {
             AuthMechanism::ScramSha1 => {
                 ScramVersion::Sha1
-                    .authenticate_stream(stream, credential, None)
+                    .authenticate_stream(stream, credential, server_api, None)
                     .await
             }
             AuthMechanism::ScramSha256 => {
                 ScramVersion::Sha256
-                    .authenticate_stream(stream, credential, None)
+                    .authenticate_stream(stream, credential, server_api, None)
                     .await
             }
-            AuthMechanism::MongoDbX509 => x509::authenticate_stream(stream, credential, None).await,
-            AuthMechanism::Plain => plain::authenticate_stream(stream, credential).await,
+            AuthMechanism::MongoDbX509 => {
+                x509::authenticate_stream(stream, credential, server_api, None).await
+            }
+            AuthMechanism::Plain => {
+                plain::authenticate_stream(stream, credential, server_api).await
+            }
             #[cfg(feature = "tokio-runtime")]
             AuthMechanism::MongoDbAws => {
-                aws::authenticate_stream(stream, credential, http_client).await
+                aws::authenticate_stream(stream, credential, server_api, http_client).await
             }
             AuthMechanism::MongoDbCr => Err(ErrorKind::AuthenticationError {
                 message: "MONGODB-CR is deprecated and not supported by this driver. Use SCRAM \
@@ -393,6 +399,7 @@ impl Credential {
         &self,
         conn: &mut Connection,
         http_client: &HttpClient,
+        server_api: Option<&ServerApi>,
         first_round: Option<FirstRound>,
     ) -> Result<()> {
         let stream_description = conn.stream_description()?;
@@ -407,10 +414,12 @@ impl Credential {
         if let Some(first_round) = first_round {
             return match first_round {
                 FirstRound::Scram(version, first_round) => {
-                    version.authenticate_stream(conn, self, first_round).await
+                    version
+                        .authenticate_stream(conn, self, server_api, first_round)
+                        .await
                 }
                 FirstRound::X509(server_first) => {
-                    x509::authenticate_stream(conn, self, server_first).await
+                    x509::authenticate_stream(conn, self, server_api, server_first).await
                 }
             };
         }
@@ -421,7 +430,9 @@ impl Credential {
         };
 
         // Authenticate according to the chosen mechanism.
-        mechanism.authenticate_stream(conn, self, http_client).await
+        mechanism
+            .authenticate_stream(conn, self, server_api, http_client)
+            .await
     }
 }
 
