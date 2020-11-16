@@ -14,7 +14,7 @@ pub fn results_match(
     results_match_inner(actual, expected, returns_root_documents, true, entities)
 }
 
-pub fn results_match_inner(
+fn results_match_inner(
     actual: Option<&Bson>,
     expected: &Bson,
     returns_root_documents: bool,
