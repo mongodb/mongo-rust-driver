@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use futures::stream::TryStreamExt;
 use serde::{de::Deserializer, Deserialize};
 
-use super::{Entity, ExpectError, FailPointDisableCommand, TestRunner};
+use super::{Entity, ExpectError, TestRunner};
 
 use crate::{
     bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
@@ -24,12 +24,12 @@ use crate::{
         InsertOneOptions,
         ListCollectionsOptions,
         ListDatabasesOptions,
-        ReadPreference,
         ReplaceOptions,
         SelectionCriteria,
         UpdateModifications,
         UpdateOptions,
     },
+    test::FailPoint,
 };
 
 #[async_trait]
@@ -155,8 +155,10 @@ impl<'de> Deserialize<'de> for Operation {
                 FindOneAndDelete::deserialize(BsonDeserializer::new(definition.arguments))
                     .map(|op| Box::new(op) as Box<dyn TestOperation>)
             }
-            "failPoint" => FailPoint::deserialize(BsonDeserializer::new(definition.arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "failPoint" => {
+                FailPointCommand::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
             "assertCollectionExists" => {
                 AssertCollectionExists::deserialize(BsonDeserializer::new(definition.arguments))
                     .map(|op| Box::new(op) as Box<dyn TestOperation>)
@@ -797,30 +799,20 @@ impl TestOperation for FindOneAndDelete {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(super) struct FailPoint {
-    fail_point: Document,
+pub(super) struct FailPointCommand {
+    fail_point: FailPoint,
     client: String,
 }
 
 #[async_trait]
-impl TestOperation for FailPoint {
+impl TestOperation for FailPointCommand {
     async fn execute_test_runner_operation<'a>(&self, test_runner: &'a mut TestRunner) {
-        let selection_criteria = SelectionCriteria::ReadPreference(ReadPreference::Primary);
-        let client = test_runner.entities.get(&self.client).unwrap().as_client();
-        client
-            .database("admin")
-            .run_command(self.fail_point.clone(), selection_criteria)
+        let client = test_runner.get_client(&self.client);
+        let guard = client
+            .enable_failpoint(self.fail_point.clone())
             .await
             .unwrap();
-
-        let disable = FailPointDisableCommand {
-            command: doc! {
-                "configureFailPoint": self.fail_point.get_str("configureFailPoint").unwrap(),
-                "mode": "off",
-            },
-            client: self.client.clone(),
-        };
-        test_runner.failpoint_disable_commands.push(disable);
+        test_runner.fail_point_guards.push(guard);
     }
 
     async fn execute_entity_operation<'a>(

@@ -14,7 +14,13 @@ use crate::{
     bson::{doc, Document},
     concern::{Acknowledgment, WriteConcern},
     options::{CollectionOptions, FindOptions, ReadConcern, ReadPreference, SelectionCriteria},
-    test::{assert_matches, run_spec_test, util::EventClient, TestClient, LOCK},
+    test::{
+        assert_matches,
+        run_spec_test,
+        util::{EventClient, FailPointGuard},
+        TestClient,
+        LOCK,
+    },
     Collection,
     Database,
 };
@@ -49,12 +55,7 @@ pub type EntityMap = HashMap<String, Entity>;
 pub struct TestRunner {
     pub internal_client: TestClient,
     pub entities: EntityMap,
-    pub failpoint_disable_commands: Vec<FailPointDisableCommand>,
-}
-
-pub struct FailPointDisableCommand {
-    pub command: Document,
-    pub client: String,
+    pub fail_point_guards: Vec<FailPointGuard>,
 }
 
 impl TestRunner {
@@ -62,7 +63,7 @@ impl TestRunner {
         Self {
             internal_client: TestClient::new().await,
             entities: HashMap::new(),
-            failpoint_disable_commands: Vec::new(),
+            fail_point_guards: Vec::new(),
         }
     }
 
@@ -88,17 +89,8 @@ impl TestRunner {
     }
 
     pub async fn disable_fail_points(&self) {
-        for disable_command in &self.failpoint_disable_commands {
-            let client = self
-                .entities
-                .get(&disable_command.client)
-                .unwrap()
-                .as_client();
-            client
-                .database("admin")
-                .run_command(disable_command.command.clone(), None)
-                .await
-                .unwrap();
+        for guard in &self.fail_point_guards {
+            guard.disable().await;
         }
     }
 
@@ -362,7 +354,7 @@ pub async fn run_unified_format_test(test_file: TestFile) {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(threaded_scheduler))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn test_examples() {
     let _guard = LOCK.run_exclusively().await;

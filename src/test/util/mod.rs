@@ -5,7 +5,7 @@ mod matchable;
 
 pub use self::{
     event::{CommandEvent, EventClient},
-    failpoint::{FailCommandOptions, FailPoint, FailPointMode},
+    failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     lock::TestLock,
     matchable::{assert_matches, Matchable},
 };
@@ -26,7 +26,6 @@ use crate::{
     Client,
     Collection,
 };
-use failpoint::FailPointGuard;
 
 #[derive(Clone, Debug)]
 pub struct TestClient {

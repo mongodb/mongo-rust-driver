@@ -1,13 +1,19 @@
 use bson::{doc, Document};
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
 use std::time::Duration;
 use typed_builder::TypedBuilder;
 
 use super::TestClient;
-use crate::{error::Result, operation::append_options, RUNTIME};
+use crate::{
+    error::Result,
+    operation::append_options,
+    options::{ReadPreference, SelectionCriteria},
+    RUNTIME,
+};
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct FailPoint {
+    #[serde(flatten)]
     command: Document,
 }
 
@@ -38,9 +44,10 @@ impl FailPoint {
     }
 
     pub(super) async fn enable(self, client: &TestClient) -> Result<FailPointGuard> {
+        let selection_criteria = SelectionCriteria::ReadPreference(ReadPreference::Primary);
         client
             .database("admin")
-            .run_command(self.command.clone(), None)
+            .run_command(self.command.clone(), selection_criteria)
             .await?;
         Ok(FailPointGuard {
             failpoint_name: self.name().to_string(),
@@ -54,21 +61,39 @@ pub struct FailPointGuard {
     failpoint_name: String,
 }
 
+impl FailPointGuard {
+    pub async fn disable(&self) {
+        let result = self
+            .client
+            .database("admin")
+            .run_command(
+                doc! { "configureFailPoint": self.failpoint_name.clone(), "mode": "off" },
+                None,
+            )
+            .await;
+        if let Err(e) = result {
+            println!("Failed disabling fail point: {:?}", e);
+        }
+    }
+}
+
 impl Drop for FailPointGuard {
     fn drop(&mut self) {
-        let client = self.client.clone();
-        let name = self.failpoint_name.clone();
+        // let client = self.client.clone();
+        // let name = self.failpoint_name.clone();
 
-        let result = RUNTIME.block_on(async move {
-            client
-                .database("admin")
-                .run_command(doc! { "configureFailPoint": name, "mode": "off" }, None)
-                .await
-        });
+        // let result = RUNTIME.block_on(async move {
+        //     client
+        //         .database("admin")
+        //         .run_command(doc! { "configureFailPoint": name, "mode": "off" }, None)
+        //         .await
+        // });
 
-        if let Err(e) = result {
-            println!("failed disabling failpoint: {:?}", e);
-        }
+        // if let Err(e) = result {
+        //     println!("failed disabling failpoint: {:?}", e);
+        // }
+
+        RUNTIME.block_on(self.disable());
     }
 }
 
