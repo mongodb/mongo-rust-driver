@@ -1,7 +1,4 @@
-use crate::{
-    bson::Document,
-    test::CommandEvent,
-};
+use crate::{bson::Document, test::CommandEvent};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, PartialEq)]

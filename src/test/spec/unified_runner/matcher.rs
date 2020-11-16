@@ -31,9 +31,7 @@ pub fn events_match(actual: &TestEvent, expected: &TestEvent) -> bool {
             if expected_command_name.is_some() && actual_command_name != expected_command_name {
                 return false;
             }
-            if expected_database_name.is_some()
-                && actual_database_name != expected_database_name
-            {
+            if expected_database_name.is_some() && actual_database_name != expected_database_name {
                 return false;
             }
             if let Some(expected_command) = expected_command {
