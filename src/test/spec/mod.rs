@@ -67,6 +67,7 @@ where
         let json: Value =
             serde_json::from_reader(File::open(test_file_full_path.as_path()).unwrap()).unwrap();
 
+        // Printing the name of the test file makes it easier to debug deserialization errors.
         println!(
             "Running tests from {}",
             test_file_full_path.display().to_string()
