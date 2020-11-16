@@ -3,7 +3,7 @@ use crate::{
     bson_util::get_int,
 };
 
-use super::EntityMap;
+use super::{EntityMap, TestEvent};
 
 pub fn results_match(
     actual: Option<&Bson>,
@@ -12,6 +12,83 @@ pub fn results_match(
     entities: Option<&EntityMap>,
 ) -> bool {
     results_match_inner(actual, expected, returns_root_documents, true, entities)
+}
+
+pub fn events_match(actual: &TestEvent, expected: &TestEvent) -> bool {
+    match (actual, expected) {
+        (
+            TestEvent::CommandStartedEvent {
+                command_name: actual_command_name,
+                database_name: actual_database_name,
+                command: actual_command,
+            },
+            TestEvent::CommandStartedEvent {
+                command_name: expected_command_name,
+                database_name: expected_database_name,
+                command: expected_command,
+            },
+        ) => {
+            if expected_command_name.is_some() && actual_command_name != expected_command_name {
+                return false;
+            }
+            if expected_database_name.is_some()
+                && actual_database_name != expected_database_name
+            {
+                return false;
+            }
+            if let Some(expected_command) = expected_command {
+                let actual_command = actual_command
+                    .as_ref()
+                    .map(|doc| Bson::Document(doc.clone()));
+                results_match(
+                    actual_command.as_ref(),
+                    &Bson::Document(expected_command.clone()),
+                    false,
+                    None,
+                )
+            } else {
+                true
+            }
+        }
+        (
+            TestEvent::CommandSucceededEvent {
+                command_name: actual_command_name,
+                reply: actual_reply,
+            },
+            TestEvent::CommandSucceededEvent {
+                command_name: expected_command_name,
+                reply: expected_reply,
+            },
+        ) => {
+            if expected_command_name.is_some() && actual_command_name != expected_command_name {
+                return false;
+            }
+            if let Some(expected_reply) = expected_reply {
+                let actual_reply = actual_reply.as_ref().map(|doc| Bson::Document(doc.clone()));
+                results_match(
+                    actual_reply.as_ref(),
+                    &Bson::Document(expected_reply.clone()),
+                    false,
+                    None,
+                )
+            } else {
+                true
+            }
+        }
+        (
+            TestEvent::CommandFailedEvent {
+                command_name: actual_command_name,
+            },
+            TestEvent::CommandFailedEvent {
+                command_name: expected_command_name,
+            },
+        ) => match (expected_command_name, actual_command_name) {
+            (Some(expected), Some(actual)) => expected == actual,
+            (Some(_), None) => false,
+            _ => true,
+        },
+        _ => false,
+    }
 }
 
 fn results_match_inner(

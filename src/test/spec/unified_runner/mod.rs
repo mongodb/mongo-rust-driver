@@ -15,7 +15,6 @@ use crate::{
     concern::{Acknowledgment, WriteConcern},
     options::{CollectionOptions, FindOptions, ReadConcern, ReadPreference, SelectionCriteria},
     test::{
-        assert_matches,
         run_spec_test,
         util::{EventClient, FailPointGuard},
         TestClient,
@@ -27,7 +26,7 @@ use crate::{
 
 pub use self::{
     entity::{ClientEntity, Entity},
-    matcher::results_match,
+    matcher::{events_match, results_match},
     operation::{Operation, OperationObject},
     test_event::TestEvent,
     test_file::{CollectionData, ExpectError, TestFile, TestFileEntity, Topology},
@@ -316,7 +315,7 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                 assert_eq!(actual_events.len(), expected_events.len());
 
                 for (actual, expected) in actual_events.iter().zip(expected_events) {
-                    assert_matches(actual, expected, None);
+                    assert!(events_match(actual, expected));
                 }
             }
         }
