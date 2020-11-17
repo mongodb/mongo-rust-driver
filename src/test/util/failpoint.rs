@@ -61,39 +61,21 @@ pub struct FailPointGuard {
     failpoint_name: String,
 }
 
-impl FailPointGuard {
-    pub async fn disable(&self) {
-        let result = self
-            .client
-            .database("admin")
-            .run_command(
-                doc! { "configureFailPoint": self.failpoint_name.clone(), "mode": "off" },
-                None,
-            )
-            .await;
-        if let Err(e) = result {
-            println!("Failed disabling fail point: {:?}", e);
-        }
-    }
-}
-
 impl Drop for FailPointGuard {
     fn drop(&mut self) {
-        // let client = self.client.clone();
-        // let name = self.failpoint_name.clone();
+        let client = self.client.clone();
+        let name = self.failpoint_name.clone();
 
-        // let result = RUNTIME.block_on(async move {
-        //     client
-        //         .database("admin")
-        //         .run_command(doc! { "configureFailPoint": name, "mode": "off" }, None)
-        //         .await
-        // });
+        let result = RUNTIME.block_on(async move {
+            client
+                .database("admin")
+                .run_command(doc! { "configureFailPoint": name, "mode": "off" }, None)
+                .await
+        });
 
-        // if let Err(e) = result {
-        //     println!("failed disabling failpoint: {:?}", e);
-        // }
-
-        RUNTIME.block_on(self.disable());
+        if let Err(e) = result {
+            println!("failed disabling failpoint: {:?}", e);
+        }
     }
 }
 

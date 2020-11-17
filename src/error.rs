@@ -1,5 +1,5 @@
 //! Contains the `Error` and `Result` types that `mongodb` uses.
-//
+
 use std::{fmt, sync::Arc};
 
 use err_derive::Error;

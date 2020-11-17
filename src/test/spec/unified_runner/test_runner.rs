@@ -51,12 +51,6 @@ impl TestRunner {
         }
     }
 
-    pub async fn disable_fail_points(&self) {
-        for guard in &self.fail_point_guards {
-            guard.disable().await;
-        }
-    }
-
     pub async fn populate_entity_map(&mut self, create_entities: &[TestFileEntity]) {
         self.entities.clear();
 

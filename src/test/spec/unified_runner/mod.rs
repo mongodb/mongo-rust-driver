@@ -174,7 +174,7 @@ pub async fn run_unified_format_test(test_file: TestFile) {
             }
         }
 
-        test_runner.disable_fail_points().await;
+        test_runner.fail_point_guards.clear();
 
         if let Some(ref events) = test_case.expect_events {
             for expected in events {
