@@ -25,7 +25,6 @@ lazy_static::lazy_static! {
 
 async fn run_test(new_hosts: Result<Vec<StreamAddress>>, expected_hosts: HashSet<StreamAddress>) {
     let topology = Topology::new_from_hosts(DEFAULT_HOSTS.iter());
-    let state = topology.clone_state().await;
     let mut monitor = SrvPollingMonitor::new(topology.downgrade()).unwrap();
 
     monitor
@@ -35,7 +34,6 @@ async fn run_test(new_hosts: Result<Vec<StreamAddress>>, expected_hosts: HashSet
                 min_ttl: None,
             }),
             topology.clone(),
-            state,
         )
         .await;
 

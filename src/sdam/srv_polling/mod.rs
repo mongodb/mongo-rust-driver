@@ -65,11 +65,9 @@ impl SrvPollingMonitor {
                 None => break,
             };
 
-            let state = topology.clone_state().await;
-
-            if state.is_sharded() || state.is_unknown() {
+            if topology.is_sharded().await || topology.is_unknown().await {
                 let hosts = self.lookup_hosts().await;
-                self.update_hosts(hosts, topology.clone(), state).await;
+                self.update_hosts(hosts, topology.clone()).await;
             }
 
             std::mem::drop(topology);
@@ -80,12 +78,7 @@ impl SrvPollingMonitor {
         }
     }
 
-    async fn update_hosts(
-        &mut self,
-        lookup: Result<LookupHosts>,
-        topology: Topology,
-        mut topology_state: TopologyState,
-    ) {
+    async fn update_hosts(&mut self, lookup: Result<LookupHosts>, topology: Topology) {
         let lookup = match lookup {
             Ok(LookupHosts { hosts, .. }) if hosts.is_empty() => {
                 self.no_valid_hosts(None);
@@ -102,9 +95,9 @@ impl SrvPollingMonitor {
 
         self.rescan_interval = lookup.min_ttl;
 
-        let diff =
-            topology_state.update_hosts(&lookup.hosts.into_iter().collect(), &self.client_options);
-        topology.update_state(diff, topology_state).await;
+        topology
+            .update_hosts(lookup.hosts.into_iter().collect(), &self.client_options)
+            .await;
     }
 
     async fn lookup_hosts(&mut self) -> Result<LookupHosts> {
