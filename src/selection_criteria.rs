@@ -1,33 +1,30 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use derivative::Derivative;
-use serde::Deserialize;
+use serde::{de::Error, Deserialize, Deserializer};
 use typed_builder::TypedBuilder;
 
 use crate::{
     bson::{doc, Bson, Document},
+    bson_util::deserialize_duration_from_u64_seconds,
     error::{ErrorKind, Result},
     options::StreamAddress,
     sdam::public::ServerInfo,
 };
 
 /// Describes which servers are suitable for a given operation.
-#[derive(Clone, Derivative, Deserialize)]
+#[derive(Clone, Derivative)]
 #[derivative(Debug)]
-#[serde(untagged)]
 #[non_exhaustive]
 pub enum SelectionCriteria {
     /// A read preference that describes the suitable servers based on the server type, max
     /// staleness, and server tags.
     ///
     /// See the documentation [here](https://docs.mongodb.com/manual/core/read-preference/) for more details.
-    // TODO RUST-495: unskip for deserialization
-    #[serde(skip)]
     ReadPreference(ReadPreference),
 
     /// A predicate used to filter servers that are considered suitable. A `server` will be
     /// considered suitable by a `predicate` if `predicate(server)` returns true.
-    #[serde(skip)]
     Predicate(#[derivative(Debug = "ignore")] Predicate),
 }
 
@@ -75,6 +72,15 @@ impl SelectionCriteria {
     }
 }
 
+impl<'de> Deserialize<'de> for SelectionCriteria {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(SelectionCriteria::ReadPreference(ReadPreference::deserialize(deserializer)?))
+    }
+}
+
 /// A predicate used to filter servers that are considered suitable.
 pub type Predicate = Arc<dyn Send + Sync + Fn(&ServerInfo) -> bool>;
 
@@ -87,7 +93,6 @@ pub type Predicate = Arc<dyn Send + Sync + Fn(&ServerInfo) -> bool>;
 ///
 /// See the [MongoDB docs](https://docs.mongodb.com/manual/core/read-preference) for more details.
 #[derive(Clone, Debug, PartialEq)]
-// TODO RUST-495: implement Deserialize for ReadPreference
 pub enum ReadPreference {
     /// Only route this operation to the primary.
     Primary,
@@ -106,8 +111,34 @@ pub enum ReadPreference {
     Nearest { options: ReadPreferenceOptions },
 }
 
+impl<'de> Deserialize<'de> for ReadPreference {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase", deny_unknown_fields)]
+        struct ReadPreferenceHelper {
+            mode: String,
+            #[serde(flatten)]
+            options: ReadPreferenceOptions,
+        }
+        let preference = ReadPreferenceHelper::deserialize(deserializer)?;
+
+        match preference.mode.as_str() {
+            "Primary" => Ok(ReadPreference::Primary),
+            "Secondary" => Ok(ReadPreference::Secondary { options: preference.options }),
+            "PrimaryPreferred" => Ok(ReadPreference::PrimaryPreferred { options: preference.options }),
+            "SecondaryPreferred" => Ok(ReadPreference::SecondaryPreferred { options: preference.options }),
+            "Nearest" => Ok(ReadPreference::Nearest { options: preference.options }),
+            other => Err(D::Error::custom(format!("Unknown read preference mode: {}", other))),
+        }
+    }
+}
+
 /// Specifies read preference options for non-primary read preferences.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, TypedBuilder)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ReadPreferenceOptions {
     /// Specifies which replica set members should be considered for operations. Each tag set will
@@ -119,9 +150,10 @@ pub struct ReadPreferenceOptions {
     /// considered for the given operation. Any secondaries lagging behind more than
     /// `max_staleness` will not be considered for the operation.
     ///
-    /// `max_stalesness` must be at least 90 seconds. If a `max_stalness` less than 90 seconds is
+    /// `max_staleness` must be at least 90 seconds. If a `max_staleness` less than 90 seconds is
     /// specified for an operation, the operation will return an error.
     #[builder(default)]
+    #[serde(rename = "maxStalenessSeconds", deserialize_with = "deserialize_duration_from_u64_seconds")]
     pub max_staleness: Option<Duration>,
 
     /// Specifies hedging behavior for reads. These options only apply to sharded clusters on

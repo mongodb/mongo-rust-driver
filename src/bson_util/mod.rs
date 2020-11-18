@@ -86,6 +86,16 @@ where
     Ok(millis.map(Duration::from_millis))
 }
 
+pub(crate) fn deserialize_duration_from_u64_seconds<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<Duration>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let millis = Option::<u64>::deserialize(deserializer)?;
+    Ok(millis.map(Duration::from_secs))
+}
+
 #[allow(clippy::trivially_copy_pass_by_ref)]
 pub(crate) fn serialize_u32_as_i32<S: Serializer>(
     val: &Option<u32>,

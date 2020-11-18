@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
@@ -40,13 +40,27 @@ pub struct CollectionOptions {
 /// [`Collection::find_one_and_replace`](../struct.Collection.html#method.find_one_and_replace) and
 /// [`Collection::find_one_and_update`](../struct.Collection.html#method.find_one_and_update)
 /// operation should return the document before or after modification.
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug)]
 #[non_exhaustive]
 pub enum ReturnDocument {
     /// Return the document after modification.
     After,
     /// Return the document before modification.
     Before,
+}
+
+impl<'de> Deserialize<'de> for ReturnDocument {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        match s.to_lowercase().as_str() {
+            "after" => Ok(ReturnDocument::After),
+            "before" => Ok(ReturnDocument::Before),
+            other => Err(D::Error::custom(format!(
+                "Unknown return document value: {}",
+                other
+            ))),
+        }
+    }
 }
 
 /// Specifies the index to use for an operation.
@@ -288,6 +302,7 @@ pub struct DeleteOptions {
 /// [`Collection::find_one_and_delete`](../struct.Collection.html#method.find_one_and_delete)
 /// operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct FindOneAndDeleteOptions {
     /// The maximum amount of time to allow the query to run.
@@ -326,6 +341,7 @@ pub struct FindOneAndDeleteOptions {
 /// [`Collection::find_one_and_replace`](../struct.Collection.html#method.find_one_and_replace)
 /// operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct FindOneAndReplaceOptions {
     /// Opt out of document-level validation.
@@ -376,6 +392,7 @@ pub struct FindOneAndReplaceOptions {
 /// [`Collection::find_one_and_update`](../struct.Collection.html#method.find_one_and_update)
 /// operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct FindOneAndUpdateOptions {
     /// A set of filters specifying to which array elements an update should apply.

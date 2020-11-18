@@ -1,13 +1,19 @@
 use bson::{doc, Document};
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
 use std::time::Duration;
 use typed_builder::TypedBuilder;
 
 use super::TestClient;
-use crate::{error::Result, operation::append_options, RUNTIME};
+use crate::{
+    error::Result,
+    operation::append_options,
+    options::{ReadPreference, SelectionCriteria},
+    RUNTIME,
+};
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct FailPoint {
+    #[serde(flatten)]
     command: Document,
 }
 
@@ -38,9 +44,10 @@ impl FailPoint {
     }
 
     pub(super) async fn enable(self, client: &TestClient) -> Result<FailPointGuard> {
+        let selection_criteria = SelectionCriteria::ReadPreference(ReadPreference::Primary);
         client
             .database("admin")
-            .run_command(self.command.clone(), None)
+            .run_command(self.command.clone(), selection_criteria)
             .await?;
         Ok(FailPointGuard {
             failpoint_name: self.name().to_string(),

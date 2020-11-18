@@ -5,7 +5,7 @@ mod matchable;
 
 pub use self::{
     event::{CommandEvent, EventClient},
-    failpoint::{FailCommandOptions, FailPoint, FailPointMode},
+    failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     lock::TestLock,
     matchable::{assert_matches, Matchable},
 };
@@ -22,12 +22,12 @@ use crate::{
     error::{CommandError, ErrorKind, Result},
     operation::RunCommand,
     options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
+    test::Topology,
     Client,
     Collection,
 };
-use failpoint::FailPointGuard;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TestClient {
     client: Client,
     pub options: ClientOptions,
@@ -280,6 +280,30 @@ impl TestClient {
     pub async fn drop_collection(&self, db_name: &str, coll_name: &str) {
         let coll = self.get_coll(db_name, coll_name);
         drop_collection(&coll).await;
+    }
+
+    pub async fn topology(&self) -> Topology {
+        if self.is_sharded() {
+            let shard_info = self
+                .database("config")
+                .collection("shards")
+                .find_one(None, None)
+                .await
+                .unwrap()
+                .unwrap();
+            let hosts = shard_info.get_str("host").unwrap();
+            // If the host string has more than one host, a slash will separate the replica set name
+            // and list of hosts.
+            if hosts.contains('/') {
+                Topology::ShardedReplicaSet
+            } else {
+                Topology::Sharded
+            }
+        } else if self.is_replica_set() {
+            Topology::ReplicaSet
+        } else {
+            Topology::Single
+        }
     }
 }
 

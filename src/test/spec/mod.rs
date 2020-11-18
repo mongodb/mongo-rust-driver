@@ -12,6 +12,7 @@ mod read_write_concern;
 mod retryable_reads;
 mod retryable_writes;
 mod runner;
+mod unified_runner;
 
 use std::{
     convert::TryFrom,
@@ -21,14 +22,17 @@ use std::{
     path::PathBuf,
 };
 
-pub use self::runner::{
-    run_v2_test,
-    AnyTestOperation,
-    OperationObject,
-    RunOn,
-    TestData,
-    TestEvent,
-    TestFile,
+pub use self::{
+    runner::{
+        run_v2_test,
+        AnyTestOperation,
+        OperationObject,
+        RunOn,
+        TestData,
+        TestEvent,
+        TestFile,
+    },
+    unified_runner::Topology,
 };
 
 use serde::de::DeserializeOwned;
@@ -62,6 +66,12 @@ where
         let test_file_full_path = base_path.join(&test_file_path);
         let json: Value =
             serde_json::from_reader(File::open(test_file_full_path.as_path()).unwrap()).unwrap();
+
+        // Printing the name of the test file makes it easier to debug deserialization errors.
+        println!(
+            "Running tests from {}",
+            test_file_full_path.display().to_string()
+        );
 
         run_test_file(
             bson::from_bson(
