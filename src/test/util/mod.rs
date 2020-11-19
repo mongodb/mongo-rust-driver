@@ -107,12 +107,12 @@ impl TestClient {
             let get_parameters =
                 RunCommand::new("admin".into(), doc! { "getParameter": "*" }, None).unwrap();
 
-            let response = client
+            if let Ok(response) = client
                 .execute_operation_with_session(get_parameters, &mut session)
                 .await
-                .unwrap();
-
-            server_parameters = Some(Bson::Document(response));
+            {
+                server_parameters = Some(Bson::Document(response));
+            }
         }
 
         Self {
