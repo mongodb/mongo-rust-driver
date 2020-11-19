@@ -228,9 +228,9 @@ impl AuthMechanism {
 
                 Ok(Some(ClientFirst::Scram(ScramVersion::Sha256, client_first)))
             }
-            Self::MongoDbX509 => Ok(Some(ClientFirst::X509(x509::build_client_first(
-                credential,
-            )))),
+            Self::MongoDbX509 => Ok(Some(ClientFirst::X509(
+                x509::build_speculative_client_first(credential),
+            ))),
             Self::Plain => Ok(None),
             #[cfg(feature = "tokio-runtime")]
             AuthMechanism::MongoDbAws => Ok(None),

@@ -119,14 +119,24 @@ impl ScramVersion {
         &self,
         credential: &Credential,
     ) -> Result<ClientFirst> {
-        self.build_client_first(credential, true)
+        self.build_client_first(credential, true, None)
     }
 
     /// Constructs the first client message in the SCRAM handshake.
-    fn build_client_first(&self, credential: &Credential, include_db: bool) -> Result<ClientFirst> {
+    fn build_client_first(
+        &self,
+        credential: &Credential,
+        include_db: bool,
+        server_api: Option<&ServerApi>,
+    ) -> Result<ClientFirst> {
         let info = self.client_auth_info(credential)?;
 
-        Ok(ClientFirst::new(info.source, info.username, include_db))
+        Ok(ClientFirst::new(
+            info.source,
+            info.username,
+            include_db,
+            server_api.cloned(),
+        ))
     }
 
     /// Sends the first client message in the SCRAM handshake.
@@ -136,12 +146,9 @@ impl ScramVersion {
         credential: &Credential,
         server_api: Option<&ServerApi>,
     ) -> Result<FirstRound> {
-        let client_first = self.build_client_first(credential, false)?;
+        let client_first = self.build_client_first(credential, false, server_api)?;
 
-        let mut command = client_first.to_command(self);
-        if let Some(server_api) = server_api {
-            command.set_server_api(server_api);
-        }
+        let command = client_first.to_command(self);
 
         let server_first = conn.send_command(command, None).await?;
 
@@ -202,12 +209,10 @@ impl ScramVersion {
             &client_first,
             &server_first,
             self,
+            server_api.cloned(),
         )?;
 
-        let mut command = client_final.to_command();
-        if let Some(server_api) = server_api {
-            command.set_server_api(server_api);
-        }
+        let command = client_final.to_command();
 
         let server_final_response = conn.send_command(command, None).await?;
         let server_final = ServerFinal::parse(server_final_response.raw_response)?;
@@ -221,11 +226,9 @@ impl ScramVersion {
                 source.into(),
                 server_final.conversation_id().clone(),
                 Vec::new(),
+                server_api.cloned(),
             );
-            let mut command = noop.into_command();
-            if let Some(server_api) = server_api {
-                command.set_server_api(server_api);
-            }
+            let command = noop.into_command();
 
             let server_noop_response = conn.send_command(command, None).await?;
 
@@ -397,10 +400,12 @@ pub(crate) struct ClientFirst {
     nonce: String,
 
     include_db: bool,
+
+    server_api: Option<ServerApi>,
 }
 
 impl ClientFirst {
-    fn new(source: &str, username: &str, include_db: bool) -> Self {
+    fn new(source: &str, username: &str, include_db: bool, server_api: Option<ServerApi>) -> Self {
         let nonce = auth::generate_nonce();
         let gs2_header = format!("{},,", NO_CHANNEL_BINDING);
         let bare = format!("{}={},{}={}", USERNAME_KEY, username, NONCE_KEY, nonce);
@@ -419,6 +424,7 @@ impl ClientFirst {
             },
             nonce,
             include_db,
+            server_api,
         }
     }
 
@@ -437,7 +443,12 @@ impl ClientFirst {
     pub(super) fn to_command(&self, scram: &ScramVersion) -> Command {
         let payload = self.message().as_bytes().to_vec();
         let auth_mech = AuthMechanism::from_scram_version(scram);
-        let sasl_start = SaslStart::new(self.source.clone(), auth_mech, payload);
+        let sasl_start = SaslStart::new(
+            self.source.clone(),
+            auth_mech,
+            payload,
+            self.server_api.clone(),
+        );
 
         let mut cmd = sasl_start.into_command();
 
@@ -551,6 +562,7 @@ struct ClientFinal {
     message: String,
     auth_message: String,
     conversation_id: Bson,
+    server_api: Option<ServerApi>,
 }
 
 impl ClientFinal {
@@ -560,6 +572,7 @@ impl ClientFinal {
         client_first: &ClientFirst,
         server_first: &ServerFirst,
         scram: &ScramVersion,
+        server_api: Option<ServerApi>,
     ) -> Result<Self> {
         let client_key = scram.hmac(salted_password, b"Client Key")?;
         let stored_key = scram.h(client_key.as_ref());
@@ -588,6 +601,7 @@ impl ClientFinal {
             message,
             auth_message,
             conversation_id: server_first.conversation_id().clone(),
+            server_api,
         })
     }
 
@@ -608,6 +622,7 @@ impl ClientFinal {
             self.source.clone(),
             self.conversation_id.clone(),
             self.payload(),
+            self.server_api.clone(),
         )
         .into_command()
     }

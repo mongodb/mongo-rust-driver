@@ -55,11 +55,9 @@ pub(super) async fn authenticate_stream(
         source.into(),
         AuthMechanism::MongoDbAws,
         client_first_payload_bytes,
+        server_api.cloned(),
     );
-    let mut client_first = sasl_start.into_command();
-    if let Some(server_api) = server_api {
-        client_first.set_server_api(server_api);
-    }
+    let client_first = sasl_start.into_command();
 
     let server_first_response = conn.send_command(client_first, None).await?;
 
@@ -92,12 +90,10 @@ pub(super) async fn authenticate_stream(
         source.into(),
         server_first.conversation_id.clone(),
         client_second_payload_bytes,
+        server_api.cloned(),
     );
 
-    let mut client_second = sasl_continue.into_command();
-    if let Some(server_api) = server_api {
-        client_second.set_server_api(server_api);
-    }
+    let client_second = sasl_continue.into_command();
 
     let server_second_response = conn.send_command(client_second, None).await?;
     let server_second = SaslResponse::parse("MONGODB-AWS", server_second_response.raw_response)?;

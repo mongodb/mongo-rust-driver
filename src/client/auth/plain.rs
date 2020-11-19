@@ -27,15 +27,13 @@ pub(crate) async fn authenticate_stream(
         .as_ref()
         .ok_or_else(|| Error::authentication_error("PLAIN", "no password supplied"))?;
 
-    let mut sasl_start = SaslStart::new(
+    let sasl_start = SaslStart::new(
         source.into(),
         AuthMechanism::Plain,
         payload_bytes(username, password),
+        server_api.cloned(),
     )
     .into_command();
-    if let Some(server_api) = server_api {
-        sasl_start.set_server_api(server_api);
-    }
 
     let response = conn.send_command(sasl_start, None).await?;
     let sasl_response = SaslResponse::parse("PLAIN", response.raw_response)?;

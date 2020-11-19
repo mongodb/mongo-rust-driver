@@ -1,7 +1,7 @@
 use crate::{
     bson::{doc, spec::BinarySubtype, Binary, Bson, Document},
     bson_util,
-    client::auth::AuthMechanism,
+    client::{auth::AuthMechanism, options::ServerApi},
     cmap::Command,
     error::{Error, Result},
 };
@@ -11,14 +11,21 @@ pub(super) struct SaslStart {
     source: String,
     mechanism: AuthMechanism,
     payload: Vec<u8>,
+    server_api: Option<ServerApi>,
 }
 
 impl SaslStart {
-    pub(super) fn new(source: String, mechanism: AuthMechanism, payload: Vec<u8>) -> Self {
+    pub(super) fn new(
+        source: String,
+        mechanism: AuthMechanism,
+        payload: Vec<u8>,
+        server_api: Option<ServerApi>,
+    ) -> Self {
         Self {
             source,
             mechanism,
             payload,
+            server_api,
         }
     }
 
@@ -34,7 +41,12 @@ impl SaslStart {
             body.insert("options", doc! { "skipEmptyExchange": true });
         }
 
-        Command::new("saslStart".into(), self.source, body)
+        let mut command = Command::new("saslStart".into(), self.source, body);
+        if let Some(server_api) = self.server_api {
+            command.set_server_api(&server_api);
+        }
+
+        command
     }
 }
 
@@ -43,14 +55,21 @@ pub(super) struct SaslContinue {
     source: String,
     conversation_id: Bson,
     payload: Vec<u8>,
+    server_api: Option<ServerApi>,
 }
 
 impl SaslContinue {
-    pub(super) fn new(source: String, conversation_id: Bson, payload: Vec<u8>) -> Self {
+    pub(super) fn new(
+        source: String,
+        conversation_id: Bson,
+        payload: Vec<u8>,
+        server_api: Option<ServerApi>,
+    ) -> Self {
         Self {
             source,
             conversation_id,
             payload,
+            server_api,
         }
     }
 
@@ -61,7 +80,12 @@ impl SaslContinue {
             "payload": Binary { subtype: BinarySubtype::Generic, bytes: self.payload },
         };
 
-        Command::new("saslContinue".into(), self.source, body)
+        let mut command = Command::new("saslContinue".into(), self.source, body);
+        if let Some(server_api) = self.server_api {
+            command.set_server_api(&server_api);
+        }
+
+        command
     }
 }
 
