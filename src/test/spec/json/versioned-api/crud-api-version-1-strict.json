@@ -149,6 +149,9 @@
             "pipeline": [
               {
                 "$listLocalSessions": {}
+              },
+              {
+                "$limit": 1
               }
             ]
           }
@@ -165,6 +168,9 @@
                   "pipeline": [
                     {
                       "$listLocalSessions": {}
+                    },
+                    {
+                      "$limit": 1
                     }
                   ],
                   "apiVersion": "1",
@@ -208,6 +214,18 @@
                 }
               },
               {
+                "deleteMany": {
+                  "filter": {
+                    "x": {
+                      "$nin": [
+                        24,
+                        34
+                      ]
+                    }
+                  }
+                }
+              },
+              {
                 "updateMany": {
                   "filter": {
                     "_id": {
@@ -217,18 +235,6 @@
                   "update": {
                     "$inc": {
                       "x": 1
-                    }
-                  }
-                }
-              },
-              {
-                "deleteMany": {
-                  "filter": {
-                    "x": {
-                      "$nin": [
-                        24,
-                        34
-                      ]
                     }
                   }
                 }
@@ -306,6 +312,31 @@
             {
               "commandStartedEvent": {
                 "command": {
+                  "delete": "test",
+                  "deletes": [
+                    {
+                      "q": {
+                        "x": {
+                          "$nin": [
+                            24,
+                            34
+                          ]
+                        }
+                      },
+                      "limit": 0
+                    }
+                  ],
+                  "apiVersion": "1",
+                  "apiStrict": true,
+                  "apiDeprecationErrors": {
+                    "$$unsetOrMatches": false
+                  }
+                }
+              }
+            },
+            {
+              "commandStartedEvent": {
+                "command": {
                   "update": "test",
                   "updates": [
                     {
@@ -320,31 +351,6 @@
                         }
                       },
                       "multi": true
-                    }
-                  ],
-                  "apiVersion": "1",
-                  "apiStrict": true,
-                  "apiDeprecationErrors": {
-                    "$$unsetOrMatches": false
-                  }
-                }
-              }
-            },
-            {
-              "commandStartedEvent": {
-                "command": {
-                  "delete": "test",
-                  "deletes": [
-                    {
-                      "q": {
-                        "x": {
-                          "$nin": [
-                            24,
-                            34
-                          ]
-                        }
-                      },
-                      "limit": 0
                     }
                   ],
                   "apiVersion": "1",
@@ -625,8 +631,7 @@
             "sort": {
               "_id": 1
             },
-            "batchSize": 3,
-            "limit": 4
+            "batchSize": 3
           },
           "expectResult": [
             {
@@ -644,6 +649,10 @@
             {
               "_id": 4,
               "x": 44
+            },
+            {
+              "_id": 5,
+              "x": 55
             }
           ]
         }
