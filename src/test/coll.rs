@@ -960,7 +960,7 @@ async fn count_documents_with_wc() {
         .build()
         .into();
 
-    let client = TestClient::with_options(Some(options)).await;
+    let client = TestClient::with_options(Some(options), true).await;
     let coll = client
         .database(function_name!())
         .collection(function_name!());
