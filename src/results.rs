@@ -19,11 +19,7 @@ pub struct InsertOneResult {
 impl InsertOneResult {
     pub(crate) fn from_insert_many_result(result: InsertManyResult) -> Self {
         Self {
-            inserted_id: result
-                .inserted_ids
-                .get(&0)
-                .cloned()
-                .unwrap_or_else(|| Bson::Null),
+            inserted_id: result.inserted_ids.get(&0).cloned().unwrap_or(Bson::Null),
         }
     }
 }

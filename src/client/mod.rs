@@ -248,7 +248,7 @@ impl Client {
     /// will be used instead.
     async fn select_server(&self, criteria: Option<&SelectionCriteria>) -> Result<Arc<Server>> {
         let criteria =
-            criteria.unwrap_or_else(|| &SelectionCriteria::ReadPreference(ReadPreference::Primary));
+            criteria.unwrap_or(&SelectionCriteria::ReadPreference(ReadPreference::Primary));
 
         let start_time = PreciseTime::now();
         let timeout = time::Duration::from_std(

@@ -287,7 +287,7 @@ async fn handle_write_concern_error() {
     let response = CommandResponse::with_document(doc! {
         "cursor" : {
             "firstBatch" : [ ],
-            "id" : 0 as i64,
+            "id" : 0_i64,
             "ns" : "test.test"
         },
         "writeConcernError" : {

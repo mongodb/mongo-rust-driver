@@ -34,12 +34,12 @@ use crate::{
 
 #[async_trait]
 pub trait TestOperation: Debug {
-    async fn execute_test_runner_operation<'a>(&self, test_runner: &'a mut TestRunner);
+    async fn execute_test_runner_operation(&self, test_runner: &mut TestRunner);
 
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>>;
 
     /// Whether or not this operation returns an array of root documents. This information is
@@ -202,10 +202,10 @@ pub(super) struct DeleteMany {
 
 #[async_trait]
 impl TestOperation for DeleteMany {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         let collection = test_runner.get_collection(id);
         let result = collection
@@ -215,7 +215,7 @@ impl TestOperation for DeleteMany {
         Ok(Some(result.into()))
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
@@ -230,10 +230,10 @@ pub(super) struct DeleteOne {
 
 #[async_trait]
 impl TestOperation for DeleteOne {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         let collection = test_runner.get_collection(id);
         let result = collection
@@ -243,7 +243,7 @@ impl TestOperation for DeleteOne {
         Ok(Some(result.into()))
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
@@ -258,10 +258,10 @@ pub(super) struct Find {
 
 #[async_trait]
 impl TestOperation for Find {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         let collection = test_runner.get_collection(id);
         let cursor = collection
@@ -275,7 +275,7 @@ impl TestOperation for Find {
         false
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
@@ -290,10 +290,10 @@ pub(super) struct InsertMany {
 
 #[async_trait]
 impl TestOperation for InsertMany {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         let collection = test_runner.get_collection(id);
         let result = collection
@@ -308,7 +308,7 @@ impl TestOperation for InsertMany {
         Ok(Some(Bson::from(doc! { "insertedIds": ids }).into()))
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
@@ -323,10 +323,10 @@ pub(super) struct InsertOne {
 
 #[async_trait]
 impl TestOperation for InsertOne {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         let collection = test_runner.get_collection(id);
         let result = collection
@@ -336,7 +336,7 @@ impl TestOperation for InsertOne {
         Ok(Some(result.into()))
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
@@ -352,10 +352,10 @@ pub(super) struct UpdateMany {
 
 #[async_trait]
 impl TestOperation for UpdateMany {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         let collection = test_runner.get_collection(id);
         let result = collection
@@ -369,7 +369,7 @@ impl TestOperation for UpdateMany {
         Ok(Some(result.into()))
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
@@ -385,10 +385,10 @@ pub(super) struct UpdateOne {
 
 #[async_trait]
 impl TestOperation for UpdateOne {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         let collection = test_runner.get_collection(id);
         let result = collection
@@ -402,7 +402,7 @@ impl TestOperation for UpdateOne {
         Ok(Some(result.into()))
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
@@ -417,10 +417,10 @@ pub(super) struct Aggregate {
 
 #[async_trait]
 impl TestOperation for Aggregate {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         let cursor = match test_runner.entities.get(id).unwrap() {
             Entity::Collection(collection) => {
@@ -442,7 +442,7 @@ impl TestOperation for Aggregate {
         true
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
@@ -458,10 +458,10 @@ pub(super) struct Distinct {
 
 #[async_trait]
 impl TestOperation for Distinct {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         let collection = test_runner.get_collection(id);
         let result = collection
@@ -470,7 +470,7 @@ impl TestOperation for Distinct {
         Ok(Some(Bson::Array(result).into()))
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
@@ -485,10 +485,10 @@ pub(super) struct CountDocuments {
 
 #[async_trait]
 impl TestOperation for CountDocuments {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         let collection = test_runner.get_collection(id);
         let result = collection
@@ -497,7 +497,7 @@ impl TestOperation for CountDocuments {
         Ok(Some(Bson::from(result).into()))
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
@@ -511,10 +511,10 @@ pub(super) struct EstimatedDocumentCount {
 
 #[async_trait]
 impl TestOperation for EstimatedDocumentCount {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         let collection = test_runner.get_collection(id);
         let result = collection
@@ -523,7 +523,7 @@ impl TestOperation for EstimatedDocumentCount {
         Ok(Some(Bson::from(result).into()))
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
@@ -538,10 +538,10 @@ pub(super) struct FindOne {
 
 #[async_trait]
 impl TestOperation for FindOne {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         let collection = test_runner.get_collection(id);
         let result = collection
@@ -553,7 +553,7 @@ impl TestOperation for FindOne {
         }
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
@@ -568,10 +568,10 @@ pub(super) struct ListDatabases {
 
 #[async_trait]
 impl TestOperation for ListDatabases {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         let client = test_runner.get_client(id);
         let result = client
@@ -581,7 +581,7 @@ impl TestOperation for ListDatabases {
         Ok(Some(Bson::Array(result).into()))
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
@@ -596,10 +596,10 @@ pub(super) struct ListDatabaseNames {
 
 #[async_trait]
 impl TestOperation for ListDatabaseNames {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         let client = test_runner.get_client(id);
         let result = client
@@ -609,7 +609,7 @@ impl TestOperation for ListDatabaseNames {
         Ok(Some(Bson::Array(result).into()))
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
@@ -624,10 +624,10 @@ pub(super) struct ListCollections {
 
 #[async_trait]
 impl TestOperation for ListCollections {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         let db = test_runner.get_database(id);
         let cursor = db
@@ -641,7 +641,7 @@ impl TestOperation for ListCollections {
         true
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
@@ -654,10 +654,10 @@ pub(super) struct ListCollectionNames {
 
 #[async_trait]
 impl TestOperation for ListCollectionNames {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         let db = test_runner.get_database(id);
         let result = db.list_collection_names(self.filter.clone()).await?;
@@ -665,7 +665,7 @@ impl TestOperation for ListCollectionNames {
         Ok(Some(Bson::from(result).into()))
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
@@ -681,10 +681,10 @@ pub(super) struct ReplaceOne {
 
 #[async_trait]
 impl TestOperation for ReplaceOne {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         let collection = test_runner.get_collection(id);
         let result = collection
@@ -698,7 +698,7 @@ impl TestOperation for ReplaceOne {
         Ok(Some(result.into()))
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
@@ -714,10 +714,10 @@ pub(super) struct FindOneAndUpdate {
 
 #[async_trait]
 impl TestOperation for FindOneAndUpdate {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         let collection = test_runner.get_collection(id);
         let result = collection
@@ -731,7 +731,7 @@ impl TestOperation for FindOneAndUpdate {
         Ok(Some(result.into()))
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
@@ -747,10 +747,10 @@ pub(super) struct FindOneAndReplace {
 
 #[async_trait]
 impl TestOperation for FindOneAndReplace {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         let collection = test_runner.get_collection(id);
         let result = collection
@@ -764,7 +764,7 @@ impl TestOperation for FindOneAndReplace {
         Ok(Some(result.into()))
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
@@ -779,10 +779,10 @@ pub(super) struct FindOneAndDelete {
 
 #[async_trait]
 impl TestOperation for FindOneAndDelete {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         let collection = test_runner.get_collection(id);
         let result = collection
@@ -792,7 +792,7 @@ impl TestOperation for FindOneAndDelete {
         Ok(Some(result.into()))
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
@@ -806,7 +806,7 @@ pub(super) struct FailPointCommand {
 
 #[async_trait]
 impl TestOperation for FailPointCommand {
-    async fn execute_test_runner_operation<'a>(&self, test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, test_runner: &mut TestRunner) {
         let client = test_runner.get_client(&self.client);
         let guard = client
             .enable_failpoint(self.fail_point.clone())
@@ -815,10 +815,10 @@ impl TestOperation for FailPointCommand {
         test_runner.fail_point_guards.push(guard);
     }
 
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         _id: &str,
-        _test_runner: &'a mut TestRunner,
+        _test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         unimplemented!()
     }
@@ -833,16 +833,16 @@ pub(super) struct AssertCollectionExists {
 
 #[async_trait]
 impl TestOperation for AssertCollectionExists {
-    async fn execute_test_runner_operation<'a>(&self, test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, test_runner: &mut TestRunner) {
         let db = test_runner.internal_client.database(&self.database_name);
         let names = db.list_collection_names(None).await.unwrap();
         assert!(names.contains(&self.collection_name));
     }
 
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         _id: &str,
-        _test_runner: &'a mut TestRunner,
+        _test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         unimplemented!()
     }
@@ -857,16 +857,16 @@ pub(super) struct AssertCollectionNotExists {
 
 #[async_trait]
 impl TestOperation for AssertCollectionNotExists {
-    async fn execute_test_runner_operation<'a>(&self, test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, test_runner: &mut TestRunner) {
         let db = test_runner.internal_client.database(&self.database_name);
         let names = db.list_collection_names(None).await.unwrap();
         assert!(!names.contains(&self.collection_name));
     }
 
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         _id: &str,
-        _test_runner: &'a mut TestRunner,
+        _test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         unimplemented!()
     }
@@ -885,10 +885,10 @@ pub(super) struct RunCommand {
 
 #[async_trait]
 impl TestOperation for RunCommand {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         id: &str,
-        test_runner: &'a mut TestRunner,
+        test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         let mut command = self.command.clone();
         if let Some(ref read_concern) = self.read_concern {
@@ -906,7 +906,7 @@ impl TestOperation for RunCommand {
         Ok(Some(result.into()))
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
@@ -916,15 +916,15 @@ pub(super) struct UnimplementedOperation;
 
 #[async_trait]
 impl TestOperation for UnimplementedOperation {
-    async fn execute_entity_operation<'a>(
+    async fn execute_entity_operation(
         &self,
         _id: &str,
-        _test_runner: &'a mut TestRunner,
+        _test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
         unimplemented!()
     }
 
-    async fn execute_test_runner_operation<'a>(&self, _test_runner: &'a mut TestRunner) {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }

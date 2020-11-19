@@ -147,7 +147,7 @@ async fn build_limit() {
 
     let positive_body = doc! {
         "find": "test_coll",
-        "limit": 5 as i64
+        "limit": 5_i64
     };
 
     build_test(ns.clone(), None, Some(positive_options), positive_body);
@@ -156,7 +156,7 @@ async fn build_limit() {
 
     let negative_body = doc! {
         "find": "test_coll",
-        "limit": 5 as i64,
+        "limit": 5_i64,
         "singleBatch": true
     };
 
