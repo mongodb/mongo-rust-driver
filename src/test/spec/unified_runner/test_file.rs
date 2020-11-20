@@ -37,7 +37,6 @@ pub struct TestFile {
     pub create_entities: Option<Vec<TestFileEntity>>,
     pub initial_data: Option<Vec<CollectionData>>,
     pub tests: Vec<TestCase>,
-    // TODO: don't read this field
     #[serde(rename = "_yamlAnchors")]
     yaml_anchors: Option<Document>,
 }

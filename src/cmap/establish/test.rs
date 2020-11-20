@@ -56,7 +56,6 @@ async fn speculative_auth_test(
 
     // Regardless of whether the server supports our speculative authentication attempt, we should
     // be able to successfully authenticate after the handshake.
-    // TODO: will have to add versioned API options before running command
     credential
         .authenticate_stream(&mut conn, &Default::default(), None, first_round)
         .await
@@ -71,7 +70,6 @@ async fn speculative_auth_test(
         doc! { "find": "foo", "limit": 1  },
     );
 
-    // TODO: will have to add versioned API options before running command
     let response = conn.send_command(command, None).await.unwrap();
 
     assert!(response.is_success());
