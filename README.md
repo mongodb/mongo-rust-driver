@@ -37,8 +37,9 @@ This repository contains the officially supported MongoDB Rust driver, a client 
 - MongoDB 3.6+
 
 **Note**: A regression introduced in Rust 1.46 may cause out-of-memory errors when compiling an application that uses
-the driver with a framework like actix. As a workaround, Rust 1.45 or nightly can be used instead. For more information
-or to track progress on a fix, see https://github.com/rust-lang/rust/issues/75992.
+the driver with a framework like actix-web. Rust 1.45 or the latest nightly version can be used to work around this
+problem temporarily. For more information or to track progress on a fix, see
+https://github.com/rust-lang/rust/issues/75992.
 
 ### Importing
 The driver is available on [crates.io](https://crates.io/crates/mongodb). To use the driver in your application, simply add it to your project's `Cargo.toml`.
