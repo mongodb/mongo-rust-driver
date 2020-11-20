@@ -35,7 +35,7 @@ async fn build() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_with_options() {
     let read_concern: ReadConcern = ReadConcernLevel::Local.into();
-    let max_time = Duration::from_millis(2 as u64);
+    let max_time = Duration::from_millis(2_u64);
     let options: EstimatedDocumentCountOptions = EstimatedDocumentCountOptions::builder()
         .max_time(max_time)
         .read_concern(read_concern.clone())
