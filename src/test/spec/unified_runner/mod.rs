@@ -8,6 +8,7 @@ mod test_runner;
 use futures::stream::TryStreamExt;
 use lazy_static::lazy_static;
 use semver::Version;
+use tokio::sync::RwLockWriteGuard;
 
 use crate::{
     bson::{doc, Document},
@@ -236,13 +237,13 @@ pub async fn run_unified_format_test(test_file: TestFile) {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(threaded_scheduler))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn test_examples() {
-    let _guard = LOCK.run_exclusively().await;
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
     run_spec_test(&["unified-runner-examples"], run_unified_format_test).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn test_versioned_api() {
-    let _guard = LOCK.run_exclusively().await;
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
     run_spec_test(&["versioned-api"], run_unified_format_test).await;
 }
