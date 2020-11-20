@@ -21,7 +21,7 @@ async fn basic() {
         response_to: 0,
         flags: MessageFlags::empty(),
         sections: vec![MessageSection::Document(
-            doc! { "isMaster": 1, "$db": "admin" },
+            doc! { "isMaster": 1, "$db": "admin", "apiVersion": "1" },
         )],
         checksum: None,
         request_id: None,

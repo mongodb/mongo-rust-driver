@@ -18,7 +18,15 @@ use crate::{
     error::{Error, Result},
     options::TlsOptions,
     runtime::AsyncJoinHandle,
-    test::{assert_matches, run_spec_test, EventClient, Matchable, CLIENT_OPTIONS, LOCK},
+    test::{
+        assert_matches,
+        run_spec_test,
+        EventClient,
+        Matchable,
+        CLIENT_OPTIONS,
+        LOCK,
+        SERVER_API,
+    },
     RUNTIME,
 };
 use bson::doc;
@@ -85,6 +93,7 @@ impl Executor {
         let mut pool_options = test_file.pool_options.unwrap_or_else(Default::default);
         pool_options.tls_options = CLIENT_OPTIONS.tls_options();
         pool_options.event_handler = Some(handler.clone());
+        pool_options.server_api = SERVER_API.clone();
 
         let state = State {
             handler,
