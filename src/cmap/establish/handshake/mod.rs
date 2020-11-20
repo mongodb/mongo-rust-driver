@@ -10,9 +10,9 @@ use crate::{
     bson::{doc, Bson, Document},
     client::auth::{ClientFirst, FirstRound},
     cmap::{options::ConnectionPoolOptions, Command, Connection, StreamDescription},
-    error::Result,
+    error::{ErrorKind, Result},
     is_master::{IsMasterCommandResponse, IsMasterReply},
-    options::{AuthMechanism, Credential},
+    options::{AuthMechanism, ClientOptions, Credential, DriverInfo},
 };
 
 #[cfg(feature = "tokio-runtime")]
@@ -136,15 +136,16 @@ lazy_static! {
 
 /// Contains the logic needed to handshake a connection.
 #[derive(Debug, Clone)]
-pub(super) struct Handshaker {
+pub(crate) struct Handshaker {
     /// The `isMaster` command to send when handshaking. This will always be identical
     /// given the same pool options, so it can be created at the time the Handshaker is created.
     command: Command,
+    credential: Option<Credential>,
 }
 
 impl Handshaker {
     /// Creates a new Handshaker.
-    pub(super) fn new(options: Option<&ConnectionPoolOptions>) -> Self {
+    pub(crate) fn new(options: Option<HandshakerOptions>) -> Self {
         let mut metadata = BASE_CLIENT_METADATA.clone();
 
         if let Some(app_name) = options.as_ref().and_then(|opts| opts.app_name.as_ref()) {
@@ -177,7 +178,8 @@ impl Handshaker {
             "client": metadata,
         };
 
-        if let Some(credential) = options.as_ref().and_then(|opts| opts.credential.as_ref()) {
+        let credential = options.as_ref().and_then(|opts| opts.credential.as_ref());
+        if let Some(credential) = credential {
             credential.append_needed_mechanism_negotiation(&mut body);
             db = credential.resolved_source();
         }
@@ -186,45 +188,101 @@ impl Handshaker {
         if let Some(server_api) = options.as_ref().and_then(|opts| opts.server_api.as_ref()) {
             command.set_server_api(server_api)
         }
-
-        Self { command }
+        Self {
+            command,
+            credential: credential.cloned(),
+        }
     }
 
     /// Handshakes a connection.
-    pub(super) async fn handshake(
-        &self,
-        conn: &mut Connection,
-        credential: Option<&Credential>,
-    ) -> Result<Option<FirstRound>> {
+    pub(crate) async fn handshake(&self, conn: &mut Connection) -> Result<HandshakeResult> {
         let mut command = self.command.clone();
 
-        let client_first = set_speculative_auth_info(&mut command.body, credential)?;
+        let client_first = set_speculative_auth_info(&mut command.body, self.credential.as_ref())?;
 
-        let start_time = PreciseTime::now();
-        let response = conn.send_command(command, None).await?;
-        let end_time = PreciseTime::now();
-
-        response.validate()?;
-        let mut command_response: IsMasterCommandResponse = response.body()?;
+        let mut is_master_reply = is_master(command, conn).await?;
+        conn.stream_description = Some(StreamDescription::from_is_master(is_master_reply.clone()));
 
         // Record the client's message and the server's response from speculative authentication if
         // the server did send a response.
         let first_round = client_first.and_then(|client_first| {
-            command_response
+            is_master_reply
+                .command_response
                 .speculative_authenticate
                 .take()
                 .map(|server_first| client_first.into_first_round(server_first))
         });
 
-        let is_master_reply = IsMasterReply {
-            command_response,
-            round_trip_time: Some(start_time.to(end_time).to_std().unwrap()),
-            cluster_time: None,
-        };
-
-        conn.stream_description = Some(StreamDescription::from_is_master(is_master_reply));
-        Ok(first_round)
+        Ok(HandshakeResult {
+            first_round,
+            is_master_reply,
+        })
     }
+}
+
+/// The information returned from the server as part of the handshake.
+///
+/// Also optionally includes the first round of speculative authentication
+/// if applicable.
+#[derive(Debug)]
+pub(crate) struct HandshakeResult {
+    /// The response from the server.
+    pub(crate) is_master_reply: IsMasterReply,
+
+    /// The first round of speculative authentication, if applicable.
+    pub(crate) first_round: Option<FirstRound>,
+}
+
+#[derive(Debug)]
+pub(crate) struct HandshakerOptions {
+    app_name: Option<String>,
+    credential: Option<Credential>,
+    driver_info: Option<DriverInfo>,
+}
+
+impl From<ConnectionPoolOptions> for HandshakerOptions {
+    fn from(options: ConnectionPoolOptions) -> Self {
+        Self {
+            app_name: options.app_name,
+            credential: options.credential,
+            driver_info: options.driver_info,
+        }
+    }
+}
+
+impl From<ClientOptions> for HandshakerOptions {
+    fn from(options: ClientOptions) -> Self {
+        Self {
+            app_name: options.app_name,
+            credential: options.credential,
+            driver_info: options.driver_info,
+        }
+    }
+}
+
+/// Run the given isMaster command.
+///
+/// If the given command is not an isMaster, this function will return an error.
+pub(crate) async fn is_master(command: Command, conn: &mut Connection) -> Result<IsMasterReply> {
+    if !command.name.eq_ignore_ascii_case("ismaster") {
+        return Err(ErrorKind::OperationError {
+            message: format!("invalid ismaster command: {}", command.name),
+        }
+        .into());
+    }
+    let start_time = PreciseTime::now();
+    let response = conn.send_command(command, None).await?;
+    let end_time = PreciseTime::now();
+
+    response.validate()?;
+    let cluster_time = response.cluster_time().cloned();
+    let command_response: IsMasterCommandResponse = response.body()?;
+
+    Ok(IsMasterReply {
+        command_response,
+        round_trip_time: Some(start_time.to(end_time).to_std().unwrap()),
+        cluster_time,
+    })
 }
 
 /// Updates the handshake command document with the speculative authenitication info.

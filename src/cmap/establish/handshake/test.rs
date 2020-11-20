@@ -34,7 +34,7 @@ fn metadata_with_options() {
         )
         .build();
 
-    let handshaker = Handshaker::new(Some(&options));
+    let handshaker = Handshaker::new(Some(options.into()));
 
     let metadata = handshaker.command.body.get_document("client").unwrap();
     assert_eq!(
