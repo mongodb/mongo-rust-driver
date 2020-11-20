@@ -107,6 +107,9 @@ impl TestClient {
             let get_parameters =
                 RunCommand::new("admin".into(), doc! { "getParameter": "*" }, None).unwrap();
 
+            // The command above may fail due to insufficient permissions. In that case, the unified
+            // test runner will skip any tests with a serverParameters runOnRequirement as the check
+            // will fail.
             if let Ok(response) = client
                 .execute_operation_with_session(get_parameters, &mut session)
                 .await
