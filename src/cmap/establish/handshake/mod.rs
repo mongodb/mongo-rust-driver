@@ -147,50 +147,61 @@ impl Handshaker {
     /// Creates a new Handshaker.
     pub(crate) fn new(options: Option<HandshakerOptions>) -> Self {
         let mut metadata = BASE_CLIENT_METADATA.clone();
-
-        if let Some(app_name) = options.as_ref().and_then(|opts| opts.app_name.as_ref()) {
-            metadata.application = Some(AppMetadata {
-                name: app_name.to_string(),
-            });
-        }
-
-        if let Some(driver_info) = options.as_ref().and_then(|opts| opts.driver_info.as_ref()) {
-            metadata.driver.name.push('|');
-            metadata.driver.name.push_str(&driver_info.name);
-
-            if let Some(ref version) = driver_info.version {
-                metadata.driver.version.push('|');
-                metadata.driver.version.push_str(version);
-            }
-
-            if let Some(ref mut platform) = metadata.platform {
-                if let Some(ref driver_info_platform) = driver_info.platform {
-                    platform.push('|');
-                    platform.push_str(driver_info_platform);
-                }
-            }
-        }
-
-        let mut db = "admin";
+        let mut credential = None;
+        let mut db = None;
+        let mut server_api = None;
 
         let mut body = doc! {
             "isMaster": 1,
-            "client": metadata,
         };
 
-        let credential = options.as_ref().and_then(|opts| opts.credential.as_ref());
-        if let Some(credential) = credential {
-            credential.append_needed_mechanism_negotiation(&mut body);
-            db = credential.resolved_source();
+        if let Some(options) = options {
+            if let Some(app_name) = options.app_name {
+                metadata.application = Some(AppMetadata { name: app_name });
+            }
+
+            if let Some(driver_info) = options.driver_info {
+                metadata.driver.name.push('|');
+                metadata.driver.name.push_str(&driver_info.name);
+
+                if let Some(ref version) = driver_info.version {
+                    metadata.driver.version.push('|');
+                    metadata.driver.version.push_str(version);
+                }
+
+                if let Some(ref mut platform) = metadata.platform {
+                    if let Some(ref driver_info_platform) = driver_info.platform {
+                        platform.push('|');
+                        platform.push_str(driver_info_platform);
+                    }
+                }
+            }
+
+            if let Some(cred) = options.credential {
+                cred.append_needed_mechanism_negotiation(&mut body);
+                db = Some(cred.resolved_source().to_string());
+                credential = Some(cred);
+            }
+
+            server_api = options.server_api;
         }
 
-        let mut command = Command::new_read("isMaster".to_string(), db.to_string(), None, body);
-        if let Some(server_api) = options.as_ref().and_then(|opts| opts.server_api.as_ref()) {
+        body.insert("client", metadata);
+
+        let mut command = Command::new_read(
+            "isMaster".to_string(),
+            db.unwrap_or_else(|| "admin".to_string()),
+            None,
+            body,
+        );
+
+        if let Some(server_api) = server_api {
             command.set_server_api(server_api)
         }
+
         Self {
             command,
-            credential: credential.cloned(),
+            credential,
         }
     }
 
