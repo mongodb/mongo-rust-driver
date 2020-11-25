@@ -62,8 +62,19 @@ impl Command {
     }
 
     pub(crate) fn set_server_api(&mut self, server_api: &ServerApi) {
-        if server_api.applies_to_command(self.name.as_str()) {
-            server_api.append_to_command(&mut self.body);
+        // TODO RUST-90: Don't include version fields for commands run as part of a transaction
+        if matches!(self.name.as_str(), "getMore") {
+            return;
+        }
+
+        self.body.insert("apiVersion", format!("{}", server_api.version));
+
+        if let Some(strict) = server_api.strict {
+            self.body.insert("apiStrict", strict);
+        }
+
+        if let Some(deprecation_errors) = server_api.deprecation_errors {
+            self.body.insert("apiDeprecationErrors", deprecation_errors);
         }
     }
 }

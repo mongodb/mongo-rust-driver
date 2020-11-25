@@ -262,25 +262,6 @@ pub struct ServerApi {
     pub deprecation_errors: Option<bool>,
 }
 
-impl ServerApi {
-    pub(crate) fn append_to_command(&self, command: &mut Document) {
-        command.insert("apiVersion", format!("{}", self.version));
-
-        if let Some(strict) = self.strict {
-            command.insert("apiStrict", strict);
-        }
-
-        if let Some(deprecation_errors) = self.deprecation_errors {
-            command.insert("apiDeprecationErrors", deprecation_errors);
-        }
-    }
-
-    pub(crate) fn applies_to_command(&self, command_name: &str) -> bool {
-        // TODO RUST-90: Don't include version fields for commands run as part of a transaction
-        !matches!(command_name, "getMore")
-    }
-}
-
 /// Contains the options that can be used to create a new [`Client`](../struct.Client.html).
 #[derive(Clone, Derivative, Deserialize, TypedBuilder)]
 #[derivative(Debug, PartialEq)]
