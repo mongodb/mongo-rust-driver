@@ -1,7 +1,5 @@
 use std::time::Duration;
 
-use std::str::FromStr;
-
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Deserializer};
 
@@ -9,7 +7,7 @@ use super::{Operation, TestEvent};
 
 use crate::{
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
-    client::options::{ServerApi, ServerApiVersion},
+    client::options::ServerApi,
     concern::{Acknowledgment, ReadConcernLevel},
     error::Error,
     options::{
@@ -24,7 +22,6 @@ use crate::{
     },
     test::{spec::unified_runner::results_match, TestClient, DEFAULT_URI},
 };
-use bson::document::ValueAccessError;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -133,7 +130,6 @@ pub struct Client {
     pub observe_events: Option<Vec<String>>,
     pub ignore_command_monitoring_events: Option<Vec<String>>,
     #[serde(default)]
-    #[serde(deserialize_with = "deserialize_server_api")]
     pub server_api: Option<ServerApi>,
 }
 
@@ -184,35 +180,6 @@ where
     uri.pop();
 
     Ok(uri)
-}
-
-fn deserialize_server_api<'de, D>(
-    deserializer: D,
-) -> std::result::Result<Option<ServerApi>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let server_api = Document::deserialize(deserializer)?;
-
-    let server_api = ServerApi {
-        version: match server_api.get_str("version") {
-            Ok(v) => ServerApiVersion::from_str(v).unwrap(),
-            Err(ValueAccessError::NotPresent) => panic!("Need to provide server API version"),
-            _ => panic!("Invalid server API version given"),
-        },
-        strict: match server_api.get_bool("strict") {
-            Ok(v) => Some(v),
-            Err(ValueAccessError::NotPresent) => None,
-            _ => panic!("Invalid strict value for server API given"),
-        },
-        deprecation_errors: match server_api.get_bool("deprecationErrors") {
-            Ok(v) => Some(v),
-            Err(ValueAccessError::NotPresent) => None,
-            _ => panic!("Invalid deprecationErrors value for server API given"),
-        },
-    };
-
-    Ok(Some(server_api))
 }
 
 #[derive(Debug, Deserialize)]

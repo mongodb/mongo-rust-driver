@@ -22,7 +22,11 @@ use rustls::{
     ServerCertVerifier,
     TLSError,
 };
-use serde::{de::Error, Deserialize, Deserializer};
+use serde::{
+    de::{Error, Unexpected},
+    Deserialize,
+    Deserializer,
+};
 use strsim::jaro_winkler;
 pub use trust_dns_resolver::config::ResolverConfig;
 use typed_builder::TypedBuilder;
@@ -202,7 +206,7 @@ impl fmt::Display for StreamAddress {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum ServerApiVersion {
     Version1,
@@ -227,6 +231,18 @@ impl Display for ServerApiVersion {
         match self {
             Self::Version1 => write!(f, "1"),
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for ServerApiVersion {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+
+        ServerApiVersion::from_str(&s)
+            .map_err(|_| Error::invalid_value(Unexpected::Str(&s), &"a valid version number"))
     }
 }
 
