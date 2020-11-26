@@ -67,7 +67,8 @@ impl Command {
             return;
         }
 
-        self.body.insert("apiVersion", format!("{}", server_api.version));
+        self.body
+            .insert("apiVersion", format!("{}", server_api.version));
 
         if let Some(strict) = server_api.strict {
             self.body.insert("apiStrict", strict);
