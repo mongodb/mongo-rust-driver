@@ -206,6 +206,7 @@ impl fmt::Display for StreamAddress {
     }
 }
 
+/// Specifies the server API version to declare
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum ServerApiVersion {
@@ -246,6 +247,7 @@ impl<'de> Deserialize<'de> for ServerApiVersion {
     }
 }
 
+/// Declares a versioned server API
 #[derive(Clone, Debug, Deserialize, PartialEq, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
