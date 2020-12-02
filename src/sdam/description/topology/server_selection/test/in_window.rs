@@ -115,11 +115,11 @@ async fn load_balancing_test() {
     let mut setup_client_options = CLIENT_OPTIONS.clone();
     setup_client_options.hosts.drain(1..);
     setup_client_options.direct_connection = Some(true);
-    let setup_client = TestClient::with_options(Some(setup_client_options)).await;
+    let setup_client = TestClient::with_options(Some(setup_client_options), true).await;
 
     let version = VersionReq::parse(">= 4.2.9").unwrap();
     // blockConnection failpoint option only supported in 4.2.9+.
-    if !version.matches(&setup_client.server_version) {
+    if !version.matches(&setup_client.server_version.as_ref().unwrap()) {
         println!(
             "skipping load_balancing_test test due to server not supporting blockConnection option"
         );

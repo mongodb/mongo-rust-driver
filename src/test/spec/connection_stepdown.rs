@@ -25,7 +25,7 @@ async fn run_test<F: Future>(name: &str, test: impl Fn(EventClient, Database, Co
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
     let options = ClientOptions::builder().retry_writes(false).build();
-    let client = EventClient::with_additional_options(Some(options), None, None).await;
+    let client = EventClient::with_additional_options(Some(options), None, None, true).await;
 
     if !client.is_replica_set() {
         return;

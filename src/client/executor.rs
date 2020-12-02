@@ -246,6 +246,10 @@ impl Client {
         let connection_info = connection.info();
         let request_id = crate::cmap::conn::next_request_id();
 
+        if let Some(ref server_api) = self.inner.options.server_api {
+            cmd.set_server_api(server_api);
+        }
+
         self.emit_command_event(|handler| {
             let should_redact = REDACTED_COMMANDS.contains(cmd.name.to_lowercase().as_str());
 

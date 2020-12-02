@@ -45,12 +45,16 @@ async fn acquire_connection_and_send_command() {
     let read_pref = ReadPreference::PrimaryPreferred {
         options: Default::default(),
     };
-    let cmd = Command::new_read(
+    let mut cmd = Command::new_read(
         "listDatabases".to_string(),
         "admin".to_string(),
         Some(read_pref),
         body,
     );
+    if let Some(server_api) = client_options.server_api.as_ref() {
+        cmd.set_server_api(server_api);
+    }
+
     let response = connection.send_command(cmd, None).await.unwrap();
 
     assert!(response.is_success());
@@ -76,10 +80,10 @@ async fn concurrent_connections() {
     options.direct_connection = Some(true);
     options.hosts.drain(1..);
 
-    let client = TestClient::with_options(Some(options)).await;
+    let client = TestClient::with_options(Some(options), true).await;
     let version = VersionReq::parse(">= 4.2.9").unwrap();
     // blockConnection failpoint option only supported in 4.2.9+.
-    if !version.matches(&client.server_version) {
+    if !version.matches(&client.server_version.as_ref().unwrap()) {
         println!(
             "skipping concurrent_connections test due to server not supporting failpoint option"
         );
@@ -158,7 +162,7 @@ async fn connection_error_during_establishment() {
     client_options.direct_connection = Some(true);
     client_options.repl_set_name = None;
 
-    let client = TestClient::with_options(Some(client_options.clone())).await;
+    let client = TestClient::with_options(Some(client_options.clone()), true).await;
     if !client.supports_fail_command().await {
         println!(
             "skipping {} due to failCommand not being supported",
@@ -206,7 +210,7 @@ async fn connection_error_during_operation() {
     options.hosts.drain(1..);
     options.max_pool_size = Some(1);
 
-    let client = TestClient::with_options(options.into()).await;
+    let client = TestClient::with_options(options.into(), true).await;
     if !client.supports_fail_command().await {
         println!(
             "skipping {} due to failCommand not being supported",

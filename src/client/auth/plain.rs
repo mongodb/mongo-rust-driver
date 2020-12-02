@@ -1,8 +1,11 @@
 use crate::{
-    client::auth::{
-        sasl::{SaslResponse, SaslStart},
-        AuthMechanism,
-        Credential,
+    client::{
+        auth::{
+            sasl::{SaslResponse, SaslStart},
+            AuthMechanism,
+            Credential,
+        },
+        options::ServerApi,
     },
     cmap::Connection,
     error::{Error, Result},
@@ -11,6 +14,7 @@ use crate::{
 pub(crate) async fn authenticate_stream(
     conn: &mut Connection,
     credential: &Credential,
+    server_api: Option<&ServerApi>,
 ) -> Result<()> {
     let source = credential.source.as_deref().unwrap_or("$external");
     let username = credential
@@ -27,6 +31,7 @@ pub(crate) async fn authenticate_stream(
         source.into(),
         AuthMechanism::Plain,
         payload_bytes(username, password),
+        server_api.cloned(),
     )
     .into_command();
 

@@ -601,7 +601,7 @@ async fn x509_auth() {
             .build(),
     );
 
-    let client = TestClient::with_options(Some(options)).await;
+    let client = TestClient::with_options(Some(options), true).await;
     client
         .database(function_name!())
         .collection(function_name!())

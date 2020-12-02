@@ -661,7 +661,7 @@ async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>,
     let client = EventClient::new().await;
 
     let req = VersionReq::parse(">= 4.2").unwrap();
-    if options.is_some() && !req.matches(&client.server_version) {
+    if options.is_some() && !req.matches(&client.server_version.as_ref().unwrap()) {
         return;
     }
 
@@ -719,10 +719,10 @@ async fn find_one_and_delete_hint_server_version() {
 
     let req1 = VersionReq::parse("< 4.2").unwrap();
     let req2 = VersionReq::parse("4.2.*").unwrap();
-    if req1.matches(&client.server_version) {
+    if req1.matches(&client.server_version.as_ref().unwrap()) {
         let error = res.expect_err("find one and delete should fail");
         assert!(matches!(error.kind.as_ref(), ErrorKind::OperationError { .. }));
-    } else if req2.matches(&client.server_version) {
+    } else if req2.matches(&client.server_version.as_ref().unwrap()) {
         let error = res.expect_err("find one and delete should fail");
         assert!(matches!(error.kind.as_ref(), ErrorKind::CommandError { .. }));
     } else {
@@ -960,7 +960,7 @@ async fn count_documents_with_wc() {
         .build()
         .into();
 
-    let client = TestClient::with_options(Some(options)).await;
+    let client = TestClient::with_options(Some(options), true).await;
     let coll = client
         .database(function_name!())
         .collection(function_name!());

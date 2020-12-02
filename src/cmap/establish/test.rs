@@ -57,7 +57,7 @@ async fn speculative_auth_test(
     // Regardless of whether the server supports our speculative authentication attempt, we should
     // be able to successfully authenticate after the handshake.
     credential
-        .authenticate_stream(&mut conn, &Default::default(), first_round)
+        .authenticate_stream(&mut conn, &Default::default(), None, first_round)
         .await
         .unwrap();
 

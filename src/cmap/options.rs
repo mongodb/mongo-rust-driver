@@ -6,7 +6,7 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     bson_util,
-    client::auth::Credential,
+    client::{auth::Credential, options::ServerApi},
     event::cmap::CmapEventHandler,
     options::{ClientOptions, DriverInfo, StreamAddress, TlsOptions},
 };
@@ -70,6 +70,12 @@ pub struct ConnectionPoolOptions {
     #[builder(default)]
     pub min_pool_size: Option<u32>,
 
+    /// The declared API version
+    ///
+    /// The default value is to have no declared API version
+    #[builder(default)]
+    pub server_api: Option<ServerApi>,
+
     /// The options specifying how a TLS connection should be configured. If `tls_options` is
     /// `None`, then TLS will not be used for the connections.
     ///
@@ -100,6 +106,7 @@ impl ConnectionPoolOptions {
             .max_idle_time(options.max_idle_time)
             .max_pool_size(options.max_pool_size)
             .min_pool_size(options.min_pool_size)
+            .server_api(options.server_api.clone())
             .tls_options(options.tls_options())
             .wait_queue_timeout(options.wait_queue_timeout)
             .build()

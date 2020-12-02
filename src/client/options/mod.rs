@@ -3,7 +3,7 @@ mod test;
 
 use std::{
     collections::HashSet,
-    fmt,
+    fmt::{self, Display, Formatter},
     fs::File,
     hash::{Hash, Hasher},
     io::{BufReader, Seek, SeekFrom},
@@ -22,14 +22,18 @@ use rustls::{
     ServerCertVerifier,
     TLSError,
 };
-use serde::{de::Error, Deserialize, Deserializer};
+use serde::{
+    de::{Error, Unexpected},
+    Deserialize,
+    Deserializer,
+};
 use strsim::jaro_winkler;
 pub use trust_dns_resolver::config::ResolverConfig;
 use typed_builder::TypedBuilder;
 use webpki_roots::TLS_SERVER_ROOTS;
 
 use crate::{
-    bson::{Bson, Document},
+    bson::{doc, Bson, Document},
     client::auth::{AuthMechanism, Credential},
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::{ErrorKind, Result},
@@ -202,6 +206,64 @@ impl fmt::Display for StreamAddress {
     }
 }
 
+/// Specifies the server API version to declare
+#[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
+pub enum ServerApiVersion {
+    Version1,
+}
+
+impl FromStr for ServerApiVersion {
+    type Err = crate::error::Error;
+
+    fn from_str(str: &str) -> Result<Self> {
+        match str {
+            "1" => Ok(Self::Version1),
+            _ => Err(ErrorKind::ArgumentError {
+                message: format!("invalid server api version string: {}", str),
+            }
+            .into()),
+        }
+    }
+}
+
+impl Display for ServerApiVersion {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            Self::Version1 => write!(f, "1"),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ServerApiVersion {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+
+        ServerApiVersion::from_str(&s)
+            .map_err(|_| Error::invalid_value(Unexpected::Str(&s), &"a valid version number"))
+    }
+}
+
+/// Declares a versioned server API
+#[derive(Clone, Debug, Deserialize, PartialEq, TypedBuilder)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ServerApi {
+    /// The version string of the declared API version
+    pub version: ServerApiVersion,
+
+    /// Whether the server should return errors for features that are not part of the API version
+    #[builder(default)]
+    pub strict: Option<bool>,
+
+    /// Whether the server should return errors for deprecated features
+    #[builder(default)]
+    pub deprecation_errors: Option<bool>,
+}
+
 /// Contains the options that can be used to create a new [`Client`](../struct.Client.html).
 #[derive(Clone, Derivative, Deserialize, TypedBuilder)]
 #[derivative(Debug, PartialEq)]
@@ -336,6 +398,12 @@ pub struct ClientOptions {
     /// SelectionCriteria type documentation for more details.
     #[builder(default)]
     pub selection_criteria: Option<SelectionCriteria>,
+
+    /// The declared API version
+    ///
+    /// The default value is to have no declared API version
+    #[builder(default)]
+    pub server_api: Option<ServerApi>,
 
     /// The amount of time the Client should attempt to select a server for an operation before
     /// timing outs
@@ -603,6 +671,7 @@ impl From<ClientOptionsParser> for ClientOptions {
             original_uri: Some(parser.original_uri),
             resolver_config: None,
             heartbeat_freq_test: None,
+            server_api: None,
         }
     }
 }
@@ -829,6 +898,7 @@ impl ClientOptions {
                 retry_reads,
                 retry_writes,
                 selection_criteria,
+                server_api,
                 server_selection_timeout,
                 socket_timeout,
                 tls,

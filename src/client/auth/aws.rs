@@ -5,11 +5,14 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     bson::{doc, spec::BinarySubtype, Binary, Bson, Document},
-    client::auth::{
-        self,
-        sasl::{SaslContinue, SaslResponse, SaslStart},
-        AuthMechanism,
-        Credential,
+    client::{
+        auth::{
+            self,
+            sasl::{SaslContinue, SaslResponse, SaslStart},
+            AuthMechanism,
+            Credential,
+        },
+        options::ServerApi,
     },
     cmap::Connection,
     error::{Error, Result},
@@ -24,6 +27,7 @@ const AWS_LONG_DATE_FMT: &str = "%Y%m%dT%H%M%SZ";
 pub(super) async fn authenticate_stream(
     conn: &mut Connection,
     credential: &Credential,
+    server_api: Option<&ServerApi>,
     http_client: &HttpClient,
 ) -> Result<()> {
     let source = match credential.source.as_deref() {
@@ -51,6 +55,7 @@ pub(super) async fn authenticate_stream(
         source.into(),
         AuthMechanism::MongoDbAws,
         client_first_payload_bytes,
+        server_api.cloned(),
     );
     let client_first = sasl_start.into_command();
 
@@ -85,6 +90,7 @@ pub(super) async fn authenticate_stream(
         source.into(),
         server_first.conversation_id.clone(),
         client_second_payload_bytes,
+        server_api.cloned(),
     );
 
     let client_second = sasl_continue.into_command();

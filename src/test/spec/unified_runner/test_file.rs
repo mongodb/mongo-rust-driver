@@ -7,6 +7,7 @@ use super::{Operation, TestEvent};
 
 use crate::{
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
+    client::options::ServerApi,
     concern::{Acknowledgment, ReadConcernLevel},
     error::Error,
     options::{
@@ -19,7 +20,7 @@ use crate::{
         SelectionCriteria,
         WriteConcern,
     },
-    test::{TestClient, DEFAULT_URI},
+    test::{spec::unified_runner::results_match, TestClient, DEFAULT_URI},
 };
 
 #[derive(Debug, Deserialize)]
@@ -33,6 +34,8 @@ pub struct TestFile {
     pub create_entities: Option<Vec<TestFileEntity>>,
     pub initial_data: Option<Vec<CollectionData>>,
     pub tests: Vec<TestCase>,
+    #[serde(rename = "_yamlAnchors")]
+    yaml_anchors: Option<Document>,
 }
 
 fn deserialize_schema_version<'de, D>(deserializer: D) -> std::result::Result<Version, D::Error>
@@ -57,6 +60,7 @@ pub struct RunOnRequirement {
     min_server_version: Option<String>,
     max_server_version: Option<String>,
     topologies: Option<Vec<Topology>>,
+    server_parameters: Option<Document>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -73,18 +77,28 @@ impl RunOnRequirement {
     pub async fn can_run_on(&self, client: &TestClient) -> bool {
         if let Some(ref min_version) = self.min_server_version {
             let req = VersionReq::parse(&format!(">= {}", &min_version)).unwrap();
-            if !req.matches(&client.server_version) {
+            if !req.matches(&client.server_version.as_ref().unwrap()) {
                 return false;
             }
         }
         if let Some(ref max_version) = self.max_server_version {
             let req = VersionReq::parse(&format!("<= {}", &max_version)).unwrap();
-            if !req.matches(&client.server_version) {
+            if !req.matches(&client.server_version.as_ref().unwrap()) {
                 return false;
             }
         }
         if let Some(ref topologies) = self.topologies {
             if !topologies.contains(&client.topology().await) {
+                return false;
+            }
+        }
+        if let Some(ref actual_server_parameters) = self.server_parameters {
+            if !results_match(
+                Some(client.server_parameters.as_ref().unwrap()),
+                &Bson::Document(actual_server_parameters.clone()),
+                false,
+                None,
+            ) {
                 return false;
             }
         }
@@ -115,6 +129,8 @@ pub struct Client {
     pub use_multiple_mongoses: Option<bool>,
     pub observe_events: Option<Vec<String>>,
     pub ignore_command_monitoring_events: Option<Vec<String>>,
+    #[serde(default)]
+    pub server_api: Option<ServerApi>,
 }
 
 fn default_uri() -> String {

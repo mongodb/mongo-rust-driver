@@ -4,7 +4,7 @@ use super::wire::Message;
 use crate::{
     bson::{Bson, Document},
     bson_util,
-    client::{ClientSession, ClusterTime},
+    client::{options::ServerApi, ClientSession, ClusterTime},
     error::{CommandError, ErrorKind, Result},
     options::StreamAddress,
     selection_criteria::ReadPreference,
@@ -59,6 +59,24 @@ impl Command {
 
     pub(crate) fn set_txn_number(&mut self, txn_number: u64) {
         self.body.insert("txnNumber", txn_number);
+    }
+
+    pub(crate) fn set_server_api(&mut self, server_api: &ServerApi) {
+        // TODO RUST-90: Don't include version fields for commands run as part of a transaction
+        if matches!(self.name.as_str(), "getMore") {
+            return;
+        }
+
+        self.body
+            .insert("apiVersion", format!("{}", server_api.version));
+
+        if let Some(strict) = server_api.strict {
+            self.body.insert("apiStrict", strict);
+        }
+
+        if let Some(deprecation_errors) = server_api.deprecation_errors {
+            self.body.insert("apiDeprecationErrors", deprecation_errors);
+        }
     }
 }
 

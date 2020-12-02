@@ -8,6 +8,7 @@ use super::{
 };
 use crate::{
     bson::doc,
+    client::options::ServerApi,
     cmap::{Command, Connection},
     error::Result,
     is_master::IsMasterReply,
@@ -112,8 +113,9 @@ impl Monitor {
     }
 
     async fn perform_is_master(&mut self) -> Result<IsMasterReply> {
+        let server_api = self.topology.client_options().server_api.clone();
         let connection = self.resolve_connection().await?;
-        let result = is_master(connection).await;
+        let result = is_master(connection, server_api.as_ref()).await;
 
         if result
             .as_ref()
@@ -151,13 +153,19 @@ impl Monitor {
     }
 }
 
-async fn is_master(connection: &mut Connection) -> Result<IsMasterReply> {
-    let command = Command::new_read(
+async fn is_master(
+    connection: &mut Connection,
+    server_api: Option<&ServerApi>,
+) -> Result<IsMasterReply> {
+    let mut command = Command::new_read(
         "isMaster".into(),
         "admin".into(),
         None,
         doc! { "isMaster": 1 },
     );
+    if let Some(server_api) = server_api {
+        command.set_server_api(server_api);
+    }
 
     let start_time = PreciseTime::now();
     let command_response = connection.send_command(command, None).await?;

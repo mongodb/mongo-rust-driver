@@ -74,7 +74,7 @@ async fn negotiate_mangled() {
 }
 
 fn scram_sasl_first_options(mechanism: AuthMechanism) {
-    let sasl_first = SaslStart::new(String::new(), mechanism, Vec::new());
+    let sasl_first = SaslStart::new(String::new(), mechanism, Vec::new(), None);
     let command = sasl_first.into_command();
     let options = match command.body.get_document("options") {
         Ok(options) => options,
@@ -99,7 +99,7 @@ async fn sasl_first_options_specified() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn sasl_first_options_not_specified() {
-    let sasl_first = SaslStart::new(String::new(), AuthMechanism::MongoDbX509, Vec::new());
+    let sasl_first = SaslStart::new(String::new(), AuthMechanism::MongoDbX509, Vec::new(), None);
     let command = sasl_first.into_command();
     assert!(
         command.body.get_document("options").is_err(),
