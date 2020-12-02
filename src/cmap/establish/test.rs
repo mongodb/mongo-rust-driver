@@ -39,16 +39,13 @@ async fn speculative_auth_test(
         .tls_options(CLIENT_OPTIONS.tls_options())
         .build();
 
-    let handshaker = Handshaker::new(Some(&pool_options));
+    let handshaker = Handshaker::new(Some(pool_options.clone().into()));
 
     let mut conn = Connection::new_testing(1, Default::default(), 1, Some(pool_options.into()))
         .await
         .unwrap();
 
-    let first_round = handshaker
-        .handshake(&mut conn, Some(&credential))
-        .await
-        .unwrap();
+    let first_round = handshaker.handshake(&mut conn).await.unwrap().first_round;
 
     // We expect that the server will return a response with the `speculativeAuthenticate` field if
     // and only if it's new enough to support it.

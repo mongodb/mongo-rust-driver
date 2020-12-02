@@ -1,4 +1,4 @@
-mod handshake;
+pub(super) mod handshake;
 #[cfg(test)]
 mod test;
 
@@ -24,7 +24,7 @@ pub(super) struct ConnectionEstablisher {
 impl ConnectionEstablisher {
     /// Creates a new ConnectionEstablisher from the given options.
     pub(super) fn new(http_client: HttpClient, options: Option<&ConnectionPoolOptions>) -> Self {
-        let handshaker = Handshaker::new(options);
+        let handshaker = Handshaker::new(options.cloned().map(Into::into));
 
         Self {
             handshaker,
@@ -43,8 +43,9 @@ impl ConnectionEstablisher {
 
         let first_round = self
             .handshaker
-            .handshake(&mut connection, self.credential.as_ref())
-            .await?;
+            .handshake(&mut connection)
+            .await?
+            .first_round;
 
         if let Some(ref credential) = self.credential {
             credential
