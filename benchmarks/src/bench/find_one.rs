@@ -1,13 +1,15 @@
-use std::{fs::File, path::PathBuf};
+use std::{convert::TryInto, fs::File, path::PathBuf};
 
-use bson::Bson;
-use mongodb::{options::FindOptions, Client, Collection, Database};
+use anyhow::{bail, Result};
+use mongodb::{
+    bson::{doc, Bson},
+    Client,
+    Collection,
+    Database,
+};
 use serde_json::Value;
 
-use crate::{
-    bench::{Benchmark, COLL_NAME, DATABASE_NAME},
-    error::{Error, Result},
-};
+use crate::bench::{Benchmark, COLL_NAME, DATABASE_NAME};
 
 pub struct FindOneBenchmark {
     db: Database,
@@ -22,49 +24,46 @@ pub struct Options {
     pub uri: String,
 }
 
+#[async_trait::async_trait]
 impl Benchmark for FindOneBenchmark {
     type Options = Options;
 
-    fn setup(options: Self::Options) -> Result<Self> {
-        let client = Client::with_uri_str(&options.uri)?;
+    async fn setup(options: Self::Options) -> Result<Self> {
+        let client = Client::with_uri_str(&options.uri).await?;
         let db = client.database(&DATABASE_NAME);
-        db.drop()?;
+        db.drop(None).await?;
 
-        let mut file = File::open(options.path)?;
+        let num_iter = options.num_iter;
 
-        let json: Value = serde_json::from_reader(&mut file)?;
-        let mut doc = match json.into() {
+        let mut file = spawn_blocking_and_await!(File::open(options.path))?;
+
+        let json: Value = spawn_blocking_and_await!(serde_json::from_reader(&mut file))?;
+        let mut doc = match json.try_into()? {
             Bson::Document(doc) => doc,
-            _ => return Err(Error::UnexpectedJson("invalid json test file".to_string())),
+            _ => bail!("invalid json test file"),
         };
 
         let coll = db.collection(&COLL_NAME);
-        for i in 0..options.num_iter {
+        for i in 0..num_iter {
             doc.insert("_id", i as i32);
-            coll.insert_one(doc.clone(), None)?;
+            coll.insert_one(doc.clone(), None).await?;
         }
 
-        Ok(FindOneBenchmark {
-            db,
-            num_iter: options.num_iter,
-            coll,
-        })
+        Ok(FindOneBenchmark { db, num_iter, coll })
     }
 
-    fn do_task(&self) -> Result<()> {
-        let find_options = FindOptions::builder().limit(Some(1)).build();
+    async fn do_task(&self) -> Result<()> {
         for i in 0..self.num_iter {
-            let mut cursor = self
-                .coll
-                .find(Some(doc! { "_id": i as i32 }), Some(find_options.clone()))?;
-            let _doc = cursor.next();
+            self.coll
+                .find_one(Some(doc! { "_id": i as i32 }), None)
+                .await?;
         }
 
         Ok(())
     }
 
-    fn teardown(&self) -> Result<()> {
-        self.db.drop()?;
+    async fn teardown(&self) -> Result<()> {
+        self.db.drop(None).await?;
 
         Ok(())
     }

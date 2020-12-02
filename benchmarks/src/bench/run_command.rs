@@ -1,10 +1,11 @@
-use bson::Document;
-use mongodb::{Client, Database};
-
-use crate::{
-    bench::{Benchmark, DATABASE_NAME},
-    error::Result,
+use anyhow::Result;
+use mongodb::{
+    bson::{doc, Document},
+    Client,
+    Database,
 };
+
+use crate::bench::{Benchmark, DATABASE_NAME};
 
 pub struct RunCommandBenchmark {
     db: Database,
@@ -17,13 +18,14 @@ pub struct Options {
     pub uri: String,
 }
 
+#[async_trait::async_trait]
 impl Benchmark for RunCommandBenchmark {
     type Options = Options;
 
-    fn setup(options: Self::Options) -> Result<Self> {
-        let client = Client::with_uri_str(&options.uri)?;
+    async fn setup(options: Self::Options) -> Result<Self> {
+        let client = Client::with_uri_str(&options.uri).await?;
         let db = client.database(&DATABASE_NAME);
-        db.drop()?;
+        db.drop(None).await?;
 
         Ok(RunCommandBenchmark {
             db,
@@ -32,16 +34,16 @@ impl Benchmark for RunCommandBenchmark {
         })
     }
 
-    fn do_task(&self) -> Result<()> {
+    async fn do_task(&self) -> Result<()> {
         for _ in 0..self.num_iter {
-            let _doc = self.db.run_command(self.cmd.clone(), None)?;
+            let _doc = self.db.run_command(self.cmd.clone(), None).await?;
         }
 
         Ok(())
     }
 
-    fn teardown(&self) -> Result<()> {
-        self.db.drop()?;
+    async fn teardown(&self) -> Result<()> {
+        self.db.drop(None).await?;
 
         Ok(())
     }

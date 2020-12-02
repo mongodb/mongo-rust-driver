@@ -1,29 +1,55 @@
 #[macro_use]
-extern crate bson;
+macro_rules! spawn {
+    ($task:expr) => {{
+        #[cfg(feature = "tokio-runtime")]
+        {
+            tokio::task::spawn($task)
+        }
+
+        #[cfg(feature = "async-std-runtime")]
+        {
+            async_std::task::spawn($task)
+        }
+    }};
+}
+
 #[macro_use]
-extern crate lazy_static;
-extern crate clap;
-extern crate indicatif;
-extern crate num_cpus;
+macro_rules! spawn_blocking_and_await {
+    ($blocking_call:expr) => {{
+        #[cfg(feature = "tokio-runtime")]
+        {
+            tokio::task::spawn_blocking(move || $blocking_call)
+                .await
+                .unwrap()
+        }
+
+        #[cfg(feature = "async-std-runtime")]
+        {
+            async_std::task::spawn_blocking(move || $blocking_call).await
+        }
+    }};
+}
 
 mod bench;
-mod error;
 
 use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
 
+use anyhow::Result;
 use clap::{App, Arg, ArgMatches};
+use lazy_static::lazy_static;
 
-use crate::{
-    bench::{
-        find_many::FindManyBenchmark, find_one::FindOneBenchmark, insert_many::InsertManyBenchmark,
-        insert_one::InsertOneBenchmark, json_multi_export::JsonMultiExportBenchmark,
-        json_multi_import::JsonMultiImportBenchmark, run_command::RunCommandBenchmark,
-        MAX_ITERATIONS,
-    },
-    error::Result,
+use crate::bench::{
+    find_many::FindManyBenchmark,
+    find_one::FindOneBenchmark,
+    insert_many::InsertManyBenchmark,
+    insert_one::InsertOneBenchmark,
+    json_multi_export::JsonMultiExportBenchmark,
+    json_multi_import::JsonMultiImportBenchmark,
+    run_command::RunCommandBenchmark,
+    MAX_ITERATIONS,
 };
 
 lazy_static! {
@@ -78,7 +104,7 @@ fn score_test(durations: Vec<Duration>, name: &str, task_size: f64, more_info: b
     score
 }
 
-fn single_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<f64> {
+async fn single_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<f64> {
     println!("----------------------------");
     println!("Single-Doc Benchmarks:");
     println!("----------------------------\n");
@@ -92,7 +118,7 @@ fn single_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<f64
             uri: uri.to_string(),
         };
         println!("Running Run command...");
-        let run_command = bench::run_benchmark::<RunCommandBenchmark>(run_command_options)?;
+        let run_command = bench::run_benchmark::<RunCommandBenchmark>(run_command_options).await?;
 
         comp_score += score_test(run_command, "Run command", 0.16, more_info);
     }
@@ -107,7 +133,7 @@ fn single_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<f64
             uri: uri.to_string(),
         };
         println!("Running Find one by ID...");
-        let find_one = bench::run_benchmark::<FindOneBenchmark>(find_one_options)?;
+        let find_one = bench::run_benchmark::<FindOneBenchmark>(find_one_options).await?;
 
         comp_score += score_test(find_one, "Find one by ID", 16.22, more_info);
     }
@@ -123,7 +149,7 @@ fn single_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<f64
         };
         println!("Running Small doc insertOne...");
         let small_insert_one =
-            bench::run_benchmark::<InsertOneBenchmark>(small_insert_one_options)?;
+            bench::run_benchmark::<InsertOneBenchmark>(small_insert_one_options).await?;
 
         comp_score += score_test(small_insert_one, "Small doc insertOne", 2.75, more_info);
     }
@@ -139,7 +165,7 @@ fn single_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<f64
         };
         println!("Running Large doc insertOne...");
         let large_insert_one =
-            bench::run_benchmark::<InsertOneBenchmark>(large_insert_one_options)?;
+            bench::run_benchmark::<InsertOneBenchmark>(large_insert_one_options).await?;
 
         comp_score += score_test(large_insert_one, "Large doc insertOne", 27.31, more_info);
     }
@@ -148,7 +174,7 @@ fn single_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<f64
     Ok(comp_score)
 }
 
-fn multi_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<f64> {
+async fn multi_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<f64> {
     println!("----------------------------");
     println!("Multi-Doc Benchmarks:");
     println!("----------------------------\n");
@@ -165,7 +191,7 @@ fn multi_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<f64>
             uri: uri.to_string(),
         };
         println!("Running Find many and empty the cursor...");
-        let find_many = bench::run_benchmark::<FindManyBenchmark>(find_many_options)?;
+        let find_many = bench::run_benchmark::<FindManyBenchmark>(find_many_options).await?;
 
         comp_score += score_test(
             find_many,
@@ -186,7 +212,7 @@ fn multi_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<f64>
         };
         println!("Running Small doc bulk insert...");
         let small_insert_many =
-            bench::run_benchmark::<InsertManyBenchmark>(small_insert_many_options)?;
+            bench::run_benchmark::<InsertManyBenchmark>(small_insert_many_options).await?;
 
         comp_score += score_test(small_insert_many, "Small doc bulk insert", 2.75, more_info);
     }
@@ -202,7 +228,7 @@ fn multi_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<f64>
         };
         println!("Running Large doc bulk insert...");
         let large_insert_many =
-            bench::run_benchmark::<InsertManyBenchmark>(large_insert_many_options)?;
+            bench::run_benchmark::<InsertManyBenchmark>(large_insert_many_options).await?;
 
         comp_score += score_test(large_insert_many, "Large doc bulk insert", 27.31, more_info);
     }
@@ -211,7 +237,7 @@ fn multi_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<f64>
     Ok(comp_score)
 }
 
-fn parallel_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<f64> {
+async fn parallel_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<f64> {
     println!("----------------------------");
     println!("Parallel Benchmarks:");
     println!("----------------------------\n");
@@ -221,13 +247,12 @@ fn parallel_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<f64> 
     // LDJSON multi-file import
     if ids[7] {
         let json_multi_import_options = bench::json_multi_import::Options {
-            num_threads: num_cpus::get(),
             path: DATA_PATH.join("parallel").join("ldjson_multi"),
             uri: uri.to_string(),
         };
         println!("Running LDJSON multi-file import...");
         let json_multi_import =
-            bench::run_benchmark::<JsonMultiImportBenchmark>(json_multi_import_options)?;
+            bench::run_benchmark::<JsonMultiImportBenchmark>(json_multi_import_options).await?;
 
         comp_score += score_test(
             json_multi_import,
@@ -240,13 +265,12 @@ fn parallel_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<f64> 
     // LDJSON multi-file export
     if ids[8] {
         let json_multi_export_options = bench::json_multi_export::Options {
-            num_threads: num_cpus::get(),
             path: DATA_PATH.join("parallel").join("ldjson_multi"),
             uri: uri.to_string(),
         };
         println!("Running LDJSON multi-file export...");
         let json_multi_export =
-            bench::run_benchmark::<JsonMultiExportBenchmark>(json_multi_export_options)?;
+            bench::run_benchmark::<JsonMultiExportBenchmark>(json_multi_export_options).await?;
 
         comp_score += score_test(
             json_multi_export,
@@ -299,7 +323,9 @@ fn parse_ids(matches: ArgMatches) -> Vec<bool> {
     ids
 }
 
-fn main() {
+#[cfg_attr(feature = "tokio-runtime", tokio::main)]
+#[cfg_attr(feature = "async-std-runtime", async_std::main)]
+async fn main() {
     let matches = App::new("RustDriverBenchmark")
         .version(env!("CARGO_PKG_VERSION"))
         .about("Runs performance micro-bench")
@@ -371,15 +397,15 @@ Run benchmarks by id number (comma-separated):
 
     // Single
     if ids[0] || ids[1] || ids[2] || ids[3] {
-        comp_score += single_doc_benchmarks(uri, verbose, &ids).unwrap();
+        comp_score += single_doc_benchmarks(uri, verbose, &ids).await.unwrap();
     }
     // Multi
     if ids[4] || ids[5] || ids[6] {
-        comp_score += multi_doc_benchmarks(uri, verbose, &ids).unwrap();
+        comp_score += multi_doc_benchmarks(uri, verbose, &ids).await.unwrap();
     }
     // Parallel
     if ids[7] || ids[8] {
-        comp_score += parallel_benchmarks(uri, verbose, &ids).unwrap();
+        comp_score += parallel_benchmarks(uri, verbose, &ids).await.unwrap();
     }
 
     println!("----------------------------");

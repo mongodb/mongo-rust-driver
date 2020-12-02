@@ -4,106 +4,117 @@ use std::{
     path::PathBuf,
 };
 
-use mongodb::{Client, Collection, Database};
+use anyhow::Result;
+use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
+use mongodb::{bson::doc, Client, Collection, Database};
 
-use crate::{
-    bench::{parse_json_file_to_documents, Benchmark, COLL_NAME, DATABASE_NAME},
-    error::Result,
-};
+use crate::bench::{parse_json_file_to_documents, Benchmark, COLL_NAME, DATABASE_NAME};
 
 const TOTAL_FILES: usize = 100;
 
 pub struct JsonMultiExportBenchmark {
     db: Database,
     coll: Collection,
-    num_threads: usize,
 }
 
 // Specifies the options to a `JsonMultiExportBenchmark::setup` operation.
 pub struct Options {
-    pub num_threads: usize,
     pub path: PathBuf,
     pub uri: String,
 }
 
+#[async_trait::async_trait]
 impl Benchmark for JsonMultiExportBenchmark {
     type Options = Options;
 
-    fn setup(options: Self::Options) -> Result<Self> {
-        let client = Client::with_uri_str(&options.uri)?;
+    async fn setup(options: Self::Options) -> Result<Self> {
+        let client = Client::with_uri_str(&options.uri).await?;
         let db = client.database(&DATABASE_NAME);
-        db.drop()?;
+        db.drop(None).await?;
 
         let coll = db.collection(&COLL_NAME);
 
+        let mut tasks = FuturesUnordered::new();
+
         for i in 0..TOTAL_FILES {
-            let json_file_name = options.path.join(format!("ldjson{:03}.txt", i));
-            let file = File::open(&json_file_name)?;
+            let path = options.path.clone();
+            let coll = coll.clone();
 
-            let docs = parse_json_file_to_documents(file)?;
+            tasks.push(async move {
+                let json_file_name = path.join(format!("ldjson{:03}.txt", i));
+                let file = spawn_blocking_and_await!(File::open(&json_file_name))?;
 
-            for mut doc in docs {
-                doc.insert("file", i as i32);
-                coll.insert_one(doc, None)?;
-            }
+                let docs = spawn_blocking_and_await!(parse_json_file_to_documents(file))?;
+
+                for mut doc in docs {
+                    doc.insert("file", i as i32);
+                    coll.insert_one(doc, None).await?;
+                }
+
+                let ok: anyhow::Result<()> = Ok(());
+                ok
+            });
         }
 
-        Ok(JsonMultiExportBenchmark {
-            db,
-            coll,
-            num_threads: options.num_threads,
-        })
+        while let Some(result) = tasks.next().await {
+            println!("done!");
+            result?;
+        }
+
+        Ok(JsonMultiExportBenchmark { db, coll })
     }
 
-    fn do_task(&self) -> Result<()> {
-        let mut num_each = TOTAL_FILES / self.num_threads;
-        let remainder = TOTAL_FILES % self.num_threads;
-        if remainder != 0 {
-            num_each += 1;
-        }
+    async fn do_task(&self) -> Result<()> {
+        let mut tasks = FuturesUnordered::new();
 
-        let mut downloaded_files = 0;
-        let mut threads = Vec::new();
-        while downloaded_files < TOTAL_FILES {
-            let num_files = std::cmp::min(TOTAL_FILES - downloaded_files, num_each);
+        for i in 0..TOTAL_FILES {
             let coll_ref = self.coll.clone();
             let path = std::env::temp_dir();
 
-            let thread = std::thread::spawn(move || {
+            tasks.push(async move {
                 // Note that errors are unwrapped within threads instead of propagated with `?`.
-                // While we could set up a channel to send errors back to main thread, this is a lot
-                // of work for little gain since we `unwrap()` in main.rs anyway.
-                for i in downloaded_files..downloaded_files + num_files {
-                    let file_name = path.join(format!("ldjson{:03}.txt", i));
-                    let mut file = OpenOptions::new()
-                        .create(true)
-                        .write(true)
-                        .open(&file_name)
-                        .unwrap();
+                // While we could set up a channel to send errors back to main thread, this is a
+                // lot of work for little gain since we `unwrap()` in
+                // main.rs anyway.
+                let file_name = path.join(format!("ldjson{:03}.txt", i));
+                let mut file = OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .open(&file_name)
+                    .unwrap();
 
-                    let cursor = coll_ref
-                        .find(Some(doc! { "file": i as i32 }), None)
-                        .unwrap();
+                let mut cursor = coll_ref
+                    .find(Some(doc! { "file": i as i32 }), None)
+                    .await
+                    .unwrap();
 
-                    for doc in cursor {
-                        writeln!(file, "{}", doc.unwrap().to_string()).unwrap();
+                let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel();
+
+                let send_future = spawn!(async move {
+                    while let Some(doc) = cursor.try_next().await.unwrap() {
+                        sender.send(doc.to_string()).unwrap();
                     }
-                }
-            });
-            threads.push(thread);
+                });
 
-            downloaded_files += num_each;
+                let rec_future = spawn_blocking_and_await!(async move {
+                    while let Some(s) = receiver.next().await {
+                        writeln!(file, "{}", s).unwrap();
+                    }
+                });
+
+                futures::future::join(send_future, rec_future).await
+            });
         }
 
-        for thread in threads {
-            thread.join().unwrap();
+        while !tasks.is_empty() {
+            tasks.next().await;
         }
 
         Ok(())
     }
 
-    fn teardown(&self) -> Result<()> {
-        self.db.drop()?;
+    async fn teardown(&self) -> Result<()> {
+        self.db.drop(None).await?;
 
         Ok(())
     }

@@ -7,16 +7,17 @@ pub mod json_multi_import;
 pub mod run_command;
 
 use std::{
+    convert::TryInto,
     fs::File,
     io::{BufRead, BufReader},
     time::{Duration, Instant},
 };
 
-use bson::{Bson, Document};
+use anyhow::{bail, Result};
 use indicatif::{ProgressBar, ProgressStyle};
+use lazy_static::lazy_static;
+use mongodb::bson::{Bson, Document};
 use serde_json::Value;
-
-use crate::error::{Error, Result};
 
 lazy_static! {
     static ref DATABASE_NAME: String = option_env!("DATABASE_NAME")
@@ -37,26 +38,27 @@ lazy_static! {
         .expect("invalid MAX_ITERATIONS");
 }
 
+#[async_trait::async_trait]
 pub trait Benchmark: Sized {
     type Options;
 
     // execute once before benchmarking
-    fn setup(options: Self::Options) -> Result<Self>;
+    async fn setup(options: Self::Options) -> Result<Self>;
 
     // execute at the beginning of every iteration
-    fn before_task(&mut self) -> Result<()> {
+    async fn before_task(&mut self) -> Result<()> {
         Ok(())
     }
 
-    fn do_task(&self) -> Result<()>;
+    async fn do_task(&self) -> Result<()>;
 
     // execute at the end of every iteration
-    fn after_task(&self) -> Result<()> {
+    async fn after_task(&self) -> Result<()> {
         Ok(())
     }
 
     // execute once after benchmarking
-    fn teardown(&self) -> Result<()>;
+    async fn teardown(&self) -> Result<()>;
 }
 
 pub fn parse_json_file_to_documents(file: File) -> Result<Vec<Document>> {
@@ -65,9 +67,9 @@ pub fn parse_json_file_to_documents(file: File) -> Result<Vec<Document>> {
     for line in BufReader::new(file).lines() {
         let json: Value = serde_json::from_str(&line?)?;
 
-        docs.push(match json.into() {
+        docs.push(match json.try_into()? {
             Bson::Document(doc) => doc,
-            _ => return Err(Error::UnexpectedJson("invalid json document".to_string())),
+            _ => bail!("invalid json document"),
         });
     }
 
@@ -79,8 +81,10 @@ fn finished(duration: Duration, iter: usize) -> bool {
     elapsed >= *MAX_EXECUTION_TIME || (iter >= *MAX_ITERATIONS && elapsed > *MIN_EXECUTION_TIME)
 }
 
-pub fn run_benchmark<B: Benchmark>(options: B::Options) -> Result<Vec<Duration>> {
-    let mut test = B::setup(options)?;
+pub async fn run_benchmark<B: Benchmark + Send + Sync>(
+    options: B::Options,
+) -> Result<Vec<Duration>> {
+    let mut test = B::setup(options).await?;
 
     let mut test_durations = Vec::new();
 
@@ -99,15 +103,15 @@ pub fn run_benchmark<B: Benchmark>(options: B::Options) -> Result<Vec<Duration>>
     while !finished(benchmark_timer.elapsed(), iter) {
         progress_bar.inc(1);
 
-        test.before_task()?;
+        test.before_task().await?;
         let timer = Instant::now();
-        test.do_task()?;
+        test.do_task().await?;
         test_durations.push(timer.elapsed());
-        test.after_task()?;
+        test.after_task().await?;
 
         iter += 1;
     }
-    test.teardown()?;
+    test.teardown().await?;
     progress_bar.finish();
 
     test_durations.sort();
