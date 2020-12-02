@@ -12,7 +12,7 @@ use crate::{
     cmap::{options::ConnectionPoolOptions, Command, Connection, StreamDescription},
     error::{ErrorKind, Result},
     is_master::{IsMasterCommandResponse, IsMasterReply},
-    options::{AuthMechanism, ClientOptions, Credential, DriverInfo},
+    options::{AuthMechanism, ClientOptions, Credential, DriverInfo, ServerApi},
 };
 
 #[cfg(feature = "tokio-runtime")]
@@ -196,7 +196,7 @@ impl Handshaker {
         );
 
         if let Some(server_api) = server_api {
-            command.set_server_api(server_api)
+            command.set_server_api(&server_api)
         }
 
         Self {
@@ -249,6 +249,7 @@ pub(crate) struct HandshakerOptions {
     app_name: Option<String>,
     credential: Option<Credential>,
     driver_info: Option<DriverInfo>,
+    server_api: Option<ServerApi>,
 }
 
 impl From<ConnectionPoolOptions> for HandshakerOptions {
@@ -257,6 +258,7 @@ impl From<ConnectionPoolOptions> for HandshakerOptions {
             app_name: options.app_name,
             credential: options.credential,
             driver_info: options.driver_info,
+            server_api: options.server_api,
         }
     }
 }
@@ -267,6 +269,7 @@ impl From<ClientOptions> for HandshakerOptions {
             app_name: options.app_name,
             credential: options.credential,
             driver_info: options.driver_info,
+            server_api: options.server_api,
         }
     }
 }

@@ -6,7 +6,6 @@ use super::{
 };
 use crate::{
     bson::doc,
-    client::options::ServerApi,
     cmap::{is_master, Command, Connection, Handshaker},
     error::Result,
     is_master::IsMasterReply,
