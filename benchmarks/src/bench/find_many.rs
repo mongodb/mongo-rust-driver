@@ -1,13 +1,11 @@
-use std::{fs::File, path::PathBuf};
+use std::{convert::TryInto, fs::File, path::PathBuf};
 
-use bson::Bson;
-use mongodb::{Client, Collection, Database};
+use anyhow::{bail, Result};
+use futures::stream::StreamExt;
+use mongodb::{bson::Bson, Client, Collection, Database};
 use serde_json::Value;
 
-use crate::{
-    bench::{Benchmark, COLL_NAME, DATABASE_NAME},
-    error::{Error, Result},
-};
+use crate::bench::{Benchmark, COLL_NAME, DATABASE_NAME};
 
 pub struct FindManyBenchmark {
     db: Database,
@@ -21,40 +19,43 @@ pub struct Options {
     pub uri: String,
 }
 
+#[async_trait::async_trait]
 impl Benchmark for FindManyBenchmark {
     type Options = Options;
 
-    fn setup(options: Self::Options) -> Result<Self> {
-        let client = Client::with_uri_str(&options.uri)?;
+    async fn setup(options: Self::Options) -> Result<Self> {
+        let client = Client::with_uri_str(&options.uri).await?;
         let db = client.database(&DATABASE_NAME);
-        db.drop()?;
+        db.drop(None).await?;
 
-        let mut file = File::open(options.path)?;
+        let num_iter = options.num_iter;
 
-        let json: Value = serde_json::from_reader(&mut file)?;
-        let doc = match json.into() {
+        let mut file = spawn_blocking_and_await!(File::open(options.path))?;
+
+        let json: Value = spawn_blocking_and_await!(serde_json::from_reader(&mut file))?;
+        let doc = match json.try_into()? {
             Bson::Document(doc) => doc,
-            _ => return Err(Error::UnexpectedJson("invalid json test file".to_string())),
+            _ => bail!("invalid json test file"),
         };
 
         let coll = db.collection(&COLL_NAME);
-        let docs = vec![doc.clone(); options.num_iter];
-        coll.insert_many(docs, None)?;
+        let docs = vec![doc.clone(); num_iter];
+        coll.insert_many(docs, None).await?;
 
         Ok(FindManyBenchmark { db, coll })
     }
 
-    fn do_task(&self) -> Result<()> {
-        let cursor = self.coll.find(None, None)?;
-        for doc in cursor {
+    async fn do_task(&self) -> Result<()> {
+        let mut cursor = self.coll.find(None, None).await?;
+        while let Some(doc) = cursor.next().await {
             doc?;
         }
 
         Ok(())
     }
 
-    fn teardown(&self) -> Result<()> {
-        self.db.drop()?;
+    async fn teardown(&self) -> Result<()> {
+        self.db.drop(None).await?;
 
         Ok(())
     }

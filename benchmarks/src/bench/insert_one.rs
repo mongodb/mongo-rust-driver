@@ -1,13 +1,15 @@
-use std::{fs::File, path::PathBuf};
+use std::{convert::TryInto, fs::File, path::PathBuf};
 
-use bson::{Bson, Document};
-use mongodb::{Client, Collection, Database};
+use anyhow::{bail, Result};
+use mongodb::{
+    bson::{Bson, Document},
+    Client,
+    Collection,
+    Database,
+};
 use serde_json::Value;
 
-use crate::{
-    bench::{Benchmark, COLL_NAME, DATABASE_NAME},
-    error::{Error, Result},
-};
+use crate::bench::{Benchmark, COLL_NAME, DATABASE_NAME};
 
 pub struct InsertOneBenchmark {
     db: Database,
@@ -23,48 +25,51 @@ pub struct Options {
     pub uri: String,
 }
 
+#[async_trait::async_trait]
 impl Benchmark for InsertOneBenchmark {
     type Options = Options;
 
-    fn setup(options: Self::Options) -> Result<Self> {
-        let client = Client::with_uri_str(&options.uri)?;
+    async fn setup(options: Self::Options) -> Result<Self> {
+        let client = Client::with_uri_str(&options.uri).await?;
         let db = client.database(&DATABASE_NAME);
-        db.drop()?;
+        db.drop(None).await?;
 
-        let mut file = File::open(options.path)?;
+        let num_iter = options.num_iter;
 
-        let json: Value = serde_json::from_reader(&mut file)?;
+        let mut file = spawn_blocking_and_await!(File::open(options.path))?;
+
+        let json: Value = spawn_blocking_and_await!(serde_json::from_reader(&mut file))?;
 
         let coll = db.collection(&COLL_NAME);
 
         Ok(InsertOneBenchmark {
             db,
-            num_iter: options.num_iter,
+            num_iter,
             coll,
-            doc: match json.into() {
+            doc: match json.try_into()? {
                 Bson::Document(doc) => doc,
-                _ => return Err(Error::UnexpectedJson("invalid json test file".to_string())),
+                _ => bail!("invalid json test file"),
             },
         })
     }
 
-    fn before_task(&mut self) -> Result<()> {
-        self.coll.drop()?;
-        self.db.create_collection(&COLL_NAME, None)?;
+    async fn before_task(&mut self) -> Result<()> {
+        self.coll.drop(None).await?;
+        self.db.create_collection(&COLL_NAME, None).await?;
 
         Ok(())
     }
 
-    fn do_task(&self) -> Result<()> {
+    async fn do_task(&self) -> Result<()> {
         for _ in 0..self.num_iter {
-            self.coll.insert_one(self.doc.clone(), None)?;
+            self.coll.insert_one(self.doc.clone(), None).await?;
         }
 
         Ok(())
     }
 
-    fn teardown(&self) -> Result<()> {
-        self.db.drop()?;
+    async fn teardown(&self) -> Result<()> {
+        self.db.drop(None).await?;
 
         Ok(())
     }
