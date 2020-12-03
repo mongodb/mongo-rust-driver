@@ -4,13 +4,11 @@ mod integration;
 
 use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 
-use futures::future::{BoxFuture, FutureExt};
-
 use tokio::sync::{Mutex, RwLock, RwLockWriteGuard};
 
 use self::{
     event::{Event, EventHandler},
-    file::{Operation, TestFile},
+    file::{Operation, TestFile, ThreadedOperation},
 };
 
 use crate::{
@@ -49,7 +47,7 @@ const EVENT_TIMEOUT: Duration = Duration::from_secs(3);
 #[derive(Debug)]
 struct Executor {
     description: String,
-    operations: Vec<Operation>,
+    operations: Vec<ThreadedOperation>,
     error: Option<self::file::Error>,
     events: Vec<Event>,
     state: Arc<State>,
@@ -62,7 +60,7 @@ struct State {
     handler: Arc<EventHandler>,
     connections: RwLock<HashMap<String, Connection>>,
     unlabeled_connections: Mutex<Vec<Connection>>,
-    threads: RwLock<HashMap<String, AsyncJoinHandle<Result<()>>>>,
+    threads: RwLock<HashMap<String, CmapThread>>,
 
     // In order to drop the pool when performing a `close` operation, we use an `Option` so that we
     // can replace it with `None`. Since none of the tests should use the pool after its closed
@@ -84,9 +82,39 @@ impl State {
     }
 }
 
+#[derive(Debug)]
+struct CmapThread {
+    handle: AsyncJoinHandle<Result<()>>,
+    dispatcher: tokio::sync::mpsc::UnboundedSender<Operation>,
+}
+
+impl CmapThread {
+    fn start(state: Arc<State>) -> Self {
+        let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel::<Operation>();
+        let handle = RUNTIME
+            .spawn(async move {
+                while let Some(operation) = receiver.recv().await {
+                    operation.execute(state.clone()).await?;
+                }
+                Ok(())
+            })
+            .unwrap();
+
+        Self {
+            dispatcher: sender,
+            handle,
+        }
+    }
+
+    async fn wait_until_complete(self) -> Result<()> {
+        // hang up dispatcher so task will complete.
+        drop(self.dispatcher);
+        self.handle.await
+    }
+}
+
 impl Executor {
-    fn new(mut test_file: TestFile) -> Self {
-        let operations = test_file.process_operations();
+    fn new(test_file: TestFile) -> Self {
         let handler = Arc::new(EventHandler::new());
         let error = test_file.error;
 
@@ -107,7 +135,7 @@ impl Executor {
             description: test_file.description,
             error,
             events: test_file.events,
-            operations,
+            operations: test_file.operations,
             state: Arc::new(state),
             ignored_event_names: test_file.ignore,
             pool_options,
@@ -134,12 +162,6 @@ impl Executor {
             if error.is_none() {
                 error = err;
             }
-
-            // Some of the CMAP spec tests have some subtle race conditions due assertions about the
-            // order that concurrent threads check out connections from the pool. The solution to
-            // this is to sleep for a small amount of time between each operation, which in practice
-            // allows threads to enter the wait queue in the order that they were started.
-            RUNTIME.delay_for(Duration::from_millis(1)).await;
         }
 
         match (self.error, error) {
@@ -177,101 +199,93 @@ impl Executor {
 
 impl Operation {
     /// Execute this operation.
-    /// async fns currently cannot be recursive, so instead we manually return a BoxFuture here.
-    /// See: https://rust-lang.github.io/async-book/07_workarounds/05_recursion.html
-    fn execute(self, state: Arc<State>) -> BoxFuture<'static, Result<()>> {
-        async move {
-            match self {
-                Operation::StartHelper { target, operations } => {
-                    let state_ref = state.clone();
-                    let task = RUNTIME.spawn(async move {
-                        for operation in operations {
-                            // If any error occurs during an operation, we halt the thread and yield
-                            // that value when `join` is called on the thread.
-                            operation.execute(state_ref.clone()).await?;
-                        }
-                        Ok(())
+    async fn execute(self, state: Arc<State>) -> Result<()> {
+        match self {
+            Operation::Wait { ms } => RUNTIME.delay_for(Duration::from_millis(ms)).await,
+            Operation::WaitForThread { target } => {
+                state
+                    .threads
+                    .write()
+                    .await
+                    .remove(&target)
+                    .unwrap()
+                    .wait_until_complete()
+                    .await?
+            }
+            Operation::WaitForEvent { event, count } => {
+                while state.count_events(&event) < count {
+                    RUNTIME.delay_for(Duration::from_millis(100)).await;
+                }
+            }
+            Operation::CheckOut { label } => {
+                if let Some(pool) = state.pool.read().await.deref() {
+                    let conn = pool.check_out().await?;
+
+                    if let Some(label) = label {
+                        state.connections.write().await.insert(label, conn);
+                    } else {
+                        state.unlabeled_connections.lock().await.push(conn);
+                    }
+                }
+            }
+            Operation::CheckIn { connection } => {
+                let mut subscriber = state.handler.subscribe();
+                let conn = state.connections.write().await.remove(&connection).unwrap();
+                let id = conn.id;
+                // connections are checked in via tasks spawned in their drop implementation,
+                // they are not checked in explicitly.
+                drop(conn);
+
+                // wait for event to be emitted to ensure check in has completed.
+                subscriber
+                    .wait_for_event(EVENT_TIMEOUT, |e| {
+                        matches!(e, Event::ConnectionCheckedIn(event) if event.connection_id == id)
+                    })
+                    .await
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "did not receive checkin event after dropping connection (id={})",
+                            connection
+                        )
                     });
+            }
+            Operation::Clear => {
+                let mut subscriber = state.handler.subscribe();
 
-                    state.threads.write().await.insert(target, task.unwrap());
-                }
-                Operation::Wait { ms } => RUNTIME.delay_for(Duration::from_millis(ms)).await,
-                Operation::WaitForThread { target } => {
-                    state.threads.write().await.remove(&target).unwrap().await?
-                }
-                Operation::WaitForEvent { event, count } => {
-                    while state.count_events(&event) < count {
-                        RUNTIME.delay_for(Duration::from_millis(100)).await;
-                    }
-                }
-                Operation::CheckOut { label } => {
-                    if let Some(pool) = state.pool.read().await.deref() {
-                        let conn = pool.check_out().await?;
-
-                        if let Some(label) = label {
-                            state.connections.write().await.insert(label, conn);
-                        } else {
-                            state.unlabeled_connections.lock().await.push(conn);
-                        }
-                    }
-                }
-                Operation::CheckIn { connection } => {
-                    let mut subscriber = state.handler.subscribe();
-                    let conn = state.connections.write().await.remove(&connection).unwrap();
-                    let id = conn.id;
-                    // connections are checked in via tasks spawned in their drop implementation,
-                    // they are not checked in explicitly.
-                    drop(conn);
-
-                    // wait for event to be emitted to ensure check in has completed.
-                    subscriber
-                        .wait_for_event(EVENT_TIMEOUT, |e| {
-                            matches!(e, Event::ConnectionCheckedIn(event) if event.connection_id == id)
-                        })
-                        .await
-                        .unwrap_or_else(|| {
-                            panic!(
-                                "did not receive checkin event after dropping connection (id={})",
-                                connection
-                            )
-                        });
-                }
-                Operation::Clear => {
-                    let mut subscriber = state.handler.subscribe();
-
-                    if let Some(pool) = state.pool.write().await.deref() {
-                        pool.clear();
-                        // wait for event to be emitted to ensure drop has completed.
-                        subscriber
-                            .wait_for_event(EVENT_TIMEOUT, |e| {
-                                matches!(e, Event::ConnectionPoolCleared(_))
-                            })
-                            .await
-                            .expect("did not receive ConnectionPoolCleared event after clearing pool");
-                    }
-                }
-                Operation::Close => {
-                    let mut subscriber = state.handler.subscribe();
-
-                    // pools are closed via their drop implementation
-                    state.pool.write().await.take();
-
+                if let Some(pool) = state.pool.write().await.deref() {
+                    pool.clear();
                     // wait for event to be emitted to ensure drop has completed.
                     subscriber
                         .wait_for_event(EVENT_TIMEOUT, |e| {
-                            matches!(e, Event::ConnectionPoolClosed(_))
+                            matches!(e, Event::ConnectionPoolCleared(_))
                         })
                         .await
-                        .expect("did not receive ConnectionPoolClosed event after closing pool");
+                        .expect("did not receive ConnectionPoolCleared event after clearing pool");
                 }
-
-                // We replace all instances of `Start` with `StartHelper` when we preprocess the
-                // events, so this should never actually be found.
-                Operation::Start { .. } => unreachable!(),
             }
-            Ok(())
+            Operation::Close => {
+                let mut subscriber = state.handler.subscribe();
+
+                // pools are closed via their drop implementation
+                state.pool.write().await.take();
+
+                // wait for event to be emitted to ensure drop has completed.
+                subscriber
+                    .wait_for_event(EVENT_TIMEOUT, |e| {
+                        matches!(e, Event::ConnectionPoolClosed(_))
+                    })
+                    .await
+                    .expect("did not receive ConnectionPoolClosed event after closing pool");
+            }
+            Operation::Start { target } => {
+                state
+                    .threads
+                    .write()
+                    .await
+                    .insert(target, CmapThread::start(state.clone()));
+            }
         }
-        .boxed()
+        Ok(())
     }
 }
 
