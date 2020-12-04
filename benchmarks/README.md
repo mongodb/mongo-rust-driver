@@ -34,7 +34,6 @@ the single-doc benchmarks. By default, all benchmarks are executed. The table be
 
 Note that in order to compare against the other drivers, an inMemory mongod instance should be used.
 
-At this point, BSON and GridFS benchmarks are not implemented because we do not own the Rust BSON library, and GridFS has not been implemented
-in the driver.
+At this point, GridFS benchmarks are not implemented because it has not been implemented in the driver.
 
 Also note that the parallel benchmarks are implemented to mirror the C++ driver's interpretation of the spec.

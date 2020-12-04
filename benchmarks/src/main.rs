@@ -1,19 +1,4 @@
 #[macro_use]
-macro_rules! spawn {
-    ($task:expr) => {{
-        #[cfg(feature = "tokio-runtime")]
-        {
-            tokio::task::spawn($task)
-        }
-
-        #[cfg(feature = "async-std-runtime")]
-        {
-            async_std::task::spawn($task)
-        }
-    }};
-}
-
-#[macro_use]
 macro_rules! spawn_blocking_and_await {
     ($blocking_call:expr) => {{
         #[cfg(feature = "tokio-runtime")]
@@ -31,6 +16,7 @@ macro_rules! spawn_blocking_and_await {
 }
 
 mod bench;
+mod fs;
 
 use std::{
     path::{Path, PathBuf},

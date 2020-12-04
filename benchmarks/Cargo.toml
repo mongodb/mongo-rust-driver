@@ -6,7 +6,7 @@ edition = "2018"
 
 [features]
 default = ["tokio-runtime"]
-tokio-runtime = ["tokio/macros", "tokio/rt-core", "tokio/rt-threaded"]
+tokio-runtime = ["tokio/fs", "tokio/macros", "tokio/rt-core", "tokio/rt-threaded"]
 async-std-runtime = ["async-std"]
 
 [dependencies]
@@ -17,6 +17,7 @@ clap = "2.33.3"
 indicatif = "0.15.0"
 async-trait = "0.1.41"
 tokio = { version = "0.2.23", features = ["sync"] }
-async-std = { version = "1.6.2", optional = true, features = ["attributes"] }
+# "unstable" feature is needed for `spawn_blocking`, which is only used in task setup
+async-std = { version = "=1.6.2", optional = true, features = ["attributes", "unstable"] }
 futures = "0.3.8"
 anyhow = "1.0.34"

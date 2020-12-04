@@ -8,16 +8,17 @@ pub mod run_command;
 
 use std::{
     convert::TryInto,
-    fs::File,
-    io::{BufRead, BufReader},
     time::{Duration, Instant},
 };
 
 use anyhow::{bail, Result};
+use futures::stream::TryStreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use lazy_static::lazy_static;
 use mongodb::bson::{Bson, Document};
 use serde_json::Value;
+
+use crate::fs::{BufReader, File};
 
 lazy_static! {
     static ref DATABASE_NAME: String = option_env!("DATABASE_NAME")
@@ -61,11 +62,13 @@ pub trait Benchmark: Sized {
     async fn teardown(&self) -> Result<()>;
 }
 
-pub fn parse_json_file_to_documents(file: File) -> Result<Vec<Document>> {
+pub(crate) async fn parse_json_file_to_documents(file: File) -> Result<Vec<Document>> {
     let mut docs: Vec<Document> = Vec::new();
 
-    for line in BufReader::new(file).lines() {
-        let json: Value = serde_json::from_str(&line?)?;
+    let mut lines = BufReader::new(file).lines();
+
+    while let Some(line) = lines.try_next().await? {
+        let json: Value = serde_json::from_str(&line)?;
 
         docs.push(match json.try_into()? {
             Bson::Document(doc) => doc,
