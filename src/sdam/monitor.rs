@@ -210,12 +210,7 @@ impl HeartbeatMonitor {
             }
         };
 
-        if result
-            .as_ref()
-            .err()
-            .map(|e| e.kind.is_network_error())
-            .unwrap_or(false)
-        {
+        if result.is_err() {
             self.connection.take();
         }
 

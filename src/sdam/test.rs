@@ -1,4 +1,7 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use bson::doc;
 use semver::VersionReq;
@@ -21,6 +24,63 @@ use crate::{
     Client,
     RUNTIME,
 };
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(threaded_scheduler))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn min_heartbeat_frequency() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+
+    let mut setup_client_options = CLIENT_OPTIONS.clone();
+    setup_client_options.hosts.drain(1..);
+    setup_client_options.direct_connection = Some(true);
+
+    let setup_client = TestClient::with_options(Some(setup_client_options.clone()), true).await;
+
+    if !setup_client.supports_fail_command().await {
+        println!("skipping min_heartbeat_frequency test due to server not supporting fail points");
+        return;
+    }
+
+    if setup_client.server_version_lt(4, 9) {
+        println!("skipping min_heartbeat_frequency test due to server version being less than 4.9");
+        return;
+    }
+
+    let fp_options = FailCommandOptions::builder()
+        .app_name("SDAMMinHeartbeatFrequencyTest".to_string())
+        .error_code(1234)
+        .build();
+    let failpoint = FailPoint::fail_command(&["isMaster"], FailPointMode::Times(5), fp_options);
+
+    let _fp_guard = setup_client
+        .enable_failpoint(failpoint, None)
+        .await
+        .expect("enabling failpoint should succeed");
+
+    let mut options = setup_client_options;
+    options.app_name = Some("SDAMMinHeartbeatFrequencyTest".to_string());
+    options.server_selection_timeout = Some(Duration::from_secs(5));
+    let client = Client::with_options(options).expect("client creation succeeds");
+
+    let start = Instant::now();
+    client
+        .database("admin")
+        .run_command(doc! { "ping": 1 }, None)
+        .await
+        .expect("ping should eventually succeed");
+
+    let elapsed = Instant::now().duration_since(start).as_millis();
+    assert!(
+        elapsed >= 2000,
+        "expected to take at least 2 seconds, instead took {}ms",
+        elapsed
+    );
+    assert!(
+        elapsed <= 3500,
+        "expected to take at most 3.5 seconds, instead took {}ms",
+        elapsed
+    );
+}
 
 // TODO: RUST-232 update this test to incorporate SDAM events
 #[cfg_attr(feature = "tokio-runtime", tokio::test(threaded_scheduler))]
