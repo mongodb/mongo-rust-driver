@@ -36,8 +36,13 @@ impl Benchmark for InsertManyBenchmark {
 
         let num_copies = options.num_copies;
 
+        // This benchmark uses a file that's quite large, and unfortunately `serde_json` has no
+        // async version of `from_reader`, so rather than read the whole file into memory at once,
+        // we use the runtime's `spawn_blocking` functionality to do this efficiently.
+        //
+        // Note that the setup is _not_ measured as part of the benchmark runtime, so even if
+        // `spawn_blocking` turned out not to be super efficient, it wouldn't be a big deal.
         let mut file = spawn_blocking_and_await!(File::open(options.path))?;
-
         let json: Value = spawn_blocking_and_await!(serde_json::from_reader(&mut file))?;
 
         let coll = db.collection(&COLL_NAME);

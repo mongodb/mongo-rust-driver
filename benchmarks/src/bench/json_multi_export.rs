@@ -1,14 +1,13 @@
-use std::{
-    fs::{File, OpenOptions},
-    io::Write,
-    path::PathBuf,
-};
+use std::path::PathBuf;
 
 use anyhow::Result;
 use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
 use mongodb::{bson::doc, Client, Collection, Database};
 
-use crate::bench::{parse_json_file_to_documents, Benchmark, COLL_NAME, DATABASE_NAME};
+use crate::{
+    bench::{parse_json_file_to_documents, Benchmark, COLL_NAME, DATABASE_NAME},
+    fs::File,
+};
 
 const TOTAL_FILES: usize = 100;
 
@@ -42,9 +41,9 @@ impl Benchmark for JsonMultiExportBenchmark {
 
             tasks.push(async move {
                 let json_file_name = path.join(format!("ldjson{:03}.txt", i));
-                let file = spawn_blocking_and_await!(File::open(&json_file_name))?;
+                let file = File::open_read(&json_file_name).await?;
 
-                let docs = spawn_blocking_and_await!(parse_json_file_to_documents(file))?;
+                let docs = parse_json_file_to_documents(file).await?;
 
                 for mut doc in docs {
                     doc.insert("file", i as i32);
@@ -57,7 +56,6 @@ impl Benchmark for JsonMultiExportBenchmark {
         }
 
         while let Some(result) = tasks.next().await {
-            println!("done!");
             result?;
         }
 
@@ -77,32 +75,16 @@ impl Benchmark for JsonMultiExportBenchmark {
                 // lot of work for little gain since we `unwrap()` in
                 // main.rs anyway.
                 let file_name = path.join(format!("ldjson{:03}.txt", i));
-                let mut file = OpenOptions::new()
-                    .create(true)
-                    .write(true)
-                    .open(&file_name)
-                    .unwrap();
+                let mut file = File::open_write(&file_name).await.unwrap();
 
                 let mut cursor = coll_ref
                     .find(Some(doc! { "file": i as i32 }), None)
                     .await
                     .unwrap();
 
-                let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel();
-
-                let send_future = spawn!(async move {
-                    while let Some(doc) = cursor.try_next().await.unwrap() {
-                        sender.send(doc.to_string()).unwrap();
-                    }
-                });
-
-                let rec_future = spawn_blocking_and_await!(async move {
-                    while let Some(s) = receiver.next().await {
-                        writeln!(file, "{}", s).unwrap();
-                    }
-                });
-
-                futures::future::join(send_future, rec_future).await
+                while let Some(doc) = cursor.try_next().await.unwrap() {
+                    file.write_line(&doc.to_string()).await.unwrap();
+                }
             });
         }
 

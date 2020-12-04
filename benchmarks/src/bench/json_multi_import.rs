@@ -1,10 +1,13 @@
-use std::{fs::File, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Result;
 use futures::stream::{FuturesUnordered, StreamExt};
 use mongodb::{options::InsertManyOptions, Client, Collection, Database};
 
-use crate::bench::{parse_json_file_to_documents, Benchmark, COLL_NAME, DATABASE_NAME};
+use crate::{
+    bench::{parse_json_file_to_documents, Benchmark, COLL_NAME, DATABASE_NAME},
+    fs::File,
+};
 
 const TOTAL_FILES: usize = 100;
 
@@ -59,10 +62,9 @@ impl Benchmark for JsonMultiImportBenchmark {
                 let mut docs = Vec::new();
 
                 let json_file_name = path.join(format!("ldjson{:03}.txt", i));
-                let file: File = spawn_blocking_and_await!(File::open(&json_file_name)).unwrap();
+                let file = File::open_read(&json_file_name).await.unwrap();
 
-                let mut new_docs =
-                    spawn_blocking_and_await!(parse_json_file_to_documents(file)).unwrap();
+                let mut new_docs = parse_json_file_to_documents(file).await.unwrap();
 
                 docs.append(&mut new_docs);
 

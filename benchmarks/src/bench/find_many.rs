@@ -1,11 +1,14 @@
-use std::{convert::TryInto, fs::File, path::PathBuf};
+use std::{convert::TryInto, path::PathBuf};
 
 use anyhow::{bail, Result};
 use futures::stream::StreamExt;
 use mongodb::{bson::Bson, Client, Collection, Database};
 use serde_json::Value;
 
-use crate::bench::{Benchmark, COLL_NAME, DATABASE_NAME};
+use crate::{
+    bench::{Benchmark, COLL_NAME, DATABASE_NAME},
+    fs::read_to_string,
+};
 
 pub struct FindManyBenchmark {
     db: Database,
@@ -30,9 +33,9 @@ impl Benchmark for FindManyBenchmark {
 
         let num_iter = options.num_iter;
 
-        let mut file = spawn_blocking_and_await!(File::open(options.path))?;
+        let mut file = read_to_string(&options.path).await?;
 
-        let json: Value = spawn_blocking_and_await!(serde_json::from_reader(&mut file))?;
+        let json: Value = serde_json::from_str(&mut file)?;
         let doc = match json.try_into()? {
             Bson::Document(doc) => doc,
             _ => bail!("invalid json test file"),
