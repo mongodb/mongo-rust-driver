@@ -107,7 +107,10 @@ async fn inconsistent_write_concern_rejected() {
         )
         .await
         .expect_err("insert should fail");
-    assert!(matches!(error.kind.as_ref(), ErrorKind::ArgumentError { .. }));
+    assert!(matches!(
+        error.kind.as_ref(),
+        ErrorKind::ArgumentError { .. }
+    ));
 
     let coll = db.collection(function_name!());
     let wc = WriteConcern {
@@ -120,7 +123,10 @@ async fn inconsistent_write_concern_rejected() {
         .insert_one(doc! {}, options)
         .await
         .expect_err("insert should fail");
-    assert!(matches!(error.kind.as_ref(), ErrorKind::ArgumentError { .. }));
+    assert!(matches!(
+        error.kind.as_ref(),
+        ErrorKind::ArgumentError { .. }
+    ));
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -142,5 +148,8 @@ async fn unacknowledged_write_concern_rejected() {
         )
         .await
         .expect_err("insert should fail");
-    assert!(matches!(error.kind.as_ref(), ErrorKind::ArgumentError { .. }));
+    assert!(matches!(
+        error.kind.as_ref(),
+        ErrorKind::ArgumentError { .. }
+    ));
 }
