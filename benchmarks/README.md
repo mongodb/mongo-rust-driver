@@ -2,7 +2,8 @@
 
 This suite implements the benchmarks described in this (spec)[https://github.com/mongodb/specifications/blob/master/source/benchmarking/benchmarking.rst].
 
-In order to run the microbenchmarks, first run `../etc/microbenchmark-test-data.sh` to download the data.
+In order to run the microbenchmarks, first run `./download-data.sh`. (NOTE: the data for the deeply nested BSON encoding and decoding is
+currently broken, so these benchmarks will not be runnable until that's fixed).
 
 Note: make sure you run the download script and the microbenchmarks binary from the benchmark root (the directory containing this README).
 
@@ -11,7 +12,7 @@ connection string by setting the `MONGODB_URI` environment variable). You can sp
 collection by setting the `DATABASE_NAME` or `COLL_NAME` environment variables respectively.
 
 Additionally, you can specify custom time frames for the benchmarks by setting the `MAX_EXECUTION_TIME`, `MIN_EXECUTION_TIME`
-and `MAX_ITERATIONS` environment variables.
+and `TARGET_ITERATION_COUNT` environment variables.
 
 Run `cargo run --release -- --help` to see a full list of testing options.
 
@@ -30,6 +31,12 @@ the single-doc benchmarks. By default, all benchmarks are executed. The table be
 | Large doc bulk insert          | 7  |
 | LDJSON multi-file import       | 8  |
 | LDJSON multi-file export       | 9  |
+| BSON flat decode               | 10 |
+| BSON flat encode               | 11 |
+| BSON deeply nested decode      | 12 |
+| BSON deeply nested encode      | 13 |
+| BSON full document decode      | 14 |
+| BSON full document encode      | 15 |  
 | All benchmarks                 | all|
 
 Note that in order to compare against the other drivers, an inMemory mongod instance should be used.
