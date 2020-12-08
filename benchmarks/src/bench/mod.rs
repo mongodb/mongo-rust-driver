@@ -1,3 +1,5 @@
+pub mod bson_decode;
+pub mod bson_encode;
 pub mod find_many;
 pub mod find_one;
 pub mod insert_many;
@@ -33,10 +35,10 @@ lazy_static! {
         .unwrap_or("60")
         .parse::<u64>()
         .expect("invalid MIN_EXECUTION_TIME");
-    pub static ref MAX_ITERATIONS: usize = option_env!("MAX_ITERATIONS")
+    pub static ref TARGET_ITERATION_COUNT: usize = option_env!("TARGET_ITERATION_COUNT")
         .unwrap_or("100")
         .parse::<usize>()
-        .expect("invalid MAX_ITERATIONS");
+        .expect("invalid TARGET_ITERATION_COUNT");
 }
 
 #[async_trait::async_trait]
@@ -59,7 +61,9 @@ pub trait Benchmark: Sized {
     }
 
     // execute once after benchmarking
-    async fn teardown(&self) -> Result<()>;
+    async fn teardown(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 pub(crate) async fn parse_json_file_to_documents(file: File) -> Result<Vec<Document>> {
@@ -81,7 +85,7 @@ pub(crate) async fn parse_json_file_to_documents(file: File) -> Result<Vec<Docum
 
 fn finished(duration: Duration, iter: usize) -> bool {
     let elapsed = duration.as_secs();
-    elapsed >= *MAX_EXECUTION_TIME || (iter >= *MAX_ITERATIONS && elapsed > *MIN_EXECUTION_TIME)
+    elapsed >= *MAX_EXECUTION_TIME || (iter >= *TARGET_ITERATION_COUNT && elapsed > *MIN_EXECUTION_TIME)
 }
 
 pub async fn run_benchmark<B: Benchmark + Send + Sync>(
@@ -91,7 +95,7 @@ pub async fn run_benchmark<B: Benchmark + Send + Sync>(
 
     let mut test_durations = Vec::new();
 
-    let progress_bar = ProgressBar::new(*MAX_ITERATIONS as u64);
+    let progress_bar = ProgressBar::new(*TARGET_ITERATION_COUNT as u64);
     progress_bar.set_style(
         ProgressStyle::default_bar()
             .template(

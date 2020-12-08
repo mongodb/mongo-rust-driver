@@ -28,6 +28,8 @@ use clap::{App, Arg, ArgMatches};
 use lazy_static::lazy_static;
 
 use crate::bench::{
+    bson_decode::BsonDecodeBenchmark,
+    bson_encode::BsonEncodeBenchmark,
     find_many::FindManyBenchmark,
     find_one::FindOneBenchmark,
     insert_many::InsertManyBenchmark,
@@ -35,7 +37,7 @@ use crate::bench::{
     json_multi_export::JsonMultiExportBenchmark,
     json_multi_import::JsonMultiImportBenchmark,
     run_command::RunCommandBenchmark,
-    MAX_ITERATIONS,
+    TARGET_ITERATION_COUNT,
 };
 
 lazy_static! {
@@ -43,16 +45,16 @@ lazy_static! {
 }
 
 fn get_nth_percentile(durations: &[Duration], n: f64) -> Duration {
-    let index = (durations.len() as f64 * n / *MAX_ITERATIONS as f64) as usize;
+    let index = (durations.len() as f64 * (n / 100.0)) as usize;
     durations[std::cmp::max(index, 1) - 1]
 }
 
 fn score_test(durations: Vec<Duration>, name: &str, task_size: f64, more_info: bool) -> f64 {
-    let median = get_nth_percentile(&durations, (*MAX_ITERATIONS / 2) as f64);
+    let median = get_nth_percentile(&durations, 50.0);
     let score = task_size / (median.as_millis() as f64 / 1000.0);
     println!("TEST: {} -- Score: {}\n", name, score);
 
-    if more_info && *MAX_ITERATIONS == 100 {
+    if more_info {
         println!(
             "10th percentile: {:#?}",
             get_nth_percentile(&durations, 10.0),
@@ -96,6 +98,7 @@ async fn single_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Resu
     println!("----------------------------\n");
 
     let mut comp_score: f64 = 0.0;
+    let mut benchmark_count = 0_usize;
 
     // Run command
     if ids[0] {
@@ -107,6 +110,7 @@ async fn single_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Resu
         let run_command = bench::run_benchmark::<RunCommandBenchmark>(run_command_options).await?;
 
         comp_score += score_test(run_command, "Run command", 0.16, more_info);
+        benchmark_count += 1;
     }
 
     // Find one by ID
@@ -122,6 +126,7 @@ async fn single_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Resu
         let find_one = bench::run_benchmark::<FindOneBenchmark>(find_one_options).await?;
 
         comp_score += score_test(find_one, "Find one by ID", 16.22, more_info);
+        benchmark_count += 1;
     }
 
     // Small doc insertOne
@@ -138,6 +143,7 @@ async fn single_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Resu
             bench::run_benchmark::<InsertOneBenchmark>(small_insert_one_options).await?;
 
         comp_score += score_test(small_insert_one, "Small doc insertOne", 2.75, more_info);
+        benchmark_count += 1;
     }
 
     // Large doc insertOne
@@ -154,7 +160,11 @@ async fn single_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Resu
             bench::run_benchmark::<InsertOneBenchmark>(large_insert_one_options).await?;
 
         comp_score += score_test(large_insert_one, "Large doc insertOne", 27.31, more_info);
+        benchmark_count += 1;
     }
+
+    // Take average of total.
+    comp_score /= benchmark_count as f64;
 
     println!("\nSingle-doc benchmark composite score: {}\n", comp_score);
     Ok(comp_score)
@@ -166,6 +176,7 @@ async fn multi_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Resul
     println!("----------------------------\n");
 
     let mut comp_score: f64 = 0.0;
+    let mut benchmark_count = 0_usize;
 
     // Find many and empty the cursor
     if ids[4] {
@@ -185,6 +196,7 @@ async fn multi_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Resul
             16.22,
             more_info,
         );
+        benchmark_count += 1;
     }
 
     // Small doc bulk insert
@@ -201,6 +213,7 @@ async fn multi_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Resul
             bench::run_benchmark::<InsertManyBenchmark>(small_insert_many_options).await?;
 
         comp_score += score_test(small_insert_many, "Small doc bulk insert", 2.75, more_info);
+        benchmark_count += 1;
     }
 
     // Large doc bulk insert
@@ -217,7 +230,11 @@ async fn multi_doc_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Resul
             bench::run_benchmark::<InsertManyBenchmark>(large_insert_many_options).await?;
 
         comp_score += score_test(large_insert_many, "Large doc bulk insert", 27.31, more_info);
+        benchmark_count += 1;
     }
+
+    // Take average of total.
+    comp_score /= benchmark_count as f64;
 
     println!("\nMulti-doc benchmark composite score: {}\n", comp_score);
     Ok(comp_score)
@@ -229,6 +246,7 @@ async fn parallel_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result
     println!("----------------------------\n");
 
     let mut comp_score: f64 = 0.0;
+    let mut benchmark_count = 0_usize;
 
     // LDJSON multi-file import
     if ids[7] {
@@ -246,6 +264,7 @@ async fn parallel_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result
             565.0,
             more_info,
         );
+        benchmark_count += 1;
     }
 
     // LDJSON multi-file export
@@ -264,15 +283,118 @@ async fn parallel_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result
             565.0,
             more_info,
         );
+        benchmark_count += 1;
     }
+
+    // Take average of total.
+    comp_score /= benchmark_count as f64;
 
     println!("\nParallel benchmark composite score: {}\n", comp_score);
     Ok(comp_score)
 }
 
+async fn bson_benchmarks(more_info: bool, ids: &[bool]) -> Result<f64> {
+    println!("----------------------------");
+    println!("BSON Benchmarks:");
+    println!("----------------------------\n");
+
+    let mut comp_score: f64 = 0.0;
+    let mut benchmark_count = 0;
+
+    // BSON flat document decode
+    if ids[9] {
+        let bson_flat_decode_options = bench::bson_decode::Options {
+            num_iter: 10_000,
+            path: DATA_PATH.join("extended_bson").join("flat_bson.json"),
+        };
+        println!("Running BSON flat decode...");
+        let bson_flat_decode =
+            bench::run_benchmark::<BsonDecodeBenchmark>(bson_flat_decode_options).await?;
+
+        comp_score += score_test(bson_flat_decode, "BSON flat decode", 75.31, more_info);
+        benchmark_count += 1;
+    }
+
+    // BSON flat document encode
+    if ids[10] {
+        let bson_flat_encode_options = bench::bson_encode::Options {
+            num_iter: 10_000,
+            path: DATA_PATH.join("extended_bson").join("flat_bson.json"),
+        };
+        println!("Running BSON flat encode...");
+        let bson_flat_encode =
+            bench::run_benchmark::<BsonEncodeBenchmark>(bson_flat_encode_options).await?;
+
+        comp_score += score_test(bson_flat_encode, "BSON flat encode", 75.31, more_info);
+        benchmark_count += 1;
+    }
+
+    // BSON deep document decode
+    if ids[11] {
+        let bson_deep_decode_options = bench::bson_decode::Options {
+            num_iter: 10_000,
+            path: DATA_PATH.join("extended_bson").join("deep_bson.json"),
+        };
+        println!("Running BSON deep decode...");
+        let bson_deep_decode =
+            bench::run_benchmark::<BsonDecodeBenchmark>(bson_deep_decode_options).await?;
+
+        comp_score += score_test(bson_deep_decode, "BSON deep decode", 19.64, more_info);
+        benchmark_count += 1;
+    }
+
+    // BSON deep document encode
+    if ids[12] {
+        let bson_deep_encode_options = bench::bson_encode::Options {
+            num_iter: 10_000,
+            path: DATA_PATH.join("extended_bson").join("deep_bson.json"),
+        };
+        println!("Running BSON deep encode...");
+        let bson_deep_encode =
+            bench::run_benchmark::<BsonEncodeBenchmark>(bson_deep_encode_options).await?;
+
+        comp_score += score_test(bson_deep_encode, "BSON deep encode", 19.64, more_info);
+        benchmark_count += 1;
+    }
+
+    // BSON full document decode
+    if ids[13] {
+        let bson_full_decode_options = bench::bson_decode::Options {
+            num_iter: 10_000,
+            path: DATA_PATH.join("extended_bson").join("full_bson.json"),
+        };
+        println!("Running BSON full decode...");
+        let bson_full_decode =
+            bench::run_benchmark::<BsonDecodeBenchmark>(bson_full_decode_options).await?;
+
+        comp_score += score_test(bson_full_decode, "BSON full decode", 57.34, more_info);
+        benchmark_count += 1;
+    }
+
+    // BSON full document encode
+    if ids[14] {
+        let bson_full_encode_options = bench::bson_encode::Options {
+            num_iter: 10_000,
+            path: DATA_PATH.join("extended_bson").join("full_bson.json"),
+        };
+        println!("Running BSON full encode...");
+        let bson_full_encode =
+            bench::run_benchmark::<BsonEncodeBenchmark>(bson_full_encode_options).await?;
+
+        comp_score += score_test(bson_full_encode, "BSON full encode", 57.34, more_info);
+        benchmark_count += 1;
+    }
+
+    // Take average of total.
+    comp_score /= benchmark_count as f64;
+
+    println!("\nBSON benchmark composite score: {}\n", comp_score);
+    Ok(comp_score)
+}
+
 fn parse_ids(matches: ArgMatches) -> Vec<bool> {
     let id_list: Vec<usize> = match matches.value_of("ids") {
-        Some("all") | None => vec![1, 2, 3, 4, 5, 6, 7, 8, 9],
+        Some("all") | None => vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
         Some(id_list) => id_list
             .split(',')
             .map(|str| {
@@ -282,9 +404,9 @@ fn parse_ids(matches: ArgMatches) -> Vec<bool> {
             .collect(),
     };
 
-    let mut ids = vec![false; 9];
+    let mut ids = vec![false; 15];
     for id in id_list {
-        if id < 1 || id > 9 {
+        if id < 1 || id > 15 {
             panic!("invalid test IDs provided, see README");
         }
         ids[id - 1] = true;
@@ -304,6 +426,15 @@ fn parse_ids(matches: ArgMatches) -> Vec<bool> {
     if matches.is_present("parallel") {
         ids[7] = true;
         ids[8] = true;
+    }
+    if matches.is_present("bson") {
+        ids[9] = true;
+        ids[10] = true;
+        ids[11] = true;
+        ids[12] = true;
+        ids[13] = true;
+        ids[14] = true;
+        ids[15] = true;
     }
 
     ids
@@ -335,6 +466,12 @@ async fn main() {
                 .help("Run parallel document benchmarks"),
         )
         .arg(
+            Arg::with_name("bson")
+                .short("b")
+                .long("bson")
+                .help("Run BSON-only benchmarks"),
+        )
+        .arg(
             Arg::with_name("verbose")
                 .short("v")
                 .long("verbose")
@@ -358,6 +495,12 @@ Run benchmarks by id number (comma-separated):
     7: Large doc bulk insert
     8: LDJSON multi-file import
     9: LDJSON multi-file export
+    10: BSON flat document decode
+    11: BSON flat document encode
+    12: BSON deeply nested document decode
+    13: BSON deeply nested document encode
+    14: BSON full document decode
+    15: BSON full document encode
     all: All benchmarks
                     ",
                 ),
@@ -392,6 +535,13 @@ Run benchmarks by id number (comma-separated):
     // Parallel
     if ids[7] || ids[8] {
         comp_score += parallel_benchmarks(uri, verbose, &ids).await.unwrap();
+    }
+
+    // Bson
+    if ids[9] || ids[10] || ids[11] || ids[12] || ids[13] || ids[14] {
+        // BSON benchmarks are not computed as part of the composite score for the driver since
+        // encoding/decoding is already part of all the other tasks.
+        bson_benchmarks(verbose, &ids).await.unwrap();
     }
 
     println!("----------------------------");
