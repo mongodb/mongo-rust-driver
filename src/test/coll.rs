@@ -721,10 +721,16 @@ async fn find_one_and_delete_hint_server_version() {
     let req2 = VersionReq::parse("4.2.*").unwrap();
     if req1.matches(&client.server_version.as_ref().unwrap()) {
         let error = res.expect_err("find one and delete should fail");
-        assert!(matches!(error.kind.as_ref(), ErrorKind::OperationError { .. }));
+        assert!(matches!(
+            error.kind.as_ref(),
+            ErrorKind::OperationError { .. }
+        ));
     } else if req2.matches(&client.server_version.as_ref().unwrap()) {
         let error = res.expect_err("find one and delete should fail");
-        assert!(matches!(error.kind.as_ref(), ErrorKind::CommandError { .. }));
+        assert!(matches!(
+            error.kind.as_ref(),
+            ErrorKind::CommandError { .. }
+        ));
     } else {
         assert!(res.is_ok());
     }
