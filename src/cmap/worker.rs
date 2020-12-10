@@ -158,7 +158,7 @@ impl ConnectionPoolWorker {
             .and_then(|opts| opts.ready)
             .unwrap_or(false)
         {
-            PoolState::Open
+            PoolState::Ready
         } else {
             PoolState::Paused
         };
@@ -222,7 +222,7 @@ impl ConnectionPoolWorker {
 
             match task {
                 PoolTask::CheckOut(request) => match self.state {
-                    PoolState::Open => {
+                    PoolState::Ready => {
                         self.wait_queue.push_back(request);
                     }
                     PoolState::Paused => {
@@ -230,18 +230,26 @@ impl ConnectionPoolWorker {
                         let _ = request.fulfill(ConnectionRequestResult::PoolCleared);
                     }
                 },
-                PoolTask::CheckIn(connection) => self.check_in(connection),
-                PoolTask::Clear => self.clear(None),
-                PoolTask::Open { completion_handler } => {
+                PoolTask::HandleManagementRequest(PoolManagementRequest::CheckIn(connection)) => {
+                    self.check_in(connection)
+                }
+                PoolTask::HandleManagementRequest(PoolManagementRequest::Clear) => self.clear(None),
+                PoolTask::HandleManagementRequest(PoolManagementRequest::Open {
+                    completion_handler,
+                }) => {
                     self.mark_as_ready();
                     // other end hung up, nothing to do
                     let _: std::result::Result<_, _> = completion_handler.send(());
                 }
-                PoolTask::HandleConnectionSucceeded(c) => self.handle_connection_succeeded(c),
-                PoolTask::HandleConnectionFailed {
-                    error,
-                    creation_reason,
-                } => self.handle_connection_failed(error, creation_reason),
+                PoolTask::HandleManagementRequest(
+                    PoolManagementRequest::HandleConnectionSucceeded(c),
+                ) => self.handle_connection_succeeded(c),
+                PoolTask::HandleManagementRequest(
+                    PoolManagementRequest::HandleConnectionFailed {
+                        error,
+                        error_generation,
+                    },
+                ) => self.handle_connection_failed(error, error_generation),
                 PoolTask::Maintenance => self.perform_maintenance(),
             }
 
@@ -264,7 +272,7 @@ impl ConnectionPoolWorker {
     }
 
     fn can_service_connection_request(&self) -> bool {
-        if !matches!(self.state, PoolState::Open) {
+        if !matches!(self.state, PoolState::Ready) {
             return false;
         }
 
@@ -315,7 +323,6 @@ impl ConnectionPoolWorker {
                     &establisher,
                     pending_connection,
                     &manager,
-                    ConnectionCreationReason::OperationExecution,
                     event_handler.as_ref(),
                 )
                 .await;
@@ -368,18 +375,14 @@ impl ConnectionPoolWorker {
     }
 
     /// Process a connection establishment failure.
-    fn handle_connection_failed(
-        &mut self,
-        error: Error,
-        creation_reason: ConnectionCreationReason,
-    ) {
+    fn handle_connection_failed(&mut self, error: Error, error_generation: u32) {
         // Establishing a pending connection failed, so that must be reflected in to total
         // connection count.
         self.total_connection_count -= 1;
         self.pending_connection_count -= 1;
 
-        // if this error originated from within the pool, need to clear.
-        if let ConnectionCreationReason::Background = creation_reason {
+        // if this error has not been reported yet, clear the pool.
+        if self.generation == error_generation {
             self.clear(Some(error));
         }
     }
@@ -412,12 +415,12 @@ impl ConnectionPoolWorker {
         }
     }
 
-    fn clear(&mut self, background_establishment_error: Option<Error>) {
+    fn clear(&mut self, establishment_error: Option<Error>) {
         println!("clearing in pool");
         self.generation += 1;
         let previous_state = std::mem::replace(&mut self.state, PoolState::Paused);
         self.generation_publisher
-            .publish(self.generation, background_establishment_error);
+            .publish(self.generation, establishment_error);
 
         for request in self.wait_queue.drain(..) {
             println!("fulfilling requests");
@@ -438,12 +441,12 @@ impl ConnectionPoolWorker {
 
     fn mark_as_ready(&mut self) {
         println!("marking as ready");
-        if matches!(self.state, PoolState::Open) {
+        if matches!(self.state, PoolState::Ready) {
             println!("pool already ready");
             return;
         }
 
-        self.state = PoolState::Open;
+        self.state = PoolState::Ready;
         self.emit_event(|handler| {
             let event = PoolReadyEvent {
                 address: self.address.clone(),
@@ -473,7 +476,7 @@ impl ConnectionPoolWorker {
     /// min_pool_size connections.
     fn perform_maintenance(&mut self) {
         self.remove_perished_connections();
-        if matches!(self.state, PoolState::Open) {
+        if matches!(self.state, PoolState::Ready) {
             self.ensure_min_connections();
         }
     }
@@ -510,7 +513,6 @@ impl ConnectionPoolWorker {
                         &establisher,
                         pending_connection,
                         &manager,
-                        ConnectionCreationReason::Background,
                         event_handler.as_ref(),
                     )
                     .await;
@@ -531,10 +533,10 @@ async fn establish_connection(
     establisher: &ConnectionEstablisher,
     pending_connection: PendingConnection,
     manager: &PoolManager,
-    creation_reason: ConnectionCreationReason,
     event_handler: Option<&Arc<dyn CmapEventHandler>>,
 ) -> Result<Connection> {
     let connection_id = pending_connection.id;
+    let generation = pending_connection.generation;
     let address = pending_connection.address.clone();
 
     let mut establish_result = establisher.establish_connection(pending_connection).await;
@@ -549,7 +551,7 @@ async fn establish_connection(
                 };
                 handler.handle_connection_closed_event(event);
             }
-            manager.handle_connection_failed(e.clone(), creation_reason);
+            manager.handle_connection_failed(e.clone(), generation);
         }
         Ok(ref mut connection) => {
             if let Some(handler) = event_handler {
@@ -561,74 +563,34 @@ async fn establish_connection(
     establish_result
 }
 
+/// Enum modeling the possible pool states as described in the CMAP spec.
+///
+/// The "closed" state is omitted here because the pool considered closed only
+/// once it goes out of scope and cannot be manually closed before then.
 #[derive(Debug)]
 enum PoolState {
     /// Connections may not be checked out nor created in the background to satisfy minPoolSize.
     Paused,
 
     /// Pool is operational.
-    Open,
-}
-
-#[derive(Debug)]
-pub(super) enum ConnectionCreationReason {
-    /// The connection was created to service an operation execution.
-    OperationExecution,
-
-    /// The connection was created in the background to satisfy minPoolSize.
-    Background,
+    Ready,
 }
 
 /// Task to process by the worker.
 #[derive(Debug)]
 enum PoolTask {
-    /// Clear the pool.
-    Clear,
-
-    /// Check in the given connection.
-    CheckIn(Connection),
+    HandleManagementRequest(PoolManagementRequest),
 
     /// Fulfill the given connection request.
     CheckOut(ConnectionRequest),
 
-    /// Update the pool state based on the given establishment error.
-    HandleConnectionFailed {
-        error: Error,
-        creation_reason: ConnectionCreationReason,
-    },
-
-    /// Update the pool state after a successful connection, optionally populating the pool
-    /// with the successful connection.
-    HandleConnectionSucceeded(Option<Connection>),
-
     /// Perform pool maintenance (ensure min connections, remove stale or idle connections).
     Maintenance,
-
-    /// Open the pool if it was paused before.
-    Open {
-        completion_handler: tokio::sync::oneshot::Sender<()>,
-    },
 }
 
 impl From<PoolManagementRequest> for PoolTask {
     fn from(request: PoolManagementRequest) -> Self {
-        match request {
-            PoolManagementRequest::CheckIn(c) => PoolTask::CheckIn(c),
-            PoolManagementRequest::Clear => PoolTask::Clear,
-            PoolManagementRequest::Open { completion_handler } => {
-                PoolTask::Open { completion_handler }
-            }
-            PoolManagementRequest::HandleConnectionFailed {
-                error,
-                creation_reason,
-            } => PoolTask::HandleConnectionFailed {
-                error,
-                creation_reason,
-            },
-            PoolManagementRequest::HandleConnectionSucceeded(c) => {
-                PoolTask::HandleConnectionSucceeded(c)
-            }
-        }
+        PoolTask::HandleManagementRequest(request)
     }
 }
 

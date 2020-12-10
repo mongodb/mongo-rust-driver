@@ -83,16 +83,7 @@ impl Client {
         println!("executing {}", T::NAME);
         let server = self.select_server(op.selection_criteria()).await?;
 
-        let mut conn = match server.checkout_connection().await {
-            Ok(conn) => conn,
-            Err(err) => {
-                self.inner
-                    .topology
-                    .handle_pre_handshake_error(err.clone(), server.address.clone())
-                    .await;
-                return Err(err);
-            }
-        };
+        let mut conn = match server.checkout_connection().await?;
 
         let retryability = self.get_retryability(&conn, &op).await?;
 
@@ -154,16 +145,7 @@ impl Client {
             }
         };
 
-        let mut conn = match server.checkout_connection().await {
-            Ok(conn) => conn,
-            Err(err) => {
-                self.inner
-                    .topology
-                    .handle_pre_handshake_error(err.clone(), server.address.clone())
-                    .await;
-                return Err(first_error);
-            }
-        };
+        let mut conn = server.checkout_connection().await.map_err(|_| first_error)?;
 
         let retryability = self.get_retryability(&conn, &op).await?;
         if retryability == Retryability::None {

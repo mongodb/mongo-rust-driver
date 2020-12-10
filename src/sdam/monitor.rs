@@ -96,8 +96,8 @@ impl Monitor {
             tokio::select! {
                 _ = wait_for_next_check => {},
 
-                // if the pool encounters an error populating min pool size, set server description to unknown
-                Some(err) = self.generation_subscriber.listen_for_background_failure(), if has_min_pool_size => {
+                // if the pool encounters an error establishing a connection, set server description to unknown
+                Some(err) = self.generation_subscriber.listen_for_establishment_failure(), if has_min_pool_size => {
                     if let Some(topology) = self.topology.upgrade() {
                         topology.handle_pre_handshake_error(err, self.address.clone()).await;
                     }

@@ -3,14 +3,14 @@ use crate::error::Error;
 #[derive(Clone, Debug)]
 struct PoolStatus {
     generation: u32,
-    background_establishment_error: Option<Error>,
+    establishment_error: Option<Error>,
 }
 
 impl Default for PoolStatus {
     fn default() -> Self {
         PoolStatus {
             generation: 0,
-            background_establishment_error: None,
+            establishment_error: None,
         }
     }
 }
@@ -33,14 +33,10 @@ pub(super) struct PoolGenerationPublisher {
 impl PoolGenerationPublisher {
     /// Publish a new generation.
     /// If the clear was caused by a background connection establishment error, provide the error.
-    pub(super) fn publish(
-        &self,
-        new_generation: u32,
-        background_establishment_error: Option<Error>,
-    ) {
+    pub(super) fn publish(&self, new_generation: u32, establishment_error: Option<Error>) {
         let mut new_status = PoolStatus {
             generation: new_generation,
-            background_establishment_error,
+            establishment_error,
         };
 
         // if nobody is listening, this will return an error, which we don't mind.
@@ -50,7 +46,7 @@ impl PoolGenerationPublisher {
 
 /// Subscriber used to get the latest generation of the pool.
 ///
-/// This can also be used to listen for when the pool encounters an error during background
+/// This can also be used to listen for when the pool encounters an error during connection
 /// establishment.
 #[derive(Clone, Debug)]
 pub(crate) struct PoolGenerationSubscriber {
@@ -63,10 +59,10 @@ impl PoolGenerationSubscriber {
         self.receiver.borrow().generation
     }
 
-    /// Listen for a background establishment failure.
-    pub(crate) async fn listen_for_background_failure(&mut self) -> Option<Error> {
+    /// Listen for a connection establishment failure.
+    pub(crate) async fn listen_for_establishment_failure(&mut self) -> Option<Error> {
         while let Some(status) = self.receiver.recv().await {
-            if let Some(error) = status.background_establishment_error {
+            if let Some(error) = status.establishment_error {
                 return Some(error);
             }
         }

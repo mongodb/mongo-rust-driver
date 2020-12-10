@@ -179,6 +179,10 @@ impl ConnectionPool {
         self.manager.open().await;
     }
 
+    /// Subscribe to updates to the pool's generation.
+    ///
+    /// This can be used to listen for errors that occur during connection
+    /// establishment or to get the current generation of the pool.
     pub(crate) fn subscribe_to_generation_updates(&self) -> PoolGenerationSubscriber {
         self.generation_subscriber.clone()
     }

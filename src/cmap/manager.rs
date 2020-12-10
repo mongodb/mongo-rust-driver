@@ -1,6 +1,6 @@
 use tokio::sync::mpsc;
 
-use super::{worker::ConnectionCreationReason, Connection};
+use super::Connection;
 use crate::error::Error;
 
 pub(super) fn channel() -> (PoolManager, ManagementRequestReceiver) {
@@ -45,16 +45,12 @@ impl PoolManager {
     }
 
     /// Notify the pool that establishing a connection failed.
-    pub(super) fn handle_connection_failed(
-        &self,
-        error: Error,
-        creation_reason: ConnectionCreationReason,
-    ) {
+    pub(super) fn handle_connection_failed(&self, error: Error, error_generation: u32) {
         let _ = self
             .sender
             .send(PoolManagementRequest::HandleConnectionFailed {
                 error,
-                creation_reason,
+                error_generation,
             });
     }
 
@@ -86,7 +82,7 @@ pub(super) enum PoolManagementRequest {
     CheckIn(Connection),
     HandleConnectionFailed {
         error: Error,
-        creation_reason: ConnectionCreationReason,
+        error_generation: u32,
     },
     HandleConnectionSucceeded(Option<Connection>),
 }
