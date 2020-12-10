@@ -67,6 +67,7 @@ pub enum Operation {
     CheckIn { connection: String },
     Clear,
     Close,
+    Ready,
 }
 
 #[derive(Debug, Deserialize)]
