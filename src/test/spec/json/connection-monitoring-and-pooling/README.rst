@@ -72,10 +72,11 @@ Valid Unit Test Operations are the following:
 
   - ``target``: The name of the thread to wait for.
 
-- ``waitForEvent(event, count)``: block the current thread until ``event`` has occurred ``count`` times
+- ``waitForEvent(event, count, timeout)``: block the current thread until ``event`` has occurred ``count`` times
 
   - ``event``: The name of the event
   - ``count``: The number of times the event must occur (counting from the start of the test)
+  - ``timeout``: If specified, time out with an error after waiting for this many milliseconds without seeing the required events
 
 - ``label = pool.checkOut()``: call ``checkOut`` on pool, returning the checked out connection
 
@@ -152,12 +153,13 @@ For each YAML file with ``style: unit``:
 
   - If ``poolOptions`` is specified, use those options to initialize both pools
   - The returned pool must have an ``address`` set as a string value.
+  - If the pool uses a background thread to satisfy ``minPoolSize``, ensure it
+    attempts to create a new connection every 50ms.
 
-- Execute each ``operation`` in ``operations``
+- Process each ``operation`` in ``operations`` (on the main thread)
 
-  - If a ``thread`` is specified, execute in that corresponding thread. Otherwise, execute in the main thread.
+  - If a ``thread`` is specified, the main thread MUST schedule the operation to execute in the corresponding thread. Otherwise, execute the operation directly in the main thread.
 
-- Wait for the main thread to finish executing all of its operations
 - If ``error`` is presented
 
   - Assert that an actual error ``actualError`` was thrown by the main thread
@@ -182,9 +184,9 @@ Integration Test Runner
 The steps to run the integration tests are the same as those used to run the
 unit tests with the following modifications:
 
- - The integration tests MUST be run against an actual endpoint. If the
-   deployment being tested contains multiple endpoints, then the runner MUST
-   only use one of them to run the tests against.
+- The integration tests MUST be run against an actual endpoint. If the
+  deployment being tested contains multiple endpoints, then the runner MUST
+  only use one of them to run the tests against.
 
 - For each test, if `failPoint` is specified, its value is a
   ``configureFailPoint`` command. Run the command on the admin database of the

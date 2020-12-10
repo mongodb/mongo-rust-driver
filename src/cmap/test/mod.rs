@@ -257,17 +257,15 @@ impl Operation {
                     });
             }
             Operation::Clear => {
-                let mut subscriber = state.handler.subscribe();
+                if let Some(pool_guard) = state.pool.read().await.deref() {
+                    let mut subscriber = pool_guard.subscribe_to_generation_updates();
+                    pool_guard.clear();
+                    drop(pool_guard);
 
-                if let Some(pool) = state.pool.write().await.deref() {
-                    pool.clear();
-                    // wait for event to be emitted to ensure drop has completed.
                     subscriber
-                        .wait_for_event(EVENT_TIMEOUT, |e| {
-                            matches!(e, Event::ConnectionPoolCleared(_))
-                        })
+                        .wait_for_generation_change(EVENT_TIMEOUT)
                         .await
-                        .expect("did not receive ConnectionPoolCleared event after clearing pool");
+                        .expect("generation did not change after clearing pool");
                 }
             }
             Operation::Ready => {

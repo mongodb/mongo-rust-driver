@@ -422,12 +422,6 @@ impl ConnectionPoolWorker {
         self.generation_publisher
             .publish(self.generation, establishment_error);
 
-        for request in self.wait_queue.drain(..) {
-            println!("fulfilling requests");
-            let o = request.fulfill(ConnectionRequestResult::PoolCleared);
-            println!("{:?}", o);
-        }
-
         if !matches!(previous_state, PoolState::Paused) {
             self.emit_event(|handler| {
                 let event = PoolClearedEvent {
@@ -436,13 +430,18 @@ impl ConnectionPoolWorker {
 
                 handler.handle_pool_cleared_event(event);
             });
+
+            for request in self.wait_queue.drain(..) {
+                // an error means the other end hung up already, which is okay because we were
+                // returning an error anyways
+                let _: std::result::Result<_, _> =
+                    request.fulfill(ConnectionRequestResult::PoolCleared);
+            }
         }
     }
 
     fn mark_as_ready(&mut self) {
-        println!("marking as ready");
         if matches!(self.state, PoolState::Ready) {
-            println!("pool already ready");
             return;
         }
 

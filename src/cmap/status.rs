@@ -1,4 +1,6 @@
-use crate::error::Error;
+use std::time::Duration;
+
+use crate::{error::Error, RUNTIME};
 
 #[derive(Clone, Debug)]
 struct PoolStatus {
@@ -70,7 +72,12 @@ impl PoolGenerationSubscriber {
     }
 
     #[cfg(test)]
-    pub(crate) async fn listen_for_generation_change(&mut self) -> Option<u32> {
-        self.receiver.recv().await.map(|status| status.generation)
+    pub(crate) async fn wait_for_generation_change(&mut self, timeout: Duration) -> Option<u32> {
+        RUNTIME
+            .timeout(timeout, self.receiver.recv())
+            .await
+            .ok()
+            .flatten()
+            .map(|status| status.generation)
     }
 }
