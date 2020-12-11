@@ -262,21 +262,9 @@ impl Operation {
                 }
             }
             Operation::Ready => {
-                let mut subscriber = state.handler.subscribe();
-
                 if let Some(pool) = state.pool.read().await.deref() {
                     pool.mark_as_ready().await;
                 }
-
-                // wait for event to be emitted to ensure pool is ready.
-                subscriber
-                    .wait_for_event(EVENT_TIMEOUT, |e| {
-                        matches!(e, Event::ConnectionPoolReady(_))
-                    })
-                    .await
-                    .expect(
-                        "did not receive ConnectionPoolReady event after marking pool as ready",
-                    );
             }
             Operation::Close => {
                 let mut subscriber = state.handler.subscribe();
