@@ -40,7 +40,6 @@ impl FailPoint {
             "mode": bson::to_bson(&mode).unwrap(),
             "data": data,
         };
-        println!("fp command: {}", command);
         FailPoint { command }
     }
 

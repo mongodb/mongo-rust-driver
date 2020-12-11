@@ -110,6 +110,8 @@ pub(crate) struct ConnectionPoolWorker {
     /// Receiver for incoming pool management requests (e.g. checking in a connection).
     management_receiver: ManagementRequestReceiver,
 
+    /// Sender used to publish the latest generation and notifications for any establishment errors
+    /// encountered by the pool.
     generation_publisher: PoolGenerationPublisher,
 
     /// A pool manager that can be cloned and attached to connections checked out of the pool.
@@ -416,7 +418,6 @@ impl ConnectionPoolWorker {
     }
 
     fn clear(&mut self, establishment_error: Option<Error>) {
-        println!("clearing in pool");
         self.generation += 1;
         let previous_state = std::mem::replace(&mut self.state, PoolState::Paused);
         self.generation_publisher
@@ -578,6 +579,7 @@ enum PoolState {
 /// Task to process by the worker.
 #[derive(Debug)]
 enum PoolTask {
+    /// Handle a management request from a `PoolManager`.
     HandleManagementRequest(PoolManagementRequest),
 
     /// Fulfill the given connection request.

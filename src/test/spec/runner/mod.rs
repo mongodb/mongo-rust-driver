@@ -60,6 +60,7 @@ pub async fn run_v2_test(test_file: TestFile) {
             options,
             Some(Duration::from_millis(50)),
             test_case.use_multiple_mongoses,
+            None,
             true,
         )
         .await;
@@ -179,15 +180,6 @@ pub async fn run_v2_test(test_file: TestFile) {
         }
 
         if let Some(expectations) = test_case.expectations {
-            println!("=== actual below =====");
-            for actual_event in events.iter() {
-                println!("{:?}", actual_event);
-            }
-
-            println!("=== expected below =====");
-            for actual_event in expectations.iter() {
-                println!("{:?}", actual_event);
-            }
             assert!(
                 events.len() >= expectations.len(),
                 "{}",

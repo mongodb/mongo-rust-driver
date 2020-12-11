@@ -218,11 +218,10 @@ impl Topology {
         self.common.message_manager.notify_topology_changed();
     }
 
-    /// Handles an error that occurs before the handshake has completed during an operation.
+    /// Updates the topology based on an error that occurs before the handshake has completed during
+    /// an operation.
     pub(crate) async fn handle_pre_handshake_error(&self, error: Error, address: StreamAddress) {
-        if error.is_network_error() {
-            self.mark_server_as_unknown(error, address).await;
-        }
+        self.mark_server_as_unknown(error, address).await;
     }
 
     /// Handles an error that occurs after the handshake has completed during an operation.
@@ -237,7 +236,7 @@ impl Topology {
         if error.is_non_timeout_network_error() {
             self.mark_server_as_unknown(error, server.address.clone())
                 .await;
-            server.clear_connection_pool();
+            server.pool.clear();
         } else if error.is_recovering() || error.is_not_master() {
             self.mark_server_as_unknown(error.clone(), server.address.clone())
                 .await;
@@ -254,19 +253,15 @@ impl Topology {
             // in 4.2+, we only clear connection pool if we've received a
             // "node is shutting down" error. Otherwise, we always clear the pool.
             if wire_version < 8 || error.is_shutting_down() {
-                server.clear_connection_pool();
+                server.pool.clear();
             }
         }
     }
 
     /// Marks a server in the cluster as unknown due to the given `error`.
     async fn mark_server_as_unknown(&self, error: Error, address: StreamAddress) {
-        let a = address.clone();
-        println!("{}: marking as unknown", address);
         let description = ServerDescription::new(address, Some(Err(error)));
         self.update(description).await;
-        println!("{}", self.state.read().await.description);
-        println!("{}: done marking as unknown", a);
     }
 
     /// Updates the topology using the given `ServerDescription`. Monitors for new servers will

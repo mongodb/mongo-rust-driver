@@ -58,8 +58,6 @@ impl Monitor {
             .heartbeat_freq
             .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
 
-        let has_min_pool_size = self.topology.client_options().min_pool_size.is_some();
-
         while self.topology.is_alive() {
             if self.server.upgrade().is_none() {
                 break;
@@ -97,7 +95,7 @@ impl Monitor {
                 _ = wait_for_next_check => {},
 
                 // if the pool encounters an error establishing a connection, set server description to unknown
-                Some(err) = self.generation_subscriber.listen_for_establishment_failure(), if has_min_pool_size => {
+                Some(err) = self.generation_subscriber.listen_for_establishment_failure() => {
                     if let Some(topology) = self.topology.upgrade() {
                         topology.handle_pre_handshake_error(err, self.address.clone()).await;
                     }
@@ -124,9 +122,8 @@ impl Monitor {
         let server_description = match check_result {
             Ok(desc) => desc,
             Err(e) => {
-                println!("failed {}", e);
-                self.clear_connection_pool();
                 let new_desc = ServerDescription::new(self.address.clone(), Some(Err(e.clone())));
+                self.clear_connection_pool();
 
                 if e.is_network_error() && previous_description.server_type != ServerType::Unknown {
                     previous_description = new_desc;
@@ -139,13 +136,10 @@ impl Monitor {
                 }
             }
         };
-        println!("initial type: {:?}", self.server_type);
-        println!("new type: {:?}", server_description.server_type);
         if previous_description.server_type == ServerType::Unknown
             && server_description.server_type != ServerType::Unknown
         {
-            println!("opening pool");
-            self.open_connection_pool().await;
+            self.ready_connection_pool().await;
         }
 
         self.server_type = server_description.server_type;
@@ -199,16 +193,13 @@ impl Monitor {
 
     fn clear_connection_pool(&self) {
         if let Some(server) = self.server.upgrade() {
-            println!("clearing server pool");
-            server.clear_connection_pool();
-        } else {
-            println!("server null");
+            server.pool.clear();
         }
     }
 
-    async fn open_connection_pool(&self) {
+    async fn ready_connection_pool(&self) {
         if let Some(server) = self.server.upgrade() {
-            server.open_connection_pool().await;
+            server.pool.mark_as_ready().await;
         }
     }
 }

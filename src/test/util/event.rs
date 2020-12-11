@@ -98,7 +98,7 @@ impl EventHandler {
             self.event_broadcaster.send(event.into());
     }
 
-    fn subscribe(&self) -> EventSubscriber {
+    pub fn subscribe(&self) -> EventSubscriber {
         EventSubscriber {
             _handler: self,
             receiver: self.event_broadcaster.subscribe(),
@@ -200,11 +200,12 @@ impl EventClient {
         EventClient::with_options(None, true).await
     }
 
-    pub async fn with_options(
+    async fn with_options_and_handler(
         options: impl Into<Option<ClientOptions>>,
+        handler: impl Into<Option<EventHandler>>,
         collect_server_info: bool,
     ) -> Self {
-        let handler = EventHandler::new();
+        let handler = handler.into().unwrap_or_else(|| EventHandler::new());
         let client =
             TestClient::with_handler(Some(handler.clone()), options, collect_server_info).await;
 
@@ -214,10 +215,18 @@ impl EventClient {
         Self { client, handler }
     }
 
+    pub async fn with_options(
+        options: impl Into<Option<ClientOptions>>,
+        collect_server_info: bool,
+    ) -> Self {
+        Self::with_options_and_handler(options, None, collect_server_info).await
+    }
+
     pub async fn with_additional_options(
         options: Option<ClientOptions>,
         heartbeat_freq: Option<Duration>,
         use_multiple_mongoses: Option<bool>,
+        event_handler: impl Into<Option<EventHandler>>,
         collect_server_info: bool,
     ) -> Self {
         let mut options = match options {
@@ -231,7 +240,7 @@ impl EventClient {
         if TestClient::new().await.is_sharded() && use_multiple_mongoses != Some(true) {
             options.hosts = options.hosts.iter().cloned().take(1).collect();
         }
-        EventClient::with_options(options, collect_server_info).await
+        EventClient::with_options_and_handler(options, event_handler, collect_server_info).await
     }
 
     pub async fn with_uri_and_mongos_options(
@@ -388,6 +397,7 @@ impl EventClient {
             .collect()
     }
 
+    #[allow(dead_code)]
     pub fn subscribe_to_events(&self) -> EventSubscriber<'_> {
         self.handler.subscribe()
     }

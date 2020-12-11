@@ -24,13 +24,15 @@ impl PoolManager {
         let _ = self.sender.send(PoolManagementRequest::Clear);
     }
 
-    /// Open the pool.
-    pub(super) async fn open(&self) {
+    /// Mark the pool as "ready" as per the CMAP specification.
+    pub(super) async fn mark_as_ready(&self) {
         let (sender, receiver) = tokio::sync::oneshot::channel();
-        if let Ok(_) = self.sender.send(PoolManagementRequest::Open {
+        if let Ok(_) = self.sender.send(PoolManagementRequest::MarkAsReady {
             completion_handler: sender,
         }) {
-            receiver.await;
+            // Error occurs if pool drops while we're waiting for response,
+            // which isn't a concern.
+            let _: std::result::Result<_, _> = receiver.await;
         }
     }
 
@@ -75,15 +77,22 @@ impl ManagementRequestReceiver {
 
 #[derive(Debug)]
 pub(super) enum PoolManagementRequest {
+    /// Clear the pool, transitioning it to Paused.
     Clear,
-    Open {
+
+    /// Mark the pool as Ready, allowing connections to be created and checked out.
+    MarkAsReady {
         completion_handler: tokio::sync::oneshot::Sender<()>,
     },
+
+    /// Check in the given connection.
     CheckIn(Connection),
-    HandleConnectionFailed {
-        error: Error,
-        error_generation: u32,
-    },
+
+    /// Update the pool based on the given establishment error.
+    HandleConnectionFailed { error: Error, error_generation: u32 },
+
+    /// Update the pool after a successful connection, optionally populating the pool
+    /// with the successful connection.
     HandleConnectionSucceeded(Option<Connection>),
 }
 

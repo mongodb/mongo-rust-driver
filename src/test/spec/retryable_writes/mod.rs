@@ -41,6 +41,7 @@ async fn run_spec_tests() {
                 options,
                 Some(Duration::from_millis(50)),
                 test_case.use_multiple_mongoses,
+                None,
                 true,
             )
             .await;

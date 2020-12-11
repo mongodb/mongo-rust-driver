@@ -307,7 +307,7 @@ pub enum ErrorKind {
         file_path: String,
     },
 
-    /// The pool was cleared mid way through an operation execution.
+    /// The pool was cleared during operation execution.
     #[error(display = "{}", message)]
     #[non_exhaustive]
     PoolClearedError { message: String },

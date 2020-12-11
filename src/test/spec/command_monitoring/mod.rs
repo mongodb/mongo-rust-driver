@@ -89,7 +89,8 @@ async fn run_command_monitoring_test(test_file: TestFile) {
             .hosts(CLIENT_OPTIONS.hosts.clone())
             .build();
         let client =
-            EventClient::with_additional_options(Some(options), None, Some(false), true).await;
+            EventClient::with_additional_options(Some(options), None, Some(false), None, true)
+                .await;
 
         let events: Vec<TestEvent> = client
             .run_operation_with_events(

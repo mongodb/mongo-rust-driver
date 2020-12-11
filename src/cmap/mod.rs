@@ -175,8 +175,9 @@ impl ConnectionPool {
         self.manager.clear();
     }
 
-    pub(crate) async fn ready(&self) {
-        self.manager.open().await;
+    /// Mark the pool as "ready", allowing connections to be created and checked out.
+    pub(crate) async fn mark_as_ready(&self) {
+        self.manager.mark_as_ready().await;
     }
 
     /// Subscribe to updates to the pool's generation.

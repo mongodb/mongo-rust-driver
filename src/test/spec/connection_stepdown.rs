@@ -28,7 +28,7 @@ async fn run_test<F: Future>(name: &str, test: impl Fn(EventClient, Database, Co
         .retry_writes(false)
         .hosts(CLIENT_OPTIONS.hosts.clone())
         .build();
-    let client = EventClient::with_additional_options(Some(options), None, None, true).await;
+    let client = EventClient::with_additional_options(Some(options), None, None, None, true).await;
 
     if !client.is_replica_set() {
         return;

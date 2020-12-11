@@ -72,13 +72,6 @@ struct State {
 impl State {
     // Counts the number of events of the given type that have occurred so far.
     fn count_events(&self, event_type: &str) -> usize {
-        println!("counting {}", event_type);
-        for event in self.handler.events.read().unwrap().iter() {
-            if event.name() == event_type {
-                print!("match!");
-            }
-            println!("{:?}", event.name());
-        }
         self.handler
             .events
             .read()
@@ -272,7 +265,7 @@ impl Operation {
                 let mut subscriber = state.handler.subscribe();
 
                 if let Some(pool) = state.pool.read().await.deref() {
-                    pool.ready().await;
+                    pool.mark_as_ready().await;
                 }
 
                 // wait for event to be emitted to ensure pool is ready.

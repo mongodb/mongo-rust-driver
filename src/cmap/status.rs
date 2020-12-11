@@ -1,10 +1,13 @@
-use std::time::Duration;
+use crate::error::Error;
 
-use crate::{error::Error, RUNTIME};
-
+/// Struct used to track the latest status of the pool.
 #[derive(Clone, Debug)]
 struct PoolStatus {
+    /// The current generation of the pool.
     generation: u32,
+
+    /// The last connection establishment error that caused the pool to be cleared,
+    /// if that was the cause of the clearing.
     establishment_error: Option<Error>,
 }
 
@@ -34,7 +37,7 @@ pub(super) struct PoolGenerationPublisher {
 
 impl PoolGenerationPublisher {
     /// Publish a new generation.
-    /// If the clear was caused by a background connection establishment error, provide the error.
+    /// If the clear was caused by a connection establishment error, provide the error.
     pub(super) fn publish(&self, new_generation: u32, establishment_error: Option<Error>) {
         let mut new_status = PoolStatus {
             generation: new_generation,
@@ -72,8 +75,11 @@ impl PoolGenerationSubscriber {
     }
 
     #[cfg(test)]
-    pub(crate) async fn wait_for_generation_change(&mut self, timeout: Duration) -> Option<u32> {
-        RUNTIME
+    pub(crate) async fn wait_for_generation_change(
+        &mut self,
+        timeout: std::time::Duration,
+    ) -> Option<u32> {
+        crate::RUNTIME
             .timeout(timeout, self.receiver.recv())
             .await
             .ok()
