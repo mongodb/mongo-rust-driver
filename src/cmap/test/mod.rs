@@ -145,10 +145,14 @@ impl Executor {
     async fn execute_test(self) {
         let mut subscriber = self.state.handler.subscribe();
 
+        // CMAP spec requires setting this to 50ms.
+        let mut options = self.pool_options;
+        options.maintenance_frequency = Some(Duration::from_millis(50));
+
         let pool = ConnectionPool::new(
             CLIENT_OPTIONS.hosts[0].clone(),
             Default::default(),
-            Some(self.pool_options),
+            Some(options),
         );
         *self.state.pool.write().await = Some(pool);
 
@@ -212,10 +216,23 @@ impl Operation {
                     .wait_until_complete()
                     .await?
             }
-            Operation::WaitForEvent { event, count } => {
-                while state.count_events(&event) < count {
-                    RUNTIME.delay_for(Duration::from_millis(100)).await;
-                }
+            Operation::WaitForEvent {
+                event,
+                count,
+                timeout,
+            } => {
+                let event_name = event.clone();
+                let task = async move {
+                    while state.count_events(&event) < count {
+                        RUNTIME.delay_for(Duration::from_millis(100)).await;
+                    }
+                };
+                RUNTIME
+                    .timeout(timeout.unwrap_or(EVENT_TIMEOUT), task)
+                    .await
+                    .unwrap_or_else(|_| {
+                        panic!("waiting for {} {} event(s) timed out", count, event_name)
+                    });
             }
             Operation::CheckOut { label } => {
                 if let Some(pool) = state.pool.read().await.deref() {

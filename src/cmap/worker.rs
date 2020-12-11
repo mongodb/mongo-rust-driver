@@ -37,6 +37,7 @@ use std::{collections::VecDeque, sync::Arc, time::Duration};
 use tokio::sync::mpsc;
 
 const MAX_CONNECTING: u32 = 2;
+const MAINTENACE_FREQUENCY: Duration = Duration::from_millis(500);
 
 /// A worker task that manages the shared state of the pool.
 #[derive(Derivative)]
@@ -78,6 +79,9 @@ pub(crate) struct ConnectionPoolWorker {
     /// The event handler specified by the user to process CMAP events.
     #[derivative(Debug = "ignore")]
     event_handler: Option<Arc<dyn CmapEventHandler>>,
+
+    /// The time between maintenance tasks.
+    maintenance_frequency: Duration,
 
     /// Connections that have been ready for usage in the pool for longer than `max_idle_time` will
     /// be closed either by the background thread or when popped off of the set of available
@@ -164,9 +168,14 @@ impl ConnectionPoolWorker {
         } else {
             PoolState::Paused
         };
+        #[cfg(test)]
+        let maintenance_frequency = options
+            .as_ref()
+            .and_then(|opts| opts.maintenance_frequency)
+            .unwrap_or(MAINTENACE_FREQUENCY);
 
         #[cfg(not(test))]
-        let state = PoolState::Paused;
+        let (state, maintenance_frequency) = (PoolState::Paused, MAINTENACE_FREQUENCY);
 
         let worker = ConnectionPoolWorker {
             address,
@@ -188,6 +197,7 @@ impl ConnectionPoolWorker {
             handle_listener,
             state,
             generation_publisher,
+            maintenance_frequency,
         };
 
         RUNTIME.execute(async move {
@@ -201,7 +211,7 @@ impl ConnectionPoolWorker {
     /// dropped. Once all handles are dropped, the pool will close any available connections and
     /// emit a pool closed event.
     async fn execute(mut self) {
-        let mut maintenance_interval = RUNTIME.interval(Duration::from_millis(500));
+        let mut maintenance_interval = RUNTIME.interval(self.maintenance_frequency);
 
         loop {
             let task = tokio::select! {

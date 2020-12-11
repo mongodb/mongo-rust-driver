@@ -397,6 +397,7 @@ impl EventClient {
             .collect()
     }
 
+    #[allow(dead_code)]
     pub fn subscribe_to_events(&self) -> EventSubscriber<'_> {
         self.handler.subscribe()
     }
