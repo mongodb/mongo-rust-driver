@@ -94,10 +94,12 @@ impl Drop for FailPointGuard {
 pub enum FailPointMode {
     AlwaysOn,
     Times(i32),
+    Skip(i32),
     Off,
     ActivationProbability(f32),
 }
 
+#[serde_with::skip_serializing_none]
 #[derive(Debug, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FailCommandOptions {

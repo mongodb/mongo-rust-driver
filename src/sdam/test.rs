@@ -1,18 +1,24 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
+use bson::doc;
 use semver::VersionReq;
 use tokio::sync::RwLockWriteGuard;
 
-use crate::test::{
-    CmapEvent,
-    Event,
-    EventClient,
-    EventHandler,
-    FailCommandOptions,
-    FailPoint,
-    FailPointMode,
-    CLIENT_OPTIONS,
-    LOCK,
+use crate::{
+    error::ErrorKind,
+    test::{
+        CmapEvent,
+        Event,
+        EventClient,
+        EventHandler,
+        FailCommandOptions,
+        FailPoint,
+        FailPointMode,
+        TestClient,
+        CLIENT_OPTIONS,
+        LOCK,
+    },
+    Client,
 };
 
 // TODO: RUST-232 update this test to incorporate SDAM events
@@ -80,4 +86,78 @@ async fn sdam_pool_management() {
         })
         .await
         .expect("should see pool ready event");
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(threaded_scheduler))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn sdam_min_pool_size_error() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+
+    let mut setup_client_options = CLIENT_OPTIONS.clone();
+    setup_client_options.hosts.drain(1..);
+    setup_client_options.direct_connection = Some(true);
+
+    let setup_client = TestClient::with_options(Some(setup_client_options.clone()), true).await;
+
+    if !VersionReq::parse(">= 4.9.0")
+        .unwrap()
+        .matches(setup_client.server_version.as_ref().unwrap())
+    {
+        println!(
+            "skipping sdam_pool_management test due to server not supporting appName failCommand"
+        );
+        return;
+    }
+
+    let fp_options = FailCommandOptions::builder()
+        .app_name("SDAMMinPoolSizeErrorTest".to_string())
+        .error_code(1234)
+        .build();
+    let failpoint = FailPoint::fail_command(&["isMaster"], FailPointMode::Skip(2), fp_options);
+
+    let _fp_guard = setup_client
+        .enable_failpoint(failpoint, None)
+        .await
+        .expect("enabling failpoint should succeed");
+
+    let handler = Arc::new(EventHandler::new());
+    let mut subscriber = handler.subscribe();
+
+    let mut options = setup_client_options;
+    options.app_name = Some("SDAMMinPoolSizeErrorTest".to_string());
+    options.min_pool_size = Some(10);
+    options.server_selection_timeout = Some(Duration::from_millis(100));
+    options.heartbeat_freq = Some(Duration::from_secs(10));
+    options.cmap_event_handler = Some(handler.clone());
+    let client = Client::with_options(options).expect("client creation should succeed");
+
+    subscriber
+        .wait_for_event(Duration::from_millis(2000), |event| {
+            matches!(event, Event::CmapEvent(CmapEvent::ConnectionPoolCleared(_)))
+        })
+        .await
+        .expect("should see pool cleared event");
+
+    let ping_err = client
+        .database("admin")
+        .run_command(doc! { "ping": 1 }, None)
+        .await
+        .expect_err("ping should fail");
+    assert!(matches!(ping_err.kind.as_ref(), ErrorKind::ServerSelectionError { .. }));
+
+    // disable the fail point, then the pool should become ready again
+    drop(_fp_guard);
+
+    subscriber
+        .wait_for_event(Duration::from_millis(500), |event| {
+            matches!(event, Event::CmapEvent(CmapEvent::ConnectionPoolReady(_)))
+        })
+        .await
+        .expect("should see pool ready event");
+
+    client
+        .database("admin")
+        .run_command(doc! { "ping": 1 }, None)
+        .await
+        .expect("ping should succeed");
 }
