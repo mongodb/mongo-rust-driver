@@ -236,7 +236,7 @@ impl ConnectionPoolWorker {
                     self.check_in(connection)
                 }
                 PoolTask::HandleManagementRequest(PoolManagementRequest::Clear) => self.clear(None),
-                PoolTask::HandleManagementRequest(PoolManagementRequest::Open {
+                PoolTask::HandleManagementRequest(PoolManagementRequest::MarkAsReady {
                     completion_handler,
                 }) => {
                     self.mark_as_ready();
