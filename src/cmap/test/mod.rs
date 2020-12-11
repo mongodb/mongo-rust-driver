@@ -250,10 +250,9 @@ impl Operation {
                     });
             }
             Operation::Clear => {
-                if let Some(pool_guard) = state.pool.read().await.deref() {
-                    let mut subscriber = pool_guard.subscribe_to_generation_updates();
-                    pool_guard.clear();
-                    drop(pool_guard);
+                if let Some(pool) = state.pool.read().await.as_ref() {
+                    let mut subscriber = pool.subscribe_to_generation_updates();
+                    pool.clear();
 
                     subscriber
                         .wait_for_generation_change(EVENT_TIMEOUT)

@@ -374,10 +374,6 @@ impl ErrorKind {
         matches!(self, ErrorKind::Io(..) | ErrorKind::PoolClearedError { .. })
     }
 
-    pub(crate) fn is_authentication_error(&self) -> bool {
-        matches!(self, ErrorKind::Io(..))
-    }
-
     /// Gets the code/message tuple from this error, if applicable. In the case of write errors, the
     /// code and message are taken from the write concern error, if there is one.
     pub(crate) fn code_and_message(&self) -> Option<(i32, &str)> {

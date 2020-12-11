@@ -205,7 +205,7 @@ impl EventClient {
         handler: impl Into<Option<EventHandler>>,
         collect_server_info: bool,
     ) -> Self {
-        let handler = handler.into().unwrap_or_else(|| EventHandler::new());
+        let handler = handler.into().unwrap_or_else(EventHandler::new);
         let client =
             TestClient::with_handler(Some(handler.clone()), options, collect_server_info).await;
 
@@ -397,7 +397,6 @@ impl EventClient {
             .collect()
     }
 
-    #[allow(dead_code)]
     pub fn subscribe_to_events(&self) -> EventSubscriber<'_> {
         self.handler.subscribe()
     }

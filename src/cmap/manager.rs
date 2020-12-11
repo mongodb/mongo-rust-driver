@@ -27,9 +27,13 @@ impl PoolManager {
     /// Mark the pool as "ready" as per the CMAP specification.
     pub(super) async fn mark_as_ready(&self) {
         let (sender, receiver) = tokio::sync::oneshot::channel();
-        if let Ok(_) = self.sender.send(PoolManagementRequest::MarkAsReady {
-            completion_handler: sender,
-        }) {
+        if self
+            .sender
+            .send(PoolManagementRequest::MarkAsReady {
+                completion_handler: sender,
+            })
+            .is_ok()
+        {
             // Error occurs if pool drops while we're waiting for response,
             // which isn't a concern.
             let _: std::result::Result<_, _> = receiver.await;

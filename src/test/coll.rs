@@ -9,7 +9,6 @@ use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 use crate::{
     bson::{doc, to_document, Bson, Document},
     error::{ErrorKind, Result, WriteFailure},
-    event::command::CommandStartedEvent,
     options::{
         Acknowledgment,
         AggregateOptions,
@@ -26,7 +25,7 @@ use crate::{
     },
     results::DeleteResult,
     test::{
-        util::{drop_collection, CommandEvent, EventClient, TestClient},
+        util::{drop_collection, EventClient, TestClient},
         CLIENT_OPTIONS,
         LOCK,
     },
@@ -266,17 +265,9 @@ async fn aggregate_out() {
 }
 
 fn kill_cursors_sent(client: &EventClient) -> bool {
-    client
-        .command_events
-        .read()
-        .unwrap()
-        .iter()
-        .any(|event| match event {
-            CommandEvent::CommandStartedEvent(CommandStartedEvent { command_name, .. }) => {
-                command_name == "killCursors"
-            }
-            _ => false,
-        })
+    !client
+        .get_command_started_events(&["killCursors"])
+        .is_empty()
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -594,7 +585,7 @@ async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>)
         .collection(function_name!());
     coll.find(None, options).await.unwrap();
 
-    let events = event_client.get_command_started_events("find");
+    let events = event_client.get_command_started_events(&["find"]);
     assert_eq!(events.len(), 1);
 
     let allow_disk_use = events[0].command.get_bool("allowDiskUse").ok();
@@ -620,7 +611,7 @@ async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
     let coll = client.database(name).collection(name);
     let _: Result<DeleteResult> = coll.delete_many(doc! {}, options.clone()).await;
 
-    let events = client.get_command_started_events("delete");
+    let events = client.get_command_started_events(&["delete"]);
     assert_eq!(events.len(), 1);
 
     let event_hint = events[0].command.get("hint").cloned();
@@ -668,7 +659,7 @@ async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>,
     let coll = client.database(name).collection(name);
     let _: Result<Option<Document>> = coll.find_one_and_delete(doc! {}, options.clone()).await;
 
-    let events = client.get_command_started_events("findAndModify");
+    let events = client.get_command_started_events(&["findAndModify"]);
     assert_eq!(events.len(), 1);
 
     let event_hint = events[0].command.get("hint").cloned();

@@ -30,10 +30,7 @@ use crate::{
         UpdateModifications,
         UpdateOptions,
     },
-    test::{
-        util::{CommandEvent, EventClient},
-        OperationObject,
-    },
+    test::{util::EventClient, OperationObject},
     Collection,
     Database,
 };

@@ -39,7 +39,7 @@ impl PoolGenerationPublisher {
     /// Publish a new generation.
     /// If the clear was caused by a connection establishment error, provide the error.
     pub(super) fn publish(&self, new_generation: u32, establishment_error: Option<Error>) {
-        let mut new_status = PoolStatus {
+        let new_status = PoolStatus {
             generation: new_generation,
             establishment_error,
         };
@@ -60,6 +60,7 @@ pub(crate) struct PoolGenerationSubscriber {
 
 impl PoolGenerationSubscriber {
     /// Get a copy of the latest status.
+    #[allow(dead_code)]
     pub(crate) fn generation(&self) -> u32 {
         self.receiver.borrow().generation
     }
