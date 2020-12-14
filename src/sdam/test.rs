@@ -75,14 +75,14 @@ async fn sdam_pool_management() {
         .expect("enabling failpoint should succeed");
 
     subscriber
-        .wait_for_event(Duration::from_millis(500), |event| {
+        .wait_for_event(Duration::from_millis(1000), |event| {
             matches!(event, Event::CmapEvent(CmapEvent::ConnectionPoolCleared(_)))
         })
         .await
         .expect("should see pool cleared event");
 
     subscriber
-        .wait_for_event(Duration::from_millis(500), |event| {
+        .wait_for_event(Duration::from_millis(1000), |event| {
             matches!(event, Event::CmapEvent(CmapEvent::ConnectionPoolReady(_)))
         })
         .await
@@ -162,7 +162,7 @@ async fn sdam_min_pool_size_error() {
     drop(_fp_guard);
 
     subscriber
-        .wait_for_event(Duration::from_millis(500), |event| {
+        .wait_for_event(Duration::from_millis(2000), |event| {
             matches!(event, Event::CmapEvent(CmapEvent::ConnectionPoolReady(_)))
         })
         .await
