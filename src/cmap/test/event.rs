@@ -114,6 +114,20 @@ impl EventSubscriber<'_> {
             .ok()
             .flatten()
     }
+
+    /// Returns the received events without waiting for any more.
+    pub fn all<F>(&mut self, filter: F) -> Vec<Event>
+    where
+        F: Fn(&Event) -> bool,
+    {
+        let mut events = Vec::new();
+        while let Ok(event) = self.receiver.try_recv() {
+            if filter(&event) {
+                events.push(event);
+            }
+        }
+        events
+    }
 }
 
 #[allow(clippy::large_enum_variant)]

@@ -184,11 +184,10 @@ impl Executor {
 
         let ignored_event_names = self.ignored_event_names;
         let description = self.description;
+        let filter = |e: &Event| !ignored_event_names.iter().any(|name| e.name() == name);
         for expected_event in self.events {
             let actual_event = subscriber
-                .wait_for_event(EVENT_TIMEOUT, |e| {
-                    !ignored_event_names.iter().any(|name| e.name() == name)
-                })
+                .wait_for_event(EVENT_TIMEOUT, filter)
                 .await
                 .unwrap_or_else(|| {
                     panic!(
@@ -198,6 +197,8 @@ impl Executor {
                 });
             assert_matches(&actual_event, &expected_event, Some(description.as_str()));
         }
+
+        assert_eq!(subscriber.all(filter), Vec::new(), "{}", description);
     }
 }
 
