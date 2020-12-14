@@ -19,6 +19,7 @@ use crate::{
         LOCK,
     },
     Client,
+    RUNTIME,
 };
 
 // TODO: RUST-232 update this test to incorporate SDAM events
@@ -137,6 +138,11 @@ async fn sdam_min_pool_size_error() {
         })
         .await
         .expect("should see pool cleared event");
+
+    // Wait a little while for the server to be marked as Unknown.
+    // Once we have SDAM monitoring, this wait can be removed and be replaced
+    // with another event waiting.
+    RUNTIME.delay_for(Duration::from_millis(750)).await;
 
     let ping_err = client
         .database("admin")
