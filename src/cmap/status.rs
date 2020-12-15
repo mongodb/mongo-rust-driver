@@ -80,11 +80,20 @@ impl PoolGenerationSubscriber {
         &mut self,
         timeout: std::time::Duration,
     ) -> Option<u32> {
+        // watch receivers return the latest vlaue immediately, need to compare against it to
+        // determine if that has happened.
+        let initial_generation = self.receiver.borrow().generation;
         crate::RUNTIME
-            .timeout(timeout, self.receiver.recv())
+            .timeout(timeout, async {
+                while let Some(status) = self.receiver.recv().await {
+                    if status.generation != initial_generation {
+                        return Some(status.generation);
+                    }
+                }
+                None
+            })
             .await
             .ok()
             .flatten()
-            .map(|status| status.generation)
     }
 }
