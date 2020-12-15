@@ -30,6 +30,7 @@ use crate::{
     },
     options::StreamAddress,
     runtime::HttpClient,
+    sdam::ServerUpdateSender,
     RUNTIME,
 };
 
@@ -120,6 +121,8 @@ pub(crate) struct ConnectionPoolWorker {
 
     /// A pool manager that can be cloned and attached to connections checked out of the pool.
     manager: PoolManager,
+
+    server_updater: ServerUpdateSender,
 }
 
 impl ConnectionPoolWorker {
@@ -129,6 +132,7 @@ impl ConnectionPoolWorker {
     pub(super) fn start(
         address: StreamAddress,
         http_client: HttpClient,
+        server_updater: ServerUpdateSender,
         options: Option<ConnectionPoolOptions>,
     ) -> (PoolManager, ConnectionRequester, PoolGenerationSubscriber) {
         let establisher = ConnectionEstablisher::new(http_client, options.as_ref());
@@ -198,6 +202,7 @@ impl ConnectionPoolWorker {
             state,
             generation_publisher,
             maintenance_frequency,
+            server_updater,
         };
 
         RUNTIME.execute(async move {
@@ -245,7 +250,7 @@ impl ConnectionPoolWorker {
                 PoolTask::HandleManagementRequest(PoolManagementRequest::CheckIn(connection)) => {
                     self.check_in(connection)
                 }
-                PoolTask::HandleManagementRequest(PoolManagementRequest::Clear) => self.clear(None),
+                PoolTask::HandleManagementRequest(PoolManagementRequest::Clear) => self.clear(),
                 PoolTask::HandleManagementRequest(PoolManagementRequest::MarkAsReady {
                     completion_handler,
                 }) => {
@@ -257,11 +262,8 @@ impl ConnectionPoolWorker {
                     PoolManagementRequest::HandleConnectionSucceeded(c),
                 ) => self.handle_connection_succeeded(c),
                 PoolTask::HandleManagementRequest(
-                    PoolManagementRequest::HandleConnectionFailed {
-                        error,
-                        error_generation,
-                    },
-                ) => self.handle_connection_failed(error, error_generation),
+                    PoolManagementRequest::HandleConnectionFailed,
+                ) => self.handle_connection_failed(),
                 PoolTask::Maintenance => self.perform_maintenance(),
             }
 
@@ -329,11 +331,13 @@ impl ConnectionPoolWorker {
             let establisher = self.establisher.clone();
             let pending_connection = self.create_pending_connection();
             let manager = self.manager.clone();
+            let mut server_updater = self.server_updater.clone();
 
             let handle = RUNTIME.spawn(async move {
                 let mut establish_result = establish_connection(
                     &establisher,
                     pending_connection,
+                    &mut server_updater,
                     &manager,
                     event_handler.as_ref(),
                 )
@@ -387,16 +391,11 @@ impl ConnectionPoolWorker {
     }
 
     /// Process a connection establishment failure.
-    fn handle_connection_failed(&mut self, error: Error, error_generation: u32) {
+    fn handle_connection_failed(&mut self) {
         // Establishing a pending connection failed, so that must be reflected in to total
         // connection count.
         self.total_connection_count -= 1;
         self.pending_connection_count -= 1;
-
-        // if this error has not been reported yet, clear the pool.
-        if self.generation == error_generation {
-            self.clear(Some(error));
-        }
     }
 
     /// Process a successful connection establishment, optionally populating the pool with the
@@ -427,11 +426,11 @@ impl ConnectionPoolWorker {
         }
     }
 
-    fn clear(&mut self, establishment_error: Option<Error>) {
+    fn clear(&mut self) {
+        println!("clearing pool");
         self.generation += 1;
         let previous_state = std::mem::replace(&mut self.state, PoolState::Paused);
-        self.generation_publisher
-            .publish(self.generation, establishment_error);
+        self.generation_publisher.publish(self.generation);
 
         if !matches!(previous_state, PoolState::Paused) {
             self.emit_event(|handler| {
@@ -518,10 +517,12 @@ impl ConnectionPoolWorker {
                 let event_handler = self.event_handler.clone();
                 let manager = self.manager.clone();
                 let establisher = self.establisher.clone();
+                let mut updater = self.server_updater.clone();
                 RUNTIME.execute(async move {
                     let connection = establish_connection(
                         &establisher,
                         pending_connection,
+                        &mut updater,
                         &manager,
                         event_handler.as_ref(),
                     )
@@ -542,6 +543,7 @@ impl ConnectionPoolWorker {
 async fn establish_connection(
     establisher: &ConnectionEstablisher,
     pending_connection: PendingConnection,
+    server_updater: &mut ServerUpdateSender,
     manager: &PoolManager,
     event_handler: Option<&Arc<dyn CmapEventHandler>>,
 ) -> Result<Connection> {
@@ -561,7 +563,9 @@ async fn establish_connection(
                 };
                 handler.handle_connection_closed_event(event);
             }
-            manager.handle_connection_failed(e.clone(), generation);
+            println!("error establishing connection {}", e);
+            server_updater.handle_error(e.clone(), generation).await;
+            manager.handle_connection_failed();
         }
         Ok(ref mut connection) => {
             if let Some(handler) = event_handler {

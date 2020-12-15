@@ -31,6 +31,7 @@ use crate::{
     },
     options::StreamAddress,
     runtime::HttpClient,
+    sdam::ServerUpdateSender,
 };
 use connection_requester::ConnectionRequester;
 use manager::PoolManager;
@@ -61,10 +62,15 @@ impl ConnectionPool {
     pub(crate) fn new(
         address: StreamAddress,
         http_client: HttpClient,
+        server_updater: ServerUpdateSender,
         options: Option<ConnectionPoolOptions>,
     ) -> Self {
-        let (manager, connection_requester, generation_subscriber) =
-            ConnectionPoolWorker::start(address.clone(), http_client, options.clone());
+        let (manager, connection_requester, generation_subscriber) = ConnectionPoolWorker::start(
+            address.clone(),
+            http_client,
+            server_updater,
+            options.clone(),
+        );
 
         let event_handler = options.as_ref().and_then(|opts| opts.event_handler.clone());
         let wait_queue_timeout = options.as_ref().and_then(|opts| opts.wait_queue_timeout);

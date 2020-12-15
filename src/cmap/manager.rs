@@ -51,13 +51,10 @@ impl PoolManager {
     }
 
     /// Notify the pool that establishing a connection failed.
-    pub(super) fn handle_connection_failed(&self, error: Error, error_generation: u32) {
+    pub(super) fn handle_connection_failed(&self) {
         let _ = self
             .sender
-            .send(PoolManagementRequest::HandleConnectionFailed {
-                error,
-                error_generation,
-            });
+            .send(PoolManagementRequest::HandleConnectionFailed);
     }
 
     /// Notify the pool that establishing a connection succeeded.
@@ -93,7 +90,7 @@ pub(super) enum PoolManagementRequest {
     CheckIn(Connection),
 
     /// Update the pool based on the given establishment error.
-    HandleConnectionFailed { error: Error, error_generation: u32 },
+    HandleConnectionFailed,
 
     /// Update the pool after a successful connection, optionally populating the pool
     /// with the successful connection.

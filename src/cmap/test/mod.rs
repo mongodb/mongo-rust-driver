@@ -16,6 +16,7 @@ use crate::{
     error::{Error, Result},
     options::TlsOptions,
     runtime::AsyncJoinHandle,
+    sdam::{ServerUpdateReason, ServerUpdateSender},
     test::{
         assert_matches,
         run_spec_test,
@@ -149,11 +150,25 @@ impl Executor {
         let mut options = self.pool_options;
         options.maintenance_frequency = Some(Duration::from_millis(50));
 
+        let (update_sender, mut update_receiver) = ServerUpdateSender::channel();
+
         let pool = ConnectionPool::new(
             CLIENT_OPTIONS.hosts[0].clone(),
             Default::default(),
+            update_sender,
             Some(options),
         );
+
+        // Mock a monitoring task responding to errors reported by the pool.
+        let manager = pool.manager.clone();
+        RUNTIME.execute(async move {
+            while let Some(update) = update_receiver.recv().await {
+                match update.reason {
+                    ServerUpdateReason::Error { .. } => manager.clear(),
+                }
+            }
+        });
+
         *self.state.pool.write().await = Some(pool);
 
         let mut error: Option<Error> = None;

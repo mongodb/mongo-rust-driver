@@ -5,18 +5,11 @@ use crate::error::Error;
 struct PoolStatus {
     /// The current generation of the pool.
     generation: u32,
-
-    /// The last connection establishment error that caused the pool to be cleared,
-    /// if that was the cause of the clearing.
-    establishment_error: Option<Error>,
 }
 
 impl Default for PoolStatus {
     fn default() -> Self {
-        PoolStatus {
-            generation: 0,
-            establishment_error: None,
-        }
+        PoolStatus { generation: 0 }
     }
 }
 
@@ -38,10 +31,9 @@ pub(super) struct PoolGenerationPublisher {
 impl PoolGenerationPublisher {
     /// Publish a new generation.
     /// If the clear was caused by a connection establishment error, provide the error.
-    pub(super) fn publish(&self, new_generation: u32, establishment_error: Option<Error>) {
+    pub(super) fn publish(&self, new_generation: u32) {
         let new_status = PoolStatus {
             generation: new_generation,
-            establishment_error,
         };
 
         // if nobody is listening, this will return an error, which we don't mind.
@@ -59,21 +51,20 @@ pub(crate) struct PoolGenerationSubscriber {
 }
 
 impl PoolGenerationSubscriber {
-    /// Get a copy of the latest status.
-    #[allow(dead_code)]
+    /// Get a copy of the latest generation.
     pub(crate) fn generation(&self) -> u32 {
         self.receiver.borrow().generation
     }
 
-    /// Listen for a connection establishment failure.
-    pub(crate) async fn listen_for_establishment_failure(&mut self) -> Option<Error> {
-        while let Some(status) = self.receiver.recv().await {
-            if let Some(error) = status.establishment_error {
-                return Some(error);
-            }
-        }
-        None
-    }
+    // /// Listen for a connection establishment failure.
+    // pub(crate) async fn listen_for_establishment_failure(&mut self) -> Option<Error> {
+    //     while let Some(status) = self.receiver.recv().await {
+    //         if let Some(error) = status.establishment_error {
+    //             return Some(error);
+    //         }
+    //     }
+    //     None
+    // }
 
     #[cfg(test)]
     pub(crate) async fn wait_for_generation_change(

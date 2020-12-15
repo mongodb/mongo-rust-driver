@@ -9,6 +9,7 @@ use crate::{
     bson::doc,
     cmap::{options::ConnectionPoolOptions, Command, ConnectionPool},
     event::cmap::{CmapEventHandler, ConnectionClosedReason},
+    sdam::ServerUpdateSender,
     selection_criteria::ReadPreference,
     test::{FailCommandOptions, FailPoint, FailPointMode, TestClient, CLIENT_OPTIONS, LOCK},
     RUNTIME,
@@ -38,6 +39,7 @@ async fn acquire_connection_and_send_command() {
     let pool = ConnectionPool::new(
         client_options.hosts[0].clone(),
         Default::default(),
+        ServerUpdateSender::channel().0,
         Some(pool_options),
     );
     let mut connection = pool.check_out().await.unwrap();
@@ -112,6 +114,7 @@ async fn concurrent_connections() {
     let pool = ConnectionPool::new(
         CLIENT_OPTIONS.hosts[0].clone(),
         Default::default(),
+        ServerUpdateSender::channel().0,
         Some(options),
     );
 
@@ -189,6 +192,7 @@ async fn connection_error_during_establishment() {
     let pool = ConnectionPool::new(
         client_options.hosts[0].clone(),
         Default::default(),
+        ServerUpdateSender::channel().0,
         Some(options),
     );
 

@@ -92,7 +92,7 @@ impl Topology {
             .map(|address| {
                 (
                     address.clone(),
-                    Server::new(address, &ClientOptions::default(), http_client.clone()).into(),
+                    Server::create(address, &ClientOptions::default(), http_client.clone()).0,
                 )
             })
             .collect();
@@ -127,16 +127,26 @@ impl Topology {
             http_client: Default::default(),
         };
 
-        for address in hosts {
-            topology_state.add_new_server(address.clone(), options.clone());
-        }
+        let monitors: Vec<_> = hosts
+            .into_iter()
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .map(|address| {
+                let (server, monitor) = Server::create(
+                    address.clone(),
+                    &options,
+                    topology_state.http_client.clone(),
+                );
+                topology_state.servers.insert(address, server);
+                monitor
+            })
+            .collect();
 
-        let servers = topology_state.servers.clone();
         let state = Arc::new(RwLock::new(topology_state));
         let topology = Topology { state, common };
 
-        for (address, server) in servers {
-            Monitor::start(address, &server, topology.downgrade());
+        for monitor in monitors {
+            monitor.start(topology.downgrade())
         }
 
         SrvPollingMonitor::start(topology.downgrade());
@@ -383,17 +393,19 @@ impl TopologyState {
     /// Adds a new server to the cluster.
     ///
     /// A reference to the containing Topology is needed in order to start the monitoring task.
-    fn add_new_server(&mut self, address: StreamAddress, options: ClientOptions) {
+    fn add_new_server(
+        &mut self,
+        address: StreamAddress,
+        options: ClientOptions,
+        topology: &WeakTopology,
+    ) {
         if self.servers.contains_key(&address) {
             return;
         }
 
-        let server = Arc::new(Server::new(
-            address.clone(),
-            &options,
-            self.http_client.clone(),
-        ));
+        let (server, monitor) = Server::create(address.clone(), &options, self.http_client.clone());
         self.servers.insert(address, server);
+        monitor.start(topology.clone());
     }
 
     /// Updates the given `command` as needed based on the `critiera`.
@@ -425,10 +437,9 @@ impl TopologyState {
         self.description.update(server)?;
 
         let hosts: HashSet<_> = self.description.server_addresses().cloned().collect();
-        self.sync_hosts(&hosts, options);
+        self.sync_hosts(&hosts, options, &topology);
 
         let diff = old_description.diff(&self.description);
-        self.start_monitoring_new_hosts(diff.as_ref(), topology);
         Ok(diff)
     }
 
@@ -443,37 +454,28 @@ impl TopologyState {
         let old_description = self.description.clone();
         self.description.sync_hosts(&hosts);
 
-        self.sync_hosts(&hosts, options);
+        self.sync_hosts(&hosts, options, &topology);
 
-        let diff = old_description.diff(&self.description);
-        self.start_monitoring_new_hosts(diff.as_ref(), topology);
-        diff
+        old_description.diff(&self.description)
     }
 
-    fn start_monitoring_new_hosts(
+    fn sync_hosts(
         &mut self,
-        diff: Option<&TopologyDescriptionDiff>,
-        topology: WeakTopology,
+        hosts: &HashSet<StreamAddress>,
+        options: &ClientOptions,
+        topology: &WeakTopology,
     ) {
-        if let Some(ref d) = diff {
-            for server in d.new_addresses.iter() {
-                self.start_monitoring_server(server.clone(), topology.clone());
-            }
-        }
-    }
-
-    fn sync_hosts(&mut self, hosts: &HashSet<StreamAddress>, options: &ClientOptions) {
         for address in hosts.iter() {
-            self.add_new_server(address.clone(), options.clone());
+            self.add_new_server(address.clone(), options.clone(), topology);
         }
 
         self.servers.retain(|host, _| hosts.contains(host));
     }
 
-    /// Start a monitor for the server at the given address if it is part of the topology.
-    fn start_monitoring_server(&self, address: StreamAddress, topology: WeakTopology) {
-        if let Some(server) = self.servers.get(&address) {
-            Monitor::start(address, server, topology);
-        }
-    }
+    // /// Start a monitor for the server at the given address if it is part of the topology.
+    // fn start_monitoring_server(&self, address: StreamAddress, topology: WeakTopology) {
+    //     if let Some(server) = self.servers.get(&address) {
+    //         Monitor::start(address, server, topology);
+    //     }
+    // }
 }
