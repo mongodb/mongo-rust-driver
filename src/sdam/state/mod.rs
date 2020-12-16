@@ -229,11 +229,15 @@ impl Topology {
 
     /// Updates the topology based on an error that occurs before the handshake has completed during
     /// an operation.
-    pub(crate) async fn handle_pre_handshake_error(&self, error: Error, server: &Server) {
+    pub(crate) async fn handle_pre_handshake_error(&self, error: Error, server: &Server) -> bool {
         let state_lock = self.state.write().await;
-        self.mark_server_as_unknown(error, &server, state_lock)
+        let changed = self
+            .mark_server_as_unknown(error, &server, state_lock)
             .await;
-        server.pool.clear();
+        if changed {
+            server.pool.clear();
+        }
+        changed
     }
 
     /// Handles an error that occurs after the handshake has completed during an operation.
@@ -279,9 +283,9 @@ impl Topology {
         error: Error,
         server: &Server,
         state_lock: RwLockWriteGuard<'_, TopologyState>,
-    ) {
+    ) -> bool {
         let description = ServerDescription::new(server.address.clone(), Some(Err(error)));
-        self.update_and_notify(description, state_lock).await;
+        self.update_and_notify(description, state_lock).await
     }
 
     async fn update_and_notify(
@@ -371,6 +375,18 @@ impl Topology {
 
     pub(super) async fn is_unknown(&self) -> bool {
         self.state.read().await.description.topology_type() == TopologyType::Unknown
+    }
+
+    pub(crate) async fn get_server_description(
+        &self,
+        address: &StreamAddress,
+    ) -> Option<ServerDescription> {
+        self.state
+            .read()
+            .await
+            .description
+            .get_server_description(address)
+            .cloned()
     }
 }
 

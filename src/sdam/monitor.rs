@@ -4,7 +4,7 @@ use std::{
 };
 
 use super::{
-    description::server::{ServerDescription, ServerType},
+    description::server::ServerDescription,
     state::{server::Server, Topology, WeakTopology},
     ServerUpdate,
     ServerUpdateReceiver,
@@ -24,11 +24,7 @@ pub(crate) const MIN_HEARTBEAT_FREQUENCY: Duration = Duration::from_millis(500);
 
 pub(crate) struct Monitor {
     address: StreamAddress,
-    connection: Option<Connection>,
-    handshaker: Handshaker,
-    server: Weak<Server>,
-    server_type: ServerType,
-    generation_subscriber: PoolGenerationSubscriber,
+    server: Arc<Server>,
     client_options: ClientOptions,
     update_receiver: ServerUpdateReceiver,
 }
@@ -42,27 +38,58 @@ impl Monitor {
         client_options: ClientOptions,
         update_receiver: ServerUpdateReceiver,
     ) -> Self {
-        let handshaker = Handshaker::new(Some(client_options.clone().into()));
-
         Self {
             address,
-            connection: None,
-            server: Arc::downgrade(server),
-            server_type: ServerType::Unknown,
-            generation_subscriber: server.pool.subscribe_to_generation_updates(),
-            handshaker,
+            server: server.clone(),
             client_options,
             update_receiver,
         }
     }
 
-    /// Start the monitor task.
-    /// A weak reference is used to ensure that the monitor doesn't keep the server alive after it's
-    /// been removed from the topology or the client has been dropped.
-    pub(super) fn start(mut self, topology: WeakTopology) {
+    /// Start the monitor tasks.
+    /// A weak reference is used to ensure that the monitor doesn't keep the topology alive after
+    /// it's been removed from the topology or the client has been dropped.
+    pub(super) fn start(self, topology: WeakTopology) {
+        let mut heartbeat_monitor = HeartbeatMonitor::new(
+            self.address,
+            Arc::downgrade(&self.server),
+            self.client_options,
+        );
+        let t = topology.clone();
         RUNTIME.execute(async move {
-            self.execute(topology).await;
+            heartbeat_monitor.execute(t).await;
         });
+
+        let update_monitor = UpdateMonitor {
+            server: Arc::downgrade(&self.server),
+            update_receiver: self.update_receiver,
+            generation_subscriber: self.server.pool.subscribe_to_generation_updates(),
+        };
+        RUNTIME.execute(async move {
+            update_monitor.execute(topology).await;
+        });
+    }
+}
+
+/// Monitor that performs regular heartbeats to determine server status.
+struct HeartbeatMonitor {
+    address: StreamAddress,
+    connection: Option<Connection>,
+    handshaker: Handshaker,
+    server: Weak<Server>,
+    client_options: ClientOptions,
+}
+
+impl HeartbeatMonitor {
+    fn new(address: StreamAddress, server: Weak<Server>, client_options: ClientOptions) -> Self {
+        let handshaker = Handshaker::new(Some(client_options.clone().into()));
+        Self {
+            address,
+            server,
+            client_options,
+            handshaker,
+            connection: None,
+        }
     }
 
     async fn execute(&mut self, weak_topology: WeakTopology) {
@@ -89,43 +116,20 @@ impl Monitor {
             let mut topology_check_requests_subscriber =
                 topology.subscribe_to_topology_check_requests().await;
 
-            let min_frequency = self
-                .client_options
-                .heartbeat_freq_test
-                .unwrap_or(MIN_HEARTBEAT_FREQUENCY);
-            let mut wait_for_next_check = Box::pin(async move {
-                RUNTIME.delay_for(min_frequency).await;
-                topology_check_requests_subscriber
-                    .wait_for_message(heartbeat_frequency - min_frequency)
-                    .await;
-            });
-
             // drop strong reference to topology before going back to sleep in case it drops off
             // in between checks.
             drop(topology);
             drop(server);
 
-            loop {
-                tokio::select! {
-                    _ = &mut wait_for_next_check => { break; },
+            let min_frequency = self
+                .client_options
+                .heartbeat_freq_test
+                .unwrap_or(MIN_HEARTBEAT_FREQUENCY);
 
-                    // If the pool encounters an error establishing a connection, it will
-                    // notify the update receiver and need to be handled.
-                    Some(update) = self.update_receiver.recv() => {
-                        if let Some(topology) = weak_topology.upgrade() {
-                            if let Some(server) = self.server.upgrade() {
-                                match update.message() {
-                                    ServerUpdate::Error { error, error_generation } => {
-                                        if *error_generation == self.generation_subscriber.generation() {
-                                            topology.handle_pre_handshake_error(error.clone(), &server).await;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                };
-            }
+            RUNTIME.delay_for(min_frequency).await;
+            topology_check_requests_subscriber
+                .wait_for_message(heartbeat_frequency - min_frequency)
+                .await;
         }
     }
 
@@ -134,12 +138,18 @@ impl Monitor {
     ///
     /// Returns true if the topology has changed and false otherwise.
     async fn check_server(&mut self, topology: &Topology, server: &Server) -> bool {
+        let mut retried = false;
         let check_result = match self.perform_is_master().await {
             Ok(reply) => Ok(reply),
             Err(e) => {
-                self.handle_error(e.clone(), topology, server).await;
-
-                if e.is_network_error() && self.server_type != ServerType::Unknown {
+                let previous_description = topology.get_server_description(&server.address).await;
+                if e.is_network_error()
+                    && previous_description
+                        .map(|sd| sd.is_available())
+                        .unwrap_or(false)
+                {
+                    self.handle_error(e, topology, server).await;
+                    retried = true;
                     self.perform_is_master().await
                 } else {
                     Err(e)
@@ -151,15 +161,14 @@ impl Monitor {
             Ok(reply) => {
                 let server_description =
                     ServerDescription::new(server.address.clone(), Some(Ok(reply)));
-                self.server_type = server_description.server_type;
 
-                if server_description.server_type != ServerType::Unknown {
+                if server_description.is_available() {
                     self.ready_connection_pool().await;
                 }
 
                 topology.update(server_description).await
             }
-            Err(e) => self.handle_error(e, topology, server).await,
+            Err(e) => self.handle_error(e, topology, server).await || retried,
         }
     }
 
@@ -214,7 +223,43 @@ impl Monitor {
     }
 
     async fn handle_error(&mut self, error: Error, topology: &Topology, server: &Server) -> bool {
-        topology.handle_pre_handshake_error(error, server).await;
-        std::mem::replace(&mut self.server_type, ServerType::Unknown) != ServerType::Unknown
+        topology.handle_pre_handshake_error(error, server).await
+    }
+}
+
+/// Monitor that listens for updates to a given server generated from operation execution.
+struct UpdateMonitor {
+    server: Weak<Server>,
+    update_receiver: ServerUpdateReceiver,
+    generation_subscriber: PoolGenerationSubscriber,
+}
+
+impl UpdateMonitor {
+    async fn execute(mut self, weak_topology: WeakTopology) {
+        // If the pool encounters an error establishing a connection, it will
+        // notify the update receiver and need to be handled.
+        while let Some(update) = self.update_receiver.recv().await {
+            let topology = match weak_topology.upgrade() {
+                Some(it) => it,
+                _ => return,
+            };
+            let server = match self.server.upgrade() {
+                Some(it) => it,
+                _ => return,
+            };
+
+            match update.message() {
+                ServerUpdate::Error {
+                    error,
+                    error_generation,
+                } => {
+                    if *error_generation == self.generation_subscriber.generation() {
+                        topology
+                            .handle_pre_handshake_error(error.clone(), &server)
+                            .await;
+                    }
+                }
+            }
+        }
     }
 }
