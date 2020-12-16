@@ -1,7 +1,7 @@
 use tokio::sync::mpsc;
 
 use super::Connection;
-use crate::error::Error;
+use crate::{error::Error, runtime::AcknowledgedMessage};
 
 pub(super) fn channel() -> (PoolManager, ManagementRequestReceiver) {
     let (sender, receiver) = mpsc::unbounded_channel();
@@ -26,17 +26,15 @@ impl PoolManager {
 
     /// Mark the pool as "ready" as per the CMAP specification.
     pub(super) async fn mark_as_ready(&self) {
-        let (sender, receiver) = tokio::sync::oneshot::channel();
+        let (message, acknowledgment_receiver) = AcknowledgedMessage::package(());
         if self
             .sender
             .send(PoolManagementRequest::MarkAsReady {
-                completion_handler: sender,
+                completion_handler: message,
             })
             .is_ok()
         {
-            // Error occurs if pool drops while we're waiting for response,
-            // which isn't a concern.
-            let _: std::result::Result<_, _> = receiver.await;
+            acknowledgment_receiver.wait_for_acknowledgment().await;
         }
     }
 
@@ -83,7 +81,7 @@ pub(super) enum PoolManagementRequest {
 
     /// Mark the pool as Ready, allowing connections to be created and checked out.
     MarkAsReady {
-        completion_handler: tokio::sync::oneshot::Sender<()>,
+        completion_handler: AcknowledgedMessage<()>,
     },
 
     /// Check in the given connection.

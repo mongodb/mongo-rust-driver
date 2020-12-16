@@ -7,7 +7,7 @@ use crate::{
     cmap::{options::ConnectionPoolOptions, ConnectionPool},
     error::Error,
     options::{ClientOptions, StreamAddress},
-    runtime::HttpClient,
+    runtime::{AcknowledgedMessage, HttpClient},
     sdam::monitor::Monitor,
 };
 
@@ -67,37 +67,24 @@ impl Server {
 }
 
 #[derive(Debug)]
-pub(crate) enum ServerUpdateReason {
+pub(crate) enum ServerUpdate {
     Error { error: Error, error_generation: u32 },
 }
 
 #[derive(Debug)]
-pub(crate) struct ServerUpdate {
-    pub(crate) reason: ServerUpdateReason,
-    acknowledger: tokio::sync::oneshot::Sender<()>,
-}
-
-impl ServerUpdate {
-    pub(crate) fn acknowledge(self) {
-        // other end hanging up is a non-issue
-        let _: std::result::Result<_, _> = self.acknowledger.send(());
-    }
-}
-
-#[derive(Debug)]
 pub(crate) struct ServerUpdateReceiver {
-    receiver: tokio::sync::mpsc::Receiver<ServerUpdate>,
+    receiver: tokio::sync::mpsc::Receiver<AcknowledgedMessage<ServerUpdate>>,
 }
 
 impl ServerUpdateReceiver {
-    pub(crate) async fn recv(&mut self) -> Option<ServerUpdate> {
+    pub(crate) async fn recv(&mut self) -> Option<AcknowledgedMessage<ServerUpdate>> {
         self.receiver.recv().await
     }
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct ServerUpdateSender {
-    sender: tokio::sync::mpsc::Sender<ServerUpdate>,
+    sender: tokio::sync::mpsc::Sender<AcknowledgedMessage<ServerUpdate>>,
 }
 
 impl ServerUpdateSender {
@@ -110,21 +97,15 @@ impl ServerUpdateSender {
     }
 
     pub(crate) async fn handle_error(&mut self, error: Error, error_generation: u32) {
-        let (sender, receiver) = tokio::sync::oneshot::channel();
-        let reason = ServerUpdateReason::Error {
+        let reason = ServerUpdate::Error {
             error,
             error_generation,
         };
-        let update = ServerUpdate {
-            reason,
-            acknowledger: sender,
-        };
 
+        let (message, callback) = AcknowledgedMessage::package(reason);
         // These only fails if the other ends hang up, which means the monitor is
         // stopped, so we can just discard this update.
-        println!("sending update {:?}", update);
-        let _: std::result::Result<_, _> = self.sender.send(update).await;
-        let _: std::result::Result<_, _> = receiver.await;
-        println!("got ack");
+        let _: std::result::Result<_, _> = self.sender.send(message).await;
+        callback.wait_for_acknowledgment().await;
     }
 }

@@ -6,7 +6,7 @@ use std::{
 use super::{
     description::server::{ServerDescription, ServerType},
     state::{server::Server, Topology, WeakTopology},
-    ServerUpdateReason,
+    ServerUpdate,
     ServerUpdateReceiver,
 };
 use crate::{
@@ -123,20 +123,15 @@ impl Monitor {
                 tokio::select! {
                     _ = &mut wait_for_next_check => { break; },
 
-                    // // if the pool encounters an error establishing a connection, set server description to unknown
-                    // Some(err) = self.generation_subscriber.listen_for_establishment_failure() => {
-                    //     if let Some(topology) = weak_topology.upgrade() {
-                    //         topology.handle_pre_handshake_error(err, self.address.clone()).await;
-                    //     }
-                    // },
-
+                    // If the pool encounters an error establishing a connection, it will
+                    // notify the update receiver and need to be handled.
                     Some(update) = self.update_receiver.recv() => {
                         println!("got update {:?}", update);
                         if let Some(topology) = weak_topology.upgrade() {
-                            match update.reason {
-                                ServerUpdateReason::Error { ref error, error_generation } => {
+                            match update.message() {
+                                ServerUpdate::Error { error, error_generation } => {
                                     println!("got error checking generation");
-                                    if error_generation == self.generation_subscriber.generation() {
+                                    if *error_generation == self.generation_subscriber.generation() {
                                         println!("generation equal, updating topology and clearing pool");
                                         topology.handle_pre_handshake_error(error.clone(), self.address.clone()).await;
                                         self.clear_connection_pool();
@@ -144,7 +139,6 @@ impl Monitor {
                                 }
                             }
                         }
-                        update.acknowledge();
                     }
                 };
             }

@@ -1,3 +1,4 @@
+mod acknowledged_message;
 mod async_read_ext;
 mod async_write_ext;
 mod http;
@@ -10,6 +11,7 @@ mod stream;
 use std::{future::Future, net::SocketAddr, time::Duration};
 
 pub(crate) use self::{
+    acknowledged_message::{AcknowledgedMessage, AcknowledgmentReceiver},
     async_read_ext::AsyncLittleEndianRead,
     async_write_ext::AsyncLittleEndianWrite,
     join_handle::AsyncJoinHandle,
