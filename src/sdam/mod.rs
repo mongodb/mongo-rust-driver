@@ -21,7 +21,13 @@ pub(crate) use self::{
     message_manager::TopologyMessageManager,
     monitor::MIN_HEARTBEAT_FREQUENCY,
     state::{
-        server::{Server, ServerUpdateReason, ServerUpdateReceiver, ServerUpdateSender},
+        server::{
+            Server,
+            ServerUpdate,
+            ServerUpdateReason,
+            ServerUpdateReceiver,
+            ServerUpdateSender,
+        },
         Topology,
     },
 };

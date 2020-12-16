@@ -254,7 +254,7 @@ impl ConnectionPoolWorker {
                 }
                 PoolTask::HandleManagementRequest(PoolManagementRequest::Clear) => self.clear(),
                 PoolTask::HandleManagementRequest(PoolManagementRequest::MarkAsReady {
-                    completion_handler,
+                    completion_handler: _handler,
                 }) => {
                     self.mark_as_ready();
                     // other end hung up, nothing to do
