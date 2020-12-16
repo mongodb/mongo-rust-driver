@@ -12,7 +12,7 @@ use super::{
 use crate::{
     bson::doc,
     cmap::{is_master, Command, Connection, Handshaker, PoolGenerationSubscriber},
-    error::Result,
+    error::{Error, Result},
     is_master::IsMasterReply,
     options::{ClientOptions, StreamAddress},
     RUNTIME,
@@ -72,16 +72,17 @@ impl Monitor {
             .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
 
         while weak_topology.is_alive() {
-            if self.server.upgrade().is_none() {
-                break;
-            }
+            let server = match self.server.upgrade() {
+                Some(server) => server,
+                None => break,
+            };
 
             let topology = match weak_topology.upgrade() {
                 Some(topology) => topology,
                 None => break,
             };
 
-            if self.check_server(&topology).await {
+            if self.check_server(&topology, &server).await {
                 topology.notify_topology_changed();
             }
 
@@ -102,6 +103,7 @@ impl Monitor {
             // drop strong reference to topology before going back to sleep in case it drops off
             // in between checks.
             drop(topology);
+            drop(server);
 
             loop {
                 tokio::select! {
@@ -111,11 +113,12 @@ impl Monitor {
                     // notify the update receiver and need to be handled.
                     Some(update) = self.update_receiver.recv() => {
                         if let Some(topology) = weak_topology.upgrade() {
-                            match update.message() {
-                                ServerUpdate::Error { error, error_generation } => {
-                                    if *error_generation == self.generation_subscriber.generation() {
-                                        topology.handle_pre_handshake_error(error.clone(), self.address.clone()).await;
-                                        self.clear_connection_pool();
+                            if let Some(server) = self.server.upgrade() {
+                                match update.message() {
+                                    ServerUpdate::Error { error, error_generation } => {
+                                        if *error_generation == self.generation_subscriber.generation() {
+                                            topology.handle_pre_handshake_error(error.clone(), &server).await;
+                                        }
                                     }
                                 }
                             }
@@ -130,43 +133,34 @@ impl Monitor {
     /// connection will replaced with a new one.
     ///
     /// Returns true if the topology has changed and false otherwise.
-    async fn check_server(&mut self, topology: &Topology) -> bool {
-        let check_result = self
-            .perform_is_master()
-            .await
-            .map(|reply| ServerDescription::new(self.address.clone(), Some(Ok(reply))));
-
-        let mut previous_description = topology
-            .get_server_description(&self.address)
-            .await
-            .unwrap_or_else(|| ServerDescription::new(self.address.clone(), None));
-
-        let server_description = match check_result {
-            Ok(desc) => desc,
+    async fn check_server(&mut self, topology: &Topology, server: &Server) -> bool {
+        let check_result = match self.perform_is_master().await {
+            Ok(reply) => Ok(reply),
             Err(e) => {
-                let new_desc = ServerDescription::new(self.address.clone(), Some(Err(e.clone())));
-                self.clear_connection_pool();
+                self.handle_error(e.clone(), topology, server).await;
 
-                if e.is_network_error() && previous_description.server_type != ServerType::Unknown {
-                    previous_description = new_desc;
-                    ServerDescription::new(
-                        self.address.clone(),
-                        Some(self.perform_is_master().await),
-                    )
+                if e.is_network_error() && self.server_type != ServerType::Unknown {
+                    self.perform_is_master().await
                 } else {
-                    new_desc
+                    Err(e)
                 }
             }
         };
-        if previous_description.server_type == ServerType::Unknown
-            && server_description.server_type != ServerType::Unknown
-        {
-            self.ready_connection_pool().await;
+
+        match check_result {
+            Ok(reply) => {
+                let server_description =
+                    ServerDescription::new(server.address.clone(), Some(Ok(reply)));
+                self.server_type = server_description.server_type;
+
+                if server_description.server_type != ServerType::Unknown {
+                    self.ready_connection_pool().await;
+                }
+
+                topology.update(server_description).await
+            }
+            Err(e) => self.handle_error(e, topology, server).await,
         }
-
-        self.server_type = server_description.server_type;
-
-        topology.update(server_description).await
     }
 
     async fn perform_is_master(&mut self) -> Result<IsMasterReply> {
@@ -213,15 +207,14 @@ impl Monitor {
         result
     }
 
-    fn clear_connection_pool(&self) {
-        if let Some(server) = self.server.upgrade() {
-            server.pool.clear();
-        }
-    }
-
     async fn ready_connection_pool(&self) {
         if let Some(server) = self.server.upgrade() {
             server.pool.mark_as_ready().await;
         }
+    }
+
+    async fn handle_error(&mut self, error: Error, topology: &Topology, server: &Server) -> bool {
+        topology.handle_pre_handshake_error(error, server).await;
+        std::mem::replace(&mut self.server_type, ServerType::Unknown) != ServerType::Unknown
     }
 }

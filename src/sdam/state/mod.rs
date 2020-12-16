@@ -9,7 +9,7 @@ use std::{
     },
 };
 
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, RwLockWriteGuard};
 
 use self::server::Server;
 use super::{
@@ -229,8 +229,11 @@ impl Topology {
 
     /// Updates the topology based on an error that occurs before the handshake has completed during
     /// an operation.
-    pub(crate) async fn handle_pre_handshake_error(&self, error: Error, address: StreamAddress) {
-        self.mark_server_as_unknown(error, address).await;
+    pub(crate) async fn handle_pre_handshake_error(&self, error: Error, server: &Server) {
+        let state_lock = self.state.write().await;
+        self.mark_server_as_unknown(error, &server, state_lock)
+            .await;
+        server.pool.clear();
     }
 
     /// Handles an error that occurs after the handshake has completed during an operation.
@@ -243,14 +246,15 @@ impl Topology {
         // If we encounter certain errors, we must update the topology as per the
         // SDAM spec.
         if error.is_non_timeout_network_error() {
-            self.mark_server_as_unknown(error, server.address.clone())
+            let state_lock = self.state.write().await;
+            self.mark_server_as_unknown(error, &server, state_lock)
                 .await;
             server.pool.clear();
         } else if error.is_recovering() || error.is_not_master() {
-            self.mark_server_as_unknown(error.clone(), server.address.clone())
-                .await;
+            let state_lock = self.state.write().await;
 
-            self.common.message_manager.request_topology_check();
+            self.mark_server_as_unknown(error.clone(), &server, state_lock)
+                .await;
 
             let wire_version = conn
                 .stream_description()
@@ -264,13 +268,40 @@ impl Topology {
             if wire_version < 8 || error.is_shutting_down() {
                 server.pool.clear();
             }
+
+            self.common.message_manager.request_topology_check();
         }
     }
 
     /// Marks a server in the cluster as unknown due to the given `error`.
-    async fn mark_server_as_unknown(&self, error: Error, address: StreamAddress) {
-        let description = ServerDescription::new(address, Some(Err(error)));
-        self.update(description).await;
+    async fn mark_server_as_unknown(
+        &self,
+        error: Error,
+        server: &Server,
+        state_lock: RwLockWriteGuard<'_, TopologyState>,
+    ) {
+        let description = ServerDescription::new(server.address.clone(), Some(Err(error)));
+        self.update_and_notify(description, state_lock).await;
+    }
+
+    async fn update_and_notify(
+        &self,
+        server_description: ServerDescription,
+        mut state_lock: RwLockWriteGuard<'_, TopologyState>,
+    ) -> bool {
+        // TODO RUST-232: Theoretically, `TopologyDescription::update` can return an error. However,
+        // this can only happen if we try to access a field from the isMaster response when an error
+        // occurred during the check. In practice, this can't happen, because the SDAM algorithm
+        // doesn't check the fields of an Unknown server, and we only return Unknown server
+        // descriptions when errors occur. Once we implement SDAM monitoring, we can
+        // properly inform users of errors that occur here.
+        match state_lock.update(server_description, &self.common.options, self.downgrade()) {
+            Ok(Some(_)) => {
+                self.common.message_manager.notify_topology_changed();
+                true
+            }
+            _ => false,
+        }
     }
 
     /// Updates the topology using the given `ServerDescription`. Monitors for new servers will
@@ -278,23 +309,8 @@ impl Topology {
     ///
     /// Returns true if the topology changed as a result of the update and false otherwise.
     pub(crate) async fn update(&self, server_description: ServerDescription) -> bool {
-        // TODO RUST-232: Theoretically, `TopologyDescription::update` can return an error. However,
-        // this can only happen if we try to access a field from the isMaster response when an error
-        // occurred during the check. In practice, this can't happen, because the SDAM algorithm
-        // doesn't check the fields of an Unknown server, and we only return Unknown server
-        // descriptions when errors occur. Once we implement SDAM monitoring, we can
-        // properly inform users of errors that occur here.
-        match self.state.write().await.update(
-            server_description,
-            &self.common.options,
-            self.downgrade(),
-        ) {
-            Ok(Some(_)) => {
-                self.common.message_manager.notify_topology_changed();
-                true
-            }
-            _ => false,
-        }
+        self.update_and_notify(server_description, self.state.write().await)
+            .await
     }
 
     /// Updates the hosts included in this topology, starting and stopping monitors as necessary.
@@ -355,18 +371,6 @@ impl Topology {
 
     pub(super) async fn is_unknown(&self) -> bool {
         self.state.read().await.description.topology_type() == TopologyType::Unknown
-    }
-
-    pub(crate) async fn get_server_description(
-        &self,
-        address: &StreamAddress,
-    ) -> Option<ServerDescription> {
-        self.state
-            .read()
-            .await
-            .description
-            .get_server_description(address)
-            .cloned()
     }
 }
 
