@@ -257,6 +257,8 @@ impl ConnectionPoolWorker {
                     completion_handler: _handler,
                 }) => {
                     self.mark_as_ready();
+                    // other end hung up, nothing to do
+                    let _: std::result::Result<_, _> = completion_handler.send(());
                 }
                 PoolTask::HandleManagementRequest(
                     PoolManagementRequest::HandleConnectionSucceeded(c),

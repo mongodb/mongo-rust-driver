@@ -16,7 +16,7 @@ use crate::{
     error::{Error, Result},
     options::TlsOptions,
     runtime::AsyncJoinHandle,
-    sdam::{ServerUpdate, ServerUpdateSender},
+    sdam::{ServerUpdateReason, ServerUpdateSender},
     test::{
         assert_matches,
         run_spec_test,
@@ -163,8 +163,8 @@ impl Executor {
         let manager = pool.manager.clone();
         RUNTIME.execute(async move {
             while let Some(update) = update_receiver.recv().await {
-                match update.message() {
-                    ServerUpdate::Error { .. } => manager.clear(),
+                match update.reason {
+                    ServerUpdateReason::Error { .. } => manager.clear(),
                 }
             }
         });
