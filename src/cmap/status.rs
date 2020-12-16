@@ -1,4 +1,4 @@
-use crate::error::Error;
+use crate::{error::Error, RUNTIME};
 
 /// Struct used to track the latest status of the pool.
 #[derive(Clone, Debug)]
@@ -15,7 +15,11 @@ impl Default for PoolStatus {
 
 /// Create a channel for publishing and receiving updates to the pool's generation.
 pub(super) fn channel() -> (PoolGenerationPublisher, PoolGenerationSubscriber) {
-    let (sender, receiver) = tokio::sync::watch::channel(Default::default());
+    let (sender, mut receiver) = tokio::sync::watch::channel(Default::default());
+    // The first call to recv on a watch channel returns immediately with the initial value.
+    // We use futures::executor::block_on because this is not a truly blocking task, so
+    // the runtimes don't need to shift things around to ensure scheduling continues normally.
+    futures::executor::block_on(receiver.recv());
     (
         PoolGenerationPublisher { sender },
         PoolGenerationSubscriber { receiver },
@@ -56,35 +60,16 @@ impl PoolGenerationSubscriber {
         self.receiver.borrow().generation
     }
 
-    // /// Listen for a connection establishment failure.
-    // pub(crate) async fn listen_for_establishment_failure(&mut self) -> Option<Error> {
-    //     while let Some(status) = self.receiver.recv().await {
-    //         if let Some(error) = status.establishment_error {
-    //             return Some(error);
-    //         }
-    //     }
-    //     None
-    // }
-
     #[cfg(test)]
     pub(crate) async fn wait_for_generation_change(
         &mut self,
         timeout: std::time::Duration,
     ) -> Option<u32> {
-        // watch receivers return the latest vlaue immediately, need to compare against it to
-        // determine if that has happened.
-        let initial_generation = self.receiver.borrow().generation;
         crate::RUNTIME
-            .timeout(timeout, async {
-                while let Some(status) = self.receiver.recv().await {
-                    if status.generation != initial_generation {
-                        return Some(status.generation);
-                    }
-                }
-                None
-            })
+            .timeout(timeout, self.receiver.recv())
             .await
             .ok()
             .flatten()
+            .map(|status| status.generation)
     }
 }
