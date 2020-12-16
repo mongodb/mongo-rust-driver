@@ -128,9 +128,7 @@ impl ServerUpdateSender {
 
         // These only fails if the other ends hang up, which means the monitor is
         // stopped, so we can just discard this update.
-        println!("sending update {:?}", update);
         let _: std::result::Result<_, _> = self.sender.send(update).await;
         let _: std::result::Result<_, _> = receiver.await;
-        println!("got ack");
     }
 }
