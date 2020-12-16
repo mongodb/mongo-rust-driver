@@ -29,7 +29,6 @@ use crate::{
             server::{ServerDescription, ServerType},
             topology::{server_selection, TopologyDescriptionDiff, TopologyType},
         },
-        monitor::Monitor,
         srv_polling::SrvPollingMonitor,
         TopologyMessageManager,
     },
@@ -471,11 +470,4 @@ impl TopologyState {
 
         self.servers.retain(|host, _| hosts.contains(host));
     }
-
-    // /// Start a monitor for the server at the given address if it is part of the topology.
-    // fn start_monitoring_server(&self, address: StreamAddress, topology: WeakTopology) {
-    //     if let Some(server) = self.servers.get(&address) {
-    //         Monitor::start(address, server, topology);
-    //     }
-    // }
 }

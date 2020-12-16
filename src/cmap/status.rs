@@ -1,5 +1,3 @@
-use crate::{error::Error, RUNTIME};
-
 /// Struct used to track the latest status of the pool.
 #[derive(Clone, Debug)]
 struct PoolStatus {

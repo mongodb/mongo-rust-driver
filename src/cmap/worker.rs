@@ -19,7 +19,7 @@ use super::{
     DEFAULT_MAX_POOL_SIZE,
 };
 use crate::{
-    error::{Error, Result},
+    error::Result,
     event::cmap::{
         CmapEventHandler,
         ConnectionClosedEvent,
@@ -252,7 +252,7 @@ impl ConnectionPoolWorker {
                 }
                 PoolTask::HandleManagementRequest(PoolManagementRequest::Clear) => self.clear(),
                 PoolTask::HandleManagementRequest(PoolManagementRequest::MarkAsReady {
-                    completion_handler,
+                    completion_handler: _handler,
                 }) => {
                     self.mark_as_ready();
                 }
@@ -425,7 +425,6 @@ impl ConnectionPoolWorker {
     }
 
     fn clear(&mut self) {
-        println!("clearing pool");
         self.generation += 1;
         let previous_state = std::mem::replace(&mut self.state, PoolState::Paused);
         self.generation_publisher.publish(self.generation);
@@ -561,7 +560,6 @@ async fn establish_connection(
                 };
                 handler.handle_connection_closed_event(event);
             }
-            println!("error establishing connection {}", e);
             server_updater.handle_error(e.clone(), generation).await;
             manager.handle_connection_failed();
         }

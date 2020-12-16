@@ -66,6 +66,8 @@ impl Server {
     }
 }
 
+/// An event that could update the topology's view of a server.
+/// TODO: add success cases from application handshakes.
 #[derive(Debug)]
 pub(crate) enum ServerUpdate {
     Error { error: Error, error_generation: u32 },
@@ -82,12 +84,14 @@ impl ServerUpdateReceiver {
     }
 }
 
+/// Struct used to update the topology's view of a given server.
 #[derive(Clone, Debug)]
 pub(crate) struct ServerUpdateSender {
     sender: tokio::sync::mpsc::Sender<AcknowledgedMessage<ServerUpdate>>,
 }
 
 impl ServerUpdateSender {
+    /// Create a new sender/receiver pair.
     pub(crate) fn channel() -> (Self, ServerUpdateReceiver) {
         let (sender, receiver) = tokio::sync::mpsc::channel(1);
         (
@@ -96,6 +100,8 @@ impl ServerUpdateSender {
         )
     }
 
+    /// Update the server based on the given error.
+    /// This will block until the topology has processed the error.
     pub(crate) async fn handle_error(&mut self, error: Error, error_generation: u32) {
         let reason = ServerUpdate::Error {
             error,

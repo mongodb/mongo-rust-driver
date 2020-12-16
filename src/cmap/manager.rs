@@ -1,7 +1,7 @@
 use tokio::sync::mpsc;
 
 use super::Connection;
-use crate::{error::Error, runtime::AcknowledgedMessage};
+use crate::runtime::AcknowledgedMessage;
 
 pub(super) fn channel() -> (PoolManager, ManagementRequestReceiver) {
     let (sender, receiver) = mpsc::unbounded_channel();

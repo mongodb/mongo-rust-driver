@@ -34,10 +34,8 @@ pub(crate) struct Monitor {
 }
 
 impl Monitor {
-    /// Starts a monitoring thread associated with a given Server. A weak reference is used to
-    /// ensure that the monitoring thread doesn't keep the server alive after it's been removed
-    /// from the topology or the client has been dropped.
-
+    /// Creates a monitor associated with a given Server.     ///
+    /// This method does not start the monitor. Use `Monitor::start` to do so.
     pub(super) fn new(
         address: StreamAddress,
         server: &Arc<Server>,
@@ -58,23 +56,9 @@ impl Monitor {
         }
     }
 
-    // pub(super) fn start(address: StreamAddress, server: &Arc<Server>, topology: WeakTopology) {
-    //     let handshaker = Handshaker::new(Some(topology.client_options().clone().into()));
-    //     let mut monitor = Self {
-    //         address,
-    //         connection: None,
-    //         server: Arc::downgrade(server),
-    //         server_type: ServerType::Unknown,
-    //         generation_subscriber: server.pool.subscribe_to_generation_updates(),
-    //         topology,
-    //         handshaker,
-    //     };
-
-    //     RUNTIME.execute(async move {
-    //         monitor.execute().await;
-    //     });
-    // }
-
+    /// Start the monitor task.
+    /// A weak reference is used to ensure that the monitor doesn't keep the server alive after it's
+    /// been removed from the topology or the client has been dropped.
     pub(super) fn start(mut self, topology: WeakTopology) {
         RUNTIME.execute(async move {
             self.execute(topology).await;
@@ -126,13 +110,10 @@ impl Monitor {
                     // If the pool encounters an error establishing a connection, it will
                     // notify the update receiver and need to be handled.
                     Some(update) = self.update_receiver.recv() => {
-                        println!("got update {:?}", update);
                         if let Some(topology) = weak_topology.upgrade() {
                             match update.message() {
                                 ServerUpdate::Error { error, error_generation } => {
-                                    println!("got error checking generation");
                                     if *error_generation == self.generation_subscriber.generation() {
-                                        println!("generation equal, updating topology and clearing pool");
                                         topology.handle_pre_handshake_error(error.clone(), self.address.clone()).await;
                                         self.clear_connection_pool();
                                     }

@@ -26,6 +26,7 @@ impl<M, R> AcknowledgedMessage<M, R> {
     }
 
     /// Send acknowledgement to the receiver.
+    #[allow(dead_code)]
     pub(crate) fn acknowledge(self, result: impl Into<R>) {
         // returns an error when the other end hangs up e.g. due to a timeout.
         let _: std::result::Result<_, _> = self.notifier.send(result.into());
