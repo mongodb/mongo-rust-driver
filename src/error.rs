@@ -43,8 +43,8 @@ impl Error {
     }
 
     pub(crate) fn pool_cleared_error(address: &StreamAddress) -> Self {
-        ErrorKind::PoolClearedError {
-            message: format!("Pool for {} cleared during operation execution", address)
+        ErrorKind::ConnectionPoolClearedError {
+            message: format!("Conneciton pool for {} cleared during operation execution", address)
         }
         .into()
     }
@@ -307,10 +307,11 @@ pub enum ErrorKind {
         file_path: String,
     },
 
-    /// The pool was cleared during operation execution.
+    /// The connection pool for a server was cleared during operation execution due to
+    /// a concurrent error, causing the operation to fail.
     #[error(display = "{}", message)]
     #[non_exhaustive]
-    PoolClearedError { message: String },
+    ConnectionPoolClearedError { message: String },
 
     /// The server returned an invalid reply to a database operation.
     #[error(
@@ -371,7 +372,7 @@ impl ErrorKind {
     }
 
     pub(crate) fn is_network_error(&self) -> bool {
-        matches!(self, ErrorKind::Io(..) | ErrorKind::PoolClearedError { .. })
+        matches!(self, ErrorKind::Io(..) | ErrorKind::ConnectionPoolClearedError { .. })
     }
 
     /// Gets the code/message tuple from this error, if applicable. In the case of write errors, the

@@ -32,7 +32,6 @@ pub(super) struct PoolGenerationPublisher {
 
 impl PoolGenerationPublisher {
     /// Publish a new generation.
-    /// If the clear was caused by a connection establishment error, provide the error.
     pub(super) fn publish(&self, new_generation: u32) {
         let new_status = PoolStatus {
             generation: new_generation,
@@ -44,9 +43,6 @@ impl PoolGenerationPublisher {
 }
 
 /// Subscriber used to get the latest generation of the pool.
-///
-/// This can also be used to listen for when the pool encounters an error during connection
-/// establishment.
 #[derive(Clone, Debug)]
 pub(crate) struct PoolGenerationSubscriber {
     receiver: tokio::sync::watch::Receiver<PoolStatus>,

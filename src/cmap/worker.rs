@@ -122,6 +122,8 @@ pub(crate) struct ConnectionPoolWorker {
     /// A pool manager that can be cloned and attached to connections checked out of the pool.
     manager: PoolManager,
 
+    /// A handle used to notify SDAM that a connection establishment error happened. This will
+    /// allow the server to transition to Unknown and clear the pool as necessary.
     server_updater: ServerUpdateSender,
 }
 

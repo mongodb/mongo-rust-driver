@@ -34,7 +34,7 @@ pub(crate) struct Monitor {
 }
 
 impl Monitor {
-    /// Creates a monitor associated with a given Server.     ///
+    /// Creates a monitor associated with a given Server.
     /// This method does not start the monitor. Use `Monitor::start` to do so.
     pub(super) fn new(
         address: StreamAddress,
