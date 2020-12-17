@@ -312,9 +312,16 @@ impl Topology {
     /// be started as necessary.
     ///
     /// Returns true if the topology changed as a result of the update and false otherwise.
-    pub(crate) async fn update(&self, server_description: ServerDescription) -> bool {
-        self.update_and_notify(server_description, self.state.write().await)
-            .await
+    pub(crate) async fn update(
+        &self,
+        server: &Server,
+        server_description: ServerDescription,
+    ) -> bool {
+        let state_lock = self.state.write().await;
+        if server_description.is_available() {
+            server.pool.mark_as_ready().await;
+        }
+        self.update_and_notify(server_description, state_lock).await
     }
 
     /// Updates the hosts included in this topology, starting and stopping monitors as necessary.

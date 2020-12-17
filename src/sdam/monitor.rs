@@ -161,12 +161,7 @@ impl HeartbeatMonitor {
             Ok(reply) => {
                 let server_description =
                     ServerDescription::new(server.address.clone(), Some(Ok(reply)));
-
-                if server_description.is_available() {
-                    self.ready_connection_pool().await;
-                }
-
-                topology.update(server_description).await
+                topology.update(server, server_description).await
             }
             Err(e) => self.handle_error(e, topology, server).await || retried,
         }
@@ -214,12 +209,6 @@ impl HeartbeatMonitor {
         }
 
         result
-    }
-
-    async fn ready_connection_pool(&self) {
-        if let Some(server) = self.server.upgrade() {
-            server.pool.mark_as_ready().await;
-        }
     }
 
     async fn handle_error(&mut self, error: Error, topology: &Topology, server: &Server) -> bool {
