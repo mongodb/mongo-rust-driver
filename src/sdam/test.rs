@@ -89,6 +89,8 @@ async fn sdam_pool_management() {
         .expect("should see pool ready event");
 }
 
+// prose version of minPoolSize-error.yml SDAM integration test
+// TODO: RUST-232 replace this test with the spec runner
 #[cfg_attr(feature = "tokio-runtime", tokio::test(threaded_scheduler))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn sdam_min_pool_size_error() {
@@ -114,7 +116,7 @@ async fn sdam_min_pool_size_error() {
         .app_name("SDAMMinPoolSizeErrorTest".to_string())
         .error_code(1234)
         .build();
-    let failpoint = FailPoint::fail_command(&["isMaster"], FailPointMode::Skip(2), fp_options);
+    let failpoint = FailPoint::fail_command(&["isMaster"], FailPointMode::Skip(3), fp_options);
 
     let _fp_guard = setup_client
         .enable_failpoint(failpoint, None)
@@ -127,7 +129,7 @@ async fn sdam_min_pool_size_error() {
     let mut options = setup_client_options;
     options.app_name = Some("SDAMMinPoolSizeErrorTest".to_string());
     options.min_pool_size = Some(10);
-    options.server_selection_timeout = Some(Duration::from_millis(100));
+    options.server_selection_timeout = Some(Duration::from_millis(1000));
     options.heartbeat_freq = Some(Duration::from_secs(10));
     options.cmap_event_handler = Some(handler.clone());
     let client = Client::with_options(options).expect("client creation should succeed");
@@ -161,16 +163,16 @@ async fn sdam_min_pool_size_error() {
     // disable the fail point, then the pool should become ready again
     drop(_fp_guard);
 
-    subscriber
-        .wait_for_event(Duration::from_millis(2000), |event| {
-            matches!(event, Event::CmapEvent(CmapEvent::ConnectionPoolReady(_)))
-        })
-        .await
-        .expect("should see pool ready event");
-
     client
         .database("admin")
         .run_command(doc! { "ping": 1 }, None)
         .await
         .expect("ping should succeed");
+
+    subscriber
+        .wait_for_event(Duration::from_millis(10), |event| {
+            matches!(event, Event::CmapEvent(CmapEvent::ConnectionPoolReady(_)))
+        })
+        .await
+        .expect("should see pool ready event");
 }
