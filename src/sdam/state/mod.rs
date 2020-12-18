@@ -278,6 +278,7 @@ impl Topology {
     }
 
     /// Marks a server in the cluster as unknown due to the given `error`.
+    /// Returns whether the topology changed as a result of the update.
     async fn mark_server_as_unknown(
         &self,
         error: Error,
@@ -285,14 +286,23 @@ impl Topology {
         state_lock: RwLockWriteGuard<'_, TopologyState>,
     ) -> bool {
         let description = ServerDescription::new(server.address.clone(), Some(Err(error)));
-        self.update_and_notify(description, state_lock).await
+        self.update_and_notify(server, description, state_lock)
+            .await
     }
 
+    /// Update the topology using the given server description.
+    ///
+    /// Because this method takes a lock guard as a parameter, it is mainly useful for sychronizing
+    /// updates to the topology with other state management.
+    ///
+    /// Returns a boolean indicating whether the topology changed as a result of the update.
     async fn update_and_notify(
         &self,
+        server: &Server,
         server_description: ServerDescription,
         mut state_lock: RwLockWriteGuard<'_, TopologyState>,
     ) -> bool {
+        let is_available = server_description.is_available();
         // TODO RUST-232: Theoretically, `TopologyDescription::update` can return an error. However,
         // this can only happen if we try to access a field from the isMaster response when an error
         // occurred during the check. In practice, this can't happen, because the SDAM algorithm
@@ -301,6 +311,9 @@ impl Topology {
         // properly inform users of errors that occur here.
         match state_lock.update(server_description, &self.common.options, self.downgrade()) {
             Ok(Some(_)) => {
+                if is_available {
+                    server.pool.mark_as_ready().await;
+                }
                 self.common.message_manager.notify_topology_changed();
                 true
             }
@@ -317,11 +330,8 @@ impl Topology {
         server: &Server,
         server_description: ServerDescription,
     ) -> bool {
-        let state_lock = self.state.write().await;
-        if server_description.is_available() {
-            server.pool.mark_as_ready().await;
-        }
-        self.update_and_notify(server_description, state_lock).await
+        self.update_and_notify(server, server_description, self.state.write().await)
+            .await
     }
 
     /// Updates the hosts included in this topology, starting and stopping monitors as necessary.
