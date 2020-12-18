@@ -45,7 +45,7 @@ pub struct ConnectionPoolOptions {
     #[serde(skip)]
     pub event_handler: Option<Arc<dyn CmapEventHandler>>,
 
-    /// How often the background thread performas its maintenance (e.g. ensure minPoolSize).
+    /// How often the background thread performs its maintenance (e.g. ensure minPoolSize).
     #[cfg(test)]
     #[builder(default)]
     #[serde(skip)]
