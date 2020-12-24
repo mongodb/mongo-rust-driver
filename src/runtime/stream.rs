@@ -281,18 +281,25 @@ impl AsyncWrite for AsyncTcpStream {
 
 impl TokioAsyncRead for AsyncTcpStream {
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut tokio::io::ReadBuf,
     ) -> Poll<tokio::io::Result<()>> {
-        let s = buf.initialize_unfilled();
-        let bread = match AsyncRead::poll_read(self, cx, s) {
-            Poll::Pending => return Poll::Pending,
-            Poll::Ready(b) => b?,
-        };
+        match self.deref_mut() {
+            #[cfg(feature = "tokio-runtime")]
+            Self::Tokio(ref mut stream) => Pin::new(stream).poll_read(cx, buf),
+            #[cfg(feature = "async-std-runtime")]
+            Self::AsyncStd(ref mut stream) => {
+                let s = buf.initialize_unfilled();
+                let bread = match Pin::new(stream).poll_read(cx, s) {
+                    Poll::Pending => return Poll::Pending,
+                    Poll::Ready(b) => b?,
+                };
 
-        buf.advance(bread);
-        Poll::Ready(Ok(()))
+                buf.advance(bread);
+                Poll::Ready(Ok(()))
+            }
+        }
     }
 }
 
