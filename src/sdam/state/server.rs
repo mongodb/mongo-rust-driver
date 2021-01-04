@@ -35,7 +35,7 @@ impl Server {
     }
 
     /// Create a new reference counted `Server` instance and a `Monitor` for that server.
-    /// The monitor is not started as part ofthis; call `Monitor::execute` to start it.
+    /// The monitor is not started as part of this; call `Monitor::execute` to start it.
     pub(crate) fn create(
         address: StreamAddress,
         options: &ClientOptions,
