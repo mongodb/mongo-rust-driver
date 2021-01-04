@@ -103,6 +103,17 @@ impl AsyncRuntime {
         }
     }
 
+    /// Run a future in the foreground, blocking on it completing.
+    /// This does not notify the runtime that it will be blocking and should only be used for
+    /// operations that will immediately (or quickly) succeed.
+    pub(crate) fn block_in_place<F, T>(self, fut: F) -> T
+    where
+        F: Future<Output = T> + Send,
+        T: Send,
+    {
+        futures::executor::block_on(fut)
+    }
+
     /// Delay for the specified duration.
     pub(crate) async fn delay_for(self, delay: Duration) {
         #[cfg(feature = "tokio-runtime")]

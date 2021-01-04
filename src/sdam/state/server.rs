@@ -3,6 +3,7 @@ use std::sync::{
     Arc,
 };
 
+use super::WeakTopology;
 use crate::{
     cmap::{options::ConnectionPoolOptions, ConnectionPool},
     error::Error,
@@ -38,6 +39,7 @@ impl Server {
     pub(crate) fn create(
         address: StreamAddress,
         options: &ClientOptions,
+        topology: WeakTopology,
         http_client: HttpClient,
     ) -> (Arc<Self>, Monitor) {
         let (update_sender, update_receiver) = ServerUpdateSender::channel();
@@ -51,7 +53,7 @@ impl Server {
             address: address.clone(),
             operation_count: AtomicU32::new(0),
         });
-        let monitor = Monitor::new(address, &server, options.clone(), update_receiver);
+        let monitor = Monitor::new(address, &server, topology, options.clone(), update_receiver);
         (server, monitor)
     }
 

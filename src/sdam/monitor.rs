@@ -27,6 +27,7 @@ pub(crate) struct Monitor {
     server: Arc<Server>,
     client_options: ClientOptions,
     update_receiver: ServerUpdateReceiver,
+    topology: WeakTopology,
 }
 
 impl Monitor {
@@ -35,6 +36,7 @@ impl Monitor {
     pub(super) fn new(
         address: StreamAddress,
         server: &Arc<Server>,
+        topology: WeakTopology,
         client_options: ClientOptions,
         update_receiver: ServerUpdateReceiver,
     ) -> Self {
@@ -43,30 +45,32 @@ impl Monitor {
             server: server.clone(),
             client_options,
             update_receiver,
+            topology,
         }
     }
 
     /// Start the monitor tasks.
     /// A weak reference is used to ensure that the monitor doesn't keep the topology alive after
     /// it's been removed from the topology or the client has been dropped.
-    pub(super) fn start(self, topology: WeakTopology) {
+    pub(super) fn start(self) {
         let mut heartbeat_monitor = HeartbeatMonitor::new(
             self.address,
             Arc::downgrade(&self.server),
+            self.topology.clone(),
             self.client_options,
         );
-        let t = topology.clone();
         RUNTIME.execute(async move {
-            heartbeat_monitor.execute(t).await;
+            heartbeat_monitor.execute().await;
         });
 
         let update_monitor = UpdateMonitor {
             server: Arc::downgrade(&self.server),
+            topology: self.topology,
             update_receiver: self.update_receiver,
             generation_subscriber: self.server.pool.subscribe_to_generation_updates(),
         };
         RUNTIME.execute(async move {
-            update_monitor.execute(topology).await;
+            update_monitor.execute().await;
         });
     }
 }
@@ -77,34 +81,41 @@ struct HeartbeatMonitor {
     connection: Option<Connection>,
     handshaker: Handshaker,
     server: Weak<Server>,
+    topology: WeakTopology,
     client_options: ClientOptions,
 }
 
 impl HeartbeatMonitor {
-    fn new(address: StreamAddress, server: Weak<Server>, client_options: ClientOptions) -> Self {
+    fn new(
+        address: StreamAddress,
+        server: Weak<Server>,
+        topology: WeakTopology,
+        client_options: ClientOptions,
+    ) -> Self {
         let handshaker = Handshaker::new(Some(client_options.clone().into()));
         Self {
             address,
             server,
             client_options,
             handshaker,
+            topology,
             connection: None,
         }
     }
 
-    async fn execute(&mut self, weak_topology: WeakTopology) {
+    async fn execute(&mut self) {
         let heartbeat_frequency = self
             .client_options
             .heartbeat_freq
             .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
 
-        while weak_topology.is_alive() {
+        while self.topology.is_alive() {
             let server = match self.server.upgrade() {
                 Some(server) => server,
                 None => break,
             };
 
-            let topology = match weak_topology.upgrade() {
+            let topology = match self.topology.upgrade() {
                 Some(topology) => topology,
                 None => break,
             };
@@ -219,16 +230,17 @@ impl HeartbeatMonitor {
 /// Monitor that listens for updates to a given server generated from operation execution.
 struct UpdateMonitor {
     server: Weak<Server>,
+    topology: WeakTopology,
     update_receiver: ServerUpdateReceiver,
     generation_subscriber: PoolGenerationSubscriber,
 }
 
 impl UpdateMonitor {
-    async fn execute(mut self, weak_topology: WeakTopology) {
+    async fn execute(mut self) {
         // If the pool encounters an error establishing a connection, it will
         // notify the update receiver and need to be handled.
         while let Some(update) = self.update_receiver.recv().await {
-            let topology = match weak_topology.upgrade() {
+            let topology = match self.topology.upgrade() {
                 Some(it) => it,
                 _ => return,
             };

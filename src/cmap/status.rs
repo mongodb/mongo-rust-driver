@@ -1,3 +1,5 @@
+use crate::RUNTIME;
+
 /// Struct used to track the latest status of the pool.
 #[derive(Clone, Debug)]
 struct PoolStatus {
@@ -15,9 +17,9 @@ impl Default for PoolStatus {
 pub(super) fn channel() -> (PoolGenerationPublisher, PoolGenerationSubscriber) {
     let (sender, mut receiver) = tokio::sync::watch::channel(Default::default());
     // The first call to recv on a watch channel returns immediately with the initial value.
-    // We use futures::executor::block_on because this is not a truly blocking task, so
+    // We use RUNTIME.block_in_place because this is not a truly blocking task, so
     // the runtimes don't need to shift things around to ensure scheduling continues normally.
-    futures::executor::block_on(receiver.recv());
+    RUNTIME.block_in_place(receiver.recv());
     (
         PoolGenerationPublisher { sender },
         PoolGenerationSubscriber { receiver },

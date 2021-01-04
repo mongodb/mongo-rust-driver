@@ -32,6 +32,7 @@ use crate::{
         srv_polling::SrvPollingMonitor,
         TopologyMessageManager,
     },
+    RUNTIME,
 };
 
 /// A strong reference to the topology, which includes the current state as well as the client
@@ -86,26 +87,36 @@ impl Topology {
 
         let http_client = HttpClient::default();
 
-        let servers = hosts
-            .into_iter()
-            .map(|address| {
-                (
-                    address.clone(),
-                    Server::create(address, &ClientOptions::default(), http_client.clone()).0,
-                )
-            })
-            .collect();
-
         let state = TopologyState {
             description,
-            servers,
-            http_client,
+            servers: Default::default(),
+            http_client: http_client.clone(),
         };
 
-        Self {
+        let topology = Self {
             state: Arc::new(RwLock::new(state)),
             common,
-        }
+        };
+
+        // we can block in place here because we're the only ones with access to the lock, so it
+        // should be acquired immediately.
+        let mut topology_state = RUNTIME.block_in_place(topology.state.write());
+
+        hosts.into_iter().for_each(|address| {
+            topology_state.servers.insert(
+                address.clone(),
+                Server::create(
+                    address,
+                    &ClientOptions::default(),
+                    topology.downgrade(),
+                    http_client.clone(),
+                )
+                .0,
+            );
+        });
+
+        drop(topology_state);
+        topology
     }
 
     /// Creates a new Topology given the `options`.
@@ -120,36 +131,27 @@ impl Topology {
             options: options.clone(),
         };
 
-        let mut topology_state = TopologyState {
+        let http_client = HttpClient::default();
+
+        let topology_state = TopologyState {
             description,
             servers: Default::default(),
-            http_client: Default::default(),
+            http_client: http_client.clone(),
         };
-
-        let monitors: Vec<_> = hosts
-            .into_iter()
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .map(|address| {
-                let (server, monitor) = Server::create(
-                    address.clone(),
-                    &options,
-                    topology_state.http_client.clone(),
-                );
-                topology_state.servers.insert(address, server);
-                monitor
-            })
-            .collect();
 
         let state = Arc::new(RwLock::new(topology_state));
         let topology = Topology { state, common };
 
-        for monitor in monitors {
-            monitor.start(topology.downgrade())
+        // we can block in place here because we're the only ones with access to the lock, so it
+        // should be acquired immediately.
+        let mut topology_state = RUNTIME.block_in_place(topology.state.write());
+        for address in hosts {
+            topology_state.add_new_server(address, options.clone(), &topology.downgrade());
         }
 
         SrvPollingMonitor::start(topology.downgrade());
 
+        drop(topology_state);
         Ok(topology)
     }
 
@@ -439,9 +441,14 @@ impl TopologyState {
             return;
         }
 
-        let (server, monitor) = Server::create(address.clone(), &options, self.http_client.clone());
+        let (server, monitor) = Server::create(
+            address.clone(),
+            &options,
+            topology.clone(),
+            self.http_client.clone(),
+        );
         self.servers.insert(address, server);
-        monitor.start(topology.clone());
+        monitor.start();
     }
 
     /// Updates the given `command` as needed based on the `critiera`.
