@@ -102,7 +102,7 @@ impl Topology {
         // should be acquired immediately.
         let mut topology_state = RUNTIME.block_in_place(topology.state.write());
 
-        hosts.into_iter().for_each(|address| {
+        for address in hosts {
             topology_state.servers.insert(
                 address.clone(),
                 Server::create(
@@ -113,7 +113,7 @@ impl Topology {
                 )
                 .0,
             );
-        });
+        }
 
         drop(topology_state);
         topology
