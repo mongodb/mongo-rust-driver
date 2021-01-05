@@ -136,7 +136,7 @@ impl Topology {
         let topology_state = TopologyState {
             description,
             servers: Default::default(),
-            http_client: http_client.clone(),
+            http_client,
         };
 
         let state = Arc::new(RwLock::new(topology_state));
