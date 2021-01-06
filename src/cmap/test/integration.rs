@@ -122,20 +122,22 @@ async fn concurrent_connections() {
     });
     futures::future::join_all(tasks).await;
 
-    // ensure all three ConnectionCreatedEvents were emitted before one ConnectionReadyEvent.
-    let events = handler.events.read().unwrap();
-    let mut consecutive_creations = 0;
-    for event in events.iter() {
-        match event {
-            Event::ConnectionCreated(_) => {
-                consecutive_creations += 1;
-            }
-            Event::ConnectionReady(_) => {
-                if consecutive_creations < 2 {
-                    panic!("connections not created concurrently");
+    {
+        // ensure all three ConnectionCreatedEvents were emitted before one ConnectionReadyEvent.
+        let events = handler.events.read().unwrap();
+        let mut consecutive_creations = 0;
+        for event in events.iter() {
+            match event {
+                Event::ConnectionCreated(_) => {
+                    consecutive_creations += 1;
                 }
+                Event::ConnectionReady(_) => {
+                    if consecutive_creations < 2 {
+                        panic!("connections not created concurrently");
+                    }
+                }
+                _ => (),
             }
-            _ => (),
         }
     }
 
