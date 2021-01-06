@@ -681,9 +681,10 @@ impl ClientOptions {
     /// used in the SRV tests.
     #[cfg(test)]
     pub(crate) fn new_srv() -> Self {
-        let mut options = Self::default();
-        options.original_srv_hostname = Some("localhost.test.test.build.10gen.cc".into());
-        options
+        Self {
+            original_srv_hostname: Some("localhost.test.test.build.10gen.cc".into()),
+            ..Default::default()
+        }
     }
 
     /// Parses a MongoDB connection string into a ClientOptions struct. If the string is malformed
