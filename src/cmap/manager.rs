@@ -1,7 +1,7 @@
 use tokio::sync::mpsc;
 
 use super::Connection;
-use crate::error::Error;
+use crate::runtime::AcknowledgedMessage;
 
 pub(super) fn channel() -> (PoolManager, ManagementRequestReceiver) {
     let (sender, receiver) = mpsc::unbounded_channel();
@@ -24,6 +24,20 @@ impl PoolManager {
         let _ = self.sender.send(PoolManagementRequest::Clear);
     }
 
+    /// Mark the pool as "ready" as per the CMAP specification.
+    pub(super) async fn mark_as_ready(&self) {
+        let (message, acknowledgment_receiver) = AcknowledgedMessage::package(());
+        if self
+            .sender
+            .send(PoolManagementRequest::MarkAsReady {
+                completion_handler: message,
+            })
+            .is_ok()
+        {
+            acknowledgment_receiver.wait_for_acknowledgment().await;
+        }
+    }
+
     /// Check in the given connection to the pool.
     /// This returns an error containing the connection if the pool has been dropped already.
     pub(crate) fn check_in(&self, connection: Connection) -> std::result::Result<(), Connection> {
@@ -35,10 +49,10 @@ impl PoolManager {
     }
 
     /// Notify the pool that establishing a connection failed.
-    pub(super) fn handle_connection_failed(&self, error: Error) {
+    pub(super) fn handle_connection_failed(&self) {
         let _ = self
             .sender
-            .send(PoolManagementRequest::HandleConnectionFailed(error));
+            .send(PoolManagementRequest::HandleConnectionFailed);
     }
 
     /// Notify the pool that establishing a connection succeeded.
@@ -62,9 +76,22 @@ impl ManagementRequestReceiver {
 
 #[derive(Debug)]
 pub(super) enum PoolManagementRequest {
+    /// Clear the pool, transitioning it to Paused.
     Clear,
+
+    /// Mark the pool as Ready, allowing connections to be created and checked out.
+    MarkAsReady {
+        completion_handler: AcknowledgedMessage<()>,
+    },
+
+    /// Check in the given connection.
     CheckIn(Connection),
-    HandleConnectionFailed(Error),
+
+    /// Update the pool based on the given establishment error.
+    HandleConnectionFailed,
+
+    /// Update the pool after a successful connection, optionally populating the pool
+    /// with the successful connection.
     HandleConnectionSucceeded(Option<Connection>),
 }
 

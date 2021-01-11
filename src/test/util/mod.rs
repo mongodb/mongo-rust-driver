@@ -4,7 +4,7 @@ mod lock;
 mod matchable;
 
 pub use self::{
-    event::{CommandEvent, EventClient},
+    event::{CmapEvent, CommandEvent, Event, EventClient, EventHandler},
     failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     lock::TestLock,
     matchable::{assert_matches, Matchable},
@@ -19,7 +19,6 @@ use crate::{
 use semver::{Version, VersionReq};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use self::event::EventHandler;
 use super::CLIENT_OPTIONS;
 use crate::{
     error::{CommandError, ErrorKind, Result},

@@ -5,6 +5,8 @@ mod monitor;
 pub mod public;
 mod srv_polling;
 mod state;
+#[cfg(test)]
+mod test;
 
 pub use self::public::{ServerInfo, ServerType};
 
@@ -18,5 +20,8 @@ pub(crate) use self::{
     },
     message_manager::TopologyMessageManager,
     monitor::MIN_HEARTBEAT_FREQUENCY,
-    state::{server::Server, Topology},
+    state::{
+        server::{Server, ServerUpdate, ServerUpdateReceiver, ServerUpdateSender},
+        Topology,
+    },
 };

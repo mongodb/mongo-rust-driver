@@ -4,14 +4,17 @@ use std::{
     time::Duration,
 };
 
-use tokio::sync::RwLockReadGuard;
+use tokio::sync::{
+    broadcast::{RecvError, SendError},
+    RwLockReadGuard,
+};
 
 use super::TestClient;
 use crate::{
     bson::doc,
     client::options::ServerApi,
     event::{
-        cmap::{CmapEventHandler, PoolClearedEvent},
+        cmap::{CmapEventHandler, PoolClearedEvent, PoolReadyEvent},
         command::{
             CommandEventHandler,
             CommandFailedEvent,
@@ -21,9 +24,17 @@ use crate::{
     },
     options::ClientOptions,
     test::{CLIENT_OPTIONS, LOCK},
+    RUNTIME,
 };
 
 pub type EventQueue<T> = Arc<RwLock<VecDeque<T>>>;
+pub type CmapEvent = crate::cmap::test::event::Event;
+
+#[derive(Clone, Debug, From)]
+pub enum Event {
+    CmapEvent(CmapEvent),
+    CommandEvent(CommandEvent),
+}
 
 #[derive(Clone, Debug)]
 pub enum CommandEvent {
@@ -39,10 +50,6 @@ impl CommandEvent {
             CommandEvent::CommandFailedEvent(event) => event.command_name.as_str(),
             CommandEvent::CommandSucceededEvent(event) => event.command_name.as_str(),
         }
-    }
-
-    pub fn is_command_started(&self) -> bool {
-        matches!(self, CommandEvent::CommandStartedEvent(_))
     }
 
     fn request_id(&self) -> i32 {
@@ -68,20 +75,51 @@ impl CommandEvent {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Debug)]
 pub struct EventHandler {
-    pub command_events: EventQueue<CommandEvent>,
+    command_events: EventQueue<CommandEvent>,
     pub pool_cleared_events: EventQueue<PoolClearedEvent>,
+    event_broadcaster: tokio::sync::broadcast::Sender<Event>,
+}
+
+impl EventHandler {
+    pub fn new() -> Self {
+        let (event_broadcaster, _) = tokio::sync::broadcast::channel(500);
+        Self {
+            command_events: Default::default(),
+            pool_cleared_events: Default::default(),
+            event_broadcaster,
+        }
+    }
+
+    fn handle(&self, event: impl Into<Event>) {
+        // this only errors if no receivers are listening which isn't a concern here.
+        let _: std::result::Result<usize, SendError<Event>> =
+            self.event_broadcaster.send(event.into());
+    }
+
+    pub fn subscribe(&self) -> EventSubscriber {
+        EventSubscriber {
+            _handler: self,
+            receiver: self.event_broadcaster.subscribe(),
+        }
+    }
 }
 
 impl CmapEventHandler for EventHandler {
     fn handle_pool_cleared_event(&self, event: PoolClearedEvent) {
-        self.pool_cleared_events.write().unwrap().push_back(event)
+        self.handle(CmapEvent::ConnectionPoolCleared(event.clone()));
+        self.pool_cleared_events.write().unwrap().push_back(event);
+    }
+
+    fn handle_pool_ready_event(&self, event: PoolReadyEvent) {
+        self.handle(CmapEvent::ConnectionPoolReady(event))
     }
 }
 
 impl CommandEventHandler for EventHandler {
     fn handle_command_started_event(&self, event: CommandStartedEvent) {
+        self.handle(CommandEvent::CommandStartedEvent(event.clone()));
         self.command_events
             .write()
             .unwrap()
@@ -89,6 +127,7 @@ impl CommandEventHandler for EventHandler {
     }
 
     fn handle_command_failed_event(&self, event: CommandFailedEvent) {
+        self.handle(CommandEvent::CommandFailedEvent(event.clone()));
         self.command_events
             .write()
             .unwrap()
@@ -96,6 +135,7 @@ impl CommandEventHandler for EventHandler {
     }
 
     fn handle_command_succeeded_event(&self, event: CommandSucceededEvent) {
+        self.handle(CommandEvent::CommandSucceededEvent(event.clone()));
         self.command_events
             .write()
             .unwrap()
@@ -103,11 +143,42 @@ impl CommandEventHandler for EventHandler {
     }
 }
 
+#[derive(Debug)]
+pub struct EventSubscriber<'a> {
+    /// A reference to the handler this subscriber is receiving events from.
+    /// Stored here to ensure this subscriber cannot outlive the handler that is generating its
+    /// events.
+    _handler: &'a EventHandler,
+    receiver: tokio::sync::broadcast::Receiver<Event>,
+}
+
+impl EventSubscriber<'_> {
+    pub async fn wait_for_event<F>(&mut self, timeout: Duration, filter: F) -> Option<Event>
+    where
+        F: Fn(&Event) -> bool,
+    {
+        RUNTIME
+            .timeout(timeout, async {
+                loop {
+                    match self.receiver.recv().await {
+                        Ok(event) if filter(&event) => return event.into(),
+                        // the channel hit capacity and the channnel will skip a few to catch up.
+                        Err(RecvError::Lagged(_)) => continue,
+                        Err(_) => return None,
+                        _ => continue,
+                    }
+                }
+            })
+            .await
+            .ok()
+            .flatten()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct EventClient {
     client: TestClient,
-    pub command_events: EventQueue<CommandEvent>,
-    pub pool_cleared_events: EventQueue<PoolClearedEvent>,
+    handler: EventHandler,
 }
 
 impl std::ops::Deref for EventClient {
@@ -129,34 +200,37 @@ impl EventClient {
         EventClient::with_options(None, true).await
     }
 
+    async fn with_options_and_handler(
+        options: impl Into<Option<ClientOptions>>,
+        handler: impl Into<Option<EventHandler>>,
+        collect_server_info: bool,
+    ) -> Self {
+        let handler = handler.into().unwrap_or_else(EventHandler::new);
+        let client =
+            TestClient::with_handler(Some(handler.clone()), options, collect_server_info).await;
+
+        // clear events from commands used to set up client.
+        handler.command_events.write().unwrap().clear();
+
+        Self { client, handler }
+    }
+
     pub async fn with_options(
         options: impl Into<Option<ClientOptions>>,
         collect_server_info: bool,
     ) -> Self {
-        let handler = EventHandler::default();
-        let command_events = handler.command_events.clone();
-        let pool_cleared_events = handler.pool_cleared_events.clone();
-        let client = TestClient::with_handler(Some(handler), options, collect_server_info).await;
-
-        // clear events from commands used to set up client.
-        command_events.write().unwrap().clear();
-
-        Self {
-            client,
-            command_events,
-            pool_cleared_events,
-        }
+        Self::with_options_and_handler(options, None, collect_server_info).await
     }
 
     pub async fn with_additional_options(
         options: Option<ClientOptions>,
         heartbeat_freq: Option<Duration>,
         use_multiple_mongoses: Option<bool>,
+        event_handler: impl Into<Option<EventHandler>>,
         collect_server_info: bool,
     ) -> Self {
         let mut options = match options {
             Some(mut options) => {
-                options.hosts = CLIENT_OPTIONS.hosts.clone();
                 options.merge(CLIENT_OPTIONS.clone());
                 options
             }
@@ -166,7 +240,7 @@ impl EventClient {
         if TestClient::new().await.is_sharded() && use_multiple_mongoses != Some(true) {
             options.hosts = options.hosts.iter().cloned().take(1).collect();
         }
-        EventClient::with_options(options, collect_server_info).await
+        EventClient::with_options_and_handler(options, event_handler, collect_server_info).await
     }
 
     pub async fn with_uri_and_mongos_options(
@@ -200,7 +274,7 @@ impl EventClient {
         &self,
         command_name: &str,
     ) -> (CommandStartedEvent, CommandSucceededEvent) {
-        let mut command_events = self.command_events.write().unwrap();
+        let mut command_events = self.handler.command_events.write().unwrap();
 
         let mut started: Option<CommandStartedEvent> = None;
 
@@ -242,14 +316,14 @@ impl EventClient {
         }
     }
 
-    /// Gets all of the command started events for a specified command name.
-    pub fn get_command_started_events(&self, command_name: &str) -> Vec<CommandStartedEvent> {
-        let events = self.command_events.read().unwrap();
+    /// Gets all of the command started events for a specified command names.
+    pub fn get_command_started_events(&self, command_names: &[&str]) -> Vec<CommandStartedEvent> {
+        let events = self.handler.command_events.read().unwrap();
         events
             .iter()
             .filter_map(|event| match event {
                 CommandEvent::CommandStartedEvent(event) => {
-                    if event.command_name == command_name {
+                    if command_names.contains(&event.command_name.as_str()) {
                         Some(event.clone())
                     } else {
                         None
@@ -268,7 +342,7 @@ impl EventClient {
         observe_events: &Option<Vec<String>>,
         ignore_command_names: &Option<Vec<String>>,
     ) -> Vec<CommandEvent> {
-        let events = self.command_events.read().unwrap();
+        let events = self.handler.command_events.read().unwrap();
         events
             .iter()
             .cloned()
@@ -303,6 +377,35 @@ impl EventClient {
             })
             .collect()
     }
+
+    pub fn get_command_events(&self, command_names: &[&str]) -> Vec<CommandEvent> {
+        self.handler
+            .command_events
+            .write()
+            .unwrap()
+            .drain(..)
+            .filter(|event| command_names.contains(&event.command_name()))
+            .collect()
+    }
+
+    pub fn get_pool_cleared_events(&self) -> Vec<PoolClearedEvent> {
+        self.handler
+            .pool_cleared_events
+            .write()
+            .unwrap()
+            .drain(..)
+            .collect()
+    }
+
+    #[allow(dead_code)]
+    pub fn subscribe_to_events(&self) -> EventSubscriber<'_> {
+        self.handler.subscribe()
+    }
+
+    pub fn clear_cached_events(&self) {
+        self.handler.command_events.write().unwrap().clear();
+        self.handler.pool_cleared_events.write().unwrap().clear();
+    }
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -317,14 +420,5 @@ async fn command_started_event_count() {
         coll.insert_one(doc! { "x": i }, None).await.unwrap();
     }
 
-    assert_eq!(
-        client
-            .command_events
-            .read()
-            .unwrap()
-            .iter()
-            .filter(|event| event.is_command_started() && event.command_name() == "insert")
-            .count(),
-        10
-    );
+    assert_eq!(client.get_command_started_events(&["insert"]).len(), 10);
 }

@@ -21,8 +21,11 @@ pub(crate) use self::{
     },
     util::{
         assert_matches,
+        CmapEvent,
         CommandEvent,
+        Event,
         EventClient,
+        EventHandler,
         FailCommandOptions,
         FailPoint,
         FailPointMode,

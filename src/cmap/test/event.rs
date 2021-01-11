@@ -44,6 +44,10 @@ impl CmapEventHandler for EventHandler {
         self.handle(event);
     }
 
+    fn handle_pool_ready_event(&self, event: PoolReadyEvent) {
+        self.handle(event);
+    }
+
     fn handle_pool_cleared_event(&self, event: PoolClearedEvent) {
         self.handle(event);
     }
@@ -110,6 +114,20 @@ impl EventSubscriber<'_> {
             .ok()
             .flatten()
     }
+
+    /// Returns the received events without waiting for any more.
+    pub fn all<F>(&mut self, filter: F) -> Vec<Event>
+    where
+        F: Fn(&Event) -> bool,
+    {
+        let mut events = Vec::new();
+        while let Ok(event) = self.receiver.try_recv() {
+            if filter(&event) {
+                events.push(event);
+            }
+        }
+        events
+    }
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -119,6 +137,7 @@ pub enum Event {
     #[serde(deserialize_with = "self::deserialize_pool_created")]
     ConnectionPoolCreated(PoolCreatedEvent),
     ConnectionPoolClosed(PoolClosedEvent),
+    ConnectionPoolReady(PoolReadyEvent),
     ConnectionCreated(ConnectionCreatedEvent),
     ConnectionReady(ConnectionReadyEvent),
     ConnectionClosed(ConnectionClosedEvent),
@@ -134,6 +153,7 @@ impl Event {
     pub fn name(&self) -> &'static str {
         match self {
             Event::ConnectionPoolCreated(_) => "ConnectionPoolCreated",
+            Event::ConnectionPoolReady(_) => "ConnectionPoolReady",
             Event::ConnectionPoolClosed(_) => "ConnectionPoolClosed",
             Event::ConnectionCreated(_) => "ConnectionCreated",
             Event::ConnectionReady(_) => "ConnectionReady",

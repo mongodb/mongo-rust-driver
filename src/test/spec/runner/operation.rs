@@ -30,10 +30,7 @@ use crate::{
         UpdateModifications,
         UpdateOptions,
     },
-    test::{
-        util::{CommandEvent, EventClient},
-        OperationObject,
-    },
+    test::{util::EventClient, OperationObject},
     Collection,
     Database,
 };
@@ -844,17 +841,5 @@ impl EventClient {
 
     pub async fn run_client_operation(&self, operation: &AnyTestOperation) -> Result<Option<Bson>> {
         operation.execute_on_client(self).await
-    }
-
-    pub fn collect_events(&self, operation: &AnyTestOperation) -> Vec<CommandEvent> {
-        self.command_events
-            .write()
-            .unwrap()
-            .drain(..)
-            .filter(|event| {
-                event.is_command_started()
-                    && operation.command_names().contains(&event.command_name())
-            })
-            .collect()
     }
 }

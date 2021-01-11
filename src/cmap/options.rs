@@ -45,6 +45,12 @@ pub struct ConnectionPoolOptions {
     #[serde(skip)]
     pub event_handler: Option<Arc<dyn CmapEventHandler>>,
 
+    /// How often the background thread performs its maintenance (e.g. ensure minPoolSize).
+    #[cfg(test)]
+    #[builder(default)]
+    #[serde(skip)]
+    pub maintenance_frequency: Option<Duration>,
+
     /// Connections that have been ready for usage in the pool for longer than `max_idle_time` will
     /// not be used.
     ///
@@ -69,6 +75,12 @@ pub struct ConnectionPoolOptions {
     /// The default is that no minimum is enforced
     #[builder(default)]
     pub min_pool_size: Option<u32>,
+
+    /// Whether to start the pool as "ready" or not.
+    /// For tests only.
+    #[cfg(test)]
+    #[builder(default)]
+    pub ready: Option<bool>,
 
     /// The declared API version
     ///

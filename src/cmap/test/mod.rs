@@ -1,4 +1,4 @@
-mod event;
+pub(crate) mod event;
 mod file;
 mod integration;
 
@@ -16,6 +16,7 @@ use crate::{
     error::{Error, Result},
     options::TlsOptions,
     runtime::AsyncJoinHandle,
+    sdam::{ServerUpdate, ServerUpdateSender},
     test::{
         assert_matches,
         run_spec_test,
@@ -145,11 +146,29 @@ impl Executor {
     async fn execute_test(self) {
         let mut subscriber = self.state.handler.subscribe();
 
+        // CMAP spec requires setting this to 50ms.
+        let mut options = self.pool_options;
+        options.maintenance_frequency = Some(Duration::from_millis(50));
+
+        let (update_sender, mut update_receiver) = ServerUpdateSender::channel();
+
         let pool = ConnectionPool::new(
             CLIENT_OPTIONS.hosts[0].clone(),
             Default::default(),
-            Some(self.pool_options),
+            update_sender,
+            Some(options),
         );
+
+        // Mock a monitoring task responding to errors reported by the pool.
+        let manager = pool.manager.clone();
+        RUNTIME.execute(async move {
+            while let Some(update) = update_receiver.recv().await {
+                match update.message() {
+                    ServerUpdate::Error { .. } => manager.clear(),
+                }
+            }
+        });
+
         *self.state.pool.write().await = Some(pool);
 
         let mut error: Option<Error> = None;
@@ -180,11 +199,10 @@ impl Executor {
 
         let ignored_event_names = self.ignored_event_names;
         let description = self.description;
+        let filter = |e: &Event| !ignored_event_names.iter().any(|name| e.name() == name);
         for expected_event in self.events {
             let actual_event = subscriber
-                .wait_for_event(EVENT_TIMEOUT, |e| {
-                    !ignored_event_names.iter().any(|name| e.name() == name)
-                })
+                .wait_for_event(EVENT_TIMEOUT, filter)
                 .await
                 .unwrap_or_else(|| {
                     panic!(
@@ -194,6 +212,8 @@ impl Executor {
                 });
             assert_matches(&actual_event, &expected_event, Some(description.as_str()));
         }
+
+        assert_eq!(subscriber.all(filter), Vec::new(), "{}", description);
     }
 }
 
@@ -212,10 +232,23 @@ impl Operation {
                     .wait_until_complete()
                     .await?
             }
-            Operation::WaitForEvent { event, count } => {
-                while state.count_events(&event) < count {
-                    RUNTIME.delay_for(Duration::from_millis(100)).await;
-                }
+            Operation::WaitForEvent {
+                event,
+                count,
+                timeout,
+            } => {
+                let event_name = event.clone();
+                let task = async move {
+                    while state.count_events(&event) < count {
+                        RUNTIME.delay_for(Duration::from_millis(100)).await;
+                    }
+                };
+                RUNTIME
+                    .timeout(timeout.unwrap_or(EVENT_TIMEOUT), task)
+                    .await
+                    .unwrap_or_else(|_| {
+                        panic!("waiting for {} {} event(s) timed out", count, event_name)
+                    });
             }
             Operation::CheckOut { label } => {
                 if let Some(pool) = state.pool.read().await.deref() {
@@ -250,17 +283,19 @@ impl Operation {
                     });
             }
             Operation::Clear => {
-                let mut subscriber = state.handler.subscribe();
-
-                if let Some(pool) = state.pool.write().await.deref() {
+                if let Some(pool) = state.pool.read().await.as_ref() {
+                    let mut subscriber = pool.subscribe_to_generation_updates();
                     pool.clear();
-                    // wait for event to be emitted to ensure drop has completed.
+
                     subscriber
-                        .wait_for_event(EVENT_TIMEOUT, |e| {
-                            matches!(e, Event::ConnectionPoolCleared(_))
-                        })
+                        .wait_for_generation_change(EVENT_TIMEOUT)
                         .await
-                        .expect("did not receive ConnectionPoolCleared event after clearing pool");
+                        .expect("generation did not change after clearing pool");
+                }
+            }
+            Operation::Ready => {
+                if let Some(pool) = state.pool.read().await.deref() {
+                    pool.mark_as_ready().await;
                 }
             }
             Operation::Close => {
@@ -343,6 +378,7 @@ impl Matchable for Event {
             ) => actual.reason == expected.reason,
             (Event::ConnectionCheckOutStarted(_), Event::ConnectionCheckOutStarted(_)) => true,
             (Event::ConnectionPoolCleared(_), Event::ConnectionPoolCleared(_)) => true,
+            (Event::ConnectionPoolReady(_), Event::ConnectionPoolReady(_)) => true,
             (Event::ConnectionPoolClosed(_), Event::ConnectionPoolClosed(_)) => true,
             _ => false,
         }

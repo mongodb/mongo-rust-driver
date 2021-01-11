@@ -9,7 +9,7 @@ use std::{
     },
 };
 
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, RwLockWriteGuard};
 
 use self::server::Server;
 use super::{
@@ -29,10 +29,10 @@ use crate::{
             server::{ServerDescription, ServerType},
             topology::{server_selection, TopologyDescriptionDiff, TopologyType},
         },
-        monitor::Monitor,
         srv_polling::SrvPollingMonitor,
         TopologyMessageManager,
     },
+    RUNTIME,
 };
 
 /// A strong reference to the topology, which includes the current state as well as the client
@@ -87,26 +87,36 @@ impl Topology {
 
         let http_client = HttpClient::default();
 
-        let servers = hosts
-            .into_iter()
-            .map(|address| {
-                (
-                    address.clone(),
-                    Server::new(address, &ClientOptions::default(), http_client.clone()).into(),
-                )
-            })
-            .collect();
-
         let state = TopologyState {
             description,
-            servers,
-            http_client,
+            servers: Default::default(),
+            http_client: http_client.clone(),
         };
 
-        Self {
+        let topology = Self {
             state: Arc::new(RwLock::new(state)),
             common,
+        };
+
+        // we can block in place here because we're the only ones with access to the lock, so it
+        // should be acquired immediately.
+        let mut topology_state = RUNTIME.block_in_place(topology.state.write());
+
+        for address in hosts {
+            topology_state.servers.insert(
+                address.clone(),
+                Server::create(
+                    address,
+                    &ClientOptions::default(),
+                    topology.downgrade(),
+                    http_client.clone(),
+                )
+                .0,
+            );
         }
+
+        drop(topology_state);
+        topology
     }
 
     /// Creates a new Topology given the `options`.
@@ -121,26 +131,27 @@ impl Topology {
             options: options.clone(),
         };
 
-        let mut topology_state = TopologyState {
+        let http_client = HttpClient::default();
+
+        let topology_state = TopologyState {
             description,
             servers: Default::default(),
-            http_client: Default::default(),
+            http_client,
         };
 
-        for address in hosts {
-            topology_state.add_new_server(address.clone(), options.clone());
-        }
-
-        let servers = topology_state.servers.clone();
         let state = Arc::new(RwLock::new(topology_state));
         let topology = Topology { state, common };
 
-        for (address, server) in servers {
-            Monitor::start(address, Arc::downgrade(&server), topology.downgrade());
+        // we can block in place here because we're the only ones with access to the lock, so it
+        // should be acquired immediately.
+        let mut topology_state = RUNTIME.block_in_place(topology.state.write());
+        for address in hosts {
+            topology_state.add_new_server(address, options.clone(), &topology.downgrade());
         }
 
         SrvPollingMonitor::start(topology.downgrade());
 
+        drop(topology_state);
         Ok(topology)
     }
 
@@ -218,11 +229,17 @@ impl Topology {
         self.common.message_manager.notify_topology_changed();
     }
 
-    /// Handles an error that occurs before the handshake has completed during an operation.
-    pub(crate) async fn handle_pre_handshake_error(&self, error: Error, address: StreamAddress) {
-        if error.is_network_error() {
-            self.mark_server_as_unknown(error, address).await;
+    /// Updates the topology based on an error that occurs before the handshake has completed during
+    /// an operation.
+    pub(crate) async fn handle_pre_handshake_error(&self, error: Error, server: &Server) -> bool {
+        let state_lock = self.state.write().await;
+        let changed = self
+            .mark_server_as_unknown(error, &server, state_lock)
+            .await;
+        if changed {
+            server.pool.clear();
         }
+        changed
     }
 
     /// Handles an error that occurs after the handshake has completed during an operation.
@@ -235,14 +252,15 @@ impl Topology {
         // If we encounter certain errors, we must update the topology as per the
         // SDAM spec.
         if error.is_non_timeout_network_error() {
-            self.mark_server_as_unknown(error, server.address.clone())
+            let state_lock = self.state.write().await;
+            self.mark_server_as_unknown(error, &server, state_lock)
                 .await;
-            server.clear_connection_pool();
+            server.pool.clear();
         } else if error.is_recovering() || error.is_not_master() {
-            self.mark_server_as_unknown(error.clone(), server.address.clone())
-                .await;
+            let state_lock = self.state.write().await;
 
-            self.common.message_manager.request_topology_check();
+            self.mark_server_as_unknown(error.clone(), &server, state_lock)
+                .await;
 
             let wire_version = conn
                 .stream_description()
@@ -254,39 +272,68 @@ impl Topology {
             // in 4.2+, we only clear connection pool if we've received a
             // "node is shutting down" error. Otherwise, we always clear the pool.
             if wire_version < 8 || error.is_shutting_down() {
-                server.clear_connection_pool();
+                server.pool.clear();
             }
+
+            self.common.message_manager.request_topology_check();
         }
     }
 
     /// Marks a server in the cluster as unknown due to the given `error`.
-    async fn mark_server_as_unknown(&self, error: Error, address: StreamAddress) {
-        let description = ServerDescription::new(address, Some(Err(error)));
-        self.update(description).await;
+    /// Returns whether the topology changed as a result of the update.
+    async fn mark_server_as_unknown(
+        &self,
+        error: Error,
+        server: &Server,
+        state_lock: RwLockWriteGuard<'_, TopologyState>,
+    ) -> bool {
+        let description = ServerDescription::new(server.address.clone(), Some(Err(error)));
+        self.update_and_notify(server, description, state_lock)
+            .await
     }
 
-    /// Updates the topology using the given `ServerDescription`. Monitors for new servers will
-    /// be started as necessary.
+    /// Update the topology using the given server description.
     ///
-    /// Returns true if the topology changed as a result of the update and false otherwise.
-    pub(crate) async fn update(&self, server_description: ServerDescription) -> bool {
+    /// Because this method takes a lock guard as a parameter, it is mainly useful for sychronizing
+    /// updates to the topology with other state management.
+    ///
+    /// Returns a boolean indicating whether the topology changed as a result of the update.
+    async fn update_and_notify(
+        &self,
+        server: &Server,
+        server_description: ServerDescription,
+        mut state_lock: RwLockWriteGuard<'_, TopologyState>,
+    ) -> bool {
+        let is_available = server_description.is_available();
         // TODO RUST-232: Theoretically, `TopologyDescription::update` can return an error. However,
         // this can only happen if we try to access a field from the isMaster response when an error
         // occurred during the check. In practice, this can't happen, because the SDAM algorithm
         // doesn't check the fields of an Unknown server, and we only return Unknown server
         // descriptions when errors occur. Once we implement SDAM monitoring, we can
         // properly inform users of errors that occur here.
-        match self.state.write().await.update(
-            server_description,
-            &self.common.options,
-            self.downgrade(),
-        ) {
+        match state_lock.update(server_description, &self.common.options, self.downgrade()) {
             Ok(Some(_)) => {
+                if is_available {
+                    server.pool.mark_as_ready().await;
+                }
                 self.common.message_manager.notify_topology_changed();
                 true
             }
             _ => false,
         }
+    }
+
+    /// Updates the topology using the given `ServerDescription`. Monitors for new servers will
+    /// be started as necessary.
+    ///
+    /// Returns true if the topology changed as a result of the update and false otherwise.
+    pub(crate) async fn update(
+        &self,
+        server: &Server,
+        server_description: ServerDescription,
+    ) -> bool {
+        self.update_and_notify(server, server_description, self.state.write().await)
+            .await
     }
 
     /// Updates the hosts included in this topology, starting and stopping monitors as necessary.
@@ -348,6 +395,18 @@ impl Topology {
     pub(super) async fn is_unknown(&self) -> bool {
         self.state.read().await.description.topology_type() == TopologyType::Unknown
     }
+
+    pub(crate) async fn get_server_description(
+        &self,
+        address: &StreamAddress,
+    ) -> Option<ServerDescription> {
+        self.state
+            .read()
+            .await
+            .description
+            .get_server_description(address)
+            .cloned()
+    }
 }
 
 impl WeakTopology {
@@ -372,17 +431,24 @@ impl TopologyState {
     /// Adds a new server to the cluster.
     ///
     /// A reference to the containing Topology is needed in order to start the monitoring task.
-    fn add_new_server(&mut self, address: StreamAddress, options: ClientOptions) {
+    fn add_new_server(
+        &mut self,
+        address: StreamAddress,
+        options: ClientOptions,
+        topology: &WeakTopology,
+    ) {
         if self.servers.contains_key(&address) {
             return;
         }
 
-        let server = Arc::new(Server::new(
+        let (server, monitor) = Server::create(
             address.clone(),
             &options,
+            topology.clone(),
             self.http_client.clone(),
-        ));
+        );
         self.servers.insert(address, server);
+        monitor.start();
     }
 
     /// Updates the given `command` as needed based on the `critiera`.
@@ -414,10 +480,9 @@ impl TopologyState {
         self.description.update(server)?;
 
         let hosts: HashSet<_> = self.description.server_addresses().cloned().collect();
-        self.sync_hosts(&hosts, options);
+        self.sync_hosts(&hosts, options, &topology);
 
         let diff = old_description.diff(&self.description);
-        self.start_monitoring_new_hosts(diff.as_ref(), topology);
         Ok(diff)
     }
 
@@ -432,37 +497,21 @@ impl TopologyState {
         let old_description = self.description.clone();
         self.description.sync_hosts(&hosts);
 
-        self.sync_hosts(&hosts, options);
+        self.sync_hosts(&hosts, options, &topology);
 
-        let diff = old_description.diff(&self.description);
-        self.start_monitoring_new_hosts(diff.as_ref(), topology);
-        diff
+        old_description.diff(&self.description)
     }
 
-    fn start_monitoring_new_hosts(
+    fn sync_hosts(
         &mut self,
-        diff: Option<&TopologyDescriptionDiff>,
-        topology: WeakTopology,
+        hosts: &HashSet<StreamAddress>,
+        options: &ClientOptions,
+        topology: &WeakTopology,
     ) {
-        if let Some(ref d) = diff {
-            for server in d.new_addresses.iter() {
-                self.start_monitoring_server(server.clone(), topology.clone());
-            }
-        }
-    }
-
-    fn sync_hosts(&mut self, hosts: &HashSet<StreamAddress>, options: &ClientOptions) {
         for address in hosts.iter() {
-            self.add_new_server(address.clone(), options.clone());
+            self.add_new_server(address.clone(), options.clone(), topology);
         }
 
         self.servers.retain(|host, _| hosts.contains(host));
-    }
-
-    /// Start a monitor for the server at the given address if it is part of the topology.
-    fn start_monitoring_server(&self, address: StreamAddress, topology: WeakTopology) {
-        if let Some(server) = self.servers.get(&address) {
-            Monitor::start(address, Arc::downgrade(&server), topology);
-        }
     }
 }

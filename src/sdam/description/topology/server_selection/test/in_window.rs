@@ -151,7 +151,7 @@ async fn load_balancing_test() {
     /// min_share is the lower bound for the % of times the the less selected server
     /// was selected. max_share is the upper bound.
     async fn do_test(client: &mut EventClient, min_share: f64, max_share: f64) {
-        client.command_events.write().unwrap().clear();
+        client.clear_cached_events();
 
         let mut handles: Vec<AsyncJoinHandle<()>> = Vec::new();
         for _ in 0..10 {
@@ -172,7 +172,7 @@ async fn load_balancing_test() {
         futures::future::join_all(handles).await;
 
         let mut tallies: HashMap<StreamAddress, u32> = HashMap::new();
-        for event in client.get_command_started_events("find") {
+        for event in client.get_command_started_events(&["find"]) {
             *tallies.entry(event.connection.address.clone()).or_insert(0) += 1;
         }
 

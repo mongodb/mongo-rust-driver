@@ -1,9 +1,10 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use serde::Deserialize;
 
 use super::{event::Event, State};
 use crate::{
+    bson_util,
     cmap::options::ConnectionPoolOptions,
     error::{ErrorKind, Result},
     test::RunOn,
@@ -59,14 +60,31 @@ impl ThreadedOperation {
 #[serde(tag = "name")]
 #[serde(rename_all = "camelCase")]
 pub enum Operation {
-    Start { target: String },
-    Wait { ms: u64 },
-    WaitForThread { target: String },
-    WaitForEvent { event: String, count: usize },
-    CheckOut { label: Option<String> },
-    CheckIn { connection: String },
+    Start {
+        target: String,
+    },
+    Wait {
+        ms: u64,
+    },
+    WaitForThread {
+        target: String,
+    },
+    WaitForEvent {
+        event: String,
+        count: usize,
+        #[serde(deserialize_with = "bson_util::deserialize_duration_from_u64_millis")]
+        #[serde(default)]
+        timeout: Option<Duration>,
+    },
+    CheckOut {
+        label: Option<String>,
+    },
+    CheckIn {
+        connection: String,
+    },
     Clear,
     Close,
+    Ready,
 }
 
 #[derive(Debug, Deserialize)]

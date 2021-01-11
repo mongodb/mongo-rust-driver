@@ -1,12 +1,7 @@
 use tokio::sync::{mpsc, oneshot};
 
 use super::{worker::PoolWorkerHandle, Connection};
-use crate::{
-    error::{ErrorKind, Result},
-    options::StreamAddress,
-    runtime::AsyncJoinHandle,
-    RUNTIME,
-};
+use crate::{error::Result, options::StreamAddress, runtime::AsyncJoinHandle, RUNTIME};
 use std::time::Duration;
 
 /// Returns a new requester/receiver pair.
@@ -21,7 +16,7 @@ pub(super) fn channel(
             sender,
             handle,
         },
-        ConnectionRequestReceiver::new(receiver),
+        ConnectionRequestReceiver { receiver },
     )
 }
 
@@ -31,42 +26,33 @@ pub(super) fn channel(
 #[derive(Clone, Debug)]
 pub(super) struct ConnectionRequester {
     address: StreamAddress,
-    sender: mpsc::UnboundedSender<oneshot::Sender<RequestedConnection>>,
+    sender: mpsc::UnboundedSender<oneshot::Sender<ConnectionRequestResult>>,
     handle: PoolWorkerHandle,
 }
 
 impl ConnectionRequester {
     /// Request a connection from the pool that owns the receiver end of this requester.
-    /// Returns an error if it takes longer than wait_queue_timeout before either a connection is
-    /// received or an establishment begins.
-    pub(super) async fn request(&self, wait_queue_timeout: Option<Duration>) -> Result<Connection> {
+    /// Returns None if it takes longer than wait_queue_timeout before the pool returns a result.
+    pub(super) async fn request(
+        &self,
+        wait_queue_timeout: Option<Duration>,
+    ) -> Option<ConnectionRequestResult> {
         let (sender, receiver) = oneshot::channel();
 
         // this only errors if the receiver end is dropped, which can't happen because
         // we own a handle to the worker, keeping it alive.
         self.sender.send(sender).unwrap();
 
-        let response = match wait_queue_timeout {
+        match wait_queue_timeout {
             Some(timeout) => RUNTIME
                 .timeout(timeout, receiver)
                 .await
                 .map(|r| r.unwrap()) // see comment below as to why this is safe
-                .map_err(|_| {
-                    ErrorKind::WaitQueueTimeoutError {
-                        address: self.address.clone(),
-                    }
-                    .into()
-                }),
+                .ok(),
 
             // similarly, the receiver only returns an error if the sender is dropped, which
             // can't happen due to the handle.
-            None => Ok(receiver.await.unwrap()),
-        };
-
-        match response {
-            Ok(RequestedConnection::Pooled(c)) => Ok(c),
-            Ok(RequestedConnection::Establishing(task)) => task.await,
-            Err(e) => Err(e),
+            None => Some(receiver.await.unwrap()),
         }
     }
 }
@@ -74,42 +60,22 @@ impl ConnectionRequester {
 /// Receiving end of a given ConnectionRequester.
 #[derive(Debug)]
 pub(super) struct ConnectionRequestReceiver {
-    receiver: mpsc::UnboundedReceiver<oneshot::Sender<RequestedConnection>>,
-    cache: Option<ConnectionRequest>,
+    receiver: mpsc::UnboundedReceiver<oneshot::Sender<ConnectionRequestResult>>,
 }
 
 impl ConnectionRequestReceiver {
-    pub(super) fn new(
-        receiver: mpsc::UnboundedReceiver<oneshot::Sender<RequestedConnection>>,
-    ) -> Self {
-        Self {
-            receiver,
-            cache: None,
-        }
-    }
-
     pub(super) async fn recv(&mut self) -> Option<ConnectionRequest> {
-        match self.cache.take() {
-            Some(request) => Some(request),
-            None => self
-                .receiver
-                .recv()
-                .await
-                .map(|sender| ConnectionRequest { sender }),
-        }
-    }
-
-    /// Put a request back into the receiver. Next call to `recv` will immediately
-    /// return this value.
-    pub(super) fn cache_request(&mut self, request: ConnectionRequest) {
-        self.cache = Some(request);
+        self.receiver
+            .recv()
+            .await
+            .map(|sender| ConnectionRequest { sender })
     }
 }
 
 /// Struct encapsulating a request for a connection.
 #[derive(Debug)]
 pub(super) struct ConnectionRequest {
-    sender: oneshot::Sender<RequestedConnection>,
+    sender: oneshot::Sender<ConnectionRequestResult>,
 }
 
 impl ConnectionRequest {
@@ -117,26 +83,30 @@ impl ConnectionRequest {
     /// establishing asynchronously.
     pub(super) fn fulfill(
         self,
-        conn: RequestedConnection,
-    ) -> std::result::Result<(), RequestedConnection> {
-        self.sender.send(conn)
+        result: ConnectionRequestResult,
+    ) -> std::result::Result<(), ConnectionRequestResult> {
+        self.sender.send(result)
     }
 }
 
 #[derive(Debug)]
-pub(super) enum RequestedConnection {
+pub(super) enum ConnectionRequestResult {
     /// A connection that was already established and was simply checked out of the pool.
     Pooled(Connection),
 
     /// A new connection in the process of being established.
     /// The handle can be awaited upon to receive the established connection.
     Establishing(AsyncJoinHandle<Result<Connection>>),
+
+    /// The request was rejected because the pool was cleared before it could
+    /// be fulfilled.
+    PoolCleared,
 }
 
-impl RequestedConnection {
+impl ConnectionRequestResult {
     pub(super) fn unwrap_pooled_connection(self) -> Connection {
         match self {
-            RequestedConnection::Pooled(c) => c,
+            ConnectionRequestResult::Pooled(c) => c,
             _ => panic!("attempted to unwrap pooled connection when was establishing"),
         }
     }
