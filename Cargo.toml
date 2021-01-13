@@ -83,7 +83,7 @@ version = "0.11.5"
 optional = true
 
 [dependencies.tokio]
-version = "1.0.0"
+version = "1.0.1"
 features = ["io-util", "sync", "macros"]
 
 [dependencies.tokio-rustls]
