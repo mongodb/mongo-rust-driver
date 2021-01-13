@@ -74,6 +74,7 @@ impl AsyncTcpStream {
         };
         let socket = Socket::new(domain, Type::stream(), Some(Protocol::tcp()))?;
         socket.set_keepalive(Some(KEEPALIVE_TIME))?;
+        socket.set_nonblocking(true)?;
 
         let address: SockAddr = address.clone().into();
         if connect_timeout == Duration::from_secs(0) {
