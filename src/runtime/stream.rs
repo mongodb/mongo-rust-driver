@@ -91,7 +91,9 @@ impl AsyncTcpStream {
     async fn try_connect(address: &SocketAddr, connect_timeout: Duration) -> Result<Self> {
         use tokio::net::TcpStream;
 
-        let stream = TcpStream::from_std(Self::try_connect_common(address, connect_timeout)?)?;
+        let addr_c = address.clone();
+        let connect_task = tokio::task::spawn_blocking(move || Self::try_connect_common(&addr_c, connect_timeout));
+        let stream = TcpStream::from_std(connect_task.await.map_err(|e| std::io::Error::from(e))??)?;
         Ok(stream.into())
     }
 
