@@ -79,7 +79,7 @@ pub(crate) struct ServerDescription {
 
 impl PartialEq for ServerDescription {
     fn eq(&self, other: &Self) -> bool {
-        if self.address == other.address && self.server_type == other.server_type {
+        if self.address != other.address || self.server_type != other.server_type {
             return false;
         }
 

@@ -107,7 +107,7 @@ async fn select_in_window() {
     run_spec_test(&["server-selection", "in_window"], run_test).await;
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(threaded_scheduler))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn load_balancing_test() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;

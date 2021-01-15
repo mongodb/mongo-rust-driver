@@ -21,12 +21,12 @@ exclude = [
 
 [features]
 default = ["tokio-runtime"]
-tokio-runtime = ["tokio/dns", "tokio/macros", "tokio/rt-core", "tokio/tcp", "tokio/rt-threaded", "tokio/time", "reqwest", "serde_bytes"]
-async-std-runtime = ["async-std", "async-std/attributes"]
+tokio-runtime = ["tokio/macros", "tokio/net", "tokio/rt", "tokio/time", "reqwest", "serde_bytes"]
+async-std-runtime = ["async-std", "async-std/attributes", "async-std-resolver", "tokio-util/compat"]
 sync = ["async-std-runtime"]
 
 [dependencies]
-async-trait = "0.1.24"
+async-trait = "0.1.42"
 base64 = "0.11.0"
 bitflags = "1.1.0"
 bson = "1.1.0"
@@ -49,8 +49,8 @@ stringprep = "0.1.2"
 strsim = "0.10.0"
 take_mut = "0.2.2"
 time = "0.1.42"
-trust-dns-proto = "0.19.4"
-trust-dns-resolver = "0.19.5"
+trust-dns-proto = "0.20.0"
+trust-dns-resolver = "0.20.0"
 typed-builder = "0.4.0"
 version_check = "0.9.1"
 webpki = "0.21.0"
@@ -60,18 +60,22 @@ webpki-roots = "0.18.0"
 version = "1.6.2"
 optional = true
 
+[dependencies.async-std-resolver]
+version = "0.20.0"
+optional = true
+
 [dependencies.pbkdf2]
 version = "0.3.0"
 default-features = false
 
 [dependencies.reqwest]
-version = "0.10.6"
+version = "0.11.0"
 optional = true
 default-features = false
 features = ["json", "rustls-tls"]
 
 [dependencies.rustls]
-version = "0.17.0"
+version = "0.19.0"
 features = ["dangerous_configuration"]
 
 [dependencies.serde]
@@ -83,12 +87,16 @@ version = "0.11.5"
 optional = true
 
 [dependencies.tokio]
-version = "~0.2.18"
+version = "1.0.1"
 features = ["io-util", "sync", "macros"]
 
 [dependencies.tokio-rustls]
-version = "0.13.0"
+version = "0.22.0"
 features = ["dangerous_configuration"]
+
+[dependencies.tokio-util]
+version = "0.6.1"
+features = ["io"]
 
 [dependencies.uuid]
 version = "0.8.1"

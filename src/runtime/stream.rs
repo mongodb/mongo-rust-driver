@@ -8,7 +8,7 @@ use std::{
 };
 
 use futures::io::{AsyncRead, AsyncWrite};
-use tokio::io::{AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite};
+use tokio::io::{AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite, ReadBuf};
 use tokio_rustls::TlsConnector;
 use webpki::DNSNameRef;
 
@@ -74,8 +74,12 @@ impl AsyncTcpStream {
             timeout(connect_timeout, stream_future).await??
         };
 
-        stream.set_keepalive(Some(KEEPALIVE_TIME))?;
         stream.set_nodelay(true)?;
+
+        let socket = socket2::Socket::from(stream.into_std()?);
+        socket.set_keepalive(Some(KEEPALIVE_TIME))?;
+        let std_stream = socket.into_tcp_stream();
+        let stream = TcpStream::from_std(std_stream)?;
 
         Ok(stream.into())
     }
@@ -103,14 +107,6 @@ impl AsyncTcpStream {
         stream.set_nodelay(true)?;
 
         Ok(stream.into())
-    }
-
-    pub(crate) async fn connect_socket_addr(
-        address: &SocketAddr,
-        connect_timeout: Option<Duration>,
-    ) -> Result<Self> {
-        let timeout = connect_timeout.unwrap_or(DEFAULT_CONNECT_TIMEOUT);
-        Self::try_connect(address, timeout).await
     }
 
     async fn connect(address: &StreamAddress, connect_timeout: Option<Duration>) -> Result<Self> {
@@ -165,12 +161,14 @@ impl AsyncRead for AsyncStream {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
+        mut buf: &mut [u8],
     ) -> Poll<std::io::Result<usize>> {
         match self.deref_mut() {
             Self::Null => Poll::Ready(Ok(0)),
             Self::Tcp(ref mut inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
-            Self::Tls(ref mut inner) => Pin::new(inner).poll_read(cx, buf),
+            Self::Tls(ref mut inner) => {
+                tokio_util::io::poll_read_buf(Pin::new(inner), cx, &mut buf)
+            }
         }
     }
 }
@@ -209,14 +207,14 @@ impl AsyncRead for AsyncTcpStream {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
+        // We need `mut` here for the tokio impl, but it isn't used by the async-std version, so we
+        // suppress the warning.
+        #[allow(unused_mut)] mut buf: &mut [u8],
     ) -> Poll<std::io::Result<usize>> {
         match self.deref_mut() {
             #[cfg(feature = "tokio-runtime")]
             Self::Tokio(ref mut stream) => {
-                use tokio::io::AsyncRead;
-
-                Pin::new(stream).poll_read(cx, buf)
+                tokio_util::io::poll_read_buf(Pin::new(stream), cx, &mut buf)
             }
 
             #[cfg(feature = "async-std-runtime")]
@@ -277,11 +275,21 @@ impl AsyncWrite for AsyncTcpStream {
 
 impl TokioAsyncRead for AsyncTcpStream {
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<tokio::io::Result<usize>> {
-        AsyncRead::poll_read(self, cx, buf)
+        buf: &mut ReadBuf,
+    ) -> Poll<tokio::io::Result<()>> {
+        match self.deref_mut() {
+            #[cfg(feature = "tokio-runtime")]
+            Self::Tokio(ref mut inner) => Pin::new(inner).poll_read(cx, buf),
+
+            #[cfg(feature = "async-std-runtime")]
+            Self::AsyncStd(ref mut inner) => {
+                use tokio_util::compat::FuturesAsyncReadCompatExt;
+
+                Pin::new(&mut inner.compat()).poll_read(cx, buf)
+            }
+        }
     }
 }
 

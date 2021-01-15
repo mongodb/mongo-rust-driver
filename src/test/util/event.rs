@@ -5,7 +5,7 @@ use std::{
 };
 
 use tokio::sync::{
-    broadcast::{RecvError, SendError},
+    broadcast::error::{RecvError, SendError},
     RwLockReadGuard,
 };
 

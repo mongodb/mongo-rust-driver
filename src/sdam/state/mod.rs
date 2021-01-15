@@ -209,19 +209,15 @@ impl Topology {
     }
 
     /// Subscribe to notifications of requests to perform a server check.
-    pub(crate) async fn subscribe_to_topology_check_requests(&self) -> TopologyMessageSubscriber {
+    pub(crate) fn subscribe_to_topology_check_requests(&self) -> TopologyMessageSubscriber {
         self.common
             .message_manager
             .subscribe_to_topology_check_requests()
-            .await
     }
 
     /// Subscribe to notifications that the topology has been updated.
-    pub(crate) async fn subscribe_to_topology_changes(&self) -> TopologyMessageSubscriber {
-        self.common
-            .message_manager
-            .subscribe_to_topology_changes()
-            .await
+    pub(crate) fn subscribe_to_topology_changes(&self) -> TopologyMessageSubscriber {
+        self.common.message_manager.subscribe_to_topology_changes()
     }
 
     /// Wakes all tasks waiting for a topology change.
@@ -316,7 +312,6 @@ impl Topology {
                 if is_available {
                     server.pool.mark_as_ready().await;
                 }
-                self.common.message_manager.notify_topology_changed();
                 true
             }
             _ => false,

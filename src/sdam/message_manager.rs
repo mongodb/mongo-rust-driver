@@ -1,6 +1,6 @@
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
-use tokio::sync::watch::{self, Receiver, Sender};
+use tokio::sync::broadcast::{self, Receiver, Sender};
 
 use crate::RUNTIME;
 
@@ -8,44 +8,40 @@ use crate::RUNTIME;
 /// background tasks.
 #[derive(Clone, Debug)]
 pub(crate) struct TopologyMessageManager {
-    topology_check_requester: Arc<Sender<()>>,
-    topology_check_listener: Receiver<()>,
-    topology_change_notifier: Arc<Sender<()>>,
-    topology_change_listener: Receiver<()>,
+    topology_check_requester: Sender<()>,
+    topology_change_notifier: Sender<()>,
 }
 
 impl TopologyMessageManager {
     /// Constructs a new TopologyMessageManager.
     pub(super) fn new() -> Self {
-        let (topology_check_requester, topology_check_listener) = watch::channel(());
-        let (topology_change_notifier, topology_change_listener) = watch::channel(());
+        let (topology_check_requester, _) = broadcast::channel(1);
+        let (topology_change_notifier, _) = broadcast::channel(1);
 
         Self {
-            topology_check_requester: Arc::new(topology_check_requester),
-            topology_check_listener,
-            topology_change_notifier: Arc::new(topology_change_notifier),
-            topology_change_listener,
+            topology_check_requester,
+            topology_change_notifier,
         }
     }
 
     /// Requests that the SDAM background tasks check the topology immediately. This should be
     /// called by each server selection operation when it fails to select a server.
     pub(super) fn request_topology_check(&self) {
-        let _ = self.topology_check_requester.broadcast(());
+        let _: Result<_, _> = self.topology_check_requester.send(());
     }
 
     /// Notifies the server selection operations that the topology has changed. This should be
     /// called by SDAM background tasks after a topology check if the topology has changed.
     pub(super) fn notify_topology_changed(&self) {
-        let _ = self.topology_change_notifier.broadcast(());
+        let _: Result<_, _> = self.topology_change_notifier.send(());
     }
 
-    pub(super) async fn subscribe_to_topology_check_requests(&self) -> TopologyMessageSubscriber {
-        TopologyMessageSubscriber::new(&self.topology_check_listener).await
+    pub(super) fn subscribe_to_topology_check_requests(&self) -> TopologyMessageSubscriber {
+        TopologyMessageSubscriber::new(self.topology_check_requester.subscribe())
     }
 
-    pub(super) async fn subscribe_to_topology_changes(&self) -> TopologyMessageSubscriber {
-        TopologyMessageSubscriber::new(&self.topology_change_listener).await
+    pub(super) fn subscribe_to_topology_changes(&self) -> TopologyMessageSubscriber {
+        TopologyMessageSubscriber::new(self.topology_change_notifier.subscribe())
     }
 }
 
@@ -54,9 +50,7 @@ pub(crate) struct TopologyMessageSubscriber {
 }
 
 impl TopologyMessageSubscriber {
-    async fn new(receiver: &Receiver<()>) -> Self {
-        let mut receiver = receiver.clone();
-        receiver.recv().await;
+    fn new(receiver: Receiver<()>) -> Self {
         Self { receiver }
     }
 

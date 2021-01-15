@@ -118,7 +118,7 @@ impl AsyncRuntime {
     pub(crate) async fn delay_for(self, delay: Duration) {
         #[cfg(feature = "tokio-runtime")]
         {
-            tokio::time::delay_for(delay).await
+            tokio::time::sleep(delay).await
         }
 
         #[cfg(feature = "async-std-runtime")]
