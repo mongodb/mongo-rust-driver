@@ -1342,4 +1342,5 @@ buildvariants:
   tasks:
     - name: "check-clippy"
     - name: "check-rustfmt"
+    - name: "check-rustdoc"
 
