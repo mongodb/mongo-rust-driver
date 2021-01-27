@@ -25,7 +25,7 @@ use crate::{
     RUNTIME,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test(threaded_scheduler))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn min_heartbeat_frequency() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
@@ -83,7 +83,7 @@ async fn min_heartbeat_frequency() {
 }
 
 // TODO: RUST-232 update this test to incorporate SDAM events
-#[cfg_attr(feature = "tokio-runtime", tokio::test(threaded_scheduler))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn sdam_pool_management() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
@@ -151,7 +151,7 @@ async fn sdam_pool_management() {
 
 // prose version of minPoolSize-error.yml SDAM integration test
 // TODO: RUST-232 replace this test with the spec runner
-#[cfg_attr(feature = "tokio-runtime", tokio::test(threaded_scheduler))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn sdam_min_pool_size_error() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;

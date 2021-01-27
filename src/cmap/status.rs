@@ -1,5 +1,3 @@
-use crate::RUNTIME;
-
 /// Struct used to track the latest status of the pool.
 #[derive(Clone, Debug)]
 struct PoolStatus {
@@ -15,11 +13,7 @@ impl Default for PoolStatus {
 
 /// Create a channel for publishing and receiving updates to the pool's generation.
 pub(super) fn channel() -> (PoolGenerationPublisher, PoolGenerationSubscriber) {
-    let (sender, mut receiver) = tokio::sync::watch::channel(Default::default());
-    // The first call to recv on a watch channel returns immediately with the initial value.
-    // We use RUNTIME.block_in_place because this is not a truly blocking task, so
-    // the runtimes don't need to shift things around to ensure scheduling continues normally.
-    RUNTIME.block_in_place(receiver.recv());
+    let (sender, receiver) = tokio::sync::watch::channel(Default::default());
     (
         PoolGenerationPublisher { sender },
         PoolGenerationSubscriber { receiver },
@@ -40,7 +34,7 @@ impl PoolGenerationPublisher {
         };
 
         // if nobody is listening, this will return an error, which we don't mind.
-        let _: std::result::Result<_, _> = self.sender.broadcast(new_status);
+        let _: std::result::Result<_, _> = self.sender.send(new_status);
     }
 }
 
@@ -62,10 +56,11 @@ impl PoolGenerationSubscriber {
         timeout: std::time::Duration,
     ) -> Option<u32> {
         crate::RUNTIME
-            .timeout(timeout, self.receiver.recv())
+            .timeout(timeout, self.receiver.changed())
             .await
-            .ok()
-            .flatten()
-            .map(|status| status.generation)
+            .ok()?
+            .ok()?;
+
+        Some(self.receiver.borrow().generation)
     }
 }

@@ -35,16 +35,12 @@ pub struct Error {
 }
 
 impl Error {
-    pub(crate) fn new(e: Arc<ErrorKind>) -> Error {
-        Error {
-            kind: e,
-            labels: Vec::new(),
-        }
-    }
-
     pub(crate) fn pool_cleared_error(address: &StreamAddress) -> Self {
         ErrorKind::ConnectionPoolClearedError {
-            message: format!("Conneciton pool for {} cleared during operation execution", address)
+            message: format!(
+                "Connection pool for {} cleared during operation execution",
+                address
+            ),
         }
         .into()
     }
@@ -66,20 +62,6 @@ impl Error {
     /// invalid.
     pub(crate) fn invalid_authentication_response(mechanism_name: &str) -> Error {
         Error::authentication_error(mechanism_name, "invalid server response")
-    }
-
-    /// Attempts to get the `std::io::Error` from this `Error`.
-    /// If there are other references to the underlying `Arc`, or if the `ErrorKind` is not `Io`,
-    /// then the original error is returned as a custom `std::io::Error`.
-    pub(crate) fn into_io_error(self) -> std::io::Error {
-        match Arc::try_unwrap(self.kind) {
-            Ok(ErrorKind::Io(io_error)) => io_error,
-            Ok(other_error_kind) => {
-                let error: Error = other_error_kind.into();
-                std::io::Error::new(std::io::ErrorKind::Other, Box::new(error))
-            }
-            Err(e) => std::io::Error::new(std::io::ErrorKind::Other, Box::new(Error::new(e))),
-        }
     }
 
     /// Whether this error is an "ns not found" error or not.
@@ -129,10 +111,13 @@ impl Error {
 
     /// Whether an error originated from the server.
     pub(crate) fn is_server_error(&self) -> bool {
-        matches!(self.kind.as_ref(), ErrorKind::AuthenticationError { .. }
-        | ErrorKind::BulkWriteError(_)
-        | ErrorKind::CommandError(_)
-        | ErrorKind::WriteError(_))
+        matches!(
+            self.kind.as_ref(),
+            ErrorKind::AuthenticationError { .. }
+                | ErrorKind::BulkWriteError(_)
+                | ErrorKind::CommandError(_)
+                | ErrorKind::WriteError(_)
+        )
     }
 
     /// Returns the labels for this error.
@@ -153,7 +138,9 @@ impl Error {
 
     /// Whether this error contains the specified label.
     pub fn contains_label<T: AsRef<str>>(&self, label: T) -> bool {
-        self.labels().iter().any(|actual_label| actual_label.as_str() == label.as_ref())
+        self.labels()
+            .iter()
+            .any(|actual_label| actual_label.as_str() == label.as_ref())
     }
 
     /// Returns a copy of this Error with the specified label added.
@@ -334,7 +321,7 @@ pub enum ErrorKind {
     /// A timeout occurred before a Tokio task could be completed.
     #[cfg(feature = "tokio-runtime")]
     #[error(display = "{}", _0)]
-    TokioTimeoutElapsed(#[error(source)] tokio::time::Elapsed),
+    TokioTimeoutElapsed(#[error(source)] tokio::time::error::Elapsed),
 
     #[error(display = "{}", _0)]
     RustlsConfig(#[error(source)] rustls::TLSError),
@@ -372,7 +359,10 @@ impl ErrorKind {
     }
 
     pub(crate) fn is_network_error(&self) -> bool {
-        matches!(self, ErrorKind::Io(..) | ErrorKind::ConnectionPoolClearedError { .. })
+        matches!(
+            self,
+            ErrorKind::Io(..) | ErrorKind::ConnectionPoolClearedError { .. }
+        )
     }
 
     /// Gets the code/message tuple from this error, if applicable. In the case of write errors, the
@@ -396,13 +386,14 @@ impl ErrorKind {
     pub(crate) fn code_name(&self) -> Option<&str> {
         match self {
             ErrorKind::CommandError(ref cmd_err) => Some(cmd_err.code_name.as_str()),
-            ErrorKind::WriteError(ref failure) => {
-                match failure {
-                    WriteFailure::WriteConcernError(ref wce) => Some(wce.code_name.as_str()),
-                    WriteFailure::WriteError(ref we) => we.code_name.as_deref(),
-                }
-            }
-            ErrorKind::BulkWriteError(ref bwe) => bwe.write_concern_error.as_ref().map(|wce| wce.code_name.as_str()),
+            ErrorKind::WriteError(ref failure) => match failure {
+                WriteFailure::WriteConcernError(ref wce) => Some(wce.code_name.as_str()),
+                WriteFailure::WriteError(ref we) => we.code_name.as_deref(),
+            },
+            ErrorKind::BulkWriteError(ref bwe) => bwe
+                .write_concern_error
+                .as_ref()
+                .map(|wce| wce.code_name.as_str()),
             _ => None,
         }
     }

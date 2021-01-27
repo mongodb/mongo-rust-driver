@@ -5,7 +5,7 @@ authors = ["Saghm Rossi <saghmrossi@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-tokio = "0.2.21"
+tokio = "1.0.2"
 
 [dependencies.mongodb]
 path = "../.."

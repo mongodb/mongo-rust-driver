@@ -85,7 +85,6 @@ impl PartialEq for TopologyDescription {
         self.compatibility_error == other.compatibility_error
             && self.servers == other.servers
             && self.topology_type == other.topology_type
-            && self.cluster_time == other.cluster_time
     }
 }
 
