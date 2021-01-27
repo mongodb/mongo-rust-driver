@@ -1125,6 +1125,10 @@ tasks:
     commands:
       - func: "check clippy"
 
+  - name: "check-rustdoc"
+    commands:
+      - func: "check rustdoc"
+
 
 
 axes:
