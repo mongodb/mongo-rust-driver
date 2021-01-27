@@ -497,6 +497,16 @@ functions:
           ${PREPARE_SHELL}
           .evergreen/check-clippy.sh
 
+  "check rustdoc":
+    - command: shell.exec
+      type: test
+      params:
+        shell: bash
+        working_dir: "src"
+        script: |
+          ${PREPARE_SHELL}
+          .evergreen/check-rustdoc.sh
+
   "upload-mo-artifacts":
     - command: shell.exec
       params:
