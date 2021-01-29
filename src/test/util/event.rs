@@ -243,7 +243,7 @@ impl EventClient {
         EventClient::with_options_and_handler(options, event_handler, collect_server_info).await
     }
 
-    pub async fn with_uri_and_mongos_options(
+    pub(crate) async fn with_uri_and_mongos_options(
         uri: &str,
         use_multiple_mongoses: Option<bool>,
         server_api: Option<ServerApi>,
