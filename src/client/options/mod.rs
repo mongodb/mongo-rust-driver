@@ -209,7 +209,7 @@ impl fmt::Display for StreamAddress {
 /// Specifies the server API version to declare
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
-pub enum ServerApiVersion {
+pub(crate) enum ServerApiVersion {
     Version1,
 }
 
@@ -251,7 +251,7 @@ impl<'de> Deserialize<'de> for ServerApiVersion {
 #[derive(Clone, Debug, Deserialize, PartialEq, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-pub struct ServerApi {
+pub(crate) struct ServerApi {
     /// The version string of the declared API version
     pub version: ServerApiVersion,
 
@@ -402,8 +402,8 @@ pub struct ClientOptions {
     /// The declared API version
     ///
     /// The default value is to have no declared API version
-    #[builder(default)]
-    pub server_api: Option<ServerApi>,
+    #[builder(default, skip)]
+    pub(crate) server_api: Option<ServerApi>,
 
     /// The amount of time the Client should attempt to select a server for an operation before
     /// timing outs
