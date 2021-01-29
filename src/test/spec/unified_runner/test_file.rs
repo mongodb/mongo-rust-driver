@@ -130,7 +130,7 @@ pub struct Client {
     pub observe_events: Option<Vec<String>>,
     pub ignore_command_monitoring_events: Option<Vec<String>>,
     #[serde(default)]
-    pub server_api: Option<ServerApi>,
+    pub(crate) server_api: Option<ServerApi>,
 }
 
 fn default_uri() -> String {
