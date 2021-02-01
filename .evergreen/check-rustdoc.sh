@@ -3,6 +3,6 @@
 set -o errexit
 
 . ~/.cargo/env
-cargo doc
-cargo doc --no-default-features --features async-std-runtime
-cargo doc --no-default-features --features sync
+cargo rustdoc -- -D warnings
+cargo rustdoc --no-default-features --features async-std-runtime -- -D warnings
+cargo rustdoc --no-default-features --features sync -- -D warnings
