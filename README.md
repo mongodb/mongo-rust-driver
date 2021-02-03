@@ -270,9 +270,11 @@ You can use `rustup` to install them both:
 rustup component add clippy --toolchain stable
 rustup component add rustfmt --toolchain nightly
 ```
-To run the linter tests, run the `check-clippy.sh` and `check-rustfmt.sh` scripts in the `.evergreen` directory:
+Our linter tests also use `rustdoc` to verify that all necessary documentation is present and properly formatted. `rustdoc` is included in the standard Rust distribution.
+
+To run the linter tests, run the `check-clippy.sh`, `check-rustfmt.sh`, and `check-rustdoc.sh` scripts in the `.evergreen` directory:
 ```bash
-bash .evergreen/check-clippy.sh && bash .evergreen/check-rustfmt.sh
+bash .evergreen/check-clippy.sh && bash .evergreen/check-rustfmt.sh && bash .evergreen/check-rustdoc.sh
 ```
 
 ## Continuous Integration
