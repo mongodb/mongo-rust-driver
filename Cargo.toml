@@ -24,6 +24,10 @@ default = ["tokio-runtime"]
 tokio-runtime = ["tokio/macros", "tokio/net", "tokio/rt", "tokio/time", "reqwest", "serde_bytes"]
 async-std-runtime = ["async-std", "async-std/attributes", "async-std-resolver", "tokio-util/compat"]
 sync = ["async-std-runtime"]
+# The bson/u2i feature enables automatic conversion from unsigned to signed types during
+# serialization. This feature is intended for use when serializing data types in third-party crates
+# whose implementation cannot be changed; otherwise, it is preferred to use the helper functions
+# provided in the bson::serde_helpers module.
 bson-u2i = ["bson/u2i"]
 
 [dependencies]
