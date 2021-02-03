@@ -93,12 +93,15 @@ pub type Predicate = Arc<dyn Send + Sync + Fn(&ServerInfo) -> bool>;
 /// option and will be sent to the server as an integer number of seconds.
 ///
 /// See the [MongoDB docs](https://docs.mongodb.com/manual/core/read-preference) for more details.
+#[allow(missing_docs)]
 #[derive(Clone, Debug, PartialEq)]
 pub enum ReadPreference {
     /// Only route this operation to the primary.
     Primary,
+
     /// Only route this operation to a secondary.
     Secondary { options: ReadPreferenceOptions },
+
     /// Route this operation to the primary if it's available, but fall back to the secondaries if
     /// not.
     PrimaryPreferred { options: ReadPreferenceOptions },
@@ -179,6 +182,7 @@ pub struct HedgedReadOptions {
 }
 
 impl HedgedReadOptions {
+    /// Creates a new `HedgedReadOptions` with the given value for `enabled`.
     pub fn with_enabled(enabled: bool) -> Self {
         Self { enabled }
     }
