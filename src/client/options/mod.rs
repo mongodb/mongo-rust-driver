@@ -142,7 +142,7 @@ impl Hash for StreamAddress {
 }
 
 impl StreamAddress {
-    /// Parses an address string into a StreamAddress.
+    /// Parses an address string into a `StreamAddress`.
     pub fn parse(address: &str) -> Result<Self> {
         let mut parts = address.split(':');
 
@@ -570,7 +570,7 @@ impl ServerCertVerifier for NoCertVerifier {
 }
 
 impl TlsOptions {
-    /// Converts TlsOptions into a rustls::ClientConfig.
+    /// Converts `TlsOptions` into a rustls::ClientConfig.
     pub fn into_rustls_config(self) -> Result<rustls::ClientConfig> {
         let mut config = rustls::ClientConfig::new();
 
