@@ -118,7 +118,9 @@ pub enum ValidationLevel {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum ValidationAction {
+    /// Return an error if inserted documents do not pass the validation.
     Error,
+    /// Raise a warning if inserted documents do not pass the validation.
     Warn,
 }
 

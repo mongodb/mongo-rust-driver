@@ -181,6 +181,7 @@ impl AuthMechanism {
         }
     }
 
+    /// Returns this `AuthMechanism` as a string.
     pub fn as_str(&self) -> &'static str {
         match self {
             AuthMechanism::ScramSha1 => SCRAM_SHA_1_STR,
