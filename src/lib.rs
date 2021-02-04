@@ -177,3 +177,6 @@ pub(crate) static RUNTIME: runtime::AsyncRuntime = runtime::AsyncRuntime::Tokio;
 
 #[cfg(all(not(feature = "tokio-runtime"), feature = "async-std-runtime"))]
 pub(crate) static RUNTIME: runtime::AsyncRuntime = runtime::AsyncRuntime::AsyncStd;
+
+#[cfg(feature = "gridfs")]
+mod gridfs;
