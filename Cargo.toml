@@ -1,5 +1,5 @@
 [package]
-authors = ["Saghm Rossi <saghmrossi@gmail.com>", "Patrick Freed <patrick.freed@mongodb.com>"]
+authors = ["Saghm Rossi <saghmrossi@gmail.com>", "Patrick Freed <patrick.freed@mongodb.com>", "Isabel Atkinson <isabel.atkinson@mongodb.com>"]
 description = "The official MongoDB driver for Rust"
 edition = "2018"
 documentation = "https://docs.rs/mongodb"
