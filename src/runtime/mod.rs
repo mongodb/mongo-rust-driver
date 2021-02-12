@@ -46,6 +46,7 @@ impl AsyncRuntime {
     /// If the runtime is still running, this will return a handle to the background task.
     /// Otherwise, it will return `None`. As a result, this must be called from an async block
     /// or function running on a runtime.
+    #[allow(clippy::unnecessary_wraps)]
     pub(crate) fn spawn<F, O>(self, fut: F) -> Option<AsyncJoinHandle<O>>
     where
         F: Future<Output = O> + Send + 'static,
