@@ -218,6 +218,7 @@ impl std::ops::Deref for Error {
 }
 
 /// The types of errors that can occur.
+#[allow(missing_docs)]
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum ErrorKind {
@@ -560,7 +561,11 @@ impl BulkWriteFailure {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub enum WriteFailure {
+    /// An error that occurred due to not being able to satisfy a write concern.
     WriteConcernError(WriteConcernError),
+
+    /// An error that occurred during a write operation that wasn't due to being unable to satisfy a
+    /// write concern.
     WriteError(WriteError),
 }
 

@@ -107,7 +107,7 @@ async fn connection_drop_during_read() {
 async fn server_selection_timeout_message() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
-    if !CLIENT_OPTIONS.repl_set_name.is_some() {
+    if CLIENT_OPTIONS.repl_set_name.is_none() {
         return;
     }
 

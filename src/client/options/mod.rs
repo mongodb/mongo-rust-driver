@@ -142,6 +142,7 @@ impl Hash for StreamAddress {
 }
 
 impl StreamAddress {
+    /// Parses an address string into a `StreamAddress`.
     pub fn parse(address: &str) -> Result<Self> {
         let mut parts = address.split(':');
 
@@ -209,7 +210,7 @@ impl fmt::Display for StreamAddress {
 /// Specifies the server API version to declare
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
-pub enum ServerApiVersion {
+pub(crate) enum ServerApiVersion {
     Version1,
 }
 
@@ -251,7 +252,7 @@ impl<'de> Deserialize<'de> for ServerApiVersion {
 #[derive(Clone, Debug, Deserialize, PartialEq, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-pub struct ServerApi {
+pub(crate) struct ServerApi {
     /// The version string of the declared API version
     pub version: ServerApiVersion,
 
@@ -402,8 +403,8 @@ pub struct ClientOptions {
     /// The declared API version
     ///
     /// The default value is to have no declared API version
-    #[builder(default)]
-    pub server_api: Option<ServerApi>,
+    #[builder(default, skip)]
+    pub(crate) server_api: Option<ServerApi>,
 
     /// The amount of time the Client should attempt to select a server for an operation before
     /// timing outs
@@ -509,7 +510,10 @@ struct ClientOptionsParser {
 /// [`Client`](../struct.Client.html) performs.
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub enum Tls {
+    /// Enable TLS with the specified options.
     Enabled(TlsOptions),
+
+    /// Disable TLS.
     Disabled,
 }
 
@@ -566,6 +570,7 @@ impl ServerCertVerifier for NoCertVerifier {
 }
 
 impl TlsOptions {
+    /// Converts `TlsOptions` into a rustls::ClientConfig.
     pub fn into_rustls_config(self) -> Result<rustls::ClientConfig> {
         let mut config = rustls::ClientConfig::new();
 
