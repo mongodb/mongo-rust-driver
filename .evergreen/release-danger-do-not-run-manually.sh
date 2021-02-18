@@ -21,7 +21,7 @@ if [[ -z "$TOKEN" ]]; then
 	exit 1
 fi
 
-git fetch origin $TAG
+git fetch origin tag $TAG --no-tags
 git checkout $TAG
 
 . ~/.cargo/env
