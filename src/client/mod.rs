@@ -259,6 +259,9 @@ impl Client {
         )?;
 
         loop {
+            let mut topology_change_subscriber =
+                self.inner.topology.subscribe_to_topology_changes();
+
             let selected_server = self
                 .inner
                 .topology
@@ -269,8 +272,6 @@ impl Client {
                 return Ok(server);
             }
 
-            let mut topology_change_subscriber =
-                self.inner.topology.subscribe_to_topology_changes();
             self.inner.topology.request_topology_check();
 
             let time_passed = start_time.to(PreciseTime::now());
