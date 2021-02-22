@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    collections::HashMap,
+    collections::{hash_map::Entry, HashMap},
     fmt::{self, Display, Formatter},
     ops::{BitXor, Range},
     str,
@@ -258,8 +258,8 @@ impl ScramVersion {
 
         if should_update_cache {
             let mut cache = CREDENTIAL_CACHE.write().await;
-            if cache.get(&cache_entry_key).is_none() {
-                cache.insert(cache_entry_key, salted_password);
+            if let Entry::Vacant(entry) = cache.entry(cache_entry_key) {
+                entry.insert(salted_password);
             }
         }
 
