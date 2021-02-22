@@ -6,10 +6,10 @@ use std::{
     str,
 };
 
-use hmac::{Hmac, Mac};
+use hmac::{digest::Digest, Hmac, Mac, NewMac};
 use lazy_static::lazy_static;
 use md5::Md5;
-use sha1::{Digest, Sha1};
+use sha1::Sha1;
 use sha2::Sha256;
 use tokio::sync::RwLock;
 
@@ -42,7 +42,7 @@ const USERNAME_KEY: char = 'n';
 const NO_CHANNEL_BINDING: char = 'n';
 
 /// The minimum number of iterations of the hash function that we will accept from the server.
-const MIN_ITERATION_COUNT: usize = 4096;
+const MIN_ITERATION_COUNT: u32 = 4096;
 
 lazy_static! {
     /// Cache of pre-computed salted passwords.
@@ -55,7 +55,7 @@ lazy_static! {
 struct CacheEntry {
     password: String,
     salt: Vec<u8>,
-    i: usize,
+    i: u32,
     mechanism: ScramVersion,
 }
 
@@ -297,7 +297,7 @@ impl ScramVersion {
     }
 
     /// The "h_i" function as defined in the SCRAM RFC.
-    fn h_i(&self, str: &str, salt: &[u8], iterations: usize) -> Vec<u8> {
+    fn h_i(&self, str: &str, salt: &[u8], iterations: u32) -> Vec<u8> {
         match self {
             ScramVersion::Sha1 => h_i::<Hmac<Sha1>>(str, salt, iterations, 160 / 8),
             ScramVersion::Sha256 => h_i::<Hmac<Sha256>>(str, salt, iterations, 256 / 8),
@@ -310,14 +310,14 @@ impl ScramVersion {
         &self,
         username: &str,
         password: &str,
-        i: usize,
+        i: u32,
         salt: &[u8],
     ) -> Result<Vec<u8>> {
         let normalized_password = match self {
             ScramVersion::Sha1 => {
                 let mut md5 = Md5::new();
-                md5.input(format!("{}:mongo:{}", username, password));
-                Cow::Owned(hex::encode(md5.result()))
+                md5.update(format!("{}:mongo:{}", username, password));
+                Cow::Owned(hex::encode(md5.finalize()))
             }
             ScramVersion::Sha256 => match stringprep::saslprep(password) {
                 Ok(p) => p,
@@ -352,9 +352,9 @@ fn xor(lhs: &[u8], rhs: &[u8]) -> Vec<u8> {
         .collect()
 }
 
-fn mac_verify<M: Mac>(key: &[u8], input: &[u8], signature: &[u8]) -> Result<()> {
+fn mac_verify<M: Mac + NewMac>(key: &[u8], input: &[u8], signature: &[u8]) -> Result<()> {
     let mut mac = M::new_varkey(key).map_err(|_| Error::unknown_authentication_error("SCRAM"))?;
-    mac.input(input);
+    mac.update(input);
     match mac.verify(signature) {
         Ok(_) => Ok(()),
         Err(_) => Err(Error::authentication_error(
@@ -366,11 +366,16 @@ fn mac_verify<M: Mac>(key: &[u8], input: &[u8], signature: &[u8]) -> Result<()> 
 
 fn hash<D: Digest>(val: &[u8]) -> Vec<u8> {
     let mut hash = D::new();
-    hash.input(val);
-    hash.result().to_vec()
+    hash.update(val);
+    hash.finalize().to_vec()
 }
 
-fn h_i<M: Mac + Sync>(str: &str, salt: &[u8], iterations: usize, output_size: usize) -> Vec<u8> {
+fn h_i<M: Mac + NewMac + Sync>(
+    str: &str,
+    salt: &[u8],
+    iterations: u32,
+    output_size: usize,
+) -> Vec<u8> {
     let mut buf = vec![0u8; output_size];
     pbkdf2::pbkdf2::<M>(str.as_bytes(), salt, iterations, buf.as_mut_slice());
     buf
@@ -468,7 +473,7 @@ struct ServerFirst {
     message: String,
     nonce: String,
     salt: Vec<u8>,
-    i: usize,
+    i: u32,
 }
 
 impl ServerFirst {
@@ -493,7 +498,7 @@ impl ServerFirst {
         let salt = base64::decode(parse_kvp(parts[1], SALT_KEY)?.as_str())
             .map_err(|_| Error::invalid_authentication_response("SCRAM"))?;
 
-        let i: usize = match parse_kvp(parts[2], ITERATION_COUNT_KEY)?.parse() {
+        let i: u32 = match parse_kvp(parts[2], ITERATION_COUNT_KEY)?.parse() {
             Ok(num) => num,
             Err(_) => {
                 return Err(Error::authentication_error(
@@ -529,7 +534,7 @@ impl ServerFirst {
         self.salt.as_slice()
     }
 
-    fn i(&self) -> usize {
+    fn i(&self) -> u32 {
         self.i
     }
 
