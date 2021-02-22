@@ -3,21 +3,19 @@
 use std::{fmt, sync::Arc};
 
 use err_derive::Error;
-use lazy_static::lazy_static;
 use serde::Deserialize;
 use time::OutOfRangeError;
 
 use crate::{bson::Document, options::StreamAddress};
 
-lazy_static! {
-    static ref RECOVERING_CODES: Vec<i32> = vec![11600, 11602, 13436, 189, 91];
-    static ref NOTMASTER_CODES: Vec<i32> = vec![10107, 13435];
-    static ref SHUTTING_DOWN_CODES: Vec<i32> = vec![11600, 91];
-    static ref RETRYABLE_READ_CODES: Vec<i32> =
-        vec![11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001];
-    static ref RETRYABLE_WRITE_CODES: Vec<i32> =
-        vec![11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001, 262];
-}
+const RECOVERING_CODES: [i32; 5] = [11600, 11602, 13436, 189, 91];
+const NOTMASTER_CODES: [i32; 2] = [10107, 13435];
+const SHUTTING_DOWN_CODES: [i32; 2] = [11600, 91];
+const RETRYABLE_READ_CODES: [i32; 11] =
+    [11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001];
+const RETRYABLE_WRITE_CODES: [i32; 12] = [
+    11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001, 262,
+];
 
 /// The result type for all methods that can return an error in the `mongodb` crate.
 pub type Result<T> = std::result::Result<T, Error>;
