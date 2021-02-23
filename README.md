@@ -39,7 +39,7 @@ This repository contains the officially supported MongoDB Rust driver, a client 
 - MongoDB 3.6+
 
 **Note**: A bug affecting Rust 1.46-1.47 may cause out-of-memory errors when compiling an application that uses the 1.1
-version of the driver driver with a framework like actix-web. Upgrading Rust to 1.48+ or the driver to 1.2+ fixes this
+version of the driver with a framework like actix-web. Upgrading Rust to 1.48+ or the driver to 1.2+ fixes this
 issue. For more information, see https://github.com/rust-lang/rust/issues/75992.
 
 ### Importing
