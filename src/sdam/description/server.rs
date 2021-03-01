@@ -5,7 +5,6 @@ use chrono::offset::Utc;
 
 use crate::{
     client::ClusterTime,
-    error::Result,
     is_master::IsMasterReply,
     options::StreamAddress,
     selection_criteria::TagSet,
@@ -74,7 +73,7 @@ pub(crate) struct ServerDescription {
     // allows us to ensure that only valid states are possible (e.g. preventing that both an error
     // and a reply are present) while still making it easy to define helper methods on
     // ServerDescription for information we need from the isMaster reply by propagating with `?`.
-    pub(crate) reply: Result<Option<IsMasterReply>>,
+    pub(crate) reply: Result<Option<IsMasterReply>, String>,
 }
 
 impl PartialEq for ServerDescription {
@@ -98,7 +97,7 @@ impl PartialEq for ServerDescription {
 impl ServerDescription {
     pub(crate) fn new(
         mut address: StreamAddress,
-        is_master_reply: Option<Result<IsMasterReply>>,
+        is_master_reply: Option<Result<IsMasterReply, String>>,
     ) -> Self {
         address.hostname = address.hostname.to_lowercase();
 
@@ -201,7 +200,7 @@ impl ServerDescription {
         None
     }
 
-    pub(crate) fn set_name(&self) -> Result<Option<String>> {
+    pub(crate) fn set_name(&self) -> Result<Option<String>, String> {
         let set_name = self
             .reply
             .as_ref()
@@ -211,7 +210,7 @@ impl ServerDescription {
         Ok(set_name)
     }
 
-    pub(crate) fn known_hosts(&self) -> Result<impl Iterator<Item = &String>> {
+    pub(crate) fn known_hosts(&self) -> Result<impl Iterator<Item = &String>, String> {
         let known_hosts = self
             .reply
             .as_ref()
@@ -232,7 +231,7 @@ impl ServerDescription {
         Ok(known_hosts.into_iter().flatten())
     }
 
-    pub(crate) fn invalid_me(&self) -> Result<bool> {
+    pub(crate) fn invalid_me(&self) -> Result<bool, String> {
         if let Some(ref reply) = self.reply.as_ref().map_err(Clone::clone)? {
             if let Some(ref me) = reply.command_response.me {
                 return Ok(&self.address.to_string() != me);
@@ -242,7 +241,7 @@ impl ServerDescription {
         Ok(false)
     }
 
-    pub(crate) fn set_version(&self) -> Result<Option<i32>> {
+    pub(crate) fn set_version(&self) -> Result<Option<i32>, String> {
         let me = self
             .reply
             .as_ref()
@@ -252,7 +251,7 @@ impl ServerDescription {
         Ok(me)
     }
 
-    pub(crate) fn election_id(&self) -> Result<Option<ObjectId>> {
+    pub(crate) fn election_id(&self) -> Result<Option<ObjectId>, String> {
         let me = self
             .reply
             .as_ref()
@@ -263,7 +262,7 @@ impl ServerDescription {
     }
 
     #[cfg(test)]
-    pub(crate) fn min_wire_version(&self) -> Result<Option<i32>> {
+    pub(crate) fn min_wire_version(&self) -> Result<Option<i32>, String> {
         let me = self
             .reply
             .as_ref()
@@ -274,7 +273,7 @@ impl ServerDescription {
     }
 
     #[cfg(test)]
-    pub(crate) fn max_wire_version(&self) -> Result<Option<i32>> {
+    pub(crate) fn max_wire_version(&self) -> Result<Option<i32>, String> {
         let me = self
             .reply
             .as_ref()
@@ -284,7 +283,7 @@ impl ServerDescription {
         Ok(me)
     }
 
-    pub(crate) fn last_write_date(&self) -> Result<Option<DateTime>> {
+    pub(crate) fn last_write_date(&self) -> Result<Option<DateTime>, String> {
         match self.reply {
             Ok(None) => Ok(None),
             Ok(Some(ref reply)) => Ok(reply
@@ -296,7 +295,7 @@ impl ServerDescription {
         }
     }
 
-    pub(crate) fn logical_session_timeout(&self) -> Result<Option<Duration>> {
+    pub(crate) fn logical_session_timeout(&self) -> Result<Option<Duration>, String> {
         match self.reply {
             Ok(None) => Ok(None),
             Ok(Some(ref reply)) => Ok(reply
@@ -307,7 +306,7 @@ impl ServerDescription {
         }
     }
 
-    pub(crate) fn cluster_time(&self) -> Result<Option<ClusterTime>> {
+    pub(crate) fn cluster_time(&self) -> Result<Option<ClusterTime>, String> {
         match self.reply {
             Ok(None) => Ok(None),
             Ok(Some(ref reply)) => Ok(reply.cluster_time.clone()),
