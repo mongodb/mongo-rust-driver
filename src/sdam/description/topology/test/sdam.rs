@@ -6,7 +6,6 @@ use tokio::sync::RwLockReadGuard;
 use crate::{
     bson::{doc, oid::ObjectId},
     client::Client,
-    error::ErrorKind,
     is_master::{IsMasterCommandResponse, IsMasterReply},
     options::{ClientOptions, ReadPreference, SelectionCriteria, StreamAddress},
     sdam::description::{
@@ -82,10 +81,7 @@ async fn run_test(test_file: TestFile) {
     for (i, phase) in test_file.phases.into_iter().enumerate() {
         for Response(address, command_response) in phase.responses {
             let is_master_reply = if command_response == Default::default() {
-                Err(ErrorKind::OperationError {
-                    message: "dummy error".to_string(),
-                }
-                .into())
+                Err("dummy error".to_string())
             } else {
                 Ok(IsMasterReply {
                     command_response,

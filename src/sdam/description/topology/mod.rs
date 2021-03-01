@@ -13,7 +13,6 @@ use crate::{
     bson::oid::ObjectId,
     client::ClusterTime,
     cmap::Command,
-    error::{ErrorKind, Result},
     options::{ClientOptions, StreamAddress},
     sdam::description::server::{ServerDescription, ServerType},
     selection_criteria::{ReadPreference, SelectionCriteria},
@@ -111,7 +110,7 @@ impl TopologyDescription {
         }
     }
 
-    pub(crate) fn new(options: ClientOptions) -> Result<Self> {
+    pub(crate) fn new(options: ClientOptions) -> crate::error::Result<Self> {
         verify_max_staleness(
             options
                 .selection_criteria
@@ -395,7 +394,10 @@ impl TopologyDescription {
 
     /// Update the topology based on the new information about the topology contained by the
     /// ServerDescription.
-    pub(crate) fn update(&mut self, mut server_description: ServerDescription) -> Result<()> {
+    pub(crate) fn update(
+        &mut self,
+        mut server_description: ServerDescription,
+    ) -> Result<(), String> {
         // Ignore updates from servers not currently in the cluster.
         if !self.servers.contains_key(&server_description.address) {
             return Ok(());
@@ -439,7 +441,10 @@ impl TopologyDescription {
     }
 
     /// Update the Unknown topology description based on the server description.
-    fn update_unknown_topology(&mut self, server_description: ServerDescription) -> Result<()> {
+    fn update_unknown_topology(
+        &mut self,
+        server_description: ServerDescription,
+    ) -> Result<(), String> {
         match server_description.server_type {
             ServerType::Unknown | ServerType::RSGhost => {}
             ServerType::Standalone => {
@@ -473,7 +478,7 @@ impl TopologyDescription {
     fn update_replica_set_no_primary_topology(
         &mut self,
         server_description: ServerDescription,
-    ) -> Result<()> {
+    ) -> Result<(), String> {
         match server_description.server_type {
             ServerType::Unknown | ServerType::RSGhost => {}
             ServerType::Standalone | ServerType::Mongos => {
@@ -495,7 +500,7 @@ impl TopologyDescription {
     fn update_replica_set_with_primary_topology(
         &mut self,
         server_description: ServerDescription,
-    ) -> Result<()> {
+    ) -> Result<(), String> {
         match server_description.server_type {
             ServerType::Unknown | ServerType::RSGhost => {
                 self.record_primary_state();
@@ -527,7 +532,7 @@ impl TopologyDescription {
     fn update_rs_without_primary_server(
         &mut self,
         server_description: ServerDescription,
-    ) -> Result<()> {
+    ) -> Result<(), String> {
         if self.set_name.is_none() {
             self.set_name = server_description.set_name()?;
         } else if self.set_name != server_description.set_name()? {
@@ -550,7 +555,7 @@ impl TopologyDescription {
     fn update_rs_with_primary_from_member(
         &mut self,
         server_description: ServerDescription,
-    ) -> Result<()> {
+    ) -> Result<(), String> {
         if self.set_name != server_description.set_name()? {
             self.servers.remove(&server_description.address);
             self.record_primary_state();
@@ -572,7 +577,7 @@ impl TopologyDescription {
     fn update_rs_from_primary_server(
         &mut self,
         server_description: ServerDescription,
-    ) -> Result<()> {
+    ) -> Result<(), String> {
         if self.set_name.is_none() {
             self.set_name = server_description.set_name()?;
         } else if self.set_name != server_description.set_name()? {
@@ -661,8 +666,13 @@ impl TopologyDescription {
     }
 
     /// Create a new ServerDescription for each address and add it to the topology.
-    fn add_new_servers<'a>(&mut self, servers: impl Iterator<Item = &'a String>) -> Result<()> {
-        let servers: Result<Vec<_>> = servers.map(|server| StreamAddress::parse(server)).collect();
+    fn add_new_servers<'a>(
+        &mut self,
+        servers: impl Iterator<Item = &'a String>,
+    ) -> Result<(), String> {
+        let servers: Result<Vec<_>, String> = servers
+            .map(|server| StreamAddress::parse(server).map_err(|e| e.to_string()))
+            .collect();
 
         self.add_new_servers_from_addresses(servers?.iter());
         Ok(())
@@ -731,15 +741,17 @@ pub(crate) struct TopologyDescriptionDiff {
     pub(crate) new_addresses: HashSet<StreamAddress>,
 }
 
-fn verify_max_staleness(max_staleness: Option<Duration>) -> Result<()> {
+fn verify_max_staleness(max_staleness: Option<Duration>) -> crate::error::Result<()> {
+    verify_max_staleness_inner(max_staleness)
+        .map_err(|s| crate::error::ErrorKind::ArgumentError { message: s }.into())
+}
+
+fn verify_max_staleness_inner(max_staleness: Option<Duration>) -> Result<(), String> {
     if max_staleness
         .map(|staleness| staleness > Duration::from_secs(0) && staleness < Duration::from_secs(90))
         .unwrap_or(false)
     {
-        return Err(ErrorKind::ArgumentError {
-            message: "max staleness cannot be both positive and below 90 seconds".into(),
-        }
-        .into());
+        return Err("max staleness cannot be both positive and below 90 seconds".into());
     }
 
     Ok(())

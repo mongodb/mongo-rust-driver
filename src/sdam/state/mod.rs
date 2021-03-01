@@ -283,7 +283,8 @@ impl Topology {
         server: &Server,
         state_lock: RwLockWriteGuard<'_, TopologyState>,
     ) -> bool {
-        let description = ServerDescription::new(server.address.clone(), Some(Err(error)));
+        let description =
+            ServerDescription::new(server.address.clone(), Some(Err(error.to_string())));
         self.update_and_notify(server, description, state_lock)
             .await
     }
@@ -470,7 +471,7 @@ impl TopologyState {
         server: ServerDescription,
         options: &ClientOptions,
         topology: WeakTopology,
-    ) -> Result<Option<TopologyDescriptionDiff>> {
+    ) -> std::result::Result<Option<TopologyDescriptionDiff>, String> {
         let old_description = self.description.clone();
         self.description.update(server)?;
 
