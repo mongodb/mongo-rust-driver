@@ -9,7 +9,7 @@ use crate::{
     bson::{Bson, Document},
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     operation::{Aggregate, Create, DropDatabase, ListCollections, RunCommand},
     options::{
         AggregateOptions,
@@ -21,8 +21,10 @@ use crate::{
     },
     selection_criteria::SelectionCriteria,
     Client,
+    ClientSession,
     Collection,
     Namespace,
+    SessionCursor,
 };
 
 /// `Database` is the client-side abstraction of a MongoDB database. It can be used to perform
@@ -176,13 +178,33 @@ impl Database {
         Collection::new(self.clone(), name, Some(options))
     }
 
-    /// Drops the database, deleting all data, collections, and indexes stored in it.
-    pub async fn drop(&self, options: impl Into<Option<DropDatabaseOptions>>) -> Result<()> {
+    async fn drop_common(
+        &self,
+        options: impl Into<Option<DropDatabaseOptions>>,
+        session: impl Into<Option<&mut ClientSession>>,
+    ) -> Result<()> {
         let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
         let drop_database = DropDatabase::new(self.name().to_string(), options);
-        self.client().execute_operation(drop_database).await
+        self.client()
+            .execute_operation(drop_database, session)
+            .await
+    }
+
+    /// Drops the database, deleting all data, collections, and indexes stored in it.
+    pub async fn drop(&self, options: impl Into<Option<DropDatabaseOptions>>) -> Result<()> {
+        self.drop_common(options, None).await
+    }
+
+    /// Drops the database, deleting all data, collections, and indexes stored in it using the
+    /// provided `ClientSession`.
+    pub async fn drop_with_session(
+        &self,
+        options: impl Into<Option<DropDatabaseOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<()> {
+        self.drop_common(options, session).await
     }
 
     /// Gets information about each of the collections in the database. The cursor will yield a
@@ -204,19 +226,31 @@ impl Database {
             .map(|(spec, session)| Cursor::new(self.client().clone(), spec, session))
     }
 
-    /// Gets the names of the collections in the database.
-    pub async fn list_collection_names(
+    /// Gets information about each of the collections in the database using the provided
+    /// `ClientSession`. The cursor will yield a document pertaining to each collection in the
+    /// database.
+    pub async fn list_collections_with_session(
         &self,
         filter: impl Into<Option<Document>>,
-    ) -> Result<Vec<String>> {
-        let list_collections =
-            ListCollections::new(self.name().to_string(), filter.into(), true, None);
-        let cursor: Cursor<Document> = self
-            .client()
-            .execute_cursor_operation(list_collections)
+        options: impl Into<Option<ListCollectionsOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<SessionCursor> {
+        let list_collections = ListCollections::new(
+            self.name().to_string(),
+            filter.into(),
+            false,
+            options.into(),
+        );
+        self.client()
+            .execute_operation(list_collections, session)
             .await
-            .map(|(spec, session)| Cursor::new(self.client().clone(), spec, session))?;
+            .map(|spec| SessionCursor::new(self.client().clone(), spec))
+    }
 
+    async fn list_collection_names_common(
+        &self,
+        cursor: impl TryStreamExt<Ok = Document, Error = Error>,
+    ) -> Result<Vec<String>> {
         cursor
             .and_then(|doc| match doc.get("name").and_then(Bson::as_str) {
                 Some(name) => futures::future::ok(name.into()),
@@ -232,14 +266,45 @@ impl Database {
             .await
     }
 
-    /// Creates a new collection in the database with the given `name` and `options`.
-    ///
-    /// Note that MongoDB creates collections implicitly when data is inserted, so this method is
-    /// not needed if no special options are required.
-    pub async fn create_collection(
+    /// Gets the names of the collections in the database.
+    pub async fn list_collection_names(
+        &self,
+        filter: impl Into<Option<Document>>,
+    ) -> Result<Vec<String>> {
+        let list_collections =
+            ListCollections::new(self.name().to_string(), filter.into(), true, None);
+        let cursor: Cursor<Document> = self
+            .client()
+            .execute_cursor_operation(list_collections)
+            .await
+            .map(|(spec, session)| Cursor::new(self.client().clone(), spec, session))?;
+
+        self.list_collection_names_common(cursor).await
+    }
+
+    /// Gets the names of the collections in the database using the provided `ClientSession`.
+    pub async fn list_collection_names_with_session(
+        &self,
+        filter: impl Into<Option<Document>>,
+        session: &mut ClientSession,
+    ) -> Result<Vec<String>> {
+        let list_collections =
+            ListCollections::new(self.name().to_string(), filter.into(), true, None);
+        let mut cursor: SessionCursor<Document> = self
+            .client()
+            .execute_operation(list_collections, Some(&mut *session))
+            .await
+            .map(|spec| SessionCursor::new(self.client().clone(), spec))?;
+
+        self.list_collection_names_common(cursor.with_session(session))
+            .await
+    }
+
+    async fn create_collection_common(
         &self,
         name: &str,
         options: impl Into<Option<CreateCollectionOptions>>,
+        session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<()> {
         let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
@@ -251,7 +316,43 @@ impl Database {
             },
             options,
         );
-        self.client().execute_operation(create).await
+        self.client().execute_operation(create, session).await
+    }
+
+    /// Creates a new collection in the database with the given `name` and `options`.
+    ///
+    /// Note that MongoDB creates collections implicitly when data is inserted, so this method is
+    /// not needed if no special options are required.
+    pub async fn create_collection(
+        &self,
+        name: &str,
+        options: impl Into<Option<CreateCollectionOptions>>,
+    ) -> Result<()> {
+        self.create_collection_common(name, options, None).await
+    }
+
+    /// Creates a new collection in the database with the given `name` and `options` using the
+    /// provided `ClientSession`.
+    ///
+    /// Note that MongoDB creates collections implicitly when data is inserted, so this method is
+    /// not needed if no special options are required.
+    pub async fn create_collection_with_session(
+        &self,
+        name: &str,
+        options: impl Into<Option<CreateCollectionOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<()> {
+        self.create_collection_common(name, options, session).await
+    }
+
+    async fn run_command_common(
+        &self,
+        command: Document,
+        selection_criteria: impl Into<Option<SelectionCriteria>>,
+        session: impl Into<Option<&mut ClientSession>>,
+    ) -> Result<Document> {
+        let operation = RunCommand::new(self.name().into(), command, selection_criteria.into())?;
+        self.client().execute_operation(operation, session).await
     }
 
     /// Runs a database-level command.
@@ -264,8 +365,23 @@ impl Database {
         command: Document,
         selection_criteria: impl Into<Option<SelectionCriteria>>,
     ) -> Result<Document> {
-        let operation = RunCommand::new(self.name().into(), command, selection_criteria.into())?;
-        self.client().execute_operation(operation).await
+        self.run_command_common(command, selection_criteria, None)
+            .await
+    }
+
+    /// Runs a database-level command using the provided `ClientSession`.
+    ///
+    /// Note that no inspection is done on `doc`, so the command will not use the database's default
+    /// read concern or write concern. If specific read concern or write concern is desired, it must
+    /// be specified manually.
+    pub async fn run_command_with_session(
+        &self,
+        command: Document,
+        selection_criteria: impl Into<Option<SelectionCriteria>>,
+        session: &mut ClientSession,
+    ) -> Result<Document> {
+        self.run_command_common(command, selection_criteria, session)
+            .await
     }
 
     /// Runs an aggregation operation.
@@ -290,5 +406,30 @@ impl Database {
             .execute_cursor_operation(aggregate)
             .await
             .map(|(spec, session)| Cursor::new(client.clone(), spec, session))
+    }
+
+    /// Runs an aggregation operation with the provided `ClientSession`.
+    ///
+    /// See the documentation [here](https://docs.mongodb.com/manual/aggregation/) for more
+    /// information on aggregations.
+    pub async fn aggregate_with_session(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: impl Into<Option<AggregateOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<SessionCursor> {
+        let mut options = options.into();
+        resolve_options!(
+            self,
+            options,
+            [read_concern, write_concern, selection_criteria]
+        );
+
+        let aggregate = Aggregate::new(self.name().to_string(), pipeline, options);
+        let client = self.client();
+        client
+            .execute_operation(aggregate, session)
+            .await
+            .map(|spec| SessionCursor::new(client.clone(), spec))
     }
 }

@@ -5,7 +5,7 @@ use std::{
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use super::Cursor;
+use super::{Cursor, SessionCursor};
 use crate::{
     bson::{Bson, Document},
     error::Result,
@@ -31,6 +31,7 @@ use crate::{
         WriteConcern,
     },
     results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
+    ClientSession,
     Collection as AsyncCollection,
     Namespace,
     RUNTIME,
@@ -131,6 +132,19 @@ where
         RUNTIME.block_on(self.async_collection.drop(options.into()))
     }
 
+    /// Drops the collection, deleting all data, users, and indexes stored in it using the provided
+    /// `ClientSession`.
+    pub fn drop_with_session(
+        &self,
+        options: impl Into<Option<DropCollectionOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<()> {
+        RUNTIME.block_on(
+            self.async_collection
+                .drop_with_session(options.into(), session),
+        )
+    }
+
     /// Runs an aggregation operation.
     ///
     /// See the documentation [here](https://docs.mongodb.com/manual/aggregation/) for more
@@ -144,6 +158,26 @@ where
         RUNTIME
             .block_on(self.async_collection.aggregate(pipeline, options.into()))
             .map(Cursor::new)
+    }
+
+    /// Runs an aggregation operation using the provided `ClientSession`.
+    ///
+    /// See the documentation [here](https://docs.mongodb.com/manual/aggregation/) for more
+    /// information on aggregations.
+    pub fn aggregate_with_session(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: impl Into<Option<AggregateOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<SessionCursor> {
+        let pipeline: Vec<Document> = pipeline.into_iter().collect();
+        RUNTIME
+            .block_on(self.async_collection.aggregate_with_session(
+                pipeline,
+                options.into(),
+                session,
+            ))
+            .map(SessionCursor::new)
     }
 
     /// Estimates the number of documents in the collection using collection metadata.
@@ -172,6 +206,23 @@ where
         )
     }
 
+    /// Gets the number of documents matching `filter` using the provided `ClientSession`.
+    ///
+    /// Note that using [`Collection::estimated_document_count`](#method.estimated_document_count)
+    /// is recommended instead of this method is most cases.
+    pub fn count_documents_with_session(
+        &self,
+        filter: impl Into<Option<Document>>,
+        options: impl Into<Option<CountOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<i64> {
+        RUNTIME.block_on(self.async_collection.count_documents_with_session(
+            filter.into(),
+            options.into(),
+            session,
+        ))
+    }
+
     /// Deletes all documents stored in the collection matching `query`.
     pub fn delete_many(
         &self,
@@ -179,6 +230,21 @@ where
         options: impl Into<Option<DeleteOptions>>,
     ) -> Result<DeleteResult> {
         RUNTIME.block_on(self.async_collection.delete_many(query, options.into()))
+    }
+
+    /// Deletes all documents stored in the collection matching `query` using the provided
+    /// `ClientSession`.
+    pub fn delete_many_with_session(
+        &self,
+        query: Document,
+        options: impl Into<Option<DeleteOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<DeleteResult> {
+        RUNTIME.block_on(self.async_collection.delete_many_with_session(
+            query,
+            options.into(),
+            session,
+        ))
     }
 
     /// Deletes up to one document found matching `query`.
@@ -195,6 +261,25 @@ where
         RUNTIME.block_on(self.async_collection.delete_one(query, options.into()))
     }
 
+    /// Deletes up to one document found matching `query` using the provided `ClientSession`.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
+    pub fn delete_one_with_session(
+        &self,
+        query: Document,
+        options: impl Into<Option<DeleteOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<DeleteResult> {
+        RUNTIME.block_on(self.async_collection.delete_one_with_session(
+            query,
+            options.into(),
+            session,
+        ))
+    }
+
     /// Finds the distinct values of the field specified by `field_name` across the collection.
     pub fn distinct(
         &self,
@@ -208,6 +293,23 @@ where
         )
     }
 
+    /// Finds the distinct values of the field specified by `field_name` across the collection using
+    /// the provided `ClientSession`.
+    pub fn distinct_with_session(
+        &self,
+        field_name: &str,
+        filter: impl Into<Option<Document>>,
+        options: impl Into<Option<DistinctOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<Vec<Bson>> {
+        RUNTIME.block_on(self.async_collection.distinct_with_session(
+            field_name,
+            filter.into(),
+            options.into(),
+            session,
+        ))
+    }
+
     /// Finds the documents in the collection matching `filter`.
     pub fn find(
         &self,
@@ -217,6 +319,22 @@ where
         RUNTIME
             .block_on(self.async_collection.find(filter.into(), options.into()))
             .map(Cursor::new)
+    }
+
+    /// Finds the documents in the collection matching `filter` using the provided `ClientSession`.
+    pub fn find_with_session(
+        &self,
+        filter: impl Into<Option<Document>>,
+        options: impl Into<Option<FindOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<SessionCursor<T>> {
+        RUNTIME
+            .block_on(self.async_collection.find_with_session(
+                filter.into(),
+                options.into(),
+                session,
+            ))
+            .map(SessionCursor::new)
     }
 
     /// Finds a single document in the collection matching `filter`.
@@ -229,6 +347,21 @@ where
             self.async_collection
                 .find_one(filter.into(), options.into()),
         )
+    }
+
+    /// Finds a single document in the collection matching `filter` using the provided
+    /// `ClientSession`.
+    pub fn find_one_with_session(
+        &self,
+        filter: impl Into<Option<Document>>,
+        options: impl Into<Option<FindOneOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<Option<T>> {
+        RUNTIME.block_on(self.async_collection.find_one_with_session(
+            filter.into(),
+            options.into(),
+            session,
+        ))
     }
 
     /// Atomically finds up to one document in the collection matching `filter` and deletes it.
@@ -248,6 +381,26 @@ where
         )
     }
 
+    /// Atomically finds up to one document in the collection matching `filter` and deletes it using
+    /// the provided `ClientSession`.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
+    pub fn find_one_and_delete_with_session(
+        &self,
+        filter: Document,
+        options: impl Into<Option<FindOneAndDeleteOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<Option<T>> {
+        RUNTIME.block_on(self.async_collection.find_one_and_delete_with_session(
+            filter,
+            options.into(),
+            session,
+        ))
+    }
+
     /// Atomically finds up to one document in the collection matching `filter` and replaces it with
     /// `replacement`.
     ///
@@ -265,6 +418,28 @@ where
             filter,
             replacement,
             options.into(),
+        ))
+    }
+
+    /// Atomically finds up to one document in the collection matching `filter` and replaces it with
+    /// `replacement` using the provided `ClientSession`.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
+    pub fn find_one_and_replace_with_session(
+        &self,
+        filter: Document,
+        replacement: T,
+        options: impl Into<Option<FindOneAndReplaceOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<Option<T>> {
+        RUNTIME.block_on(self.async_collection.find_one_and_replace_with_session(
+            filter,
+            replacement,
+            options.into(),
+            session,
         ))
     }
 
@@ -290,6 +465,30 @@ where
         ))
     }
 
+    /// Atomically finds up to one document in the collection matching `filter` and updates it using
+    /// the provided `ClientSession`. Both `Document` and `Vec<Document>` implement
+    /// `Into<UpdateModifications>`, so either can be passed in place of constructing the enum
+    /// case. Note: pipeline updates are only supported in MongoDB 4.2+.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
+    pub fn find_one_and_update_with_session(
+        &self,
+        filter: Document,
+        update: impl Into<UpdateModifications>,
+        options: impl Into<Option<FindOneAndUpdateOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<Option<T>> {
+        RUNTIME.block_on(self.async_collection.find_one_and_update_with_session(
+            filter,
+            update.into(),
+            options.into(),
+            session,
+        ))
+    }
+
     /// Inserts the documents in `docs` into the collection.
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
@@ -305,6 +504,26 @@ where
         RUNTIME.block_on(self.async_collection.insert_many(docs, options.into()))
     }
 
+    /// Inserts the documents in `docs` into the collection using the provided `ClientSession`.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
+    pub fn insert_many_with_session(
+        &self,
+        docs: impl IntoIterator<Item = T>,
+        options: impl Into<Option<InsertManyOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<InsertManyResult> {
+        let docs: Vec<T> = docs.into_iter().collect();
+        RUNTIME.block_on(self.async_collection.insert_many_with_session(
+            docs,
+            options.into(),
+            session,
+        ))
+    }
+
     /// Inserts `doc` into the collection.
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
@@ -317,6 +536,25 @@ where
         options: impl Into<Option<InsertOneOptions>>,
     ) -> Result<InsertOneResult> {
         RUNTIME.block_on(self.async_collection.insert_one(doc, options.into()))
+    }
+
+    /// Inserts `doc` into the collection using the provided `ClientSession`.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
+    pub fn insert_one_with_session(
+        &self,
+        doc: T,
+        options: impl Into<Option<InsertOneOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<InsertOneResult> {
+        RUNTIME.block_on(self.async_collection.insert_one_with_session(
+            doc,
+            options.into(),
+            session,
+        ))
     }
 
     /// Replaces up to one document matching `query` in the collection with `replacement`.
@@ -337,6 +575,28 @@ where
         )
     }
 
+    /// Replaces up to one document matching `query` in the collection with `replacement` using the
+    /// provided `ClientSession`.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
+    pub fn replace_one_with_session(
+        &self,
+        query: Document,
+        replacement: T,
+        options: impl Into<Option<ReplaceOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<UpdateResult> {
+        RUNTIME.block_on(self.async_collection.replace_one_with_session(
+            query,
+            replacement,
+            options.into(),
+            session,
+        ))
+    }
+
     /// Updates all documents matching `query` in the collection.
     ///
     /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
@@ -353,6 +613,27 @@ where
             self.async_collection
                 .update_many(query, update.into(), options.into()),
         )
+    }
+
+    /// Updates all documents matching `query` in the collection using the provided `ClientSession`.
+    ///
+    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
+    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
+    /// in MongoDB 4.2+. See the official MongoDB
+    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#behavior) for more information on specifying updates.
+    pub fn update_many_with_session(
+        &self,
+        query: Document,
+        update: impl Into<UpdateModifications>,
+        options: impl Into<Option<UpdateOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<UpdateResult> {
+        RUNTIME.block_on(self.async_collection.update_many_with_session(
+            query,
+            update.into(),
+            options.into(),
+            session,
+        ))
     }
 
     /// Updates up to one document matching `query` in the collection.
@@ -376,5 +657,32 @@ where
             self.async_collection
                 .update_one(query, update.into(), options.into()),
         )
+    }
+
+    /// Updates up to one document matching `query` in the collection using the provided
+    /// `ClientSession`.
+    ///
+    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
+    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
+    /// in MongoDB 4.2+. See the official MongoDB
+    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#behavior) for more information on specifying updates.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
+    pub fn update_one_with_session(
+        &self,
+        query: Document,
+        update: impl Into<UpdateModifications>,
+        options: impl Into<Option<UpdateOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<UpdateResult> {
+        RUNTIME.block_on(self.async_collection.update_one_with_session(
+            query,
+            update.into(),
+            options.into(),
+            session,
+        ))
     }
 }

@@ -202,10 +202,8 @@ async fn pool_is_lifo() {
         return;
     }
 
-    let timeout = Duration::from_secs(60 * 60);
-
-    let a = client.start_implicit_session_with_timeout(timeout).await;
-    let b = client.start_implicit_session_with_timeout(timeout).await;
+    let a = client.start_session(None).await.unwrap();
+    let b = client.start_session(None).await.unwrap();
 
     let a_id = a.id().clone();
     let b_id = b.id().clone();
@@ -218,10 +216,10 @@ async fn pool_is_lifo() {
     drop(b);
     RUNTIME.delay_for(Duration::from_millis(250)).await;
 
-    let s1 = client.start_implicit_session_with_timeout(timeout).await;
+    let s1 = client.start_session(None).await.unwrap();
     assert_eq!(s1.id(), &b_id);
 
-    let s2 = client.start_implicit_session_with_timeout(timeout).await;
+    let s2 = client.start_session(None).await.unwrap();
     assert_eq!(s2.id(), &a_id);
 }
 

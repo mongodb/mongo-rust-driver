@@ -72,7 +72,6 @@
 
 #![warn(missing_docs)]
 #![warn(missing_crate_level_docs)]
-
 #![cfg_attr(
     feature = "cargo-clippy",
     allow(
@@ -135,7 +134,7 @@ define_if_single_runtime_enabled! {
     pub use crate::{
         client::Client,
         coll::Collection,
-        cursor::Cursor,
+        cursor::{Cursor, session::{SessionCursor, SessionCursorHandle}},
         db::Database,
     };
 
@@ -143,9 +142,11 @@ define_if_single_runtime_enabled! {
     pub(crate) use crate::{
         client::Client,
         coll::Collection,
-        cursor::Cursor,
+        cursor::{Cursor, session::{SessionCursor, SessionCursorHandle}},
         db::Database,
     };
+
+    pub use client::session::ClientSession;
 
     pub use coll::Namespace;
 }

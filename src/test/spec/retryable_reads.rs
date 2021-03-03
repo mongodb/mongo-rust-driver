@@ -1,6 +1,8 @@
 use tokio::sync::RwLockWriteGuard;
 
-use crate::test::{run_spec_test, run_v2_test, LOCK};
+use crate::test::{run_spec_test, LOCK};
+
+use super::run_v2_test;
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]

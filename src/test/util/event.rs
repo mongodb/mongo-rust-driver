@@ -225,13 +225,13 @@ impl EventClient {
     }
 
     pub async fn with_additional_options(
-        options: Option<ClientOptions>,
+        options: impl Into<Option<ClientOptions>>,
         heartbeat_freq: Option<Duration>,
         use_multiple_mongoses: Option<bool>,
         event_handler: impl Into<Option<EventHandler>>,
         collect_server_info: bool,
     ) -> Self {
-        let mut options = match options {
+        let mut options = match options.into() {
             Some(mut options) => {
                 options.merge(CLIENT_OPTIONS.clone());
                 options
@@ -308,17 +308,7 @@ impl EventClient {
         panic!("could not find event for {} command", command_name);
     }
 
-    pub fn topology(&self) -> String {
-        if self.client.is_sharded() {
-            String::from("sharded")
-        } else if self.client.is_replica_set() {
-            String::from("replicaset")
-        } else {
-            String::from("single")
-        }
-    }
-
-    /// Gets all of the command started events for a specified command names.
+    /// Gets all of the command started events for the specified command names.
     pub fn get_command_started_events(&self, command_names: &[&str]) -> Vec<CommandStartedEvent> {
         let events = self.handler.command_events.read().unwrap();
         events
@@ -330,6 +320,22 @@ impl EventClient {
                     } else {
                         None
                     }
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Gets all command started events, excluding configureFailPoint events.
+    pub fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
+        let events = self.handler.command_events.read().unwrap();
+        events
+            .iter()
+            .filter_map(|event| match event {
+                CommandEvent::CommandStartedEvent(event)
+                    if event.command_name != "configureFailPoint" =>
+                {
+                    Some(event.clone())
                 }
                 _ => None,
             })

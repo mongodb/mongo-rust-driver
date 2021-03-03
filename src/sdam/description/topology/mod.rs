@@ -288,16 +288,6 @@ impl TopologyDescription {
             return;
         }
 
-        if server_description.server_type == ServerType::Standalone {
-            self.session_support_status = SessionSupportStatus::Unsupported {
-                logical_session_timeout: server_description
-                    .logical_session_timeout()
-                    .ok()
-                    .flatten(),
-            };
-            return;
-        }
-
         match server_description.logical_session_timeout().ok().flatten() {
             Some(timeout) => match self.session_support_status {
                 SessionSupportStatus::Supported {

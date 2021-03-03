@@ -1,7 +1,7 @@
 pub mod auth;
 mod executor;
 pub mod options;
-mod session;
+pub mod session;
 
 use std::{sync::Arc, time::Duration};
 
@@ -23,10 +23,12 @@ use crate::{
         ListDatabasesOptions,
         ReadPreference,
         SelectionCriteria,
+        SessionOptions,
     },
     sdam::{SelectedServer, SessionSupportStatus, Topology},
+    ClientSession,
 };
-pub(crate) use session::{ClientSession, ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS};
+pub(crate) use session::{ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS};
 use session::{ServerSession, ServerSessionPool};
 
 const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
@@ -161,7 +163,7 @@ impl Client {
         options: impl Into<Option<ListDatabasesOptions>>,
     ) -> Result<Vec<Document>> {
         let op = ListDatabases::new(filter.into(), false, options.into());
-        self.execute_operation(op).await
+        self.execute_operation(op, None).await
     }
 
     /// Gets the names of the databases present in the cluster the Client is connected to.
@@ -171,7 +173,7 @@ impl Client {
         options: impl Into<Option<ListDatabasesOptions>>,
     ) -> Result<Vec<String>> {
         let op = ListDatabases::new(filter.into(), true, options.into());
-        match self.execute_operation(op).await {
+        match self.execute_operation(op, None).await {
             Ok(databases) => databases
                 .into_iter()
                 .map(|doc| {
@@ -186,6 +188,18 @@ impl Client {
                 })
                 .collect(),
             Err(e) => Err(e),
+        }
+    }
+
+    /// Starts a new `ClientSession`.
+    pub async fn start_session(&self, options: Option<SessionOptions>) -> Result<ClientSession> {
+        match self.get_session_support_status().await? {
+            SessionSupportStatus::Supported {
+                logical_session_timeout,
+            } => Ok(self
+                .start_session_with_timeout(logical_session_timeout, options, false)
+                .await),
+            _ => Err(ErrorKind::SessionsNotSupported.into()),
         }
     }
 
@@ -210,16 +224,20 @@ impl Client {
     /// This method will attempt to re-use server sessions from the pool which are not about to
     /// expire according to the provided logical session timeout. If no such sessions are
     /// available, a new one will be created.
-    pub(crate) async fn start_implicit_session_with_timeout(
+    pub(crate) async fn start_session_with_timeout(
         &self,
         logical_session_timeout: Duration,
+        options: Option<SessionOptions>,
+        is_implicit: bool,
     ) -> ClientSession {
-        ClientSession::new_implicit(
+        ClientSession::new(
             self.inner
                 .session_pool
                 .check_out(logical_session_timeout)
                 .await,
             self.clone(),
+            options,
+            is_implicit,
         )
     }
 

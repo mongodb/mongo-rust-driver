@@ -321,6 +321,10 @@ pub enum ErrorKind {
     #[non_exhaustive]
     SrvLookupError { message: String },
 
+    /// The Client does not support sessions.
+    #[error("Attempted to start a session on a deployment that does not support sessions")]
+    SessionsNotSupported,
+
     #[error("{0}")]
     RustlsConfig(#[from] rustls::TLSError),
 

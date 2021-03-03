@@ -6,12 +6,12 @@ use std::collections::HashMap;
 use crate::{
     bson::{doc, Document},
     bson_util,
-    client::ClientSession,
     cmap::{Command, CommandResponse, StreamDescription},
     error::{ErrorKind, Result},
     operation::{append_options, Operation, Retryability, WriteResponseBody},
     options::{InsertManyOptions, WriteConcern},
     results::InsertManyResult,
+    ClientSession,
     Namespace,
 };
 

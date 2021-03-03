@@ -1,30 +1,61 @@
-use std::collections::VecDeque;
+use std::{
+    collections::VecDeque,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
-use futures::future::BoxFuture;
+use futures::{future::BoxFuture, Stream};
+use serde::de::DeserializeOwned;
 
 use super::common::{CursorInformation, GenericCursor, GetMoreProvider, GetMoreProviderResult};
 use crate::{
-    bson::Document,
-    client::ClientSession,
+    bson::{from_document, Document},
     cursor::CursorSpecification,
     error::{Error, Result},
     operation::GetMore,
     results::GetMoreResult,
     Client,
+    ClientSession,
     RUNTIME,
 };
 
-/// A cursor that was started with a session and must be iterated using one.
+/// A `SessionCursor` is a cursor that was created with a `ClientSession` and must be iterated using
+/// one. To iterate, retrieve a `SessionCursorHandle` using `SessionCursor::with_session`:
+///
+/// ```rust
+/// # use futures::stream::StreamExt;
+/// # use mongodb::{Client, error::Result, ClientSession, SessionCursor};
+/// #
+/// # async fn do_stuff() -> Result<()> {
+/// # let client = Client::with_uri_str("mongodb://example.com").await?;
+/// # let mut session = client.start_session(None).await?;
+/// # let coll = client.database("foo").collection("bar");
+/// # let mut cursor = coll.find_with_session(None, None, &mut session).await?;
+/// #
+/// while let Some(doc) = cursor.with_session(&mut session).next().await {
+///     println!("{}", doc?)
+/// }
+/// #
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Debug)]
-pub(crate) struct SessionCursor {
+pub struct SessionCursor<T = Document>
+where
+    T: DeserializeOwned + Unpin,
+{
     exhausted: bool,
     client: Client,
     info: CursorInformation,
     buffer: VecDeque<Document>,
+    _phantom: std::marker::PhantomData<T>,
 }
 
-impl SessionCursor {
-    fn new(client: Client, spec: CursorSpecification) -> Self {
+impl<T> SessionCursor<T>
+where
+    T: DeserializeOwned + Unpin,
+{
+    pub(crate) fn new(client: Client, spec: CursorSpecification) -> Self {
         let exhausted = spec.id() == 0;
 
         Self {
@@ -32,13 +63,16 @@ impl SessionCursor {
             client,
             info: spec.info,
             buffer: spec.initial_buffer,
+            _phantom: Default::default(),
         }
     }
 
-    fn with_session<'session>(
+    /// Retrieves a `SessionCursorHandle` to iterate this cursor. The session provided must be the
+    /// same session used to create the cursor.
+    pub fn with_session<'session>(
         &mut self,
         session: &'session mut ClientSession,
-    ) -> SessionCursorHandle<'_, 'session> {
+    ) -> SessionCursorHandle<'_, 'session, T> {
         let get_more_provider = ExplicitSessionGetMoreProvider::new(session);
 
         // Pass the buffer into this cursor handle for iteration.
@@ -58,7 +92,10 @@ impl SessionCursor {
     }
 }
 
-impl Drop for SessionCursor {
+impl<T> Drop for SessionCursor<T>
+where
+    T: DeserializeOwned + Unpin,
+{
     fn drop(&mut self) {
         if self.exhausted {
             return;
@@ -79,15 +116,38 @@ impl Drop for SessionCursor {
 type ExplicitSessionCursor<'session> = GenericCursor<ExplicitSessionGetMoreProvider<'session>>;
 
 /// A handle that borrows a `ClientSession` temporarily for executing getMores or iterating through
-/// the current buffer.
+/// the current buffer of a `SessionCursor`.
 ///
-/// This updates the buffer of the parent cursor when dropped.
-struct SessionCursorHandle<'cursor, 'session> {
-    session_cursor: &'cursor mut SessionCursor,
+/// This updates the buffer of the parent `SessionCursor` when dropped.
+pub struct SessionCursorHandle<'cursor, 'session, T = Document>
+where
+    T: DeserializeOwned + Unpin,
+{
+    session_cursor: &'cursor mut SessionCursor<T>,
     generic_cursor: ExplicitSessionCursor<'session>,
 }
 
-impl<'cursor, 'session> Drop for SessionCursorHandle<'cursor, 'session> {
+impl<'cursor, 'session, T> Stream for SessionCursorHandle<'cursor, 'session, T>
+where
+    T: DeserializeOwned + Unpin,
+{
+    type Item = Result<T>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let next = Pin::new(&mut self.generic_cursor).poll_next(cx);
+        match next {
+            Poll::Ready(opt) => Poll::Ready(
+                opt.map(|result| result.and_then(|doc| from_document(doc).map_err(Into::into))),
+            ),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
+impl<'cursor, 'session, T> Drop for SessionCursorHandle<'cursor, 'session, T>
+where
+    T: DeserializeOwned + Unpin,
+{
     fn drop(&mut self) {
         // Update the parent cursor's state based on any iteration performed on this handle.
         self.session_cursor.buffer = self.generic_cursor.take_buffer();
@@ -137,7 +197,7 @@ impl<'session> GetMoreProvider for ExplicitSessionGetMoreProvider<'session> {
                 let future = Box::pin(async move {
                     let get_more = GetMore::new(info);
                     let get_more_result = client
-                        .execute_operation_with_session(get_more, session.reference)
+                        .execute_operation(get_more, Some(&mut *session.reference))
                         .await;
                     ExecutionResult {
                         get_more_result,

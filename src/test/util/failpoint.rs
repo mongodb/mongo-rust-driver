@@ -43,7 +43,7 @@ impl FailPoint {
         FailPoint { command }
     }
 
-    pub(super) async fn enable(
+    pub async fn enable(
         self,
         client: &TestClient,
         criteria: impl Into<Option<SelectionCriteria>>,

@@ -62,12 +62,17 @@ impl Matchable for Document {
             if k == "upsertedCount" {
                 continue;
             }
-            if let Some(actual_v) = self.get(k) {
-                if !actual_v.matches(v) {
-                    return false;
+            match self.get(k) {
+                Some(actual_v) => {
+                    if !actual_v.matches(v) {
+                        return false;
+                    }
                 }
-            } else {
-                return false;
+                None => {
+                    if v != &Bson::Null {
+                        return false;
+                    }
+                }
             }
         }
         true

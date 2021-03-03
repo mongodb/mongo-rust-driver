@@ -11,8 +11,9 @@ mod ocsp;
 mod read_write_concern;
 mod retryable_reads;
 mod retryable_writes;
-mod runner;
+mod sessions;
 mod unified_runner;
+mod v2_runner;
 
 use std::{
     convert::TryFrom,
@@ -23,16 +24,8 @@ use std::{
 };
 
 pub use self::{
-    runner::{
-        run_v2_test,
-        AnyTestOperation,
-        OperationObject,
-        RunOn,
-        TestData,
-        TestEvent,
-        TestFile,
-    },
     unified_runner::Topology,
+    v2_runner::{operation::Operation, run_v2_test, test_file::RunOn},
 };
 
 use serde::de::DeserializeOwned;

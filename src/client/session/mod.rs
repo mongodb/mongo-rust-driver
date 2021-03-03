@@ -13,6 +13,7 @@ use uuid::Uuid;
 
 use crate::{
     bson::{doc, spec::BinarySubtype, Binary, Bson, Document},
+    options::SessionOptions,
     Client,
     RUNTIME,
 };
@@ -28,29 +29,44 @@ lazy_static! {
     };
 }
 
-/// Session to be used with client operations. This acts as a handle to a server session.
-/// This keeps the details of how server sessions are pooled opaque to users.
+/// A MongoDB client session. This struct represents a logical session used for ordering sequential
+/// operations. To create a `ClientSession`, call `start_session` on a `Client`.
+///
+/// `ClientSession` instances are not thread safe or fork safe. They can only be used by one thread
+/// or process at a time.
 #[derive(Debug)]
-pub(crate) struct ClientSession {
+pub struct ClientSession {
     cluster_time: Option<ClusterTime>,
     server_session: ServerSession,
     client: Client,
     is_implicit: bool,
+    options: Option<SessionOptions>,
 }
 
 impl ClientSession {
     /// Creates a new `ClientSession` wrapping the provided server session.
-    pub(crate) fn new_implicit(server_session: ServerSession, client: Client) -> Self {
+    pub(crate) fn new(
+        server_session: ServerSession,
+        client: Client,
+        options: Option<SessionOptions>,
+        is_implicit: bool,
+    ) -> Self {
         Self {
             client,
             server_session,
             cluster_time: None,
-            is_implicit: true,
+            is_implicit,
+            options,
         }
     }
 
+    /// The client used to create this session.
+    pub fn client(&self) -> Client {
+        self.client.clone()
+    }
+
     /// The id of this session.
-    pub(crate) fn id(&self) -> &Document {
+    pub fn id(&self) -> &Document {
         &self.server_session.id
     }
 
@@ -61,13 +77,18 @@ impl ClientSession {
 
     /// The highest seen cluster time this session has seen so far.
     /// This will be `None` if this session has not been used in an operation yet.
-    pub(crate) fn cluster_time(&self) -> Option<&ClusterTime> {
+    pub fn cluster_time(&self) -> Option<&ClusterTime> {
         self.cluster_time.as_ref()
+    }
+
+    /// The options used to create this session.
+    pub fn options(&self) -> Option<&SessionOptions> {
+        self.options.as_ref()
     }
 
     /// Set the cluster time to the provided one if it is greater than this session's highest seen
     /// cluster time or if this session's cluster time is `None`.
-    pub(crate) fn advance_cluster_time(&mut self, to: &ClusterTime) {
+    pub fn advance_cluster_time(&mut self, to: &ClusterTime) {
         if self.cluster_time().map(|ct| ct < to).unwrap_or(true) {
             self.cluster_time = Some(to.clone());
         }
@@ -89,6 +110,12 @@ impl ClientSession {
         self.server_session.txn_number += 1;
         self.server_session.txn_number
     }
+
+    /// Whether this session is dirty.
+    #[cfg(test)]
+    pub(crate) fn is_dirty(&self) -> bool {
+        self.server_session.dirty
+    }
 }
 
 impl Drop for ClientSession {
@@ -109,7 +136,7 @@ impl Drop for ClientSession {
 
 /// Client side abstraction of a server session. These are pooled and may be associated with
 /// multiple `ClientSession`s over the course of their lifetime.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct ServerSession {
     /// The id of the server session to which this corresponds.
     id: Document,

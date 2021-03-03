@@ -16,7 +16,7 @@ use crate::{
     test::{
         assert_matches,
         run_spec_test,
-        util::get_db_name,
+        util::get_default_name,
         EventClient,
         TestClient,
         CLIENT_OPTIONS,
@@ -54,7 +54,7 @@ async fn run_spec_tests() {
                 }
             }
 
-            let db_name = get_db_name(&test_case.description);
+            let db_name = get_default_name(&test_case.description);
             let coll_name = "coll";
 
             let write_concern = WriteConcern::builder().w(Acknowledgment::Majority).build();
@@ -81,14 +81,10 @@ async fn run_spec_tests() {
                     .unwrap();
             }
 
-            let result = client
-                .run_collection_operation(
-                    &test_case.operation,
-                    &db_name,
-                    &coll_name,
-                    Some(options.clone()),
-                )
-                .await;
+            let coll = client
+                .database(&db_name)
+                .collection_with_options(&coll_name, options.clone());
+            let result = test_case.operation.execute_on_collection(&coll, None).await;
 
             if let Some(error) = test_case.outcome.error {
                 assert_eq!(
