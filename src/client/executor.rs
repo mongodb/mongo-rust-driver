@@ -103,7 +103,7 @@ impl Client {
             Err(err) => {
                 self.inner
                     .topology
-                    .handle_post_handshake_error(err.clone(), &conn, server)
+                    .handle_post_handshake_error(&err, &conn, server)
                     .await;
 
                 // Retryable writes are only supported by storage engines with document-level
@@ -162,7 +162,7 @@ impl Client {
             Err(err) => {
                 self.inner
                     .topology
-                    .handle_post_handshake_error(err.clone(), &conn, server)
+                    .handle_post_handshake_error(&err, &conn, server)
                     .await;
 
                 let err = match retryability {
