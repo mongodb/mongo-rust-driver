@@ -21,8 +21,8 @@ impl<M, R> AcknowledgedMessage<M, R> {
     }
 
     /// Get the message.
-    pub(crate) fn message(&self) -> &M {
-        &self.message
+    pub(crate) fn into_message(self) -> M {
+        self.message
     }
 
     /// Send acknowledgement to the receiver.
