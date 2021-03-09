@@ -10,7 +10,7 @@ use futures::{Future, Stream};
 
 use crate::{
     bson::Document,
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     options::StreamAddress,
     results::GetMoreResult,
     Client,
@@ -73,12 +73,13 @@ impl<T: GetMoreProvider> Stream for GenericCursor<T> {
             if let Some(future) = self.provider.executing_future() {
                 match Pin::new(future).poll(cx) {
                     // If a result is ready, retrieve the buffer and update the exhausted status.
-                    Poll::Ready(mut get_more_result) => {
-                        let buffer_result = get_more_result.take_buffer();
-                        self.exhausted = get_more_result.exhausted();
+                    Poll::Ready(get_more_result) => {
+                        let exhausted = get_more_result.exhausted();
+                        let (result, session) = get_more_result.into_parts();
 
-                        self.provider.clear_execution(get_more_result);
-                        self.buffer = buffer_result?;
+                        self.exhausted = exhausted;
+                        self.provider.clear_execution(session, exhausted);
+                        self.buffer = result?.batch;
                     }
                     Poll::Pending => return Poll::Pending,
                 }
@@ -113,7 +114,11 @@ pub(super) trait GetMoreProvider: Unpin {
     fn executing_future(&mut self) -> Option<&mut Self::GetMoreFuture>;
 
     /// Clear out any state remaining from previous getMore executions.
-    fn clear_execution(&mut self, result: Self::GetMoreResult);
+    fn clear_execution(
+        &mut self,
+        session: <Self::GetMoreResult as GetMoreProviderResult>::Session,
+        exhausted: bool,
+    );
 
     /// Start executing a new getMore if one isn't already in flight.
     fn start_execution(&mut self, spec: CursorInformation, client: Client);
@@ -121,16 +126,11 @@ pub(super) trait GetMoreProvider: Unpin {
 
 /// Trait describing results returned from a `GetMoreProvider`.
 pub(super) trait GetMoreProviderResult {
-    /// A result containing a mutable reference to the raw getMore result.
-    fn as_mut(&mut self) -> Result<&mut GetMoreResult>;
+    type Session;
 
-    /// A result containing a reference to the raw getMore result.
-    fn as_ref(&self) -> Result<&GetMoreResult>;
+    fn as_ref(&self) -> std::result::Result<&GetMoreResult, &Error>;
 
-    /// Take the buffer from the getMore result.
-    fn take_buffer(&mut self) -> Result<VecDeque<Document>> {
-        self.as_mut().map(|res| std::mem::take(&mut res.batch))
-    }
+    fn into_parts(self) -> (Result<GetMoreResult>, Self::Session);
 
     /// Whether the response from the server indicated the cursor was exhausted or not.
     fn exhausted(&self) -> bool {
