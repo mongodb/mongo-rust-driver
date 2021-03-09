@@ -218,7 +218,7 @@ impl HeartbeatMonitor {
     }
 
     async fn handle_error(&mut self, error: Error, topology: &Topology, server: &Server) -> bool {
-        topology.handle_pre_handshake_error(error, server).await
+        topology.handle_pre_handshake_error(&error, server).await
     }
 }
 
@@ -250,9 +250,7 @@ impl UpdateMonitor {
                     error_generation,
                 } => {
                     if *error_generation == self.generation_subscriber.generation() {
-                        topology
-                            .handle_pre_handshake_error(error.clone(), &server)
-                            .await;
+                        topology.handle_pre_handshake_error(&error, &server).await;
                     }
                 }
             }

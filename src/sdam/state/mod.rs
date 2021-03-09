@@ -227,10 +227,10 @@ impl Topology {
 
     /// Updates the topology based on an error that occurs before the handshake has completed during
     /// an operation.
-    pub(crate) async fn handle_pre_handshake_error(&self, error: Error, server: &Server) -> bool {
+    pub(crate) async fn handle_pre_handshake_error(&self, error: &Error, server: &Server) -> bool {
         let state_lock = self.state.write().await;
         let changed = self
-            .mark_server_as_unknown(error, &server, state_lock)
+            .mark_server_as_unknown(&error, &server, state_lock)
             .await;
         if changed {
             server.pool.clear();
@@ -241,7 +241,7 @@ impl Topology {
     /// Handles an error that occurs after the handshake has completed during an operation.
     pub(crate) async fn handle_post_handshake_error(
         &self,
-        error: Error,
+        error: &Error,
         conn: &Connection,
         server: SelectedServer,
     ) {
@@ -255,7 +255,7 @@ impl Topology {
         } else if error.is_recovering() || error.is_not_master() {
             let state_lock = self.state.write().await;
 
-            self.mark_server_as_unknown(error.clone(), &server, state_lock)
+            self.mark_server_as_unknown(error, &server, state_lock)
                 .await;
 
             let wire_version = conn
@@ -279,7 +279,7 @@ impl Topology {
     /// Returns whether the topology changed as a result of the update.
     async fn mark_server_as_unknown(
         &self,
-        error: Error,
+        error: &Error,
         server: &Server,
         state_lock: RwLockWriteGuard<'_, TopologyState>,
     ) -> bool {
