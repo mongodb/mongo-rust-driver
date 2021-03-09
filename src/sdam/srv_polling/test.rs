@@ -3,11 +3,7 @@ use std::collections::HashSet;
 use pretty_assertions::assert_eq;
 
 use super::{LookupHosts, SrvPollingMonitor};
-use crate::{
-    error::{ErrorKind, Result},
-    options::StreamAddress,
-    sdam::Topology,
-};
+use crate::{error::Result, options::StreamAddress, sdam::Topology};
 
 fn localhost_test_build_10gen(port: u16) -> StreamAddress {
     StreamAddress {
@@ -88,7 +84,7 @@ async fn replace_all_dns_records() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn timeout_error() {
     run_test(
-        Err(ErrorKind::Io(std::io::ErrorKind::TimedOut.into()).into()),
+        Err(std::io::ErrorKind::TimedOut.into()),
         DEFAULT_HOSTS.iter().cloned().collect(),
     )
     .await;

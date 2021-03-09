@@ -227,7 +227,7 @@ async fn handle_write_failure() {
     });
     let write_error_result = op.handle_response(write_error_response);
     assert!(write_error_result.is_err());
-    match *write_error_result.unwrap_err().kind {
+    match write_error_result.unwrap_err().kind {
         ErrorKind::WriteError(WriteFailure::WriteError(ref error)) => {
             let expected_err = WriteError {
                 code: 1234,
@@ -266,7 +266,7 @@ async fn handle_write_concern_failure() {
     let wc_error_result = op.handle_response(wc_error_response);
     assert!(wc_error_result.is_err());
 
-    match *wc_error_result.unwrap_err().kind {
+    match wc_error_result.unwrap_err().kind {
         ErrorKind::WriteError(WriteFailure::WriteConcernError(ref wc_error)) => {
             let expected_wc_err = WriteConcernError {
                 code: 456,

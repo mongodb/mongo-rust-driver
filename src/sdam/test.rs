@@ -212,12 +212,9 @@ async fn sdam_min_pool_size_error() {
         .await
         .expect_err("ping should fail");
     assert!(
-        matches!(
-            ping_err.kind.as_ref(),
-            ErrorKind::ServerSelectionError { .. }
-        ),
+        matches!(ping_err.kind, ErrorKind::ServerSelectionError { .. }),
         "Expected to fail due to server selection timing out, instead got: {:?}",
-        ping_err.kind.as_ref()
+        ping_err.kind
     );
 
     // disable the fail point, then the pool should become ready again

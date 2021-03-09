@@ -27,7 +27,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[non_exhaustive]
 pub struct Error {
     /// The type of error that occurred.
-    pub kind: Arc<ErrorKind>,
+    pub kind: ErrorKind,
     labels: Vec<String>,
 }
 
@@ -63,7 +63,7 @@ impl Error {
 
     /// Whether this error is an "ns not found" error or not.
     pub(crate) fn is_ns_not_found(&self) -> bool {
-        matches!(self.kind.as_ref(), ErrorKind::CommandError(err) if err.code == 26)
+        matches!(self.kind, ErrorKind::CommandError(ref err) if err.code == 26)
     }
 
     /// Whether a read operation should be retried if this error occurs.
@@ -109,7 +109,7 @@ impl Error {
     /// Whether an error originated from the server.
     pub(crate) fn is_server_error(&self) -> bool {
         matches!(
-            self.kind.as_ref(),
+            self.kind,
             ErrorKind::AuthenticationError { .. }
                 | ErrorKind::BulkWriteError(_)
                 | ErrorKind::CommandError(_)
@@ -119,13 +119,13 @@ impl Error {
 
     /// Returns the labels for this error.
     pub fn labels(&self) -> &[String] {
-        match self.kind.as_ref() {
-            ErrorKind::CommandError(err) => &err.labels,
-            ErrorKind::WriteError(err) => match err {
+        match self.kind {
+            ErrorKind::CommandError(ref err) => &err.labels,
+            ErrorKind::WriteError(ref err) => match err {
                 WriteFailure::WriteError(_) => &self.labels,
-                WriteFailure::WriteConcernError(err) => &err.labels,
+                WriteFailure::WriteConcernError(ref err) => &err.labels,
             },
-            ErrorKind::BulkWriteError(err) => match err.write_concern_error {
+            ErrorKind::BulkWriteError(ref err) => match err.write_concern_error {
                 Some(ref err) => &err.labels,
                 None => &self.labels,
             },
@@ -143,24 +143,24 @@ impl Error {
     /// Returns a copy of this Error with the specified label added.
     pub(crate) fn with_label<T: AsRef<str>>(mut self, label: T) -> Self {
         let label = label.as_ref().to_string();
-        match self.kind.as_ref() {
-            ErrorKind::CommandError(err) => {
+        match self.kind {
+            ErrorKind::CommandError(ref err) => {
                 let mut err = err.clone();
                 err.labels.push(label);
                 ErrorKind::CommandError(err).into()
             }
-            ErrorKind::WriteError(err) => match err {
+            ErrorKind::WriteError(ref err) => match err {
                 WriteFailure::WriteError(_) => {
                     self.labels.push(label);
                     self
                 }
-                WriteFailure::WriteConcernError(err) => {
+                WriteFailure::WriteConcernError(ref err) => {
                     let mut err = err.clone();
                     err.labels.push(label);
                     ErrorKind::WriteError(WriteFailure::WriteConcernError(err)).into()
                 }
             },
-            ErrorKind::BulkWriteError(err) => match err.write_concern_error {
+            ErrorKind::BulkWriteError(ref err) => match err.write_concern_error {
                 Some(ref write_concern_error) => {
                     let mut err = err.clone();
                     let mut write_concern_error = write_concern_error.clone();
@@ -187,14 +187,38 @@ where
 {
     fn from(err: E) -> Self {
         Self {
-            kind: Arc::new(err.into()),
+            kind: err.into(),
             labels: Vec::new(),
         }
     }
 }
 
+impl From<bson::de::Error> for ErrorKind {
+    fn from(err: bson::de::Error) -> Self {
+        Self::BsonDecode(Arc::new(err))
+    }
+}
+
+impl From<bson::ser::Error> for ErrorKind {
+    fn from(err: bson::ser::Error) -> Self {
+        Self::BsonEncode(Arc::new(err))
+    }
+}
+
+impl From<std::io::Error> for ErrorKind {
+    fn from(err: std::io::Error) -> Self {
+        Self::Io(Arc::new(err))
+    }
+}
+
+impl From<std::io::ErrorKind> for ErrorKind {
+    fn from(err: std::io::ErrorKind) -> Self {
+        Self::Io(Arc::new(err.into()))
+    }
+}
+
 impl std::ops::Deref for Error {
-    type Target = Arc<ErrorKind>;
+    type Target = ErrorKind;
 
     fn deref(&self) -> &Self::Target {
         &self.kind
@@ -203,7 +227,7 @@ impl std::ops::Deref for Error {
 
 /// The types of errors that can occur.
 #[allow(missing_docs)]
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error)]
 #[non_exhaustive]
 pub enum ErrorKind {
     /// Wrapper around [`std::net::AddrParseError`](https://doc.rust-lang.org/std/net/struct.AddrParseError.html).
@@ -215,10 +239,6 @@ pub enum ErrorKind {
     #[non_exhaustive]
     ArgumentError { message: String },
 
-    #[cfg(feature = "async-std-runtime")]
-    #[error("{0}")]
-    AsyncStdTimeout(#[from] async_std::future::TimeoutError),
-
     /// An error occurred while the [`Client`](../struct.Client.html) attempted to authenticate a
     /// connection.
     #[error("{message}")]
@@ -227,11 +247,11 @@ pub enum ErrorKind {
 
     /// Wrapper around `bson::de::Error`.
     #[error("{0}")]
-    BsonDecode(#[from] crate::bson::de::Error),
+    BsonDecode(Arc<crate::bson::de::Error>),
 
     /// Wrapper around `bson::ser::Error`.
     #[error("{0}")]
-    BsonEncode(#[from] crate::bson::ser::Error),
+    BsonEncode(Arc<crate::bson::ser::Error>),
 
     /// An error occurred when trying to execute a write operation consisting of multiple writes.
     #[error("An error occurred when trying to execute a write operation: {0:?}")]
@@ -262,7 +282,7 @@ pub enum ErrorKind {
 
     /// Wrapper around [`std::io::Error`](https://doc.rust-lang.org/std/io/struct.Error.html).
     #[error("{0}")]
-    Io(#[from] std::io::Error),
+    Io(Arc<std::io::Error>),
 
     #[error("No DNS results for domain {0}")]
     NoDnsResults(StreamAddress),
@@ -300,11 +320,6 @@ pub enum ErrorKind {
     #[error("An error occurred during SRV record lookup: {message}")]
     #[non_exhaustive]
     SrvLookupError { message: String },
-
-    /// A timeout occurred before a Tokio task could be completed.
-    #[cfg(feature = "tokio-runtime")]
-    #[error("{0}")]
-    TokioTimeoutElapsed(#[from] tokio::time::error::Elapsed),
 
     #[error("{0}")]
     RustlsConfig(#[from] rustls::TLSError),
@@ -561,7 +576,7 @@ impl WriteFailure {
 /// Translates ErrorKind::BulkWriteError cases to ErrorKind::WriteErrors, leaving all other errors
 /// untouched.
 pub(crate) fn convert_bulk_errors(error: Error) -> Error {
-    match *error.kind {
+    match error.kind {
         ErrorKind::BulkWriteError(ref bulk_failure) => {
             match WriteFailure::from_bulk_failure(bulk_failure.clone()) {
                 Ok(failure) => ErrorKind::WriteError(failure).into(),

@@ -97,7 +97,7 @@ pub struct Error {
 
 impl Error {
     pub fn assert_matches(&self, error: &crate::error::Error, description: &str) {
-        match error.kind.as_ref() {
+        match error.kind {
             ErrorKind::WaitQueueTimeoutError { .. } => {
                 assert_eq!(self.type_, "WaitQueueTimeoutError", "{}", description);
             }

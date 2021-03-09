@@ -74,7 +74,7 @@ async fn insert_err_details() {
         .unwrap();
 
     let wc_error_result = coll.insert_one(doc! { "test": 1 }, None).await;
-    match *wc_error_result.unwrap_err().kind {
+    match wc_error_result.unwrap_err().kind {
         ErrorKind::WriteError(WriteFailure::WriteConcernError(ref wc_error)) => {
             match &wc_error.details {
                 Some(doc) => {
@@ -468,7 +468,6 @@ async fn large_insert_unordered_with_errors() {
         .await
         .expect_err("should get error")
         .kind
-        .as_ref()
     {
         ErrorKind::BulkWriteError(ref failure) => {
             let mut write_errors = failure
@@ -509,7 +508,6 @@ async fn large_insert_ordered_with_errors() {
         .await
         .expect_err("should get error")
         .kind
-        .as_ref()
     {
         ErrorKind::BulkWriteError(ref failure) => {
             let write_errors = failure
@@ -544,7 +542,6 @@ async fn empty_insert() {
         .await
         .expect_err("should get error")
         .kind
-        .as_ref()
     {
         ErrorKind::ArgumentError { .. } => {}
         e => panic!("expected argument error, got {:?}", e),
@@ -712,16 +709,10 @@ async fn find_one_and_delete_hint_server_version() {
     let req2 = VersionReq::parse("4.2.*").unwrap();
     if req1.matches(&client.server_version.as_ref().unwrap()) {
         let error = res.expect_err("find one and delete should fail");
-        assert!(matches!(
-            error.kind.as_ref(),
-            ErrorKind::OperationError { .. }
-        ));
+        assert!(matches!(error.kind, ErrorKind::OperationError { .. }));
     } else if req2.matches(&client.server_version.as_ref().unwrap()) {
         let error = res.expect_err("find one and delete should fail");
-        assert!(matches!(
-            error.kind.as_ref(),
-            ErrorKind::CommandError { .. }
-        ));
+        assert!(matches!(error.kind, ErrorKind::CommandError { .. }));
     } else {
         assert!(res.is_ok());
     }

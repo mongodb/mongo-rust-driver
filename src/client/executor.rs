@@ -108,7 +108,7 @@ impl Client {
 
                 // Retryable writes are only supported by storage engines with document-level
                 // locking, so users need to disable retryable writes if using mmapv1.
-                if let ErrorKind::CommandError(ref err) = err.kind.as_ref() {
+                if let ErrorKind::CommandError(ref err) = err.kind {
                     if err.code == 20 && err.message.starts_with("Transaction numbers") {
                         let mut err = err.clone();
                         err.message = "This MongoDB deployment does not support retryable writes. \

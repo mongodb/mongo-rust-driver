@@ -193,8 +193,13 @@ impl SrvResolver {
 }
 
 fn ignore_no_records(error: Error) -> Result<()> {
-    match error.kind.as_ref() {
-        ErrorKind::DnsResolve(resolve_error) if matches!(resolve_error.kind(), ResolveErrorKind::NoRecordsFound { .. }) => {
+    match error.kind {
+        ErrorKind::DnsResolve(resolve_error)
+            if matches!(
+                resolve_error.kind(),
+                ResolveErrorKind::NoRecordsFound { .. }
+            ) =>
+        {
             Ok(())
         }
         _ => Err(error),

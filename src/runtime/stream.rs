@@ -64,14 +64,14 @@ impl From<async_std::net::TcpStream> for AsyncTcpStream {
 impl AsyncTcpStream {
     #[cfg(feature = "tokio-runtime")]
     async fn try_connect(address: &SocketAddr, connect_timeout: Duration) -> Result<Self> {
-        use tokio::{net::TcpStream, time::timeout};
+        use tokio::net::TcpStream;
 
         let stream_future = TcpStream::connect(address);
 
         let stream = if connect_timeout == Duration::from_secs(0) {
             stream_future.await?
         } else {
-            timeout(connect_timeout, stream_future).await??
+            RUNTIME.timeout(connect_timeout, stream_future).await??
         };
 
         stream.set_nodelay(true)?;
