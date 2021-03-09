@@ -310,7 +310,7 @@ async fn handle_write_concern_error() {
     let error = aggregate
         .handle_response(response)
         .expect_err("should get wc error");
-    match *error.kind {
+    match error.kind {
         ErrorKind::WriteError(WriteFailure::WriteConcernError(_)) => {}
         ref e => panic!("should have gotten WriteConcernError, got {:?} instead", e),
     }

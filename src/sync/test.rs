@@ -41,7 +41,7 @@ pub fn drop_collection<T>(coll: &Collection<T>)
 where
     T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
 {
-    match coll.drop(None).as_ref().map_err(|e| e.as_ref()) {
+    match coll.drop(None).as_ref().map_err(|e| &e.kind) {
         Err(ErrorKind::CommandError(CommandError { code: 26, .. })) | Ok(_) => {}
         e @ Err(_) => {
             e.unwrap();

@@ -18,10 +18,7 @@ pub(crate) use self::{
     resolver::AsyncResolver,
     stream::AsyncStream,
 };
-use crate::{
-    error::{ErrorKind, Result},
-    options::StreamAddress,
-};
+use crate::{error::Result, options::StreamAddress};
 pub(crate) use http::HttpClient;
 #[cfg(feature = "async-std-runtime")]
 use interval::Interval;
@@ -138,14 +135,14 @@ impl AsyncRuntime {
         {
             tokio::time::timeout(timeout, future)
                 .await
-                .map_err(|e| ErrorKind::Io(e.into()).into())
+                .map_err(|_| std::io::ErrorKind::TimedOut.into())
         }
 
         #[cfg(feature = "async-std-runtime")]
         {
             async_std::future::timeout(timeout, future)
                 .await
-                .map_err(|_| ErrorKind::Io(std::io::ErrorKind::TimedOut.into()).into())
+                .map_err(|_| std::io::ErrorKind::TimedOut.into())
         }
     }
 

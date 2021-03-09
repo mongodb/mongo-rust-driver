@@ -80,7 +80,7 @@ async fn handle_write_concern_error() {
     let result = op.handle_response(response);
     assert!(result.is_err());
 
-    match *result.unwrap_err().kind {
+    match result.unwrap_err().kind {
         ErrorKind::WriteError(WriteFailure::WriteConcernError(ref wc_err)) => {
             assert_eq!(wc_err.code, 100);
             assert_eq!(wc_err.code_name, "hello world");

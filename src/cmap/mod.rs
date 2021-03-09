@@ -156,12 +156,11 @@ impl ConnectionPool {
                 });
             }
             Err(ref e) => {
-                let failure_reason =
-                    if let ErrorKind::WaitQueueTimeoutError { .. } = e.kind.as_ref() {
-                        ConnectionCheckoutFailedReason::Timeout
-                    } else {
-                        ConnectionCheckoutFailedReason::ConnectionError
-                    };
+                let failure_reason = if let ErrorKind::WaitQueueTimeoutError { .. } = e.kind {
+                    ConnectionCheckoutFailedReason::Timeout
+                } else {
+                    ConnectionCheckoutFailedReason::ConnectionError
+                };
 
                 self.emit_event(|handler| {
                     handler.handle_connection_checkout_failed_event(ConnectionCheckoutFailedEvent {
