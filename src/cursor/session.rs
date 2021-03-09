@@ -7,7 +7,7 @@ use crate::{
     bson::Document,
     client::ClientSession,
     cursor::CursorSpecification,
-    error::Result,
+    error::{Error, Result},
     operation::GetMore,
     results::GetMoreResult,
     Client,
@@ -127,10 +127,8 @@ impl<'session> GetMoreProvider for ExplicitSessionGetMoreProvider<'session> {
         }
     }
 
-    fn clear_execution(&mut self, result: Self::GetMoreResult) {
-        *self = Self::Idle(MutableSessionReference {
-            reference: result.session,
-        })
+    fn clear_execution(&mut self, session: &'session mut ClientSession, _exhausted: bool) {
+        *self = Self::Idle(MutableSessionReference { reference: session })
     }
 
     fn start_execution(&mut self, info: CursorInformation, client: Client) {
@@ -161,12 +159,14 @@ struct ExecutionResult<'session> {
 }
 
 impl<'session> GetMoreProviderResult for ExecutionResult<'session> {
-    fn as_mut(&mut self) -> Result<&mut GetMoreResult> {
-        self.get_more_result.as_mut().map_err(|e| e.clone())
+    type Session = &'session mut ClientSession;
+
+    fn as_ref(&self) -> std::result::Result<&GetMoreResult, &Error> {
+        self.get_more_result.as_ref()
     }
 
-    fn as_ref(&self) -> Result<&GetMoreResult> {
-        self.get_more_result.as_ref().map_err(|e| e.clone())
+    fn into_parts(self) -> (Result<GetMoreResult>, Self::Session) {
+        (self.get_more_result, self.session)
     }
 }
 

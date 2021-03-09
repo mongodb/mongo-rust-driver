@@ -14,7 +14,7 @@ use serde::de::DeserializeOwned;
 use crate::{
     bson::{from_document, Document},
     client::ClientSession,
-    error::Result,
+    error::{Error, Result},
     operation::GetMore,
     results::GetMoreResult,
     Client,
@@ -157,11 +157,14 @@ struct ImplicitSessionGetMoreResult {
 }
 
 impl GetMoreProviderResult for ImplicitSessionGetMoreResult {
-    fn as_mut(&mut self) -> Result<&mut GetMoreResult> {
-        self.get_more_result.as_mut().map_err(|e| e.clone())
+    type Session = Option<ClientSession>;
+
+    fn as_ref(&self) -> std::result::Result<&GetMoreResult, &Error> {
+        self.get_more_result.as_ref()
     }
-    fn as_ref(&self) -> Result<&GetMoreResult> {
-        self.get_more_result.as_ref().map_err(|e| e.clone())
+
+    fn into_parts(self) -> (Result<GetMoreResult>, Self::Session) {
+        (self.get_more_result, self.session)
     }
 }
 
@@ -194,12 +197,12 @@ impl GetMoreProvider for ImplicitSessionGetMoreProvider {
         }
     }
 
-    fn clear_execution(&mut self, result: Self::GetMoreResult) {
+    fn clear_execution(&mut self, session: Option<ClientSession>, exhausted: bool) {
         // If cursor is exhausted, immediately return implicit session to the pool.
-        if result.get_more_result.map(|r| r.exhausted).unwrap_or(false) {
+        if exhausted {
             *self = Self::Done;
         } else {
-            *self = Self::Idle(result.session)
+            *self = Self::Idle(session)
         }
     }
 
