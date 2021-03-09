@@ -227,10 +227,10 @@ impl Topology {
 
     /// Updates the topology based on an error that occurs before the handshake has completed during
     /// an operation.
-    pub(crate) async fn handle_pre_handshake_error(&self, error: &Error, server: &Server) -> bool {
+    pub(crate) async fn handle_pre_handshake_error(&self, error: String, server: &Server) -> bool {
         let state_lock = self.state.write().await;
         let changed = self
-            .mark_server_as_unknown(&error, &server, state_lock)
+            .mark_server_as_unknown(error, &server, state_lock)
             .await;
         if changed {
             server.pool.clear();
@@ -249,13 +249,13 @@ impl Topology {
         // SDAM spec.
         if error.is_non_timeout_network_error() {
             let state_lock = self.state.write().await;
-            self.mark_server_as_unknown(error, &server, state_lock)
+            self.mark_server_as_unknown(error.to_string(), &server, state_lock)
                 .await;
             server.pool.clear();
         } else if error.is_recovering() || error.is_not_master() {
             let state_lock = self.state.write().await;
 
-            self.mark_server_as_unknown(error, &server, state_lock)
+            self.mark_server_as_unknown(error.to_string(), &server, state_lock)
                 .await;
 
             let wire_version = conn
@@ -279,12 +279,11 @@ impl Topology {
     /// Returns whether the topology changed as a result of the update.
     async fn mark_server_as_unknown(
         &self,
-        error: &Error,
+        error: String,
         server: &Server,
         state_lock: RwLockWriteGuard<'_, TopologyState>,
     ) -> bool {
-        let description =
-            ServerDescription::new(server.address.clone(), Some(Err(error.to_string())));
+        let description = ServerDescription::new(server.address.clone(), Some(Err(error)));
         self.update_and_notify(server, description, state_lock)
             .await
     }

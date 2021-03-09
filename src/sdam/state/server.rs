@@ -74,7 +74,10 @@ impl Server {
 /// TODO: add success cases from application handshakes.
 #[derive(Debug)]
 pub(crate) enum ServerUpdate {
-    Error { error: Error, error_generation: u32 },
+    Error {
+        error: String,
+        error_generation: u32,
+    },
 }
 
 #[derive(Debug)]
@@ -106,9 +109,9 @@ impl ServerUpdateSender {
 
     /// Update the server based on the given error.
     /// This will block until the topology has processed the error.
-    pub(crate) async fn handle_error(&mut self, error: Error, error_generation: u32) {
+    pub(crate) async fn handle_error(&mut self, error: &Error, error_generation: u32) {
         let reason = ServerUpdate::Error {
-            error,
+            error: error.to_string(),
             error_generation,
         };
 

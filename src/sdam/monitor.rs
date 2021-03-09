@@ -12,7 +12,7 @@ use super::{
 use crate::{
     bson::doc,
     cmap::{is_master, Command, Connection, Handshaker, PoolGenerationSubscriber},
-    error::{Error, Result},
+    error::Result,
     is_master::IsMasterReply,
     options::{ClientOptions, StreamAddress},
     RUNTIME,
@@ -159,7 +159,7 @@ impl HeartbeatMonitor {
                         .map(|sd| sd.is_available())
                         .unwrap_or(false)
                 {
-                    self.handle_error(e, topology, server).await;
+                    self.handle_error(e.to_string(), topology, server).await;
                     retried = true;
                     self.perform_is_master().await
                 } else {
@@ -174,7 +174,7 @@ impl HeartbeatMonitor {
                     ServerDescription::new(server.address.clone(), Some(Ok(reply)));
                 topology.update(server, server_description).await
             }
-            Err(e) => self.handle_error(e, topology, server).await || retried,
+            Err(e) => self.handle_error(e.to_string(), topology, server).await || retried,
         }
     }
 
@@ -217,8 +217,8 @@ impl HeartbeatMonitor {
         result
     }
 
-    async fn handle_error(&mut self, error: Error, topology: &Topology, server: &Server) -> bool {
-        topology.handle_pre_handshake_error(&error, server).await
+    async fn handle_error(&mut self, error: String, topology: &Topology, server: &Server) -> bool {
+        topology.handle_pre_handshake_error(error, server).await
     }
 }
 
@@ -244,13 +244,13 @@ impl UpdateMonitor {
                 _ => return,
             };
 
-            match update.message() {
+            match update.into_message() {
                 ServerUpdate::Error {
                     error,
                     error_generation,
                 } => {
-                    if *error_generation == self.generation_subscriber.generation() {
-                        topology.handle_pre_handshake_error(&error, &server).await;
+                    if error_generation == self.generation_subscriber.generation() {
+                        topology.handle_pre_handshake_error(error, &server).await;
                     }
                 }
             }

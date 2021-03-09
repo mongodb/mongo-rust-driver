@@ -31,12 +31,14 @@ pub type EventQueue<T> = Arc<RwLock<VecDeque<T>>>;
 pub type CmapEvent = crate::cmap::test::event::Event;
 
 #[derive(Clone, Debug, From)]
+#[allow(clippy::large_enum_variant)]
 pub enum Event {
     CmapEvent(CmapEvent),
     CommandEvent(CommandEvent),
 }
 
 #[derive(Clone, Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum CommandEvent {
     CommandStartedEvent(CommandStartedEvent),
     CommandSucceededEvent(CommandSucceededEvent),

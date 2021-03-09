@@ -562,7 +562,7 @@ async fn establish_connection(
                 };
                 handler.handle_connection_closed_event(event);
             }
-            server_updater.handle_error(e.clone(), generation).await;
+            server_updater.handle_error(&e, generation).await;
             manager.handle_connection_failed();
         }
         Ok(ref mut connection) => {
