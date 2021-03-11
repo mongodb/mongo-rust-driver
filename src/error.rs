@@ -2,8 +2,8 @@
 
 use std::{fmt, sync::Arc};
 
-use err_derive::Error;
 use serde::Deserialize;
+use thiserror::Error;
 use time::OutOfRangeError;
 
 use crate::{bson::Document, options::StreamAddress};
@@ -24,7 +24,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// [`ErrorKind`](enum.ErrorKind.html) is wrapped in an `Arc` to allow the errors to be
 /// cloned.
 #[derive(Clone, Debug, Error)]
-#[error(display = "{}", kind)]
+#[error("{kind}")]
 #[non_exhaustive]
 pub struct Error {
     /// The type of error that occurred.
@@ -208,85 +208,76 @@ impl std::ops::Deref for Error {
 #[non_exhaustive]
 pub enum ErrorKind {
     /// Wrapper around [`std::net::AddrParseError`](https://doc.rust-lang.org/std/net/struct.AddrParseError.html).
-    #[error(display = "{}", _0)]
-    AddrParse(#[error(source)] std::net::AddrParseError),
+    #[error("{0}")]
+    AddrParse(#[from] std::net::AddrParseError),
 
     /// An invalid argument was provided to a database operation.
-    #[error(
-        display = "An invalid argument was provided to a database operation: {}",
-        message
-    )]
+    #[error("An invalid argument was provided to a database operation: {message}")]
     #[non_exhaustive]
     ArgumentError { message: String },
 
     #[cfg(feature = "async-std-runtime")]
-    #[error(display = "{}", _0)]
-    AsyncStdTimeout(#[error(source)] async_std::future::TimeoutError),
+    #[error("{0}")]
+    AsyncStdTimeout(#[from] async_std::future::TimeoutError),
 
     /// An error occurred while the [`Client`](../struct.Client.html) attempted to authenticate a
     /// connection.
-    #[error(display = "{}", message)]
+    #[error("{message}")]
     #[non_exhaustive]
     AuthenticationError { message: String },
 
     /// Wrapper around `bson::de::Error`.
-    #[error(display = "{}", _0)]
-    BsonDecode(#[error(source)] crate::bson::de::Error),
+    #[error("{0}")]
+    BsonDecode(#[from] crate::bson::de::Error),
 
     /// Wrapper around `bson::ser::Error`.
-    #[error(display = "{}", _0)]
-    BsonEncode(#[error(source)] crate::bson::ser::Error),
+    #[error("{0}")]
+    BsonEncode(#[from] crate::bson::ser::Error),
 
     /// An error occurred when trying to execute a write operation consisting of multiple writes.
-    #[error(
-        display = "An error occurred when trying to execute a write operation: {:?}",
-        _0
-    )]
+    #[error("An error occurred when trying to execute a write operation: {0:?}")]
     BulkWriteError(BulkWriteFailure),
 
     /// The server returned an error to an attempted operation.
-    #[error(display = "Command failed {}", _0)]
+    #[error("Command failed {0}")]
     CommandError(CommandError),
 
     // `trust_dns` does not implement the `Error` trait on their errors, so we have to manually
     // implement `From` rather than using the `source annotation.
     /// Wrapper around `trust_dns_resolver::error::ResolveError`.
-    #[error(display = "{}", _0)]
+    #[error("{0}")]
     DnsResolve(trust_dns_resolver::error::ResolveError),
 
-    #[error(display = "Internal error: {}", message)]
+    #[error("Internal error: {message}")]
     #[non_exhaustive]
     InternalError { message: String },
 
     /// Wrapper around `webpki::InvalidDNSNameError`.
-    #[error(display = "{}", _0)]
-    InvalidDnsName(#[error(source)] webpki::InvalidDNSNameError),
+    #[error("{0}")]
+    InvalidDnsName(#[from] webpki::InvalidDNSNameError),
 
     /// A hostname could not be parsed.
-    #[error(display = "Unable to parse hostname: {}", hostname)]
+    #[error("Unable to parse hostname: {hostname}")]
     #[non_exhaustive]
     InvalidHostname { hostname: String },
 
     /// Wrapper around [`std::io::Error`](https://doc.rust-lang.org/std/io/struct.Error.html).
-    #[error(display = "{}", _0)]
-    Io(#[error(source)] std::io::Error),
+    #[error("{0}")]
+    Io(#[from] std::io::Error),
 
-    #[error(display = "No DNS results for domain {}", _0)]
+    #[error("No DNS results for domain {0}")]
     NoDnsResults(StreamAddress),
 
     /// A database operation failed to send or receive a reply.
-    #[error(
-        display = "A database operation failed to send or receive a reply: {}",
-        message
-    )]
+    #[error("A database operation failed to send or receive a reply: {message}")]
     #[non_exhaustive]
     OperationError { message: String },
 
-    #[error(display = "{}", _0)]
-    OutOfRangeError(#[error(source)] OutOfRangeError),
+    #[error("{0}")]
+    OutOfRangeError(#[from] OutOfRangeError),
 
     /// Data from a file could not be parsed.
-    #[error(display = "Unable to parse {} data from {}", data_type, file_path)]
+    #[error("Unable to parse {data_type} data from {file_path}")]
     #[non_exhaustive]
     ParseError {
         data_type: String,
@@ -295,54 +286,47 @@ pub enum ErrorKind {
 
     /// The connection pool for a server was cleared during operation execution due to
     /// a concurrent error, causing the operation to fail.
-    #[error(display = "{}", message)]
+    #[error("{message}")]
     #[non_exhaustive]
     ConnectionPoolClearedError { message: String },
 
     /// The server returned an invalid reply to a database operation.
-    #[error(
-        display = "The server returned an invalid reply to a database operation: {}",
-        message
-    )]
+    #[error("The server returned an invalid reply to a database operation: {message}")]
     #[non_exhaustive]
     ResponseError { message: String },
 
     /// The Client was not able to select a server for the operation.
-    #[error(display = "{}", message)]
+    #[error("{message}")]
     #[non_exhaustive]
     ServerSelectionError { message: String },
 
     /// An error occurred during SRV record lookup.
-    #[error(display = "An error occurred during SRV record lookup: {}", message)]
+    #[error("An error occurred during SRV record lookup: {message}")]
     #[non_exhaustive]
     SrvLookupError { message: String },
 
     /// A timeout occurred before a Tokio task could be completed.
     #[cfg(feature = "tokio-runtime")]
-    #[error(display = "{}", _0)]
-    TokioTimeoutElapsed(#[error(source)] tokio::time::error::Elapsed),
+    #[error("{0}")]
+    TokioTimeoutElapsed(#[from] tokio::time::error::Elapsed),
 
-    #[error(display = "{}", _0)]
-    RustlsConfig(#[error(source)] rustls::TLSError),
+    #[error("{0}")]
+    RustlsConfig(#[from] rustls::TLSError),
 
     /// An error occurred during TXT record lookup
-    #[error(display = "An error occurred during TXT record lookup: {}", message)]
+    #[error("An error occurred during TXT record lookup: {message}")]
     #[non_exhaustive]
     TxtLookupError { message: String },
 
     /// The Client timed out while checking out a connection from connection pool.
     #[error(
-        display = "Timed out while checking out a connection from connection pool with address {}",
-        address
+        "Timed out while checking out a connection from connection pool with address {address}"
     )]
     #[non_exhaustive]
     WaitQueueTimeoutError { address: StreamAddress },
 
     /// An error occurred when trying to execute a write operation
-    #[error(
-        display = "An error occurred when trying to execute a write operation: {:?}",
-        _0
-    )]
+    #[error("An error occurred when trying to execute a write operation: {0:?}")]
     WriteError(WriteFailure),
 }
 
@@ -553,8 +537,8 @@ pub enum WriteFailure {
     /// An error that occurred due to not being able to satisfy a write concern.
     WriteConcernError(WriteConcernError),
 
-    /// An error that occurred during a write operation that wasn't due to being unable to satisfy a
-    /// write concern.
+    /// An error that occurred during a write operation that wasn't due to being unable to satisfy
+    /// a write concern.
     WriteError(WriteError),
 }
 
