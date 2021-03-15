@@ -6,7 +6,7 @@ mod session;
 use std::{sync::Arc, time::Duration};
 
 use derivative::Derivative;
-use time::PreciseTime;
+use std::time::Instant;
 
 #[cfg(test)]
 use crate::options::StreamAddress;
@@ -250,13 +250,12 @@ impl Client {
         let criteria =
             criteria.unwrap_or(&SelectionCriteria::ReadPreference(ReadPreference::Primary));
 
-        let start_time = PreciseTime::now();
-        let timeout = time::Duration::from_std(
-            self.inner
-                .options
-                .server_selection_timeout
-                .unwrap_or(DEFAULT_SERVER_SELECTION_TIMEOUT),
-        )?;
+        let start_time = Instant::now();
+        let timeout = self
+            .inner
+            .options
+            .server_selection_timeout
+            .unwrap_or(DEFAULT_SERVER_SELECTION_TIMEOUT);
 
         loop {
             let mut topology_change_subscriber =
@@ -274,11 +273,15 @@ impl Client {
 
             self.inner.topology.request_topology_check();
 
-            let time_passed = start_time.to(PreciseTime::now());
-            let time_remaining = std::cmp::max(time::Duration::zero(), timeout - time_passed);
+            // If the time that has passed since the start of the loop is greater than the timeout,
+            // then `time_remaining` will be 0, so no change will be found.
+            let time_passed = start_time.elapsed();
+            let time_remaining = timeout
+                .checked_sub(time_passed)
+                .unwrap_or_else(|| Duration::from_millis(0));
 
             let change_occurred = topology_change_subscriber
-                .wait_for_message(time_remaining.to_std()?)
+                .wait_for_message(time_remaining)
                 .await;
 
             if !change_occurred {

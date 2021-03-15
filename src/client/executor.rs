@@ -3,7 +3,7 @@ use super::{Client, ClientSession};
 use std::{collections::HashSet, sync::Arc};
 
 use lazy_static::lazy_static;
-use time::PreciseTime;
+use std::time::Instant;
 
 use crate::{
     bson::Document,
@@ -254,7 +254,7 @@ impl Client {
             handler.handle_command_started_event(command_started_event);
         });
 
-        let start_time = PreciseTime::now();
+        let start_time = Instant::now();
 
         let response_result = match connection.send_command(cmd.clone(), request_id).await {
             Ok(response) => {
@@ -269,8 +269,7 @@ impl Client {
             err => err,
         };
 
-        let end_time = PreciseTime::now();
-        let duration = start_time.to(end_time).to_std()?;
+        let duration = start_time.elapsed();
 
         match response_result {
             Err(error) => {
