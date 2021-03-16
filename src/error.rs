@@ -4,7 +4,6 @@ use std::{fmt, sync::Arc};
 
 use serde::Deserialize;
 use thiserror::Error;
-use time::OutOfRangeError;
 
 use crate::{bson::Document, options::StreamAddress};
 
@@ -272,9 +271,6 @@ pub enum ErrorKind {
     #[error("A database operation failed to send or receive a reply: {message}")]
     #[non_exhaustive]
     OperationError { message: String },
-
-    #[error("{0}")]
-    OutOfRangeError(#[from] OutOfRangeError),
 
     /// Data from a file could not be parsed.
     #[error("Unable to parse {data_type} data from {file_path}")]

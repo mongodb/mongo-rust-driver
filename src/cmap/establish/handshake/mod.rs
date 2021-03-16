@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test;
 
-use time::PreciseTime;
+use std::time::Instant;
 
 use lazy_static::lazy_static;
 use os_info::{Type, Version};
@@ -284,9 +284,9 @@ pub(crate) async fn is_master(command: Command, conn: &mut Connection) -> Result
         }
         .into());
     }
-    let start_time = PreciseTime::now();
+    let start_time = Instant::now();
     let response = conn.send_command(command, None).await?;
-    let end_time = PreciseTime::now();
+    let end_time = Instant::now();
 
     response.validate()?;
     let cluster_time = response.cluster_time().cloned();
@@ -294,7 +294,7 @@ pub(crate) async fn is_master(command: Command, conn: &mut Connection) -> Result
 
     Ok(IsMasterReply {
         command_response,
-        round_trip_time: Some(start_time.to(end_time).to_std().unwrap()),
+        round_trip_time: Some(end_time.duration_since(start_time)),
         cluster_time,
     })
 }
