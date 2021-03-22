@@ -72,7 +72,6 @@
 
 #![warn(missing_docs)]
 #![warn(missing_crate_level_docs)]
-
 #![cfg_attr(
     feature = "cargo-clippy",
     allow(
