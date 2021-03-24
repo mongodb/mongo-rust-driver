@@ -61,11 +61,11 @@ webpki = "0.21.0"
 webpki-roots = "0.21.0"
 
 [dependencies.async-std]
-version = "1.6.2"
+version = "1.9.0"
 optional = true
 
 [dependencies.async-std-resolver]
-version = "0.20.0"
+version = "0.20.1"
 optional = true
 
 [dependencies.pbkdf2]
@@ -73,7 +73,7 @@ version = "0.7.4"
 default-features = false
 
 [dependencies.reqwest]
-version = "0.11.0"
+version = "0.11.2"
 optional = true
 default-features = false
 features = ["json", "rustls-tls"]
@@ -83,7 +83,7 @@ version = "0.19.0"
 features = ["dangerous_configuration"]
 
 [dependencies.serde]
-version = "1.0.98"
+version = "1.0.125"
 features = ["derive"]
 
 [dependencies.serde_bytes]
@@ -91,7 +91,7 @@ version = "0.11.5"
 optional = true
 
 [dependencies.tokio]
-version = "1.0.1"
+version = "1.4.0"
 features = ["io-util", "sync", "macros"]
 
 [dependencies.tokio-rustls]
@@ -99,19 +99,19 @@ version = "0.22.0"
 features = ["dangerous_configuration"]
 
 [dependencies.tokio-util]
-version = "0.6.1"
+version = "0.6.5"
 features = ["io"]
 
 [dependencies.uuid]
-version = "0.8.1"
+version = "0.8.2"
 features = ["v4"]
 
 [dev-dependencies]
 approx = "0.4.0"
-derive_more = "0.99.11"
+derive_more = "0.99.13"
 function_name = "0.2.0"
-pretty_assertions = "0.6.1"
-serde_json = "1.0.40"
+pretty_assertions = "0.7.1"
+serde_json = "1.0.64"
 semver = "0.11.0"
 
 [package.metadata.docs.rs]
