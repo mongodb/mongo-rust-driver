@@ -200,10 +200,10 @@ async fn handle_success() {
         "ok": 1.0
     };
 
-    let result = aggregate.handle_response(CommandResponse::with_document_and_address(
-        address.clone(),
-        response.clone(),
-    ));
+    let result = aggregate.handle_response(
+        CommandResponse::with_document_and_address(address.clone(), response.clone()),
+        &Default::default(),
+    );
     assert!(result.is_ok());
 
     let cursor_spec = result.unwrap();
@@ -228,10 +228,10 @@ async fn handle_success() {
                 .build(),
         ),
     );
-    let result = aggregate.handle_response(CommandResponse::with_document_and_address(
-        address.clone(),
-        response,
-    ));
+    let result = aggregate.handle_response(
+        CommandResponse::with_document_and_address(address.clone(), response),
+        &Default::default(),
+    );
     assert!(result.is_ok());
 
     let cursor_spec = result.unwrap();
@@ -266,7 +266,7 @@ async fn handle_max_await_time() {
     let aggregate = Aggregate::empty();
 
     let spec = aggregate
-        .handle_response(response.clone())
+        .handle_response(response.clone(), &Default::default())
         .expect("handle should succeed");
     assert!(spec.max_time().is_none());
 
@@ -276,7 +276,7 @@ async fn handle_max_await_time() {
         .build();
     let aggregate = Aggregate::new(Namespace::empty(), Vec::new(), Some(options));
     let spec = aggregate
-        .handle_response(response)
+        .handle_response(response, &Default::default())
         .expect("handle_should_succeed");
     assert_eq!(spec.max_time(), Some(max_await));
 }
@@ -308,7 +308,7 @@ async fn handle_write_concern_error() {
     );
 
     let error = aggregate
-        .handle_response(response)
+        .handle_response(response, &Default::default())
         .expect_err("should get wc error");
     match error.kind {
         ErrorKind::WriteError(WriteFailure::WriteConcernError(_)) => {}
@@ -323,7 +323,7 @@ async fn handle_invalid_response() {
 
     let garbled = doc! { "asdfasf": "ASdfasdf" };
     assert!(aggregate
-        .handle_response(CommandResponse::with_document(garbled))
+        .handle_response(CommandResponse::with_document(garbled), &Default::default())
         .is_err());
 
     let missing_cursor_field = doc! {
@@ -333,6 +333,9 @@ async fn handle_invalid_response() {
         }
     };
     assert!(aggregate
-        .handle_response(CommandResponse::with_document(missing_cursor_field))
+        .handle_response(
+            CommandResponse::with_document(missing_cursor_field),
+            &Default::default()
+        )
         .is_err());
 }

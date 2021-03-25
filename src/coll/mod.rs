@@ -265,6 +265,7 @@ where
         resolve_options!(self, options, [read_concern, selection_criteria]);
 
         let op = Count::new(self.namespace(), options);
+
         self.client().execute_operation(op, None).await
     }
 

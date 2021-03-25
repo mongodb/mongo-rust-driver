@@ -109,7 +109,7 @@ async fn handle_success() {
     });
 
     let actual_values = distinct_op
-        .handle_response(response)
+        .handle_response(response, &Default::default())
         .expect("supposed to succeed");
 
     assert_eq!(actual_values, expected_values);
@@ -128,7 +128,7 @@ async fn handle_response_with_empty_values() {
     let expected_values: Vec<Bson> = Vec::new();
 
     let actual_values = distinct_op
-        .handle_response(response)
+        .handle_response(response, &Default::default())
         .expect("supposed to succeed");
 
     assert_eq!(actual_values, expected_values);
@@ -143,7 +143,7 @@ async fn handle_response_no_values() {
        "ok" : 1
     });
 
-    let result = distinct_op.handle_response(response);
+    let result = distinct_op.handle_response(response, &Default::default());
     match result.as_ref().map_err(|e| &e.kind) {
         Err(ErrorKind::ResponseError { .. }) => {}
         other => panic!("expected response error, but got {:?}", other),

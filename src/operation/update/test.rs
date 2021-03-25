@@ -170,7 +170,7 @@ async fn handle_success() {
         ]
     });
 
-    let ok_result = op.handle_response(ok_response);
+    let ok_result = op.handle_response(ok_response, &Default::default());
     assert!(ok_result.is_ok());
 
     let update_result = ok_result.unwrap();
@@ -190,7 +190,7 @@ async fn handle_success_no_upsert() {
         "nModified": 2
     });
 
-    let ok_result = op.handle_response(ok_response);
+    let ok_result = op.handle_response(ok_response, &Default::default());
     assert!(ok_result.is_ok());
 
     let update_result = ok_result.unwrap();
@@ -205,7 +205,9 @@ async fn handle_invalid_response() {
     let op = Update::empty();
 
     let invalid_response = CommandResponse::with_document(doc! { "ok": 1.0, "asdfadsf": 123123 });
-    assert!(op.handle_response(invalid_response).is_err());
+    assert!(op
+        .handle_response(invalid_response, &Default::default())
+        .is_err());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -225,7 +227,7 @@ async fn handle_write_failure() {
             }
         ]
     });
-    let write_error_result = op.handle_response(write_error_response);
+    let write_error_result = op.handle_response(write_error_response, &Default::default());
     assert!(write_error_result.is_err());
     match write_error_result.unwrap_err().kind {
         ErrorKind::WriteError(WriteFailure::WriteError(ref error)) => {
@@ -263,7 +265,7 @@ async fn handle_write_concern_failure() {
         }
     });
 
-    let wc_error_result = op.handle_response(wc_error_response);
+    let wc_error_result = op.handle_response(wc_error_response, &Default::default());
     assert!(wc_error_result.is_err());
 
     match wc_error_result.unwrap_err().kind {

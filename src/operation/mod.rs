@@ -65,7 +65,11 @@ pub(crate) trait Operation {
     fn build(&self, description: &StreamDescription) -> Result<Command>;
 
     /// Interprets the server response to the command.
-    fn handle_response(&self, response: CommandResponse) -> Result<Self::O>;
+    fn handle_response(
+        &self,
+        response: CommandResponse,
+        description: &StreamDescription,
+    ) -> Result<Self::O>;
 
     /// Interpret an error encountered while sending the built command to the server, potentially
     /// recovering.

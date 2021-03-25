@@ -124,7 +124,7 @@ async fn handle_success() {
     });
 
     let actual_values = list_databases_op
-        .handle_response(response)
+        .handle_response(response, &Default::default())
         .expect("supposed to succeed");
 
     assert_eq!(actual_values, expected_values);
@@ -139,7 +139,7 @@ async fn handle_response_no_databases() {
        "ok" : 1
     });
 
-    let result = list_databases_op.handle_response(response);
+    let result = list_databases_op.handle_response(response, &Default::default());
     match result.as_ref().map_err(|e| &e.kind) {
         Err(ErrorKind::ResponseError { .. }) => {}
         other => panic!("expected response error, but got {:?}", other),

@@ -65,7 +65,11 @@ impl Operation for ListDatabases {
         ))
     }
 
-    fn handle_response(&self, response: CommandResponse) -> Result<Self::O> {
+    fn handle_response(
+        &self,
+        response: CommandResponse,
+        _description: &StreamDescription,
+    ) -> Result<Self::O> {
         response.body::<ResponseBody>().map(|body| body.databases)
     }
 

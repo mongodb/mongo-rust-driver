@@ -2,6 +2,7 @@
 mod auth;
 mod command_monitoring;
 mod connection_stepdown;
+mod crud_unified;
 mod crud_v1;
 mod crud_v2;
 #[cfg(not(feature = "sync"))]
@@ -24,7 +25,7 @@ use std::{
 };
 
 pub use self::{
-    unified_runner::Topology,
+    unified_runner::{run_unified_format_test, Topology},
     v2_runner::{operation::Operation, run_v2_test, test_file::RunOn},
 };
 

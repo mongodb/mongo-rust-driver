@@ -85,7 +85,11 @@ impl Operation for Delete {
         ))
     }
 
-    fn handle_response(&self, response: CommandResponse) -> Result<Self::O> {
+    fn handle_response(
+        &self,
+        response: CommandResponse,
+        _description: &StreamDescription,
+    ) -> Result<Self::O> {
         let body: WriteResponseBody = response.body()?;
         body.validate().map_err(convert_bulk_errors)?;
 
