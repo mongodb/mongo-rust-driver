@@ -815,6 +815,7 @@ where
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<UpdateResult> {
         let replacement = to_document(&replacement)?;
+
         bson_util::replacement_document_check(&replacement)?;
 
         let mut options = options.into();
@@ -872,11 +873,12 @@ where
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<UpdateResult> {
         let update = update.into();
+
         let mut options = options.into();
 
         if let UpdateModifications::Document(ref d) = update {
             bson_util::update_document_check(d)?;
-        };
+        }
 
         resolve_options!(self, options, [write_concern]);
 
@@ -924,9 +926,15 @@ where
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<UpdateResult> {
         let mut options = options.into();
+        let update = update.into();
+
+        if let UpdateModifications::Document(ref d) = update {
+            bson_util::update_document_check(d)?;
+        }
+
         resolve_options!(self, options, [write_concern]);
 
-        let update = Update::new(self.namespace(), query, update.into(), false, options);
+        let update = Update::new(self.namespace(), query, update, false, options);
         self.client().execute_operation(update, session).await
     }
 
