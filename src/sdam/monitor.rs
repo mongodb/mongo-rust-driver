@@ -5,14 +5,14 @@ use std::{
 
 use super::{
     description::server::ServerDescription,
-    state::{server::Server, Topology, WeakTopology},
+    state::{server::Server, HandshakePhase, Topology, WeakTopology},
     ServerUpdate,
     ServerUpdateReceiver,
 };
 use crate::{
     bson::doc,
-    cmap::{is_master, Command, Connection, Handshaker, PoolGenerationSubscriber},
-    error::Result,
+    cmap::{is_master, Command, Connection, Handshaker},
+    error::{Error, Result},
     is_master::IsMasterReply,
     options::{ClientOptions, StreamAddress},
     RUNTIME,
@@ -67,7 +67,6 @@ impl Monitor {
             server: Arc::downgrade(&self.server),
             topology: self.topology,
             update_receiver: self.update_receiver,
-            generation_subscriber: self.server.pool.subscribe_to_generation_updates(),
         };
         RUNTIME.execute(async move {
             update_monitor.execute().await;
@@ -159,7 +158,7 @@ impl HeartbeatMonitor {
                         .map(|sd| sd.is_available())
                         .unwrap_or(false)
                 {
-                    self.handle_error(e.to_string(), topology, server).await;
+                    self.handle_error(e, topology, server).await;
                     retried = true;
                     self.perform_is_master().await
                 } else {
@@ -174,7 +173,7 @@ impl HeartbeatMonitor {
                     ServerDescription::new(server.address.clone(), Some(Ok(reply)));
                 topology.update(server, server_description).await
             }
-            Err(e) => self.handle_error(e.to_string(), topology, server).await || retried,
+            Err(e) => self.handle_error(e, topology, server).await || retried,
         }
     }
 
@@ -217,8 +216,8 @@ impl HeartbeatMonitor {
         result
     }
 
-    async fn handle_error(&mut self, error: String, topology: &Topology, server: &Server) -> bool {
-        topology.handle_pre_handshake_error(error, server).await
+    async fn handle_error(&mut self, error: Error, topology: &Topology, server: &Server) -> bool {
+        topology.handle_monitor_error(error, server).await
     }
 }
 
@@ -227,7 +226,6 @@ struct UpdateMonitor {
     server: Weak<Server>,
     topology: WeakTopology,
     update_receiver: ServerUpdateReceiver,
-    generation_subscriber: PoolGenerationSubscriber,
 }
 
 impl UpdateMonitor {
@@ -249,9 +247,15 @@ impl UpdateMonitor {
                     error,
                     error_generation,
                 } => {
-                    if error_generation == self.generation_subscriber.generation() {
-                        topology.handle_pre_handshake_error(error, &server).await;
-                    }
+                    topology
+                        .handle_application_error(
+                            error,
+                            HandshakePhase::PreCompletion {
+                                generation: error_generation,
+                            },
+                            &server,
+                        )
+                        .await;
                 }
             }
         }

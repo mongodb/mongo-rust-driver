@@ -61,6 +61,18 @@ impl Error {
         Error::authentication_error(mechanism_name, "invalid server response")
     }
 
+    pub(crate) fn is_state_change_error(&self) -> bool {
+        self.is_recovering() || self.is_not_master()
+    }
+
+    pub(crate) fn is_auth_error(&self) -> bool {
+        matches!(self.kind, ErrorKind::AuthenticationError { .. })
+    }
+
+    pub(crate) fn is_network_timeout(&self) -> bool {
+        matches!(self.kind, ErrorKind::Io(ref io_err) if io_err.kind() == std::io::ErrorKind::TimedOut)
+    }
+
     /// Whether this error is an "ns not found" error or not.
     pub(crate) fn is_ns_not_found(&self) -> bool {
         matches!(self.kind, ErrorKind::CommandError(ref err) if err.code == 26)
@@ -352,10 +364,6 @@ impl From<trust_dns_resolver::error::ResolveError> for ErrorKind {
 }
 
 impl ErrorKind {
-    pub(crate) fn is_non_timeout_network_error(&self) -> bool {
-        matches!(self, ErrorKind::Io(ref io_err) if io_err.kind() != std::io::ErrorKind::TimedOut)
-    }
-
     pub(crate) fn is_network_error(&self) -> bool {
         matches!(
             self,

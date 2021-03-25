@@ -164,7 +164,7 @@ impl Executor {
         RUNTIME.execute(async move {
             while let Some(update) = update_receiver.recv().await {
                 match update.into_message() {
-                    ServerUpdate::Error { .. } => manager.clear(),
+                    ServerUpdate::Error { .. } => manager.clear().await,
                 }
             }
         });
@@ -284,13 +284,7 @@ impl Operation {
             }
             Operation::Clear => {
                 if let Some(pool) = state.pool.read().await.as_ref() {
-                    let mut subscriber = pool.subscribe_to_generation_updates();
-                    pool.clear();
-
-                    subscriber
-                        .wait_for_generation_change(EVENT_TIMEOUT)
-                        .await
-                        .expect("generation did not change after clearing pool");
+                    pool.clear().await;
                 }
             }
             Operation::Ready => {

@@ -49,18 +49,4 @@ impl PoolGenerationSubscriber {
     pub(crate) fn generation(&self) -> u32 {
         self.receiver.borrow().generation
     }
-
-    #[cfg(test)]
-    pub(crate) async fn wait_for_generation_change(
-        &mut self,
-        timeout: std::time::Duration,
-    ) -> Option<u32> {
-        crate::RUNTIME
-            .timeout(timeout, self.receiver.changed())
-            .await
-            .ok()?
-            .ok()?;
-
-        Some(self.receiver.borrow().generation)
-    }
 }

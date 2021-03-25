@@ -225,54 +225,53 @@ impl Topology {
         self.common.message_manager.notify_topology_changed();
     }
 
-    /// Updates the topology based on an error that occurs before the handshake has completed during
-    /// an operation.
-    pub(crate) async fn handle_pre_handshake_error(&self, error: String, server: &Server) -> bool {
+    pub(crate) async fn handle_application_error(
+        &self,
+        error: Error,
+        handshake: HandshakePhase,
+        server: &Server,
+    ) -> bool {
         let state_lock = self.state.write().await;
-        let changed = self
-            .mark_server_as_unknown(error, &server, state_lock)
-            .await;
-        if changed {
-            server.pool.clear();
+        if handshake.generation() < server.pool.generation() {
+            return false;
         }
-        changed
+
+        if error.is_state_change_error() {
+            let updated = self
+                .mark_server_as_unknown(error.to_string(), server, state_lock)
+                .await;
+
+            if updated && (error.is_shutting_down() || handshake.wire_version().unwrap_or(0) < 8) {
+                server.pool.clear().await;
+            }
+            self.request_topology_check();
+
+            updated
+        } else if error.is_network_error()
+            || (handshake.is_pre_completion()
+                && (error.is_auth_error() || error.is_network_timeout()))
+        {
+            let updated = self
+                .mark_server_as_unknown(error.to_string(), server, state_lock)
+                .await;
+            if updated {
+                server.pool.clear().await;
+            }
+            updated
+        } else {
+            false
+        }
     }
 
-    /// Handles an error that occurs after the handshake has completed during an operation.
-    pub(crate) async fn handle_post_handshake_error(
-        &self,
-        error: &Error,
-        conn: &Connection,
-        server: SelectedServer,
-    ) {
-        // If we encounter certain errors, we must update the topology as per the
-        // SDAM spec.
-        if error.is_non_timeout_network_error() {
-            let state_lock = self.state.write().await;
-            self.mark_server_as_unknown(error.to_string(), &server, state_lock)
-                .await;
-            server.pool.clear();
-        } else if error.is_recovering() || error.is_not_master() {
-            let state_lock = self.state.write().await;
-
-            self.mark_server_as_unknown(error.to_string(), &server, state_lock)
-                .await;
-
-            let wire_version = conn
-                .stream_description()
-                .map(|sd| sd.max_wire_version)
-                .ok()
-                .flatten()
-                .unwrap_or(0);
-
-            // in 4.2+, we only clear connection pool if we've received a
-            // "node is shutting down" error. Otherwise, we always clear the pool.
-            if wire_version < 8 || error.is_shutting_down() {
-                server.pool.clear();
-            }
-
-            self.common.message_manager.request_topology_check();
+    pub(crate) async fn handle_monitor_error(&self, error: Error, server: &Server) -> bool {
+        let state_lock = self.state.write().await;
+        let updated = self
+            .mark_server_as_unknown(error.to_string(), server, state_lock)
+            .await;
+        if updated {
+            server.pool.clear().await;
         }
+        updated
     }
 
     /// Marks a server in the cluster as unknown due to the given `error`.
@@ -508,5 +507,55 @@ impl TopologyState {
         }
 
         self.servers.retain(|host, _| hosts.contains(host));
+    }
+}
+
+/// Enum describing a point in time during an operation's execution relative to when the MongoDB
+/// handshake for the conection being used in that operation.
+///
+/// This is used to determine the error handling semantics for certain error types.
+pub(crate) enum HandshakePhase {
+    /// Describes an point that occurred before the handshake completed (e.g. when opening the
+    /// socket or while performing authentication)
+    PreCompletion { generation: u32 },
+
+    /// Describes a point in time after the handshake completed (e.g. when the command was sent to
+    /// the server).
+    PostCompletion { generation: u32, max_wire_version: i32, },
+}
+
+impl HandshakePhase {
+    pub(crate) fn post_completion(handshaked_connection: Connection) -> Self {
+        Self::PostCompletion {
+            generation: handshaked_connection.generation,
+            // TODO: fix this
+            max_wire_version: handshaked_connection.stream_description().unwrap().max_wire_version.unwrap()
+        }
+    }
+
+    /// The generation of the connection that was used in the handshake.
+    fn generation(&self) -> u32 {
+        match self {
+            HandshakePhase::PreCompletion { generation } => *generation,
+            HandshakePhase::PostCompletion {
+                generation, ..
+            } => *generation,
+        }
+    }
+
+    /// Whether this phase is before the handshake completed or not.
+    fn is_pre_completion(&self) -> bool {
+        matches!(self, HandshakePhase::PreCompletion { .. })
+    }
+
+    /// The wire version of the server as reported by the handshake. If the handshake did not
+    /// complete, this returns `None`.
+    fn wire_version(&self) -> Option<i32> {
+        match self {
+            HandshakePhase::PostCompletion {
+                max_wire_version, ..
+            } => Some(*max_wire_version),
+            HandshakePhase::PreCompletion { .. } => None,
+        }
     }
 }

@@ -12,7 +12,7 @@ use crate::{
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
     operation::{Operation, Retryability},
     options::SelectionCriteria,
-    sdam::{SelectedServer, SessionSupportStatus},
+    sdam::{HandshakePhase, SelectedServer, SessionSupportStatus},
 };
 
 lazy_static! {
@@ -100,30 +100,36 @@ impl Client {
                 return Ok(result);
             }
             Err(err) => {
-                self.inner
-                    .topology
-                    .handle_post_handshake_error(&err, &conn, server)
-                    .await;
-
-                // Retryable writes are only supported by storage engines with document-level
-                // locking, so users need to disable retryable writes if using mmapv1.
-                if let ErrorKind::CommandError(ref err) = err.kind {
-                    if err.code == 20 && err.message.starts_with("Transaction numbers") {
-                        let mut err = err.clone();
-                        err.message = "This MongoDB deployment does not support retryable writes. \
-                                       Please add retryWrites=false to your connection string."
-                            .to_string();
-                        return Err(ErrorKind::CommandError(err).into());
-                    }
-                }
-
                 // For a pre-4.4 connection, an error label should be added to any write-retryable
                 // error as long as the retry_writes client option is not set to false. For a 4.4+
                 // connection, a label should be added only to network errors.
-                let err = match retryability {
+                let mut err = match retryability {
                     Retryability::Write => get_error_with_retryable_write_label(&conn, err).await?,
                     _ => err,
                 };
+
+                // Retryable writes are only supported by storage engines with document-level
+                // locking, so users need to disable retryable writes if using mmapv1.
+                if let ErrorKind::CommandError(ref mut command_error) = err.kind {
+                    if command_error.code == 20
+                        && command_error.message.starts_with("Transaction numbers")
+                    {
+                        command_error.message = "This MongoDB deployment does not support \
+                                                 retryable writes. Please add retryWrites=false \
+                                                 to your connection string."
+                            .to_string();
+                    }
+                }
+
+                self.inner
+                    .topology
+                    .handle_application_error(
+                        err.clone(),
+                        HandshakePhase::post_completion(conn),
+                        &server,
+                    )
+                    .await;
+                drop(server);
 
                 // TODO RUST-90: Do not retry read if session is in a transaction
                 if retryability == Retryability::Read && err.is_read_retryable()
@@ -159,15 +165,19 @@ impl Client {
         {
             Ok(result) => Ok(result),
             Err(err) => {
-                self.inner
-                    .topology
-                    .handle_post_handshake_error(&err, &conn, server)
-                    .await;
-
                 let err = match retryability {
                     Retryability::Write => get_error_with_retryable_write_label(&conn, err).await?,
                     _ => err,
                 };
+                self.inner
+                    .topology
+                    .handle_application_error(
+                        err.clone(),
+                        HandshakePhase::post_completion(conn),
+                        &server,
+                    )
+                    .await;
+                drop(server);
 
                 if err.is_server_error() || err.is_read_retryable() || err.is_write_retryable() {
                     Err(err)

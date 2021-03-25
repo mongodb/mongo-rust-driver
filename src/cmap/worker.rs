@@ -252,7 +252,9 @@ impl ConnectionPoolWorker {
                 PoolTask::HandleManagementRequest(PoolManagementRequest::CheckIn(connection)) => {
                     self.check_in(connection)
                 }
-                PoolTask::HandleManagementRequest(PoolManagementRequest::Clear) => self.clear(),
+                PoolTask::HandleManagementRequest(PoolManagementRequest::Clear(_message)) => {
+                    self.clear();
+                }
                 PoolTask::HandleManagementRequest(PoolManagementRequest::MarkAsReady {
                     completion_handler: _handler,
                 }) => {
@@ -562,7 +564,7 @@ async fn establish_connection(
                 };
                 handler.handle_connection_closed_event(event);
             }
-            server_updater.handle_error(&e, generation).await;
+            server_updater.handle_error(e.clone(), generation).await;
             manager.handle_connection_failed();
         }
         Ok(ref mut connection) => {

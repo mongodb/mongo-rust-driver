@@ -46,7 +46,7 @@ pub struct ConnectionInfo {
 pub(crate) struct Connection {
     pub(super) id: u32,
     pub(super) address: StreamAddress,
-    pub(super) generation: u32,
+    pub(crate) generation: u32,
 
     /// The cached StreamDescription from the connection's handshake.
     pub(super) stream_description: Option<StreamDescription>,
