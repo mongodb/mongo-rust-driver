@@ -322,7 +322,7 @@ impl Client {
                     handler.handle_command_succeeded_event(command_succeeded_event);
                 });
 
-                op.handle_response(response)
+                op.handle_response(response, connection.stream_description()?)
             }
         }
     }

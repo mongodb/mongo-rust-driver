@@ -71,10 +71,14 @@ impl Operation for CountDocuments {
         self.aggregate.build(description)
     }
 
-    fn handle_response(&self, response: CommandResponse) -> Result<Self::O> {
+    fn handle_response(
+        &self,
+        response: CommandResponse,
+        description: &StreamDescription,
+    ) -> Result<Self::O> {
         let result = self
             .aggregate
-            .handle_response(response)
+            .handle_response(response, description)
             .map(|mut spec| spec.initial_buffer.pop_front())?;
 
         let result_doc = match result {

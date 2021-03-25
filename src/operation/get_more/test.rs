@@ -196,7 +196,7 @@ async fn handle_success() {
     });
 
     let result = get_more
-        .handle_response(response)
+        .handle_response(response, &Default::default())
         .expect("handle success case failed");
     assert!(!result.exhausted);
     assert_eq!(result.batch, batch);
@@ -210,7 +210,7 @@ async fn handle_success() {
         "ok": 1
     });
     let result = get_more
-        .handle_response(response)
+        .handle_response(response, &Default::default())
         .expect("handle success case failed");
     assert!(result.exhausted);
     assert_eq!(result.batch, batch);

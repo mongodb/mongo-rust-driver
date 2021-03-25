@@ -151,7 +151,12 @@ pub async fn run_unified_format_test(test_file: TestFile) {
 
                     if let Some(ref expect_result) = operation.expect_result {
                         let result = result
-                            .unwrap_or_else(|_| panic!("{} should succeed", operation.name))
+                            .unwrap_or_else(|e| {
+                                panic!(
+                                    "{} should succeed, but the following error: {}",
+                                    operation.name, e
+                                )
+                            })
                             .unwrap_or_else(|| {
                                 panic!("{} should return an entity", operation.name)
                             });

@@ -69,7 +69,11 @@ impl Operation for GetMore {
         ))
     }
 
-    fn handle_response(&self, response: CommandResponse) -> Result<Self::O> {
+    fn handle_response(
+        &self,
+        response: CommandResponse,
+        _description: &StreamDescription,
+    ) -> Result<Self::O> {
         let body: GetMoreResponseBody = response.body()?;
         Ok(GetMoreResult {
             batch: body.cursor.next_batch,

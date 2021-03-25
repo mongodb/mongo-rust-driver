@@ -137,7 +137,11 @@ where
         ))
     }
 
-    fn handle_response(&self, response: CommandResponse) -> Result<Self::O> {
+    fn handle_response(
+        &self,
+        response: CommandResponse,
+        _description: &StreamDescription,
+    ) -> Result<Self::O> {
         let body: ResponseBody = response.body()?;
         match body.value {
             Bson::Document(doc) => Ok(Some(from_document(doc)?)),

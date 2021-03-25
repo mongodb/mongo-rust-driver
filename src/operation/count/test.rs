@@ -82,7 +82,7 @@ async fn handle_success() {
     let response = CommandResponse::with_document(doc! { "n" : n, "ok" : 1 });
 
     let actual_values = count_op
-        .handle_response(response)
+        .handle_response(response, &Default::default())
         .expect("supposed to succeed");
 
     assert_eq!(actual_values, n);
@@ -95,7 +95,7 @@ async fn handle_response_no_n() {
 
     let response = CommandResponse::with_document(doc! { "ok" : 1 });
 
-    let result = count_op.handle_response(response);
+    let result = count_op.handle_response(response, &Default::default());
     match result.as_ref().map_err(|e| &e.kind) {
         Err(ErrorKind::ResponseError { .. }) => {}
         other => panic!("expected response error, but got {:?}", other),

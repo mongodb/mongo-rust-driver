@@ -36,7 +36,8 @@ async fn no_error_ok_0() {
     });
 
     assert_eq!(
-        op.handle_response(command_response).ok(),
+        op.handle_response(command_response, &Default::default())
+            .ok(),
         Some(doc! { "ok": 0 })
     );
 }

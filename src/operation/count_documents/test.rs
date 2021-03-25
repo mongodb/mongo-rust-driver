@@ -117,7 +117,7 @@ async fn handle_success() {
     });
 
     let actual_values = count_op
-        .handle_response(response)
+        .handle_response(response, &Default::default())
         .expect("supposed to succeed");
 
     assert_eq!(actual_values, n);

@@ -64,7 +64,11 @@ impl Operation for RunCommand {
         ))
     }
 
-    fn handle_response(&self, response: CommandResponse) -> Result<Self::O> {
+    fn handle_response(
+        &self,
+        response: CommandResponse,
+        _description: &StreamDescription,
+    ) -> Result<Self::O> {
         Ok(response.raw_response)
     }
 
