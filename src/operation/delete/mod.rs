@@ -8,7 +8,7 @@ use crate::{
     collation::Collation,
     error::{convert_bulk_errors, Result},
     operation::{append_options, Operation, Retryability, WriteResponseBody},
-    options::{DeleteOptions, WriteConcern},
+    options::{DeleteOptions, Hint, WriteConcern},
     results::DeleteResult,
 };
 
@@ -19,6 +19,7 @@ pub(crate) struct Delete {
     limit: u32,
     options: Option<DeleteOptions>,
     collation: Option<Collation>,
+    hint: Option<Hint>,
 }
 
 impl Delete {
@@ -46,6 +47,7 @@ impl Delete {
             filter,
             limit: limit.unwrap_or(0), // 0 = no limit
             collation: options.as_mut().and_then(|opts| opts.collation.take()),
+            hint: options.as_mut().and_then(|opts| opts.hint.take()),
             options,
         }
     }
@@ -63,6 +65,10 @@ impl Operation for Delete {
 
         if let Some(ref collation) = self.collation {
             delete.insert("collation", bson::to_bson(&collation)?);
+        }
+
+        if let Some(ref hint) = self.hint {
+            delete.insert("hint", bson::to_bson(&hint)?);
         }
 
         let mut body = doc! {

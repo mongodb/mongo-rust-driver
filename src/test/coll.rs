@@ -611,12 +611,15 @@ async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
     let events = client.get_command_started_events(&["delete"]);
     assert_eq!(events.len(), 1);
 
-    let event_hint = events[0].command.get("hint").cloned();
+    let event_hint = events[0].command.get_array("deletes").unwrap()[0]
+        .as_document()
+        .unwrap()
+        .get("hint");
     let expected_hint = match options {
         Some(options) => options.hint.map(|hint| hint.to_bson()),
         None => None,
     };
-    assert_eq!(event_hint, expected_hint);
+    assert_eq!(event_hint, expected_hint.as_ref());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
