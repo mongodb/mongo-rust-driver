@@ -71,18 +71,18 @@ impl IsMasterCommandResponse {
             ServerType::Mongos
         } else if self.set_name.is_some() {
             if let Some(true) = self.hidden {
-                ServerType::RSOther
+                ServerType::RsOther
             } else if let Some(true) = self.is_master {
-                ServerType::RSPrimary
+                ServerType::RsPrimary
             } else if let Some(true) = self.secondary {
-                ServerType::RSSecondary
+                ServerType::RsSecondary
             } else if let Some(true) = self.arbiter_only {
-                ServerType::RSArbiter
+                ServerType::RsArbiter
             } else {
-                ServerType::RSOther
+                ServerType::RsOther
             }
         } else if let Some(true) = self.is_replica_set {
-            ServerType::RSGhost
+            ServerType::RsGhost
         } else {
             ServerType::Standalone
         }

@@ -446,16 +446,16 @@ impl TopologyDescription {
         server_description: ServerDescription,
     ) -> Result<(), String> {
         match server_description.server_type {
-            ServerType::Unknown | ServerType::RSGhost => {}
+            ServerType::Unknown | ServerType::RsGhost => {}
             ServerType::Standalone => {
                 self.update_unknown_with_standalone_server(server_description)
             }
             ServerType::Mongos => self.topology_type = TopologyType::Sharded,
-            ServerType::RSPrimary => {
+            ServerType::RsPrimary => {
                 self.topology_type = TopologyType::ReplicaSetWithPrimary;
                 self.update_rs_from_primary_server(server_description)?;
             }
-            ServerType::RSSecondary | ServerType::RSArbiter | ServerType::RSOther => {
+            ServerType::RsSecondary | ServerType::RsArbiter | ServerType::RsOther => {
                 self.topology_type = TopologyType::ReplicaSetNoPrimary;
                 self.update_rs_without_primary_server(server_description)?;
             }
@@ -480,15 +480,15 @@ impl TopologyDescription {
         server_description: ServerDescription,
     ) -> Result<(), String> {
         match server_description.server_type {
-            ServerType::Unknown | ServerType::RSGhost => {}
+            ServerType::Unknown | ServerType::RsGhost => {}
             ServerType::Standalone | ServerType::Mongos => {
                 self.servers.remove(&server_description.address);
             }
-            ServerType::RSPrimary => {
+            ServerType::RsPrimary => {
                 self.topology_type = TopologyType::ReplicaSetWithPrimary;
                 self.update_rs_from_primary_server(server_description)?
             }
-            ServerType::RSSecondary | ServerType::RSArbiter | ServerType::RSOther => {
+            ServerType::RsSecondary | ServerType::RsArbiter | ServerType::RsOther => {
                 self.update_rs_without_primary_server(server_description)?;
             }
         }
@@ -502,15 +502,15 @@ impl TopologyDescription {
         server_description: ServerDescription,
     ) -> Result<(), String> {
         match server_description.server_type {
-            ServerType::Unknown | ServerType::RSGhost => {
+            ServerType::Unknown | ServerType::RsGhost => {
                 self.record_primary_state();
             }
             ServerType::Standalone | ServerType::Mongos => {
                 self.servers.remove(&server_description.address);
                 self.record_primary_state();
             }
-            ServerType::RSPrimary => self.update_rs_from_primary_server(server_description)?,
-            ServerType::RSSecondary | ServerType::RSArbiter | ServerType::RSOther => {
+            ServerType::RsPrimary => self.update_rs_from_primary_server(server_description)?,
+            ServerType::RsSecondary | ServerType::RsArbiter | ServerType::RsOther => {
                 self.update_rs_with_primary_from_member(server_description)?;
             }
         }
@@ -629,7 +629,7 @@ impl TopologyDescription {
                 continue;
             }
 
-            if let ServerType::RSPrimary = self.servers.get(&address).unwrap().server_type {
+            if let ServerType::RsPrimary = self.servers.get(&address).unwrap().server_type {
                 self.servers
                     .insert(address.clone(), ServerDescription::new(address, None));
             }
@@ -657,7 +657,7 @@ impl TopologyDescription {
         self.topology_type = if self
             .servers
             .values()
-            .any(|server| server.server_type == ServerType::RSPrimary)
+            .any(|server| server.server_type == ServerType::RsPrimary)
         {
             TopologyType::ReplicaSetWithPrimary
         } else {

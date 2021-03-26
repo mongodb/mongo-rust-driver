@@ -134,11 +134,11 @@ impl TestServerType {
         match self {
             TestServerType::Standalone => Some(ServerType::Standalone),
             TestServerType::Mongos => Some(ServerType::Mongos),
-            TestServerType::RSPrimary => Some(ServerType::RSPrimary),
-            TestServerType::RSSecondary => Some(ServerType::RSSecondary),
-            TestServerType::RSArbiter => Some(ServerType::RSArbiter),
-            TestServerType::RSOther => Some(ServerType::RSOther),
-            TestServerType::RSGhost => Some(ServerType::RSGhost),
+            TestServerType::RSPrimary => Some(ServerType::RsPrimary),
+            TestServerType::RSSecondary => Some(ServerType::RsSecondary),
+            TestServerType::RSArbiter => Some(ServerType::RsArbiter),
+            TestServerType::RSOther => Some(ServerType::RsOther),
+            TestServerType::RSGhost => Some(ServerType::RsGhost),
             TestServerType::Unknown => Some(ServerType::Unknown),
             TestServerType::PossiblePrimary => None,
         }
@@ -166,27 +166,27 @@ fn is_master_response_from_server_type(server_type: ServerType) -> IsMasterComma
             response.ok = Some(1.0);
             response.msg = Some("isdbgrid".into());
         }
-        ServerType::RSPrimary => {
+        ServerType::RsPrimary => {
             response.ok = Some(1.0);
             response.set_name = Some("foo".into());
             response.is_master = Some(true);
         }
-        ServerType::RSOther => {
+        ServerType::RsOther => {
             response.ok = Some(1.0);
             response.set_name = Some("foo".into());
             response.hidden = Some(true);
         }
-        ServerType::RSSecondary => {
+        ServerType::RsSecondary => {
             response.ok = Some(1.0);
             response.set_name = Some("foo".into());
             response.secondary = Some(true);
         }
-        ServerType::RSArbiter => {
+        ServerType::RsArbiter => {
             response.ok = Some(1.0);
             response.set_name = Some("foo".into());
             response.arbiter_only = Some(true);
         }
-        ServerType::RSGhost => {
+        ServerType::RsGhost => {
             response.ok = Some(1.0);
             response.is_replica_set = Some(true);
         }
