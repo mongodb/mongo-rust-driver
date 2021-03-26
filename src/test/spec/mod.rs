@@ -76,7 +76,7 @@ where
         run_test_file(
             bson::from_bson(
                 Bson::try_from(json)
-                    .unwrap_or_else(|_| panic!(test_file_full_path.display().to_string())),
+                    .unwrap_or_else(|_| panic!("{}", test_file_full_path.display().to_string())),
             )
             .unwrap_or_else(|e| panic!("{}: {}", test_file_full_path.display().to_string(), e)),
         )

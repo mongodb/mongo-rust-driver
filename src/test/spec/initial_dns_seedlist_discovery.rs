@@ -60,7 +60,7 @@ async fn run() {
         };
 
         if let Some(true) = test_file.error {
-            assert!(matches!(result, Err(_)), test_file.comment.unwrap());
+            assert!(matches!(result, Err(_)), "{}", test_file.comment.unwrap());
             return;
         }
 
