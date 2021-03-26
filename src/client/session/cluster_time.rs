@@ -11,10 +11,10 @@ use crate::bson::{Document, Timestamp};
 #[derivative(PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ClusterTime {
-    pub cluster_time: Timestamp,
+    cluster_time: Timestamp,
 
     #[derivative(PartialEq = "ignore")]
-    pub signature: Document,
+    signature: Document,
 }
 
 impl std::cmp::Ord for ClusterTime {
