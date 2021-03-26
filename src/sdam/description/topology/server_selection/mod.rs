@@ -189,18 +189,18 @@ impl TopologyDescription {
         read_preference: &'a ReadPreference,
     ) -> Result<Vec<&'a ServerDescription>> {
         let servers = match read_preference {
-            ReadPreference::Primary => self.servers_with_type(&[ServerType::RSPrimary]).collect(),
+            ReadPreference::Primary => self.servers_with_type(&[ServerType::RsPrimary]).collect(),
             ReadPreference::Secondary { ref options } => self
                 .suitable_servers_for_read_preference(
-                    &[ServerType::RSSecondary],
+                    &[ServerType::RsSecondary],
                     options.tag_sets.as_ref(),
                     options.max_staleness,
                 )?,
             ReadPreference::PrimaryPreferred { ref options } => {
-                match self.servers_with_type(&[ServerType::RSPrimary]).next() {
+                match self.servers_with_type(&[ServerType::RsPrimary]).next() {
                     Some(primary) => vec![primary],
                     None => self.suitable_servers_for_read_preference(
-                        &[ServerType::RSSecondary],
+                        &[ServerType::RsSecondary],
                         options.tag_sets.as_ref(),
                         options.max_staleness,
                     )?,
@@ -208,19 +208,19 @@ impl TopologyDescription {
             }
             ReadPreference::SecondaryPreferred { ref options } => {
                 let suitable_servers = self.suitable_servers_for_read_preference(
-                    &[ServerType::RSSecondary],
+                    &[ServerType::RsSecondary],
                     options.tag_sets.as_ref(),
                     options.max_staleness,
                 )?;
 
                 if suitable_servers.is_empty() {
-                    self.servers_with_type(&[ServerType::RSPrimary]).collect()
+                    self.servers_with_type(&[ServerType::RsPrimary]).collect()
                 } else {
                     suitable_servers
                 }
             }
             ReadPreference::Nearest { ref options } => self.suitable_servers_for_read_preference(
-                &[ServerType::RSPrimary, ServerType::RSSecondary],
+                &[ServerType::RsPrimary, ServerType::RsSecondary],
                 options.tag_sets.as_ref(),
                 options.max_staleness,
             )?,
@@ -263,7 +263,7 @@ impl TopologyDescription {
         let primary = self
             .servers
             .values()
-            .find(|server| server.server_type == ServerType::RSPrimary);
+            .find(|server| server.server_type == ServerType::RsPrimary);
 
         match primary {
             Some(primary) => {
@@ -299,7 +299,7 @@ impl TopologyDescription {
         let max_write_date = self
             .servers
             .values()
-            .filter(|server| server.server_type == ServerType::RSSecondary)
+            .filter(|server| server.server_type == ServerType::RsSecondary)
             .filter_map(|server| {
                 server
                     .last_write_date()

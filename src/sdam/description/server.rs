@@ -19,11 +19,11 @@ const DRIVER_MAX_WIRE_VERSION: i32 = 7;
 pub enum ServerType {
     Standalone,
     Mongos,
-    RSPrimary,
-    RSSecondary,
-    RSArbiter,
-    RSOther,
-    RSGhost,
+    RsPrimary,
+    RsSecondary,
+    RsArbiter,
+    RsOther,
+    RsGhost,
     Unknown,
 }
 
@@ -32,8 +32,8 @@ impl ServerType {
         matches!(
             self,
             ServerType::Standalone
-                | ServerType::RSPrimary
-                | ServerType::RSSecondary
+                | ServerType::RsPrimary
+                | ServerType::RsSecondary
                 | ServerType::Mongos
         )
     }
@@ -42,8 +42,8 @@ impl ServerType {
         matches!(
             self,
             ServerType::Standalone
-                | ServerType::RSPrimary
-                | ServerType::RSSecondary
+                | ServerType::RsPrimary
+                | ServerType::RsSecondary
                 | ServerType::Mongos
         )
     }

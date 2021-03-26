@@ -58,11 +58,11 @@ fn server_type_from_str(s: &str) -> Option<ServerType> {
     let t = match s {
         "Standalone" => ServerType::Standalone,
         "Mongos" => ServerType::Mongos,
-        "RSPrimary" => ServerType::RSPrimary,
-        "RSSecondary" => ServerType::RSSecondary,
-        "RSArbiter" => ServerType::RSArbiter,
-        "RSOther" => ServerType::RSOther,
-        "RSGhost" => ServerType::RSGhost,
+        "RSPrimary" => ServerType::RsPrimary,
+        "RSSecondary" => ServerType::RsSecondary,
+        "RSArbiter" => ServerType::RsArbiter,
+        "RSOther" => ServerType::RsOther,
+        "RSGhost" => ServerType::RsGhost,
         "Unknown" | "PossiblePrimary" => ServerType::Unknown,
         _ => return None,
     };
