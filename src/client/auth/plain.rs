@@ -46,9 +46,7 @@ pub(crate) async fn authenticate_stream(
 }
 
 fn payload_bytes(username: &str, password: &str) -> Vec<u8> {
-    let mut bytes = Vec::new();
-
-    bytes.push(0);
+    let mut bytes = vec![0];
     bytes.extend(username.as_bytes());
 
     bytes.push(0);

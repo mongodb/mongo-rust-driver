@@ -22,16 +22,16 @@ struct TestCredential {
     pub mechanism_properties: Option<Document>,
 }
 
-impl Into<Credential> for TestCredential {
-    fn into(self) -> Credential {
-        Credential {
-            username: self.username,
-            password: self.password,
-            source: self.source,
-            mechanism: self
+impl From<TestCredential> for Credential {
+    fn from(test_credential: TestCredential) -> Self {
+        Self {
+            username: test_credential.username,
+            password: test_credential.password,
+            source: test_credential.source,
+            mechanism: test_credential
                 .mechanism
                 .and_then(|s| AuthMechanism::from_str(s.as_str()).ok()),
-            mechanism_properties: self.mechanism_properties,
+            mechanism_properties: test_credential.mechanism_properties,
         }
     }
 }

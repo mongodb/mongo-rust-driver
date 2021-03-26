@@ -78,7 +78,9 @@ impl<'de> Deserialize<'de> for SelectionCriteria {
     where
         D: Deserializer<'de>,
     {
-        Ok(SelectionCriteria::ReadPreference(ReadPreference::deserialize(deserializer)?))
+        Ok(SelectionCriteria::ReadPreference(
+            ReadPreference::deserialize(deserializer)?,
+        ))
     }
 }
 
@@ -131,11 +133,22 @@ impl<'de> Deserialize<'de> for ReadPreference {
 
         match preference.mode.as_str() {
             "Primary" => Ok(ReadPreference::Primary),
-            "Secondary" => Ok(ReadPreference::Secondary { options: preference.options }),
-            "PrimaryPreferred" => Ok(ReadPreference::PrimaryPreferred { options: preference.options }),
-            "SecondaryPreferred" => Ok(ReadPreference::SecondaryPreferred { options: preference.options }),
-            "Nearest" => Ok(ReadPreference::Nearest { options: preference.options }),
-            other => Err(D::Error::custom(format!("Unknown read preference mode: {}", other))),
+            "Secondary" => Ok(ReadPreference::Secondary {
+                options: preference.options,
+            }),
+            "PrimaryPreferred" => Ok(ReadPreference::PrimaryPreferred {
+                options: preference.options,
+            }),
+            "SecondaryPreferred" => Ok(ReadPreference::SecondaryPreferred {
+                options: preference.options,
+            }),
+            "Nearest" => Ok(ReadPreference::Nearest {
+                options: preference.options,
+            }),
+            other => Err(D::Error::custom(format!(
+                "Unknown read preference mode: {}",
+                other
+            ))),
         }
     }
 }
@@ -157,7 +170,10 @@ pub struct ReadPreferenceOptions {
     /// `max_staleness` must be at least 90 seconds. If a `max_staleness` less than 90 seconds is
     /// specified for an operation, the operation will return an error.
     #[builder(default)]
-    #[serde(rename = "maxStalenessSeconds", deserialize_with = "deserialize_duration_from_u64_seconds")]
+    #[serde(
+        rename = "maxStalenessSeconds",
+        deserialize_with = "deserialize_duration_from_u64_seconds"
+    )]
     pub max_staleness: Option<Duration>,
 
     /// Specifies hedging behavior for reads. These options only apply to sharded clusters on

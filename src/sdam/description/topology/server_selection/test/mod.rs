@@ -120,11 +120,16 @@ struct LastWriteDate {
 enum TestServerType {
     Standalone,
     Mongos,
-    RSPrimary,
-    RSSecondary,
-    RSArbiter,
-    RSOther,
-    RSGhost,
+    #[serde(rename = "RSPrimary")]
+    RsPrimary,
+    #[serde(rename = "RSSecondary")]
+    RsSecondary,
+    #[serde(rename = "RSArbiter")]
+    RsArbiter,
+    #[serde(rename = "RSOther")]
+    RsOther,
+    #[serde(rename = "RSGhost")]
+    RsGhost,
     Unknown,
     PossiblePrimary,
 }
@@ -134,11 +139,11 @@ impl TestServerType {
         match self {
             TestServerType::Standalone => Some(ServerType::Standalone),
             TestServerType::Mongos => Some(ServerType::Mongos),
-            TestServerType::RSPrimary => Some(ServerType::RsPrimary),
-            TestServerType::RSSecondary => Some(ServerType::RsSecondary),
-            TestServerType::RSArbiter => Some(ServerType::RsArbiter),
-            TestServerType::RSOther => Some(ServerType::RsOther),
-            TestServerType::RSGhost => Some(ServerType::RsGhost),
+            TestServerType::RsPrimary => Some(ServerType::RsPrimary),
+            TestServerType::RsSecondary => Some(ServerType::RsSecondary),
+            TestServerType::RsArbiter => Some(ServerType::RsArbiter),
+            TestServerType::RsOther => Some(ServerType::RsOther),
+            TestServerType::RsGhost => Some(ServerType::RsGhost),
             TestServerType::Unknown => Some(ServerType::Unknown),
             TestServerType::PossiblePrimary => None,
         }
