@@ -6,15 +6,17 @@ use serde::{de::Deserializer, Deserialize};
 
 use crate::{
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
-    client::session::ClientSession,
+    client::session::TransactionState,
     coll::options::CollectionOptions,
     db::options::DatabaseOptions,
     error::Result,
     options::{
         AggregateOptions,
         CountOptions,
+        CreateCollectionOptions,
         DeleteOptions,
         DistinctOptions,
+        DropCollectionOptions,
         EstimatedDocumentCountOptions,
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
@@ -26,10 +28,13 @@ use crate::{
         ListCollectionsOptions,
         ListDatabasesOptions,
         ReplaceOptions,
+        TransactionOptions,
         UpdateModifications,
         UpdateOptions,
     },
-    test::EventClient,
+    selection_criteria::{ReadPreference, SelectionCriteria},
+    test::TestClient,
+    ClientSession,
     Collection,
     Database,
 };
@@ -51,9 +56,9 @@ pub trait TestOperation: Debug {
         session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>>;
 
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>>;
+    async fn execute_on_client(&self, client: &TestClient) -> Result<Option<Bson>>;
 
-    async fn execute_on_session(&self, session: &ClientSession);
+    async fn execute_on_session(&self, session: &mut ClientSession) -> Result<Option<Bson>>;
 }
 
 #[derive(Debug)]
@@ -110,6 +115,8 @@ impl<'de> Deserialize<'de> for Operation {
             pub arguments: Document,
             pub error: Option<bool>,
             pub result: Option<OperationResult>,
+            #[serde(rename = "command_name")]
+            pub command_name: Option<String>,
         }
 
         fn default_arguments() -> Document {
@@ -203,6 +210,42 @@ impl<'de> Deserialize<'de> for Operation {
                 Bson::Document(definition.arguments),
             ))
             .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "assertSessionTransactionState" => AssertSessionTransactionState::deserialize(
+                BsonDeserializer::new(Bson::Document(definition.arguments)),
+            )
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "startTransaction" => StartTransaction::deserialize(BsonDeserializer::new(
+                Bson::Document(definition.arguments),
+            ))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "commitTransaction" => CommitTransaction::deserialize(BsonDeserializer::new(
+                Bson::Document(definition.arguments),
+            ))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "abortTransaction" => AbortTransaction::deserialize(BsonDeserializer::new(
+                Bson::Document(definition.arguments),
+            ))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "runCommand" => {
+                RunCommand::deserialize(BsonDeserializer::new(Bson::Document(definition.arguments)))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "dropCollection" => DropCollection::deserialize(BsonDeserializer::new(Bson::Document(
+                definition.arguments,
+            )))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "createCollection" => CreateCollection::deserialize(BsonDeserializer::new(
+                Bson::Document(definition.arguments),
+            ))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "assertCollectionExists" => AssertCollectionExists::deserialize(BsonDeserializer::new(
+                Bson::Document(definition.arguments),
+            ))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "assertCollectionNotExists" => AssertCollectionNotExists::deserialize(
+                BsonDeserializer::new(Bson::Document(definition.arguments)),
+            )
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -266,11 +309,11 @@ impl TestOperation for DeleteMany {
         unimplemented!()
     }
 
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_session(&self, _session: &ClientSession) {
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -313,11 +356,11 @@ impl TestOperation for DeleteOne {
         unimplemented!()
     }
 
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_session(&self, _session: &ClientSession) {
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -364,11 +407,11 @@ impl TestOperation for Find {
         unimplemented!()
     }
 
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_session(&self, _session: &ClientSession) {
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -416,11 +459,11 @@ impl TestOperation for InsertMany {
         unimplemented!()
     }
 
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_session(&self, _session: &ClientSession) {
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -463,11 +506,11 @@ impl TestOperation for InsertOne {
         unimplemented!()
     }
 
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_session(&self, _session: &ClientSession) {
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -520,11 +563,11 @@ impl TestOperation for UpdateMany {
         unimplemented!()
     }
 
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_session(&self, _session: &ClientSession) {
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -577,11 +620,11 @@ impl TestOperation for UpdateOne {
         unimplemented!()
     }
 
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_session(&self, _session: &ClientSession) {
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -647,11 +690,11 @@ impl TestOperation for Aggregate {
         Ok(Some(Bson::from(result)))
     }
 
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_session(&self, _session: &ClientSession) {
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -700,11 +743,11 @@ impl TestOperation for Distinct {
         unimplemented!()
     }
 
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_session(&self, _session: &ClientSession) {
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -750,11 +793,11 @@ impl TestOperation for CountDocuments {
         unimplemented!()
     }
 
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_session(&self, _session: &ClientSession) {
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -786,11 +829,11 @@ impl TestOperation for EstimatedDocumentCount {
         unimplemented!()
     }
 
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_session(&self, _session: &ClientSession) {
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -835,11 +878,11 @@ impl TestOperation for FindOne {
         unimplemented!()
     }
 
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_session(&self, _session: &ClientSession) {
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -887,11 +930,11 @@ impl TestOperation for ListCollections {
         Ok(Some(bson::to_bson(&result)?))
     }
 
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_session(&self, _session: &ClientSession) {
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -928,11 +971,11 @@ impl TestOperation for ListCollectionNames {
         Ok(Some(Bson::from(result)))
     }
 
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_session(&self, _session: &ClientSession) {
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -985,11 +1028,11 @@ impl TestOperation for ReplaceOne {
         unimplemented!()
     }
 
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_session(&self, _session: &ClientSession) {
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -1042,11 +1085,11 @@ impl TestOperation for FindOneAndUpdate {
         unimplemented!()
     }
 
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_session(&self, _session: &ClientSession) {
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -1099,11 +1142,11 @@ impl TestOperation for FindOneAndReplace {
         unimplemented!()
     }
 
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_session(&self, _session: &ClientSession) {
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -1150,11 +1193,11 @@ impl TestOperation for FindOneAndDelete {
         unimplemented!()
     }
 
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_session(&self, _session: &ClientSession) {
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -1184,14 +1227,14 @@ impl TestOperation for ListDatabases {
         unimplemented!()
     }
 
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, client: &TestClient) -> Result<Option<Bson>> {
         let result = client
             .list_databases(self.filter.clone(), self.options.clone())
             .await?;
         Ok(Some(bson::to_bson(&result)?))
     }
 
-    async fn execute_on_session(&self, _session: &ClientSession) {
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -1221,7 +1264,7 @@ impl TestOperation for ListDatabaseNames {
         unimplemented!()
     }
 
-    async fn execute_on_client(&self, client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, client: &TestClient) -> Result<Option<Bson>> {
         let result = client
             .list_database_names(self.filter.clone(), self.options.clone())
             .await?;
@@ -1229,7 +1272,372 @@ impl TestOperation for ListDatabaseNames {
         Ok(Some(Bson::Array(result)))
     }
 
-    async fn execute_on_session(&self, _session: &ClientSession) {
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct AssertSessionTransactionState {
+    state: String,
+}
+
+#[async_trait]
+impl TestOperation for AssertSessionTransactionState {
+    async fn execute_on_collection(
+        &self,
+        _collection: &Collection,
+        _session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_database(
+        &self,
+        _database: &Database,
+        _session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_session(&self, session: &mut ClientSession) -> Result<Option<Bson>> {
+        match self.state.as_str() {
+            "none" => assert!(matches!(session.transaction.state, TransactionState::None)),
+            "starting" => assert!(matches!(
+                session.transaction.state,
+                TransactionState::Starting
+            )),
+            "in_progress" => assert!(matches!(
+                session.transaction.state,
+                TransactionState::InProgress
+            )),
+            "committed" => assert!(matches!(
+                session.transaction.state,
+                TransactionState::Committed { .. }
+            )),
+            "aborted" => assert!(matches!(
+                session.transaction.state,
+                TransactionState::Aborted
+            )),
+            other => panic!("Unknown transaction state: {}", other),
+        }
+        Ok(None)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct StartTransaction {
+    options: Option<TransactionOptions>,
+}
+
+#[async_trait]
+impl TestOperation for StartTransaction {
+    async fn execute_on_collection(
+        &self,
+        _collection: &Collection,
+        _session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_database(
+        &self,
+        _database: &Database,
+        _session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_session(&self, session: &mut ClientSession) -> Result<Option<Bson>> {
+        session
+            .start_transaction(self.options.clone())
+            .await
+            .map(|_| None)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct CommitTransaction {}
+
+#[async_trait]
+impl TestOperation for CommitTransaction {
+    async fn execute_on_collection(
+        &self,
+        _collection: &Collection,
+        _session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_database(
+        &self,
+        _database: &Database,
+        _session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_session(&self, session: &mut ClientSession) -> Result<Option<Bson>> {
+        session.commit_transaction().await.map(|_| None)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct AbortTransaction {}
+
+#[async_trait]
+impl TestOperation for AbortTransaction {
+    async fn execute_on_collection(
+        &self,
+        _collection: &Collection,
+        _session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_database(
+        &self,
+        _database: &Database,
+        _session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_session(&self, session: &mut ClientSession) -> Result<Option<Bson>> {
+        session.abort_transaction().await.map(|_| None)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct RunCommand {
+    command: Document,
+    read_preference: Option<ReadPreference>,
+}
+
+#[async_trait]
+impl TestOperation for RunCommand {
+    async fn execute_on_collection(
+        &self,
+        _collection: &Collection,
+        _session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_database(
+        &self,
+        database: &Database,
+        session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        let selection_criteria = self
+            .read_preference
+            .as_ref()
+            .map(|read_preference| SelectionCriteria::ReadPreference(read_preference.clone()));
+        let result = match session {
+            Some(session) => {
+                database
+                    .run_command_with_session(self.command.clone(), selection_criteria, session)
+                    .await
+            }
+            None => database.run_command(self.command.clone(), None).await,
+        };
+        result.map(|doc| Some(Bson::Document(doc)))
+    }
+
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct DropCollection {
+    collection: String,
+    #[serde(flatten)]
+    options: Option<DropCollectionOptions>,
+}
+
+#[async_trait]
+impl TestOperation for DropCollection {
+    async fn execute_on_collection(
+        &self,
+        _collection: &Collection,
+        _session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_database(
+        &self,
+        database: &Database,
+        session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        let result = match session {
+            Some(session) => {
+                database
+                    .collection::<Document>(&self.collection)
+                    .drop_with_session(self.options.clone(), session)
+                    .await
+            }
+            None => {
+                database
+                    .collection::<Document>(&self.collection)
+                    .drop(self.options.clone())
+                    .await
+            }
+        };
+        result.map(|_| None)
+    }
+
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct CreateCollection {
+    collection: String,
+    #[serde(flatten)]
+    options: Option<CreateCollectionOptions>,
+}
+
+#[async_trait]
+impl TestOperation for CreateCollection {
+    async fn execute_on_collection(
+        &self,
+        _collection: &Collection,
+        _session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_database(
+        &self,
+        database: &Database,
+        session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        let result = match session {
+            Some(session) => {
+                database
+                    .create_collection_with_session(&self.collection, self.options.clone(), session)
+                    .await
+            }
+            None => {
+                database
+                    .create_collection(&self.collection, self.options.clone())
+                    .await
+            }
+        };
+        result.map(|_| None)
+    }
+
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct AssertCollectionExists {
+    database: String,
+    collection: String,
+}
+
+#[async_trait]
+impl TestOperation for AssertCollectionExists {
+    async fn execute_on_collection(
+        &self,
+        _collection: &Collection,
+        _session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_database(
+        &self,
+        _database: &Database,
+        _session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_client(&self, client: &TestClient) -> Result<Option<Bson>> {
+        let collections = client
+            .database(&self.database)
+            .list_collection_names(None)
+            .await
+            .unwrap();
+        assert!(collections.contains(&self.collection));
+        Ok(None)
+    }
+
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct AssertCollectionNotExists {
+    database: String,
+    collection: String,
+}
+
+#[async_trait]
+impl TestOperation for AssertCollectionNotExists {
+    async fn execute_on_collection(
+        &self,
+        _collection: &Collection,
+        _session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_database(
+        &self,
+        _database: &Database,
+        _session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_client(&self, client: &TestClient) -> Result<Option<Bson>> {
+        let collections = client
+            .database(&self.database)
+            .list_collection_names(None)
+            .await
+            .unwrap();
+        assert!(!collections.contains(&self.collection));
+        Ok(None)
+    }
+
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }
@@ -1255,11 +1663,11 @@ impl TestOperation for UnimplementedOperation {
         unimplemented!()
     }
 
-    async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
         unimplemented!()
     }
 
-    async fn execute_on_session(&self, _session: &ClientSession) {
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
     }
 }

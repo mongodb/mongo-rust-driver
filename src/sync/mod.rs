@@ -8,7 +8,7 @@ mod db;
 #[cfg(test)]
 mod test;
 
-pub use client::Client;
+pub use client::{session::ClientSession, Client};
 pub use coll::Collection;
 pub use cursor::{Cursor, SessionCursor, SessionCursorIter};
 pub use db::Database;

@@ -11,7 +11,6 @@ use crate::{
     operation::{append_options, Operation, Retryability, WriteResponseBody},
     options::{InsertManyOptions, WriteConcern},
     results::InsertManyResult,
-    ClientSession,
     Namespace,
 };
 
@@ -20,7 +19,6 @@ pub(crate) struct Insert {
     ns: Namespace,
     documents: Vec<Document>,
     options: Option<InsertManyOptions>,
-    session: Option<ClientSession>,
 }
 
 impl Insert {
@@ -39,7 +37,6 @@ impl Insert {
                     d
                 })
                 .collect(),
-            session: None,
         }
     }
 }
@@ -53,6 +50,7 @@ impl Operation for Insert {
             Self::NAME: self.ns.coll.clone(),
             "documents": bson_util::to_bson_array(&self.documents),
         };
+
         append_options(&mut body, self.options.as_ref())?;
 
         let ordered = self

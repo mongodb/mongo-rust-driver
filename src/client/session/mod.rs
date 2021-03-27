@@ -13,7 +13,10 @@ use uuid::Uuid;
 
 use crate::{
     bson::{doc, spec::BinarySubtype, Binary, Bson, Document},
-    options::SessionOptions,
+    error::{ErrorKind, Result},
+    operation::{AbortTransaction, CommitTransaction, Operation},
+    options::{SessionOptions, TransactionOptions},
+    sdam::TransactionSupportStatus,
     Client,
     RUNTIME,
 };
@@ -34,13 +37,64 @@ lazy_static! {
 ///
 /// `ClientSession` instances are not thread safe or fork safe. They can only be used by one thread
 /// or process at a time.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ClientSession {
     cluster_time: Option<ClusterTime>,
     server_session: ServerSession,
     client: Client,
     is_implicit: bool,
     options: Option<SessionOptions>,
+    pub(crate) transaction: Transaction,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Transaction {
+    pub(crate) state: TransactionState,
+    pub(crate) options: Option<TransactionOptions>,
+}
+
+impl Transaction {
+    pub(crate) fn start(&mut self, options: Option<TransactionOptions>) {
+        self.state = TransactionState::Starting;
+        self.options = options;
+    }
+
+    pub(crate) fn commit(&mut self, data_committed: bool) {
+        self.state = TransactionState::Committed { data_committed };
+    }
+
+    pub(crate) fn abort(&mut self) {
+        self.state = TransactionState::Aborted;
+        self.options = None;
+    }
+
+    pub(crate) fn reset(&mut self) {
+        self.state = TransactionState::None;
+        self.options = None;
+    }
+}
+
+impl Default for Transaction {
+    fn default() -> Self {
+        Self {
+            state: TransactionState::None,
+            options: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum TransactionState {
+    None,
+    Starting,
+    InProgress,
+    Committed {
+        /// Whether any data was committed when commit_transaction was initially called. This is
+        /// required to determine whether a commitTransaction command should be run if the user
+        /// calls commit_transaction again.
+        data_committed: bool,
+    },
+    Aborted,
 }
 
 impl ClientSession {
@@ -57,6 +111,7 @@ impl ClientSession {
             cluster_time: None,
             is_implicit,
             options,
+            transaction: Default::default(),
         }
     }
 
@@ -73,6 +128,12 @@ impl ClientSession {
     /// Whether this session was created implicitly by the driver or explcitly by the user.
     pub(crate) fn is_implicit(&self) -> bool {
         self.is_implicit
+    }
+
+    /// Whether this session is currently in a transaction.
+    pub(crate) fn in_transaction(&self) -> bool {
+        self.transaction.state == TransactionState::Starting
+            || self.transaction.state == TransactionState::InProgress
     }
 
     /// The highest seen cluster time this session has seen so far.
@@ -105,6 +166,16 @@ impl ClientSession {
         self.server_session.last_use = Instant::now();
     }
 
+    /// Gets the current txn_number.
+    pub(crate) fn txn_number(&self) -> u64 {
+        self.server_session.txn_number
+    }
+
+    /// Increments the txn_number.
+    pub(crate) fn increment_txn_number(&mut self) {
+        self.server_session.txn_number += 1;
+    }
+
     /// Increments the txn_number and returns the new value.
     pub(crate) fn get_and_increment_txn_number(&mut self) -> u64 {
         self.server_session.txn_number += 1;
@@ -116,21 +187,270 @@ impl ClientSession {
     pub(crate) fn is_dirty(&self) -> bool {
         self.server_session.dirty
     }
+
+    /// Starts a new transaction on this session with the given `TransactionOptions`. If no options
+    /// are provided, the session's `defaultTransactionOptions` will be used. This session must
+    /// be passed into each operation within the transaction; otherwise, the operation will be
+    /// executed outside of the transaction.
+    ///
+    /// Transactions are supported on MongoDB 4.0+. The Rust driver currently only supports
+    /// transactions on replica sets.
+    ///
+    /// ```rust
+    /// # use mongodb::{bson::{doc, Document}, error::Result, Client, ClientSession};
+    /// #
+    /// # async fn do_stuff() -> Result<()> {
+    /// # let client = Client::with_uri_str("mongodb://example.com").await?;
+    /// # let coll = client.database("foo").collection::<Document>("bar");
+    /// # let mut session = client.start_session(None).await?;
+    /// session.start_transaction(None).await?;
+    /// let result = coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session).await?;
+    /// session.commit_transaction().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn start_transaction(
+        &mut self,
+        options: impl Into<Option<TransactionOptions>>,
+    ) -> Result<()> {
+        match self.transaction.state {
+            TransactionState::Starting | TransactionState::InProgress => {
+                return Err(ErrorKind::Transaction {
+                    message: "transaction already in progress".into(),
+                }
+                .into());
+            }
+            _ => {}
+        }
+        match self.client.transaction_support_status().await? {
+            TransactionSupportStatus::Supported => {
+                let mut options = match options.into() {
+                    Some(mut options) => {
+                        if let Some(defaults) = self.default_transaction_options() {
+                            merge_options!(
+                                defaults,
+                                &mut options,
+                                [
+                                    read_concern,
+                                    write_concern,
+                                    selection_criteria,
+                                    max_commit_time
+                                ]
+                            );
+                        }
+                        Some(options)
+                    }
+                    None => self.default_transaction_options().cloned(),
+                };
+                resolve_options!(
+                    self.client,
+                    options,
+                    [read_concern, write_concern, selection_criteria]
+                );
+
+                if let Some(ref options) = options {
+                    if !options
+                        .write_concern
+                        .as_ref()
+                        .map(|wc| wc.is_acknowledged())
+                        .unwrap_or(true)
+                    {
+                        return Err(ErrorKind::Transaction {
+                            message: "transactions do not support unacknowledged write concerns"
+                                .into(),
+                        }
+                        .into());
+                    }
+                }
+
+                self.increment_txn_number();
+                self.transaction.start(options);
+                Ok(())
+            }
+            _ => Err(ErrorKind::Transaction {
+                message: "Transactions are not supported by this deployment".into(),
+            }
+            .into()),
+        }
+    }
+
+    /// Commits the transaction that is currently active on this session.
+    ///
+    /// ```rust
+    /// # use mongodb::{bson::{doc, Document}, error::Result, Client, ClientSession};
+    /// #
+    /// # async fn do_stuff() -> Result<()> {
+    /// # let client = Client::with_uri_str("mongodb://example.com").await?;
+    /// # let coll = client.database("foo").collection::<Document>("bar");
+    /// # let mut session = client.start_session(None).await?;
+    /// session.start_transaction(None).await?;
+    /// let result = coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session).await?;
+    /// session.commit_transaction().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
+    pub async fn commit_transaction(&mut self) -> Result<()> {
+        match &mut self.transaction.state {
+            TransactionState::None => Err(ErrorKind::Transaction {
+                message: "no transaction started".into(),
+            }
+            .into()),
+            TransactionState::Aborted => Err(ErrorKind::Transaction {
+                message: "Cannot call commitTransaction after calling abortTransaction".into(),
+            }
+            .into()),
+            TransactionState::Starting => {
+                self.transaction.commit(false);
+                Ok(())
+            }
+            TransactionState::InProgress => {
+                let commit_transaction = CommitTransaction::new(self.transaction.options.clone());
+                self.transaction.commit(true);
+                self.client
+                    .clone()
+                    .execute_operation(commit_transaction, self)
+                    .await
+            }
+            TransactionState::Committed {
+                data_committed: true,
+            } => {
+                let mut commit_transaction =
+                    CommitTransaction::new(self.transaction.options.clone());
+                commit_transaction.update_for_retry();
+                self.client
+                    .clone()
+                    .execute_operation(commit_transaction, self)
+                    .await
+            }
+            TransactionState::Committed {
+                data_committed: false,
+            } => Ok(()),
+        }
+    }
+
+    /// Aborts the transaction that is currently active on this session. Any open transaction will
+    /// be aborted automatically in the `Drop` implementation of `ClientSession`.
+    ///
+    /// ```rust
+    /// # use mongodb::{bson::{doc, Document}, error::Result, Client, ClientSession, Collection};
+    /// #
+    /// # async fn do_stuff() -> Result<()> {
+    /// # let client = Client::with_uri_str("mongodb://example.com").await?;
+    /// # let coll = client.database("foo").collection::<Document>("bar");
+    /// # let mut session = client.start_session(None).await?;
+    /// session.start_transaction(None).await?;
+    /// match execute_transaction(coll, &mut session).await {
+    ///     Ok(_) => session.commit_transaction().await?,
+    ///     Err(_) => session.abort_transaction().await?,
+    /// }
+    /// # Ok(())
+    /// # }
+    ///
+    /// async fn execute_transaction(coll: Collection, session: &mut ClientSession) -> Result<()> {
+    ///     coll.insert_one_with_session(doc! { "x": 1 }, None, session).await?;
+    ///     coll.delete_one_with_session(doc! { "y": 2 }, None, session).await?;
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
+    pub async fn abort_transaction(&mut self) -> Result<()> {
+        match self.transaction.state {
+            TransactionState::None => Err(ErrorKind::Transaction {
+                message: "no transaction started".into(),
+            }
+            .into()),
+            TransactionState::Committed { .. } => Err(ErrorKind::Transaction {
+                message: "Cannot call abortTransaction after calling commitTransaction".into(),
+            }
+            .into()),
+            TransactionState::Aborted => Err(ErrorKind::Transaction {
+                message: "cannot call abortTransaction twice".into(),
+            }
+            .into()),
+            TransactionState::Starting => {
+                self.transaction.abort();
+                Ok(())
+            }
+            TransactionState::InProgress => {
+                let write_concern = self
+                    .transaction
+                    .options
+                    .as_ref()
+                    .and_then(|options| options.write_concern.as_ref())
+                    .cloned();
+                let abort_transaction = AbortTransaction::new(write_concern);
+                self.transaction.abort();
+                // Errors returned from running an abortTransaction command should be ignored.
+                let _result = self
+                    .client
+                    .clone()
+                    .execute_operation(abort_transaction, &mut *self)
+                    .await;
+                Ok(())
+            }
+        }
+    }
+
+    fn default_transaction_options(&self) -> Option<&TransactionOptions> {
+        self.options
+            .as_ref()
+            .and_then(|options| options.default_transaction_options.as_ref())
+    }
+}
+
+struct DroppedClientSession {
+    cluster_time: Option<ClusterTime>,
+    server_session: ServerSession,
+    client: Client,
+    is_implicit: bool,
+    options: Option<SessionOptions>,
+    transaction: Transaction,
+}
+
+impl From<DroppedClientSession> for ClientSession {
+    fn from(dropped_session: DroppedClientSession) -> Self {
+        Self {
+            cluster_time: dropped_session.cluster_time,
+            server_session: dropped_session.server_session,
+            client: dropped_session.client,
+            is_implicit: dropped_session.is_implicit,
+            options: dropped_session.options,
+            transaction: dropped_session.transaction,
+        }
+    }
 }
 
 impl Drop for ClientSession {
     fn drop(&mut self) {
-        let client = self.client.clone();
-        let server_session = ServerSession {
-            id: self.server_session.id.clone(),
-            last_use: self.server_session.last_use,
-            dirty: self.server_session.dirty,
-            txn_number: self.server_session.txn_number,
-        };
-
-        RUNTIME.execute(async move {
-            client.check_in_server_session(server_session).await;
-        })
+        if self.transaction.state == TransactionState::InProgress {
+            let dropped_session = DroppedClientSession {
+                cluster_time: self.cluster_time.clone(),
+                server_session: self.server_session.clone(),
+                client: self.client.clone(),
+                is_implicit: self.is_implicit,
+                options: self.options.clone(),
+                transaction: self.transaction.clone(),
+            };
+            RUNTIME.execute(async move {
+                let mut session: ClientSession = dropped_session.into();
+                let _result = session.abort_transaction().await;
+            });
+        } else {
+            let client = self.client.clone();
+            let server_session = self.server_session.clone();
+            RUNTIME.execute(async move {
+                client.check_in_server_session(server_session).await;
+            });
+        }
     }
 }
 

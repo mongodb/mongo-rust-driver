@@ -1,6 +1,9 @@
 //! Contains the `Error` and `Result` types that `mongodb` uses.
 
-use std::{fmt::{self, Debug}, sync::Arc};
+use std::{
+    fmt::{self, Debug},
+    sync::Arc,
+};
 
 use serde::Deserialize;
 use thiserror::Error;
@@ -15,6 +18,18 @@ const RETRYABLE_READ_CODES: [i32; 11] =
 const RETRYABLE_WRITE_CODES: [i32; 12] = [
     11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001, 262,
 ];
+const UNKNOWN_TRANSACTION_COMMIT_RESULT_LABEL_CODES: [i32; 3] = [50, 64, 91];
+
+/// Retryable write error label. This label will be added to an error when the error is
+/// write-retryable.
+pub const RETRYABLE_WRITE_ERROR: &str = "RetryableWriteError";
+/// Transient transaction error label. This label will be added to a network error or server
+/// selection error that occurs during a transaction.
+pub const TRANSIENT_TRANSACTION_ERROR: &str = "TransientTransactionError";
+/// Unknown transaction commit result error label. This label will be added to a server selection
+/// error, network error, write-retryable error, MaxTimeMSExpired error, or write concern
+/// failed/timeout during a commitTransaction.
+pub const UNKNOWN_TRANSACTION_COMMIT_RESULT: &str = "UnknownTransactionCommitResult";
 
 /// The result type for all methods that can return an error in the `mongodb` crate.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -82,21 +97,23 @@ impl Error {
         matches!(self.kind.as_ref(), ErrorKind::Command(ref err) if err.code == 26)
     }
 
+    pub(crate) fn is_server_selection_error(&self) -> bool {
+        matches!(self.kind.as_ref(), ErrorKind::ServerSelection { .. })
+    }
+
     /// Whether a read operation should be retried if this error occurs.
     pub(crate) fn is_read_retryable(&self) -> bool {
         if self.is_network_error() {
             return true;
         }
         match self.code() {
-            Some(code) => {
-                RETRYABLE_READ_CODES.contains(&code)
-            }
+            Some(code) => RETRYABLE_READ_CODES.contains(&code),
             None => false,
         }
     }
 
     pub(crate) fn is_write_retryable(&self) -> bool {
-        self.contains_label("RetryableWriteError")
+        self.contains_label(RETRYABLE_WRITE_ERROR)
     }
 
     /// Whether a "RetryableWriteError" label should be added to this error. If max_wire_version
@@ -112,6 +129,20 @@ impl Error {
         }
         match &self.code() {
             Some(code) => RETRYABLE_WRITE_CODES.contains(&code),
+            None => false,
+        }
+    }
+
+    pub(crate) fn should_add_unknown_transaction_commit_result_label(&self) -> bool {
+        if self.contains_label(TRANSIENT_TRANSACTION_ERROR) {
+            return false;
+        }
+        if self.is_network_error() || self.is_server_selection_error() || self.is_write_retryable()
+        {
+            return true;
+        }
+        match self.code() {
+            Some(code) => UNKNOWN_TRANSACTION_COMMIT_RESULT_LABEL_CODES.contains(&code),
             None => false,
         }
     }
@@ -150,48 +181,40 @@ impl Error {
             .any(|actual_label| actual_label.as_str() == label.as_ref())
     }
 
-    /// Returns a copy of this Error with the specified label added.
-    pub(crate) fn with_label<T: AsRef<str>>(mut self, label: T) -> Self {
+    /// Adds the given label to this error.
+    pub(crate) fn add_label<T: AsRef<str>>(&mut self, label: T) {
         let label = label.as_ref().to_string();
-        match self.kind.as_ref() {
-            ErrorKind::Command(ref err) => {
-                let mut err = err.clone();
+        match self.kind.as_mut() {
+            ErrorKind::Command(err) => {
                 err.labels.push(label);
-                ErrorKind::Command(err).into()
             }
-            ErrorKind::Write(ref err) => match err {
+            ErrorKind::Write(err) => match err {
                 WriteFailure::WriteError(_) => {
                     self.labels.push(label);
-                    self
                 }
-                WriteFailure::WriteConcernError(ref err) => {
-                    let mut err = err.clone();
+                WriteFailure::WriteConcernError(err) => {
                     err.labels.push(label);
-                    ErrorKind::Write(WriteFailure::WriteConcernError(err)).into()
                 }
             },
-            ErrorKind::BulkWrite(ref err) => match err.write_concern_error {
-                Some(ref write_concern_error) => {
-                    let mut err = err.clone();
-                    let mut write_concern_error = write_concern_error.clone();
+            ErrorKind::BulkWrite(err) => match err.write_concern_error.as_mut() {
+                Some(write_concern_error) => {
                     write_concern_error.labels.push(label);
-                    err.write_concern_error = Some(write_concern_error);
-                    ErrorKind::BulkWrite(err).into()
                 }
                 None => {
                     self.labels.push(label);
-                    self
                 }
             },
             _ => {
                 self.labels.push(label);
-                self
             }
         }
     }
 
     pub(crate) fn from_resolve_error(error: trust_dns_resolver::error::ResolveError) -> Self {
-        ErrorKind::DnsResolve { message: error.to_string() }.into()
+        ErrorKind::DnsResolve {
+            message: error.to_string(),
+        }
+        .into()
     }
 
     pub(crate) fn is_non_timeout_network_error(&self) -> bool {
@@ -209,30 +232,31 @@ impl Error {
     /// Any codes contained in WriteErrors are ignored.
     pub(crate) fn code(&self) -> Option<i32> {
         match self.kind.as_ref() {
-            ErrorKind::Command(command_error) => {
-                Some(command_error.code)
-            },
-            // According to SDAM spec, write concern error codes MUST also be checked, and writeError codes
-            // MUST NOT be checked.
-            ErrorKind::BulkWrite(BulkWriteFailure { write_concern_error: Some(wc_error), .. }) => {
-                Some(wc_error.code)
-            }
+            ErrorKind::Command(command_error) => Some(command_error.code),
+            // According to SDAM spec, write concern error codes MUST also be checked, and
+            // writeError codes MUST NOT be checked.
+            ErrorKind::BulkWrite(BulkWriteFailure {
+                write_concern_error: Some(wc_error),
+                ..
+            }) => Some(wc_error.code),
             ErrorKind::Write(WriteFailure::WriteConcernError(wc_error)) => Some(wc_error.code),
-            _ => None
+            _ => None,
         }
     }
 
-    /// Gets the server's message for this error, if applicable, for use in testing.
+    /// Gets the message for this error, if applicable, for use in testing.
     /// If this error is a BulkWriteError, the messages are concatenated.
     #[cfg(test)]
-    pub(crate) fn server_message(&self) -> Option<String> {
+    pub(crate) fn message(&self) -> Option<String> {
         match self.kind.as_ref() {
-            ErrorKind::Command(command_error) => {
-                Some(command_error.message.clone())
-            },
-            // since this is used primarily for errorMessageContains assertions in the unified runner, we just
-            // concatenate all the relevant server messages into one for bulk errors.
-            ErrorKind::BulkWrite(BulkWriteFailure { write_concern_error, write_errors }) => {
+            ErrorKind::Command(command_error) => Some(command_error.message.clone()),
+            // since this is used primarily for errorMessageContains assertions in the unified
+            // runner, we just concatenate all the relevant server messages into one for
+            // bulk errors.
+            ErrorKind::BulkWrite(BulkWriteFailure {
+                write_concern_error,
+                write_errors,
+            }) => {
                 let mut msg = "".to_string();
                 if let Some(wc_error) = write_concern_error {
                     msg.push_str(wc_error.message.as_str());
@@ -244,9 +268,14 @@ impl Error {
                 }
                 Some(msg)
             }
-            ErrorKind::Write(WriteFailure::WriteConcernError(wc_error)) => Some(wc_error.message.clone()),
-            ErrorKind::Write(WriteFailure::WriteError(write_error)) => Some(write_error.message.clone()),
-            _ => None
+            ErrorKind::Write(WriteFailure::WriteConcernError(wc_error)) => {
+                Some(wc_error.message.clone())
+            }
+            ErrorKind::Write(WriteFailure::WriteError(write_error)) => {
+                Some(write_error.message.clone())
+            }
+            ErrorKind::Transaction { message } => Some(message.clone()),
+            _ => None,
         }
     }
 
@@ -269,7 +298,9 @@ impl Error {
 
     /// If this error corresponds to a "not master" error as per the SDAM spec.
     pub(crate) fn is_not_master(&self) -> bool {
-        self.code().map(|code| NOTMASTER_CODES.contains(&code)).unwrap_or(false)
+        self.code()
+            .map(|code| NOTMASTER_CODES.contains(&code))
+            .unwrap_or(false)
     }
 
     /// If this error corresponds to a "node is recovering" error as per the SDAM spec.
@@ -392,11 +423,15 @@ pub enum ErrorKind {
     #[non_exhaustive]
     InvalidTlsConfig { message: String },
 
-    /// An error occurred when trying to execute a write operation
+    /// An error occurred when trying to execute a write operation.
     #[error("An error occurred when trying to execute a write operation: {0:?}")]
     Write(WriteFailure),
-}
 
+    /// An error occurred during a transaction.
+    #[error("{message}")]
+    #[non_exhaustive]
+    Transaction { message: String },
+}
 
 /// An error that occurred due to a database command failing.
 #[derive(Clone, Debug, Deserialize)]
@@ -450,7 +485,7 @@ pub struct WriteConcernError {
 
 /// An error that occurred during a write operation that wasn't due to being unable to satisfy a
 /// write concern.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize)]
 #[non_exhaustive]
 pub struct WriteError {
     /// Identifies the type of write error.
@@ -460,9 +495,11 @@ pub struct WriteError {
     ///
     /// Note that the server will not return this in some cases, hence `code_name` being an
     /// `Option`.
+    #[serde(rename = "codeName", default)]
     pub code_name: Option<String>,
 
     /// A description of the error that occurred.
+    #[serde(rename = "errmsg")]
     pub message: String,
 }
 

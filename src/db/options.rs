@@ -29,7 +29,7 @@ pub struct DatabaseOptions {
 /// These are the valid options for creating a collection with
 /// [`Database::create_collection`](../struct.Database.html#method.create_collection).
 #[skip_serializing_none]
-#[derive(Clone, Debug, Default, TypedBuilder, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]

@@ -1,4 +1,6 @@
+mod abort_transaction;
 mod aggregate;
+mod commit_transaction;
 mod count;
 mod count_documents;
 mod create;
@@ -36,7 +38,9 @@ use crate::{
     Namespace,
 };
 
+pub(crate) use abort_transaction::AbortTransaction;
 pub(crate) use aggregate::Aggregate;
+pub(crate) use commit_transaction::CommitTransaction;
 pub(crate) use count::Count;
 pub(crate) use count_documents::CountDocuments;
 pub(crate) use create::Create;
@@ -102,6 +106,13 @@ pub(crate) trait Operation {
     /// The level of retryability the operation supports.
     fn retryability(&self) -> Retryability {
         Retryability::None
+    }
+
+    // Updates this operation as needed for a retry.
+    fn update_for_retry(&mut self) {}
+
+    fn name(&self) -> &str {
+        Self::NAME
     }
 }
 

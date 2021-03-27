@@ -134,7 +134,7 @@ define_if_single_runtime_enabled! {
 
     #[cfg(not(feature = "sync"))]
     pub use crate::{
-        client::Client,
+        client::{Client, session::ClientSession},
         coll::Collection,
         cursor::{Cursor, session::{SessionCursor, SessionCursorStream}},
         db::Database,
@@ -142,13 +142,11 @@ define_if_single_runtime_enabled! {
 
     #[cfg(feature = "sync")]
     pub(crate) use crate::{
-        client::Client,
+        client::{Client, session::ClientSession},
         coll::Collection,
         cursor::{Cursor, session::{SessionCursor, SessionCursorStream}},
         db::Database,
     };
-
-    pub use client::session::ClientSession;
 
     pub use coll::Namespace;
 }

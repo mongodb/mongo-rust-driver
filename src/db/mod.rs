@@ -7,6 +7,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     bson::{Bson, Document},
+    client::session::TransactionState,
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
@@ -353,15 +354,41 @@ impl Database {
 
     /// Runs a database-level command using the provided `ClientSession`.
     ///
-    /// Note that no inspection is done on `doc`, so the command will not use the database's default
-    /// read concern or write concern. If specific read concern or write concern is desired, it must
-    /// be specified manually.
+    /// If the `ClientSession` provided is currently in a transaction, `command` must not specify a
+    /// read concern. If this operation is the first operation in the transaction, the read concern
+    /// associated with the transaction will be inherited.
+    ///
+    /// Otherwise no inspection is done on `command`, so the command will not use the database's
+    /// default read concern or write concern. If specific read concern or write concern is
+    /// desired, it must be specified manually.
     pub async fn run_command_with_session(
         &self,
         command: Document,
         selection_criteria: impl Into<Option<SelectionCriteria>>,
         session: &mut ClientSession,
     ) -> Result<Document> {
+        let mut selection_criteria = selection_criteria.into();
+        match session.transaction.state {
+            TransactionState::Starting | TransactionState::InProgress => {
+                if command.contains_key("readConcern") {
+                    return Err(ErrorKind::InvalidArgument {
+                        message: "Cannot set read concern after starting a transaction".into(),
+                    }
+                    .into());
+                }
+                selection_criteria = match selection_criteria {
+                    Some(selection_criteria) => Some(selection_criteria),
+                    None => {
+                        if let Some(ref options) = session.transaction.options {
+                            options.selection_criteria.clone()
+                        } else {
+                            None
+                        }
+                    }
+                };
+            }
+            _ => {}
+        }
         self.run_command_common(command, selection_criteria, session)
             .await
     }

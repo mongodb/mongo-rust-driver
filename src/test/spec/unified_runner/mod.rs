@@ -21,7 +21,14 @@ pub use self::{
     matcher::{events_match, results_match},
     operation::{Operation, OperationObject},
     test_event::TestEvent,
-    test_file::{CollectionData, ExpectError, TestFile, TestFileEntity, Topology},
+    test_file::{
+        deserialize_uri_options_to_uri_string,
+        CollectionData,
+        ExpectError,
+        TestFile,
+        TestFileEntity,
+        Topology,
+    },
     test_runner::{EntityMap, TestRunner},
 };
 

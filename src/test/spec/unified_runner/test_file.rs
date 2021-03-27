@@ -137,7 +137,7 @@ fn default_uri() -> String {
     DEFAULT_URI.clone()
 }
 
-fn deserialize_uri_options_to_uri_string<'de, D>(
+pub fn deserialize_uri_options_to_uri_string<'de, D>(
     deserializer: D,
 ) -> std::result::Result<String, D::Error>
 where
@@ -295,7 +295,7 @@ impl ExpectError {
             assert_eq!(is_client_error, !error.is_server_error());
         }
         if let Some(error_contains) = self.error_contains {
-            match &error.server_message() {
+            match &error.message() {
                 Some(msg) => assert!(msg.contains(&error_contains)),
                 None => panic!("{} should include message field", error),
             }

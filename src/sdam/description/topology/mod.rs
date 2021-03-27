@@ -62,6 +62,9 @@ pub(crate) struct TopologyDescription {
     /// is for them.
     session_support_status: SessionSupportStatus,
 
+    /// Whether or not this topology supports transactions.
+    transaction_support_status: TransactionSupportStatus,
+
     /// The highest reported cluster time by any server in this topology.
     cluster_time: Option<ClusterTime>,
 
@@ -122,6 +125,7 @@ impl TopologyDescription {
             max_election_id: None,
             compatibility_error: None,
             session_support_status: SessionSupportStatus::Undetermined,
+            transaction_support_status: TransactionSupportStatus::Undetermined,
             cluster_time: None,
             local_threshold: options.local_threshold,
             heartbeat_freq: options.heartbeat_freq,
@@ -315,6 +319,34 @@ impl TopologyDescription {
         }
     }
 
+    /// Updates the topology's transaction support status based on its session support status and
+    /// the server description's max wire version.
+    fn update_transaction_support_status(&mut self, server_description: &ServerDescription) {
+        if !matches!(
+            self.session_support_status,
+            SessionSupportStatus::Supported { .. }
+        ) {
+            self.transaction_support_status = TransactionSupportStatus::Unsupported;
+        }
+        if let Ok(Some(max_wire_version)) = server_description.max_wire_version() {
+            match self.topology_type {
+                TopologyType::Sharded => {
+                    // TODO RUST-122: support transactions on sharded clusters
+                    self.transaction_support_status = TransactionSupportStatus::Unsupported;
+                }
+                _ => {
+                    if max_wire_version < 7 {
+                        self.transaction_support_status = TransactionSupportStatus::Unsupported;
+                    } else {
+                        self.transaction_support_status = TransactionSupportStatus::Supported;
+                    }
+                }
+            }
+        } else {
+            self.transaction_support_status = TransactionSupportStatus::Unsupported;
+        }
+    }
+
     /// Sets the topology's cluster time to the provided one if it is higher than the currently
     /// recorded one.
     pub(crate) fn advance_cluster_time(&mut self, cluster_time: &ClusterTime) {
@@ -359,6 +391,10 @@ impl TopologyDescription {
         self.session_support_status
     }
 
+    pub(crate) fn transaction_support_status(&self) -> TransactionSupportStatus {
+        self.transaction_support_status
+    }
+
     /// Update the topology based on the new information about the topology contained by the
     /// ServerDescription.
     pub(crate) fn update(
@@ -382,6 +418,9 @@ impl TopologyDescription {
 
         // Update the topology's min logicalSessionTimeout.
         self.update_session_support_status(&server_description);
+
+        // Update the topology's transaction support status.
+        self.update_transaction_support_status(&server_description);
 
         // Update the topology's max reported $clusterTime.
         if let Some(ref cluster_time) = server_description.cluster_time().ok().flatten() {
@@ -698,6 +737,31 @@ impl SessionSupportStatus {
                 logical_session_timeout,
             } => Some(*logical_session_timeout),
         }
+    }
+}
+
+/// Enum representing whether transactions are supported by the topology.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum TransactionSupportStatus {
+    /// It is not known yet whether the topology supports transactions. This is possible if no
+    /// data-bearing servers have updated the `TopologyDescription` yet.
+    Undetermined,
+
+    /// Transactions are not supported by this topology.
+    Unsupported,
+
+    /// Transactions are supported by this topology. A topology supports transactions if it
+    /// supports sessions and its maxWireVersion >= 7. Transactions are not currently supported
+    /// on sharded clusters (TODO RUST-122).
+    ///
+    /// Note that meeting these conditions does not guarantee that a deployment
+    /// supports transactions; any other missing qualification will be reported by the server.
+    Supported,
+}
+
+impl Default for TransactionSupportStatus {
+    fn default() -> Self {
+        Self::Undetermined
     }
 }
 

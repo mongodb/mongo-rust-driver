@@ -15,7 +15,7 @@ use self::options::*;
 use crate::{
     bson::{doc, ser, to_document, Bson, Document},
     bson_util,
-    client::session::ClientSession,
+    client::session::TransactionState,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, ErrorKind, Result},
     operation::{
@@ -33,6 +33,7 @@ use crate::{
     results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
     selection_criteria::SelectionCriteria,
     Client,
+    ClientSession,
     Cursor,
     Database,
     SessionCursor,
@@ -185,11 +186,13 @@ where
         options: impl Into<Option<DropCollectionOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<()> {
+        let session = session.into();
+
         let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
 
         let drop = DropCollection::new(self.namespace(), options);
-        self.client().execute_operation(drop, session.into()).await
+        self.client().execute_operation(drop, session).await
     }
 
     /// Drops the collection, deleting all data and indexes stored in it.
@@ -242,11 +245,9 @@ where
         session: &mut ClientSession,
     ) -> Result<SessionCursor<Document>> {
         let mut options = options.into();
-        resolve_options!(
-            self,
-            options,
-            [read_concern, write_concern, selection_criteria]
-        );
+        resolve_read_concern_with_session!(self, options, Some(&mut *session))?;
+        resolve_write_concern_with_session!(self, options, Some(&mut *session))?;
+        resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
 
         let aggregate = Aggregate::new(self.namespace(), pipeline, options);
         let client = self.client();
@@ -275,8 +276,11 @@ where
         options: impl Into<Option<CountOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<u64> {
+        let session = session.into();
+
         let mut options = options.into();
-        resolve_options!(self, options, [read_concern, selection_criteria]);
+        resolve_read_concern_with_session!(self, options, session.as_ref())?;
+        resolve_selection_criteria_with_session!(self, options, session.as_ref())?;
 
         let op = CountDocuments::new(self.namespace(), filter.into(), options);
         self.client().execute_operation(op, session).await
@@ -313,8 +317,10 @@ where
         options: impl Into<Option<DeleteOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<DeleteResult> {
+        let session = session.into();
+
         let mut options = options.into();
-        resolve_options!(self, options, [write_concern]);
+        resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
         let delete = Delete::new(self.namespace(), query, None, options);
         self.client().execute_operation(delete, session).await
@@ -346,8 +352,10 @@ where
         options: impl Into<Option<DeleteOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<DeleteResult> {
+        let session = session.into();
+
         let mut options = options.into();
-        resolve_options!(self, options, [write_concern]);
+        resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
         let delete = Delete::new(self.namespace(), query, Some(1), options);
         self.client().execute_operation(delete, session).await
@@ -389,8 +397,11 @@ where
         options: impl Into<Option<DistinctOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<Vec<Bson>> {
+        let session = session.into();
+
         let mut options = options.into();
-        resolve_options!(self, options, [read_concern, selection_criteria]);
+        resolve_read_concern_with_session!(self, options, session.as_ref())?;
+        resolve_selection_criteria_with_session!(self, options, session.as_ref())?;
 
         let op = Distinct::new(
             self.namespace(),
@@ -450,7 +461,11 @@ where
         options: impl Into<Option<FindOptions>>,
         session: &mut ClientSession,
     ) -> Result<SessionCursor<T>> {
-        let find = Find::new(self.namespace(), filter.into(), options.into());
+        let mut options = options.into();
+        resolve_read_concern_with_session!(self, options, Some(&mut *session))?;
+        resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
+
+        let find = Find::new(self.namespace(), filter.into(), options);
         let client = self.client();
 
         client
@@ -482,7 +497,8 @@ where
         session: &mut ClientSession,
     ) -> Result<Option<T>> {
         let mut options = options.into();
-        resolve_options!(self, options, [read_concern, selection_criteria]);
+        resolve_read_concern_with_session!(self, options, Some(&mut *session))?;
+        resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
 
         let options: FindOptions = options.map(Into::into).unwrap_or_else(Default::default);
         let mut cursor = self
@@ -498,8 +514,10 @@ where
         options: impl Into<Option<FindOneAndDeleteOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<Option<T>> {
+        let session = session.into();
+
         let mut options = options.into();
-        resolve_options!(self, options, [write_concern]);
+        resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
         let op = FindAndModify::<T>::with_delete(self.namespace(), filter, options);
         self.client().execute_operation(op, session).await
@@ -545,8 +563,10 @@ where
     ) -> Result<Option<T>> {
         let replacement = to_document(replacement.borrow())?;
 
+        let session = session.into();
+
         let mut options = options.into();
-        resolve_options!(self, options, [write_concern]);
+        resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
         let op = FindAndModify::<T>::with_replace(self.namespace(), filter, replacement, options)?;
         self.client().execute_operation(op, session).await
@@ -595,8 +615,11 @@ where
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<Option<T>> {
         let update = update.into();
+
+        let session = session.into();
+
         let mut options = options.into();
-        resolve_options!(self, options, [write_concern]);
+        resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
         let op = FindAndModify::<T>::with_update(self.namespace(), filter, update, options)?;
         self.client().execute_operation(op, session).await
@@ -654,7 +677,7 @@ where
         let mut docs: Vec<Document> = docs?;
 
         let mut options = options.into();
-        resolve_options!(self, options, [write_concern]);
+        resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
         if docs.is_empty() {
             return Err(ErrorKind::InvalidArgument {
@@ -768,8 +791,10 @@ where
     ) -> Result<InsertOneResult> {
         let doc = to_document(doc.borrow())?;
 
+        let session = session.into();
+
         let mut options = options.into();
-        resolve_options!(self, options, [write_concern]);
+        resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
         let insert = Insert::new(
             self.namespace(),
@@ -823,8 +848,10 @@ where
 
         bson_util::replacement_document_check(&replacement)?;
 
+        let session = session.into();
+
         let mut options = options.into();
-        resolve_options!(self, options, [write_concern]);
+        resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
         let update = Update::new(
             self.namespace(),
@@ -879,13 +906,14 @@ where
     ) -> Result<UpdateResult> {
         let update = update.into();
 
-        let mut options = options.into();
-
         if let UpdateModifications::Document(ref d) = update {
             bson_util::update_document_check(d)?;
         }
 
-        resolve_options!(self, options, [write_concern]);
+        let session = session.into();
+
+        let mut options = options.into();
+        resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
         let update = Update::new(self.namespace(), query, update, true, options);
         self.client().execute_operation(update, session).await
@@ -930,14 +958,15 @@ where
         options: impl Into<Option<UpdateOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<UpdateResult> {
-        let mut options = options.into();
         let update = update.into();
-
         if let UpdateModifications::Document(ref d) = update {
             bson_util::update_document_check(d)?;
         }
 
-        resolve_options!(self, options, [write_concern]);
+        let session = session.into();
+
+        let mut options = options.into();
+        resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
         let update = Update::new(self.namespace(), query, update, false, options);
         self.client().execute_operation(update, session).await

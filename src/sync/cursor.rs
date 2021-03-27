@@ -1,10 +1,10 @@
 use futures_util::stream::StreamExt;
 use serde::de::DeserializeOwned;
 
+use super::ClientSession;
 use crate::{
     bson::Document,
     error::Result,
-    ClientSession,
     Cursor as AsyncCursor,
     SessionCursor as AsyncSessionCursor,
     SessionCursorStream,
@@ -138,7 +138,7 @@ where
         session: &'session mut ClientSession,
     ) -> SessionCursorIter<'_, 'session, T> {
         SessionCursorIter {
-            async_stream: self.async_cursor.stream(session),
+            async_stream: self.async_cursor.stream(&mut session.async_client_session),
         }
     }
 

@@ -30,13 +30,16 @@ use serde::{
     de::{Error, Unexpected},
     Deserialize,
     Deserializer,
+    Serialize,
 };
+use serde_with::skip_serializing_none;
 use strsim::jaro_winkler;
 use typed_builder::TypedBuilder;
 use webpki_roots::TLS_SERVER_ROOTS;
 
 use crate::{
     bson::{doc, Bson, Document},
+    bson_util::{deserialize_duration_from_u64_millis, serialize_duration_as_int_millis},
     client::auth::{AuthMechanism, Credential},
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::{ErrorKind, Result},
@@ -2146,4 +2149,47 @@ mod tests {
 /// [`ClientSession`](../struct.ClientSession.html).
 #[derive(Clone, Debug, Deserialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(strip_option)))]
-pub struct SessionOptions {}
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct SessionOptions {
+    /// The default options to use for transactions started on this session.
+    ///
+    /// If these options are not specified, they will be inherited from the
+    /// [`Client`](../struct.Client.html) associated with this session. They will not
+    /// be inherited from the options specified
+    /// on the [`Database`](../struct.Database.html) or [`Collection`](../struct.Collection.html)
+    /// associated with the operations within the transaction.
+    pub default_transaction_options: Option<TransactionOptions>,
+}
+
+/// Contains the options that can be used for a transaction.
+#[skip_serializing_none]
+#[derive(Debug, Default, Serialize, Deserialize, TypedBuilder, Clone)]
+#[builder(field_defaults(default, setter(strip_option)))]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct TransactionOptions {
+    /// The read concern to use for the transaction.
+    #[builder(default)]
+    #[serde(skip_serializing)]
+    pub read_concern: Option<ReadConcern>,
+
+    /// The write concern to use when committing or aborting a transaction.
+    #[builder(default)]
+    pub write_concern: Option<WriteConcern>,
+
+    /// The selection criteria to use for all read operations in a transaction.
+    #[builder(default)]
+    #[serde(skip_serializing, rename = "readPreference")]
+    pub selection_criteria: Option<SelectionCriteria>,
+
+    /// The maximum amount of time to allow a single commitTransaction to run.
+    #[builder(default)]
+    #[serde(
+        serialize_with = "serialize_duration_as_int_millis",
+        deserialize_with = "deserialize_duration_from_u64_millis",
+        rename(serialize = "maxTimeMS", deserialize = "maxCommitTimeMS"),
+        default
+    )]
+    pub max_commit_time: Option<Duration>,
+}

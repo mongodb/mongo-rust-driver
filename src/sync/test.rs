@@ -16,7 +16,8 @@ use crate::{
         WriteConcern,
     },
     sync::{Client, Collection},
-    test::CLIENT_OPTIONS,
+    test::{TestClient as AsyncTestClient, CLIENT_OPTIONS},
+    RUNTIME,
 };
 
 fn init_db_and_coll(client: &Client, db_name: &str, coll_name: &str) -> Collection<Document> {
@@ -181,4 +182,51 @@ fn typed_collection() {
     };
 
     assert!(coll.insert_one(my_type, None).is_ok());
+}
+
+#[test]
+#[function_name::named]
+fn transactions() {
+    let (should_skip, should_create_collection) = RUNTIME.block_on(async {
+        let test_client = AsyncTestClient::new().await;
+        // TODO RUST-122: Unskip this test on sharded clusters
+        let should_skip = !test_client.is_replica_set() || test_client.server_version_lt(4, 0);
+        let should_create_collection = test_client.server_version_lt(4, 4);
+        (should_skip, should_create_collection)
+    });
+    if should_skip {
+        return;
+    }
+
+    let options = CLIENT_OPTIONS.clone();
+    let client = Client::with_options(options).expect("client creation should succeed");
+    let mut session = client
+        .start_session(None)
+        .expect("session creation should succeed");
+    let coll = init_db_and_typed_coll(&client, function_name!(), function_name!());
+
+    if should_create_collection {
+        client
+            .database(function_name!())
+            .create_collection(function_name!(), None)
+            .expect("create collection should succeed");
+    }
+
+    session
+        .start_transaction(None)
+        .expect("start transaction should succeed");
+    coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session)
+        .expect("insert should succeed");
+    session
+        .commit_transaction()
+        .expect("commit transaction should succeed");
+
+    session
+        .start_transaction(None)
+        .expect("start transaction should succeed");
+    coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session)
+        .expect("insert should succeed");
+    session
+        .abort_transaction()
+        .expect("abort transaction should succeed");
 }

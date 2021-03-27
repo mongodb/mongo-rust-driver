@@ -2,7 +2,7 @@ use std::{borrow::Borrow, fmt::Debug};
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use super::{Cursor, SessionCursor};
+use super::{ClientSession, Cursor, SessionCursor};
 use crate::{
     bson::{Bson, Document},
     error::Result,
@@ -28,7 +28,6 @@ use crate::{
         WriteConcern,
     },
     results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
-    ClientSession,
     Collection as AsyncCollection,
     Namespace,
     RUNTIME,
@@ -138,7 +137,7 @@ where
     ) -> Result<()> {
         RUNTIME.block_on(
             self.async_collection
-                .drop_with_session(options.into(), session),
+                .drop_with_session(options.into(), &mut session.async_client_session),
         )
     }
 
@@ -172,7 +171,7 @@ where
             .block_on(self.async_collection.aggregate_with_session(
                 pipeline,
                 options.into(),
-                session,
+                &mut session.async_client_session,
             ))
             .map(SessionCursor::new)
     }
@@ -216,7 +215,7 @@ where
         RUNTIME.block_on(self.async_collection.count_documents_with_session(
             filter.into(),
             options.into(),
-            session,
+            &mut session.async_client_session,
         ))
     }
 
@@ -240,7 +239,7 @@ where
         RUNTIME.block_on(self.async_collection.delete_many_with_session(
             query,
             options.into(),
-            session,
+            &mut session.async_client_session,
         ))
     }
 
@@ -273,7 +272,7 @@ where
         RUNTIME.block_on(self.async_collection.delete_one_with_session(
             query,
             options.into(),
-            session,
+            &mut session.async_client_session,
         ))
     }
 
@@ -304,7 +303,7 @@ where
             field_name.as_ref(),
             filter.into(),
             options.into(),
-            session,
+            &mut session.async_client_session,
         ))
     }
 
@@ -330,7 +329,7 @@ where
             .block_on(self.async_collection.find_with_session(
                 filter.into(),
                 options.into(),
-                session,
+                &mut session.async_client_session,
             ))
             .map(SessionCursor::new)
     }
@@ -358,7 +357,7 @@ where
         RUNTIME.block_on(self.async_collection.find_one_with_session(
             filter.into(),
             options.into(),
-            session,
+            &mut session.async_client_session,
         ))
     }
 
@@ -395,7 +394,7 @@ where
         RUNTIME.block_on(self.async_collection.find_one_and_delete_with_session(
             filter,
             options.into(),
-            session,
+            &mut session.async_client_session,
         ))
     }
 
@@ -437,7 +436,7 @@ where
             filter,
             replacement,
             options.into(),
-            session,
+            &mut session.async_client_session,
         ))
     }
 
@@ -483,7 +482,7 @@ where
             filter,
             update.into(),
             options.into(),
-            session,
+            &mut session.async_client_session,
         ))
     }
 
@@ -516,7 +515,7 @@ where
         RUNTIME.block_on(self.async_collection.insert_many_with_session(
             docs,
             options.into(),
-            session,
+            &mut session.async_client_session,
         ))
     }
 
@@ -552,7 +551,7 @@ where
         RUNTIME.block_on(self.async_collection.insert_one_with_session(
             doc.borrow(),
             options.into(),
-            session,
+            &mut session.async_client_session,
         ))
     }
 
@@ -593,7 +592,7 @@ where
             query,
             replacement.borrow(),
             options.into(),
-            session,
+            &mut session.async_client_session,
         ))
     }
 
@@ -632,7 +631,7 @@ where
             query,
             update.into(),
             options.into(),
-            session,
+            &mut session.async_client_session,
         ))
     }
 
@@ -682,7 +681,7 @@ where
             query,
             update.into(),
             options.into(),
-            session,
+            &mut session.async_client_session,
         ))
     }
 }
