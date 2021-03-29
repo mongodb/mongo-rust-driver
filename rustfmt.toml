@@ -6,5 +6,5 @@ format_strings = true
 normalize_comments = true
 use_try_shorthand = true
 wrap_comments = true
-merge_imports = true
 imports_layout = "HorizontalVertical"
+imports_granularity = "Crate"
