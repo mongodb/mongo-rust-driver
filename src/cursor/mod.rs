@@ -1,7 +1,5 @@
 mod common;
-// TODO: RUST-52 use this
-#[allow(dead_code)]
-mod session;
+pub(crate) mod session;
 
 use std::{
     pin::Pin,
@@ -13,11 +11,11 @@ use serde::de::DeserializeOwned;
 
 use crate::{
     bson::{from_document, Document},
-    client::ClientSession,
     error::{Error, Result},
     operation::GetMore,
     results::GetMoreResult,
     Client,
+    ClientSession,
     RUNTIME,
 };
 pub(crate) use common::{CursorInformation, CursorSpecification};
@@ -211,14 +209,8 @@ impl GetMoreProvider for ImplicitSessionGetMoreProvider {
             Self::Idle(mut session) => {
                 let future = Box::pin(async move {
                     let get_more = GetMore::new(info);
-                    let get_more_result = match session {
-                        Some(ref mut session) => {
-                            client
-                                .execute_operation_with_session(get_more, session)
-                                .await
-                        }
-                        None => client.execute_operation(get_more).await,
-                    };
+                    let get_more_result =
+                        client.execute_operation(get_more, session.as_mut()).await;
                     ImplicitSessionGetMoreResult {
                         get_more_result,
                         session,

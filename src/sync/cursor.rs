@@ -1,7 +1,15 @@
 use futures::StreamExt;
 use serde::de::DeserializeOwned;
 
-use crate::{bson::Document, error::Result, Cursor as AsyncCursor, RUNTIME};
+use crate::{
+    bson::Document,
+    error::Result,
+    ClientSession,
+    Cursor as AsyncCursor,
+    SessionCursor as AsyncSessionCursor,
+    SessionCursorHandle as AsyncSessionCursorHandle,
+    RUNTIME,
+};
 
 /// A `Cursor` streams the result of a query. When a query is made, a `Cursor` will be returned with
 /// the first batch of results from the server; the documents will be returned as the `Cursor` is
@@ -85,5 +93,74 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         RUNTIME.block_on(self.async_cursor.next())
+    }
+}
+
+/// A `SessionCursor` is a cursor that was created with a `ClientSession` must be iterated using
+/// one. To iterate, retrieve a `SessionCursorHandle` using `SessionCursor::with_session`:
+///
+/// ```rust
+/// # use mongodb::{sync::Client, error::Result};
+/// #
+/// # fn do_stuff() -> Result<()> {
+/// # let client = Client::with_uri_str("mongodb://example.com")?;
+/// # let mut session = client.start_session(None)?;
+/// # let coll = client.database("foo").collection("bar");
+/// # let mut cursor = coll.find_with_session(None, None, &mut session)?;
+/// #
+/// for doc in cursor.with_session(&mut session) {
+///   println!("{}", doc?)
+/// }
+/// #
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Debug)]
+pub struct SessionCursor<T = Document>
+where
+    T: DeserializeOwned + Unpin + Send,
+{
+    async_cursor: AsyncSessionCursor<T>,
+}
+
+impl<T> SessionCursor<T>
+where
+    T: DeserializeOwned + Unpin + Send,
+{
+    pub(crate) fn new(async_cursor: AsyncSessionCursor<T>) -> Self {
+        Self { async_cursor }
+    }
+
+    /// Retrieves a `SessionCursorHandle` to iterate this cursor. The session provided must be the
+    /// same session used to create the cursor.
+    pub fn with_session<'session>(
+        &mut self,
+        session: &'session mut ClientSession,
+    ) -> SessionCursorHandle<'_, 'session, T> {
+        SessionCursorHandle {
+            async_handle: self.async_cursor.with_session(session),
+        }
+    }
+}
+
+/// A handle that borrows a `ClientSession` temporarily for executing getMores or iterating through
+/// the current buffer of a `SessionCursor`.
+///
+/// This updates the buffer of the parent `SessionCursor` when dropped.
+pub struct SessionCursorHandle<'cursor, 'session, T = Document>
+where
+    T: DeserializeOwned + Unpin + Send,
+{
+    async_handle: AsyncSessionCursorHandle<'cursor, 'session, T>,
+}
+
+impl<T> Iterator for SessionCursorHandle<'_, '_, T>
+where
+    T: DeserializeOwned + Unpin + Send,
+{
+    type Item = Result<T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        RUNTIME.block_on(self.async_handle.next())
     }
 }

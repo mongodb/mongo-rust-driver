@@ -73,7 +73,7 @@ impl TestClient {
         // To avoid populating the session pool with leftover implicit sessions, we check out a
         // session here and immediately mark it as dirty, then use it with any operations we need.
         let mut session = client
-            .start_implicit_session_with_timeout(Duration::from_secs(60 * 60))
+            .start_session_with_timeout(Duration::from_secs(60 * 60), None, true)
             .await;
         session.mark_dirty();
 
@@ -81,7 +81,7 @@ impl TestClient {
 
         let server_info = bson::from_bson(Bson::Document(
             client
-                .execute_operation_with_session(is_master, &mut session)
+                .execute_operation(is_master, &mut session)
                 .await
                 .unwrap(),
         ))
@@ -95,7 +95,7 @@ impl TestClient {
                 RunCommand::new("test".into(), doc! { "buildInfo":  1 }, None).unwrap();
 
             let response = client
-                .execute_operation_with_session(build_info, &mut session)
+                .execute_operation(build_info, &mut session)
                 .await
                 .unwrap();
 
@@ -109,10 +109,7 @@ impl TestClient {
             // The command above may fail due to insufficient permissions. In that case, the unified
             // test runner will skip any tests with a serverParameters runOnRequirement as the check
             // will fail.
-            if let Ok(response) = client
-                .execute_operation_with_session(get_parameters, &mut session)
-                .await
-            {
+            if let Ok(response) = client.execute_operation(get_parameters, &mut session).await {
                 server_parameters = Some(Bson::Document(response));
             }
         }
@@ -339,6 +336,16 @@ impl TestClient {
             Topology::Single
         }
     }
+
+    pub fn topology_string(&self) -> String {
+        if self.is_sharded() {
+            "sharded".to_string()
+        } else if self.is_replica_set() {
+            "replicaset".to_string()
+        } else {
+            "single".to_string()
+        }
+    }
 }
 
 pub async fn drop_collection<T>(coll: &Collection<T>)
@@ -385,7 +392,7 @@ pub struct IsMasterCommandResponse {
     pub primary: Option<String>,
 }
 
-pub fn get_db_name(description: &str) -> String {
+pub fn get_default_name(description: &str) -> String {
     let mut db_name = description.replace('$', "%").replace(' ', "_");
     // database names must have fewer than 64 characters
     db_name.truncate(63);

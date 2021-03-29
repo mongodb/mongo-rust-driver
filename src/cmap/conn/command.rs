@@ -4,10 +4,11 @@ use super::wire::Message;
 use crate::{
     bson::{Bson, Document},
     bson_util,
-    client::{options::ServerApi, ClientSession, ClusterTime},
+    client::{options::ServerApi, ClusterTime},
     error::{CommandError, ErrorKind, Result},
     options::StreamAddress,
     selection_criteria::ReadPreference,
+    ClientSession,
 };
 
 /// `Command` is a driver side abstraction of a server command containing all the information

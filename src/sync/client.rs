@@ -3,8 +3,15 @@ use crate::{
     bson::Document,
     concern::{ReadConcern, WriteConcern},
     error::Result,
-    options::{ClientOptions, DatabaseOptions, ListDatabasesOptions, SelectionCriteria},
+    options::{
+        ClientOptions,
+        DatabaseOptions,
+        ListDatabasesOptions,
+        SelectionCriteria,
+        SessionOptions,
+    },
     Client as AsyncClient,
+    ClientSession,
     RUNTIME,
 };
 
@@ -126,5 +133,10 @@ impl Client {
             self.async_client
                 .list_database_names(filter.into(), options.into()),
         )
+    }
+
+    /// Starts a new `ClientSession`.
+    pub fn start_session(&self, options: Option<SessionOptions>) -> Result<ClientSession> {
+        RUNTIME.block_on(self.async_client.start_session(options))
     }
 }

@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use super::super::{AnyTestOperation, RunOn};
+use super::super::{Operation, RunOn};
 use crate::{
     bson::{Bson, Document},
     options::ClientOptions,
@@ -21,7 +21,7 @@ pub struct TestCase {
     pub client_options: Option<ClientOptions>,
     pub use_multiple_mongoses: Option<bool>,
     pub fail_point: Option<Document>,
-    pub operation: AnyTestOperation,
+    pub operation: Operation,
     pub outcome: Outcome,
 }
 

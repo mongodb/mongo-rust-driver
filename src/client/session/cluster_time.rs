@@ -10,7 +10,7 @@ use crate::bson::{Document, Timestamp};
 #[derive(Debug, Deserialize, Clone, Serialize, Derivative)]
 #[derivative(PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ClusterTime {
+pub struct ClusterTime {
     cluster_time: Timestamp,
 
     #[derivative(PartialEq = "ignore")]

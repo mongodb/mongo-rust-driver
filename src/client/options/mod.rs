@@ -2057,3 +2057,8 @@ mod tests {
         );
     }
 }
+
+/// Contains the options that can be used to create a new
+/// [`ClientSession`](../struct.ClientSession.html).
+#[derive(Clone, Debug, Deserialize, TypedBuilder)]
+pub struct SessionOptions {}

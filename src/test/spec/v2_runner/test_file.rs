@@ -1,16 +1,21 @@
 use std::collections::HashMap;
 
-use futures::stream::TryStreamExt;
+use bson::{doc, from_document};
+use futures::TryStreamExt;
 use semver::VersionReq;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 use crate::{
-    bson::{doc, Document},
-    options::{ClientOptions, FindOptions},
-    test::{util::EventClient, AnyTestOperation, TestEvent},
+    bson::Document,
+    client::options::ClientOptions,
+    options::{FindOptions, SessionOptions},
+    test::{EventClient, FailPoint, TestClient},
 };
 
-#[derive(Debug, Deserialize)]
+use super::{operation::Operation, test_event::CommandStartedEvent};
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TestFile {
     #[serde(rename = "runOn")]
     pub run_on: Option<Vec<RunOn>>,
@@ -18,14 +23,7 @@ pub struct TestFile {
     pub collection_name: Option<String>,
     pub bucket_name: Option<String>,
     pub data: Option<TestData>,
-    pub tests: Vec<TestCase>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-pub enum TestData {
-    Single(Vec<Document>),
-    Many(HashMap<String, Vec<Document>>),
+    pub tests: Vec<Test>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -37,7 +35,7 @@ pub struct RunOn {
 }
 
 impl RunOn {
-    pub fn can_run_on(&self, client: &EventClient) -> bool {
+    pub fn can_run_on(&self, client: &TestClient) -> bool {
         if let Some(ref min_version) = self.min_server_version {
             let req = VersionReq::parse(&format!(">= {}", &min_version)).unwrap();
             if !req.matches(&client.server_version.as_ref().unwrap()) {
@@ -51,7 +49,7 @@ impl RunOn {
             }
         }
         if let Some(ref topology) = self.topology {
-            if !topology.contains(&client.topology()) {
+            if !topology.contains(&client.topology_string()) {
                 return false;
             }
         }
@@ -60,16 +58,25 @@ impl RunOn {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum TestData {
+    Single(Vec<Document>),
+    Many(HashMap<String, Vec<Document>>),
+}
+
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TestCase {
+pub struct Test {
     pub description: String,
-    pub client_options: Option<ClientOptions>,
-    pub use_multiple_mongoses: Option<bool>,
     pub skip_reason: Option<String>,
-    pub fail_point: Option<Document>,
-    pub operations: Vec<AnyTestOperation>,
+    pub use_multiple_mongoses: Option<bool>,
+    pub client_options: Option<ClientOptions>,
+    pub fail_point: Option<FailPoint>,
+    pub session_options: Option<HashMap<String, SessionOptions>>,
+    pub operations: Vec<Operation>,
+    #[serde(default, deserialize_with = "deserialize_command_started_events")]
+    pub expectations: Option<Vec<CommandStartedEvent>>,
     pub outcome: Option<Outcome>,
-    pub expectations: Option<Vec<TestEvent>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -107,11 +114,19 @@ pub struct CollectionOutcome {
     pub data: Vec<Document>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum OperationObject {
-    Database,
-    Collection,
-    Client,
-    GridfsBucket,
+fn deserialize_command_started_events<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<Vec<CommandStartedEvent>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let docs = Vec::<Document>::deserialize(deserializer)?;
+    Ok(Some(
+        docs.iter()
+            .map(|doc| {
+                let event = doc.get_document("command_started_event").unwrap();
+                from_document(event.clone()).unwrap()
+            })
+            .collect(),
+    ))
 }

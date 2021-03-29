@@ -10,15 +10,7 @@ mod spec;
 mod util;
 
 pub(crate) use self::{
-    spec::{
-        run_spec_test,
-        run_v2_test,
-        AnyTestOperation,
-        OperationObject,
-        RunOn,
-        TestEvent,
-        Topology,
-    },
+    spec::{run_spec_test, RunOn, Topology},
     util::{
         assert_matches,
         CmapEvent,

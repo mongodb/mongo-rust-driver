@@ -800,7 +800,7 @@ impl From<FindOneOptions> for FindOptions {
             skip: options.skip,
             batch_size: None,
             cursor_type: None,
-            limit: None,
+            limit: Some(-1),
             max_await_time: None,
             no_cursor_timeout: None,
             sort: options.sort,

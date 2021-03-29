@@ -36,8 +36,12 @@ impl Client {
     ///
     /// Server selection will performed using the criteria specified on the operation, if any, and
     /// an implicit session will be created if the operation and write concern are compatible with
-    /// sessions.
-    pub(crate) async fn execute_operation<T: Operation>(&self, op: T) -> Result<T::O> {
+    /// sessions and an explicit session is not provided.
+    pub(crate) async fn execute_operation<T: Operation>(
+        &self,
+        op: T,
+        session: impl Into<Option<&mut ClientSession>>,
+    ) -> Result<T::O> {
         // TODO RUST-9: allow unacknowledged write concerns
         if !op.is_acknowledged() {
             return Err(ErrorKind::ArgumentError {
@@ -45,9 +49,14 @@ impl Client {
             }
             .into());
         }
-        let mut implicit_session = self.start_implicit_session(&op).await?;
-        self.execute_operation_with_retry(op, implicit_session.as_mut())
-            .await
+        match session.into() {
+            Some(session) => self.execute_operation_with_retry(op, Some(session)).await,
+            None => {
+                let mut implicit_session = self.start_implicit_session(&op).await?;
+                self.execute_operation_with_retry(op, implicit_session.as_mut())
+                    .await
+            }
+        }
     }
 
     /// Execute the given operation, returning the implicit session created for it if one was.
@@ -61,16 +70,6 @@ impl Client {
         self.execute_operation_with_retry(op, implicit_session.as_mut())
             .await
             .map(|result| (result, implicit_session))
-    }
-
-    /// Execute the given operation with the given session.
-    /// Server selection will performed using the criteria specified on the operation, if any.
-    pub(crate) async fn execute_operation_with_session<T: Operation>(
-        &self,
-        op: T,
-        session: &mut ClientSession,
-    ) -> Result<T::O> {
-        self.execute_operation_with_retry(op, Some(session)).await
     }
 
     /// Selects a server and executes the given operation on it, optionally using a provided
@@ -324,7 +323,7 @@ impl Client {
             SessionSupportStatus::Supported {
                 logical_session_timeout,
             } if op.supports_sessions() && op.is_acknowledged() => Ok(Some(
-                self.start_implicit_session_with_timeout(logical_session_timeout)
+                self.start_session_with_timeout(logical_session_timeout, None, true)
                     .await,
             )),
             _ => Ok(None),
@@ -334,7 +333,7 @@ impl Client {
     /// Gets whether the topology supports sessions, and if so, returns the topology's logical
     /// session timeout. If it has yet to be determined if the topology supports sessions, this
     /// method will perform a server selection that will force that determination to be made.
-    async fn get_session_support_status(&self) -> Result<SessionSupportStatus> {
+    pub(crate) async fn get_session_support_status(&self) -> Result<SessionSupportStatus> {
         let initial_status = self.inner.topology.session_support_status().await;
 
         // Need to guarantee that we're connected to at least one server that can determine if
