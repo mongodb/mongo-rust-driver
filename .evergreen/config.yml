@@ -568,7 +568,9 @@ functions:
           done
 
           # Copy client certificate because symlinks do not work on Windows.
-          cp ${DRIVERS_TOOLS}/.evergreen/x509gen/client.pem ${MONGO_ORCHESTRATION_HOME}/lib/client.pem
+          if [ "Windows_NT" = "$OS" ]; then # Magic variable in cygwin
+            cp ${DRIVERS_TOOLS}/.evergreen/x509gen/client.pem ${MONGO_ORCHESTRATION_HOME}/lib/client.pem
+          fi
 
   "make files executable":
     - command: shell.exec
