@@ -318,6 +318,7 @@ impl TestOperation for InsertMany {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct InsertOne {
     document: Document,
+    session: Option<String>,
     #[serde(flatten)]
     options: Option<InsertOneOptions>,
 }

@@ -42,6 +42,9 @@ const SKIPPED_OPERATIONS: &[&str] = &[
     "listIndexNames",
     "listIndexes",
     "mapReduce",
+    "startTransaction",
+    "abortTransaction",
+    "commitTransaction",
     "watch",
 ];
 
