@@ -8,7 +8,7 @@ use thiserror::Error;
 use crate::{bson::Document, options::StreamAddress};
 
 const RECOVERING_CODES: [i32; 5] = [11600, 11602, 13436, 189, 91];
-const NOTMASTER_CODES: [i32; 2] = [10107, 13435];
+const NOTMASTER_CODES: [i32; 3] = [10107, 13435, 10058];
 const SHUTTING_DOWN_CODES: [i32; 2] = [11600, 91];
 const RETRYABLE_READ_CODES: [i32; 11] =
     [11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001];
@@ -83,15 +83,9 @@ impl Error {
         if self.is_network_error() {
             return true;
         }
-        match &self.kind.code_and_message() {
-            Some((code, message)) => {
-                if RETRYABLE_READ_CODES.contains(&code) {
-                    return true;
-                }
-                if is_not_master(*code, message) || is_recovering(*code, message) {
-                    return true;
-                }
-                false
+        match &self.kind.code() {
+            Some(code) => {
+                RETRYABLE_READ_CODES.contains(&code)
             }
             None => false,
         }
@@ -371,6 +365,13 @@ impl ErrorKind {
         )
     }
 
+    pub(crate) fn is_non_timeout_network_error(&self) -> bool {
+        matches!(
+            self,
+            ErrorKind::Io(io_error) if io_error.kind() != std::io::ErrorKind::TimedOut
+        )
+    }
+
     /// Gets the code/message tuple from this error, if applicable. In the case of write errors, the
     /// code and message are taken from the write concern error, if there is one.
     pub(crate) fn code_and_message(&self) -> Option<(i32, &str)> {
@@ -385,6 +386,24 @@ impl ErrorKind {
                 .map(|wc_err| (wc_err.code, wc_err.message.as_str())),
             _ => None,
         }
+    }
+
+    /// Gets the code from this error for performing SDAM updates, if applicable.
+    fn code(&self) -> Option<i32> {
+        match self {
+            ErrorKind::CommandError(command_error) => {
+                Some(command_error.code)
+            },
+            // According to SDAM spec, write concern error codes MUST also be checked, and writeError codes
+            // MUST NOT be checked.
+            ErrorKind::BulkWriteError(BulkWriteFailure { write_concern_error: Some(wc_error), .. }) => {
+                Some(wc_error.code)
+            }
+            // We do not need to check WriteError, since those are constructed in the public API
+            // layer of the driver and are not used for updating SDAM.
+            _ => None
+        }
+
     }
 
     /// Gets the code name from this error, if applicable.
@@ -406,40 +425,22 @@ impl ErrorKind {
 
     /// If this error corresponds to a "not master" error as per the SDAM spec.
     pub(crate) fn is_not_master(&self) -> bool {
-        self.code_and_message()
-            .map(|(code, msg)| is_not_master(code, msg))
-            .unwrap_or(false)
+        self.code().map(|code| NOTMASTER_CODES.contains(&code)).unwrap_or(false)
     }
 
     /// If this error corresponds to a "node is recovering" error as per the SDAM spec.
     pub(crate) fn is_recovering(&self) -> bool {
-        self.code_and_message()
-            .map(|(code, msg)| is_recovering(code, msg))
+        self.code()
+            .map(|code| RECOVERING_CODES.contains(&code))
             .unwrap_or(false)
     }
 
     /// If this error corresponds to a "node is shutting down" error as per the SDAM spec.
     pub(crate) fn is_shutting_down(&self) -> bool {
-        self.code_and_message()
-            .map(|(code, _)| SHUTTING_DOWN_CODES.contains(&code))
+        self.code()
+            .map(|code| SHUTTING_DOWN_CODES.contains(&code))
             .unwrap_or(false)
     }
-}
-
-fn is_not_master(code: i32, message: &str) -> bool {
-    if NOTMASTER_CODES.contains(&code) {
-        return true;
-    } else if is_recovering(code, message) {
-        return false;
-    }
-    message.contains("not master")
-}
-
-fn is_recovering(code: i32, message: &str) -> bool {
-    if RECOVERING_CODES.contains(&code) {
-        return true;
-    }
-    message.contains("not master or secondary") || message.contains("node is recovering")
 }
 
 /// An error that occurred due to a database command failing.
@@ -516,6 +517,7 @@ pub struct WriteError {
 #[non_exhaustive]
 pub struct BulkWriteError {
     /// Index into the list of operations that this error corresponds to.
+    #[serde(default = "default_index")]
     pub index: usize,
 
     /// Identifies the type of write concern error.
@@ -533,8 +535,13 @@ pub struct BulkWriteError {
     pub message: String,
 }
 
+fn default_index() -> usize {
+    0
+}
+
 /// The set of errors that occurred during a write operation.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct BulkWriteFailure {
     /// The error(s) that occurred on account of a non write concern failure.

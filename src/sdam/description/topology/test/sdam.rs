@@ -1,4 +1,4 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use serde::Deserialize;
 use tokio::sync::RwLockReadGuard;
@@ -6,12 +6,15 @@ use tokio::sync::RwLockReadGuard;
 use crate::{
     bson::{doc, oid::ObjectId},
     client::Client,
+    error::{BulkWriteFailure, CommandError, Error, ErrorKind},
     is_master::{IsMasterCommandResponse, IsMasterReply},
     options::{ClientOptions, ReadPreference, SelectionCriteria, StreamAddress},
     sdam::description::{
         server::{ServerDescription, ServerType},
-        topology::{TopologyDescription, TopologyType},
+        topology::TopologyType,
     },
+    sdam::HandshakePhase,
+    sdam::Topology,
     test::{run_spec_test, TestClient, CLIENT_OPTIONS, LOCK},
 };
 
@@ -23,13 +26,77 @@ pub struct TestFile {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Phase {
+    description: Option<String>,
+    #[serde(default)]
     responses: Vec<Response>,
+    #[serde(default)]
+    application_errors: Vec<ApplicationError>,
     outcome: Outcome,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Response(String, IsMasterCommandResponse);
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApplicationError {
+    address: StreamAddress,
+    generation: Option<u32>,
+    max_wire_version: i32,
+    when: ErrorHandshakePhase,
+    #[serde(rename = "type")]
+    error_type: ErrorType,
+    response: Option<ServerError>,
+}
+
+impl ApplicationError {
+    fn to_error(&self) -> Error {
+        match self.error_type {
+            ErrorType::Command => self.response.clone().unwrap().into(),
+            ErrorType::Network => {
+                ErrorKind::Io(Arc::new(std::io::ErrorKind::UnexpectedEof.into())).into()
+            }
+            ErrorType::Timeout => {
+                ErrorKind::Io(Arc::new(std::io::ErrorKind::TimedOut.into())).into()
+            }
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ErrorHandshakePhase {
+    BeforeHandshakeCompletes,
+    AfterHandshakeCompletes,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ErrorType {
+    Command,
+    Network,
+    Timeout,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(untagged)]
+pub enum ServerError {
+    CommandError(CommandError),
+    WriteError(BulkWriteFailure),
+}
+
+impl From<ServerError> for Error {
+    fn from(server_error: ServerError) -> Self {
+        match server_error {
+            ServerError::CommandError(command_error) => {
+                ErrorKind::CommandError(command_error).into()
+            }
+            ServerError::WriteError(bwf) => ErrorKind::BulkWriteError(bwf).into(),
+        }
+    }
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -76,7 +143,15 @@ async fn run_test(test_file: TestFile) {
         .expect(&test_file.description);
 
     let test_description = &test_file.description;
-    let mut topology_description = TopologyDescription::new(options).expect(test_description);
+
+    // TODO: RUST-360 unskip tests that rely on topology version
+    if test_description.contains("topologyVersion") {
+        println!("Skipping {} (RUST-360)", test_description);
+        return;
+    }
+
+    let topology = Topology::new_mocked(options.clone());
+    let mut servers = topology.get_servers().await;
 
     for (i, phase) in test_file.phases.into_iter().enumerate() {
         for Response(address, command_response) in phase.responses {
@@ -97,24 +172,59 @@ async fn run_test(test_file: TestFile) {
                     address
                 )
             });
-            topology_description
-                .update(ServerDescription::new(
-                    address.clone(),
-                    Some(is_master_reply),
-                ))
-                .expect(&test_file.description);
+
+            // only update server if we have strong reference to it like the monitors do
+            if let Some(server) = servers.get(&address).and_then(|s| s.upgrade()) {
+                let new_sd = ServerDescription::new(address.clone(), Some(is_master_reply));
+                if topology.update(&server, new_sd).await {
+                    servers = topology.get_servers().await
+                }
+            }
         }
 
+        for application_error in phase.application_errors {
+            // only update server if we have strong reference to it like is done as part of
+            // operation execution
+            if let Some(server) = servers
+                .get(&application_error.address)
+                .and_then(|s| s.upgrade())
+            {
+                let error = application_error.to_error();
+                let error_generation = application_error
+                    .generation
+                    .unwrap_or_else(|| server.pool.generation());
+                let handshake_phase = match application_error.when {
+                    ErrorHandshakePhase::BeforeHandshakeCompletes => {
+                        HandshakePhase::PreCompletion {
+                            generation: error_generation,
+                        }
+                    }
+                    ErrorHandshakePhase::AfterHandshakeCompletes => {
+                        HandshakePhase::PostCompletion {
+                            generation: error_generation,
+                            max_wire_version: application_error.max_wire_version,
+                        }
+                    }
+                };
+
+                topology
+                    .handle_application_error(error, handshake_phase, &server)
+                    .await;
+            }
+        }
+
+        let topology_description = topology.description().await;
+        let phase_description = phase.description.unwrap_or_else(|| format!("{}", i));
         assert_eq!(
             topology_description.topology_type, phase.outcome.topology_type,
             "{}: {}",
-            &test_file.description, i,
+            &test_file.description, phase_description
         );
 
         assert_eq!(
             topology_description.set_name, phase.outcome.set_name,
             "{}: {}",
-            &test_file.description, i,
+            &test_file.description, phase_description,
         );
 
         let expected_timeout = phase
@@ -128,7 +238,7 @@ async fn run_test(test_file: TestFile) {
             expected_timeout,
             "{}: {}",
             &test_file.description,
-            i
+            phase_description
         );
 
         if let Some(compatible) = phase.outcome.compatible {
@@ -137,7 +247,7 @@ async fn run_test(test_file: TestFile) {
                 compatible,
                 "{}: {}",
                 &test_file.description,
-                i,
+                phase_description,
             );
         }
 
@@ -146,7 +256,7 @@ async fn run_test(test_file: TestFile) {
             phase.outcome.servers.len(),
             "{}: {}",
             &test_file.description,
-            i
+            phase_description
         );
 
         for (address, server) in phase.outcome.servers {
@@ -159,15 +269,15 @@ async fn run_test(test_file: TestFile) {
             let actual_server = &topology_description
                 .servers
                 .get(&address)
-                .unwrap_or_else(|| panic!("{} (phase {})", test_description, i));
+                .unwrap_or_else(|| panic!("{} (phase {})", test_description, phase_description));
 
             let server_type = server_type_from_str(&server.server_type)
-                .unwrap_or_else(|| panic!("{} (phase {})", test_description, i));
+                .unwrap_or_else(|| panic!("{} (phase {})", test_description, phase_description));
 
             assert_eq!(
                 actual_server.server_type, server_type,
-                "{} (phase {})",
-                &test_file.description, i
+                "{} (phase {}, address: {})",
+                &test_file.description, phase_description, address,
             );
 
             assert_eq!(
@@ -175,7 +285,7 @@ async fn run_test(test_file: TestFile) {
                 server.set_name,
                 "{} (phase {})",
                 &test_file.description,
-                i
+                phase_description
             );
 
             assert_eq!(
@@ -183,7 +293,7 @@ async fn run_test(test_file: TestFile) {
                 server.set_version,
                 "{} (phase {})",
                 &test_file.description,
-                i
+                phase_description
             );
 
             assert_eq!(
@@ -191,7 +301,7 @@ async fn run_test(test_file: TestFile) {
                 server.election_id,
                 "{} (phase {})",
                 &test_file.description,
-                i
+                phase_description
             );
 
             if let Some(logical_session_timeout_minutes) = server.logical_session_timeout_minutes {
@@ -202,7 +312,7 @@ async fn run_test(test_file: TestFile) {
                     )),
                     "{} (phase {})",
                     &test_file.description,
-                    i
+                    phase_description
                 );
             }
 
@@ -212,7 +322,7 @@ async fn run_test(test_file: TestFile) {
                     Some(min_wire_version),
                     "{} (phase {})",
                     &test_file.description,
-                    i
+                    phase_description
                 );
             }
 
@@ -222,7 +332,7 @@ async fn run_test(test_file: TestFile) {
                     Some(max_wire_version),
                     "{} (phase {})",
                     &test_file.description,
-                    i
+                    phase_description
                 );
             }
         }
@@ -245,6 +355,12 @@ async fn rs() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn sharded() {
     run_spec_test(&["server-discovery-and-monitoring", "sharded"], run_test).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn errors() {
+    run_spec_test(&["server-discovery-and-monitoring", "errors"], run_test).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

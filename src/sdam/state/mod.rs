@@ -67,6 +67,8 @@ struct TopologyState {
     http_client: HttpClient,
     description: TopologyDescription,
     servers: HashMap<StreamAddress, Arc<Server>>,
+    #[cfg(test)]
+    mocked: bool,
 }
 
 impl Topology {
@@ -74,15 +76,13 @@ impl Topology {
     /// specified in `hosts` and each other field set to its default value. No monitoring threads
     /// will be started for the servers in the topology that's returned.
     #[cfg(test)]
-    pub(super) fn new_from_hosts<'a>(hosts: impl Iterator<Item = &'a StreamAddress>) -> Self {
-        let hosts: Vec<_> = hosts.cloned().collect();
-
-        let description = TopologyDescription::new_from_hosts(hosts.clone());
+    pub(super) fn new_mocked<'a>(options: ClientOptions) -> Self {
+        let description = TopologyDescription::new(options.clone()).unwrap();
 
         let common = Common {
             is_alive: Arc::new(AtomicBool::new(true)),
             message_manager: TopologyMessageManager::new(),
-            options: ClientOptions::new_srv(),
+            options: options.clone(),
         };
 
         let http_client = HttpClient::default();
@@ -91,6 +91,7 @@ impl Topology {
             description,
             servers: Default::default(),
             http_client: http_client.clone(),
+            mocked: true,
         };
 
         let topology = Self {
@@ -102,7 +103,7 @@ impl Topology {
         // should be acquired immediately.
         let mut topology_state = RUNTIME.block_in_place(topology.state.write());
 
-        for address in hosts {
+        for address in options.hosts {
             topology_state.servers.insert(
                 address.clone(),
                 Server::create(
@@ -133,6 +134,15 @@ impl Topology {
 
         let http_client = HttpClient::default();
 
+        #[cfg(test)]
+        let topology_state = TopologyState {
+            description,
+            servers: Default::default(),
+            http_client,
+            mocked: false,
+        };
+
+        #[cfg(not(test))]
         let topology_state = TopologyState {
             description,
             servers: Default::default(),
@@ -163,6 +173,11 @@ impl Topology {
     #[cfg(test)]
     pub(crate) async fn servers(&self) -> HashSet<StreamAddress> {
         self.state.read().await.servers.keys().cloned().collect()
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn description(&self) -> TopologyDescription {
+        self.state.read().await.description.clone()
     }
 
     /// Creates and returns a weak reference to the topology.
@@ -247,7 +262,7 @@ impl Topology {
             self.request_topology_check();
 
             updated
-        } else if error.is_network_error()
+        } else if error.is_non_timeout_network_error()
             || (handshake.is_pre_completion()
                 && (error.is_auth_error() || error.is_network_timeout()))
         {
@@ -401,6 +416,17 @@ impl Topology {
             .get_server_description(address)
             .cloned()
     }
+
+    #[cfg(test)]
+    pub(crate) async fn get_servers(&self) -> HashMap<StreamAddress, Weak<Server>> {
+        self.state
+            .read()
+            .await
+            .servers
+            .iter()
+            .map(|(addr, server)| (addr.clone(), Arc::downgrade(server)))
+            .collect()
+    }
 }
 
 impl WeakTopology {
@@ -442,6 +468,13 @@ impl TopologyState {
             self.http_client.clone(),
         );
         self.servers.insert(address, server);
+
+        #[cfg(test)]
+        if !self.mocked {
+            monitor.start()
+        }
+
+        #[cfg(not(test))]
         monitor.start();
     }
 
@@ -521,7 +554,10 @@ pub(crate) enum HandshakePhase {
 
     /// Describes a point in time after the handshake completed (e.g. when the command was sent to
     /// the server).
-    PostCompletion { generation: u32, max_wire_version: i32, },
+    PostCompletion {
+        generation: u32,
+        max_wire_version: i32,
+    },
 }
 
 impl HandshakePhase {
@@ -529,7 +565,11 @@ impl HandshakePhase {
         Self::PostCompletion {
             generation: handshaked_connection.generation,
             // TODO: fix this
-            max_wire_version: handshaked_connection.stream_description().unwrap().max_wire_version.unwrap()
+            max_wire_version: handshaked_connection
+                .stream_description()
+                .unwrap()
+                .max_wire_version
+                .unwrap(),
         }
     }
 
@@ -537,9 +577,7 @@ impl HandshakePhase {
     fn generation(&self) -> u32 {
         match self {
             HandshakePhase::PreCompletion { generation } => *generation,
-            HandshakePhase::PostCompletion {
-                generation, ..
-            } => *generation,
+            HandshakePhase::PostCompletion { generation, .. } => *generation,
         }
     }
 

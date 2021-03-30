@@ -88,28 +88,6 @@ impl PartialEq for TopologyDescription {
 }
 
 impl TopologyDescription {
-    /// Creates a new TopologyDescription with the set of servers initialized to the addresses
-    /// specified in `hosts` and each other field set to its default value.
-    #[cfg(test)]
-    pub(crate) fn new_from_hosts(hosts: Vec<StreamAddress>) -> Self {
-        Self {
-            single_seed: false,
-            topology_type: TopologyType::Unknown,
-            set_name: None,
-            max_set_version: None,
-            max_election_id: None,
-            compatibility_error: None,
-            session_support_status: Default::default(),
-            cluster_time: None,
-            local_threshold: None,
-            heartbeat_freq: None,
-            servers: hosts
-                .into_iter()
-                .map(|address| (address.clone(), ServerDescription::new(address, None)))
-                .collect(),
-        }
-    }
-
     pub(crate) fn new(options: ClientOptions) -> crate::error::Result<Self> {
         verify_max_staleness(
             options
