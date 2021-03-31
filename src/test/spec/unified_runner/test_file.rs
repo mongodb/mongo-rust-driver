@@ -295,14 +295,14 @@ impl ExpectError {
             assert_eq!(is_client_error, !error.is_server_error());
         }
         if let Some(error_contains) = self.error_contains {
-            match &error.kind.code_and_message() {
-                Some((_, msg)) => assert!(msg.contains(&error_contains)),
+            match &error.kind.server_message() {
+                Some(msg) => assert!(msg.contains(&error_contains)),
                 None => panic!("{} should include message field", error),
             }
         }
         if let Some(error_code) = self.error_code {
-            match &error.kind.code_and_message() {
-                Some((code, _)) => assert_eq!(*code, error_code),
+            match &error.kind.code() {
+                Some(code) => assert_eq!(*code, error_code),
                 None => panic!("{} should include code", error),
             }
         }

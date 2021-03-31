@@ -106,8 +106,8 @@ impl Error {
         if self.is_network_error() {
             return true;
         }
-        match &self.kind.code_and_message() {
-            Some((code, _)) => RETRYABLE_WRITE_CODES.contains(&code),
+        match &self.kind.code() {
+            Some(code) => RETRYABLE_WRITE_CODES.contains(&code),
             None => false,
         }
     }
@@ -358,6 +358,10 @@ impl From<trust_dns_resolver::error::ResolveError> for ErrorKind {
 }
 
 impl ErrorKind {
+    pub(crate) fn is_non_timeout_network_error(&self) -> bool {
+        matches!(self, ErrorKind::Io(ref io_err) if io_err.kind() != std::io::ErrorKind::TimedOut)
+    }
+
     pub(crate) fn is_network_error(&self) -> bool {
         matches!(
             self,
@@ -365,31 +369,9 @@ impl ErrorKind {
         )
     }
 
-    pub(crate) fn is_non_timeout_network_error(&self) -> bool {
-        matches!(
-            self,
-            ErrorKind::Io(io_error) if io_error.kind() != std::io::ErrorKind::TimedOut
-        )
-    }
-
-    /// Gets the code/message tuple from this error, if applicable. In the case of write errors, the
-    /// code and message are taken from the write concern error, if there is one.
-    pub(crate) fn code_and_message(&self) -> Option<(i32, &str)> {
-        match self {
-            ErrorKind::CommandError(ref cmd_err) => Some((cmd_err.code, cmd_err.message.as_str())),
-            ErrorKind::WriteError(WriteFailure::WriteConcernError(ref wc_err)) => {
-                Some((wc_err.code, wc_err.message.as_str()))
-            }
-            ErrorKind::BulkWriteError(ref bwe) => bwe
-                .write_concern_error
-                .as_ref()
-                .map(|wc_err| (wc_err.code, wc_err.message.as_str())),
-            _ => None,
-        }
-    }
-
     /// Gets the code from this error for performing SDAM updates, if applicable.
-    fn code(&self) -> Option<i32> {
+    /// Any codes contained in WriteErrors are ignored.
+    pub(crate) fn code(&self) -> Option<i32> {
         match self {
             ErrorKind::CommandError(command_error) => {
                 Some(command_error.code)
@@ -399,11 +381,39 @@ impl ErrorKind {
             ErrorKind::BulkWriteError(BulkWriteFailure { write_concern_error: Some(wc_error), .. }) => {
                 Some(wc_error.code)
             }
-            // We do not need to check WriteError, since those are constructed in the public API
-            // layer of the driver and are not used for updating SDAM.
+            ErrorKind::WriteError(WriteFailure::WriteConcernError(wc_error)) => Some(wc_error.code),
             _ => None
         }
+    }
 
+    /// Gets the server's message for this error, if applicable, for use in testing.
+    /// If this error is a BulkWriteError, the messages are concatenated.
+    #[cfg(test)]
+    pub(crate) fn server_message(&self) -> Option<String> {
+        match self {
+            ErrorKind::CommandError(command_error) => {
+                Some(command_error.message.clone())
+            },
+            // According to SDAM spec, write concern error codes MUST also be checked, and writeError codes
+            // MUST NOT be checked.
+            ErrorKind::BulkWriteError(BulkWriteFailure { write_concern_error, write_errors }) => {
+                let mut msg = "".to_string();
+                if let Some(wc_error) = write_concern_error {
+                    msg.push_str(wc_error.message.as_str());
+                }
+
+                if let Some(write_errors) = write_errors {
+                    for we in write_errors {
+                        msg.push_str(we.message.as_str());
+                    }
+                }
+
+                Some(msg)
+            }
+            ErrorKind::WriteError(WriteFailure::WriteConcernError(wc_error)) => Some(wc_error.message.clone()),
+            ErrorKind::WriteError(WriteFailure::WriteError(write_error)) => Some(write_error.message.clone()),
+            _ => None
+        }
     }
 
     /// Gets the code name from this error, if applicable.
