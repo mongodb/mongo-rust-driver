@@ -561,15 +561,16 @@ pub(crate) enum HandshakePhase {
 }
 
 impl HandshakePhase {
-    pub(crate) fn before_completion(handshaked_connection: Connection) -> Self {
+    pub(crate) fn after_completion(handshaked_connection: Connection) -> Self {
         Self::AfterCompletion {
             generation: handshaked_connection.generation,
-            // TODO: fix this
+            // given that this is a handshaked connection, the stream description should
+            // always be available, so 0 should never actually be returned here.
             max_wire_version: handshaked_connection
                 .stream_description()
-                .unwrap()
-                .max_wire_version
-                .unwrap(),
+                .ok()
+                .and_then(|sd| sd.max_wire_version)
+                .unwrap_or(0),
         }
     }
 
