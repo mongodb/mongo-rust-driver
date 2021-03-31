@@ -9,12 +9,14 @@ use crate::{
     error::{BulkWriteFailure, CommandError, Error, ErrorKind},
     is_master::{IsMasterCommandResponse, IsMasterReply},
     options::{ClientOptions, ReadPreference, SelectionCriteria, StreamAddress},
-    sdam::description::{
-        server::{ServerDescription, ServerType},
-        topology::TopologyType,
+    sdam::{
+        description::{
+            server::{ServerDescription, ServerType},
+            topology::TopologyType,
+        },
+        HandshakePhase,
+        Topology,
     },
-    sdam::HandshakePhase,
-    sdam::Topology,
     test::{run_spec_test, TestClient, CLIENT_OPTIONS, LOCK},
 };
 
