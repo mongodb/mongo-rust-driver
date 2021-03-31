@@ -76,7 +76,7 @@ impl Topology {
     /// specified in `hosts` and each other field set to its default value. No monitoring threads
     /// will be started for the servers in the topology that's returned.
     #[cfg(test)]
-    pub(super) fn new_mocked<'a>(options: ClientOptions) -> Self {
+    pub(super) fn new_mocked(options: ClientOptions) -> Self {
         let description = TopologyDescription::new(options.clone()).unwrap();
 
         let common = Common {
