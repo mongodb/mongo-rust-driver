@@ -106,6 +106,24 @@ impl EventHandler {
             receiver: self.event_broadcaster.subscribe(),
         }
     }
+
+    /// Gets all of the command started events for the specified command names.
+    pub fn get_command_started_events(&self, command_names: &[&str]) -> Vec<CommandStartedEvent> {
+        let events = self.command_events.read().unwrap();
+        events
+            .iter()
+            .filter_map(|event| match event {
+                CommandEvent::CommandStartedEvent(event) => {
+                    if command_names.contains(&event.command_name.as_str()) {
+                        Some(event.clone())
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            })
+            .collect()
+    }
 }
 
 impl CmapEventHandler for EventHandler {
@@ -310,20 +328,7 @@ impl EventClient {
 
     /// Gets all of the command started events for the specified command names.
     pub fn get_command_started_events(&self, command_names: &[&str]) -> Vec<CommandStartedEvent> {
-        let events = self.handler.command_events.read().unwrap();
-        events
-            .iter()
-            .filter_map(|event| match event {
-                CommandEvent::CommandStartedEvent(event) => {
-                    if command_names.contains(&event.command_name.as_str()) {
-                        Some(event.clone())
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
-            })
-            .collect()
+        self.handler.get_command_started_events(command_names)
     }
 
     /// Gets all command started events, excluding configureFailPoint events.

@@ -418,3 +418,77 @@ async fn direct_connection() {
         .await
         .expect("write should succeed with directConnection unspecified");
 }
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn pool_cleared_error_does_not_mark_unknown() {
+    let address = StreamAddress::parse("a:1234").unwrap();
+    let options = ClientOptions::builder()
+        .hosts(vec![address.clone()])
+        .build();
+    let topology = Topology::new_mocked(options);
+
+    // get the one server in the topology
+    let server = topology
+        .get_servers()
+        .await
+        .into_iter()
+        .next()
+        .unwrap()
+        .1
+        .upgrade()
+        .unwrap();
+
+    let heartbeat_response: IsMasterCommandResponse = bson::from_document(doc! {
+        "ok": 1,
+        "ismaster": true,
+        "minWireVersion": 0,
+        "maxWireVersion": 6
+    })
+    .unwrap();
+
+    // discover the node
+    topology
+        .update(
+            &server,
+            ServerDescription::new(
+                address.clone(),
+                Some(Ok(IsMasterReply {
+                    command_response: heartbeat_response,
+                    round_trip_time: Some(Duration::from_secs(1)),
+                    cluster_time: None,
+                })),
+            ),
+        )
+        .await;
+    assert_eq!(
+        topology
+            .get_server_description(&address)
+            .await
+            .unwrap()
+            .server_type,
+        ServerType::Standalone
+    );
+
+    // assert a pool cleared error would have no effect on the topology
+    let error: Error = ErrorKind::ConnectionPoolClearedError {
+        message: "foo".to_string(),
+    }
+    .into();
+    let phase = HandshakePhase::PreCompletion {
+        generation: server.pool.generation(),
+    };
+    assert!(
+        !topology
+            .handle_application_error(error, phase, &server)
+            .await
+    );
+    assert_eq!(
+        topology
+            .get_server_description(&address)
+            .await
+            .unwrap()
+            .server_type,
+        ServerType::Standalone
+    );
+}
