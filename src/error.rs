@@ -529,7 +529,7 @@ pub struct WriteError {
 #[non_exhaustive]
 pub struct BulkWriteError {
     /// Index into the list of operations that this error corresponds to.
-    #[serde(default = "default_index")]
+    #[serde(default)]
     pub index: usize,
 
     /// Identifies the type of write concern error.
@@ -545,10 +545,6 @@ pub struct BulkWriteError {
     /// A description of the error that occurred.
     #[serde(rename = "errmsg")]
     pub message: String,
-}
-
-fn default_index() -> usize {
-    0
 }
 
 /// The set of errors that occurred during a write operation.
