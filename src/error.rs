@@ -398,20 +398,18 @@ impl ErrorKind {
             ErrorKind::CommandError(command_error) => {
                 Some(command_error.message.clone())
             },
-            // According to SDAM spec, write concern error codes MUST also be checked, and writeError codes
-            // MUST NOT be checked.
+            // since this is used primarily for errorMessageContains assertions in the unified runner, we just
+            // concatenate all the relevant server messages into one for bulk errors.
             ErrorKind::BulkWriteError(BulkWriteFailure { write_concern_error, write_errors }) => {
                 let mut msg = "".to_string();
                 if let Some(wc_error) = write_concern_error {
                     msg.push_str(wc_error.message.as_str());
                 }
-
                 if let Some(write_errors) = write_errors {
                     for we in write_errors {
                         msg.push_str(we.message.as_str());
                     }
                 }
-
                 Some(msg)
             }
             ErrorKind::WriteError(WriteFailure::WriteConcernError(wc_error)) => Some(wc_error.message.clone()),
