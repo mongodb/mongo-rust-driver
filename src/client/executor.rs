@@ -125,7 +125,7 @@ impl Client {
                     .topology
                     .handle_application_error(
                         err.clone(),
-                        HandshakePhase::post_completion(conn),
+                        HandshakePhase::before_completion(conn),
                         &server,
                     )
                     .await;
@@ -173,7 +173,7 @@ impl Client {
                     .topology
                     .handle_application_error(
                         err.clone(),
-                        HandshakePhase::post_completion(conn),
+                        HandshakePhase::before_completion(conn),
                         &server,
                     )
                     .await;

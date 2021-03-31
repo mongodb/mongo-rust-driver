@@ -195,12 +195,12 @@ async fn run_test(test_file: TestFile) {
                     .unwrap_or_else(|| server.pool.generation());
                 let handshake_phase = match application_error.when {
                     ErrorHandshakePhase::BeforeHandshakeCompletes => {
-                        HandshakePhase::PreCompletion {
+                        HandshakePhase::BeforeCompletion {
                             generation: error_generation,
                         }
                     }
                     ErrorHandshakePhase::AfterHandshakeCompletes => {
-                        HandshakePhase::PostCompletion {
+                        HandshakePhase::AfterCompletion {
                             generation: error_generation,
                             max_wire_version: application_error.max_wire_version,
                         }
@@ -475,7 +475,7 @@ async fn pool_cleared_error_does_not_mark_unknown() {
         message: "foo".to_string(),
     }
     .into();
-    let phase = HandshakePhase::PreCompletion {
+    let phase = HandshakePhase::BeforeCompletion {
         generation: server.pool.generation(),
     };
     assert!(

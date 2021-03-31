@@ -263,7 +263,7 @@ impl Topology {
 
             updated
         } else if error.is_non_timeout_network_error()
-            || (handshake.is_pre_completion()
+            || (handshake.is_before_completion()
                 && (error.is_auth_error() || error.is_network_timeout()))
         {
             let updated = self
@@ -550,19 +550,19 @@ impl TopologyState {
 pub(crate) enum HandshakePhase {
     /// Describes an point that occurred before the handshake completed (e.g. when opening the
     /// socket or while performing authentication)
-    PreCompletion { generation: u32 },
+    BeforeCompletion { generation: u32 },
 
     /// Describes a point in time after the handshake completed (e.g. when the command was sent to
     /// the server).
-    PostCompletion {
+    AfterCompletion {
         generation: u32,
         max_wire_version: i32,
     },
 }
 
 impl HandshakePhase {
-    pub(crate) fn post_completion(handshaked_connection: Connection) -> Self {
-        Self::PostCompletion {
+    pub(crate) fn before_completion(handshaked_connection: Connection) -> Self {
+        Self::AfterCompletion {
             generation: handshaked_connection.generation,
             // TODO: fix this
             max_wire_version: handshaked_connection
@@ -576,24 +576,24 @@ impl HandshakePhase {
     /// The generation of the connection that was used in the handshake.
     fn generation(&self) -> u32 {
         match self {
-            HandshakePhase::PreCompletion { generation } => *generation,
-            HandshakePhase::PostCompletion { generation, .. } => *generation,
+            HandshakePhase::BeforeCompletion { generation } => *generation,
+            HandshakePhase::AfterCompletion { generation, .. } => *generation,
         }
     }
 
     /// Whether this phase is before the handshake completed or not.
-    fn is_pre_completion(&self) -> bool {
-        matches!(self, HandshakePhase::PreCompletion { .. })
+    fn is_before_completion(&self) -> bool {
+        matches!(self, HandshakePhase::BeforeCompletion { .. })
     }
 
     /// The wire version of the server as reported by the handshake. If the handshake did not
     /// complete, this returns `None`.
     fn wire_version(&self) -> Option<i32> {
         match self {
-            HandshakePhase::PostCompletion {
+            HandshakePhase::AfterCompletion {
                 max_wire_version, ..
             } => Some(*max_wire_version),
-            HandshakePhase::PreCompletion { .. } => None,
+            HandshakePhase::BeforeCompletion { .. } => None,
         }
     }
 }

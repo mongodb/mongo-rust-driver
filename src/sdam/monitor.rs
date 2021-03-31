@@ -250,7 +250,7 @@ impl UpdateMonitor {
                     topology
                         .handle_application_error(
                             error,
-                            HandshakePhase::PreCompletion {
+                            HandshakePhase::BeforeCompletion {
                                 generation: error_generation,
                             },
                             &server,
