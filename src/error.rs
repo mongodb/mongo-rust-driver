@@ -69,6 +69,10 @@ impl Error {
         matches!(self.kind, ErrorKind::AuthenticationError { .. })
     }
 
+    pub(crate) fn is_command_error(&self) -> bool {
+        matches!(self.kind, ErrorKind::CommandError(_))
+    }
+
     pub(crate) fn is_network_timeout(&self) -> bool {
         matches!(self.kind, ErrorKind::Io(ref io_err) if io_err.kind() == std::io::ErrorKind::TimedOut)
     }

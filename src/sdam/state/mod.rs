@@ -264,7 +264,9 @@ impl Topology {
             updated
         } else if error.is_non_timeout_network_error()
             || (handshake.is_before_completion()
-                && (error.is_auth_error() || error.is_network_timeout()))
+                && (error.is_auth_error()
+                    || error.is_network_timeout()
+                    || error.is_command_error()))
         {
             let updated = self
                 .mark_server_as_unknown(error.to_string(), server, state_lock)
