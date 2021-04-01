@@ -243,7 +243,6 @@ async fn auth_error() {
 
     let mut setup_client_options = CLIENT_OPTIONS.clone();
     setup_client_options.hosts.drain(1..);
-    setup_client_options.direct_connection = Some(true);
     let setup_client = TestClient::with_options(Some(setup_client_options.clone()), true).await;
     if !VersionReq::parse(">= 4.4.0")
         .unwrap()
