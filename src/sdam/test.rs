@@ -241,7 +241,10 @@ async fn sdam_min_pool_size_error() {
 async fn auth_error() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
 
-    let setup_client = TestClient::new().await;
+    let mut setup_client_options = CLIENT_OPTIONS.clone();
+    setup_client_options.hosts.drain(1..);
+    setup_client_options.direct_connection = Some(true);
+    let setup_client = TestClient::with_options(Some(setup_client_options.clone()), true).await;
     if !VersionReq::parse(">= 4.4.0")
         .unwrap()
         .matches(setup_client.server_version.as_ref().unwrap())
@@ -276,7 +279,7 @@ async fn auth_error() {
     let handler = Arc::new(EventHandler::new());
     let mut subscriber = handler.subscribe();
 
-    let mut options = CLIENT_OPTIONS.clone();
+    let mut options = setup_client_options.clone();
     options.app_name = Some("authErrorTest".to_string());
     options.retry_writes = Some(false);
     options.cmap_event_handler = Some(handler.clone());
