@@ -303,6 +303,7 @@ async fn auth_error() {
     // Wait a little while for the server to be marked as Unknown.
     // Once we have SDAM monitoring, this wait can be removed and be replaced
     // with another event waiting.
+    // TODO: RUST-232 replace this with monitoring.
     RUNTIME.delay_for(Duration::from_millis(750)).await;
 
     coll.insert_many(vec![doc! { "_id": 5 }, doc! { "_id": 6 }], None)
