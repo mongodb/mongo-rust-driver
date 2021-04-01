@@ -22,6 +22,7 @@ pub(crate) use self::{
     monitor::MIN_HEARTBEAT_FREQUENCY,
     state::{
         server::{Server, ServerUpdate, ServerUpdateReceiver, ServerUpdateSender},
+        HandshakePhase,
         Topology,
     },
 };

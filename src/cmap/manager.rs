@@ -20,8 +20,15 @@ pub(super) struct PoolManager {
 
 impl PoolManager {
     /// Lazily clear the pool.
-    pub(super) fn clear(&self) {
-        let _ = self.sender.send(PoolManagementRequest::Clear);
+    pub(super) async fn clear(&self) {
+        let (message, acknowledgment_receiver) = AcknowledgedMessage::package(());
+        if self
+            .sender
+            .send(PoolManagementRequest::Clear(message))
+            .is_ok()
+        {
+            acknowledgment_receiver.wait_for_acknowledgment().await;
+        }
     }
 
     /// Mark the pool as "ready" as per the CMAP specification.
@@ -77,7 +84,7 @@ impl ManagementRequestReceiver {
 #[derive(Debug)]
 pub(super) enum PoolManagementRequest {
     /// Clear the pool, transitioning it to Paused.
-    Clear,
+    Clear(AcknowledgedMessage<()>),
 
     /// Mark the pool as Ready, allowing connections to be created and checked out.
     MarkAsReady {

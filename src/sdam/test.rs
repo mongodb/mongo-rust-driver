@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use bson::doc;
+use bson::{bson, doc};
 use semver::VersionReq;
 use tokio::sync::RwLockWriteGuard;
 
@@ -232,4 +232,101 @@ async fn sdam_min_pool_size_error() {
         })
         .await
         .expect("should see pool ready event");
+}
+
+/// Based on the auth-error.yml SDAM integration test
+/// TODO: RUST-360 run this via the integration test runner
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn auth_error() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+
+    let mut setup_client_options = CLIENT_OPTIONS.clone();
+    setup_client_options.hosts.drain(1..);
+    let setup_client = TestClient::with_options(Some(setup_client_options.clone()), true).await;
+    if !VersionReq::parse(">= 4.4.0")
+        .unwrap()
+        .matches(setup_client.server_version.as_ref().unwrap())
+    {
+        println!("skipping auth_error test due to server not supporting appName failCommand");
+        return;
+    }
+
+    if !setup_client.auth_enabled() {
+        println!("skipping auth_error test due to auth not being enabled");
+        return;
+    }
+
+    setup_client
+        .init_db_and_coll("auth_error", "auth_error")
+        .await
+        .insert_many(vec![doc! { "_id": 1 }, doc! { "_id": 2 }], None)
+        .await
+        .unwrap();
+
+    let fp_options = FailCommandOptions::builder()
+        .app_name("authErrorTest".to_string())
+        .error_code(18)
+        .build();
+    let failpoint = FailPoint::fail_command(&["saslContinue"], FailPointMode::Times(1), fp_options);
+
+    let _fp_guard = setup_client
+        .enable_failpoint(failpoint, None)
+        .await
+        .expect("enabling failpoint should succeed");
+
+    let handler = Arc::new(EventHandler::new());
+    let mut subscriber = handler.subscribe();
+
+    let mut options = setup_client_options.clone();
+    options.app_name = Some("authErrorTest".to_string());
+    options.retry_writes = Some(false);
+    options.cmap_event_handler = Some(handler.clone());
+    options.command_event_handler = Some(handler.clone());
+    let client = Client::with_options(options).expect("client creation should succeed");
+
+    let coll = client.database("auth_error").collection("auth_error");
+    let auth_err = coll
+        .insert_many(vec![doc! { "_id": 3 }, doc! { "_id": 4 }], None)
+        .await
+        .expect_err("insert should fail");
+    assert!(matches!(
+        auth_err.kind,
+        ErrorKind::AuthenticationError { .. }
+    ));
+
+    subscriber
+        .wait_for_event(Duration::from_millis(2000), |event| {
+            matches!(event, Event::CmapEvent(CmapEvent::ConnectionPoolCleared(_)))
+        })
+        .await
+        .expect("should see pool cleared event");
+
+    // Wait a little while for the server to be marked as Unknown.
+    // Once we have SDAM monitoring, this wait can be removed and be replaced
+    // with another event waiting.
+    // TODO: RUST-232 replace this with monitoring.
+    RUNTIME.delay_for(Duration::from_millis(750)).await;
+
+    coll.insert_many(vec![doc! { "_id": 5 }, doc! { "_id": 6 }], None)
+        .await
+        .expect("insert should succeed");
+
+    // assert that no more pool cleared events were emitted
+    assert!(
+        subscriber
+            .wait_for_event(Duration::from_millis(100), |event| {
+                matches!(event, Event::CmapEvent(CmapEvent::ConnectionPoolCleared(_)))
+            })
+            .await
+            .is_none(),
+        "no more pool cleared events"
+    );
+
+    let command_events = handler.get_command_started_events(&["insert"]);
+    assert_eq!(command_events.len(), 1); // the first insert was never actually attempted
+    assert_eq!(
+        command_events[0].command.get_array("documents").unwrap(),
+        &vec![bson!({ "_id": 5 }), bson!({ "_id": 6 })]
+    );
 }

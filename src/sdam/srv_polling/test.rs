@@ -3,7 +3,11 @@ use std::collections::HashSet;
 use pretty_assertions::assert_eq;
 
 use super::{LookupHosts, SrvPollingMonitor};
-use crate::{error::Result, options::StreamAddress, sdam::Topology};
+use crate::{
+    error::Result,
+    options::{ClientOptions, StreamAddress},
+    sdam::Topology,
+};
 
 fn localhost_test_build_10gen(port: u16) -> StreamAddress {
     StreamAddress {
@@ -20,7 +24,9 @@ lazy_static::lazy_static! {
 }
 
 async fn run_test(new_hosts: Result<Vec<StreamAddress>>, expected_hosts: HashSet<StreamAddress>) {
-    let topology = Topology::new_from_hosts(DEFAULT_HOSTS.iter());
+    let mut options = ClientOptions::new_srv();
+    options.hosts = DEFAULT_HOSTS.clone();
+    let topology = Topology::new_mocked(options);
     let mut monitor = SrvPollingMonitor::new(topology.downgrade()).unwrap();
 
     monitor

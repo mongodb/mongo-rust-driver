@@ -176,8 +176,8 @@ impl ConnectionPool {
 
     /// Increments the generation of the pool. Rather than eagerly removing stale connections from
     /// the pool, they are left for the background thread to clean up.
-    pub(crate) fn clear(&self) {
-        self.manager.clear();
+    pub(crate) async fn clear(&self) {
+        self.manager.clear().await
     }
 
     /// Mark the pool as "ready", allowing connections to be created and checked out.
@@ -185,11 +185,7 @@ impl ConnectionPool {
         self.manager.mark_as_ready().await;
     }
 
-    /// Subscribe to updates to the pool's generation.
-    ///
-    /// This can be used to listen for errors that occur during connection
-    /// establishment or to get the current generation of the pool.
-    pub(crate) fn subscribe_to_generation_updates(&self) -> PoolGenerationSubscriber {
-        self.generation_subscriber.clone()
+    pub(crate) fn generation(&self) -> u32 {
+        self.generation_subscriber.generation()
     }
 }
