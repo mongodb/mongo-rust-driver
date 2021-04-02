@@ -39,7 +39,6 @@ async fn build() {
 
     assert_eq!(cmd.name.as_str(), "update");
     assert_eq!(cmd.target_db.as_str(), "test_db");
-    assert_eq!(cmd.read_pref.as_ref(), None);
 
     let mut expected_body = doc! {
         "update": "test_coll",
@@ -91,7 +90,6 @@ async fn build_hint() {
 
     assert_eq!(cmd.name.as_str(), "update");
     assert_eq!(cmd.target_db.as_str(), "test_db");
-    assert_eq!(cmd.read_pref.as_ref(), None);
 
     let mut expected_body = doc! {
         "update": "test_coll",
@@ -136,7 +134,6 @@ async fn build_many() {
 
     assert_eq!(cmd.name.as_str(), "update");
     assert_eq!(cmd.target_db.as_str(), "test_db");
-    assert_eq!(cmd.read_pref.as_ref(), None);
 
     let mut expected_body = doc! {
         "update": "test_coll",

@@ -180,12 +180,8 @@ impl HeartbeatMonitor {
     async fn perform_is_master(&mut self) -> Result<IsMasterReply> {
         let result = match self.connection {
             Some(ref mut conn) => {
-                let mut command = Command::new_read(
-                    "isMaster".into(),
-                    "admin".into(),
-                    None,
-                    doc! { "isMaster": 1 },
-                );
+                let mut command =
+                    Command::new("isMaster".into(), "admin".into(), doc! { "isMaster": 1 });
                 if let Some(ref server_api) = self.client_options.server_api {
                     command.set_server_api(server_api);
                 }

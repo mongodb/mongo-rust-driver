@@ -33,7 +33,6 @@ fn build_test(
 
     let mut cmd = build_result.unwrap();
     assert_eq!(cmd.name, "getMore".to_string());
-    assert_eq!(cmd.read_pref, None);
     assert_eq!(cmd.target_db, ns.db);
 
     bson_util::sort_document(&mut expected_body);

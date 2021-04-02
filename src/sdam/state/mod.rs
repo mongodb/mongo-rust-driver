@@ -480,7 +480,7 @@ impl TopologyState {
         monitor.start();
     }
 
-    /// Updates the given `command` as needed based on the `critiera`.
+    /// Updates the given `command` as needed based on the `criteria`.
     pub(crate) fn update_command_with_read_pref(
         &self,
         server_address: &StreamAddress,

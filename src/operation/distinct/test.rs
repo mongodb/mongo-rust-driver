@@ -28,7 +28,6 @@ async fn build() {
         }
     );
     assert_eq!(distinct_command.target_db, "test_db");
-    assert_eq!(distinct_command.read_pref, None);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -53,7 +52,6 @@ async fn build_with_query() {
         }
     );
     assert_eq!(distinct_command.target_db, "test_db");
-    assert_eq!(distinct_command.read_pref, None);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -80,7 +78,6 @@ async fn build_with_options() {
         }
     );
     assert_eq!(distinct_command.target_db, "test_db");
-    assert_eq!(distinct_command.read_pref, None);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
