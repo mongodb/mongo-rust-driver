@@ -77,8 +77,9 @@ impl AsyncTcpStream {
         stream.set_nodelay(true)?;
 
         let socket = socket2::Socket::from(stream.into_std()?);
-        socket.set_keepalive(Some(KEEPALIVE_TIME))?;
-        let std_stream = socket.into_tcp_stream();
+        let conf = socket2::TcpKeepalive::new().with_time(KEEPALIVE_TIME);
+        socket.set_tcp_keepalive(&conf)?;
+        let std_stream = std::net::TcpStream::from(socket);
         let stream = TcpStream::from_std(std_stream)?;
 
         Ok(stream.into())
@@ -89,12 +90,10 @@ impl AsyncTcpStream {
         use async_std::net::TcpStream;
         use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 
-        let domain = match address {
-            SocketAddr::V4(_) => Domain::ipv4(),
-            SocketAddr::V6(_) => Domain::ipv6(),
-        };
-        let socket = Socket::new(domain, Type::stream(), Some(Protocol::tcp()))?;
-        socket.set_keepalive(Some(KEEPALIVE_TIME))?;
+        let domain = Domain::for_address(*address);
+        let socket = Socket::new(domain, Type::STREAM, Some(Protocol::TCP))?;
+        let conf = socket2::TcpKeepalive::new().with_time(KEEPALIVE_TIME);
+        socket.set_tcp_keepalive(&conf)?;
 
         let address: SockAddr = address.clone().into();
         if connect_timeout == Duration::from_secs(0) {
@@ -103,7 +102,7 @@ impl AsyncTcpStream {
             socket.connect_timeout(&address, connect_timeout)?;
         }
 
-        let stream: TcpStream = socket.into_tcp_stream().into();
+        let stream: TcpStream = std::net::TcpStream::from(socket).into();
         stream.set_nodelay(true)?;
 
         Ok(stream.into())
