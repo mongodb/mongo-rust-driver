@@ -16,32 +16,15 @@ use crate::{
 pub(crate) struct Command {
     pub(crate) name: String,
     pub(crate) target_db: String,
-    pub(crate) read_pref: Option<ReadPreference>,
     pub(crate) body: Document,
 }
 
 impl Command {
-    /// Constructs a read command.
-    pub(crate) fn new_read(
-        name: String,
-        target_db: String,
-        read_pref: Option<ReadPreference>,
-        body: Document,
-    ) -> Self {
-        Self {
-            name,
-            target_db,
-            read_pref,
-            body,
-        }
-    }
-
     /// Constructs a new command.
     pub(crate) fn new(name: String, target_db: String, body: Document) -> Self {
         Self {
             name,
             target_db,
-            read_pref: None,
             body,
         }
     }
@@ -77,6 +60,11 @@ impl Command {
         if let Some(deprecation_errors) = server_api.deprecation_errors {
             self.body.insert("apiDeprecationErrors", deprecation_errors);
         }
+    }
+
+    pub(crate) fn set_read_preference(&mut self, read_preference: ReadPreference) {
+        self.body
+            .insert("$readPreference", read_preference.into_document());
     }
 }
 

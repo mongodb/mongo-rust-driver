@@ -188,10 +188,9 @@ impl Handshaker {
 
         body.insert("client", metadata);
 
-        let mut command = Command::new_read(
+        let mut command = Command::new(
             "isMaster".to_string(),
             db.unwrap_or_else(|| "admin".to_string()),
-            None,
             body,
         );
 

@@ -10,9 +10,8 @@ use test_file::{Result, TestFile};
 
 use crate::{
     bson::{doc, Document},
-    concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::ErrorKind,
-    options::{ClientOptions, CollectionOptions, FindOptions, InsertManyOptions},
+    options::{ClientOptions, FindOptions, InsertManyOptions},
     test::{
         assert_matches,
         run_spec_test,
@@ -57,15 +56,7 @@ async fn run_spec_tests() {
             let db_name = get_db_name(&test_case.description);
             let coll_name = "coll";
 
-            let write_concern = WriteConcern::builder().w(Acknowledgment::Majority).build();
-            let read_concern = ReadConcern::majority();
-            let options = CollectionOptions::builder()
-                .write_concern(write_concern)
-                .read_concern(read_concern)
-                .build();
-            let coll = client
-                .init_db_and_coll_with_options(&db_name, &coll_name, options.clone())
-                .await;
+            let coll = client.init_db_and_coll(&db_name, &coll_name).await;
 
             if !test_file.data.is_empty() {
                 coll.insert_many(test_file.data.clone(), None)
@@ -147,7 +138,7 @@ async fn run_spec_tests() {
                 None => coll_name.to_string(),
             };
 
-            let coll = client.get_coll_with_options(&db_name, &coll_name, options);
+            let coll = client.get_coll(&db_name, &coll_name);
             let options = FindOptions::builder().sort(doc! { "_id": 1 }).build();
             let actual_data: Vec<Document> = coll
                 .find(None, options)

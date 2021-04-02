@@ -30,12 +30,6 @@ impl Message {
     pub(crate) fn with_command(mut command: Command, request_id: Option<i32>) -> Self {
         command.body.insert("$db", command.target_db);
 
-        if let Some(read_pref) = command.read_pref {
-            command
-                .body
-                .insert("$readPreference", read_pref.into_document());
-        };
-
         Self {
             response_to: 0,
             flags: MessageFlags::empty(),

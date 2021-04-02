@@ -48,12 +48,8 @@ async fn acquire_connection_and_send_command() {
     let read_pref = ReadPreference::PrimaryPreferred {
         options: Default::default(),
     };
-    let mut cmd = Command::new_read(
-        "listDatabases".to_string(),
-        "admin".to_string(),
-        Some(read_pref),
-        body,
-    );
+    let mut cmd = Command::new("listDatabases".to_string(), "admin".to_string(), body);
+    cmd.set_read_preference(read_pref);
     if let Some(server_api) = client_options.server_api.as_ref() {
         cmd.set_server_api(server_api);
     }
