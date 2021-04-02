@@ -23,7 +23,6 @@ async fn build() {
         }
     );
     assert_eq!(list_databases_command.target_db, "admin");
-    assert_eq!(list_databases_command.read_pref, None);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -44,7 +43,6 @@ async fn build_with_name_only() {
         }
     );
     assert_eq!(list_databases_command.target_db, "admin");
-    assert_eq!(list_databases_command.read_pref, None);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -65,7 +63,6 @@ async fn build_with_filter() {
         }
     );
     assert_eq!(list_databases_command.target_db, "admin");
-    assert_eq!(list_databases_command.read_pref, None);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -88,7 +85,6 @@ async fn build_with_options() {
         }
     );
     assert_eq!(list_databases_command.target_db, "admin");
-    assert_eq!(list_databases_command.read_pref, None);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

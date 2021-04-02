@@ -28,7 +28,6 @@ async fn build() {
         }
     );
     assert_eq!(count_command.target_db, "test_db");
-    assert_eq!(count_command.read_pref, None);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -58,7 +57,6 @@ async fn build_with_options() {
         }
     );
     assert_eq!(count_command.target_db, "test_db");
-    assert_eq!(count_command.read_pref, None);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

@@ -195,18 +195,17 @@ impl TopologyDescription {
                     Some(other) => other,
                 };
 
-                command.read_pref = Some(resolved_read_pref);
+                command.set_read_preference(resolved_read_pref);
             }
             _ => {
-                command.read_pref = match criteria {
-                    Some(SelectionCriteria::ReadPreference(rp)) => Some(rp.clone()),
-                    Some(SelectionCriteria::Predicate(_)) => {
-                        Some(ReadPreference::PrimaryPreferred {
-                            options: Default::default(),
-                        })
-                    }
-                    None => Some(ReadPreference::Primary),
-                }
+                let read_pref = match criteria {
+                    Some(SelectionCriteria::ReadPreference(rp)) => rp.clone(),
+                    Some(SelectionCriteria::Predicate(_)) => ReadPreference::PrimaryPreferred {
+                        options: Default::default(),
+                    },
+                    None => ReadPreference::Primary,
+                };
+                command.set_read_preference(read_pref);
             }
         }
     }
@@ -218,26 +217,26 @@ impl TopologyDescription {
     ) {
         match criteria {
             Some(SelectionCriteria::ReadPreference(ReadPreference::Secondary { ref options })) => {
-                command.read_pref = Some(ReadPreference::Secondary {
+                command.set_read_preference(ReadPreference::Secondary {
                     options: options.clone(),
                 });
             }
             Some(SelectionCriteria::ReadPreference(ReadPreference::PrimaryPreferred {
                 ref options,
             })) => {
-                command.read_pref = Some(ReadPreference::PrimaryPreferred {
+                command.set_read_preference(ReadPreference::PrimaryPreferred {
                     options: options.clone(),
                 });
             }
             Some(SelectionCriteria::ReadPreference(ReadPreference::SecondaryPreferred {
                 ref options,
             })) if options.max_staleness.is_some() || options.tag_sets.is_some() => {
-                command.read_pref = Some(ReadPreference::SecondaryPreferred {
+                command.set_read_preference(ReadPreference::SecondaryPreferred {
                     options: options.clone(),
                 });
             }
             Some(SelectionCriteria::ReadPreference(ReadPreference::Nearest { ref options })) => {
-                command.read_pref = Some(ReadPreference::Nearest {
+                command.set_read_preference(ReadPreference::Nearest {
                     options: options.clone(),
                 });
             }

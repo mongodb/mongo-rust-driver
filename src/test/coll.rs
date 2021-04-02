@@ -12,12 +12,14 @@ use crate::{
     options::{
         Acknowledgment,
         AggregateOptions,
+        CollectionOptions,
         DeleteOptions,
         FindOneAndDeleteOptions,
         FindOneOptions,
         FindOptions,
         Hint,
         InsertManyOptions,
+        ReadConcern,
         ReadPreference,
         SelectionCriteria,
         UpdateOptions,
@@ -958,4 +960,39 @@ async fn count_documents_with_wc() {
     coll.count_documents(doc! {}, None)
         .await
         .expect("count_documents should succeed");
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn collection_options_inherited() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
+    let client = EventClient::new().await;
+
+    let read_concern = ReadConcern::majority();
+    let selection_criteria = SelectionCriteria::ReadPreference(ReadPreference::Secondary {
+        options: Default::default(),
+    });
+
+    let options = CollectionOptions::builder()
+        .read_concern(read_concern)
+        .selection_criteria(selection_criteria)
+        .build();
+    let coll = client
+        .database(function_name!())
+        .collection_with_options(function_name!(), options);
+
+    coll.find(None, None).await.unwrap();
+    assert_options_inherited(&client, "find").await;
+
+    coll.count_documents(None, None).await.unwrap();
+    assert_options_inherited(&client, "aggregate").await;
+}
+
+async fn assert_options_inherited(client: &EventClient, command_name: &str) {
+    let events = client.get_command_started_events(&[command_name]);
+    let event = events.iter().last().unwrap();
+    assert!(event.command.contains_key("readConcern"));
+    assert_eq!(event.command.contains_key("$readPreference"), !client.is_standalone());
 }

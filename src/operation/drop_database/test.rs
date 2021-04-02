@@ -25,7 +25,6 @@ async fn build() {
 
     assert_eq!(cmd.name.as_str(), "dropDatabase");
     assert_eq!(cmd.target_db.as_str(), "test_db");
-    assert_eq!(cmd.read_pref.as_ref(), None);
     assert_eq!(
         cmd.body,
         doc! {
@@ -41,7 +40,6 @@ async fn build() {
     let cmd = op.build(&description).expect("build should succeed");
     assert_eq!(cmd.name.as_str(), "dropDatabase");
     assert_eq!(cmd.target_db.as_str(), "test_db");
-    assert_eq!(cmd.read_pref.as_ref(), None);
     assert_eq!(
         cmd.body,
         doc! {
