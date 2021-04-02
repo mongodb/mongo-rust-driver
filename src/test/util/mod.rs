@@ -103,7 +103,7 @@ impl TestClient {
         let server_parameters = client
             .execute_operation(get_parameters, &mut session)
             .await
-            .unwrap();
+            .unwrap_or_default();
 
         Self {
             client,
