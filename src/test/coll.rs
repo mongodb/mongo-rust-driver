@@ -994,5 +994,8 @@ async fn assert_options_inherited(client: &EventClient, command_name: &str) {
     let events = client.get_command_started_events(&[command_name]);
     let event = events.iter().last().unwrap();
     assert!(event.command.contains_key("readConcern"));
-    assert_eq!(event.command.contains_key("$readPreference"), !client.is_standalone());
+    assert_eq!(
+        event.command.contains_key("$readPreference"),
+        !client.is_standalone()
+    );
 }

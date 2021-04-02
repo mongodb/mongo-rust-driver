@@ -276,8 +276,8 @@ where
     ) -> Result<i64> {
         let mut options = options.into();
         resolve_options!(self, options, [read_concern, selection_criteria]);
-        let filter = filter.into();
-        let op = CountDocuments::new(self.namespace(), filter, options);
+
+        let op = CountDocuments::new(self.namespace(), filter.into(), options);
         self.client().execute_operation(op, session).await
     }
 
@@ -466,6 +466,7 @@ where
     ) -> Result<Option<T>> {
         let mut options = options.into();
         resolve_options!(self, options, [read_concern, selection_criteria]);
+
         let options: FindOptions = options.map(Into::into).unwrap_or_else(Default::default);
         let mut cursor = self.find(filter, Some(options)).await?;
         cursor.next().await.transpose()
@@ -479,10 +480,10 @@ where
         options: impl Into<Option<FindOneOptions>>,
         session: &mut ClientSession,
     ) -> Result<Option<T>> {
-        let options: FindOptions = options
-            .into()
-            .map(Into::into)
-            .unwrap_or_else(Default::default);
+        let mut options = options.into();
+        resolve_options!(self, options, [read_concern, selection_criteria]);
+
+        let options: FindOptions = options.map(Into::into).unwrap_or_else(Default::default);
         let mut cursor = self
             .find_with_session(filter, Some(options), session)
             .await?;

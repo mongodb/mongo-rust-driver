@@ -234,8 +234,6 @@ impl Client {
             cmd.set_server_api(server_api);
         }
 
-        // cmd.set_read_preference();
-
         self.emit_command_event(|handler| {
             let should_redact = REDACTED_COMMANDS.contains(cmd.name.to_lowercase().as_str());
 
