@@ -103,18 +103,6 @@ impl Deref for ClientEntity {
 }
 
 impl Entity {
-    // pub fn from_client(
-    //     client: Client,
-    //     observe_events: Option<Vec<String>>,
-    //     ignore_command_names: Option<Vec<String>>,
-    // ) -> Self {
-    //     Self::Client(ClientEntity {
-    //         client,
-    //         observe_events,
-    //         ignore_command_names,
-    //     })
-    // }
-
     pub fn as_client(&self) -> &ClientEntity {
         match self {
             Self::Client(client) => client,
