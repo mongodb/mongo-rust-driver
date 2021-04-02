@@ -62,7 +62,7 @@ impl TestRunner {
                     let server_api = client.server_api.clone().or_else(|| SERVER_API.clone());
                     let observer = Arc::new(EventHandler::new());
 
-                    let mut options = ClientOptions::parse(&client.uri).await.unwrap();
+                    let mut options = ClientOptions::parse_uri(&client.uri, None).await.unwrap();
                     options.command_event_handler = Some(observer.clone());
                     options.server_api = server_api;
                     match client.use_multiple_mongoses {
