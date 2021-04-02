@@ -94,7 +94,7 @@ impl RunOnRequirement {
         }
         if let Some(ref actual_server_parameters) = self.server_parameters {
             if !results_match(
-                Some(client.server_parameters.as_ref().unwrap()),
+                Some(&Bson::Document(client.server_parameters.clone())),
                 &Bson::Document(actual_server_parameters.clone()),
                 false,
                 None,

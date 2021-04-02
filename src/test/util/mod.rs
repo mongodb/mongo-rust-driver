@@ -16,6 +16,7 @@ use crate::{
     bson::{doc, oid::ObjectId, Bson},
     selection_criteria::SelectionCriteria,
 };
+use bson::Document;
 use semver::{Version, VersionReq};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -35,7 +36,7 @@ pub struct TestClient {
     pub options: ClientOptions,
     pub server_info: IsMasterCommandResponse,
     pub server_version: Version,
-    pub server_parameters: Option<Bson>,
+    pub server_parameters: Document,
 }
 
 impl std::ops::Deref for TestClient {
@@ -86,8 +87,6 @@ impl TestClient {
         ))
         .unwrap();
 
-        let mut server_parameters = None;
-
         let build_info = RunCommand::new("test".into(), doc! { "buildInfo":  1 }, None).unwrap();
 
         let response = client
@@ -101,14 +100,10 @@ impl TestClient {
 
         let get_parameters =
             RunCommand::new("admin".into(), doc! { "getParameter": "*" }, None).unwrap();
-
-        // The command above may fail due to insufficient permissions. In that case, the unified
-        // test runner will skip any tests with a serverParameters runOnRequirement as the check
-        // will fail.
-        if let Ok(response) = client.execute_operation(get_parameters, &mut session).await {
-            println!("sufficient permissions");
-            server_parameters = Some(Bson::Document(response));
-        }
+        let server_parameters = client
+            .execute_operation(get_parameters, &mut session)
+            .await
+            .unwrap();
 
         Self {
             client,
