@@ -83,10 +83,10 @@ async fn concurrent_connections() {
     options.direct_connection = Some(true);
     options.hosts.drain(1..);
 
-    let client = TestClient::with_options(Some(options), true).await;
+    let client = TestClient::with_options(Some(options)).await;
     let version = VersionReq::parse(">= 4.2.9").unwrap();
     // blockConnection failpoint option only supported in 4.2.9+.
-    if !version.matches(&client.server_version.as_ref().unwrap()) {
+    if !version.matches(&client.server_version) {
         println!(
             "skipping concurrent_connections test due to server not supporting failpoint option"
         );
@@ -170,7 +170,7 @@ async fn connection_error_during_establishment() {
     client_options.direct_connection = Some(true);
     client_options.repl_set_name = None;
 
-    let client = TestClient::with_options(Some(client_options.clone()), true).await;
+    let client = TestClient::with_options(Some(client_options.clone())).await;
     if !client.supports_fail_command().await {
         println!(
             "skipping {} due to failCommand not being supported",
@@ -221,7 +221,7 @@ async fn connection_error_during_operation() {
     options.hosts.drain(1..);
     options.max_pool_size = Some(1);
 
-    let client = TestClient::with_options(options.into(), true).await;
+    let client = TestClient::with_options(options.into()).await;
     if !client.supports_fail_command().await {
         println!(
             "skipping {} due to failCommand not being supported",

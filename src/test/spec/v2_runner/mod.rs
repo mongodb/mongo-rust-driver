@@ -85,7 +85,7 @@ pub async fn run_v2_test(test_file: TestFile) {
         let req = VersionReq::parse(">=4.7").unwrap();
         if !(db_name.as_str() == "admin"
             && client.is_sharded()
-            && req.matches(client.server_version.as_ref().unwrap()))
+            && req.matches(&client.server_version))
         {
             coll.drop(options).await.unwrap();
         }
@@ -118,7 +118,6 @@ pub async fn run_v2_test(test_file: TestFile) {
             None,
             test.use_multiple_mongoses,
             None,
-            false,
         )
         .await;
 

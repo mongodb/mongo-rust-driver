@@ -1,6 +1,12 @@
-use std::ops::Deref;
+use std::{ops::Deref, sync::Arc};
 
-use crate::{bson::Bson, test::util::EventClient, Collection, Database};
+use crate::{
+    bson::Bson,
+    test::{CommandEvent, EventHandler},
+    Client,
+    Collection,
+    Database,
+};
 
 #[derive(Clone, Debug)]
 pub enum Entity {
@@ -13,9 +19,61 @@ pub enum Entity {
 
 #[derive(Clone, Debug)]
 pub struct ClientEntity {
-    client: EventClient,
+    client: Client,
+    observer: Arc<EventHandler>,
     pub observe_events: Option<Vec<String>>,
     pub ignore_command_names: Option<Vec<String>>,
+}
+
+impl ClientEntity {
+    pub fn new(
+        client: Client,
+        observer: Arc<EventHandler>,
+        observe_events: Option<Vec<String>>,
+        ignore_command_names: Option<Vec<String>>,
+    ) -> Self {
+        Self {
+            client,
+            observer,
+            observe_events,
+            ignore_command_names,
+        }
+    }
+
+    /// Gets a list of all of the events of the requested event types that occurred on this client.
+    /// Ignores any event with a name in the ignore list. Also ignores all configureFailPoint
+    /// events.
+    pub fn get_filtered_events(
+        &self,
+        observe_events: &Option<Vec<String>>,
+        ignore_command_names: &Option<Vec<String>>,
+    ) -> Vec<CommandEvent> {
+        self.observer.get_filtered_command_events(|event| {
+            if event.command_name() == "configureFailPoint" {
+                return false;
+            }
+            if let Some(observe_events) = observe_events {
+                if !observe_events.iter().any(|name| match event {
+                    CommandEvent::CommandStartedEvent(_) => name.as_str() == "commandStartedEvent",
+                    CommandEvent::CommandSucceededEvent(_) => {
+                        name.as_str() == "commandSucceededEvent"
+                    }
+                    CommandEvent::CommandFailedEvent(_) => name.as_str() == "commandFailedEvent",
+                }) {
+                    return false;
+                }
+            }
+            if let Some(ignore_command_names) = ignore_command_names {
+                if ignore_command_names
+                    .iter()
+                    .any(|name| event.command_name() == name)
+                {
+                    return false;
+                }
+            }
+            true
+        })
+    }
 }
 
 impl From<Database> for Entity {
@@ -37,7 +95,7 @@ impl From<Bson> for Entity {
 }
 
 impl Deref for ClientEntity {
-    type Target = EventClient;
+    type Target = Client;
 
     fn deref(&self) -> &Self::Target {
         &self.client
@@ -45,17 +103,17 @@ impl Deref for ClientEntity {
 }
 
 impl Entity {
-    pub fn from_client(
-        client: EventClient,
-        observe_events: Option<Vec<String>>,
-        ignore_command_names: Option<Vec<String>>,
-    ) -> Self {
-        Self::Client(ClientEntity {
-            client,
-            observe_events,
-            ignore_command_names,
-        })
-    }
+    // pub fn from_client(
+    //     client: Client,
+    //     observe_events: Option<Vec<String>>,
+    //     ignore_command_names: Option<Vec<String>>,
+    // ) -> Self {
+    //     Self::Client(ClientEntity {
+    //         client,
+    //         observe_events,
+    //         ignore_command_names,
+    //     })
+    // }
 
     pub fn as_client(&self) -> &ClientEntity {
         match self {
