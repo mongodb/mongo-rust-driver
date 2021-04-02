@@ -986,6 +986,9 @@ async fn collection_options_inherited() {
     coll.find(None, None).await.unwrap();
     assert_options_inherited(&client, "find").await;
 
+    coll.find_one(None, None).await.unwrap();
+    assert_options_inherited(&client, "find").await;
+
     coll.count_documents(None, None).await.unwrap();
     assert_options_inherited(&client, "aggregate").await;
 }
