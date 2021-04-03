@@ -1229,6 +1229,12 @@ axes:
         variables:
           PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
           VENV_BIN_DIR: "bin"
+      - id: ubuntu-18.04-arm64
+        display_name: "ARM64 Ubuntu 18.04"
+        run_on: ubuntu-1804-arm64-small
+        variables:
+          PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
+          VENV_BIN_DIR: "bin"
       - id: macos-10.14
         display_name: "MacOS 10.14"
         run_on: macos-1014
@@ -1249,6 +1255,7 @@ buildvariants:
   matrix_spec:
     os:
       - ubuntu-16.04
+      - ubuntu-18.04-arm64
       - macos-10.14
       - windows-64-vs2017-small
     auth-and-tls: "*"
