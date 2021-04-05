@@ -125,10 +125,13 @@ impl Client {
                     .topology
                     .handle_application_error(
                         err.clone(),
-                        HandshakePhase::after_completion(conn),
+                        HandshakePhase::after_completion(&conn),
                         &server,
                     )
                     .await;
+                // release the connection to be processed by the connection pool
+                drop(conn);
+                // release the selected server to decrement its operation count
                 drop(server);
 
                 // TODO RUST-90: Do not retry read if session is in a transaction
@@ -173,7 +176,7 @@ impl Client {
                     .topology
                     .handle_application_error(
                         err.clone(),
-                        HandshakePhase::after_completion(conn),
+                        HandshakePhase::after_completion(&conn),
                         &server,
                     )
                     .await;

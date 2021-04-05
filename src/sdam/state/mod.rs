@@ -563,7 +563,7 @@ pub(crate) enum HandshakePhase {
 }
 
 impl HandshakePhase {
-    pub(crate) fn after_completion(handshaked_connection: Connection) -> Self {
+    pub(crate) fn after_completion(handshaked_connection: &Connection) -> Self {
         Self::AfterCompletion {
             generation: handshaked_connection.generation,
             // given that this is a handshaked connection, the stream description should
