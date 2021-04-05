@@ -1369,6 +1369,12 @@ async fn delete_examples(collection: &Collection) -> Result<()> {
 #[allow(unused_variables)]
 #[cfg(not(feature = "sync"))]
 async fn versioned_api_examples() -> Result<()> {
+    let setup_client = TestClient::new().await;
+    if setup_client.server_version_lt(4, 9) {
+        println!("skipping versioned API examples due to unsupported server version");
+        return Ok(());
+    }
+
     let uri = DEFAULT_URI.clone();
     // Start 1. Declare an API version on a client
     let mut options = ClientOptions::parse(&uri).await?;
