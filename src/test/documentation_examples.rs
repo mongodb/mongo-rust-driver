@@ -1380,7 +1380,7 @@ async fn versioned_api_examples() -> Result<()> {
     options.server_api = Some(server_api);
     let client = Client::with_options(options)?;
     let cursor = client
-        .database("versined_api_example")
+        .database("versioned_api_example")
         .collection("example")
         .find(None, None)
         .await?;
