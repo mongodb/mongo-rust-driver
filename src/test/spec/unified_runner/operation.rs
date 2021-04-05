@@ -810,11 +810,10 @@ pub(super) struct FailPointCommand {
 impl TestOperation for FailPointCommand {
     async fn execute_test_runner_operation(&self, test_runner: &mut TestRunner) {
         let client = test_runner.get_client(&self.client);
-        let guard = client
-            .enable_failpoint(
-                self.fail_point.clone(),
-                Some(ReadPreference::Primary.into()),
-            )
+        let guard = self
+            .fail_point
+            .clone()
+            .enable(client, Some(ReadPreference::Primary.into()))
             .await
             .unwrap();
         test_runner.fail_point_guards.push(guard);

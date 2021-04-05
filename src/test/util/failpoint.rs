@@ -3,11 +3,11 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::time::Duration;
 use typed_builder::TypedBuilder;
 
-use super::TestClient;
 use crate::{
     error::Result,
     operation::append_options,
     selection_criteria::SelectionCriteria,
+    Client,
     RUNTIME,
 };
 
@@ -45,7 +45,7 @@ impl FailPoint {
 
     pub async fn enable(
         self,
-        client: &TestClient,
+        client: &Client,
         criteria: impl Into<Option<SelectionCriteria>>,
     ) -> Result<FailPointGuard> {
         let criteria = criteria.into();
@@ -62,7 +62,7 @@ impl FailPoint {
 }
 
 pub struct FailPointGuard {
-    client: TestClient,
+    client: Client,
     failpoint_name: String,
     criteria: Option<SelectionCriteria>,
 }

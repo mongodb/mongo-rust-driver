@@ -1,13 +1,11 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
+    client::options::ClientOptions,
     concern::{Acknowledgment, WriteConcern},
     options::CollectionOptions,
-    test::{
-        util::{EventClient, FailPointGuard},
-        TestClient,
-        SERVER_API,
-    },
+    test::{util::FailPointGuard, EventHandler, TestClient, SERVER_API},
+    Client,
     Collection,
     Database,
 };
@@ -62,16 +60,32 @@ impl TestRunner {
                     let observe_events = client.observe_events.clone();
                     let ignore_command_names = client.ignore_command_monitoring_events.clone();
                     let server_api = client.server_api.clone().or_else(|| SERVER_API.clone());
-                    let client = EventClient::with_uri_and_mongos_options(
-                        &client.uri,
-                        client.use_multiple_mongoses,
-                        server_api,
-                        false,
-                    )
-                    .await;
+                    let observer = Arc::new(EventHandler::new());
+
+                    let mut options = ClientOptions::parse_uri(&client.uri, None).await.unwrap();
+                    options.command_event_handler = Some(observer.clone());
+                    options.server_api = server_api;
+                    match client.use_multiple_mongoses {
+                        Some(true) => {
+                            if options.hosts.len() <= 1 {
+                                panic!("Test requires multiple mongos hosts");
+                            }
+                        }
+                        Some(false) => {
+                            options.hosts.drain(1..);
+                        }
+                        None => {}
+                    }
+                    let client = Client::with_options(options).unwrap();
+
                     (
                         id,
-                        Entity::from_client(client, observe_events, ignore_command_names),
+                        Entity::Client(ClientEntity::new(
+                            client,
+                            observer,
+                            observe_events,
+                            ignore_command_names,
+                        )),
                     )
                 }
                 TestFileEntity::Database(database) => {

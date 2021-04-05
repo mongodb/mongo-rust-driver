@@ -12,7 +12,6 @@ use tokio::sync::{
 use super::TestClient;
 use crate::{
     bson::doc,
-    client::options::ServerApi,
     event::{
         cmap::{CmapEventHandler, PoolClearedEvent, PoolReadyEvent},
         command::{
@@ -124,6 +123,14 @@ impl EventHandler {
             })
             .collect()
     }
+
+    pub fn get_filtered_command_events<F>(&self, filter: F) -> Vec<CommandEvent>
+    where
+        F: Fn(&CommandEvent) -> bool,
+    {
+        let events = self.command_events.read().unwrap();
+        events.iter().filter(|e| filter(*e)).cloned().collect()
+    }
 }
 
 impl CmapEventHandler for EventHandler {
@@ -217,17 +224,15 @@ impl std::ops::DerefMut for EventClient {
 
 impl EventClient {
     pub async fn new() -> Self {
-        EventClient::with_options(None, true).await
+        EventClient::with_options(None).await
     }
 
     async fn with_options_and_handler(
         options: impl Into<Option<ClientOptions>>,
         handler: impl Into<Option<EventHandler>>,
-        collect_server_info: bool,
     ) -> Self {
         let handler = handler.into().unwrap_or_else(EventHandler::new);
-        let client =
-            TestClient::with_handler(Some(handler.clone()), options, collect_server_info).await;
+        let client = TestClient::with_handler(Some(handler.clone()), options).await;
 
         // clear events from commands used to set up client.
         handler.command_events.write().unwrap().clear();
@@ -235,11 +240,8 @@ impl EventClient {
         Self { client, handler }
     }
 
-    pub async fn with_options(
-        options: impl Into<Option<ClientOptions>>,
-        collect_server_info: bool,
-    ) -> Self {
-        Self::with_options_and_handler(options, None, collect_server_info).await
+    pub async fn with_options(options: impl Into<Option<ClientOptions>>) -> Self {
+        Self::with_options_and_handler(options, None).await
     }
 
     pub async fn with_additional_options(
@@ -247,7 +249,6 @@ impl EventClient {
         heartbeat_freq: Option<Duration>,
         use_multiple_mongoses: Option<bool>,
         event_handler: impl Into<Option<EventHandler>>,
-        collect_server_info: bool,
     ) -> Self {
         let mut options = match options.into() {
             Some(mut options) => {
@@ -260,30 +261,7 @@ impl EventClient {
         if TestClient::new().await.is_sharded() && use_multiple_mongoses != Some(true) {
             options.hosts = options.hosts.iter().cloned().take(1).collect();
         }
-        EventClient::with_options_and_handler(options, event_handler, collect_server_info).await
-    }
-
-    pub(crate) async fn with_uri_and_mongos_options(
-        uri: &str,
-        use_multiple_mongoses: Option<bool>,
-        server_api: Option<ServerApi>,
-        collect_server_info: bool,
-    ) -> Self {
-        let mut options = ClientOptions::parse_uri(uri, None).await.unwrap();
-        options.server_api = server_api;
-
-        match use_multiple_mongoses {
-            Some(true) => {
-                if options.hosts.len() <= 1 {
-                    panic!("Test requires multiple mongos hosts");
-                }
-            }
-            Some(false) => {
-                options.hosts = options.hosts.iter().cloned().take(1).collect();
-            }
-            None => {}
-        }
-        EventClient::with_options(options, collect_server_info).await
+        EventClient::with_options_and_handler(options, event_handler).await
     }
 
     /// Gets the first started/succeeded pair of events for the given command name, popping off all
@@ -343,50 +321,6 @@ impl EventClient {
                     Some(event.clone())
                 }
                 _ => None,
-            })
-            .collect()
-    }
-
-    /// Gets a list of all of the events of the requested event types that occurred on this client.
-    /// Ignores any event with a name in the ignore list. Also ignores all configureFailPoint
-    /// events.
-    pub fn get_filtered_events(
-        &self,
-        observe_events: &Option<Vec<String>>,
-        ignore_command_names: &Option<Vec<String>>,
-    ) -> Vec<CommandEvent> {
-        let events = self.handler.command_events.read().unwrap();
-        events
-            .iter()
-            .cloned()
-            .filter(|event| {
-                if event.command_name() == "configureFailPoint" {
-                    return false;
-                }
-                if let Some(observe_events) = observe_events {
-                    if !observe_events.iter().any(|name| match event {
-                        CommandEvent::CommandStartedEvent(_) => {
-                            name.as_str() == "commandStartedEvent"
-                        }
-                        CommandEvent::CommandSucceededEvent(_) => {
-                            name.as_str() == "commandSucceededEvent"
-                        }
-                        CommandEvent::CommandFailedEvent(_) => {
-                            name.as_str() == "commandFailedEvent"
-                        }
-                    }) {
-                        return false;
-                    }
-                }
-                if let Some(ignore_command_names) = ignore_command_names {
-                    if ignore_command_names
-                        .iter()
-                        .any(|name| event.command_name() == name)
-                    {
-                        return false;
-                    }
-                }
-                true
             })
             .collect()
     }

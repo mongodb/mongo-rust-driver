@@ -41,7 +41,6 @@ async fn run_spec_tests() {
                 Some(Duration::from_millis(50)),
                 test_case.use_multiple_mongoses,
                 None,
-                true,
             )
             .await;
 
@@ -200,7 +199,7 @@ async fn transaction_ids_excluded() {
     assert!(excludes_txn_number("aggregate"));
 
     let req = semver::VersionReq::parse(">=4.2").unwrap();
-    if req.matches(&client.server_version.as_ref().unwrap()) {
+    if req.matches(&client.server_version) {
         coll.aggregate(
             vec![
                 doc! { "$match": doc! { "x": 1 } },
@@ -284,7 +283,7 @@ async fn mmapv1_error_raised() {
     let client = TestClient::new().await;
 
     let req = semver::VersionReq::parse("<=4.0").unwrap();
-    if !req.matches(&client.server_version.as_ref().unwrap()) || !client.is_replica_set() {
+    if !req.matches(&client.server_version) || !client.is_replica_set() {
         return;
     }
 
@@ -334,13 +333,13 @@ async fn label_not_added_second_read_error() {
 #[function_name::named]
 async fn label_not_added(retry_reads: bool) {
     let options = ClientOptions::builder().retry_reads(retry_reads).build();
-    let client = TestClient::with_additional_options(Some(options), false, true).await;
+    let client = TestClient::with_additional_options(Some(options), false).await;
 
     // Configuring a failpoint is only supported on 4.0+ replica sets and 4.1.5+ sharded clusters.
     let req = VersionReq::parse(">=4.0").unwrap();
     let sharded_req = VersionReq::parse(">=4.1.5").unwrap();
-    if client.is_sharded() && !sharded_req.matches(&client.server_version.as_ref().unwrap())
-        || !req.matches(&client.server_version.as_ref().unwrap())
+    if client.is_sharded() && !sharded_req.matches(&client.server_version)
+        || !req.matches(&client.server_version)
     {
         return;
     }

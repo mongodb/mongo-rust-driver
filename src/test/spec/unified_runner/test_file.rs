@@ -77,13 +77,13 @@ impl RunOnRequirement {
     pub async fn can_run_on(&self, client: &TestClient) -> bool {
         if let Some(ref min_version) = self.min_server_version {
             let req = VersionReq::parse(&format!(">= {}", &min_version)).unwrap();
-            if !req.matches(&client.server_version.as_ref().unwrap()) {
+            if !req.matches(&client.server_version) {
                 return false;
             }
         }
         if let Some(ref max_version) = self.max_server_version {
             let req = VersionReq::parse(&format!("<= {}", &max_version)).unwrap();
-            if !req.matches(&client.server_version.as_ref().unwrap()) {
+            if !req.matches(&client.server_version) {
                 return false;
             }
         }
@@ -94,7 +94,7 @@ impl RunOnRequirement {
         }
         if let Some(ref actual_server_parameters) = self.server_parameters {
             if !results_match(
-                Some(client.server_parameters.as_ref().unwrap()),
+                Some(&Bson::Document(client.server_parameters.clone())),
                 &Bson::Document(actual_server_parameters.clone()),
                 false,
                 None,

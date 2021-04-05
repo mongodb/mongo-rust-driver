@@ -34,7 +34,7 @@ async fn min_heartbeat_frequency() {
     setup_client_options.hosts.drain(1..);
     setup_client_options.direct_connection = Some(true);
 
-    let setup_client = TestClient::with_options(Some(setup_client_options.clone()), true).await;
+    let setup_client = TestClient::with_options(Some(setup_client_options.clone())).await;
 
     if !setup_client.supports_fail_command().await {
         println!("skipping min_heartbeat_frequency test due to server not supporting fail points");
@@ -102,13 +102,12 @@ async fn sdam_pool_management() {
         Some(Duration::from_millis(50)),
         None,
         event_handler.clone(),
-        true,
     )
     .await;
 
     if !VersionReq::parse(">= 4.2.9")
         .unwrap()
-        .matches(client.server_version.as_ref().unwrap())
+        .matches(&client.server_version)
     {
         println!(
             "skipping sdam_pool_management test due to server not supporting appName failCommand"
@@ -160,11 +159,11 @@ async fn sdam_min_pool_size_error() {
     setup_client_options.hosts.drain(1..);
     setup_client_options.direct_connection = Some(true);
 
-    let setup_client = TestClient::with_options(Some(setup_client_options.clone()), true).await;
+    let setup_client = TestClient::with_options(Some(setup_client_options.clone())).await;
 
     if !VersionReq::parse(">= 4.9.0")
         .unwrap()
-        .matches(setup_client.server_version.as_ref().unwrap())
+        .matches(&setup_client.server_version)
     {
         println!(
             "skipping sdam_pool_management test due to server not supporting appName failCommand"
@@ -243,10 +242,10 @@ async fn auth_error() {
 
     let mut setup_client_options = CLIENT_OPTIONS.clone();
     setup_client_options.hosts.drain(1..);
-    let setup_client = TestClient::with_options(Some(setup_client_options.clone()), true).await;
+    let setup_client = TestClient::with_options(Some(setup_client_options.clone())).await;
     if !VersionReq::parse(">= 4.4.0")
         .unwrap()
-        .matches(setup_client.server_version.as_ref().unwrap())
+        .matches(&setup_client.server_version)
     {
         println!("skipping auth_error test due to server not supporting appName failCommand");
         return;
