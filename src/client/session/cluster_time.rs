@@ -18,11 +18,8 @@ pub struct ClusterTime {
 }
 
 impl std::cmp::Ord for ClusterTime {
-    // TODO: RUST-390 use Timestamp's Ord impl.
     fn cmp(&self, other: &ClusterTime) -> std::cmp::Ordering {
-        let lhs = (self.cluster_time.time, self.cluster_time.increment);
-        let rhs = (other.cluster_time.time, other.cluster_time.increment);
-        lhs.cmp(&rhs)
+        self.cluster_time.cmp(&other.cluster_time)
     }
 }
 
