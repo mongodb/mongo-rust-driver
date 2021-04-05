@@ -4,10 +4,8 @@ use tokio::sync::RwLockReadGuard;
 use crate::{
     bson::{doc, Bson},
     error::Result,
-    options::{ClientOptions, CursorType},
-    options::{FindOptions, ServerApi, ServerApiVersion},
-    test::DEFAULT_URI,
-    test::{TestClient, LOCK},
+    options::{ClientOptions, CursorType, FindOptions, ServerApi, ServerApiVersion},
+    test::{TestClient, DEFAULT_URI, LOCK},
     Client,
     Collection,
 };
