@@ -1404,7 +1404,7 @@ async fn versioned_api_examples() -> Result<()> {
         .find(None, find_options)
         .await
         .expect_err("should fail");
-    // End 3.
+    // End 2.
 
     // Start 3. deprecationErrors option
     let mut options = ClientOptions::parse(&uri).await?;
