@@ -77,7 +77,7 @@ async fn run_spec_tests() {
                     &test_case.operation,
                     &db_name,
                     &coll_name,
-                    Some(options.clone()),
+                    None,
                 )
                 .await;
 
