@@ -5,6 +5,7 @@ mod client;
 mod coll;
 mod cursor;
 mod db;
+#[cfg(not(feature = "sync"))]
 mod documentation_examples;
 mod spec;
 mod util;

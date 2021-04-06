@@ -248,19 +248,22 @@ impl<'de> Deserialize<'de> for ServerApiVersion {
     }
 }
 
-/// Declares a versioned server API
+/// Options used to declare a versioned server API.
 #[derive(Clone, Debug, Deserialize, PartialEq, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub(crate) struct ServerApi {
-    /// The version string of the declared API version
+    /// The declared API version.
     pub version: ServerApiVersion,
 
-    /// Whether the server should return errors for features that are not part of the API version
+    /// Whether the MongoDB server should reject all commands that are not part of the
+    /// declared API version. This includes command options and aggregation pipeline stages.
     #[builder(default)]
     pub strict: Option<bool>,
 
-    /// Whether the server should return errors for deprecated features
+    /// Whether the MongoDB server should return command failures when functionality that is
+    /// deprecated from the declared API version is used.
+    /// Note that at the time of this writing, no deprecations in version 1 exist.
     #[builder(default)]
     pub deprecation_errors: Option<bool>,
 }
@@ -400,9 +403,15 @@ pub struct ClientOptions {
     #[builder(default)]
     pub selection_criteria: Option<SelectionCriteria>,
 
-    /// The declared API version
+    /// The declared API version for this client.
+    /// The declared API version is applied to all commands run through the client, including those
+    /// sent through any [crate::Database] or [crate::Collection] derived from the client.
     ///
-    /// The default value is to have no declared API version
+    /// Specifying versioned API options in the command document passed to
+    /// [crate::Database::run_command] AND declaring an API version on the client is not
+    /// supported and is considered undefined behaviour. To run any command with a different API
+    /// version or without declaring one, create a separate client that declares the
+    /// appropriate API version.
     #[builder(default, skip)]
     pub(crate) server_api: Option<ServerApi>,
 

@@ -1,10 +1,12 @@
 use futures::TryStreamExt;
+use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, Bson},
     error::Result,
-    options::FindOptions,
-    test::TestClient,
+    options::{ClientOptions, CursorType, FindOptions, ServerApi, ServerApiVersion},
+    test::{TestClient, DEFAULT_URI, LOCK},
+    Client,
     Collection,
 };
 
@@ -1364,9 +1366,68 @@ async fn delete_examples(collection: &Collection) -> Result<()> {
     Ok(())
 }
 
+#[allow(unused_variables)]
+#[cfg(not(feature = "sync"))]
+async fn versioned_api_examples() -> Result<()> {
+    let setup_client = TestClient::new().await;
+    if setup_client.server_version_lt(4, 9) {
+        println!("skipping versioned API examples due to unsupported server version");
+        return Ok(());
+    }
+
+    let uri = DEFAULT_URI.clone();
+    // Start 1. Declare an API version on a client
+    let mut options = ClientOptions::parse(&uri).await?;
+    let server_api = ServerApi::builder()
+        .version(ServerApiVersion::Version1)
+        .build();
+    options.server_api = Some(server_api);
+    let client = Client::with_options(options)?;
+    let cursor = client
+        .database("versioned_api_example")
+        .collection("example")
+        .find(None, None)
+        .await?;
+    // End 1.
+
+    // Start 2. Strict option
+    let mut options = ClientOptions::parse(&uri).await?;
+    let server_api = ServerApi::builder()
+        .version(ServerApiVersion::Version1)
+        .strict(true)
+        .build();
+    options.server_api = Some(server_api);
+    let client = Client::with_options(options)?;
+
+    let find_options = FindOptions::builder()
+        .cursor_type(CursorType::Tailable)
+        .build();
+    let cursor = client
+        .database("versioned_api_example")
+        .collection("example")
+        .find(None, find_options)
+        .await
+        .expect_err("should fail");
+    // End 2.
+
+    // Start 3. deprecationErrors option
+    let mut options = ClientOptions::parse(&uri).await?;
+    let server_api = ServerApi::builder()
+        .version(ServerApiVersion::Version1)
+        .deprecation_errors(true)
+        .build();
+    options.server_api = Some(server_api);
+    let client = Client::with_options(options)?;
+    // End 3.
+
+    Ok(())
+}
+
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn test() {
+    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
+
     let client = TestClient::new().await;
     let coll = client
         .database("documentation_examples")
@@ -1383,4 +1444,5 @@ async fn test() {
     projection_examples(&coll).await.unwrap();
     update_examples(&coll).await.unwrap();
     delete_examples(&coll).await.unwrap();
+    versioned_api_examples().await.unwrap();
 }
