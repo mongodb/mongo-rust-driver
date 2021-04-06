@@ -232,9 +232,10 @@ where
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<CountOptions>>,
     ) -> Result<i64> {
-        let options = options.into();
-        let filter = filter.into();
-        let op = CountDocuments::new(self.namespace(), filter, options);
+        let mut options = options.into();
+        resolve_options!(self, options, [read_concern, selection_criteria]);
+
+        let op = CountDocuments::new(self.namespace(), filter.into(), options);
         self.client().execute_operation(op).await
     }
 
