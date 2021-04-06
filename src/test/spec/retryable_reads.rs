@@ -36,9 +36,9 @@ async fn retry_releases_connection() {
     client_options.retry_reads = Some(true);
     client_options.max_pool_size = Some(1);
 
-    let client = TestClient::with_options(Some(client_options.clone()), true).await;
+    let client = TestClient::with_options(Some(client_options), true).await;
     if !client.supports_fail_command().await {
-        println!("skipping {} due to failCommand not being supported", "ok");
+        println!("skipping retry_releases_connection due to failCommand not being supported");
         return;
     }
 
