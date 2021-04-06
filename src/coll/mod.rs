@@ -232,9 +232,10 @@ where
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<CountOptions>>,
     ) -> Result<i64> {
-        let options = options.into();
-        let filter = filter.into();
-        let op = CountDocuments::new(self.namespace(), filter, options);
+        let mut options = options.into();
+        resolve_options!(self, options, [read_concern, selection_criteria]);
+
+        let op = CountDocuments::new(self.namespace(), filter.into(), options);
         self.client().execute_operation(op).await
     }
 
@@ -294,7 +295,10 @@ where
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<FindOptions>>,
     ) -> Result<Cursor<T>> {
-        let find = Find::new(self.namespace(), filter.into(), options.into());
+        let mut options = options.into();
+        resolve_options!(self, options, [read_concern, selection_criteria]);
+
+        let find = Find::new(self.namespace(), filter.into(), options);
         let client = self.client();
 
         client
@@ -309,11 +313,10 @@ where
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<FindOneOptions>>,
     ) -> Result<Option<T>> {
-        let mut options: FindOptions = options
-            .into()
-            .map(Into::into)
-            .unwrap_or_else(Default::default);
-        options.limit = Some(-1);
+        let mut options = options.into();
+        resolve_options!(self, options, [read_concern, selection_criteria]);
+
+        let options: FindOptions = options.map(Into::into).unwrap_or_else(Default::default);
         let mut cursor = self.find(filter, Some(options)).await?;
         cursor.next().await.transpose()
     }

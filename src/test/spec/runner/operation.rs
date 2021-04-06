@@ -72,7 +72,7 @@ impl<'de> Deserialize<'de> for AnyTestOperation {
             result: Option<Bson>,
             error: Option<bool>,
             collection_options: Option<CollectionOptions>,
-        };
+        }
 
         let definition = OperationDefinition::deserialize(deserializer)?;
         let boxed_op = match definition.name.as_str() {

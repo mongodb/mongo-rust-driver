@@ -13,7 +13,6 @@ fn build_test(db_name: &str, list_collections: ListCollections, mut expected_bod
         .expect("build should succeed");
     assert_eq!(cmd.name, "listCollections");
     assert_eq!(cmd.target_db, db_name);
-    assert_eq!(cmd.read_pref, None);
 
     bson_util::sort_document(&mut cmd.body);
     bson_util::sort_document(&mut expected_body);

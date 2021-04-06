@@ -34,7 +34,7 @@ impl<'de> Deserialize<'de> for AnyTestOperation {
         struct OperationDefinition {
             name: String,
             arguments: Bson,
-        };
+        }
 
         let definition = OperationDefinition::deserialize(deserializer)?;
         let boxed_op = match definition.name.as_str() {
