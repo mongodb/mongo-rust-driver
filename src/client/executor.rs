@@ -125,6 +125,8 @@ impl Client {
                     Retryability::Write => get_error_with_retryable_write_label(&conn, err).await?,
                     _ => err,
                 };
+                // release the connection to be processed by the connection pool
+                drop(conn);
 
                 // TODO RUST-90: Do not retry read if session is in a transaction
                 if retryability == Retryability::Read && err.is_read_retryable()
