@@ -39,7 +39,7 @@ async fn retry_releases_connection() {
 
     let client = TestClient::with_options(Some(client_options)).await;
     if !client.supports_fail_command().await {
-        println!("skipping {} due to failCommand not being supported", "ok");
+        println!("skipping retry_releases_connection due to failCommand not being supported");
         return;
     }
 
