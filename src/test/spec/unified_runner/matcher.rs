@@ -273,12 +273,14 @@ async fn array_matching() {
         None,
     ));
 
-    let mut actual: Vec<Bson> = Vec::new();
-    actual.push(Bson::Document(doc! { "x": 1, "y": 1 }));
-    actual.push(Bson::Document(doc! { "x": 2, "y": 2 }));
-    let mut expected: Vec<Bson> = Vec::new();
-    expected.push(Bson::Document(doc! { "x": 1 }));
-    expected.push(Bson::Document(doc! { "x": 2 }));
+    let actual: Vec<Bson> = vec![
+        Bson::Document(doc! { "x": 1, "y": 1 }),
+        Bson::Document(doc! { "x": 2, "y": 2 }),
+    ];
+    let expected: Vec<Bson> = vec![
+        Bson::Document(doc! { "x": 1 }),
+        Bson::Document(doc! { "x": 2 }),
+    ];
     assert!(!results_match(
         Some(&Bson::Array(actual)),
         &Bson::Array(expected),

@@ -117,6 +117,7 @@ struct LastWriteDate {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
+#[allow(clippy::upper_case_acronyms)]
 enum TestServerType {
     Standalone,
     Mongos,

@@ -17,6 +17,7 @@ const DRIVER_MAX_WIRE_VERSION: i32 = 7;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 #[non_exhaustive]
+#[allow(clippy::upper_case_acronyms)]
 pub enum ServerType {
     Standalone,
     Mongos,
