@@ -73,12 +73,7 @@ async fn run_spec_tests() {
             }
 
             let result = client
-                .run_collection_operation(
-                    &test_case.operation,
-                    &db_name,
-                    &coll_name,
-                    None,
-                )
+                .run_collection_operation(&test_case.operation, &db_name, &coll_name, None)
                 .await;
 
             if let Some(error) = test_case.outcome.error {
