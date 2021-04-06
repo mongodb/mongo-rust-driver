@@ -4,7 +4,8 @@
 This repository contains the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the [`bson`](https://docs.rs/bson) crate for BSON support. The driver contains a fully async API that supports either [`tokio`](https://crates.io/crates/tokio) (default) or [`async-std`](https://crates.io/crates/async-std), depending on the feature flags set. The driver also has a sync API that may be enabled via feature flag. 
 
 ## Index
-- [Installation](#Installation)
+- [Installation](#installation)
+    - [Requirements](#requirements)
     - [Importing](#importing)
         - [Configuring the async runtime](#configuring-the-async-runtime)
         - [Enabling the sync API](#enabling-the-sync-api)
@@ -26,21 +27,12 @@ This repository contains the officially supported MongoDB Rust driver, a client 
 
 ## Installation
 ### Requirements
-| Driver Version | Required Rust Version |
-|:--------------:|:---------------------:|
-| master         | 1.43+                 |
-| 1.2.x          | 1.43+                 |
-| 1.1.x          | 1.43+                 |
-| 1.0.x          | 1.43+                 |
-| 0.11.x         | 1.43+                 |
-| 0.10.x         | 1.43+                 |
-| 0.9.x          | 1.39+                 |
+- Rust 1.46+
 - MongoDB 3.6+
 
-**Note**: A regression introduced in Rust 1.46 may cause out-of-memory errors when compiling an application that uses
-the driver with a framework like actix-web. Rust 1.45 or the latest nightly version can be used to work around this
-problem temporarily. For more information or to track progress on a fix, see
-https://github.com/rust-lang/rust/issues/75992.
+**Note**: A bug affecting Rust 1.46-1.47 may cause out-of-memory errors when compiling an application that uses the 1.1
+version of the driver with a framework like actix-web. Upgrading Rust to 1.48+ or the driver to 1.2+ fixes this
+issue. For more information, see https://github.com/rust-lang/rust/issues/75992.
 
 ### Importing
 The driver is available on [crates.io](https://crates.io/crates/mongodb). To use the driver in your application, simply add it to your project's `Cargo.toml`.
