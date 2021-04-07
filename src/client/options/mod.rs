@@ -210,7 +210,8 @@ impl fmt::Display for StreamAddress {
 /// Specifies the server API version to declare
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
-pub(crate) enum ServerApiVersion {
+pub enum ServerApiVersion {
+    /// Version 1 of the server API, first introduced in MongoDB 5.0.
     Version1,
 }
 
@@ -252,7 +253,7 @@ impl<'de> Deserialize<'de> for ServerApiVersion {
 #[derive(Clone, Debug, Deserialize, PartialEq, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-pub(crate) struct ServerApi {
+pub struct ServerApi {
     /// The declared API version.
     pub version: ServerApiVersion,
 
@@ -412,8 +413,8 @@ pub struct ClientOptions {
     /// supported and is considered undefined behaviour. To run any command with a different API
     /// version or without declaring one, create a separate client that declares the
     /// appropriate API version.
-    #[builder(default, skip)]
-    pub(crate) server_api: Option<ServerApi>,
+    #[builder(default)]
+    pub server_api: Option<ServerApi>,
 
     /// The amount of time the Client should attempt to select a server for an operation before
     /// timing outs
