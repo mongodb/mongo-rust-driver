@@ -32,11 +32,11 @@ use crate::{
 /// documents it yields:
 ///
 /// ```rust
-/// # use mongodb::{sync::Client, error::Result};
+/// # use mongodb::{bson::Document, sync::Client, error::Result};
 /// #
 /// # fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com")?;
-/// # let coll = client.database("foo").collection("bar");
+/// # let coll = client.database("foo").collection::<Document>("bar");
 /// # let mut cursor = coll.find(None, None)?;
 /// #
 /// for doc in cursor {
@@ -100,12 +100,12 @@ where
 /// one. To iterate, retrieve a `SessionCursorHandle` using `SessionCursor::with_session`:
 ///
 /// ```rust
-/// # use mongodb::{sync::Client, error::Result};
+/// # use mongodb::{bson::Document, sync::Client, error::Result};
 /// #
 /// # fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com")?;
 /// # let mut session = client.start_session(None)?;
-/// # let coll = client.database("foo").collection("bar");
+/// # let coll = client.database("foo").collection::<Document>("bar");
 /// # let mut cursor = coll.find_with_session(None, None, &mut session)?;
 /// #
 /// for doc in cursor.with_session(&mut session) {
