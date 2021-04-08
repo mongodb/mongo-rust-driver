@@ -1,3 +1,4 @@
+use bson::Document;
 use futures::TryStreamExt;
 use tokio::sync::RwLockReadGuard;
 
@@ -1385,7 +1386,7 @@ async fn versioned_api_examples() -> Result<()> {
     let client = Client::with_options(options)?;
     let cursor = client
         .database("versioned_api_example")
-        .collection("example")
+        .collection::<Document>("example")
         .find(None, None)
         .await?;
     // End 1.
@@ -1404,7 +1405,7 @@ async fn versioned_api_examples() -> Result<()> {
         .build();
     let cursor = client
         .database("versioned_api_example")
-        .collection("example")
+        .collection::<Document>("example")
         .find(None, find_options)
         .await
         .expect_err("should fail");

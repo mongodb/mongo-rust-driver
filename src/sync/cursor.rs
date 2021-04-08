@@ -69,7 +69,7 @@ use crate::{
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Cursor<T = Document>
+pub struct Cursor<T>
 where
     T: DeserializeOwned + Unpin + Send,
 {
@@ -116,7 +116,7 @@ where
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct SessionCursor<T = Document>
+pub struct SessionCursor<T>
 where
     T: DeserializeOwned + Unpin + Send,
 {

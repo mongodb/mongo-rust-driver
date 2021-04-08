@@ -40,7 +40,7 @@ use crate::{
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct SessionCursor<T = Document>
+pub struct SessionCursor<T>
 where
     T: DeserializeOwned + Unpin,
 {
@@ -105,7 +105,7 @@ where
         let coll = self
             .client
             .database(ns.db.as_str())
-            .collection(ns.coll.as_str());
+            .collection::<Document>(ns.coll.as_str());
         let cursor_id = self.info.id;
         RUNTIME.execute(async move { coll.kill_cursor(cursor_id).await });
     }

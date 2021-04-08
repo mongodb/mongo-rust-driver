@@ -1,5 +1,6 @@
 use std::{borrow::Cow, collections::HashMap, time::Duration};
 
+use bson::Document;
 use serde::Deserialize;
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
@@ -604,7 +605,7 @@ async fn x509_auth() {
     let client = TestClient::with_options(Some(options)).await;
     client
         .database(function_name!())
-        .collection(function_name!())
+        .collection::<Document>(function_name!())
         .find_one(None, None)
         .await
         .unwrap();

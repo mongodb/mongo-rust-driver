@@ -1,4 +1,5 @@
 use crate::{bson::doc, options::ClientOptions, Client};
+use bson::Document;
 use trust_dns_resolver::config::ResolverConfig;
 
 async fn run_test(uri_env_var: &str, resolver_config: Option<ResolverConfig>) {
@@ -27,7 +28,7 @@ async fn run_test(uri_env_var: &str, resolver_config: Option<ResolverConfig>) {
         .await
         .expect("isMaster should succeed");
 
-    let coll = db.collection("test");
+    let coll = db.collection::<Document>("test");
     coll.find_one(None, None)
         .await
         .expect("findOne should succeed");

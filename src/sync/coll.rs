@@ -74,7 +74,7 @@ use crate::{
 /// ```
 
 #[derive(Clone, Debug)]
-pub struct Collection<T = Document>
+pub struct Collection<T>
 where
     T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
 {
@@ -153,7 +153,7 @@ where
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<AggregateOptions>>,
-    ) -> Result<Cursor> {
+    ) -> Result<Cursor<Document>> {
         let pipeline: Vec<Document> = pipeline.into_iter().collect();
         RUNTIME
             .block_on(self.async_collection.aggregate(pipeline, options.into()))
@@ -169,7 +169,7 @@ where
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<AggregateOptions>>,
         session: &mut ClientSession,
-    ) -> Result<SessionCursor> {
+    ) -> Result<SessionCursor<Document>> {
         let pipeline: Vec<Document> = pipeline.into_iter().collect();
         RUNTIME
             .block_on(self.async_collection.aggregate_with_session(

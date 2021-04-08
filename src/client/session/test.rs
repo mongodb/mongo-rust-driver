@@ -1,5 +1,6 @@
 use std::{future::Future, time::Duration};
 
+use bson::Document;
 use futures::stream::StreamExt;
 use tokio::sync::RwLockReadGuard;
 
@@ -38,7 +39,7 @@ macro_rules! db_op {
 macro_rules! collection_op {
     ($test_name:expr, $coll:ident, $body:expr) => {
         |client| async move {
-            let $coll = client.database($test_name).collection($test_name);
+            let $coll = client.database($test_name).collection::<bson::Document>($test_name);
             $body.await.unwrap();
         }
     };
@@ -285,7 +286,7 @@ async fn cluster_time_in_commands() {
     cluster_time_test("aggregate", |client| async move {
         client
             .database(function_name!())
-            .collection(function_name!())
+            .collection::<Document>(function_name!())
             .aggregate(vec![doc! { "$match": { "x": 1 } }], None)
             .await
     })
@@ -294,7 +295,7 @@ async fn cluster_time_in_commands() {
     cluster_time_test("find", |client| async move {
         client
             .database(function_name!())
-            .collection(function_name!())
+            .collection::<Document>(function_name!())
             .find(doc! {}, None)
             .await
     })
@@ -303,7 +304,7 @@ async fn cluster_time_in_commands() {
     cluster_time_test("insert", |client| async move {
         client
             .database(function_name!())
-            .collection(function_name!())
+            .collection::<Document>(function_name!())
             .insert_one(doc! {}, None)
             .await
     })

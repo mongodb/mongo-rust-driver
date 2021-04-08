@@ -215,7 +215,7 @@ where
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<AggregateOptions>>,
-    ) -> Result<Cursor> {
+    ) -> Result<Cursor<Document>> {
         let mut options = options.into();
         resolve_options!(
             self,
@@ -240,7 +240,7 @@ where
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<AggregateOptions>>,
         session: &mut ClientSession,
-    ) -> Result<SessionCursor> {
+    ) -> Result<SessionCursor<Document>> {
         let mut options = options.into();
         resolve_options!(
             self,

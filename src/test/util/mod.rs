@@ -192,7 +192,7 @@ impl TestClient {
     where
         T: Serialize + DeserializeOwned + Unpin + Debug,
     {
-        let coll = self.database(db_name).collection_with_type(coll_name);
+        let coll = self.database(db_name).collection(coll_name);
         drop_collection(&coll).await;
         coll
     }
@@ -301,7 +301,7 @@ impl TestClient {
         if self.is_sharded() {
             let shard_info = self
                 .database("config")
-                .collection("shards")
+                .collection::<Document>("shards")
                 .find_one(None, None)
                 .await
                 .unwrap()

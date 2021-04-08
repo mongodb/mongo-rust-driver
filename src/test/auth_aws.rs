@@ -1,3 +1,4 @@
+use bson::Document;
 use tokio::sync::RwLockReadGuard;
 
 use super::{TestClient, LOCK};
@@ -8,7 +9,7 @@ async fn auth_aws() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
-    let coll = client.database("aws").collection("somecoll");
+    let coll = client.database("aws").collection::<Document>("somecoll");
 
     coll.find_one(None, None).await.unwrap();
 }

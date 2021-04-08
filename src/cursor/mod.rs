@@ -81,7 +81,7 @@ use common::{GenericCursor, GetMoreProvider, GetMoreProviderResult};
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Cursor<T = Document>
+pub struct Cursor<T>
 where
     T: DeserializeOwned + Unpin,
 {
@@ -139,7 +139,7 @@ where
         let coll = self
             .client
             .database(ns.db.as_str())
-            .collection(ns.coll.as_str());
+            .collection::<Document>(ns.coll.as_str());
         let cursor_id = self.wrapped_cursor.id();
         RUNTIME.execute(async move { coll.kill_cursor(cursor_id).await });
     }

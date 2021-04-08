@@ -129,36 +129,17 @@ impl Database {
         self.inner.write_concern.as_ref()
     }
 
-    /// Gets a handle to a collection specified by `name` of the database. The `Collection` options
-    /// (e.g. read preference and write concern) will default to those of the `Database`.
-    ///
-    /// This method does not send or receive anything across the wire to the database, so it can be
-    /// used repeatedly without incurring any costs from I/O.
-    pub fn collection(&self, name: &str) -> Collection {
-        Collection::new(self.clone(), name, None)
-    }
-
     /// Gets a handle to a collection with type `T` specified by `name` of the database. The
     /// `Collection` options (e.g. read preference and write concern) will default to those of the
     /// `Database`.
     ///
     /// This method does not send or receive anything across the wire to the database, so it can be
     /// used repeatedly without incurring any costs from I/O.
-    pub fn collection_with_type<T>(&self, name: &str) -> Collection<T>
+    pub fn collection<T>(&self, name: &str) -> Collection<T>
     where
         T: Serialize + DeserializeOwned + Unpin + Debug,
     {
         Collection::new(self.clone(), name, None)
-    }
-
-    /// Gets a handle to a collection specified by `name` in the cluster the `Client` is connected
-    /// to. Operations done with this `Collection` will use the options specified by `options` by
-    /// default and will otherwise default to those of the `Database`.
-    ///
-    /// This method does not send or receive anything across the wire to the database, so it can be
-    /// used repeatedly without incurring any costs from I/O.
-    pub fn collection_with_options(&self, name: &str, options: CollectionOptions) -> Collection {
-        Collection::new(self.clone(), name, Some(options))
     }
 
     /// Gets a handle to a collection with type `T` specified by `name` in the cluster the `Client`
@@ -167,7 +148,7 @@ impl Database {
     ///
     /// This method does not send or receive anything across the wire to the database, so it can be
     /// used repeatedly without incurring any costs from I/O.
-    pub fn collection_with_type_and_options<T>(
+    pub fn collection_with_options<T>(
         &self,
         name: &str,
         options: CollectionOptions,
@@ -213,7 +194,7 @@ impl Database {
         &self,
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<ListCollectionsOptions>>,
-    ) -> Result<Cursor> {
+    ) -> Result<Cursor<Document>> {
         let list_collections = ListCollections::new(
             self.name().to_string(),
             filter.into(),
@@ -234,7 +215,7 @@ impl Database {
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<ListCollectionsOptions>>,
         session: &mut ClientSession,
-    ) -> Result<SessionCursor> {
+    ) -> Result<SessionCursor<Document>> {
         let list_collections = ListCollections::new(
             self.name().to_string(),
             filter.into(),
@@ -392,7 +373,7 @@ impl Database {
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<AggregateOptions>>,
-    ) -> Result<Cursor> {
+    ) -> Result<Cursor<Document>> {
         let mut options = options.into();
         resolve_options!(
             self,
@@ -417,7 +398,7 @@ impl Database {
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<AggregateOptions>>,
         session: &mut ClientSession,
-    ) -> Result<SessionCursor> {
+    ) -> Result<SessionCursor<Document>> {
         let mut options = options.into();
         resolve_options!(
             self,
