@@ -42,7 +42,7 @@ const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 ///
 /// ```rust
 /// # #[cfg(not(feature = "sync"))]
-/// # use mongodb::{Client, error::Result};
+/// # use mongodb::{bson::Document, Client, error::Result};
 /// # #[cfg(feature = "async-std-runtime")]
 /// # use async_std::task;
 /// # #[cfg(feature = "tokio-runtime")]
@@ -56,7 +56,7 @@ const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 ///     let client_ref = client.clone();
 ///
 ///     task::spawn(async move {
-///         let collection = client_ref.database("items").collection(&format!("coll{}", i));
+///         let collection = client_ref.database("items").collection::<Document>(&format!("coll{}", i));
 ///
 ///         // Do something with the collection
 ///     });

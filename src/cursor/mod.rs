@@ -43,11 +43,11 @@ use common::{GenericCursor, GetMoreProvider, GetMoreProviderResult};
 ///
 /// ```rust
 /// # use futures::stream::StreamExt;
-/// # use mongodb::{Client, error::Result};
+/// # use mongodb::{bson::Document, Client, error::Result};
 /// #
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
-/// # let coll = client.database("foo").collection("bar");
+/// # let coll = client.database("foo").collection::<Document>("bar");
 /// # let mut cursor = coll.find(None, None).await?;
 /// #
 /// while let Some(doc) = cursor.next().await {

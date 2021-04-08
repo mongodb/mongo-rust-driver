@@ -39,7 +39,9 @@ macro_rules! db_op {
 macro_rules! collection_op {
     ($test_name:expr, $coll:ident, $body:expr) => {
         |client| async move {
-            let $coll = client.database($test_name).collection::<bson::Document>($test_name);
+            let $coll = client
+                .database($test_name)
+                .collection::<bson::Document>($test_name);
             $body.await.unwrap();
         }
     };

@@ -113,10 +113,7 @@ impl Database {
     where
         T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
     {
-        Collection::new(
-            self.async_database
-                .collection_with_options(name, options),
-        )
+        Collection::new(self.async_database.collection_with_options(name, options))
     }
 
     /// Drops the database, deleting all data, collections, users, and indexes stored in it.

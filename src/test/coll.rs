@@ -703,7 +703,9 @@ async fn find_one_and_delete_hint_server_version() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = EventClient::new().await;
-    let coll = client.database(function_name!()).collection::<Document>("coll");
+    let coll = client
+        .database(function_name!())
+        .collection::<Document>("coll");
 
     let options = FindOneAndDeleteOptions::builder()
         .hint(Hint::Name(String::new()))

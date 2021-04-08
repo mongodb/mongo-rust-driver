@@ -39,7 +39,7 @@ use crate::{
 /// ```rust
 /// 
 /// # #[cfg(not(feature = "sync"))]
-/// # use mongodb::{Client, error::Result};
+/// # use mongodb::{bson::Document, Client, error::Result};
 /// # #[cfg(feature = "async-std-runtime")]
 /// # use async_std::task;
 /// # #[cfg(feature = "tokio-runtime")]
@@ -55,7 +55,7 @@ use crate::{
 ///     let db_ref = db.clone();
 ///
 ///     task::spawn(async move {
-///         let collection = db_ref.collection(&format!("coll{}", i));
+///         let collection = db_ref.collection::<Document>(&format!("coll{}", i));
 ///
 ///         // Do something with the collection
 ///     });

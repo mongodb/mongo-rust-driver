@@ -24,12 +24,12 @@ use crate::{
 ///
 /// ```rust
 /// # use futures::stream::StreamExt;
-/// # use mongodb::{Client, error::Result, ClientSession, SessionCursor};
+/// # use mongodb::{bson::Document, Client, error::Result, ClientSession, SessionCursor};
 /// #
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// # let mut session = client.start_session(None).await?;
-/// # let coll = client.database("foo").collection("bar");
+/// # let coll = client.database("foo").collection::<Document>("bar");
 /// # let mut cursor = coll.find_with_session(None, None, &mut session).await?;
 /// #
 /// while let Some(doc) = cursor.with_session(&mut session).next().await {
