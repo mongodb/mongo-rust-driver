@@ -1,4 +1,4 @@
-use mongodb::Client;
+use mongodb::{bson::Document, Client};
 
 #[tokio::main]
 async fn main() {
@@ -7,7 +7,7 @@ async fn main() {
     
     client
         .database("aws")
-        .collection("somecoll")
+        .collection::<Document>("somecoll")
         .find_one(None, None)
         .await
         .unwrap();
