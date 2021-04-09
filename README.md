@@ -97,11 +97,11 @@ for collection_name in db.list_collection_names(None).await? {
 ```
 #### Inserting documents into a collection
 ```rust
-use mongodb::bson::doc;
+use mongodb::bson::{doc, Document};
 ```
 ```rust
 // Get a handle to a collection in the database.
-let collection = db.collection("books");
+let collection = db.collection::<Document>("books");
 
 let docs = vec![
     doc! { "title": "1984", "author": "George Orwell" },
@@ -147,14 +147,14 @@ The driver also provides a blocking sync API. See the [Installation](#enabling-t
 The various sync-specific types are found in the `mongodb::sync` submodule rather than in the crate's top level like in the async API. The sync API calls through to the async API internally though, so it looks and behaves similarly to it.
 ```rust
 use mongodb::{
-    bson::{doc, Bson},
+    bson::{doc, Bson, Document},
     sync::Client,
 };
 ```
 ```rust
 let client = Client::with_uri_str("mongodb://localhost:27017")?;
 let database = client.database("mydb");
-let collection = database.collection("books");
+let collection = database.collection::<Document>("books");
 
 let docs = vec![
     doc! { "title": "1984", "author": "George Orwell" },
