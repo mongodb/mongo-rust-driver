@@ -234,7 +234,7 @@ async fn aggregate_out() {
         .unwrap();
     assert_eq!(result.inserted_ids.len(), 5);
 
-    let out_coll = db.collection(&format!("{}_1", function_name!()));
+    let out_coll = db.collection::<Document>(&format!("{}_1", function_name!()));
     let pipeline = vec![
         doc! {
             "$match": {
@@ -291,7 +291,7 @@ async fn kill_cursors_on_drop() {
     let event_client = EventClient::new().await;
     let coll = event_client
         .database(function_name!())
-        .collection(function_name!());
+        .collection::<Document>(function_name!());
 
     let cursor = coll
         .find(None, FindOptions::builder().batch_size(1).build())
@@ -329,7 +329,7 @@ async fn no_kill_cursors_on_exhausted() {
     let event_client = EventClient::new().await;
     let coll = event_client
         .database(function_name!())
-        .collection(function_name!());
+        .collection::<Document>(function_name!());
 
     let cursor = coll
         .find(None, FindOptions::builder().build())
@@ -538,7 +538,7 @@ async fn empty_insert() {
     let client = TestClient::new().await;
     let coll = client
         .database(function_name!())
-        .collection(function_name!());
+        .collection::<Document>(function_name!());
     match coll
         .insert_many(Vec::new(), None)
         .await
@@ -581,7 +581,7 @@ async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>)
     }
     let coll = event_client
         .database(function_name!())
-        .collection(function_name!());
+        .collection::<Document>(function_name!());
     coll.find(None, options).await.unwrap();
 
     let events = event_client.get_command_started_events(&["find"]);
@@ -607,7 +607,7 @@ async fn delete_hint_test(options: Option<DeleteOptions>, name: &str) {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = EventClient::new().await;
-    let coll = client.database(name).collection(name);
+    let coll = client.database(name).collection::<Document>(name);
     let _: Result<DeleteResult> = coll.delete_many(doc! {}, options.clone()).await;
 
     let events = client.get_command_started_events(&["delete"]);
@@ -703,7 +703,9 @@ async fn find_one_and_delete_hint_server_version() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = EventClient::new().await;
-    let coll = client.database(function_name!()).collection("coll");
+    let coll = client
+        .database(function_name!())
+        .collection::<Document>("coll");
 
     let options = FindOneAndDeleteOptions::builder()
         .hint(Hint::Name(String::new()))
@@ -745,7 +747,7 @@ async fn no_read_preference_to_standalone() {
 
     client
         .database(function_name!())
-        .collection(function_name!())
+        .collection::<Document>(function_name!())
         .find_one(None, options)
         .await
         .unwrap();
@@ -984,7 +986,7 @@ async fn collection_options_inherited() {
         .build();
     let coll = client
         .database(function_name!())
-        .collection_with_options(function_name!(), options);
+        .collection_with_options::<Document>(function_name!(), options);
 
     coll.find(None, None).await.unwrap();
     assert_options_inherited(&client, "find").await;

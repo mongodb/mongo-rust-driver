@@ -22,7 +22,7 @@ use crate::{
     test::CLIENT_OPTIONS,
 };
 
-fn init_db_and_coll(client: &Client, db_name: &str, coll_name: &str) -> Collection {
+fn init_db_and_coll(client: &Client, db_name: &str, coll_name: &str) -> Collection<Document> {
     let coll = client.database(db_name).collection(coll_name);
     drop_collection(&coll);
     coll
@@ -32,7 +32,7 @@ fn init_db_and_typed_coll<T>(client: &Client, db_name: &str, coll_name: &str) ->
 where
     T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
 {
-    let coll = client.database(db_name).collection_with_type(coll_name);
+    let coll = client.database(db_name).collection(coll_name);
     drop_collection(&coll);
     coll
 }
@@ -166,7 +166,7 @@ fn collection() {
     let db_options = DatabaseOptions::builder().write_concern(wc.clone()).build();
     let coll = client
         .database_with_options(function_name!(), db_options)
-        .collection(function_name!());
+        .collection::<Document>(function_name!());
     assert_eq!(coll.write_concern(), Some(&wc));
 
     let coll_options = CollectionOptions::builder()
@@ -174,7 +174,7 @@ fn collection() {
         .build();
     let coll = client
         .database(function_name!())
-        .collection_with_options(function_name!(), coll_options);
+        .collection_with_options::<Document>(function_name!(), coll_options);
     assert_eq!(coll.write_concern(), Some(&wc));
 }
 

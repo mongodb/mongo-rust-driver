@@ -43,11 +43,11 @@ use common::{GenericCursor, GetMoreProvider, GetMoreProviderResult};
 ///
 /// ```rust
 /// # use futures::stream::StreamExt;
-/// # use mongodb::{Client, error::Result};
+/// # use mongodb::{bson::Document, Client, error::Result};
 /// #
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
-/// # let coll = client.database("foo").collection("bar");
+/// # let coll = client.database("foo").collection::<Document>("bar");
 /// # let mut cursor = coll.find(None, None).await?;
 /// #
 /// while let Some(doc) = cursor.next().await {
@@ -81,7 +81,7 @@ use common::{GenericCursor, GetMoreProvider, GetMoreProviderResult};
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Cursor<T = Document>
+pub struct Cursor<T>
 where
     T: DeserializeOwned + Unpin,
 {
@@ -139,7 +139,7 @@ where
         let coll = self
             .client
             .database(ns.db.as_str())
-            .collection(ns.coll.as_str());
+            .collection::<Document>(ns.coll.as_str());
         let cursor_id = self.wrapped_cursor.id();
         RUNTIME.execute(async move { coll.kill_cursor(cursor_id).await });
     }

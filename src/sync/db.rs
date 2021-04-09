@@ -34,7 +34,7 @@ use crate::{
 /// so it can safely be shared across threads. For example:
 ///
 /// ```rust
-/// # use mongodb::{sync::Client, error::Result};
+/// # use mongodb::{bson::Document, sync::Client, error::Result};
 ///
 /// # fn start_workers() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com")?;
@@ -44,7 +44,7 @@ use crate::{
 ///     let db_ref = db.clone();
 ///
 ///     std::thread::spawn(move || {
-///         let collection = db_ref.collection(&format!("coll{}", i));
+///         let collection = db_ref.collection::<Document>(&format!("coll{}", i));
 ///
 ///         // Do something with the collection
 ///     });
@@ -86,36 +86,17 @@ impl Database {
         self.async_database.write_concern()
     }
 
-    /// Gets a handle to a collection specified by `name` of the database. The `Collection` options
-    /// (e.g. read preference and write concern) will default to those of the `Database`.
-    ///
-    /// This method does not send or receive anything across the wire to the database, so it can be
-    /// used repeatedly without incurring any costs from I/O.
-    pub fn collection(&self, name: &str) -> Collection {
-        Collection::new(self.async_database.collection(name))
-    }
-
     /// Gets a handle to a collection with type `T` specified by `name` of the database. The
     /// `Collection` options (e.g. read preference and write concern) will default to those of the
     /// `Database`.
     ///
     /// This method does not send or receive anything across the wire to the database, so it can be
     /// used repeatedly without incurring any costs from I/O.
-    pub fn collection_with_type<T>(&self, name: &str) -> Collection<T>
+    pub fn collection<T>(&self, name: &str) -> Collection<T>
     where
         T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
     {
-        Collection::new(self.async_database.collection_with_type(name))
-    }
-
-    /// Gets a handle to a collection specified by `name` in the cluster the `Client` is connected
-    /// to. Operations done with this `Collection` will use the options specified by `options` by
-    /// default and will otherwise default to those of the `Database`.
-    ///
-    /// This method does not send or receive anything across the wire to the database, so it can be
-    /// used repeatedly without incurring any costs from I/O.
-    pub fn collection_with_options(&self, name: &str, options: CollectionOptions) -> Collection {
-        Collection::new(self.async_database.collection_with_options(name, options))
+        Collection::new(self.async_database.collection(name))
     }
 
     /// Gets a handle to a collection with type `T` specified by `name` in the cluster the `Client`
@@ -124,7 +105,7 @@ impl Database {
     ///
     /// This method does not send or receive anything across the wire to the database, so it can be
     /// used repeatedly without incurring any costs from I/O.
-    pub fn collection_with_type_and_options<T>(
+    pub fn collection_with_options<T>(
         &self,
         name: &str,
         options: CollectionOptions,
@@ -132,10 +113,7 @@ impl Database {
     where
         T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
     {
-        Collection::new(
-            self.async_database
-                .collection_with_type_and_options(name, options),
-        )
+        Collection::new(self.async_database.collection_with_options(name, options))
     }
 
     /// Drops the database, deleting all data, collections, users, and indexes stored in it.
@@ -162,7 +140,7 @@ impl Database {
         &self,
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<ListCollectionsOptions>>,
-    ) -> Result<Cursor> {
+    ) -> Result<Cursor<Document>> {
         RUNTIME
             .block_on(
                 self.async_database
@@ -179,7 +157,7 @@ impl Database {
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<ListCollectionsOptions>>,
         session: &mut ClientSession,
-    ) -> Result<SessionCursor> {
+    ) -> Result<SessionCursor<Document>> {
         RUNTIME
             .block_on(self.async_database.list_collections_with_session(
                 filter.into(),
@@ -281,7 +259,7 @@ impl Database {
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<AggregateOptions>>,
-    ) -> Result<Cursor> {
+    ) -> Result<Cursor<Document>> {
         let pipeline: Vec<Document> = pipeline.into_iter().collect();
         RUNTIME
             .block_on(self.async_database.aggregate(pipeline, options.into()))
@@ -297,7 +275,7 @@ impl Database {
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<AggregateOptions>>,
         session: &mut ClientSession,
-    ) -> Result<SessionCursor> {
+    ) -> Result<SessionCursor<Document>> {
         let pipeline: Vec<Document> = pipeline.into_iter().collect();
         RUNTIME
             .block_on(

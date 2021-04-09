@@ -24,12 +24,12 @@ use crate::{
 ///
 /// ```rust
 /// # use futures::stream::StreamExt;
-/// # use mongodb::{Client, error::Result, ClientSession, SessionCursor};
+/// # use mongodb::{bson::Document, Client, error::Result, ClientSession, SessionCursor};
 /// #
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// # let mut session = client.start_session(None).await?;
-/// # let coll = client.database("foo").collection("bar");
+/// # let coll = client.database("foo").collection::<Document>("bar");
 /// # let mut cursor = coll.find_with_session(None, None, &mut session).await?;
 /// #
 /// while let Some(doc) = cursor.with_session(&mut session).next().await {
@@ -40,7 +40,7 @@ use crate::{
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct SessionCursor<T = Document>
+pub struct SessionCursor<T>
 where
     T: DeserializeOwned + Unpin,
 {
@@ -105,7 +105,7 @@ where
         let coll = self
             .client
             .database(ns.db.as_str())
-            .collection(ns.coll.as_str());
+            .collection::<Document>(ns.coll.as_str());
         let cursor_id = self.info.id;
         RUNTIME.execute(async move { coll.kill_cursor(cursor_id).await });
     }

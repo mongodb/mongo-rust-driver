@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use approx::abs_diff_eq;
+use bson::Document;
 use semver::VersionReq;
 use serde::Deserialize;
 use tokio::sync::RwLockWriteGuard;
@@ -157,7 +158,7 @@ async fn load_balancing_test() {
         for _ in 0..10 {
             let collection = client
                 .database("load_balancing_test")
-                .collection("load_balancing_test");
+                .collection::<Document>("load_balancing_test");
             handles.push(
                 RUNTIME
                     .spawn(async move {

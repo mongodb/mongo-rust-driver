@@ -26,7 +26,7 @@ use crate::{
 /// so it can safely be shared across threads. For example:
 ///
 /// ```rust
-/// # use mongodb::{sync::Client, error::Result};
+/// # use mongodb::{bson::Document, sync::Client, error::Result};
 /// #
 /// # fn start_workers() -> Result<()> {
 /// let client = Client::with_uri_str("mongodb://example.com")?;
@@ -35,7 +35,7 @@ use crate::{
 ///     let client_ref = client.clone();
 ///
 ///     std::thread::spawn(move || {
-///         let collection = client_ref.database("items").collection(&format!("coll{}", i));
+///         let collection = client_ref.database("items").collection::<Document>(&format!("coll{}", i));
 ///
 ///         // Do something with the collection
 ///     });
