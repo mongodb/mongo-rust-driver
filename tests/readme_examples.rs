@@ -2,8 +2,17 @@
 // Be sure not to `use` anything outside of the examples, since the examples are in charge of
 // specifying anything that needs to be imported.
 
+struct Err {}
+impl From<mongodb::error::Error> for Err {
+    fn from(_error: mongodb::error::Error) -> Self {
+        Err {}
+    }
+}
+#[allow(dead_code)]
+type Result<T> = std::result::Result<T, Err>;
+
 #[cfg(not(feature = "sync"))]
-async fn _connecting() -> mongodb::error::Result<()> {
+async fn _connecting() -> Result<()> {
     use mongodb::{options::ClientOptions, Client};
 
     // Parse a connection string into an options struct.
@@ -24,7 +33,7 @@ async fn _connecting() -> mongodb::error::Result<()> {
 }
 
 #[cfg(not(feature = "sync"))]
-async fn _getting_handle_to_database(client: mongodb::Client) -> mongodb::error::Result<()> {
+async fn _getting_handle_to_database(client: mongodb::Client) -> Result<()> {
     // Get a handle to a database.
     let db = client.database("mydb");
 
@@ -37,9 +46,7 @@ async fn _getting_handle_to_database(client: mongodb::Client) -> mongodb::error:
 }
 
 #[cfg(not(feature = "sync"))]
-async fn _inserting_documents_into_a_collection(
-    db: mongodb::Database,
-) -> mongodb::error::Result<()> {
+async fn _inserting_documents_into_a_collection(db: mongodb::Database) -> Result<()> {
     use mongodb::bson::{doc, Document};
 
     // Get a handle to a collection in the database.
@@ -60,7 +67,7 @@ async fn _inserting_documents_into_a_collection(
 #[cfg(not(feature = "sync"))]
 async fn _finding_documents_into_a_collection(
     collection: mongodb::Collection<mongodb::bson::Document>,
-) -> mongodb::error::Result<()> {
+) -> Result<()> {
     use futures::stream::StreamExt;
     use mongodb::{
         bson::{doc, Bson},
@@ -90,7 +97,7 @@ async fn _finding_documents_into_a_collection(
 }
 
 #[cfg(feature = "sync")]
-async fn _using_the_sync_api() -> mongodb::error::Result<()> {
+async fn _using_the_sync_api() -> Result<()> {
     use mongodb::{
         bson::{doc, Bson, Document},
         sync::Client,
