@@ -482,7 +482,7 @@ async fn find_and_getmore_share_session() {
     async fn run_test(client: &EventClient, coll: &Collection, read_preference: ReadPreference) {
         let options = FindOptions::builder()
             .batch_size(2)
-            .selection_criteria(Some(read_preference.into()))
+            .selection_criteria(read_preference.into())
             .build();
 
         let mut cursor = coll

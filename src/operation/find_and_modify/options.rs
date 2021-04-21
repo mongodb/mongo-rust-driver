@@ -37,39 +37,39 @@ pub(super) struct FindAndModifyOptions {
     #[serde(flatten)]
     pub(crate) modification: Modification,
 
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub(crate) sort: Option<Document>,
 
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub(crate) new: Option<bool>,
 
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub(crate) upsert: Option<bool>,
 
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub(crate) bypass_document_validation: Option<bool>,
 
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub(crate) write_concern: Option<WriteConcern>,
 
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub(crate) array_filters: Option<Vec<Document>>,
 
-    #[builder(default)]
     #[serde(
         serialize_with = "bson_util::serialize_duration_as_int_millis",
         rename = "maxTimeMS"
     )]
+    #[builder(default, setter(strip_option))]
     pub(crate) max_time: Option<Duration>,
 
-    #[builder(default)]
     #[serde(rename = "fields")]
+    #[builder(default, setter(strip_option))]
     pub(crate) projection: Option<Document>,
 
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub(crate) collation: Option<Collation>,
 
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub(crate) hint: Option<Hint>,
 }
 
@@ -77,15 +77,17 @@ impl FindAndModifyOptions {
     pub(super) fn from_find_one_and_delete_options(
         opts: FindOneAndDeleteOptions,
     ) -> FindAndModifyOptions {
-        FindAndModifyOptions::builder()
+        let mut modify_opts = FindAndModifyOptions::builder()
             .modification(Modification::Delete)
-            .collation(opts.collation)
-            .max_time(opts.max_time)
-            .projection(opts.projection)
-            .sort(opts.sort)
-            .write_concern(opts.write_concern)
-            .hint(opts.hint)
-            .build()
+            .build();
+
+        modify_opts.collation = opts.collation;
+        modify_opts.max_time = opts.max_time;
+        modify_opts.projection = opts.projection;
+        modify_opts.sort = opts.sort;
+        modify_opts.write_concern = opts.write_concern;
+        modify_opts.hint = opts.hint;
+        modify_opts
     }
 
     pub(super) fn from_find_one_and_replace_options(
@@ -93,37 +95,43 @@ impl FindAndModifyOptions {
         opts: FindOneAndReplaceOptions,
     ) -> FindAndModifyOptions {
         let replacement = UpdateModifications::Document(replacement);
-        FindAndModifyOptions::builder()
+        let mut modify_opts = FindAndModifyOptions::builder()
             .modification(Modification::Update(replacement))
-            .collation(opts.collation)
-            .bypass_document_validation(opts.bypass_document_validation)
-            .max_time(opts.max_time)
-            .projection(opts.projection)
-            .new(return_document_to_bool(opts.return_document))
-            .sort(opts.sort)
-            .upsert(opts.upsert)
-            .write_concern(opts.write_concern)
-            .hint(opts.hint)
-            .build()
+            .build();
+
+        modify_opts.collation = opts.collation;
+        modify_opts.bypass_document_validation = opts.bypass_document_validation;
+        modify_opts.max_time = opts.max_time;
+        modify_opts.projection = opts.projection;
+        modify_opts.new = return_document_to_bool(opts.return_document);
+        modify_opts.sort = opts.sort;
+        modify_opts.upsert = opts.upsert;
+        modify_opts.write_concern = opts.write_concern;
+        modify_opts.hint = opts.hint;
+
+        modify_opts
     }
 
     pub(super) fn from_find_one_and_update_options(
         update: UpdateModifications,
         opts: FindOneAndUpdateOptions,
     ) -> FindAndModifyOptions {
-        FindAndModifyOptions::builder()
+        let mut modify_opts = FindAndModifyOptions::builder()
             .modification(Modification::Update(update))
-            .collation(opts.collation)
-            .array_filters(opts.array_filters)
-            .bypass_document_validation(opts.bypass_document_validation)
-            .max_time(opts.max_time)
-            .projection(opts.projection)
-            .new(return_document_to_bool(opts.return_document))
-            .sort(opts.sort)
-            .upsert(opts.upsert)
-            .write_concern(opts.write_concern)
-            .hint(opts.hint)
-            .build()
+            .build();
+
+        modify_opts.collation = opts.collation;
+        modify_opts.array_filters = opts.array_filters;
+        modify_opts.bypass_document_validation = opts.bypass_document_validation;
+        modify_opts.max_time = opts.max_time;
+        modify_opts.projection = opts.projection;
+        modify_opts.new = return_document_to_bool(opts.return_document);
+        modify_opts.sort = opts.sort;
+        modify_opts.upsert = opts.upsert;
+        modify_opts.write_concern = opts.write_concern;
+        modify_opts.hint = opts.hint;
+
+        modify_opts
     }
 }
 

@@ -313,7 +313,7 @@ async fn auth_test_options(
     mechanism: Option<AuthMechanism>,
     success: bool,
 ) {
-    let options = ClientOptions::builder()
+    let mut options = ClientOptions::builder()
         .hosts(CLIENT_OPTIONS.hosts.clone())
         .max_pool_size(1)
         .credential(Credential {
@@ -322,8 +322,8 @@ async fn auth_test_options(
             mechanism,
             ..Default::default()
         })
-        .tls(CLIENT_OPTIONS.tls.clone())
         .build();
+    options.tls = CLIENT_OPTIONS.tls.clone();
 
     auth_test(Client::with_options(options).unwrap(), success).await;
 }

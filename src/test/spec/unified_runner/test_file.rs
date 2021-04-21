@@ -234,19 +234,19 @@ pub struct CollectionOrDatabaseOptions {
 
 impl CollectionOrDatabaseOptions {
     pub fn as_database_options(&self) -> DatabaseOptions {
-        DatabaseOptions::builder()
-            .read_concern(self.read_concern.clone())
-            .selection_criteria(self.selection_criteria.clone())
-            .write_concern(self.write_concern.clone())
-            .build()
+        let mut options = DatabaseOptions::default();
+        options.read_concern = self.read_concern.clone();
+        options.selection_criteria = self.selection_criteria.clone();
+        options.write_concern = self.write_concern.clone();
+        options
     }
 
     pub fn as_collection_options(&self) -> CollectionOptions {
-        CollectionOptions::builder()
-            .read_concern(self.read_concern.clone())
-            .selection_criteria(self.selection_criteria.clone())
-            .write_concern(self.write_concern.clone())
-            .build()
+        let mut options = CollectionOptions::default();
+        options.read_concern = self.read_concern.clone();
+        options.selection_criteria = self.selection_criteria.clone();
+        options.write_concern = self.write_concern.clone();
+        options
     }
 }
 

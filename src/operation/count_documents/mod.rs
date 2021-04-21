@@ -48,13 +48,13 @@ impl CountDocuments {
         });
 
         let aggregate_options = options.map(|opts| {
-            AggregateOptions::builder()
-                .hint(opts.hint)
-                .max_time(opts.max_time)
-                .collation(opts.collation)
-                .selection_criteria(opts.selection_criteria)
-                .read_concern(opts.read_concern)
-                .build()
+            let mut agg_options = AggregateOptions::builder().build();
+            agg_options.hint = opts.hint;
+            agg_options.max_time = opts.max_time;
+            agg_options.collation = opts.collation;
+            agg_options.selection_criteria = opts.selection_criteria;
+            agg_options.read_concern = opts.read_concern;
+            agg_options
         });
 
         Self {

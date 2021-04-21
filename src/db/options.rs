@@ -13,18 +13,16 @@ use crate::{
 /// These are the valid options for creating a [`Database`](../struct.Database.html) with
 /// [`Client::database_with_options`](../struct.Client.html#method.database_with_options).
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]
 pub struct DatabaseOptions {
     /// The default read preference for operations.
-    #[builder(default)]
     pub selection_criteria: Option<SelectionCriteria>,
 
     /// The default read concern for operations.
-    #[builder(default)]
     pub read_concern: Option<ReadConcern>,
 
     /// The default write concern for operations.
-    #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 }
 
@@ -33,67 +31,56 @@ pub struct DatabaseOptions {
 #[skip_serializing_none]
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]
 pub struct CreateCollectionOptions {
     /// Whether the collection should be capped. If true, `size` must also be set.
-    #[builder(default)]
     pub capped: Option<bool>,
 
     /// The maximum size (in bytes) for a capped collection. This option is ignored if `capped` is
     /// not set to true.
-    #[builder(default)]
     pub size: Option<i64>,
 
     /// The maximum number of documents in a capped collection. The `size` limit takes precedence
     /// over this option. If a capped collection reaches the size limit before it reaches the
     /// maximum number of documents, MongoDB removes old documents.
-    #[builder(default)]
     pub max: Option<i64>,
 
     /// The storage engine that the collection should use. The value should take the following
     /// form:
     ///
     /// `{ <storage-engine-name>: <options> }`
-    #[builder(default)]
     pub storage_engine: Option<Document>,
 
     /// Specifies a validator to restrict the schema of documents which can exist in the
     /// collection. Expressions can be specified using any query operators except `$near`,
     /// `$nearSphere`, `$text`, and `$where`.
-    #[builder(default)]
     #[serde(rename = "validator")]
     pub validation: Option<Document>,
 
     /// Specifies how strictly the database should apply the validation rules to existing documents
     /// during an update.
-    #[builder(default)]
     pub validation_level: Option<ValidationLevel>,
 
     /// Specifies whether the database should return an error or simply raise a warning if inserted
     /// documents do not pass the validation.
-    #[builder(default)]
     pub validation_action: Option<ValidationAction>,
 
     /// The name of the source collection or view to base this view on. If specified, this will
     /// cause a view to be created rather than a collection.
-    #[builder(default)]
     pub view_on: Option<String>,
 
     /// An array that consists of the aggregation pipeline stages to run against `view_on` to
     /// determine the contents of the view.
-    #[builder(default)]
     pub pipeline: Option<Vec<Document>>,
 
     /// The default collation for the collection or view.   
-    #[builder(default)]
     pub collation: Option<Collation>,
 
     /// The write concern for the operation.   
-    #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 
     /// The default configuration for indexes created on this collection, including the _id index.
-    #[builder(default)]
     pub index_option_defaults: Option<IndexOptionDefaults>,
 }
 
@@ -137,10 +124,10 @@ pub struct IndexOptionDefaults {
 /// Specifies the options to a [`Database::drop`](../struct.Database.html#method.drop) operation.
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]
 pub struct DropDatabaseOptions {
     /// The write concern for the operation.
-    #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 }
 
@@ -148,6 +135,7 @@ pub struct DropDatabaseOptions {
 /// [`Database::list_collections`](../struct.Database.html#method.list_collections) operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]
 pub struct ListCollectionsOptions {
     /// The number of documents the server should return per cursor batch.
@@ -156,7 +144,6 @@ pub struct ListCollectionsOptions {
     /// only the number of documents kept in memory at a given time (and by extension, the
     /// number of round trips needed to return the entire set of documents returned by the
     /// query).
-    #[builder(default)]
     #[serde(
         serialize_with = "bson_util::serialize_batch_size",
         rename(serialize = "cursor")
@@ -168,10 +155,10 @@ pub struct ListCollectionsOptions {
 /// [`Client::list_databases`](../struct.Client.html#method.list_databases) operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]
 pub struct ListDatabasesOptions {
     /// Determines which databases to return based on the user's access privileges. This option is
     /// only supported on server versions 4.0.5+.
-    #[builder(default)]
     pub authorized_databases: Option<bool>,
 }

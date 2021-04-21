@@ -101,25 +101,22 @@ pub enum FailPointMode {
 
 #[serde_with::skip_serializing_none]
 #[derive(Debug, TypedBuilder, Serialize)]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[serde(rename_all = "camelCase")]
 pub struct FailCommandOptions {
     /// The appName that a client must use in order to hit this fail point.
-    #[builder(default)]
     app_name: Option<String>,
 
     /// If non-null, how long the server should block the affected commands.
     /// Only available in 4.2.9+.
     #[serde(serialize_with = "serialize_block_connection")]
     #[serde(flatten)]
-    #[builder(default)]
     block_connection: Option<Duration>,
 
     /// Whether the server should hang up when the client sends an affected command
-    #[builder(default)]
     close_connection: Option<bool>,
 
     /// The error code to include in the server's reply to an affected command.
-    #[builder(default)]
     error_code: Option<i64>,
 
     /// Array of error labels to be included in the server's reply to an affected command. Passing
@@ -127,11 +124,9 @@ pub struct FailCommandOptions {
     /// server. The existence of the "errorLabels" field in the failCommand failpoint completely
     /// overrides the server's normal error labels adding behaviors for the affected commands.
     /// Only available in 4.4+.
-    #[builder(default)]
     error_labels: Option<Vec<String>>,
 
     /// Document to be returned as a write concern error.
-    #[builder(default)]
     write_concern_error: Option<Document>,
 }
 

@@ -135,11 +135,11 @@ impl Serialize for ReadConcernLevel {
 /// information about write concerns.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Default, PartialEq, TypedBuilder, Serialize, Deserialize)]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]
 pub struct WriteConcern {
     /// Requests acknowledgement that the operation has propagated to a specific number or variety
     /// of servers.
-    #[builder(default)]
     pub w: Option<Acknowledgment>,
 
     /// Specifies a time limit for the write concern. If an operation has not propagated to the
@@ -148,7 +148,6 @@ pub struct WriteConcern {
     /// Note that an error being returned due to a write concern error does not imply that the
     /// write would not have finished propagating if allowed more time to finish, and the
     /// server will not roll back the writes that occurred before the timeout was reached.
-    #[builder(default)]
     #[serde(rename = "wtimeout")]
     #[serde(serialize_with = "bson_util::serialize_duration_as_int_millis")]
     #[serde(deserialize_with = "bson_util::deserialize_duration_from_u64_millis")]
@@ -156,7 +155,6 @@ pub struct WriteConcern {
     pub w_timeout: Option<Duration>,
 
     /// Requests acknowledgement that the operation has propagated to the on-disk journal.
-    #[builder(default)]
     #[serde(rename = "j")]
     pub journal: Option<bool>,
 }

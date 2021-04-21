@@ -56,11 +56,10 @@ async fn run_count_test(test_file: TestFile) {
 
         let result = match test_case.operation.name.as_str() {
             "countDocuments" => {
-                let options = CountOptions::builder()
-                    .skip(arguments.skip)
-                    .limit(arguments.limit)
-                    .collation(arguments.collation)
-                    .build();
+                let mut options = CountOptions::builder().build();
+                options.skip = arguments.skip;
+                options.limit = arguments.limit;
+                options.collation = arguments.collation;
                 coll.count_documents(arguments.filter.unwrap_or_default(), options)
                     .await
             }

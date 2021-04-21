@@ -15,36 +15,36 @@ pub struct Collation {
     pub locale: String,
 
     /// The level of comparison to perform. Corresponds to [ICU Comparison Levels](http://userguide.icu-project.org/collation/concepts#TOC-Comparison-Levels).
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub strength: Option<i32>,
 
     /// Whether to include case comparison when `strength` is level 1 or 2.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub case_level: Option<bool>,
 
     /// The sort order of case differences during tertiary level comparisons.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub case_first: Option<String>,
 
     /// Whether to compare numeric strings as numbers or strings.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub numeric_ordering: Option<bool>,
 
     /// Whether collation should consider whitespace and punctuation as base characters for
     /// purposes of comparison.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub alternate: Option<String>,
 
     /// Up to which characters are considered ignorable when `alternate` is "shifted". Has no
     /// effect if `alternate` is set to "non-ignorable".
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub max_variable: Option<String>,
 
     /// Whether to check if text require normalization and to perform it.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub normalization: Option<bool>,
 
     /// Whether strings with diacritics sort from the back of the string.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub backwards: Option<bool>,
 }
