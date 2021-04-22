@@ -696,7 +696,7 @@ where
                         }
                     }
                 }
-                Err(e) => match e.kind {
+                Err(e) => match *e.kind {
                     ErrorKind::BulkWriteError(failure) => {
                         let failure_ref =
                             cumulative_failure.get_or_insert_with(BulkWriteFailure::new);

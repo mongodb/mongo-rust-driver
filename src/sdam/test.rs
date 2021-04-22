@@ -211,7 +211,7 @@ async fn sdam_min_pool_size_error() {
         .await
         .expect_err("ping should fail");
     assert!(
-        matches!(ping_err.kind, ErrorKind::ServerSelectionError { .. }),
+        matches!(*ping_err.kind, ErrorKind::ServerSelectionError { .. }),
         "Expected to fail due to server selection timing out, instead got: {:?}",
         ping_err.kind
     );
@@ -290,7 +290,7 @@ async fn auth_error() {
         .await
         .expect_err("insert should fail");
     assert!(matches!(
-        auth_err.kind,
+        *auth_err.kind,
         ErrorKind::AuthenticationError { .. }
     ));
 

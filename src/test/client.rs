@@ -284,7 +284,7 @@ async fn list_authorized_databases() {
 }
 
 fn is_auth_error(error: Error) -> bool {
-    matches!(error.kind, ErrorKind::AuthenticationError { .. })
+    matches!(*error.kind, ErrorKind::AuthenticationError { .. })
 }
 
 /// Performs an operation that requires authentication and verifies that it either succeeded or
@@ -572,7 +572,7 @@ async fn x509_auth() {
         .run_command(doc! { "dropUser": &username }, None)
         .await;
 
-    match drop_user_result.as_ref().map_err(|e| &e.kind) {
+    match drop_user_result.map_err(|e| *e.kind) {
         Err(ErrorKind::CommandError(CommandError { code: 11, .. })) | Ok(_) => {}
         e @ Err(_) => {
             e.unwrap();

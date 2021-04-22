@@ -110,7 +110,7 @@ impl Client {
 
                 // Retryable writes are only supported by storage engines with document-level
                 // locking, so users need to disable retryable writes if using mmapv1.
-                if let ErrorKind::CommandError(ref mut command_error) = err.kind {
+                if let ErrorKind::CommandError(ref mut command_error) = *err.kind {
                     if command_error.code == 20
                         && command_error.message.starts_with("Transaction numbers")
                     {

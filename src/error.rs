@@ -1,6 +1,6 @@
 //! Contains the `Error` and `Result` types that `mongodb` uses.
 
-use std::{fmt, sync::Arc};
+use std::{fmt::{self, Debug}, sync::Arc};
 
 use serde::Deserialize;
 use thiserror::Error;
@@ -27,7 +27,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[non_exhaustive]
 pub struct Error {
     /// The type of error that occurred.
-    pub kind: ErrorKind,
+    pub kind: Box<ErrorKind>,
     labels: Vec<String>,
 }
 
@@ -66,20 +66,20 @@ impl Error {
     }
 
     pub(crate) fn is_auth_error(&self) -> bool {
-        matches!(self.kind, ErrorKind::AuthenticationError { .. })
+        matches!(self.kind.as_ref(), ErrorKind::AuthenticationError { .. })
     }
 
     pub(crate) fn is_command_error(&self) -> bool {
-        matches!(self.kind, ErrorKind::CommandError(_))
+        matches!(self.kind.as_ref(), ErrorKind::CommandError(_))
     }
 
     pub(crate) fn is_network_timeout(&self) -> bool {
-        matches!(self.kind, ErrorKind::Io(ref io_err) if io_err.kind() == std::io::ErrorKind::TimedOut)
+        matches!(self.kind.as_ref(), ErrorKind::Io(ref io_err) if io_err.kind() == std::io::ErrorKind::TimedOut)
     }
 
     /// Whether this error is an "ns not found" error or not.
     pub(crate) fn is_ns_not_found(&self) -> bool {
-        matches!(self.kind, ErrorKind::CommandError(ref err) if err.code == 26)
+        matches!(self.kind.as_ref(), ErrorKind::CommandError(ref err) if err.code == 26)
     }
 
     /// Whether a read operation should be retried if this error occurs.
@@ -119,7 +119,7 @@ impl Error {
     /// Whether an error originated from the server.
     pub(crate) fn is_server_error(&self) -> bool {
         matches!(
-            self.kind,
+            self.kind.as_ref(),
             ErrorKind::AuthenticationError { .. }
                 | ErrorKind::BulkWriteError(_)
                 | ErrorKind::CommandError(_)
@@ -129,7 +129,7 @@ impl Error {
 
     /// Returns the labels for this error.
     pub fn labels(&self) -> &[String] {
-        match self.kind {
+        match self.kind.as_ref() {
             ErrorKind::CommandError(ref err) => &err.labels,
             ErrorKind::WriteError(ref err) => match err {
                 WriteFailure::WriteError(_) => &self.labels,
@@ -153,7 +153,7 @@ impl Error {
     /// Returns a copy of this Error with the specified label added.
     pub(crate) fn with_label<T: AsRef<str>>(mut self, label: T) -> Self {
         let label = label.as_ref().to_string();
-        match self.kind {
+        match self.kind.as_ref() {
             ErrorKind::CommandError(ref err) => {
                 let mut err = err.clone();
                 err.labels.push(label);
@@ -197,7 +197,7 @@ where
 {
     fn from(err: E) -> Self {
         Self {
-            kind: err.into(),
+            kind: Box::new(err.into()),
             labels: Vec::new(),
         }
     }
@@ -603,7 +603,7 @@ impl WriteFailure {
 /// Translates ErrorKind::BulkWriteError cases to ErrorKind::WriteErrors, leaving all other errors
 /// untouched.
 pub(crate) fn convert_bulk_errors(error: Error) -> Error {
-    match error.kind {
+    match *error.kind {
         ErrorKind::BulkWriteError(ref bulk_failure) => {
             match WriteFailure::from_bulk_failure(bulk_failure.clone()) {
                 Ok(failure) => ErrorKind::WriteError(failure).into(),
