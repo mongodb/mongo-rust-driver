@@ -94,7 +94,7 @@ async fn handle_response_no_n() {
     let response = CommandResponse::with_document(doc! { "ok" : 1 });
 
     let result = count_op.handle_response(response, &Default::default());
-    match result.as_ref().map_err(|e| &e.kind) {
+    match result.map_err(|e| *e.kind) {
         Err(ErrorKind::ResponseError { .. }) => {}
         other => panic!("expected response error, but got {:?}", other),
     }

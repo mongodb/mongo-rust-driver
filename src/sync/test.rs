@@ -5,7 +5,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     bson::{doc, Document},
-    error::{CommandError, ErrorKind, Result},
+    error::Result,
     options::{
         Acknowledgment,
         ClientOptions,
@@ -21,7 +21,7 @@ use crate::{
 
 fn init_db_and_coll(client: &Client, db_name: &str, coll_name: &str) -> Collection<Document> {
     let coll = client.database(db_name).collection(coll_name);
-    drop_collection(&coll);
+    coll.drop(None).unwrap();
     coll
 }
 
@@ -30,20 +30,8 @@ where
     T: Serialize + DeserializeOwned + Unpin + Debug,
 {
     let coll = client.database(db_name).collection(coll_name);
-    drop_collection(&coll);
+    coll.drop(None).unwrap();
     coll
-}
-
-pub fn drop_collection<T>(coll: &Collection<T>)
-where
-    T: Serialize + DeserializeOwned + Unpin + Debug,
-{
-    match coll.drop(None).as_ref().map_err(|e| &e.kind) {
-        Err(ErrorKind::CommandError(CommandError { code: 26, .. })) | Ok(_) => {}
-        e @ Err(_) => {
-            e.unwrap();
-        }
-    };
 }
 
 #[test]

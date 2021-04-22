@@ -316,8 +316,7 @@ async fn run_test(test_file: TestFile) {
 
             match ClientOptions::parse(&test_case.uri)
                 .await
-                .as_ref()
-                .map_err(|e| &e.kind)
+                .map_err(|e| *e.kind)
             {
                 Ok(_) => panic!("expected {}", expected_type),
                 Err(ErrorKind::ArgumentError { .. }) => {}
@@ -341,8 +340,7 @@ async fn run_connection_string_spec_tests() {
 
 async fn parse_uri(option: &str, suggestion: Option<&str>) {
     match ClientOptionsParser::parse(&format!("mongodb://host:27017/?{}=test", option))
-        .as_ref()
-        .map_err(|e| &e.kind)
+        .map_err(|e| *e.kind)
     {
         Ok(_) => panic!("expected error for option {}", option),
         Err(ErrorKind::ArgumentError { message, .. }) => {

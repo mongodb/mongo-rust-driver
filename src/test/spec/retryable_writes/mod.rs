@@ -304,7 +304,7 @@ async fn mmapv1_error_raised() {
     }
 
     let err = coll.insert_one(doc! { "x": 1 }, None).await.unwrap_err();
-    match &err.kind {
+    match *err.kind {
         ErrorKind::CommandError(err) => {
             assert_eq!(
                 err.message,

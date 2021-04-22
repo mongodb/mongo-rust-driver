@@ -1,7 +1,7 @@
-use trust_dns_resolver::{config::ResolverConfig, error::ResolveErrorKind};
+use trust_dns_resolver::config::ResolverConfig;
 
 use crate::{
-    error::{Error, ErrorKind, Result},
+    error::{ErrorKind, Result},
     options::StreamAddress,
     runtime::AsyncResolver,
 };
@@ -193,7 +193,7 @@ impl SrvResolver {
 }
 
 fn ignore_no_records(error: Error) -> Result<()> {
-    match error.kind {
+    match *error.kind {
         ErrorKind::DnsResolve(resolve_error)
             if matches!(
                 resolve_error.kind(),

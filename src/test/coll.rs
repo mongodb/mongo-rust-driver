@@ -77,7 +77,7 @@ async fn insert_err_details() {
         .unwrap();
 
     let wc_error_result = coll.insert_one(doc! { "test": 1 }, None).await;
-    match wc_error_result.unwrap_err().kind {
+    match *wc_error_result.unwrap_err().kind {
         ErrorKind::WriteError(WriteFailure::WriteConcernError(ref wc_error)) => {
             match &wc_error.details {
                 Some(doc) => {
@@ -466,7 +466,7 @@ async fn large_insert_unordered_with_errors() {
         .await;
     let options = InsertManyOptions::builder().ordered(false).build();
 
-    match coll
+    match *coll
         .insert_many(docs, options)
         .await
         .expect_err("should get error")
@@ -506,7 +506,7 @@ async fn large_insert_ordered_with_errors() {
         .await;
     let options = InsertManyOptions::builder().ordered(true).build();
 
-    match coll
+    match *coll
         .insert_many(docs, options)
         .await
         .expect_err("should get error")
@@ -540,7 +540,7 @@ async fn empty_insert() {
     let coll = client
         .database(function_name!())
         .collection::<Document>(function_name!());
-    match coll
+    match *coll
         .insert_many(Vec::<Document>::new(), None)
         .await
         .expect_err("should get error")
@@ -717,10 +717,10 @@ async fn find_one_and_delete_hint_server_version() {
     let req2 = VersionReq::parse("4.2.*").unwrap();
     if req1.matches(&client.server_version) {
         let error = res.expect_err("find one and delete should fail");
-        assert!(matches!(error.kind, ErrorKind::OperationError { .. }));
+        assert!(matches!(*error.kind, ErrorKind::ArgumentError { .. }));
     } else if req2.matches(&client.server_version) {
         let error = res.expect_err("find one and delete should fail");
-        assert!(matches!(error.kind, ErrorKind::CommandError { .. }));
+        assert!(matches!(*error.kind, ErrorKind::CommandError { .. }));
     } else {
         assert!(res.is_ok());
     }

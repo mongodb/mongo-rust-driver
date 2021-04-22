@@ -137,7 +137,7 @@ async fn not_master_keep_pool() {
         let result = coll.insert_one(doc! { "test": 1 }, None).await;
         assert!(
             matches!(
-                result.as_ref().map_err(|e| &e.kind),
+                result.map_err(|e| *e.kind),
                 Err(ErrorKind::CommandError(CommandError { code: 10107, .. }))
             ),
             "insert should have failed"
@@ -183,7 +183,7 @@ async fn not_master_reset_pool() {
         let result = coll.insert_one(doc! { "test": 1 }, None).await;
         assert!(
             matches!(
-                result.as_ref().map_err(|e| &e.kind),
+                result.map_err(|e| *e.kind),
                 Err(ErrorKind::CommandError(CommandError { code: 10107, .. }))
             ),
             "insert should have failed"
@@ -228,7 +228,7 @@ async fn shutdown_in_progress() {
         let result = coll.insert_one(doc! { "test": 1 }, None).await;
         assert!(
             matches!(
-                result.as_ref().map_err(|e| &e.kind),
+                result.map_err(|e| *e.kind),
                 Err(ErrorKind::CommandError(CommandError { code: 91, .. }))
             ),
             "insert should have failed"
@@ -273,7 +273,7 @@ async fn interrupted_at_shutdown() {
         let result = coll.insert_one(doc! { "test": 1 }, None).await;
         assert!(
             matches!(
-                result.as_ref().map_err(|e| &e.kind),
+                result.map_err(|e| *e.kind),
                 Err(ErrorKind::CommandError(CommandError { code: 11600, .. }))
             ),
             "insert should have failed"

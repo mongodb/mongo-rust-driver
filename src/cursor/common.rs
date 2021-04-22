@@ -137,7 +137,7 @@ pub(super) trait GetMoreProviderResult {
         match self.as_ref() {
             Ok(res) => res.exhausted,
             Err(e) => {
-                matches!(e.kind, ErrorKind::CommandError(ref e) if e.code == 43 || e.code == 237)
+                matches!(*e.kind, ErrorKind::CommandError(ref e) if e.code == 43 || e.code == 237)
             }
         }
     }

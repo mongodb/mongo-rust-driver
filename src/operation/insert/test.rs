@@ -199,7 +199,7 @@ async fn handle_write_failure() {
         .handle_response(write_error_response, &Default::default());
     assert!(write_error_result.is_err());
 
-    match write_error_result.unwrap_err().kind {
+    match *write_error_result.unwrap_err().kind {
         ErrorKind::BulkWriteError(ref error) => {
             let write_errors = error.write_errors.clone().unwrap();
             assert_eq!(write_errors.len(), 1);
