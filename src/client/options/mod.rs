@@ -258,13 +258,13 @@ pub(crate) struct ServerApi {
 
     /// Whether the MongoDB server should reject all commands that are not part of the
     /// declared API version. This includes command options and aggregation pipeline stages.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub strict: Option<bool>,
 
     /// Whether the MongoDB server should return command failures when functionality that is
     /// deprecated from the declared API version is used.
     /// Note that at the time of this writing, no deprecations in version 1 exist.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub deprecation_errors: Option<bool>,
 }
 
@@ -289,23 +289,23 @@ pub struct ClientOptions {
     /// The application name that the Client will send to the server as part of the handshake. This
     /// can be used in combination with the server logs to determine which Client is connected to a
     /// server.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub app_name: Option<String>,
 
-    #[builder(default)]
+    #[builder(default, setter(skip))]
     pub(crate) compressors: Option<Vec<String>>,
 
     /// The handler that should process all Connection Monitoring and Pooling events. See the
     /// CmapEventHandler type documentation for more details.
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     #[serde(skip)]
     pub cmap_event_handler: Option<Arc<dyn CmapEventHandler>>,
 
     /// The handler that should process all command-related events. See the CommandEventHandler
     /// type documentation for more details.
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     #[serde(skip)]
     pub command_event_handler: Option<Arc<dyn CommandEventHandler>>,
 
@@ -313,30 +313,30 @@ pub struct ClientOptions {
     /// server.
     ///
     /// The default value is 10 seconds.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub connect_timeout: Option<Duration>,
 
     /// The credential to use for authenticating connections made by this client.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub credential: Option<Credential>,
 
     /// Specifies whether the Client should directly connect to a single host rather than
     /// autodiscover all servers in the cluster.
     ///
     /// The default value is false.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub direct_connection: Option<bool>,
 
     /// Extra information to append to the driver version in the metadata of the handshake with the
     /// server. This should be used by libraries wrapping the driver, e.g. ODMs.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub driver_info: Option<DriverInfo>,
 
     /// The amount of time each monitoring thread should wait between sending an isMaster command
     /// to its respective server.
     ///
     /// The default value is 10 seconds.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub heartbeat_freq: Option<Duration>,
 
     /// When running a read operation with a ReadPreference that allows selecting secondaries,
@@ -350,14 +350,14 @@ pub struct ClientOptions {
     /// lowest average round trip time is eligible.
     ///
     /// The default value is 15 ms.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub local_threshold: Option<Duration>,
 
     /// The amount of time that a connection can remain idle in a connection pool before being
     /// closed. A value of zero indicates that connections should not be closed due to being idle.
     ///
     /// By default, connections will not be closed due to being idle.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub max_idle_time: Option<Duration>,
 
     /// The maximum amount of connections that the Client should allow to be created in a
@@ -366,7 +366,7 @@ pub struct ClientOptions {
     /// operation finishes and its connection is checked back into the pool.
     ///
     /// The default value is 100.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub max_pool_size: Option<u32>,
 
     /// The minimum number of connections that should be available in a server's connection pool at
@@ -374,33 +374,33 @@ pub struct ClientOptions {
     /// be added to the pool in the background until `min_pool_size` is reached.
     ///
     /// The default value is 0.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub min_pool_size: Option<u32>,
 
     /// Specifies the default read concern for operations performed on the Client. See the
     /// ReadConcern type documentation for more details.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub read_concern: Option<ReadConcern>,
 
     /// The name of the replica set that the Client should connect to.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub repl_set_name: Option<String>,
 
     /// Whether or not the client should retry a read operation if the operation fails.
     ///
     /// The default value is true.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub retry_reads: Option<bool>,
 
     /// Whether or not the client should retry a write operation if the operation fails.
     ///
     /// The default value is true.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub retry_writes: Option<bool>,
 
     /// The default selection criteria for operations performed on the Client. See the
     /// SelectionCriteria type documentation for more details.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub selection_criteria: Option<SelectionCriteria>,
 
     /// The declared API version for this client.
@@ -412,23 +412,23 @@ pub struct ClientOptions {
     /// supported and is considered undefined behaviour. To run any command with a different API
     /// version or without declaring one, create a separate client that declares the
     /// appropriate API version.
-    #[builder(default, skip)]
+    #[builder(default, setter(skip))]
     pub(crate) server_api: Option<ServerApi>,
 
     /// The amount of time the Client should attempt to select a server for an operation before
     /// timing outs
     ///
     /// The default value is 30 seconds.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub server_selection_timeout: Option<Duration>,
 
-    #[builder(default)]
+    #[builder(default, setter(skip))]
     pub(crate) socket_timeout: Option<Duration>,
 
     /// The TLS configuration for the Client to use in its connections with the server.
     ///
     /// By default, TLS is disabled.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub tls: Option<Tls>,
 
     /// The amount of time a thread should block while waiting to check out a connection before
@@ -436,21 +436,21 @@ pub struct ClientOptions {
     /// out or if a connection is available in the pool, checking out a connection will not block.
     ///
     /// By default, threads will wait indefinitely for a connection to become available.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub wait_queue_timeout: Option<Duration>,
 
     /// Specifies the default write concern for operations performed on the Client. See the
     /// WriteConcern type documentation for more details.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub write_concern: Option<WriteConcern>,
 
-    #[builder(default)]
+    #[builder(default, setter(skip))]
     pub(crate) zlib_compression: Option<i32>,
 
-    #[builder(default)]
+    #[builder(default, setter(skip))]
     pub(crate) original_srv_hostname: Option<String>,
 
-    #[builder(default)]
+    #[builder(default, setter(skip))]
     pub(crate) original_uri: Option<String>,
 
     /// Configuration of the trust-dns resolver used for SRV and TXT lookups.
@@ -458,12 +458,13 @@ pub struct ClientOptions {
     ///
     /// On Windows, there is a known performance issue in trust-dns with using the default system
     /// configuration, so a custom configuration is recommended.
-    #[builder(default)]
+    #[builder(default, setter(skip))]
     #[serde(skip)]
     pub(crate) resolver_config: Option<ResolverConfig>,
 
     /// Used by tests to override MIN_HEARTBEAT_FREQUENCY.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
+    #[cfg(test)]
     pub(crate) heartbeat_freq_test: Option<Duration>,
 }
 
@@ -540,6 +541,7 @@ impl From<TlsOptions> for Option<Tls> {
 
 /// Specifies the TLS configuration that the [`Client`](../struct.Client.html) should use.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, TypedBuilder)]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]
 pub struct TlsOptions {
     /// Whether or not the [`Client`](../struct.Client.html) should return an error if the server
@@ -547,20 +549,17 @@ pub struct TlsOptions {
     /// production; it should only be used for testing.
     ///
     /// The default value is to error when the server presents an invalid certificate.
-    #[builder(default)]
     pub allow_invalid_certificates: Option<bool>,
 
     /// The path to the CA file that the [`Client`](../struct.Client.html) should use for TLS. If
     /// none is specified, then the driver will use the Mozilla root certificates from the
     /// `webpki-roots` crate.
-    #[builder(default)]
     pub ca_file_path: Option<String>,
 
     /// The path to the certificate file that the [`Client`](../struct.Client.html) should present
     /// to the server to verify its identify. If none is specified, then the
     /// [`Client`](../struct.Client.html) will not attempt to verify its identity to the
     /// server.
-    #[builder(default)]
     pub cert_key_file_path: Option<String>,
 }
 
@@ -645,11 +644,11 @@ pub struct DriverInfo {
     pub name: String,
 
     /// The version of the library wrapping the driver.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub version: Option<String>,
 
     /// Optional platform information for the wrapping driver.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub platform: Option<String>,
 }
 
@@ -684,8 +683,9 @@ impl From<ClientOptionsParser> for ClientOptions {
             original_srv_hostname: None,
             original_uri: Some(parser.original_uri),
             resolver_config: None,
-            heartbeat_freq_test: None,
             server_api: None,
+            #[cfg(test)]
+            heartbeat_freq_test: None,
         }
     }
 }
@@ -2070,4 +2070,5 @@ mod tests {
 /// Contains the options that can be used to create a new
 /// [`ClientSession`](../struct.ClientSession.html).
 #[derive(Clone, Debug, Deserialize, TypedBuilder)]
+#[builder(field_defaults(default, setter(strip_option)))]
 pub struct SessionOptions {}

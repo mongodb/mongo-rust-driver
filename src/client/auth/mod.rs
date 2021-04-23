@@ -325,29 +325,25 @@ impl FromStr for AuthMechanism {
 /// Some fields (mechanism and source) may be omitted and will either be negotiated or assigned a
 /// default value, depending on the values of other fields in the credential.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder, PartialEq)]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]
 pub struct Credential {
     /// The username to authenticate with. This applies to all mechanisms but may be omitted when
     /// authenticating via MONGODB-X509.
-    #[builder(default)]
     pub username: Option<String>,
 
     /// The database used to authenticate. This applies to all mechanisms and defaults to "admin"
     /// in SCRAM authentication mechanisms and "$external" for GSSAPI, MONGODB-X509 and PLAIN.
-    #[builder(default)]
     pub source: Option<String>,
 
     /// The password to authenticate with. This does not apply to all mechanisms.
-    #[builder(default)]
     pub password: Option<String>,
 
     /// Which authentication mechanism to use. If not provided, one will be negotiated with the
     /// server.
-    #[builder(default)]
     pub mechanism: Option<AuthMechanism>,
 
     /// Additional properties for the given mechanism.
-    #[builder(default)]
     pub mechanism_properties: Option<Document>,
 }
 

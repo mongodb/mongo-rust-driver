@@ -131,10 +131,14 @@ impl HeartbeatMonitor {
             drop(topology);
             drop(server);
 
+            #[cfg(test)]
             let min_frequency = self
                 .client_options
                 .heartbeat_freq_test
                 .unwrap_or(MIN_HEARTBEAT_FREQUENCY);
+
+            #[cfg(not(test))]
+            let min_frequency = MIN_HEARTBEAT_FREQUENCY;
 
             RUNTIME.delay_for(min_frequency).await;
             topology_check_requests_subscriber

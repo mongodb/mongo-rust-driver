@@ -155,12 +155,12 @@ impl<'de> Deserialize<'de> for ReadPreference {
 
 /// Specifies read preference options for non-primary read preferences.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, TypedBuilder)]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ReadPreferenceOptions {
     /// Specifies which replica set members should be considered for operations. Each tag set will
     /// be checked in order until one or more servers is found with each tag in the set.
-    #[builder(default)]
     pub tag_sets: Option<Vec<TagSet>>,
 
     /// Specifies the maximum amount of lag behind the primary that a secondary can be to be
@@ -169,7 +169,6 @@ pub struct ReadPreferenceOptions {
     ///
     /// `max_staleness` must be at least 90 seconds. If a `max_staleness` less than 90 seconds is
     /// specified for an operation, the operation will return an error.
-    #[builder(default)]
     #[serde(
         rename = "maxStalenessSeconds",
         deserialize_with = "deserialize_duration_from_u64_seconds"
@@ -181,7 +180,6 @@ pub struct ReadPreferenceOptions {
     /// read preference mode "nearest".
     ///
     /// See the [MongoDB docs](https://docs.mongodb.com/manual/core/read-preference-hedge-option/) for more details.
-    #[builder(default)]
     pub hedge: Option<HedgedReadOptions>,
 }
 

@@ -20,19 +20,17 @@ use crate::{
 /// These are the valid options for creating a [`Collection`](../struct.Collection.html) with
 /// [`Database::collection_with_options`](../struct.Database.html#method.collection_with_options).
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CollectionOptions {
     /// The default read preference for operations.
-    #[builder(default)]
     pub selection_criteria: Option<SelectionCriteria>,
 
     /// The default read concern for operations.
-    #[builder(default)]
     pub read_concern: Option<ReadConcern>,
 
     /// The default write concern for operations.
-    #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 }
 
@@ -103,14 +101,13 @@ pub enum CursorType {
 /// [`Collection::insert_one`](../struct.Collection.html#method.insert_one) operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]
 pub struct InsertOneOptions {
     /// Opt out of document-level validation.
-    #[builder(default)]
     pub bypass_document_validation: Option<bool>,
 
     /// The write concern for the operation.
-    #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 }
 
@@ -118,22 +115,20 @@ pub struct InsertOneOptions {
 /// [`Collection::insert_many`](../struct.Collection.html#method.insert_many) operation.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Default, TypedBuilder, Serialize, Deserialize)]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct InsertManyOptions {
     /// Opt out of document-level validation.
-    #[builder(default)]
     pub bypass_document_validation: Option<bool>,
 
     /// If true, when an insert fails, return without performing the remaining writes. If false,
     /// when a write fails, continue with the remaining writes, if any.
     ///
     /// Defaults to true.
-    #[builder(default)]
     pub ordered: Option<bool>,
 
     /// The write concern for the operation.
-    #[builder(default)]
     #[serde(skip_deserializing)]
     pub write_concern: Option<WriteConcern>,
 }
@@ -191,39 +186,34 @@ impl From<Vec<Document>> for UpdateModifications {
 /// [`Collection::update_many`](../struct.Collection.html#method.update_many) operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]
 pub struct UpdateOptions {
     /// A set of filters specifying to which array elements an update should apply.
     ///
     /// See the documentation [here](https://docs.mongodb.com/manual/reference/command/update/) for
     /// more information on array filters.
-    #[builder(default)]
     pub array_filters: Option<Vec<Document>>,
 
     /// Opt out of document-level validation.
-    #[builder(default)]
     pub bypass_document_validation: Option<bool>,
 
     /// If true, insert a document if no matching document is found.
-    #[builder(default)]
     pub upsert: Option<bool>,
 
     /// The collation to use for the operation.
     ///
     /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
     /// information on how to use this option.
-    #[builder(default)]
     pub collation: Option<Collation>,
 
     /// A document or string that specifies the index to use to support the query predicate.
     ///
     /// Only available in MongoDB 4.2+. See the official MongoDB
     /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#ex-update-command-hint) for examples.
-    #[builder(default)]
     pub hint: Option<Hint>,
 
     /// The write concern for the operation.
-    #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 }
 
@@ -244,32 +234,28 @@ impl UpdateOptions {
 /// [`Collection::replace_one`](../struct.Collection.html#method.replace_one) operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]
 pub struct ReplaceOptions {
     /// Opt out of document-level validation.
-    #[builder(default)]
     pub bypass_document_validation: Option<bool>,
 
     /// If true, insert a document if no matching document is found.
-    #[builder(default)]
     pub upsert: Option<bool>,
 
     /// The collation to use for the operation.
     ///
     /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
     /// information on how to use this option.
-    #[builder(default)]
     pub collation: Option<Collation>,
 
     /// A document or string that specifies the index to use to support the query predicate.
     ///
     /// Only available in MongoDB 4.2+. See the official MongoDB
     /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#ex-update-command-hint) for examples.
-    #[builder(default)]
     pub hint: Option<Hint>,
 
     /// The write concern for the operation.
-    #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 }
 
@@ -279,22 +265,20 @@ pub struct ReplaceOptions {
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]
 pub struct DeleteOptions {
     /// The collation to use for the operation.
     ///
     /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
     /// information on how to use this option.
-    #[builder(default)]
     pub collation: Option<Collation>,
 
     /// The write concern for the operation.
-    #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 
     /// The index to use for the operation.
     /// Only available in MongoDB 4.4+.
-    #[builder(default)]
     pub hint: Option<Hint>,
 }
 
@@ -303,37 +287,32 @@ pub struct DeleteOptions {
 /// operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]
 pub struct FindOneAndDeleteOptions {
     /// The maximum amount of time to allow the query to run.
     ///
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
-    #[builder(default)]
     pub max_time: Option<Duration>,
 
     /// Limits the fields of the document being returned.
-    #[builder(default)]
     pub projection: Option<Document>,
 
     /// The order of the documents for the purposes of the operation.
-    #[builder(default)]
     pub sort: Option<Document>,
 
     /// The level of the write concern
-    #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 
     /// The collation to use for the operation.
     ///
     /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
     /// information on how to use this option.
-    #[builder(default)]
     pub collation: Option<Collation>,
 
     /// The index to use for the operation.
     /// Only available in MongoDB 4.4+.
-    #[builder(default)]
     pub hint: Option<Hint>,
 }
 
@@ -341,50 +320,42 @@ pub struct FindOneAndDeleteOptions {
 /// [`Collection::find_one_and_replace`](../struct.Collection.html#method.find_one_and_replace)
 /// operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct FindOneAndReplaceOptions {
     /// Opt out of document-level validation.
-    #[builder(default)]
     pub bypass_document_validation: Option<bool>,
 
     /// The maximum amount of time to allow the query to run.
     ///
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
-    #[builder(default)]
     pub max_time: Option<Duration>,
 
     /// Limits the fields of the document being returned.
-    #[builder(default)]
     pub projection: Option<Document>,
 
     /// Whether the operation should return the document before or after modification.
-    #[builder(default)]
     pub return_document: Option<ReturnDocument>,
 
     /// The order of the documents for the purposes of the operation.
-    #[builder(default)]
     pub sort: Option<Document>,
 
     /// If true, insert a document if no matching document is found.
-    #[builder(default)]
     pub upsert: Option<bool>,
 
     /// The level of the write concern
-    #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 
     /// The collation to use for the operation.
     ///
     /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
     /// information on how to use this option.
-    #[builder(default)]
     pub collation: Option<Collation>,
 
     /// The index to use for the operation.
     /// Only available in MongoDB 4.4+.
-    #[builder(default)]
     pub hint: Option<Hint>,
 }
 
@@ -393,56 +364,47 @@ pub struct FindOneAndReplaceOptions {
 /// operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]
 pub struct FindOneAndUpdateOptions {
     /// A set of filters specifying to which array elements an update should apply.
     ///
     /// See the documentation [here](https://docs.mongodb.com/manual/reference/command/update/) for
     /// more information on array filters.
-    #[builder(default)]
     pub array_filters: Option<Vec<Document>>,
 
     /// Opt out of document-level validation.
-    #[builder(default)]
     pub bypass_document_validation: Option<bool>,
 
     /// The maximum amount of time to allow the query to run.
     ///
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
-    #[builder(default)]
     pub max_time: Option<Duration>,
 
     /// Limits the fields of the document being returned.
-    #[builder(default)]
     pub projection: Option<Document>,
 
     /// Whether the operation should return the document before or after modification.
-    #[builder(default)]
     pub return_document: Option<ReturnDocument>,
 
     /// The order of the documents for the purposes of the operation.
-    #[builder(default)]
     pub sort: Option<Document>,
 
     /// If true, insert a document if no matching document is found.
-    #[builder(default)]
     pub upsert: Option<bool>,
 
     /// The level of the write concern
-    #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 
     /// The collation to use for the operation.
     ///
     /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
     /// information on how to use this option.
-    #[builder(default)]
     pub collation: Option<Collation>,
 
     /// The index to use for the operation.
     /// Only available in MongoDB 4.4+.
-    #[builder(default)]
     pub hint: Option<Hint>,
 }
 
@@ -451,11 +413,11 @@ pub struct FindOneAndUpdateOptions {
 #[skip_serializing_none]
 #[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]
 pub struct AggregateOptions {
     /// Enables writing to temporary files. When set to true, aggregation stages can write data to
     /// the _tmp subdirectory in the dbPath directory.
-    #[builder(default)]
     pub allow_disk_use: Option<bool>,
 
     /// The number of documents the server should return per cursor batch.
@@ -464,35 +426,29 @@ pub struct AggregateOptions {
     /// only the number of documents kept in memory at a given time (and by extension, the
     /// number of round trips needed to return the entire set of documents returned by the
     /// query).
-    #[builder(default)]
     #[serde(serialize_with = "serialize_batch_size", rename(serialize = "cursor"))]
     pub batch_size: Option<u32>,
 
     /// Opt out of document-level validation.
-    #[builder(default)]
     pub bypass_document_validation: Option<bool>,
 
     /// The collation to use for the operation.
     ///
     /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
     /// information on how to use this option.
-    #[builder(default)]
     pub collation: Option<Collation>,
 
     /// Tags the query with an arbitrary string to help trace the operation through the database
     /// profiler, currentOp and logs.
-    #[builder(default)]
     pub comment: Option<String>,
 
     /// The index to use for the operation.
-    #[builder(default)]
     pub hint: Option<Hint>,
 
     /// The maximum amount of time for the server to wait on new documents to satisfy a tailable
     /// await cursor query.
     ///
     /// This option will have no effect on non-tailable cursors that result from this operation.
-    #[builder(default)]
     #[serde(
         skip_serializing,
         deserialize_with = "deserialize_duration_from_u64_millis"
@@ -503,7 +459,6 @@ pub struct AggregateOptions {
     ///
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
-    #[builder(default)]
     #[serde(
         serialize_with = "serialize_duration_as_int_millis",
         rename = "maxTimeMS",
@@ -515,14 +470,12 @@ pub struct AggregateOptions {
     ///
     /// If none is specified, the read concern defined on the object executing this operation will
     /// be used.
-    #[builder(default)]
     pub read_concern: Option<ReadConcern>,
 
     /// The criteria used to select a server for this operation.
     ///
     /// If none is specified, the selection criteria defined on the object executing this operation
     /// will be used.
-    #[builder(default)]
     #[serde(skip_serializing)]
     #[serde(rename = "readPreference")]
     pub selection_criteria: Option<SelectionCriteria>,
@@ -531,7 +484,6 @@ pub struct AggregateOptions {
     ///
     /// If none is specified, the write concern defined on the object executing this operation will
     /// be used.
-    #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 }
 
@@ -539,44 +491,38 @@ pub struct AggregateOptions {
 /// [`Collection::count_documents`](../struct.Collection.html#method.count_documents) operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]
 pub struct CountOptions {
     /// The index to use for the operation.
-    #[builder(default)]
     pub hint: Option<Hint>,
 
     /// The maximum number of documents to count.
-    #[builder(default)]
     pub limit: Option<i64>,
 
     /// The maximum amount of time to allow the query to run.
     ///
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
-    #[builder(default)]
     #[serde(deserialize_with = "deserialize_duration_from_u64_millis")]
     pub max_time: Option<Duration>,
 
     /// The number of documents to skip before counting.
-    #[builder(default)]
     pub skip: Option<i64>,
 
     /// The collation to use for the operation.
     ///
     /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
     /// information on how to use this option.
-    #[builder(default)]
     pub collation: Option<Collation>,
 
     /// The criteria used to select a server for this operation.
     ///
     /// If none specified, the default set on the collection will be used.
-    #[builder(default)]
     #[serde(skip_serializing)]
     pub selection_criteria: Option<SelectionCriteria>,
 
     /// The level of the read concern.
-    #[builder(default)]
     pub read_concern: Option<ReadConcern>,
 }
 
@@ -590,13 +536,13 @@ pub struct CountOptions {
 #[serde_with::skip_serializing_none]
 #[derive(Debug, Default, Deserialize, TypedBuilder, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]
 pub struct EstimatedDocumentCountOptions {
     /// The maximum amount of time to allow the query to run.
     ///
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
-    #[builder(default)]
     #[serde(
         serialize_with = "serialize_duration_as_int_millis",
         rename = "maxTimeMS",
@@ -607,12 +553,10 @@ pub struct EstimatedDocumentCountOptions {
     /// The criteria used to select a server for this operation.
     ///
     /// If none specified, the default set on the collection will be used.
-    #[builder(default)]
     #[serde(skip_serializing)]
     pub selection_criteria: Option<SelectionCriteria>,
 
     /// The level of the read concern.
-    #[builder(default)]
     pub read_concern: Option<ReadConcern>,
 }
 
@@ -620,6 +564,7 @@ pub struct EstimatedDocumentCountOptions {
 /// operation.
 #[serde_with::skip_serializing_none]
 #[derive(Debug, Default, Deserialize, TypedBuilder, Serialize, Clone)]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct DistinctOptions {
@@ -627,7 +572,6 @@ pub struct DistinctOptions {
     ///
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
-    #[builder(default)]
     #[serde(
         serialize_with = "serialize_duration_as_int_millis",
         rename = "maxTimeMS",
@@ -638,19 +582,16 @@ pub struct DistinctOptions {
     /// The criteria used to select a server for this operation.
     ///
     /// If none specified, the default set on the collection will be used.
-    #[builder(default)]
     #[serde(skip_serializing)]
     pub selection_criteria: Option<SelectionCriteria>,
 
     /// The level of the read concern.
-    #[builder(default)]
     pub read_concern: Option<ReadConcern>,
 
     /// The collation to use for the operation.
     ///
     /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
     /// information on how to use this option.
-    #[builder(default)]
     pub collation: Option<Collation>,
 }
 
@@ -658,18 +599,17 @@ pub struct DistinctOptions {
 /// operation.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct FindOptions {
     /// Enables writing to temporary files by the server. When set to true, the find operation can
     /// write data to the _tmp subdirectory in the dbPath directory. Only supported in server
     /// versions 4.4+.
-    #[builder(default)]
     pub allow_disk_use: Option<bool>,
 
     /// If true, partial results will be returned from a mongos rather than an error being
     /// returned if one or more shards is down.
-    #[builder(default)]
     pub allow_partial_results: Option<bool>,
 
     /// The number of documents the server should return per cursor batch.
@@ -678,38 +618,31 @@ pub struct FindOptions {
     /// only the number of documents kept in memory at a given time (and by extension, the
     /// number of round trips needed to return the entire set of documents returned by the
     /// query.
-    #[builder(default)]
     #[serde(serialize_with = "serialize_u32_as_i32")]
     pub batch_size: Option<u32>,
 
     /// Tags the query with an arbitrary string to help trace the operation through the database
     /// profiler, currentOp and logs.
-    #[builder(default)]
     pub comment: Option<String>,
 
     /// The type of cursor to return.
-    #[builder(default)]
     #[serde(skip)]
     pub cursor_type: Option<CursorType>,
 
     /// The index to use for the operation.
-    #[builder(default)]
     pub hint: Option<Hint>,
 
     /// The maximum number of documents to query.
     /// If a negative number is specified, the documents will be returned in a single batch limited
     /// in number by the positive value of the specified limit.
-    #[builder(default)]
     #[serde(serialize_with = "serialize_absolute_value")]
     pub limit: Option<i64>,
 
     /// The exclusive upper bound for a specific index.
-    #[builder(default)]
     pub max: Option<Document>,
 
     /// The maximum amount of time for the server to wait on new documents to satisfy a tailable
     /// cursor query. If the cursor is not tailable, this option is ignored.
-    #[builder(default)]
     #[serde(skip)]
     pub max_await_time: Option<Duration>,
 
@@ -717,14 +650,12 @@ pub struct FindOptions {
     ///
     /// Note: this option is deprecated starting in MongoDB version 4.0 and removed in MongoDB 4.2.
     /// Use the maxTimeMS option instead.
-    #[builder(default)]
     pub max_scan: Option<i64>,
 
     /// The maximum amount of time to allow the query to run.
     ///
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
-    #[builder(default)]
     #[serde(
         rename = "maxTimeMS",
         serialize_with = "serialize_duration_as_int_millis"
@@ -732,51 +663,41 @@ pub struct FindOptions {
     pub max_time: Option<Duration>,
 
     /// The inclusive lower bound for a specific index.
-    #[builder(default)]
     pub min: Option<Document>,
 
     /// Whether the server should close the cursor after a period of inactivity.
-    #[builder(default)]
     pub no_cursor_timeout: Option<bool>,
 
     /// Limits the fields of the document being returned.
-    #[builder(default)]
     pub projection: Option<Document>,
 
     /// The read concern to use for this find query.
     ///
     /// If none specified, the default set on the collection will be used.
-    #[builder(default)]
     pub read_concern: Option<ReadConcern>,
 
     /// Whether to return only the index keys in the documents.
-    #[builder(default)]
     pub return_key: Option<bool>,
 
     /// The criteria used to select a server for this find query.
     ///
     /// If none specified, the default set on the collection will be used.
-    #[builder(default)]
     #[serde(skip)]
     pub selection_criteria: Option<SelectionCriteria>,
 
     /// Whether to return the record identifier for each document.
-    #[builder(default)]
     pub show_record_id: Option<bool>,
 
     /// The number of documents to skip before counting.
-    #[builder(default)]
     pub skip: Option<i64>,
 
     /// The order of the documents for the purposes of the operation.
-    #[builder(default)]
     pub sort: Option<Document>,
 
     /// The collation to use for the operation.
     ///
     /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
     /// information on how to use this option.
-    #[builder(default)]
     pub collation: Option<Collation>,
 }
 
@@ -826,82 +747,68 @@ where
 /// operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]
 pub struct FindOneOptions {
     /// If true, partial results will be returned from a mongos rather than an error being
     /// returned if one or more shards is down.
-    #[builder(default)]
     pub allow_partial_results: Option<bool>,
 
     /// The collation to use for the operation.
     ///
     /// See the [documentation](https://docs.mongodb.com/manual/reference/collation/) for more
     /// information on how to use this option.
-    #[builder(default)]
     pub collation: Option<Collation>,
 
     /// Tags the query with an arbitrary string to help trace the operation through the database
     /// profiler, currentOp and logs.
-    #[builder(default)]
     pub comment: Option<String>,
 
     /// The index to use for the operation.
-    #[builder(default)]
     pub hint: Option<Hint>,
 
     /// The exclusive upper bound for a specific index.
-    #[builder(default)]
     pub max: Option<Document>,
 
     /// Maximum number of documents or index keys to scan when executing the query.
     ///
     /// Note: this option is deprecated starting in MongoDB version 4.0 and removed in MongoDB 4.2.
     /// Use the maxTimeMS option instead.
-    #[builder(default)]
     pub max_scan: Option<i64>,
 
     /// The maximum amount of time to allow the query to run.
     ///
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
-    #[builder(default)]
     #[serde(deserialize_with = "deserialize_duration_from_u64_millis")]
     pub max_time: Option<Duration>,
 
     /// The inclusive lower bound for a specific index.
-    #[builder(default)]
     pub min: Option<Document>,
 
     /// Limits the fields of the document being returned.
-    #[builder(default)]
     pub projection: Option<Document>,
 
     /// The read concern to use for this find query.
     ///
     /// If none specified, the default set on the collection will be used.
-    #[builder(default)]
     pub read_concern: Option<ReadConcern>,
 
     /// Whether to return only the index keys in the documents.
-    #[builder(default)]
     pub return_key: Option<bool>,
 
     /// The criteria used to select a server for this find query.
     ///
     /// If none specified, the default set on the collection will be used.
-    #[builder(default)]
     pub selection_criteria: Option<SelectionCriteria>,
 
     /// Whether to return the record identifier for each document.
-    #[builder(default)]
     pub show_record_id: Option<bool>,
 
     /// The number of documents to skip before counting.
-    #[builder(default)]
     pub skip: Option<i64>,
 
     /// The order of the documents for the purposes of the operation.
-    #[builder(default)]
     pub sort: Option<Document>,
 }
 
@@ -909,9 +816,9 @@ pub struct FindOneOptions {
 /// operation.
 #[derive(Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]
 pub struct DropCollectionOptions {
     /// The write concern for the operation.
-    #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 }

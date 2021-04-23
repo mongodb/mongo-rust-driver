@@ -346,9 +346,8 @@ async fn index_option_defaults_test(defaults: Option<IndexOptionDefaults>, name:
     let client = EventClient::new().await;
     let db = client.database(name);
 
-    let options = CreateCollectionOptions::builder()
-        .index_option_defaults(defaults.clone())
-        .build();
+    let mut options = CreateCollectionOptions::builder().build();
+    options.index_option_defaults = defaults.clone();
     db.create_collection(name, options).await.unwrap();
     db.drop(None).await.unwrap();
 

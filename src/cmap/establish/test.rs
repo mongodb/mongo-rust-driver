@@ -34,10 +34,10 @@ async fn speculative_auth_test(
         .await
         .unwrap();
 
-    let pool_options = ConnectionPoolOptions::builder()
+    let mut pool_options = ConnectionPoolOptions::builder()
         .credential(credential.clone())
-        .tls_options(CLIENT_OPTIONS.tls_options())
         .build();
+    pool_options.tls_options = CLIENT_OPTIONS.tls_options();
 
     let handshaker = Handshaker::new(Some(pool_options.clone().into()));
 
