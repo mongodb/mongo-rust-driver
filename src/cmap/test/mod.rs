@@ -12,8 +12,9 @@ use self::{
 };
 
 use crate::{
-    cmap::{options::ConnectionPoolOptions, Connection, ConnectionPool},
+    cmap::{Connection, ConnectionPool, ConnectionPoolOptions},
     error::{Error, Result},
+    event::cmap::ConnectionPoolOptions as EventOptions,
     options::TlsOptions,
     runtime::AsyncJoinHandle,
     sdam::{ServerUpdate, ServerUpdateSender},
@@ -329,11 +330,10 @@ impl Matchable for TlsOptions {
     }
 }
 
-impl Matchable for ConnectionPoolOptions {
-    fn content_matches(&self, expected: &ConnectionPoolOptions) -> bool {
+impl Matchable for EventOptions {
+    fn content_matches(&self, expected: &EventOptions) -> bool {
         self.app_name.matches(&expected.app_name)
             && self.connect_timeout.matches(&expected.connect_timeout)
-            && self.credential.matches(&expected.credential)
             && self.max_idle_time.matches(&expected.max_idle_time)
             && self.max_pool_size.matches(&expected.max_pool_size)
             && self.min_pool_size.matches(&expected.min_pool_size)
