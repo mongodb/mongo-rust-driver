@@ -161,9 +161,7 @@ async fn list_databases() {
     let prev_dbs = client.list_databases(None, None).await.unwrap();
 
     for name in expected_dbs {
-        assert!(!prev_dbs
-            .iter()
-            .any(|doc| doc.get("name") == Some(&Bson::String(name.to_string()))));
+        assert!(!prev_dbs.iter().any(|doc| doc.name.as_str() == name));
 
         let db = client.database(name);
 
@@ -176,20 +174,17 @@ async fn list_databases() {
     let new_dbs = client.list_databases(None, None).await.unwrap();
     let new_dbs: Vec<_> = new_dbs
         .into_iter()
-        .filter(|doc| match doc.get("name") {
-            Some(&Bson::String(ref name)) => expected_dbs.contains(name),
-            _ => false,
-        })
+        .filter(|db_spec| expected_dbs.contains(&db_spec.name))
         .collect();
     assert_eq!(new_dbs.len(), expected_dbs.len());
 
     for name in expected_dbs {
         let db_doc = new_dbs
             .iter()
-            .find(|doc| doc.get("name") == Some(&Bson::String(name.to_string())))
+            .find(|db_spec| db_spec.name.as_str() == name)
             .unwrap();
-        assert!(db_doc.contains_key("sizeOnDisk"));
-        assert!(db_doc.contains_key("empty"));
+        assert!(db_doc.size_on_disk > 0);
+        assert!(!db_doc.empty);
     }
 }
 

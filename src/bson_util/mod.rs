@@ -2,7 +2,7 @@ pub(crate) mod async_encoding;
 
 use std::time::Duration;
 
-use serde::{ser, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{de::Error, ser, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
     bson::{doc, oid::ObjectId, Binary, Bson, Document, JavaScriptCodeWithScope, Regex},
@@ -123,6 +123,18 @@ pub(crate) fn serialize_batch_size<S: Serializer>(
             "batch size must be able to fit into a signed 32-bit integer",
         )),
     }
+}
+
+/// Deserialize an i64 from any BSON number type if it could be done losslessly.
+pub(crate) fn deserialize_i64_from_bson_number<'de, D>(
+    deserializer: D,
+) -> std::result::Result<i64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let bson = Bson::deserialize(deserializer)?;
+    get_int(&bson)
+        .ok_or_else(|| D::Error::custom(format!("could not deserialize i64 from {:?}", bson)))
 }
 
 pub fn doc_size_bytes(doc: &Document) -> usize {

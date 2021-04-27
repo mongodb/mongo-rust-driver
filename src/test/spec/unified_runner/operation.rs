@@ -579,8 +579,7 @@ impl TestOperation for ListDatabases {
         let result = client
             .list_databases(self.filter.clone(), self.options.clone())
             .await?;
-        let result: Vec<Bson> = result.iter().map(Bson::from).collect();
-        Ok(Some(Bson::Array(result).into()))
+        Ok(Some(bson::to_bson(&result)?.into()))
     }
 
     async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {

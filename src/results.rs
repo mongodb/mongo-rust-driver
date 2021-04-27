@@ -141,3 +141,23 @@ pub struct CollectionSpecification {
     /// Provides information on the _id index for the collection
     pub id_index: Document,
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+/// A struct modeling the information about an individual database returned from [`crate::Client::list_databases`].
+pub struct DatabaseSpecification {
+    /// The name of the database.
+    pub name: String,
+
+    /// The amount of disk space in bytes that is consumed by the database.
+    #[serde(deserialize_with = "crate::bson_util::deserialize_i64_from_bson_number")]
+    pub size_on_disk: i64,
+
+    /// Whether the database has any data.
+    pub empty: bool,
+
+    /// For sharded clusters, this field includes a document which maps each shard to the size in bytes of the database
+    /// on disk on that shard. For non sharded environments, this field is `None`.
+    pub shards: Option<Document>,
+}

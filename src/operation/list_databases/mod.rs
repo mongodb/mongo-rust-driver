@@ -85,5 +85,4 @@ impl Operation for ListDatabases {
 #[derive(Debug, Deserialize)]
 struct ResponseBody {
     databases: Vec<Document>,
-    total_size: Option<i64>,
 }
