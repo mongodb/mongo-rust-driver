@@ -53,7 +53,7 @@ async fn build_validator() {
             coll: "test_coll".to_string(),
         },
         Some(CreateCollectionOptions {
-            validation: Some(query.clone()),
+            validator: Some(query.clone()),
             ..Default::default()
         }),
     );

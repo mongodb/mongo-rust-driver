@@ -635,8 +635,8 @@ impl TestOperation for ListCollections {
         let cursor = db
             .list_collections(self.filter.clone(), self.options.clone())
             .await?;
-        let result = cursor.try_collect::<Vec<Document>>().await?;
-        Ok(Some(Bson::from(result).into()))
+        let result = cursor.try_collect::<Vec<_>>().await?;
+        Ok(Some(bson::to_bson(&result)?.into()))
     }
 
     fn returns_root_documents(&self) -> bool {

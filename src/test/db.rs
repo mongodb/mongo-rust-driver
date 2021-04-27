@@ -8,7 +8,14 @@ use tokio::sync::RwLockReadGuard;
 use crate::{
     bson::{doc, Bson, Document},
     error::Result,
-    options::{AggregateOptions, CreateCollectionOptions, IndexOptionDefaults},
+    options::{
+        AggregateOptions,
+        CreateCollectionOptions,
+        IndexOptionDefaults,
+        ValidationAction,
+        ValidationLevel,
+    },
+    results::{CollectionSpecification, CollectionType},
     test::{
         util::{EventClient, TestClient},
         LOCK,
@@ -16,37 +23,17 @@ use crate::{
     Database,
 };
 
-#[derive(Debug, Deserialize)]
-struct CollectionInfo {
-    pub name: String,
-    #[serde(rename = "type")]
-    pub coll_type: String,
-    pub options: Document,
-    pub info: Info,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Info {
-    pub read_only: bool,
-    pub uuid: Bson,
-}
-
 #[derive(Deserialize)]
 struct IsMasterReply {
     ismaster: bool,
     ok: f64,
 }
 
-async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<CollectionInfo> {
-    let mut colls: Vec<CollectionInfo> = db
+async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<CollectionSpecification> {
+    let mut colls: Vec<CollectionSpecification> = db
         .list_collections(filter, None)
         .await
         .unwrap()
-        .and_then(|doc| match bson::from_bson(Bson::Document(doc)) {
-            Ok(info) => futures::future::ok(info),
-            Err(e) => futures::future::err(e.into()),
-        })
         .try_collect()
         .await
         .unwrap();
@@ -105,13 +92,8 @@ async fn list_collections() {
 
     for (i, coll) in colls.into_iter().enumerate() {
         assert_eq!(&coll.name, &coll_names[i]);
-        assert_eq!(&coll.coll_type, "collection");
+        assert_eq!(&coll.collection_type, &CollectionType::Collection);
         assert!(!coll.info.read_only);
-
-        match coll.info.uuid {
-            Bson::Binary(..) => {}
-            other => panic!("invalid BSON type for collection uuid: {:?}", other),
-        }
     }
 }
 
@@ -153,13 +135,8 @@ async fn list_collections_filter() {
 
     for (i, coll) in colls.into_iter().enumerate() {
         assert_eq!(&coll.name, &coll_names[i]);
-        assert_eq!(&coll.coll_type, "collection");
+        assert_eq!(&coll.collection_type, &CollectionType::Collection);
         assert!(!coll.info.read_only);
-
-        match coll.info.uuid {
-            Bson::Binary(..) => {}
-            other => panic!("invalid BSON type for collection uuid: {:?}", other),
-        }
     }
 }
 
@@ -197,6 +174,31 @@ async fn list_collection_names() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
+async fn collection_type() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
+    let view = Bson::String("view".to_string());
+    assert_eq!(
+        bson::from_bson::<CollectionType>(view).expect("deserialization should succeed"),
+        CollectionType::View
+    );
+
+    let collection = Bson::String("collection".to_string());
+    assert_eq!(
+        bson::from_bson::<CollectionType>(collection).expect("deserialization should succeed"),
+        CollectionType::Collection
+    );
+
+    let other = Bson::String("blah".to_string());
+    assert_eq!(
+        bson::from_bson::<CollectionType>(other).expect("deserialization should succeed"),
+        CollectionType::Other("blah".to_string())
+    );
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
 async fn collection_management() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
@@ -213,24 +215,40 @@ async fn collection_management() {
     let options = CreateCollectionOptions::builder()
         .capped(true)
         .size(512)
+        .validator(doc! { "x": { "$gt": 2 } })
+        .validation_level(ValidationLevel::Moderate)
+        .validation_action(ValidationAction::Warn)
         .build();
     db.create_collection(&format!("{}{}", function_name!(), 2), Some(options))
         .await
         .unwrap();
 
-    let colls = get_coll_info(&db, None).await;
+    let mut colls = get_coll_info(&db, None).await;
     assert_eq!(colls.len(), 2);
 
     assert_eq!(colls[0].name, format!("{}1", function_name!()));
-    assert_eq!(colls[0].coll_type, "collection");
-    assert!(colls[0].options.is_empty());
+    assert_eq!(colls[0].collection_type, CollectionType::Collection);
+    assert_eq!(
+        bson::to_document(&colls[0].options).expect("serialization should succeed"),
+        doc! {}
+    );
     assert!(!colls[0].info.read_only);
 
-    assert_eq!(colls[1].name, format!("{}2", function_name!()));
-    assert_eq!(colls[1].coll_type, "collection");
-    assert_eq!(colls[1].options.get("capped"), Some(&Bson::Boolean(true)));
-    assert_eq!(colls[1].options.get("size"), Some(&Bson::Int32(512)));
-    assert!(!colls[1].info.read_only);
+    let coll2 = colls.remove(1);
+    assert_eq!(coll2.name, format!("{}2", function_name!()));
+    assert_eq!(coll2.collection_type, CollectionType::Collection);
+    assert_eq!(coll2.options.capped, Some(true));
+    assert_eq!(coll2.options.size, Some(512));
+    assert_eq!(coll2.options.validator, Some(doc! { "x": { "$gt": 2 } }));
+    assert!(matches!(
+        coll2.options.validation_level,
+        Some(ValidationLevel::Moderate)
+    ));
+    assert!(matches!(
+        coll2.options.validation_action,
+        Some(ValidationAction::Warn)
+    ));
+    assert!(!coll2.info.read_only);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

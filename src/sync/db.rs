@@ -20,6 +20,7 @@ use crate::{
         SelectionCriteria,
         WriteConcern,
     },
+    results::CollectionSpecification,
     Database as AsyncDatabase,
     RUNTIME,
 };
@@ -140,7 +141,7 @@ impl Database {
         &self,
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<ListCollectionsOptions>>,
-    ) -> Result<Cursor<Document>> {
+    ) -> Result<Cursor<CollectionSpecification>> {
         RUNTIME
             .block_on(
                 self.async_database
@@ -157,7 +158,7 @@ impl Database {
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<ListCollectionsOptions>>,
         session: &mut ClientSession,
-    ) -> Result<SessionCursor<Document>> {
+    ) -> Result<SessionCursor<CollectionSpecification>> {
         RUNTIME
             .block_on(self.async_database.list_collections_with_session(
                 filter.into(),

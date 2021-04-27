@@ -2,9 +2,11 @@
 
 use std::collections::{HashMap, VecDeque};
 
-use crate::bson::{Bson, Document};
+use crate::{bson::{Bson, Document}, db::options::CreateCollectionOptions};
 
+use bson::Binary;
 use serde::Serialize;
+use serde::Deserialize;
 
 /// The result of a [`Collection::insert_one`](../struct.Collection.html#method.insert_one)
 /// operation.
@@ -70,4 +72,72 @@ pub struct DeleteResult {
 pub(crate) struct GetMoreResult {
     pub(crate) batch: VecDeque<Document>,
     pub(crate) exhausted: bool,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "lowercase", untagged)]
+#[non_exhaustive]
+/// Describes the type of data store returned when executing [`crate::Database::list_collections`].
+pub enum CollectionType {
+    /// Indicates that the data store is a view.
+    View,
+
+    /// Indicates that the data store is a collection.
+    Collection,
+
+    /// An unknown collection type. This is included for forwards compatibility.
+    Other(String),
+}
+
+impl<'de> Deserialize<'de> for CollectionType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de> {
+        let s = String::deserialize(deserializer)?;
+        let out = match s.as_str() {
+            "collection" => CollectionType::Collection,
+            "view" => CollectionType::View,
+            _ => CollectionType::Other(s)
+        };
+        Ok(out)
+    }
+}
+
+/// Info about the collection that is contained in the `CollectionSpecification::info` field of a specification returned from
+/// [`crate::Database::list_collections`].
+///
+/// See the MongoDB [manual](https://docs.mongodb.com/manual/reference/command/listCollections/#listCollections.cursor)
+/// for more information.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct CollectionSpecificationInfo {
+    /// Indicates whether or not the data store is read-only.
+    pub read_only: bool,
+
+    /// The collection's UUID - once established, this does not change and remains the same across replica
+    /// set members and shards in a sharded cluster. If the data store is a view, this field is `None`.
+    pub uuid: Option<Binary>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+/// Information about a collection as reported by [`crate::Database::list_collections`].
+pub struct CollectionSpecification {
+    /// The name of the collection.
+    pub name: String,
+
+    /// Type of the data store.
+    #[serde(rename="type")]
+    pub collection_type: CollectionType,
+
+    /// The options used to create the collection.
+    pub options: CreateCollectionOptions,
+
+    /// Additional info pertaining to the collection.
+    pub info: CollectionSpecificationInfo,
+
+    /// Provides information on the _id index for the collection
+    pub id_index: Document,
 }
