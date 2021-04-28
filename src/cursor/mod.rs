@@ -151,11 +151,11 @@ type ImplicitSessionCursor = GenericCursor<ImplicitSessionGetMoreProvider>;
 
 struct ImplicitSessionGetMoreResult {
     get_more_result: Result<GetMoreResult>,
-    session: Option<ClientSession>,
+    session: Option<Box<ClientSession>>,
 }
 
 impl GetMoreProviderResult for ImplicitSessionGetMoreResult {
-    type Session = Option<ClientSession>;
+    type Session = Option<Box<ClientSession>>;
 
     fn as_ref(&self) -> std::result::Result<&GetMoreResult, &Error> {
         self.get_more_result.as_ref()
@@ -170,7 +170,7 @@ impl GetMoreProviderResult for ImplicitSessionGetMoreResult {
 /// This is to be used with cursors associated with implicit sessions.
 enum ImplicitSessionGetMoreProvider {
     Executing(BoxFuture<'static, ImplicitSessionGetMoreResult>),
-    Idle(Option<ClientSession>),
+    Idle(Option<Box<ClientSession>>),
     Done,
 }
 
@@ -179,7 +179,7 @@ impl ImplicitSessionGetMoreProvider {
         if spec.id() == 0 {
             Self::Done
         } else {
-            Self::Idle(session)
+            Self::Idle(session.map(Box::new))
         }
     }
 }
@@ -195,7 +195,7 @@ impl GetMoreProvider for ImplicitSessionGetMoreProvider {
         }
     }
 
-    fn clear_execution(&mut self, session: Option<ClientSession>, exhausted: bool) {
+    fn clear_execution(&mut self, session: Option<Box<ClientSession>>, exhausted: bool) {
         // If cursor is exhausted, immediately return implicit session to the pool.
         if exhausted {
             *self = Self::Done;
@@ -209,8 +209,9 @@ impl GetMoreProvider for ImplicitSessionGetMoreProvider {
             Self::Idle(mut session) => {
                 let future = Box::pin(async move {
                     let get_more = GetMore::new(info);
-                    let get_more_result =
-                        client.execute_operation(get_more, session.as_mut()).await;
+                    let get_more_result = client
+                        .execute_operation(get_more, session.as_mut().map(|b| b.as_mut()))
+                        .await;
                     ImplicitSessionGetMoreResult {
                         get_more_result,
                         session,
