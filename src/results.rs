@@ -73,11 +73,11 @@ pub(crate) struct GetMoreResult {
     pub(crate) exhausted: bool,
 }
 
+/// Describes the type of data store returned when executing
+/// [`Database::list_collections`](../struct.Database.html#method.list_collections).
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase", untagged)]
 #[non_exhaustive]
-/// Describes the type of data store returned when executing
-/// [`Database::list_collections`](../struct.Database.html#method.list_collections).
 pub enum CollectionType {
     /// Indicates that the data store is a view.
     View,
@@ -120,10 +120,10 @@ pub struct CollectionSpecificationInfo {
     pub uuid: Option<Binary>,
 }
 
+/// Information about a collection as reported by [`Database::list_collections`](../struct.Database.html#method.list_collections).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-/// Information about a collection as reported by [`Database::list_collections`](../struct.Database.html#method.list_collections).
 pub struct CollectionSpecification {
     /// The name of the collection.
     pub name: String,
@@ -143,11 +143,11 @@ pub struct CollectionSpecification {
     pub id_index: Option<Document>,
 }
 
+/// A struct modeling the information about an individual database returned from
+/// [`Client::list_databases`](../struct.Client.html#method.list_databases).
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-/// A struct modeling the information about an individual database returned from
-/// [`Client::list_databases`](../struct.Client.html#method.list_databases).
 pub struct DatabaseSpecification {
     /// The name of the database.
     pub name: String,
