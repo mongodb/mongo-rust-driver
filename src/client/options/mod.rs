@@ -588,7 +588,7 @@ impl ServerCertVerifier for NoCertVerifier {
 
 impl TlsOptions {
     /// Converts `TlsOptions` into a rustls::ClientConfig.
-    pub fn into_rustls_config(self) -> Result<rustls::ClientConfig> {
+    pub(crate) fn into_rustls_config(self) -> Result<rustls::ClientConfig> {
         let mut config = rustls::ClientConfig::new();
 
         if let Some(true) = self.allow_invalid_certificates {
