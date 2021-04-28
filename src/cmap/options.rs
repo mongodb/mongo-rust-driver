@@ -21,7 +21,7 @@ pub(crate) struct ConnectionPoolOptions {
     /// handshake that each connection makes when it's created.
     pub(crate) app_name: Option<String>,
 
-    /// The connect timeout passed to each underlying TcpStream when attemtping to connect to the
+    /// The connect timeout passed to each underlying TcpStream when attempting to connect to the
     /// server.
     #[serde(skip)]
     pub(crate) connect_timeout: Option<Duration>,

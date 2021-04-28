@@ -45,7 +45,7 @@ pub struct ConnectionPoolOptions {
     /// handshake that each connection makes when it's created.
     pub app_name: Option<String>,
 
-    /// The connect timeout passed to each underlying TcpStream when attemtping to connect to the
+    /// The connect timeout passed to each underlying TcpStream when attempting to connect to the
     /// server.
     #[serde(skip)]
     pub connect_timeout: Option<Duration>,
