@@ -189,6 +189,10 @@ impl Error {
             }
         }
     }
+
+    pub(crate) fn from_resolve_error(error: trust_dns_resolver::error::ResolveError) -> Self {
+        ErrorKind::DnsResolveError { message: error.to_string() }.into()
+    }
 }
 
 impl<E> From<E> for Error
@@ -240,12 +244,8 @@ impl std::ops::Deref for Error {
 #[derive(Clone, Debug, Error)]
 #[non_exhaustive]
 pub enum ErrorKind {
-    /// Wrapper around [`std::net::AddrParseError`](https://doc.rust-lang.org/std/net/struct.AddrParseError.html).
-    #[error("{0}")]
-    AddrParse(#[from] std::net::AddrParseError),
-
-    /// An invalid argument was provided to a database operation.
-    #[error("An invalid argument was provided to a database operation: {message}")]
+    /// An invalid argument was provided.
+    #[error("An invalid argument was provided: {message}")]
     #[non_exhaustive]
     ArgumentError { message: String },
 
@@ -271,44 +271,18 @@ pub enum ErrorKind {
     #[error("Command failed {0}")]
     CommandError(CommandError),
 
-    // `trust_dns` does not implement the `Error` trait on their errors, so we have to manually
-    // implement `From` rather than using the `source annotation.
-    /// Wrapper around `trust_dns_resolver::error::ResolveError`.
-    #[error("{0}")]
-    DnsResolve(trust_dns_resolver::error::ResolveError),
+    /// An error occurred during DNS resolution.
+    #[error("An error occurred during DNS resolution: {message}")]
+    #[non_exhaustive]
+    DnsResolveError { message: String },
 
     #[error("Internal error: {message}")]
     #[non_exhaustive]
     InternalError { message: String },
 
-    /// Wrapper around `webpki::InvalidDNSNameError`.
-    #[error("{0}")]
-    InvalidDnsName(#[from] webpki::InvalidDNSNameError),
-
-    /// A hostname could not be parsed.
-    #[error("Unable to parse hostname: {hostname}")]
-    #[non_exhaustive]
-    InvalidHostname { hostname: String },
-
     /// Wrapper around [`std::io::Error`](https://doc.rust-lang.org/std/io/struct.Error.html).
     #[error("{0}")]
     Io(Arc<std::io::Error>),
-
-    #[error("No DNS results for domain {0}")]
-    NoDnsResults(StreamAddress),
-
-    /// A database operation failed to send or receive a reply.
-    #[error("A database operation failed to send or receive a reply: {message}")]
-    #[non_exhaustive]
-    OperationError { message: String },
-
-    /// Data from a file could not be parsed.
-    #[error("Unable to parse {data_type} data from {file_path}")]
-    #[non_exhaustive]
-    ParseError {
-        data_type: String,
-        file_path: String,
-    },
 
     /// The connection pool for a server was cleared during operation execution due to
     /// a concurrent error, causing the operation to fail.
@@ -326,22 +300,13 @@ pub enum ErrorKind {
     #[non_exhaustive]
     ServerSelectionError { message: String },
 
-    /// An error occurred during SRV record lookup.
-    #[error("An error occurred during SRV record lookup: {message}")]
-    #[non_exhaustive]
-    SrvLookupError { message: String },
-
     /// The Client does not support sessions.
     #[error("Attempted to start a session on a deployment that does not support sessions")]
     SessionsNotSupported,
 
-    #[error("{0}")]
-    RustlsConfig(#[from] rustls::TLSError),
-
-    /// An error occurred during TXT record lookup
-    #[error("An error occurred during TXT record lookup: {message}")]
+    #[error("{message}")]
     #[non_exhaustive]
-    TxtLookupError { message: String },
+    TlsConfigError { message: String },
 
     /// The Client timed out while checking out a connection from connection pool.
     #[error(
@@ -353,12 +318,6 @@ pub enum ErrorKind {
     /// An error occurred when trying to execute a write operation
     #[error("An error occurred when trying to execute a write operation: {0:?}")]
     WriteError(WriteFailure),
-}
-
-impl From<trust_dns_resolver::error::ResolveError> for ErrorKind {
-    fn from(error: trust_dns_resolver::error::ResolveError) -> Self {
-        Self::DnsResolve(error)
-    }
 }
 
 impl ErrorKind {

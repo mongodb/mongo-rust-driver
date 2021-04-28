@@ -278,7 +278,7 @@ impl From<ClientOptions> for HandshakerOptions {
 /// If the given command is not an isMaster, this function will return an error.
 pub(crate) async fn is_master(command: Command, conn: &mut Connection) -> Result<IsMasterReply> {
     if !command.name.eq_ignore_ascii_case("ismaster") {
-        return Err(ErrorKind::OperationError {
+        return Err(ErrorKind::InternalError {
             message: format!("invalid ismaster command: {}", command.name),
         }
         .into());

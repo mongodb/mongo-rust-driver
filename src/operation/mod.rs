@@ -107,7 +107,10 @@ pub(crate) trait Operation {
 
 /// Appends a serializable struct to the input document.
 /// The serializable struct MUST serialize to a Document, otherwise an error will be thrown.
-pub(crate) fn append_options<T: Serialize>(doc: &mut Document, options: Option<&T>) -> Result<()> {
+pub(crate) fn append_options<T: Serialize + Debug>(
+    doc: &mut Document,
+    options: Option<&T>,
+) -> Result<()> {
     match options {
         Some(options) => {
             let temp_doc = bson::to_bson(options)?;
@@ -116,8 +119,8 @@ pub(crate) fn append_options<T: Serialize>(doc: &mut Document, options: Option<&
                     doc.extend(d);
                     Ok(())
                 }
-                _ => Err(ErrorKind::OperationError {
-                    message: "options did not serialize to a Document".to_string(),
+                _ => Err(ErrorKind::InternalError {
+                    message: format!("options did not serialize to a Document: {:?}", options),
                 }
                 .into()),
             }

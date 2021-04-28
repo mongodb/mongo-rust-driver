@@ -82,7 +82,7 @@ impl SrvResolver {
             .collect();
 
         if srv_addresses.is_empty() {
-            return Err(ErrorKind::SrvLookupError {
+            return Err(ErrorKind::DnsResolveError {
                 message: format!("SRV lookup for {} returned no records", original_hostname),
             }
             .into());
@@ -99,7 +99,7 @@ impl SrvResolver {
             }
 
             if !&hostname_parts[1..].ends_with(domain_name) {
-                return Err(ErrorKind::SrvLookupError {
+                return Err(ErrorKind::DnsResolveError {
                     message: format!(
                         "SRV lookup for {} returned result {}, which does not match domain name {}",
                         original_hostname,
@@ -125,9 +125,9 @@ impl SrvResolver {
         original_hostname: &str,
         config: &mut ResolvedConfig,
     ) -> Result<()> {
-        let txt_records_response = match self.resolver.txt_lookup(original_hostname).await {
-            Ok(response) => response,
-            Err(e) => return ignore_no_records(e),
+        let txt_records_response = match self.resolver.txt_lookup(original_hostname).await? {
+            Some(response) => response,
+            None => return Ok(()),
         };
         let mut txt_records = txt_records_response.iter();
 
@@ -137,7 +137,7 @@ impl SrvResolver {
         };
 
         if txt_records.next().is_some() {
-            return Err(ErrorKind::TxtLookupError {
+            return Err(ErrorKind::DnsResolveError {
                 message: format!(
                     "TXT lookup for {} returned more than one record, but more than one are not \
                      allowed with 'mongodb+srv'",
@@ -159,7 +159,7 @@ impl SrvResolver {
             let parts: Vec<_> = option_pair.split('=').collect();
 
             if parts.len() != 2 {
-                return Err(ErrorKind::TxtLookupError {
+                return Err(ErrorKind::DnsResolveError {
                     message: format!(
                         "TXT record string '{}' is not a value `key=value` option pair",
                         option_pair
@@ -176,7 +176,7 @@ impl SrvResolver {
                     config.replica_set = Some(parts[1].into());
                 }
                 other => {
-                    return Err(ErrorKind::TxtLookupError {
+                    return Err(ErrorKind::DnsResolveError {
                         message: format!(
                             "TXT record option '{}' was returned, but only 'authSource' and \
                              'replicaSet' are allowed",
@@ -189,19 +189,5 @@ impl SrvResolver {
         }
 
         Ok(())
-    }
-}
-
-fn ignore_no_records(error: Error) -> Result<()> {
-    match *error.kind {
-        ErrorKind::DnsResolve(resolve_error)
-            if matches!(
-                resolve_error.kind(),
-                ResolveErrorKind::NoRecordsFound { .. }
-            ) =>
-        {
-            Ok(())
-        }
-        _ => Err(error),
     }
 }

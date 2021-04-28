@@ -256,7 +256,7 @@ impl Connection {
     /// Gets the connection's StreamDescription.
     pub(crate) fn stream_description(&self) -> Result<&StreamDescription> {
         self.stream_description.as_ref().ok_or_else(|| {
-            ErrorKind::OperationError {
+            ErrorKind::InternalError {
                 message: "Stream checked out but not handshaked".to_string(),
             }
             .into()
