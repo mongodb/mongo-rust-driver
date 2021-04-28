@@ -205,13 +205,13 @@ where
 
 impl From<bson::de::Error> for ErrorKind {
     fn from(err: bson::de::Error) -> Self {
-        Self::BsonDecode(Arc::new(err))
+        Self::BsonDecode(err)
     }
 }
 
 impl From<bson::ser::Error> for ErrorKind {
     fn from(err: bson::ser::Error) -> Self {
-        Self::BsonEncode(Arc::new(err))
+        Self::BsonEncode(err)
     }
 }
 
@@ -257,11 +257,11 @@ pub enum ErrorKind {
 
     /// Wrapper around `bson::de::Error`.
     #[error("{0}")]
-    BsonDecode(Arc<crate::bson::de::Error>),
+    BsonDecode(crate::bson::de::Error),
 
     /// Wrapper around `bson::ser::Error`.
     #[error("{0}")]
-    BsonEncode(Arc<crate::bson::ser::Error>),
+    BsonEncode(crate::bson::ser::Error),
 
     /// An error occurred when trying to execute a write operation consisting of multiple writes.
     #[error("An error occurred when trying to execute a write operation: {0:?}")]
