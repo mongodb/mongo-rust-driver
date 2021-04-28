@@ -1,6 +1,5 @@
-use crate::{bson::doc, options::ClientOptions, Client};
+use crate::{bson::doc, client::options::ResolverConfig, options::ClientOptions, Client};
 use bson::Document;
-use trust_dns_resolver::config::ResolverConfig;
 
 async fn run_test(uri_env_var: &str, resolver_config: Option<ResolverConfig>) {
     if std::env::var_os("MONGO_ATLAS_TESTS").is_none() {
