@@ -17,7 +17,7 @@ pub struct TestFile {
     version: u8,
     style: TestStyle,
     pub description: String,
-    pub pool_options: Option<ConnectionPoolOptions>,
+    pub(crate) pool_options: Option<ConnectionPoolOptions>,
     pub operations: Vec<ThreadedOperation>,
     pub error: Option<Error>,
     pub events: Vec<Event>,

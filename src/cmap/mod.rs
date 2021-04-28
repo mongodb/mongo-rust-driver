@@ -78,7 +78,7 @@ impl ConnectionPool {
         if let Some(ref handler) = event_handler {
             handler.handle_pool_created_event(PoolCreatedEvent {
                 address: address.clone(),
-                options,
+                options: options.map(|o| o.to_event_options()),
             });
         };
 

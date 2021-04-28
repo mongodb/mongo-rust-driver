@@ -1,10 +1,14 @@
 //! Contains the events and functionality for monitoring behavior of the connection pooling of a
 //! `Client`.
 
+use std::time::Duration;
+
 use serde::Deserialize;
 
-pub use crate::cmap::options::ConnectionPoolOptions;
-use crate::options::StreamAddress;
+use crate::{
+    client::options::{DriverInfo, ServerApi, TlsOptions},
+    options::StreamAddress,
+};
 
 /// We implement `Deserialize` for all of the event types so that we can more easily parse the CMAP
 /// spec tests. However, we have no need to parse the address field from the JSON files (if it's
@@ -29,6 +33,70 @@ pub struct PoolCreatedEvent {
 
     /// The options used for the pool.
     pub options: Option<ConnectionPoolOptions>,
+}
+
+/// Contains the options for creating a connection pool. While these options are specified at the
+/// client-level, `ConnectionPoolOptions` is exposed for the purpose of CMAP event handling.
+#[derive(Clone, Default, Deserialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ConnectionPoolOptions {
+    /// The application name specified by the user. This is sent to the server as part of the
+    /// handshake that each connection makes when it's created.
+    pub app_name: Option<String>,
+
+    /// The connect timeout passed to each underlying TcpStream when attempting to connect to the
+    /// server.
+    #[serde(skip)]
+    pub connect_timeout: Option<Duration>,
+
+    /// Extra information to append to the driver version in the metadata of the handshake with the
+    /// server. This should be used by libraries wrapping the driver, e.g. ODMs.
+    #[serde(skip)]
+    pub driver_info: Option<DriverInfo>,
+
+    /// Connections that have been ready for usage in the pool for longer than `max_idle_time` will
+    /// not be used.
+    ///
+    /// The default is that connections will not be closed due to being idle.
+    #[serde(rename = "maxIdleTimeMS")]
+    #[serde(default)]
+    #[serde(deserialize_with = "crate::bson_util::deserialize_duration_from_u64_millis")]
+    pub max_idle_time: Option<Duration>,
+
+    /// The maximum number of connections that the pool can have at a given time. This includes
+    /// connections which are currently checked out of the pool.
+    ///
+    /// The default is 100.
+    pub max_pool_size: Option<u32>,
+
+    /// The minimum number of connections that the pool can have at a given time. This includes
+    /// connections which are currently checked out of the pool. If fewer than `min_pool_size`
+    /// connections are in the pool, connections will be added to the pool in the background.
+    ///
+    /// The default is that no minimum is enforced
+    pub min_pool_size: Option<u32>,
+
+    /// The declared API version
+    ///
+    /// The default value is to have no declared API version
+    pub(crate) server_api: Option<ServerApi>,
+
+    /// The options specifying how a TLS connection should be configured. If `tls_options` is
+    /// `None`, then TLS will not be used for the connections.
+    ///
+    /// The default is not to use TLS for connections.
+    #[serde(skip)]
+    pub tls_options: Option<TlsOptions>,
+
+    /// Rather than wait indefinitely for a connection to become available, instead return an error
+    /// after the given duration.
+    ///
+    /// The default is to block indefinitely until a connection becomes available.
+    #[serde(rename = "waitQueueTimeoutMS")]
+    #[serde(default)]
+    #[serde(deserialize_with = "crate::bson_util::deserialize_duration_from_u64_millis")]
+    pub wait_queue_timeout: Option<Duration>,
 }
 
 /// Event emitted when a connection pool becomes ready.
