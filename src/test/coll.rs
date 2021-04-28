@@ -14,6 +14,7 @@ use crate::{
         AggregateOptions,
         CollectionOptions,
         DeleteOptions,
+        DropCollectionOptions,
         FindOneAndDeleteOptions,
         FindOneOptions,
         FindOptions,
@@ -1006,4 +1007,16 @@ async fn assert_options_inherited(client: &EventClient, command_name: &str) {
         event.command.contains_key("$readPreference"),
         !client.is_standalone()
     );
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn drop_skip_serializing_none() {
+    let client = TestClient::new().await;
+    let coll: Collection<Document> = client
+        .database(function_name!())
+        .collection(function_name!());
+    let options = DropCollectionOptions::builder().build();
+    assert!(coll.drop(options).await.is_ok());
 }
