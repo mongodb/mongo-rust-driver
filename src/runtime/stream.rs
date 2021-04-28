@@ -114,7 +114,10 @@ impl AsyncTcpStream {
         let mut socket_addrs: Vec<_> = RUNTIME.resolve_address(address).await?.collect();
 
         if socket_addrs.is_empty() {
-            return Err(ErrorKind::NoDnsResults(address.clone()).into());
+            return Err(ErrorKind::DnsResolveError {
+                message: format!("No DNS results for domain {}", address),
+            }
+            .into());
         }
 
         // After considering various approaches, we decided to do what other drivers do, namely try
@@ -130,7 +133,12 @@ impl AsyncTcpStream {
             };
         }
 
-        Err(connect_error.unwrap_or_else(|| ErrorKind::NoDnsResults(address.clone()).into()))
+        Err(connect_error.unwrap_or_else(|| {
+            ErrorKind::InternalError {
+                message: "connecting to all DNS results failed but no error reported".to_string(),
+            }
+            .into()
+        }))
     }
 }
 
@@ -142,7 +150,12 @@ impl AsyncStream {
         // If there are TLS options, wrap the inner stream with rustls.
         match options.tls_options {
             Some(cfg) => {
-                let name = DNSNameRef::try_from_ascii_str(&options.address.hostname)?;
+                let name =
+                    DNSNameRef::try_from_ascii_str(&options.address.hostname).map_err(|e| {
+                        ErrorKind::DnsResolveError {
+                            message: e.to_string(),
+                        }
+                    })?;
                 let mut tls_config = cfg.into_rustls_config()?;
                 tls_config.enable_sni = true;
 

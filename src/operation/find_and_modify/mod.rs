@@ -103,24 +103,13 @@ where
     const NAME: &'static str = "findAndModify";
 
     fn build(&self, description: &StreamDescription) -> Result<Command> {
-        if self.options.hint.is_some() {
-            match description.max_wire_version {
-                Some(version) if version < 8 => {
-                    return Err(ErrorKind::OperationError {
-                        message: "Specifying a hint is not supported on server versions < 4.4"
-                            .to_string(),
-                    }
-                    .into());
-                }
-                None => {
-                    return Err(ErrorKind::OperationError {
-                        message: "Specifying a hint is not supported on server versions < 4.4"
-                            .to_string(),
-                    }
-                    .into());
-                }
-                _ => {}
+        if self.options.hint.is_some() && description.max_wire_version.unwrap_or(0) < 8 {
+            return Err(ErrorKind::ArgumentError {
+                message: "Specifying a hint to find_one_and_x is not supported on server versions \
+                          < 4.4"
+                    .to_string(),
             }
+            .into());
         }
 
         let mut body: Document = doc! {

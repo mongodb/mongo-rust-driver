@@ -149,8 +149,8 @@ impl StreamAddress {
         let hostname = match parts.next() {
             Some(part) => part,
             None => {
-                return Err(ErrorKind::InvalidHostname {
-                    hostname: address.to_string(),
+                return Err(ErrorKind::ArgumentError {
+                    message: format!("invalid server address: \"{}\"", address),
                 }
                 .into())
             }
@@ -158,13 +158,19 @@ impl StreamAddress {
 
         let port = match parts.next() {
             Some(part) => {
-                let port = u16::from_str(part).map_err(|_| ErrorKind::InvalidHostname {
-                    hostname: address.to_string(),
+                let port = u16::from_str(part).map_err(|_| ErrorKind::ArgumentError {
+                    message: format!(
+                        "port must be valid 16-bit unsigned integer, instead got: {}",
+                        part
+                    ),
                 })?;
 
                 if parts.next().is_some() {
-                    return Err(ErrorKind::InvalidHostname {
-                        hostname: address.to_string(),
+                    return Err(ErrorKind::ArgumentError {
+                        message: format!(
+                            "address \"{}\" contains more than one unescaped ':'",
+                            address
+                        ),
                     }
                     .into());
                 }
@@ -592,9 +598,8 @@ impl TlsOptions {
         if let Some(path) = self.ca_file_path {
             store
                 .add_pem_file(&mut BufReader::new(File::open(&path)?))
-                .map_err(|_| ErrorKind::ParseError {
-                    data_type: "PEM-encoded root certificate".to_string(),
-                    file_path: path,
+                .map_err(|_| ErrorKind::TlsConfigError {
+                    message: format!("Unable to parse PEM-encoded root certificate from {}", path),
                 })?;
         } else {
             store.add_server_trust_anchors(&TLS_SERVER_ROOTS);
@@ -607,9 +612,11 @@ impl TlsOptions {
             let certs = match pemfile::certs(&mut file) {
                 Ok(certs) => certs,
                 Err(()) => {
-                    return Err(ErrorKind::ParseError {
-                        data_type: "PEM-encoded client certificate".to_string(),
-                        file_path: path,
+                    return Err(ErrorKind::TlsConfigError {
+                        message: format!(
+                            "Unable to parse PEM-encoded client certificate from {}",
+                            path
+                        ),
                     }
                     .into())
                 }
@@ -619,16 +626,19 @@ impl TlsOptions {
             let key = match pemfile::rsa_private_keys(&mut file) {
                 Ok(key) => key,
                 Err(()) => {
-                    return Err(ErrorKind::ParseError {
-                        data_type: "PEM-encoded RSA key".to_string(),
-                        file_path: path,
+                    return Err(ErrorKind::TlsConfigError {
+                        message: format!("Unable to parse PEM-encoded RSA key from {}", path),
                     }
                     .into())
                 }
             };
 
             // TODO: Get rid of unwrap.
-            config.set_single_client_cert(certs, key.into_iter().next().unwrap())?;
+            config
+                .set_single_client_cert(certs, key.into_iter().next().unwrap())
+                .map_err(|e| ErrorKind::TlsConfigError {
+                    message: e.to_string(),
+                })?;
         }
 
         Ok(config)
