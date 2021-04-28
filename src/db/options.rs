@@ -85,7 +85,7 @@ pub struct CreateCollectionOptions {
 
 /// Specifies how strictly the database should apply validation rules to existing documents during
 /// an update.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum ValidationLevel {
@@ -100,7 +100,7 @@ pub enum ValidationLevel {
 
 /// Specifies whether the database should return an error or simply raise a warning if inserted
 /// documents do not pass the validation.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum ValidationAction {
@@ -111,7 +111,7 @@ pub enum ValidationAction {
 }
 
 /// Specifies default configuration for indexes created on a collection, including the _id index.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, TypedBuilder, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct IndexOptionDefaults {

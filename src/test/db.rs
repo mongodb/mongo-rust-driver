@@ -10,6 +10,7 @@ use crate::{
     error::Result,
     options::{
         AggregateOptions,
+        Collation,
         CreateCollectionOptions,
         IndexOptionDefaults,
         ValidationAction,
@@ -212,19 +213,41 @@ async fn collection_management() {
         .await
         .unwrap();
 
+    let collation = Collation::builder().locale("en_US".to_string()).build();
     let options = CreateCollectionOptions::builder()
         .capped(true)
         .size(512)
-        .validator(doc! { "x": { "$gt": 2 } })
+        .max(50)
+        .storage_engine(doc! { "wiredTiger": {} })
+        .validator(doc! { "x" : { "$gt": 0 } })
         .validation_level(ValidationLevel::Moderate)
-        .validation_action(ValidationAction::Warn)
+        .validation_action(ValidationAction::Error)
+        .collation(collation.clone())
+        .index_option_defaults(
+            IndexOptionDefaults::builder()
+                .storage_engine(doc! { "wiredTiger": {} })
+                .build(),
+        )
         .build();
-    db.create_collection(&format!("{}{}", function_name!(), 2), Some(options))
+
+    db.create_collection(&format!("{}{}", function_name!(), 2), options.clone())
         .await
         .unwrap();
 
-    let mut colls = get_coll_info(&db, None).await;
-    assert_eq!(colls.len(), 2);
+    let view_options = CreateCollectionOptions::builder()
+        .view_on(format!("{}{}", function_name!(), 2))
+        .pipeline(vec![doc! { "$match": {} }])
+        .build();
+    db.create_collection(&format!("{}{}", function_name!(), 3), view_options.clone())
+        .await
+        .unwrap();
+
+    let mut colls = get_coll_info(
+        &db,
+        Some(doc! { "name": { "$regex": "^collection_management" } }),
+    )
+    .await;
+    assert_eq!(colls.len(), 3);
 
     assert_eq!(colls[0].name, format!("{}1", function_name!()));
     assert_eq!(colls[0].collection_type, CollectionType::Collection);
@@ -237,18 +260,27 @@ async fn collection_management() {
     let coll2 = colls.remove(1);
     assert_eq!(coll2.name, format!("{}2", function_name!()));
     assert_eq!(coll2.collection_type, CollectionType::Collection);
-    assert_eq!(coll2.options.capped, Some(true));
-    assert_eq!(coll2.options.size, Some(512));
-    assert_eq!(coll2.options.validator, Some(doc! { "x": { "$gt": 2 } }));
-    assert!(matches!(
-        coll2.options.validation_level,
-        Some(ValidationLevel::Moderate)
-    ));
-    assert!(matches!(
-        coll2.options.validation_action,
-        Some(ValidationAction::Warn)
-    ));
+    assert_eq!(coll2.options.capped, options.capped);
+    assert_eq!(coll2.options.size, options.size);
+    assert_eq!(coll2.options.validator, options.validator);
+    assert_eq!(coll2.options.validation_action, options.validation_action);
+    assert_eq!(coll2.options.validation_level, options.validation_level);
+    assert_eq!(coll2.options.collation.unwrap().locale, collation.locale);
+    assert_eq!(coll2.options.storage_engine, options.storage_engine);
+    assert_eq!(
+        coll2.options.index_option_defaults,
+        options.index_option_defaults
+    );
     assert!(!coll2.info.read_only);
+    assert!(coll2.id_index.is_some());
+
+    let coll3 = colls.remove(1);
+    assert_eq!(coll3.name, format!("{}3", function_name!()));
+    assert_eq!(coll3.collection_type, CollectionType::View);
+    assert_eq!(coll3.options.view_on, view_options.view_on);
+    assert_eq!(coll3.options.pipeline, view_options.pipeline);
+    assert!(coll3.info.read_only);
+    assert!(coll3.id_index.is_none());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

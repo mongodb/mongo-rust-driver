@@ -5,8 +5,7 @@ use std::collections::{HashMap, VecDeque};
 use crate::{bson::{Bson, Document}, db::options::CreateCollectionOptions};
 
 use bson::Binary;
-use serde::Serialize;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// The result of a [`Collection::insert_one`](../struct.Collection.html#method.insert_one)
 /// operation.
@@ -140,7 +139,8 @@ pub struct CollectionSpecification {
     pub info: CollectionSpecificationInfo,
 
     /// Provides information on the _id index for the collection
-    pub id_index: Document,
+    /// For views, this is `None`.
+    pub id_index: Option<Document>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
