@@ -1,7 +1,5 @@
-use bson::Document;
-
 use crate::{
-    bson::{doc, Bson},
+    bson::{doc, Bson, Document},
     bson_util,
     cmap::{CommandResponse, StreamDescription},
     error::ErrorKind,
@@ -113,6 +111,8 @@ async fn handle_success() {
         },
     ];
 
+    let expected_values: Vec<Document> = databases.clone();
+
     let response = CommandResponse::with_document(doc! {
        "databases" : bson_util::to_bson_array(&databases),
        "totalSize" : total_size,
@@ -123,7 +123,7 @@ async fn handle_success() {
         .handle_response(response, &Default::default())
         .expect("supposed to succeed");
 
-    assert_eq!(actual_values, databases);
+    assert_eq!(actual_values, expected_values);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
