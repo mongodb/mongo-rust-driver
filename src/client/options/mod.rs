@@ -1,6 +1,8 @@
 #[cfg(all(test, not(feature = "sync")))]
 mod test;
 
+mod resolver_config;
+
 use std::{
     collections::HashSet,
     fmt::{self, Display, Formatter},
@@ -28,7 +30,6 @@ use serde::{
     Deserializer,
 };
 use strsim::jaro_winkler;
-pub use trust_dns_resolver::config::ResolverConfig;
 use typed_builder::TypedBuilder;
 use webpki_roots::TLS_SERVER_ROOTS;
 
@@ -43,6 +44,8 @@ use crate::{
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
     srv::SrvResolver,
 };
+
+pub use resolver_config::ResolverConfig;
 
 const DEFAULT_PORT: u16 = 27017;
 
@@ -820,7 +823,7 @@ impl ClientOptions {
         options.resolver_config = resolver_config.clone();
 
         if srv {
-            let mut resolver = SrvResolver::new(resolver_config).await?;
+            let mut resolver = SrvResolver::new(resolver_config.map(|config| config.inner)).await?;
             let mut config = resolver
                 .resolve_client_options(&options.hosts[0].hostname)
                 .await?;
