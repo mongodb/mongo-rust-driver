@@ -77,7 +77,8 @@ pub(crate) struct GetMoreResult {
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase", untagged)]
 #[non_exhaustive]
-/// Describes the type of data store returned when executing [`crate::Database::list_collections`].
+/// Describes the type of data store returned when executing
+/// [`Database::list_collections`](../struct.Database.html#method.list_collections).
 pub enum CollectionType {
     /// Indicates that the data store is a view.
     View,
@@ -104,7 +105,7 @@ impl<'de> Deserialize<'de> for CollectionType {
 }
 
 /// Info about the collection that is contained in the `CollectionSpecification::info` field of a specification returned from
-/// [`crate::Database::list_collections`].
+/// [`Database::list_collections`](../struct.Database.html#method.list_collections).
 ///
 /// See the MongoDB [manual](https://docs.mongodb.com/manual/reference/command/listCollections/#listCollections.cursor)
 /// for more information.
@@ -123,7 +124,7 @@ pub struct CollectionSpecificationInfo {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-/// Information about a collection as reported by [`crate::Database::list_collections`].
+/// Information about a collection as reported by [`Database::list_collections`](../struct.Database.html#method.list_collections).
 pub struct CollectionSpecification {
     /// The name of the collection.
     pub name: String,
@@ -145,7 +146,8 @@ pub struct CollectionSpecification {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-/// A struct modeling the information about an individual database returned from [`crate::Client::list_databases`].
+/// A struct modeling the information about an individual database returned from
+/// [`Client::list_databases`](../struct.Client.html#method.list_databases).
 pub struct DatabaseSpecification {
     /// The name of the database.
     pub name: String,
