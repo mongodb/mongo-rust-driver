@@ -257,7 +257,7 @@ impl ServerDescription {
             .as_ref()
             .map_err(Clone::clone)?
             .as_ref()
-            .and_then(|reply| reply.command_response.election_id.clone());
+            .and_then(|reply| reply.command_response.election_id);
         Ok(me)
     }
 
