@@ -175,31 +175,6 @@ async fn list_collection_names() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-async fn collection_type() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
-    let view = Bson::String("view".to_string());
-    assert_eq!(
-        bson::from_bson::<CollectionType>(view).expect("deserialization should succeed"),
-        CollectionType::View
-    );
-
-    let collection = Bson::String("collection".to_string());
-    assert_eq!(
-        bson::from_bson::<CollectionType>(collection).expect("deserialization should succeed"),
-        CollectionType::Collection
-    );
-
-    let other = Bson::String("blah".to_string());
-    assert_eq!(
-        bson::from_bson::<CollectionType>(other).expect("deserialization should succeed"),
-        CollectionType::Other("blah".to_string())
-    );
-}
-
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-#[function_name::named]
 async fn collection_management() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 

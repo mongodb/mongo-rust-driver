@@ -75,8 +75,8 @@ pub(crate) struct GetMoreResult {
 
 /// Describes the type of data store returned when executing
 /// [`Database::list_collections`](../struct.Database.html#method.list_collections).
-#[derive(Debug, Clone, Serialize, PartialEq)]
-#[serde(rename_all = "lowercase", untagged)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum CollectionType {
     /// Indicates that the data store is a view.
@@ -84,23 +84,6 @@ pub enum CollectionType {
 
     /// Indicates that the data store is a collection.
     Collection,
-
-    /// An unknown collection type. This is included for forwards compatibility.
-    Other(String),
-}
-
-impl<'de> Deserialize<'de> for CollectionType {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de> {
-        let s = String::deserialize(deserializer)?;
-        let out = match s.as_str() {
-            "collection" => CollectionType::Collection,
-            "view" => CollectionType::View,
-            _ => CollectionType::Other(s)
-        };
-        Ok(out)
-    }
 }
 
 /// Info about the collection that is contained in the `CollectionSpecification::info` field of a specification returned from
