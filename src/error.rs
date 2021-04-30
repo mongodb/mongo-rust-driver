@@ -87,7 +87,7 @@ impl Error {
         if self.is_network_error() {
             return true;
         }
-        match &self.kind.code() {
+        match self.code() {
             Some(code) => {
                 RETRYABLE_READ_CODES.contains(&code)
             }
@@ -110,7 +110,7 @@ impl Error {
         if self.is_network_error() {
             return true;
         }
-        match &self.kind.code() {
+        match &self.code() {
             Some(code) => RETRYABLE_WRITE_CODES.contains(&code),
             None => false,
         }
@@ -193,6 +193,98 @@ impl Error {
     pub(crate) fn from_resolve_error(error: trust_dns_resolver::error::ResolveError) -> Self {
         ErrorKind::DnsResolveError { message: error.to_string() }.into()
     }
+
+    pub(crate) fn is_non_timeout_network_error(&self) -> bool {
+        matches!(self.kind.as_ref(), ErrorKind::Io(ref io_err) if io_err.kind() != std::io::ErrorKind::TimedOut)
+    }
+
+    pub(crate) fn is_network_error(&self) -> bool {
+        matches!(
+            self.kind.as_ref(),
+            ErrorKind::Io(..) | ErrorKind::ConnectionPoolClearedError { .. }
+        )
+    }
+
+    /// Gets the code from this error for performing SDAM updates, if applicable.
+    /// Any codes contained in WriteErrors are ignored.
+    pub(crate) fn code(&self) -> Option<i32> {
+        match self.kind.as_ref() {
+            ErrorKind::CommandError(command_error) => {
+                Some(command_error.code)
+            },
+            // According to SDAM spec, write concern error codes MUST also be checked, and writeError codes
+            // MUST NOT be checked.
+            ErrorKind::BulkWriteError(BulkWriteFailure { write_concern_error: Some(wc_error), .. }) => {
+                Some(wc_error.code)
+            }
+            ErrorKind::WriteError(WriteFailure::WriteConcernError(wc_error)) => Some(wc_error.code),
+            _ => None
+        }
+    }
+
+    /// Gets the server's message for this error, if applicable, for use in testing.
+    /// If this error is a BulkWriteError, the messages are concatenated.
+    #[cfg(test)]
+    pub(crate) fn server_message(&self) -> Option<String> {
+        match self.kind.as_ref() {
+            ErrorKind::CommandError(command_error) => {
+                Some(command_error.message.clone())
+            },
+            // since this is used primarily for errorMessageContains assertions in the unified runner, we just
+            // concatenate all the relevant server messages into one for bulk errors.
+            ErrorKind::BulkWriteError(BulkWriteFailure { write_concern_error, write_errors }) => {
+                let mut msg = "".to_string();
+                if let Some(wc_error) = write_concern_error {
+                    msg.push_str(wc_error.message.as_str());
+                }
+                if let Some(write_errors) = write_errors {
+                    for we in write_errors {
+                        msg.push_str(we.message.as_str());
+                    }
+                }
+                Some(msg)
+            }
+            ErrorKind::WriteError(WriteFailure::WriteConcernError(wc_error)) => Some(wc_error.message.clone()),
+            ErrorKind::WriteError(WriteFailure::WriteError(write_error)) => Some(write_error.message.clone()),
+            _ => None
+        }
+    }
+
+    /// Gets the code name from this error, if applicable.
+    #[cfg(test)]
+    pub(crate) fn code_name(&self) -> Option<&str> {
+        match self.kind.as_ref() {
+            ErrorKind::CommandError(ref cmd_err) => Some(cmd_err.code_name.as_str()),
+            ErrorKind::WriteError(ref failure) => match failure {
+                WriteFailure::WriteConcernError(ref wce) => Some(wce.code_name.as_str()),
+                WriteFailure::WriteError(ref we) => we.code_name.as_deref(),
+            },
+            ErrorKind::BulkWriteError(ref bwe) => bwe
+                .write_concern_error
+                .as_ref()
+                .map(|wce| wce.code_name.as_str()),
+            _ => None,
+        }
+    }
+
+    /// If this error corresponds to a "not master" error as per the SDAM spec.
+    pub(crate) fn is_not_master(&self) -> bool {
+        self.code().map(|code| NOTMASTER_CODES.contains(&code)).unwrap_or(false)
+    }
+
+    /// If this error corresponds to a "node is recovering" error as per the SDAM spec.
+    pub(crate) fn is_recovering(&self) -> bool {
+        self.code()
+            .map(|code| RECOVERING_CODES.contains(&code))
+            .unwrap_or(false)
+    }
+
+    /// If this error corresponds to a "node is shutting down" error as per the SDAM spec.
+    pub(crate) fn is_shutting_down(&self) -> bool {
+        self.code()
+            .map(|code| SHUTTING_DOWN_CODES.contains(&code))
+            .unwrap_or(false)
+    }
 }
 
 impl<E> From<E> for Error
@@ -228,14 +320,6 @@ impl From<std::io::Error> for ErrorKind {
 impl From<std::io::ErrorKind> for ErrorKind {
     fn from(err: std::io::ErrorKind) -> Self {
         Self::Io(Arc::new(err.into()))
-    }
-}
-
-impl std::ops::Deref for Error {
-    type Target = ErrorKind;
-
-    fn deref(&self) -> &Self::Target {
-        &self.kind
     }
 }
 
@@ -320,99 +404,6 @@ pub enum ErrorKind {
     WriteError(WriteFailure),
 }
 
-impl ErrorKind {
-    pub(crate) fn is_non_timeout_network_error(&self) -> bool {
-        matches!(self, ErrorKind::Io(ref io_err) if io_err.kind() != std::io::ErrorKind::TimedOut)
-    }
-
-    pub(crate) fn is_network_error(&self) -> bool {
-        matches!(
-            self,
-            ErrorKind::Io(..) | ErrorKind::ConnectionPoolClearedError { .. }
-        )
-    }
-
-    /// Gets the code from this error for performing SDAM updates, if applicable.
-    /// Any codes contained in WriteErrors are ignored.
-    pub(crate) fn code(&self) -> Option<i32> {
-        match self {
-            ErrorKind::CommandError(command_error) => {
-                Some(command_error.code)
-            },
-            // According to SDAM spec, write concern error codes MUST also be checked, and writeError codes
-            // MUST NOT be checked.
-            ErrorKind::BulkWriteError(BulkWriteFailure { write_concern_error: Some(wc_error), .. }) => {
-                Some(wc_error.code)
-            }
-            ErrorKind::WriteError(WriteFailure::WriteConcernError(wc_error)) => Some(wc_error.code),
-            _ => None
-        }
-    }
-
-    /// Gets the server's message for this error, if applicable, for use in testing.
-    /// If this error is a BulkWriteError, the messages are concatenated.
-    #[cfg(test)]
-    pub(crate) fn server_message(&self) -> Option<String> {
-        match self {
-            ErrorKind::CommandError(command_error) => {
-                Some(command_error.message.clone())
-            },
-            // since this is used primarily for errorMessageContains assertions in the unified runner, we just
-            // concatenate all the relevant server messages into one for bulk errors.
-            ErrorKind::BulkWriteError(BulkWriteFailure { write_concern_error, write_errors }) => {
-                let mut msg = "".to_string();
-                if let Some(wc_error) = write_concern_error {
-                    msg.push_str(wc_error.message.as_str());
-                }
-                if let Some(write_errors) = write_errors {
-                    for we in write_errors {
-                        msg.push_str(we.message.as_str());
-                    }
-                }
-                Some(msg)
-            }
-            ErrorKind::WriteError(WriteFailure::WriteConcernError(wc_error)) => Some(wc_error.message.clone()),
-            ErrorKind::WriteError(WriteFailure::WriteError(write_error)) => Some(write_error.message.clone()),
-            _ => None
-        }
-    }
-
-    /// Gets the code name from this error, if applicable.
-    #[cfg(test)]
-    pub(crate) fn code_name(&self) -> Option<&str> {
-        match self {
-            ErrorKind::CommandError(ref cmd_err) => Some(cmd_err.code_name.as_str()),
-            ErrorKind::WriteError(ref failure) => match failure {
-                WriteFailure::WriteConcernError(ref wce) => Some(wce.code_name.as_str()),
-                WriteFailure::WriteError(ref we) => we.code_name.as_deref(),
-            },
-            ErrorKind::BulkWriteError(ref bwe) => bwe
-                .write_concern_error
-                .as_ref()
-                .map(|wce| wce.code_name.as_str()),
-            _ => None,
-        }
-    }
-
-    /// If this error corresponds to a "not master" error as per the SDAM spec.
-    pub(crate) fn is_not_master(&self) -> bool {
-        self.code().map(|code| NOTMASTER_CODES.contains(&code)).unwrap_or(false)
-    }
-
-    /// If this error corresponds to a "node is recovering" error as per the SDAM spec.
-    pub(crate) fn is_recovering(&self) -> bool {
-        self.code()
-            .map(|code| RECOVERING_CODES.contains(&code))
-            .unwrap_or(false)
-    }
-
-    /// If this error corresponds to a "node is shutting down" error as per the SDAM spec.
-    pub(crate) fn is_shutting_down(&self) -> bool {
-        self.code()
-            .map(|code| SHUTTING_DOWN_CODES.contains(&code))
-            .unwrap_or(false)
-    }
-}
 
 /// An error that occurred due to a database command failing.
 #[derive(Clone, Debug, Deserialize)]
