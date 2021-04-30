@@ -63,7 +63,7 @@ pub async fn run_v2_test(test_file: TestFile) {
             .await
         {
             Ok(_) => {}
-            Err(err) => match err.kind.code() {
+            Err(err) => match err.code() {
                 Some(11601) => {}
                 _ => panic!("{}: killAllSessions failed", test.description),
             },
@@ -234,11 +234,11 @@ pub async fn run_v2_test(test_file: TestFile) {
                     OperationResult::Error(operation_error) => {
                         let error = result.unwrap_err();
                         if let Some(error_contains) = operation_error.error_contains {
-                            let message = error.kind.server_message().unwrap();
+                            let message = error.server_message().unwrap();
                             assert!(message.contains(&error_contains));
                         }
                         if let Some(error_code_name) = operation_error.error_code_name {
-                            let code_name = error.kind.code_name().unwrap();
+                            let code_name = error.code_name().unwrap();
                             assert_eq!(error_code_name, code_name);
                         }
                         if let Some(error_labels_contain) = operation_error.error_labels_contain {
