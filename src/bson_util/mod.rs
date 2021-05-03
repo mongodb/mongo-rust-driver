@@ -1,8 +1,8 @@
 pub(crate) mod async_encoding;
 
-use std::time::Duration;
+use std::{convert::TryFrom, time::Duration};
 
-use serde::{ser, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{de::Error, ser, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
     bson::{doc, oid::ObjectId, Binary, Bson, Document, JavaScriptCodeWithScope, Regex},
@@ -15,7 +15,18 @@ pub(crate) fn get_int(val: &Bson) -> Option<i64> {
     match *val {
         Bson::Int32(i) => Some(i64::from(i)),
         Bson::Int64(i) => Some(i),
-        Bson::Double(f) if f == f as i64 as f64 => Some(f as i64),
+        Bson::Double(f) if (f - (f as i64 as f64)).abs() <= f64::EPSILON => Some(f as i64),
+        _ => None,
+    }
+}
+
+/// Coerce numeric types into an `u64` if it would be lossless to do so. If this Bson is not numeric
+/// or the conversion would be lossy (e.g. 1.5 -> 1), this returns `None`.
+pub(crate) fn get_u64(val: &Bson) -> Option<u64> {
+    match *val {
+        Bson::Int32(i) => u64::try_from(i).ok(),
+        Bson::Int64(i) => u64::try_from(i).ok(),
+        Bson::Double(f) if (f - (f as u64 as f64)).abs() <= f64::EPSILON => Some(f as u64),
         _ => None,
     }
 }
@@ -123,6 +134,18 @@ pub(crate) fn serialize_batch_size<S: Serializer>(
             "batch size must be able to fit into a signed 32-bit integer",
         )),
     }
+}
+
+/// Deserialize an u64 from any BSON number type if it could be done losslessly.
+pub(crate) fn deserialize_u64_from_bson_number<'de, D>(
+    deserializer: D,
+) -> std::result::Result<u64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let bson = Bson::deserialize(deserializer)?;
+    get_u64(&bson)
+        .ok_or_else(|| D::Error::custom(format!("could not deserialize u64 from {:?}", bson)))
 }
 
 pub fn doc_size_bytes(doc: &Document) -> usize {

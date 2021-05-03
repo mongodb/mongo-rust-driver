@@ -10,6 +10,7 @@ use crate::{
         SelectionCriteria,
         SessionOptions,
     },
+    results::DatabaseSpecification,
     Client as AsyncClient,
     ClientSession,
     RUNTIME,
@@ -116,7 +117,7 @@ impl Client {
         &self,
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<ListDatabasesOptions>>,
-    ) -> Result<Vec<Document>> {
+    ) -> Result<Vec<DatabaseSpecification>> {
         RUNTIME.block_on(
             self.async_client
                 .list_databases(filter.into(), options.into()),

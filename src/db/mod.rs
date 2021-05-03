@@ -19,6 +19,7 @@ use crate::{
         DropDatabaseOptions,
         ListCollectionsOptions,
     },
+    results::CollectionSpecification,
     selection_criteria::SelectionCriteria,
     Client,
     ClientSession,
@@ -194,7 +195,7 @@ impl Database {
         &self,
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<ListCollectionsOptions>>,
-    ) -> Result<Cursor<Document>> {
+    ) -> Result<Cursor<CollectionSpecification>> {
         let list_collections = ListCollections::new(
             self.name().to_string(),
             filter.into(),
@@ -215,7 +216,7 @@ impl Database {
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<ListCollectionsOptions>>,
         session: &mut ClientSession,
-    ) -> Result<SessionCursor<Document>> {
+    ) -> Result<SessionCursor<CollectionSpecification>> {
         let list_collections = ListCollections::new(
             self.name().to_string(),
             filter.into(),

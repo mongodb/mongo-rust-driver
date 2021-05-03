@@ -29,7 +29,7 @@ pub struct DatabaseOptions {
 /// These are the valid options for creating a collection with
 /// [`Database::create_collection`](../struct.Database.html#method.create_collection).
 #[skip_serializing_none]
-#[derive(Debug, Default, TypedBuilder, Serialize)]
+#[derive(Clone, Debug, Default, TypedBuilder, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]
@@ -55,8 +55,7 @@ pub struct CreateCollectionOptions {
     /// Specifies a validator to restrict the schema of documents which can exist in the
     /// collection. Expressions can be specified using any query operators except `$near`,
     /// `$nearSphere`, `$text`, and `$where`.
-    #[serde(rename = "validator")]
-    pub validation: Option<Document>,
+    pub validator: Option<Document>,
 
     /// Specifies how strictly the database should apply the validation rules to existing documents
     /// during an update.
@@ -86,7 +85,7 @@ pub struct CreateCollectionOptions {
 
 /// Specifies how strictly the database should apply validation rules to existing documents during
 /// an update.
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum ValidationLevel {
@@ -101,7 +100,7 @@ pub enum ValidationLevel {
 
 /// Specifies whether the database should return an error or simply raise a warning if inserted
 /// documents do not pass the validation.
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum ValidationAction {
@@ -112,8 +111,9 @@ pub enum ValidationAction {
 }
 
 /// Specifies default configuration for indexes created on a collection, including the _id index.
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, TypedBuilder, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct IndexOptionDefaults {
     /// The `storageEngine` document should be in the following form:
     ///

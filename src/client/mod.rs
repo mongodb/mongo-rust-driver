@@ -5,13 +5,14 @@ pub mod session;
 
 use std::{sync::Arc, time::Duration};
 
+use bson::Bson;
 use derivative::Derivative;
 use std::time::Instant;
 
 #[cfg(test)]
 use crate::options::StreamAddress;
 use crate::{
-    bson::{Bson, Document},
+    bson::Document,
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::{ErrorKind, Result},
@@ -25,6 +26,7 @@ use crate::{
         SelectionCriteria,
         SessionOptions,
     },
+    results::DatabaseSpecification,
     sdam::{SelectedServer, SessionSupportStatus, Topology},
     ClientSession,
 };
@@ -161,9 +163,13 @@ impl Client {
         &self,
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<ListDatabasesOptions>>,
-    ) -> Result<Vec<Document>> {
+    ) -> Result<Vec<DatabaseSpecification>> {
         let op = ListDatabases::new(filter.into(), false, options.into());
-        self.execute_operation(op, None).await
+        self.execute_operation(op, None).await.and_then(|dbs| {
+            dbs.into_iter()
+                .map(|db_spec| bson::from_document(db_spec).map_err(crate::error::Error::from))
+                .collect()
+        })
     }
 
     /// Gets the names of the databases present in the cluster the Client is connected to.

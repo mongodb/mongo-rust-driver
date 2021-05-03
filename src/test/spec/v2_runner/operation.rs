@@ -875,19 +875,16 @@ impl TestOperation for ListCollections {
                         session,
                     )
                     .await?;
-                cursor
-                    .with_session(session)
-                    .try_collect::<Vec<Document>>()
-                    .await?
+                cursor.with_session(session).try_collect::<Vec<_>>().await?
             }
             None => {
                 let cursor = database
                     .list_collections(self.filter.clone(), self.options.clone())
                     .await?;
-                cursor.try_collect::<Vec<Document>>().await?
+                cursor.try_collect::<Vec<_>>().await?
             }
         };
-        Ok(Some(Bson::from(result)))
+        Ok(Some(bson::to_bson(&result)?))
     }
 
     async fn execute_on_client(&self, _client: &EventClient) -> Result<Option<Bson>> {
@@ -1191,8 +1188,7 @@ impl TestOperation for ListDatabases {
         let result = client
             .list_databases(self.filter.clone(), self.options.clone())
             .await?;
-        let result: Vec<Bson> = result.iter().map(Bson::from).collect();
-        Ok(Some(Bson::Array(result)))
+        Ok(Some(bson::to_bson(&result)?))
     }
 
     async fn execute_on_session(&self, _session: &ClientSession) {

@@ -579,8 +579,7 @@ impl TestOperation for ListDatabases {
         let result = client
             .list_databases(self.filter.clone(), self.options.clone())
             .await?;
-        let result: Vec<Bson> = result.iter().map(Bson::from).collect();
-        Ok(Some(Bson::Array(result).into()))
+        Ok(Some(bson::to_bson(&result)?.into()))
     }
 
     async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
@@ -635,8 +634,8 @@ impl TestOperation for ListCollections {
         let cursor = db
             .list_collections(self.filter.clone(), self.options.clone())
             .await?;
-        let result = cursor.try_collect::<Vec<Document>>().await?;
-        Ok(Some(Bson::from(result).into()))
+        let result = cursor.try_collect::<Vec<_>>().await?;
+        Ok(Some(bson::to_bson(&result)?.into()))
     }
 
     fn returns_root_documents(&self) -> bool {

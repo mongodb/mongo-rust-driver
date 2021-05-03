@@ -8,7 +8,15 @@ use tokio::sync::RwLockReadGuard;
 use crate::{
     bson::{doc, Bson, Document},
     error::Result,
-    options::{AggregateOptions, CreateCollectionOptions, IndexOptionDefaults},
+    options::{
+        AggregateOptions,
+        Collation,
+        CreateCollectionOptions,
+        IndexOptionDefaults,
+        ValidationAction,
+        ValidationLevel,
+    },
+    results::{CollectionSpecification, CollectionType},
     test::{
         util::{EventClient, TestClient},
         LOCK,
@@ -16,37 +24,17 @@ use crate::{
     Database,
 };
 
-#[derive(Debug, Deserialize)]
-struct CollectionInfo {
-    pub name: String,
-    #[serde(rename = "type")]
-    pub coll_type: String,
-    pub options: Document,
-    pub info: Info,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Info {
-    pub read_only: bool,
-    pub uuid: Bson,
-}
-
 #[derive(Deserialize)]
 struct IsMasterReply {
     ismaster: bool,
     ok: f64,
 }
 
-async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<CollectionInfo> {
-    let mut colls: Vec<CollectionInfo> = db
+async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<CollectionSpecification> {
+    let mut colls: Vec<CollectionSpecification> = db
         .list_collections(filter, None)
         .await
         .unwrap()
-        .and_then(|doc| match bson::from_bson(Bson::Document(doc)) {
-            Ok(info) => futures::future::ok(info),
-            Err(e) => futures::future::err(e.into()),
-        })
         .try_collect()
         .await
         .unwrap();
@@ -105,13 +93,8 @@ async fn list_collections() {
 
     for (i, coll) in colls.into_iter().enumerate() {
         assert_eq!(&coll.name, &coll_names[i]);
-        assert_eq!(&coll.coll_type, "collection");
+        assert_eq!(&coll.collection_type, &CollectionType::Collection);
         assert!(!coll.info.read_only);
-
-        match coll.info.uuid {
-            Bson::Binary(..) => {}
-            other => panic!("invalid BSON type for collection uuid: {:?}", other),
-        }
     }
 }
 
@@ -153,13 +136,8 @@ async fn list_collections_filter() {
 
     for (i, coll) in colls.into_iter().enumerate() {
         assert_eq!(&coll.name, &coll_names[i]);
-        assert_eq!(&coll.coll_type, "collection");
+        assert_eq!(&coll.collection_type, &CollectionType::Collection);
         assert!(!coll.info.read_only);
-
-        match coll.info.uuid {
-            Bson::Binary(..) => {}
-            other => panic!("invalid BSON type for collection uuid: {:?}", other),
-        }
     }
 }
 
@@ -210,27 +188,74 @@ async fn collection_management() {
         .await
         .unwrap();
 
+    let collation = Collation::builder().locale("en_US".to_string()).build();
     let options = CreateCollectionOptions::builder()
         .capped(true)
         .size(512)
+        .max(50)
+        .storage_engine(doc! { "wiredTiger": {} })
+        .validator(doc! { "x" : { "$gt": 0 } })
+        .validation_level(ValidationLevel::Moderate)
+        .validation_action(ValidationAction::Error)
+        .collation(collation.clone())
+        .index_option_defaults(
+            IndexOptionDefaults::builder()
+                .storage_engine(doc! { "wiredTiger": {} })
+                .build(),
+        )
         .build();
-    db.create_collection(&format!("{}{}", function_name!(), 2), Some(options))
+
+    db.create_collection(&format!("{}{}", function_name!(), 2), options.clone())
         .await
         .unwrap();
 
-    let colls = get_coll_info(&db, None).await;
-    assert_eq!(colls.len(), 2);
+    let view_options = CreateCollectionOptions::builder()
+        .view_on(format!("{}{}", function_name!(), 2))
+        .pipeline(vec![doc! { "$match": {} }])
+        .build();
+    db.create_collection(&format!("{}{}", function_name!(), 3), view_options.clone())
+        .await
+        .unwrap();
+
+    let mut colls = get_coll_info(
+        &db,
+        Some(doc! { "name": { "$regex": "^collection_management" } }),
+    )
+    .await;
+    assert_eq!(colls.len(), 3);
 
     assert_eq!(colls[0].name, format!("{}1", function_name!()));
-    assert_eq!(colls[0].coll_type, "collection");
-    assert!(colls[0].options.is_empty());
+    assert_eq!(colls[0].collection_type, CollectionType::Collection);
+    assert_eq!(
+        bson::to_document(&colls[0].options).expect("serialization should succeed"),
+        doc! {}
+    );
     assert!(!colls[0].info.read_only);
 
-    assert_eq!(colls[1].name, format!("{}2", function_name!()));
-    assert_eq!(colls[1].coll_type, "collection");
-    assert_eq!(colls[1].options.get("capped"), Some(&Bson::Boolean(true)));
-    assert_eq!(colls[1].options.get("size"), Some(&Bson::Int32(512)));
-    assert!(!colls[1].info.read_only);
+    let coll2 = colls.remove(1);
+    assert_eq!(coll2.name, format!("{}2", function_name!()));
+    assert_eq!(coll2.collection_type, CollectionType::Collection);
+    assert_eq!(coll2.options.capped, options.capped);
+    assert_eq!(coll2.options.size, options.size);
+    assert_eq!(coll2.options.validator, options.validator);
+    assert_eq!(coll2.options.validation_action, options.validation_action);
+    assert_eq!(coll2.options.validation_level, options.validation_level);
+    assert_eq!(coll2.options.collation.unwrap().locale, collation.locale);
+    assert_eq!(coll2.options.storage_engine, options.storage_engine);
+    assert_eq!(
+        coll2.options.index_option_defaults,
+        options.index_option_defaults
+    );
+    assert!(!coll2.info.read_only);
+    assert!(coll2.id_index.is_some());
+
+    let coll3 = colls.remove(1);
+    assert_eq!(coll3.name, format!("{}3", function_name!()));
+    assert_eq!(coll3.collection_type, CollectionType::View);
+    assert_eq!(coll3.options.view_on, view_options.view_on);
+    assert_eq!(coll3.options.pipeline, view_options.pipeline);
+    assert!(coll3.info.read_only);
+    assert!(coll3.id_index.is_none());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
