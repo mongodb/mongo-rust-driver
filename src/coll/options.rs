@@ -499,7 +499,6 @@ pub struct CountOptions {
     pub hint: Option<Hint>,
 
     /// The maximum number of documents to count.
-    #[serde(serialize_with = "serialize_u64_option_as_i64")]
     pub limit: Option<u64>,
 
     /// The maximum amount of time to allow the query to run.
@@ -510,7 +509,6 @@ pub struct CountOptions {
     pub max_time: Option<Duration>,
 
     /// The number of documents to skip before counting.
-    #[serde(serialize_with = "serialize_u64_option_as_i64")]
     pub skip: Option<u64>,
 
     /// The collation to use for the operation.
@@ -522,7 +520,6 @@ pub struct CountOptions {
     /// The criteria used to select a server for this operation.
     ///
     /// If none specified, the default set on the collection will be used.
-    #[serde(skip_serializing)]
     pub selection_criteria: Option<SelectionCriteria>,
 
     /// The level of the read concern.
