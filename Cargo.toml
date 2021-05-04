@@ -2,8 +2,8 @@
 authors = ["Saghm Rossi <saghmrossi@gmail.com>", "Patrick Freed <patrick.freed@mongodb.com>", "Isabel Atkinson <isabel.atkinson@mongodb.com>"]
 description = "The official MongoDB driver for Rust"
 edition = "2018"
-documentation = "https://docs.rs/mongodb"
 keywords = ["mongo", "mongodb", "database", "bson", "nosql"]
+categories = ["asynchronous", "database", "web-programming"]
 repository = "https://github.com/mongodb/mongo-rust-driver"
 license = "Apache-2.0"
 readme = "README.md"
