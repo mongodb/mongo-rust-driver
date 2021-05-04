@@ -57,7 +57,7 @@ pub(crate) fn first_key(document: &Document) -> Option<&str> {
 pub(crate) fn replacement_document_check(replacement: &Document) -> Result<()> {
     match first_key(replacement) {
         Some(s) if !s.starts_with('$') => Ok(()),
-        _ => Err(ErrorKind::ArgumentError {
+        _ => Err(ErrorKind::InvalidArgument {
             message: "replace document must have first key not starting with '$".to_string(),
         }
         .into()),
@@ -67,7 +67,7 @@ pub(crate) fn replacement_document_check(replacement: &Document) -> Result<()> {
 pub(crate) fn update_document_check(update: &Document) -> Result<()> {
     match first_key(update) {
         Some(s) if s.starts_with('$') => Ok(()),
-        _ => Err(ErrorKind::ArgumentError {
+        _ => Err(ErrorKind::InvalidArgument {
             message: "update document must have first key starting with '$".to_string(),
         }
         .into()),

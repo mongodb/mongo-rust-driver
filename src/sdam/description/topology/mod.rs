@@ -710,7 +710,7 @@ pub(crate) struct TopologyDescriptionDiff {
 
 fn verify_max_staleness(max_staleness: Option<Duration>) -> crate::error::Result<()> {
     verify_max_staleness_inner(max_staleness)
-        .map_err(|s| crate::error::ErrorKind::ArgumentError { message: s }.into())
+        .map_err(|s| crate::error::ErrorKind::InvalidArgument { message: s }.into())
 }
 
 fn verify_max_staleness_inner(max_staleness: Option<Duration>) -> Result<(), String> {

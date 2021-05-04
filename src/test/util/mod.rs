@@ -169,7 +169,7 @@ impl TestClient {
             .await;
 
         match drop_user_result.map_err(|e| *e.kind) {
-            Err(ErrorKind::CommandError(CommandError { code: 11, .. })) | Ok(_) => {}
+            Err(ErrorKind::Command(CommandError { code: 11, .. })) | Ok(_) => {}
             e @ Err(_) => {
                 e.unwrap();
             }
@@ -337,7 +337,7 @@ where
     T: Serialize + DeserializeOwned + Unpin + Debug,
 {
     match coll.drop(None).await.map_err(|e| *e.kind) {
-        Err(ErrorKind::CommandError(CommandError { code: 26, .. })) | Ok(_) => {}
+        Err(ErrorKind::Command(CommandError { code: 26, .. })) | Ok(_) => {}
         e @ Err(_) => {
             e.unwrap();
         }

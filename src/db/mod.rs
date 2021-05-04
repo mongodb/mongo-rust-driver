@@ -237,7 +237,7 @@ impl Database {
             .and_then(|doc| match doc.get("name").and_then(Bson::as_str) {
                 Some(name) => futures::future::ok(name.into()),
                 None => futures::future::err(
-                    ErrorKind::ResponseError {
+                    ErrorKind::InvalidResponse {
                         message: "Expected name field in server response, but there was none."
                             .to_string(),
                     }

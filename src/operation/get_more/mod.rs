@@ -49,7 +49,7 @@ impl Operation for GetMore {
 
         if let Some(batch_size) = self.batch_size {
             if batch_size > std::i32::MAX as u32 {
-                return Err(ErrorKind::ArgumentError {
+                return Err(ErrorKind::InvalidArgument {
                     message: "The batch size must fit into a signed 32-bit integer".to_string(),
                 }
                 .into());

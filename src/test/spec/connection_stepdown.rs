@@ -138,7 +138,7 @@ async fn not_master_keep_pool() {
         assert!(
             matches!(
                 result.map_err(|e| *e.kind),
-                Err(ErrorKind::CommandError(CommandError { code: 10107, .. }))
+                Err(ErrorKind::Command(CommandError { code: 10107, .. }))
             ),
             "insert should have failed"
         );
@@ -184,7 +184,7 @@ async fn not_master_reset_pool() {
         assert!(
             matches!(
                 result.map_err(|e| *e.kind),
-                Err(ErrorKind::CommandError(CommandError { code: 10107, .. }))
+                Err(ErrorKind::Command(CommandError { code: 10107, .. }))
             ),
             "insert should have failed"
         );
@@ -229,7 +229,7 @@ async fn shutdown_in_progress() {
         assert!(
             matches!(
                 result.map_err(|e| *e.kind),
-                Err(ErrorKind::CommandError(CommandError { code: 91, .. }))
+                Err(ErrorKind::Command(CommandError { code: 91, .. }))
             ),
             "insert should have failed"
         );
@@ -274,7 +274,7 @@ async fn interrupted_at_shutdown() {
         assert!(
             matches!(
                 result.map_err(|e| *e.kind),
-                Err(ErrorKind::CommandError(CommandError { code: 11600, .. }))
+                Err(ErrorKind::Command(CommandError { code: 11600, .. }))
             ),
             "insert should have failed"
         );

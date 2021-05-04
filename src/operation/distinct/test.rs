@@ -142,7 +142,7 @@ async fn handle_response_no_values() {
 
     let result = distinct_op.handle_response(response, &Default::default());
     match result.map_err(|e| *e.kind) {
-        Err(ErrorKind::ResponseError { .. }) => {}
+        Err(ErrorKind::InvalidResponse { .. }) => {}
         other => panic!("expected response error, but got {:?}", other),
     }
 }

@@ -143,7 +143,7 @@ impl ConnectionPool {
             Some(ConnectionRequestResult::PoolCleared) => {
                 Err(Error::pool_cleared_error(&self.address))
             }
-            None => Err(ErrorKind::WaitQueueTimeoutError {
+            None => Err(ErrorKind::WaitQueueTimeout {
                 address: self.address.clone(),
             }
             .into()),
@@ -156,7 +156,7 @@ impl ConnectionPool {
                 });
             }
             Err(ref e) => {
-                let failure_reason = if let ErrorKind::WaitQueueTimeoutError { .. } = *e.kind {
+                let failure_reason = if let ErrorKind::WaitQueueTimeout { .. } = *e.kind {
                     ConnectionCheckoutFailedReason::Timeout
                 } else {
                     ConnectionCheckoutFailedReason::ConnectionError

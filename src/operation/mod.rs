@@ -119,7 +119,7 @@ pub(crate) fn append_options<T: Serialize + Debug>(
                     doc.extend(d);
                     Ok(())
                 }
-                _ => Err(ErrorKind::InternalError {
+                _ => Err(ErrorKind::Internal {
                     message: format!("options did not serialize to a Document: {:?}", options),
                 }
                 .into()),
@@ -143,7 +143,7 @@ impl WriteConcernOnlyBody {
     fn validate(&self) -> Result<()> {
         match self.write_concern_error {
             Some(ref wc_error) => {
-                Err(ErrorKind::WriteError(WriteFailure::WriteConcernError(wc_error.clone())).into())
+                Err(ErrorKind::Write(WriteFailure::WriteConcernError(wc_error.clone())).into())
             }
             None => Ok(()),
         }
@@ -190,7 +190,7 @@ impl<T> WriteResponseBody<T> {
             write_concern_error,
         };
 
-        Err(ErrorKind::BulkWriteError(failure).into())
+        Err(ErrorKind::BulkWrite(failure).into())
     }
 }
 

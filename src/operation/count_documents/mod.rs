@@ -89,7 +89,7 @@ impl Operation for CountDocuments {
         let n = match result_doc.get("n") {
             Some(n) => n,
             None => {
-                return Err(ErrorKind::ResponseError {
+                return Err(ErrorKind::InvalidResponse {
                     message: "server response to count_documents aggregate did not contain the \
                               'n' field"
                         .into(),
@@ -99,7 +99,7 @@ impl Operation for CountDocuments {
         };
 
         bson_util::get_u64(n).ok_or_else(|| {
-            ErrorKind::ResponseError {
+            ErrorKind::InvalidResponse {
                 message: format!(
                     "server response to count_documents aggregate should have contained integer \
                      'n', but instead had {:?}",

@@ -33,7 +33,7 @@ pub struct Error {
 
 impl Error {
     pub(crate) fn pool_cleared_error(address: &StreamAddress) -> Self {
-        ErrorKind::ConnectionPoolClearedError {
+        ErrorKind::ConnectionPoolCleared {
             message: format!(
                 "Connection pool for {} cleared during operation execution",
                 address
@@ -44,7 +44,7 @@ impl Error {
 
     /// Creates an `AuthenticationError` for the given mechanism with the provided reason.
     pub(crate) fn authentication_error(mechanism_name: &str, reason: &str) -> Self {
-        ErrorKind::AuthenticationError {
+        ErrorKind::Authentication {
             message: format!("{} failure: {}", mechanism_name, reason),
         }
         .into()
@@ -66,11 +66,11 @@ impl Error {
     }
 
     pub(crate) fn is_auth_error(&self) -> bool {
-        matches!(self.kind.as_ref(), ErrorKind::AuthenticationError { .. })
+        matches!(self.kind.as_ref(), ErrorKind::Authentication { .. })
     }
 
     pub(crate) fn is_command_error(&self) -> bool {
-        matches!(self.kind.as_ref(), ErrorKind::CommandError(_))
+        matches!(self.kind.as_ref(), ErrorKind::Command(_))
     }
 
     pub(crate) fn is_network_timeout(&self) -> bool {
@@ -79,7 +79,7 @@ impl Error {
 
     /// Whether this error is an "ns not found" error or not.
     pub(crate) fn is_ns_not_found(&self) -> bool {
-        matches!(self.kind.as_ref(), ErrorKind::CommandError(ref err) if err.code == 26)
+        matches!(self.kind.as_ref(), ErrorKind::Command(ref err) if err.code == 26)
     }
 
     /// Whether a read operation should be retried if this error occurs.
@@ -120,22 +120,22 @@ impl Error {
     pub(crate) fn is_server_error(&self) -> bool {
         matches!(
             self.kind.as_ref(),
-            ErrorKind::AuthenticationError { .. }
-                | ErrorKind::BulkWriteError(_)
-                | ErrorKind::CommandError(_)
-                | ErrorKind::WriteError(_)
+            ErrorKind::Authentication { .. }
+                | ErrorKind::BulkWrite(_)
+                | ErrorKind::Command(_)
+                | ErrorKind::Write(_)
         )
     }
 
     /// Returns the labels for this error.
     pub fn labels(&self) -> &[String] {
         match self.kind.as_ref() {
-            ErrorKind::CommandError(ref err) => &err.labels,
-            ErrorKind::WriteError(ref err) => match err {
+            ErrorKind::Command(ref err) => &err.labels,
+            ErrorKind::Write(ref err) => match err {
                 WriteFailure::WriteError(_) => &self.labels,
                 WriteFailure::WriteConcernError(ref err) => &err.labels,
             },
-            ErrorKind::BulkWriteError(ref err) => match err.write_concern_error {
+            ErrorKind::BulkWrite(ref err) => match err.write_concern_error {
                 Some(ref err) => &err.labels,
                 None => &self.labels,
             },
@@ -154,12 +154,12 @@ impl Error {
     pub(crate) fn with_label<T: AsRef<str>>(mut self, label: T) -> Self {
         let label = label.as_ref().to_string();
         match self.kind.as_ref() {
-            ErrorKind::CommandError(ref err) => {
+            ErrorKind::Command(ref err) => {
                 let mut err = err.clone();
                 err.labels.push(label);
-                ErrorKind::CommandError(err).into()
+                ErrorKind::Command(err).into()
             }
-            ErrorKind::WriteError(ref err) => match err {
+            ErrorKind::Write(ref err) => match err {
                 WriteFailure::WriteError(_) => {
                     self.labels.push(label);
                     self
@@ -167,16 +167,16 @@ impl Error {
                 WriteFailure::WriteConcernError(ref err) => {
                     let mut err = err.clone();
                     err.labels.push(label);
-                    ErrorKind::WriteError(WriteFailure::WriteConcernError(err)).into()
+                    ErrorKind::Write(WriteFailure::WriteConcernError(err)).into()
                 }
             },
-            ErrorKind::BulkWriteError(ref err) => match err.write_concern_error {
+            ErrorKind::BulkWrite(ref err) => match err.write_concern_error {
                 Some(ref write_concern_error) => {
                     let mut err = err.clone();
                     let mut write_concern_error = write_concern_error.clone();
                     write_concern_error.labels.push(label);
                     err.write_concern_error = Some(write_concern_error);
-                    ErrorKind::BulkWriteError(err).into()
+                    ErrorKind::BulkWrite(err).into()
                 }
                 None => {
                     self.labels.push(label);
@@ -191,7 +191,7 @@ impl Error {
     }
 
     pub(crate) fn from_resolve_error(error: trust_dns_resolver::error::ResolveError) -> Self {
-        ErrorKind::DnsResolveError { message: error.to_string() }.into()
+        ErrorKind::DnsResolve { message: error.to_string() }.into()
     }
 
     pub(crate) fn is_non_timeout_network_error(&self) -> bool {
@@ -201,7 +201,7 @@ impl Error {
     pub(crate) fn is_network_error(&self) -> bool {
         matches!(
             self.kind.as_ref(),
-            ErrorKind::Io(..) | ErrorKind::ConnectionPoolClearedError { .. }
+            ErrorKind::Io(..) | ErrorKind::ConnectionPoolCleared { .. }
         )
     }
 
@@ -209,15 +209,15 @@ impl Error {
     /// Any codes contained in WriteErrors are ignored.
     pub(crate) fn code(&self) -> Option<i32> {
         match self.kind.as_ref() {
-            ErrorKind::CommandError(command_error) => {
+            ErrorKind::Command(command_error) => {
                 Some(command_error.code)
             },
             // According to SDAM spec, write concern error codes MUST also be checked, and writeError codes
             // MUST NOT be checked.
-            ErrorKind::BulkWriteError(BulkWriteFailure { write_concern_error: Some(wc_error), .. }) => {
+            ErrorKind::BulkWrite(BulkWriteFailure { write_concern_error: Some(wc_error), .. }) => {
                 Some(wc_error.code)
             }
-            ErrorKind::WriteError(WriteFailure::WriteConcernError(wc_error)) => Some(wc_error.code),
+            ErrorKind::Write(WriteFailure::WriteConcernError(wc_error)) => Some(wc_error.code),
             _ => None
         }
     }
@@ -227,12 +227,12 @@ impl Error {
     #[cfg(test)]
     pub(crate) fn server_message(&self) -> Option<String> {
         match self.kind.as_ref() {
-            ErrorKind::CommandError(command_error) => {
+            ErrorKind::Command(command_error) => {
                 Some(command_error.message.clone())
             },
             // since this is used primarily for errorMessageContains assertions in the unified runner, we just
             // concatenate all the relevant server messages into one for bulk errors.
-            ErrorKind::BulkWriteError(BulkWriteFailure { write_concern_error, write_errors }) => {
+            ErrorKind::BulkWrite(BulkWriteFailure { write_concern_error, write_errors }) => {
                 let mut msg = "".to_string();
                 if let Some(wc_error) = write_concern_error {
                     msg.push_str(wc_error.message.as_str());
@@ -244,8 +244,8 @@ impl Error {
                 }
                 Some(msg)
             }
-            ErrorKind::WriteError(WriteFailure::WriteConcernError(wc_error)) => Some(wc_error.message.clone()),
-            ErrorKind::WriteError(WriteFailure::WriteError(write_error)) => Some(write_error.message.clone()),
+            ErrorKind::Write(WriteFailure::WriteConcernError(wc_error)) => Some(wc_error.message.clone()),
+            ErrorKind::Write(WriteFailure::WriteError(write_error)) => Some(write_error.message.clone()),
             _ => None
         }
     }
@@ -254,12 +254,12 @@ impl Error {
     #[cfg(test)]
     pub(crate) fn code_name(&self) -> Option<&str> {
         match self.kind.as_ref() {
-            ErrorKind::CommandError(ref cmd_err) => Some(cmd_err.code_name.as_str()),
-            ErrorKind::WriteError(ref failure) => match failure {
+            ErrorKind::Command(ref cmd_err) => Some(cmd_err.code_name.as_str()),
+            ErrorKind::Write(ref failure) => match failure {
                 WriteFailure::WriteConcernError(ref wce) => Some(wce.code_name.as_str()),
                 WriteFailure::WriteError(ref we) => we.code_name.as_deref(),
             },
-            ErrorKind::BulkWriteError(ref bwe) => bwe
+            ErrorKind::BulkWrite(ref bwe) => bwe
                 .write_concern_error
                 .as_ref()
                 .map(|wce| wce.code_name.as_str()),
@@ -301,13 +301,13 @@ where
 
 impl From<bson::de::Error> for ErrorKind {
     fn from(err: bson::de::Error) -> Self {
-        Self::BsonDecode(err)
+        Self::BsonDeserialization(err)
     }
 }
 
 impl From<bson::ser::Error> for ErrorKind {
     fn from(err: bson::ser::Error) -> Self {
-        Self::BsonEncode(err)
+        Self::BsonSerialization(err)
     }
 }
 
@@ -331,38 +331,38 @@ pub enum ErrorKind {
     /// An invalid argument was provided.
     #[error("An invalid argument was provided: {message}")]
     #[non_exhaustive]
-    ArgumentError { message: String },
+    InvalidArgument { message: String },
 
     /// An error occurred while the [`Client`](../struct.Client.html) attempted to authenticate a
     /// connection.
     #[error("{message}")]
     #[non_exhaustive]
-    AuthenticationError { message: String },
+    Authentication { message: String },
 
     /// Wrapper around `bson::de::Error`.
     #[error("{0}")]
-    BsonDecode(crate::bson::de::Error),
+    BsonDeserialization(crate::bson::de::Error),
 
     /// Wrapper around `bson::ser::Error`.
     #[error("{0}")]
-    BsonEncode(crate::bson::ser::Error),
+    BsonSerialization(crate::bson::ser::Error),
 
     /// An error occurred when trying to execute a write operation consisting of multiple writes.
     #[error("An error occurred when trying to execute a write operation: {0:?}")]
-    BulkWriteError(BulkWriteFailure),
+    BulkWrite(BulkWriteFailure),
 
     /// The server returned an error to an attempted operation.
     #[error("Command failed {0}")]
-    CommandError(CommandError),
+    Command(CommandError),
 
     /// An error occurred during DNS resolution.
     #[error("An error occurred during DNS resolution: {message}")]
     #[non_exhaustive]
-    DnsResolveError { message: String },
+    DnsResolve { message: String },
 
     #[error("Internal error: {message}")]
     #[non_exhaustive]
-    InternalError { message: String },
+    Internal { message: String },
 
     /// Wrapper around [`std::io::Error`](https://doc.rust-lang.org/std/io/struct.Error.html).
     #[error("{0}")]
@@ -372,17 +372,17 @@ pub enum ErrorKind {
     /// a concurrent error, causing the operation to fail.
     #[error("{message}")]
     #[non_exhaustive]
-    ConnectionPoolClearedError { message: String },
+    ConnectionPoolCleared { message: String },
 
     /// The server returned an invalid reply to a database operation.
     #[error("The server returned an invalid reply to a database operation: {message}")]
     #[non_exhaustive]
-    ResponseError { message: String },
+    InvalidResponse { message: String },
 
     /// The Client was not able to select a server for the operation.
     #[error("{message}")]
     #[non_exhaustive]
-    ServerSelectionError { message: String },
+    ServerSelection { message: String },
 
     /// The Client does not support sessions.
     #[error("Attempted to start a session on a deployment that does not support sessions")]
@@ -390,18 +390,18 @@ pub enum ErrorKind {
 
     #[error("{message}")]
     #[non_exhaustive]
-    TlsConfigError { message: String },
+    InvalidTlsConfig { message: String },
 
     /// The Client timed out while checking out a connection from connection pool.
     #[error(
         "Timed out while checking out a connection from connection pool with address {address}"
     )]
     #[non_exhaustive]
-    WaitQueueTimeoutError { address: StreamAddress },
+    WaitQueueTimeout { address: StreamAddress },
 
     /// An error occurred when trying to execute a write operation
     #[error("An error occurred when trying to execute a write operation: {0:?}")]
-    WriteError(WriteFailure),
+    Write(WriteFailure),
 }
 
 
@@ -542,7 +542,7 @@ impl WriteFailure {
         } else if let Some(wc_error) = bulk.write_concern_error {
             Ok(WriteFailure::WriteConcernError(wc_error))
         } else {
-            Err(ErrorKind::ResponseError {
+            Err(ErrorKind::InvalidResponse {
                 message: "error missing write errors and write concern errors".to_string(),
             }
             .into())
@@ -554,9 +554,9 @@ impl WriteFailure {
 /// untouched.
 pub(crate) fn convert_bulk_errors(error: Error) -> Error {
     match *error.kind {
-        ErrorKind::BulkWriteError(ref bulk_failure) => {
+        ErrorKind::BulkWrite(ref bulk_failure) => {
             match WriteFailure::from_bulk_failure(bulk_failure.clone()) {
-                Ok(failure) => ErrorKind::WriteError(failure).into(),
+                Ok(failure) => ErrorKind::Write(failure).into(),
                 Err(e) => e,
             }
         }

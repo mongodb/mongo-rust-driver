@@ -311,7 +311,7 @@ async fn handle_write_concern_error() {
         .handle_response(response, &Default::default())
         .expect_err("should get wc error");
     match *error.kind {
-        ErrorKind::WriteError(WriteFailure::WriteConcernError(_)) => {}
+        ErrorKind::Write(WriteFailure::WriteConcernError(_)) => {}
         ref e => panic!("should have gotten WriteConcernError, got {:?} instead", e),
     }
 }

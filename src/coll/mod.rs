@@ -657,7 +657,7 @@ where
         resolve_options!(self, options, [write_concern]);
 
         if docs.is_empty() {
-            return Err(ErrorKind::ArgumentError {
+            return Err(ErrorKind::InvalidArgument {
                 message: "No documents provided to insert_many".to_string(),
             }
             .into());
@@ -697,7 +697,7 @@ where
                     }
                 }
                 Err(e) => match *e.kind {
-                    ErrorKind::BulkWriteError(failure) => {
+                    ErrorKind::BulkWrite(failure) => {
                         let failure_ref =
                             cumulative_failure.get_or_insert_with(BulkWriteFailure::new);
                         if let Some(ref write_errors) = failure.write_errors {
@@ -714,7 +714,7 @@ where
                         }
 
                         if ordered {
-                            return Err(ErrorKind::BulkWriteError(
+                            return Err(ErrorKind::BulkWrite(
                                 cumulative_failure.unwrap_or_else(BulkWriteFailure::new),
                             )
                             .into());
@@ -726,7 +726,7 @@ where
         }
 
         match cumulative_failure {
-            Some(failure) => Err(ErrorKind::BulkWriteError(failure).into()),
+            Some(failure) => Err(ErrorKind::BulkWrite(failure).into()),
             None => Ok(cumulative_result.unwrap_or_else(InsertManyResult::new)),
         }
     }

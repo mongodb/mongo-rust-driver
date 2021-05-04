@@ -78,7 +78,7 @@ async fn insert_err_details() {
 
     let wc_error_result = coll.insert_one(doc! { "test": 1 }, None).await;
     match *wc_error_result.unwrap_err().kind {
-        ErrorKind::WriteError(WriteFailure::WriteConcernError(ref wc_error)) => {
+        ErrorKind::Write(WriteFailure::WriteConcernError(ref wc_error)) => {
             match &wc_error.details {
                 Some(doc) => {
                     let result = doc.get_document("writeConcern");
@@ -472,7 +472,7 @@ async fn large_insert_unordered_with_errors() {
         .expect_err("should get error")
         .kind
     {
-        ErrorKind::BulkWriteError(ref failure) => {
+        ErrorKind::BulkWrite(ref failure) => {
             let mut write_errors = failure
                 .write_errors
                 .clone()
@@ -512,7 +512,7 @@ async fn large_insert_ordered_with_errors() {
         .expect_err("should get error")
         .kind
     {
-        ErrorKind::BulkWriteError(ref failure) => {
+        ErrorKind::BulkWrite(ref failure) => {
             let write_errors = failure
                 .write_errors
                 .clone()
@@ -546,7 +546,7 @@ async fn empty_insert() {
         .expect_err("should get error")
         .kind
     {
-        ErrorKind::ArgumentError { .. } => {}
+        ErrorKind::InvalidArgument { .. } => {}
         e => panic!("expected argument error, got {:?}", e),
     };
 }
@@ -717,10 +717,10 @@ async fn find_one_and_delete_hint_server_version() {
     let req2 = VersionReq::parse("4.2.*").unwrap();
     if req1.matches(&client.server_version) {
         let error = res.expect_err("find one and delete should fail");
-        assert!(matches!(*error.kind, ErrorKind::ArgumentError { .. }));
+        assert!(matches!(*error.kind, ErrorKind::InvalidArgument { .. }));
     } else if req2.matches(&client.server_version) {
         let error = res.expect_err("find one and delete should fail");
-        assert!(matches!(*error.kind, ErrorKind::CommandError { .. }));
+        assert!(matches!(*error.kind, ErrorKind::Command { .. }));
     } else {
         assert!(res.is_ok());
     }

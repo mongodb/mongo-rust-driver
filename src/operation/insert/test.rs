@@ -200,7 +200,7 @@ async fn handle_write_failure() {
     assert!(write_error_result.is_err());
 
     match *write_error_result.unwrap_err().kind {
-        ErrorKind::BulkWriteError(ref error) => {
+        ErrorKind::BulkWrite(ref error) => {
             let write_errors = error.write_errors.clone().unwrap();
             assert_eq!(write_errors.len(), 1);
             let expected_err = BulkWriteError {

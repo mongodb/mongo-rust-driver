@@ -216,7 +216,7 @@ impl ReadPreference {
     pub(crate) fn with_tags(mut self, tag_sets: Vec<TagSet>) -> Result<Self> {
         let options = match self {
             ReadPreference::Primary => {
-                return Err(ErrorKind::ArgumentError {
+                return Err(ErrorKind::InvalidArgument {
                     message: "read preference tags can only be specified when a non-primary mode \
                               is specified"
                         .to_string(),
@@ -237,7 +237,7 @@ impl ReadPreference {
     pub(crate) fn with_max_staleness(mut self, max_staleness: Duration) -> Result<Self> {
         let options = match self {
             ReadPreference::Primary => {
-                return Err(ErrorKind::ArgumentError {
+                return Err(ErrorKind::InvalidArgument {
                     message: "max staleness can only be specified when a non-primary mode is \
                               specified"
                         .to_string(),

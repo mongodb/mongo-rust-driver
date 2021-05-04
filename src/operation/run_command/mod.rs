@@ -53,7 +53,7 @@ impl Operation for RunCommand {
     fn build(&self, _description: &StreamDescription) -> Result<Command> {
         let command_name = self
             .command_name()
-            .ok_or_else(|| ErrorKind::ArgumentError {
+            .ok_or_else(|| ErrorKind::InvalidArgument {
                 message: "an empty document cannot be passed to a run_command operation".into(),
             })?;
 
