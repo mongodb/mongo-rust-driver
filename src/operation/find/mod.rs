@@ -64,7 +64,7 @@ impl Operation for Find {
                 .map(|batch_size| batch_size > std::i32::MAX as u32)
                 == Some(true)
             {
-                return Err(ErrorKind::ArgumentError {
+                return Err(ErrorKind::InvalidArgument {
                     message: "The batch size must fit into a signed 32-bit integer".to_string(),
                 }
                 .into());

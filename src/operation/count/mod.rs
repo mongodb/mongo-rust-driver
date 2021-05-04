@@ -89,7 +89,7 @@ impl Operation for Count {
                     .pop_front()
                     .and_then(|doc| bson::from_document(doc).ok())
                     .ok_or_else(|| {
-                        Error::from(ErrorKind::ResponseError {
+                        Error::from(ErrorKind::InvalidResponse {
                             message: "invalid server response to count operation".into(),
                         })
                     })?

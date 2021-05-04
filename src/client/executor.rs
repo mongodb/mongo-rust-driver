@@ -44,7 +44,7 @@ impl Client {
     ) -> Result<T::O> {
         // TODO RUST-9: allow unacknowledged write concerns
         if !op.is_acknowledged() {
-            return Err(ErrorKind::ArgumentError {
+            return Err(ErrorKind::InvalidArgument {
                 message: "Unacknowledged write concerns are not supported".to_string(),
             }
             .into());
@@ -110,7 +110,7 @@ impl Client {
 
                 // Retryable writes are only supported by storage engines with document-level
                 // locking, so users need to disable retryable writes if using mmapv1.
-                if let ErrorKind::CommandError(ref mut command_error) = *err.kind {
+                if let ErrorKind::Command(ref mut command_error) = *err.kind {
                     if command_error.code == 20
                         && command_error.message.starts_with("Transaction numbers")
                     {
@@ -218,13 +218,13 @@ impl Client {
                 session.update_last_use();
             }
             Some(ref session) if !op.supports_sessions() && !session.is_implicit() => {
-                return Err(ErrorKind::ArgumentError {
+                return Err(ErrorKind::InvalidArgument {
                     message: format!("{} does not support sessions", cmd.name),
                 }
                 .into());
             }
             Some(ref session) if !op.is_acknowledged() && !session.is_implicit() => {
-                return Err(ErrorKind::ArgumentError {
+                return Err(ErrorKind::InvalidArgument {
                     message: "Cannot use ClientSessions with unacknowledged write concern"
                         .to_string(),
                 }

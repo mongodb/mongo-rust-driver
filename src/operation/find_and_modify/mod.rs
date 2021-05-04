@@ -104,7 +104,7 @@ where
 
     fn build(&self, description: &StreamDescription) -> Result<Command> {
         if self.options.hint.is_some() && description.max_wire_version.unwrap_or(0) < 8 {
-            return Err(ErrorKind::ArgumentError {
+            return Err(ErrorKind::InvalidArgument {
                 message: "Specifying a hint to find_one_and_x is not supported on server versions \
                           < 4.4"
                     .to_string(),
@@ -135,7 +135,7 @@ where
         match body.value {
             Bson::Document(doc) => Ok(Some(from_document(doc)?)),
             Bson::Null => Ok(None),
-            other => Err(ErrorKind::ResponseError {
+            other => Err(ErrorKind::InvalidResponse {
                 message: format!(
                     "expected document for value field of findAndModify response, but instead got \
                      {:?}",

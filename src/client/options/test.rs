@@ -319,8 +319,8 @@ async fn run_test(test_file: TestFile) {
                 .map_err(|e| *e.kind)
             {
                 Ok(_) => panic!("expected {}", expected_type),
-                Err(ErrorKind::ArgumentError { .. }) => {}
-                Err(e) => panic!("expected ArgumentError, but got {:?}", e),
+                Err(ErrorKind::InvalidArgument { .. }) => {}
+                Err(e) => panic!("expected InvalidArgument, but got {:?}", e),
             }
         }
     }
@@ -343,13 +343,13 @@ async fn parse_uri(option: &str, suggestion: Option<&str>) {
         .map_err(|e| *e.kind)
     {
         Ok(_) => panic!("expected error for option {}", option),
-        Err(ErrorKind::ArgumentError { message, .. }) => {
+        Err(ErrorKind::InvalidArgument { message, .. }) => {
             match suggestion {
                 Some(s) => assert!(message.contains(s)),
                 None => assert!(!message.contains("similar")),
             };
         }
-        Err(e) => panic!("expected ArgumentError, but got {:?}", e),
+        Err(e) => panic!("expected InvalidArgument, but got {:?}", e),
     }
 }
 

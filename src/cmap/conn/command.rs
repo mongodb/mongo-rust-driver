@@ -124,11 +124,11 @@ impl CommandResponse {
         if !self.is_success() {
             let command_error: CommandError =
                 bson::from_bson(Bson::Document(self.raw_response.clone())).map_err(|_| {
-                    ErrorKind::ResponseError {
+                    ErrorKind::InvalidResponse {
                         message: "invalid server response".to_string(),
                     }
                 })?;
-            Err(ErrorKind::CommandError(command_error).into())
+            Err(ErrorKind::Command(command_error).into())
         } else {
             Ok(())
         }
@@ -138,7 +138,7 @@ impl CommandResponse {
     pub(crate) fn body<T: DeserializeOwned>(&self) -> Result<T> {
         match bson::from_bson(Bson::Document(self.raw_response.clone())) {
             Ok(body) => Ok(body),
-            Err(e) => Err(ErrorKind::ResponseError {
+            Err(e) => Err(ErrorKind::InvalidResponse {
                 message: format!("{}", e),
             }
             .into()),

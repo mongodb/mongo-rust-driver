@@ -82,7 +82,7 @@ impl Operation for Insert {
             map.insert(
                 i,
                 doc.get("_id")
-                    .ok_or_else(|| ErrorKind::ResponseError {
+                    .ok_or_else(|| ErrorKind::InvalidResponse {
                         message: "missing _id in inserted document".to_string(),
                     })?
                     .clone(),

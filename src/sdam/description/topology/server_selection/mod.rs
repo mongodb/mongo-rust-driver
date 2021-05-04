@@ -104,7 +104,7 @@ impl TopologyDescription {
         criteria: &'a SelectionCriteria,
     ) -> Result<Vec<&'a ServerDescription>> {
         if let Some(message) = self.compatibility_error() {
-            return Err(ErrorKind::ServerSelectionError {
+            return Err(ErrorKind::ServerSelection {
                 message: message.to_string(),
             }
             .into());

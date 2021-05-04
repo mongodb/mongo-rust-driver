@@ -55,7 +55,7 @@ impl SrvResolver {
         let hostname_parts: Vec<_> = original_hostname.split('.').collect();
 
         if hostname_parts.len() < 3 {
-            return Err(ErrorKind::ArgumentError {
+            return Err(ErrorKind::InvalidArgument {
                 message: "a 'mongodb+srv' hostname must have at least three '.'-delimited parts"
                     .into(),
             }
@@ -82,7 +82,7 @@ impl SrvResolver {
             .collect();
 
         if srv_addresses.is_empty() {
-            return Err(ErrorKind::DnsResolveError {
+            return Err(ErrorKind::DnsResolve {
                 message: format!("SRV lookup for {} returned no records", original_hostname),
             }
             .into());
@@ -99,7 +99,7 @@ impl SrvResolver {
             }
 
             if !&hostname_parts[1..].ends_with(domain_name) {
-                return Err(ErrorKind::DnsResolveError {
+                return Err(ErrorKind::DnsResolve {
                     message: format!(
                         "SRV lookup for {} returned result {}, which does not match domain name {}",
                         original_hostname,
@@ -137,7 +137,7 @@ impl SrvResolver {
         };
 
         if txt_records.next().is_some() {
-            return Err(ErrorKind::DnsResolveError {
+            return Err(ErrorKind::DnsResolve {
                 message: format!(
                     "TXT lookup for {} returned more than one record, but more than one are not \
                      allowed with 'mongodb+srv'",
@@ -159,7 +159,7 @@ impl SrvResolver {
             let parts: Vec<_> = option_pair.split('=').collect();
 
             if parts.len() != 2 {
-                return Err(ErrorKind::DnsResolveError {
+                return Err(ErrorKind::DnsResolve {
                     message: format!(
                         "TXT record string '{}' is not a value `key=value` option pair",
                         option_pair
@@ -176,7 +176,7 @@ impl SrvResolver {
                     config.replica_set = Some(parts[1].into());
                 }
                 other => {
-                    return Err(ErrorKind::DnsResolveError {
+                    return Err(ErrorKind::DnsResolve {
                         message: format!(
                             "TXT record option '{}' was returned, but only 'authSource' and \
                              'replicaSet' are allowed",

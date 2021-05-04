@@ -114,7 +114,7 @@ impl AuthMechanism {
         match self {
             AuthMechanism::ScramSha1 | AuthMechanism::ScramSha256 => {
                 if credential.username.is_none() {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: "No username provided for SCRAM authentication".to_string(),
                     }
                     .into());
@@ -123,14 +123,14 @@ impl AuthMechanism {
             }
             AuthMechanism::MongoDbX509 => {
                 if credential.password.is_some() {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: "A password cannot be specified with MONGODB-X509".to_string(),
                     }
                     .into());
                 }
 
                 if credential.source.as_deref().unwrap_or("$external") != "$external" {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: "only $external may be specified as an auth source for \
                                   MONGODB-X509"
                             .to_string(),
@@ -142,21 +142,21 @@ impl AuthMechanism {
             }
             AuthMechanism::Plain => {
                 if credential.username.is_none() {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: "No username provided for PLAIN authentication".to_string(),
                     }
                     .into());
                 }
 
                 if credential.username.as_deref() == Some("") {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: "Username for PLAIN authentication must be non-empty".to_string(),
                     }
                     .into());
                 }
 
                 if credential.password.is_none() {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: "No password provided for PLAIN authentication".to_string(),
                     }
                     .into());
@@ -167,7 +167,7 @@ impl AuthMechanism {
             #[cfg(feature = "tokio-runtime")]
             AuthMechanism::MongoDbAws => {
                 if credential.username.is_some() && credential.password.is_none() {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: "Username cannot be provided without password for MONGODB-AWS \
                                   authentication"
                             .to_string(),
@@ -235,13 +235,13 @@ impl AuthMechanism {
             Self::Plain => Ok(None),
             #[cfg(feature = "tokio-runtime")]
             AuthMechanism::MongoDbAws => Ok(None),
-            AuthMechanism::MongoDbCr => Err(ErrorKind::AuthenticationError {
+            AuthMechanism::MongoDbCr => Err(ErrorKind::Authentication {
                 message: "MONGODB-CR is deprecated and not supported by this driver. Use SCRAM \
                           for password-based authentication instead"
                     .into(),
             }
             .into()),
-            _ => Err(ErrorKind::AuthenticationError {
+            _ => Err(ErrorKind::Authentication {
                 message: format!("Authentication mechanism {:?} not yet implemented.", self),
             }
             .into()),
@@ -278,13 +278,13 @@ impl AuthMechanism {
             AuthMechanism::MongoDbAws => {
                 aws::authenticate_stream(stream, credential, server_api, http_client).await
             }
-            AuthMechanism::MongoDbCr => Err(ErrorKind::AuthenticationError {
+            AuthMechanism::MongoDbCr => Err(ErrorKind::Authentication {
                 message: "MONGODB-CR is deprecated and not supported by this driver. Use SCRAM \
                           for password-based authentication instead"
                     .into(),
             }
             .into()),
-            _ => Err(ErrorKind::AuthenticationError {
+            _ => Err(ErrorKind::Authentication {
                 message: format!("Authentication mechanism {:?} not yet implemented.", self),
             }
             .into()),
@@ -307,12 +307,12 @@ impl FromStr for AuthMechanism {
             #[cfg(feature = "tokio-runtime")]
             MONGODB_AWS_STR => Ok(AuthMechanism::MongoDbAws),
             #[cfg(not(feature = "tokio-runtime"))]
-            MONGODB_AWS_STR => Err(ErrorKind::ArgumentError {
+            MONGODB_AWS_STR => Err(ErrorKind::InvalidArgument {
                 message: "MONGODB-AWS auth is only supported with the tokio runtime".into(),
             }
             .into()),
 
-            _ => Err(ErrorKind::ArgumentError {
+            _ => Err(ErrorKind::InvalidArgument {
                 message: format!("invalid mechanism string: {}", str),
             }
             .into()),

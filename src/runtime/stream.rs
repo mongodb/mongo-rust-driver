@@ -114,7 +114,7 @@ impl AsyncTcpStream {
         let mut socket_addrs: Vec<_> = RUNTIME.resolve_address(address).await?.collect();
 
         if socket_addrs.is_empty() {
-            return Err(ErrorKind::DnsResolveError {
+            return Err(ErrorKind::DnsResolve {
                 message: format!("No DNS results for domain {}", address),
             }
             .into());
@@ -134,7 +134,7 @@ impl AsyncTcpStream {
         }
 
         Err(connect_error.unwrap_or_else(|| {
-            ErrorKind::InternalError {
+            ErrorKind::Internal {
                 message: "connecting to all DNS results failed but no error reported".to_string(),
             }
             .into()
@@ -152,7 +152,7 @@ impl AsyncStream {
             Some(cfg) => {
                 let name =
                     DNSNameRef::try_from_ascii_str(&options.address.hostname).map_err(|e| {
-                        ErrorKind::DnsResolveError {
+                        ErrorKind::DnsResolve {
                             message: e.to_string(),
                         }
                     })?;

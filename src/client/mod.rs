@@ -184,7 +184,7 @@ impl Client {
                 .into_iter()
                 .map(|doc| {
                     let name = doc.get("name").and_then(Bson::as_str).ok_or_else(|| {
-                        ErrorKind::ResponseError {
+                        ErrorKind::InvalidResponse {
                             message: "Expected \"name\" field in server response, but it was not \
                                       found"
                                 .to_string(),
@@ -309,7 +309,7 @@ impl Client {
                 .await;
 
             if !change_occurred {
-                return Err(ErrorKind::ServerSelectionError {
+                return Err(ErrorKind::ServerSelection {
                     message: self
                         .inner
                         .topology

@@ -153,7 +153,7 @@ impl StreamAddress {
         let hostname = match parts.next() {
             Some(part) => part,
             None => {
-                return Err(ErrorKind::ArgumentError {
+                return Err(ErrorKind::InvalidArgument {
                     message: format!("invalid server address: \"{}\"", address),
                 }
                 .into())
@@ -162,7 +162,7 @@ impl StreamAddress {
 
         let port = match parts.next() {
             Some(part) => {
-                let port = u16::from_str(part).map_err(|_| ErrorKind::ArgumentError {
+                let port = u16::from_str(part).map_err(|_| ErrorKind::InvalidArgument {
                     message: format!(
                         "port must be valid 16-bit unsigned integer, instead got: {}",
                         part
@@ -170,7 +170,7 @@ impl StreamAddress {
                 })?;
 
                 if parts.next().is_some() {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: format!(
                             "address \"{}\" contains more than one unescaped ':'",
                             address
@@ -230,7 +230,7 @@ impl FromStr for ServerApiVersion {
     fn from_str(str: &str) -> Result<Self> {
         match str {
             "1" => Ok(Self::Version1),
-            _ => Err(ErrorKind::ArgumentError {
+            _ => Err(ErrorKind::InvalidArgument {
                 message: format!("invalid server api version string: {}", str),
             }
             .into()),
@@ -602,7 +602,7 @@ impl TlsOptions {
         if let Some(path) = self.ca_file_path {
             store
                 .add_pem_file(&mut BufReader::new(File::open(&path)?))
-                .map_err(|_| ErrorKind::TlsConfigError {
+                .map_err(|_| ErrorKind::InvalidTlsConfig {
                     message: format!("Unable to parse PEM-encoded root certificate from {}", path),
                 })?;
         } else {
@@ -616,7 +616,7 @@ impl TlsOptions {
             let certs = match pemfile::certs(&mut file) {
                 Ok(certs) => certs,
                 Err(()) => {
-                    return Err(ErrorKind::TlsConfigError {
+                    return Err(ErrorKind::InvalidTlsConfig {
                         message: format!(
                             "Unable to parse PEM-encoded client certificate from {}",
                             path
@@ -630,7 +630,7 @@ impl TlsOptions {
             let key = match pemfile::rsa_private_keys(&mut file) {
                 Ok(key) => key,
                 Err(()) => {
-                    return Err(ErrorKind::TlsConfigError {
+                    return Err(ErrorKind::InvalidTlsConfig {
                         message: format!("Unable to parse PEM-encoded RSA key from {}", path),
                     }
                     .into())
@@ -640,7 +640,7 @@ impl TlsOptions {
             // TODO: Get rid of unwrap.
             config
                 .set_single_client_cert(certs, key.into_iter().next().unwrap())
-                .map_err(|e| ErrorKind::TlsConfigError {
+                .map_err(|e| ErrorKind::InvalidTlsConfig {
                     message: e.to_string(),
                 })?;
         }
@@ -889,7 +889,7 @@ impl ClientOptions {
     pub(crate) fn validate(&self) -> Result<()> {
         if let Some(true) = self.direct_connection {
             if self.hosts.len() > 1 {
-                return Err(ErrorKind::ArgumentError {
+                return Err(ErrorKind::InvalidArgument {
                     message: "cannot specify multiple seeds with directConnection=true".to_string(),
                 }
                 .into());
@@ -955,7 +955,7 @@ fn exclusive_split_at(s: &str, i: usize) -> (Option<&str>, Option<&str>) {
 fn percent_decode(s: &str, err_message: &str) -> Result<String> {
     match percent_encoding::percent_decode_str(s).decode_utf8() {
         Ok(result) => Ok(result.to_string()),
-        Err(_) => Err(ErrorKind::ArgumentError {
+        Err(_) => Err(ErrorKind::InvalidArgument {
             message: err_message.to_string(),
         }
         .into()),
@@ -964,7 +964,7 @@ fn percent_decode(s: &str, err_message: &str) -> Result<String> {
 
 fn validate_userinfo(s: &str, userinfo_type: &str) -> Result<()> {
     if s.chars().any(|c| USERINFO_RESERVED_CHARACTERS.contains(&c)) {
-        return Err(ErrorKind::ArgumentError {
+        return Err(ErrorKind::InvalidArgument {
             message: format!("{} must be URL encoded", userinfo_type),
         }
         .into());
@@ -976,7 +976,7 @@ fn validate_userinfo(s: &str, userinfo_type: &str) -> Result<()> {
         .skip(1)
         .any(|part| part.len() < 2 || part[0..2].chars().any(|c| !c.is_ascii_hexdigit()))
     {
-        return Err(ErrorKind::ArgumentError {
+        return Err(ErrorKind::InvalidArgument {
             message: "username/password cannot contain unescaped %".to_string(),
         }
         .into());
@@ -990,7 +990,7 @@ impl ClientOptionsParser {
         let end_of_scheme = match s.find("://") {
             Some(index) => index,
             None => {
-                return Err(ErrorKind::ArgumentError {
+                return Err(ErrorKind::InvalidArgument {
                     message: "connection string contains no scheme".to_string(),
                 }
                 .into())
@@ -1001,7 +1001,7 @@ impl ClientOptionsParser {
             "mongodb" => false,
             "mongodb+srv" => true,
             _ => {
-                return Err(ErrorKind::ArgumentError {
+                return Err(ErrorKind::InvalidArgument {
                     message: format!("invalid connection string scheme: {}", &s[..end_of_scheme]),
                 }
                 .into())
@@ -1014,7 +1014,7 @@ impl ClientOptionsParser {
             Some(slash_index) => match exclusive_split_at(after_scheme, slash_index) {
                 (Some(section), o) => (section, o),
                 (None, _) => {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: "missing hosts".to_string(),
                     }
                     .into())
@@ -1022,7 +1022,7 @@ impl ClientOptionsParser {
             },
             None => {
                 if after_scheme.find('?').is_some() {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: "Missing delimiting slash between hosts and options".to_string(),
                     }
                     .into());
@@ -1046,7 +1046,7 @@ impl ClientOptionsParser {
                     .chars()
                     .any(|c| ILLEGAL_DATABASE_CHARACTERS.contains(&c))
                 {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: "illegal character in database name".to_string(),
                     }
                     .into());
@@ -1064,7 +1064,7 @@ impl ClientOptionsParser {
                 match hosts {
                     Some(hs) => (true, creds, hs),
                     None => {
-                        return Err(ErrorKind::ArgumentError {
+                        return Err(ErrorKind::InvalidArgument {
                             message: "missing hosts".to_string(),
                         }
                         .into())
@@ -1094,7 +1094,7 @@ impl ClientOptionsParser {
                 };
 
                 if hostname.is_empty() {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: "connection string contains no host".to_string(),
                     }
                     .into());
@@ -1104,7 +1104,7 @@ impl ClientOptionsParser {
                 } else {
                     let port_string_without_colon = &port[1..];
                     let p: u16 = port_string_without_colon.parse().map_err(|_| {
-                        ErrorKind::ArgumentError {
+                        ErrorKind::InvalidArgument {
                             message: format!(
                                 "invalid port specified in connection string: {}",
                                 port
@@ -1113,7 +1113,7 @@ impl ClientOptionsParser {
                     })?;
 
                     if p == 0 {
-                        return Err(ErrorKind::ArgumentError {
+                        return Err(ErrorKind::InvalidArgument {
                             message: format!(
                                 "invalid port specified in connection string: {}",
                                 port
@@ -1136,14 +1136,14 @@ impl ClientOptionsParser {
 
         if srv {
             if hosts.len() != 1 {
-                return Err(ErrorKind::ArgumentError {
+                return Err(ErrorKind::InvalidArgument {
                     message: "exactly one host must be specified with 'mongodb+srv'".into(),
                 }
                 .into());
             }
 
             if hosts[0].port.is_some() {
-                return Err(ErrorKind::ArgumentError {
+                return Err(ErrorKind::InvalidArgument {
                     message: "a port cannot be specified with 'mongodb+srv'".into(),
                 }
                 .into());
@@ -1177,7 +1177,7 @@ impl ClientOptionsParser {
         }
 
         if options.auth_source.as_deref() == Some("") {
-            return Err(ErrorKind::ArgumentError {
+            return Err(ErrorKind::InvalidArgument {
                 message: "empty authSource provided".to_string(),
             }
             .into());
@@ -1228,7 +1228,7 @@ impl ClientOptionsParser {
                         .or(db)
                         .or_else(|| Some("admin".into()));
                 } else if authentication_requested {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: "username and mechanism both not provided, but authentication \
                                   was requested"
                             .to_string(),
@@ -1256,7 +1256,7 @@ impl ClientOptionsParser {
             let (key, value) = match option_pair.find('=') {
                 Some(index) => option_pair.split_at(index),
                 None => {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: format!(
                             "connection string options is not a `key=value` pair: {}",
                             option_pair,
@@ -1267,7 +1267,7 @@ impl ClientOptionsParser {
             };
 
             if key.to_lowercase() != "readpreferencetags" && keys.contains(&key) {
-                return Err(ErrorKind::ArgumentError {
+                return Err(ErrorKind::InvalidArgument {
                     message: "repeated options are not allowed in the connection string"
                         .to_string(),
                 }
@@ -1289,7 +1289,7 @@ impl ClientOptionsParser {
             self.read_preference = match self.read_preference.take() {
                 Some(read_pref) => Some(read_pref.with_tags(tags)?),
                 None => {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: "cannot set read preference tags without also setting read \
                                   preference mode"
                             .to_string(),
@@ -1303,7 +1303,7 @@ impl ClientOptionsParser {
             self.read_preference = match self.read_preference.take() {
                 Some(read_pref) => Some(read_pref.with_max_staleness(max_staleness)?),
                 None => {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: "cannot set max staleness without also setting read preference \
                                   mode"
                             .to_string(),
@@ -1317,7 +1317,7 @@ impl ClientOptionsParser {
 
         if let Some(true) = self.direct_connection {
             if self.srv {
-                return Err(ErrorKind::ArgumentError {
+                return Err(ErrorKind::InvalidArgument {
                     message: "cannot use SRV-style URI with directConnection=true".to_string(),
                 }
                 .into());
@@ -1334,7 +1334,7 @@ impl ClientOptionsParser {
                     "true" => true,
                     "false" => false,
                     _ => {
-                        return Err(ErrorKind::ArgumentError {
+                        return Err(ErrorKind::InvalidArgument {
                             message: format!(
                                 "connection string `{}` option must be a boolean",
                                 $option,
@@ -1351,7 +1351,7 @@ impl ClientOptionsParser {
                 match $value.parse::<u64>() {
                     Ok(i) => i,
                     _ => {
-                        return Err(ErrorKind::ArgumentError {
+                        return Err(ErrorKind::InvalidArgument {
                             message: format!(
                                 "connection string `{}` option must be a non-negative integer",
                                 $option
@@ -1368,7 +1368,7 @@ impl ClientOptionsParser {
                 match value.parse::<u32>() {
                     Ok(u) => u,
                     Err(_) => {
-                        return Err(ErrorKind::ArgumentError {
+                        return Err(ErrorKind::InvalidArgument {
                             message: format!(
                                 "connection string `{}` argument must be a positive integer",
                                 $option,
@@ -1385,7 +1385,7 @@ impl ClientOptionsParser {
                 match value.parse::<i32>() {
                     Ok(u) => u,
                     Err(_) => {
-                        return Err(ErrorKind::ArgumentError {
+                        return Err(ErrorKind::InvalidArgument {
                             message: format!(
                                 "connection string `{}` argument must be an integer",
                                 $option
@@ -1408,7 +1408,7 @@ impl ClientOptionsParser {
             "authmechanismproperties" => {
                 let mut doc = Document::new();
                 let err_func = || {
-                    ErrorKind::ArgumentError {
+                    ErrorKind::InvalidArgument {
                         message: "improperly formatted authMechanismProperties".to_string(),
                     }
                     .into()
@@ -1440,7 +1440,7 @@ impl ClientOptionsParser {
                 let duration = get_duration!(value, k);
 
                 if duration < MIN_HEARTBEAT_FREQUENCY.as_millis() as u64 {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: format!(
                             "'heartbeatFrequencyMS' must be at least 500, but {} was given",
                             duration
@@ -1466,7 +1466,7 @@ impl ClientOptionsParser {
 
                 if max_staleness > Duration::from_secs(0) && max_staleness < Duration::from_secs(90)
                 {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: "'maxStalenessSeconds' cannot be both positive and below 90"
                             .into(),
                     }
@@ -1500,7 +1500,7 @@ impl ClientOptionsParser {
                         options: Default::default(),
                     },
                     other => {
-                        return Err(ErrorKind::ArgumentError {
+                        return Err(ErrorKind::InvalidArgument {
                             message: format!("'{}' is not a valid read preference", other),
                         }
                         .into())
@@ -1520,7 +1520,7 @@ impl ClientOptionsParser {
                                 (Some(key), Some(value)) => {
                                     Ok((key.to_string(), value.to_string()))
                                 }
-                                _ => Err(ErrorKind::ArgumentError {
+                                _ => Err(ErrorKind::InvalidArgument {
                                     message: format!(
                                         "'{}' is not a valid read preference tag (which must be \
                                          of the form 'key:value'",
@@ -1557,7 +1557,7 @@ impl ClientOptionsParser {
 
                 match (self.tls.as_ref(), tls) {
                     (Some(Tls::Disabled), true) | (Some(Tls::Enabled(..)), false) => {
-                        return Err(ErrorKind::ArgumentError {
+                        return Err(ErrorKind::InvalidArgument {
                             message: "All instances of `tls` and `ssl` must have the same
  value"
                                 .to_string(),
@@ -1584,7 +1584,7 @@ impl ClientOptionsParser {
 
                 match self.tls {
                     Some(Tls::Disabled) => {
-                        return Err(ErrorKind::ArgumentError {
+                        return Err(ErrorKind::InvalidArgument {
                             message: "'tlsInsecure' can't be set if tls=false".into(),
                         }
                         .into())
@@ -1594,7 +1594,7 @@ impl ClientOptionsParser {
                             && options.allow_invalid_certificates
                                 != Some(allow_invalid_certificates) =>
                     {
-                        return Err(ErrorKind::ArgumentError {
+                        return Err(ErrorKind::InvalidArgument {
                             message: "all instances of 'tlsInsecure' and \
                                       'tlsAllowInvalidCertificates' must be consistent (e.g. \
                                       'tlsInsecure' cannot be true when \
@@ -1617,7 +1617,7 @@ impl ClientOptionsParser {
             }
             "tlscafile" => match self.tls {
                 Some(Tls::Disabled) => {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: "'tlsCAFile' can't be set if tls=false".into(),
                     }
                     .into());
@@ -1635,7 +1635,7 @@ impl ClientOptionsParser {
             },
             "tlscertificatekeyfile" => match self.tls {
                 Some(Tls::Disabled) => {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: "'tlsCertificateKeyFile' can't be set if tls=false".into(),
                     }
                     .into());
@@ -1658,7 +1658,7 @@ impl ClientOptionsParser {
                     Ok(w) => match u32::try_from(w) {
                         Ok(uw) => write_concern.w = Some(Acknowledgment::from(uw)),
                         Err(_) => {
-                            return Err(ErrorKind::ArgumentError {
+                            return Err(ErrorKind::InvalidArgument {
                                 message: "connection string `w` option cannot be a negative \
                                           integer"
                                     .to_string(),
@@ -1681,14 +1681,14 @@ impl ClientOptionsParser {
             k @ "zlibcompressionlevel" => {
                 let i = get_i32!(value, k);
                 if i < -1 {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: "'zlibCompressionLevel' cannot be less than -1".to_string(),
                     }
                     .into());
                 }
 
                 if i > 9 {
-                    return Err(ErrorKind::ArgumentError {
+                    return Err(ErrorKind::InvalidArgument {
                         message: "'zlibCompressionLevel' cannot be greater than 9".to_string(),
                     }
                     .into());
@@ -1712,7 +1712,7 @@ impl ClientOptionsParser {
                         option
                     ));
                 }
-                return Err(ErrorKind::ArgumentError { message }.into());
+                return Err(ErrorKind::InvalidArgument { message }.into());
             }
         }
 

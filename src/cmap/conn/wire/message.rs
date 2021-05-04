@@ -49,7 +49,7 @@ impl Message {
                 MessageSection::Sequence { documents, .. } => documents.into_iter().next(),
             })
             .ok_or_else(|| {
-                ErrorKind::ResponseError {
+                ErrorKind::InvalidResponse {
                     message: "no response received from server".into(),
                 }
                 .into()
@@ -90,7 +90,7 @@ impl Message {
         if length_remaining == 4 && flags.contains(MessageFlags::CHECKSUM_PRESENT) {
             checksum = Some(reader.read_u32().await?);
         } else if length_remaining != 0 {
-            return Err(ErrorKind::ResponseError {
+            return Err(ErrorKind::InvalidResponse {
                 message: format!(
                     "The server indicated that the reply would be {} bytes long, but it instead \
                      was {}",
@@ -193,7 +193,7 @@ impl MessageSection {
         }
 
         if length_remaining != count_reader.bytes_read() as i32 {
-            return Err(ErrorKind::ResponseError {
+            return Err(ErrorKind::InvalidResponse {
                 message: format!(
                     "The server indicated that the reply would be {} bytes long, but it instead \
                      was {}",

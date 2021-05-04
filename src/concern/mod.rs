@@ -250,7 +250,7 @@ impl WriteConcern {
     /// and the `j` field is `true`.
     pub(crate) fn validate(&self) -> Result<()> {
         if self.w == Some(Acknowledgment::Nodes(0)) && self.journal == Some(true) {
-            return Err(ErrorKind::ArgumentError {
+            return Err(ErrorKind::InvalidArgument {
                 message: "write concern cannot have w=0 and j=true".to_string(),
             }
             .into());
@@ -258,7 +258,7 @@ impl WriteConcern {
 
         if let Some(w_timeout) = self.w_timeout {
             if w_timeout < Duration::from_millis(0) {
-                return Err(ErrorKind::ArgumentError {
+                return Err(ErrorKind::InvalidArgument {
                     message: "write concern `w_timeout` field cannot be negative".to_string(),
                 }
                 .into());

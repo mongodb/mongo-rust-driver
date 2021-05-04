@@ -92,10 +92,8 @@ pub enum ServerError {
 impl From<ServerError> for Error {
     fn from(server_error: ServerError) -> Self {
         match server_error {
-            ServerError::CommandError(command_error) => {
-                ErrorKind::CommandError(command_error).into()
-            }
-            ServerError::WriteError(bwf) => ErrorKind::BulkWriteError(bwf).into(),
+            ServerError::CommandError(command_error) => ErrorKind::Command(command_error).into(),
+            ServerError::WriteError(bwf) => ErrorKind::BulkWrite(bwf).into(),
         }
     }
 }
@@ -473,7 +471,7 @@ async fn pool_cleared_error_does_not_mark_unknown() {
     );
 
     // assert a pool cleared error would have no effect on the topology
-    let error: Error = ErrorKind::ConnectionPoolClearedError {
+    let error: Error = ErrorKind::ConnectionPoolCleared {
         message: "foo".to_string(),
     }
     .into();
