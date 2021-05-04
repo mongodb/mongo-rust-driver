@@ -541,7 +541,7 @@ async fn empty_insert() {
         .database(function_name!())
         .collection::<Document>(function_name!());
     match coll
-        .insert_many(Vec::new(), None)
+        .insert_many(Vec::<Document>::new(), None)
         .await
         .expect_err("should get error")
         .kind

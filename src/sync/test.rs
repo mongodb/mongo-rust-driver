@@ -1,7 +1,4 @@
-use std::{
-    fmt::Debug,
-    marker::{Send, Sync},
-};
+use std::fmt::Debug;
 
 use pretty_assertions::assert_eq;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -30,7 +27,7 @@ fn init_db_and_coll(client: &Client, db_name: &str, coll_name: &str) -> Collecti
 
 fn init_db_and_typed_coll<T>(client: &Client, db_name: &str, coll_name: &str) -> Collection<T>
 where
-    T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
+    T: Serialize + DeserializeOwned + Unpin + Debug,
 {
     let coll = client.database(db_name).collection(coll_name);
     drop_collection(&coll);
@@ -39,7 +36,7 @@ where
 
 pub fn drop_collection<T>(coll: &Collection<T>)
 where
-    T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
+    T: Serialize + DeserializeOwned + Unpin + Debug,
 {
     match coll.drop(None).as_ref().map_err(|e| &e.kind) {
         Err(ErrorKind::CommandError(CommandError { code: 26, .. })) | Ok(_) => {}
