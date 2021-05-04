@@ -150,7 +150,7 @@ pub(super) struct Find {
     #[serde(default)]
     sort: Option<Document>,
     #[serde(default)]
-    skip: Option<i64>,
+    skip: Option<u64>,
     #[serde(default, rename = "batchSize")]
     batch_size: Option<i64>,
     #[serde(default)]

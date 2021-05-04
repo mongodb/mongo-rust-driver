@@ -11,8 +11,8 @@ use crate::{
 #[derive(Debug, Deserialize)]
 struct Arguments {
     pub filter: Option<Document>,
-    pub skip: Option<i64>,
-    pub limit: Option<i64>,
+    pub skip: Option<u64>,
+    pub limit: Option<u64>,
     pub collation: Option<Collation>,
 }
 
@@ -45,7 +45,7 @@ async fn run_count_test(test_file: TestFile) {
 
         let arguments: Arguments = bson::from_bson(Bson::Document(test_case.operation.arguments))
             .expect(&test_case.description);
-        let outcome: Outcome<i64> =
+        let outcome: Outcome<u64> =
             bson::from_bson(Bson::Document(test_case.outcome)).expect(&test_case.description);
 
         if let Some(ref c) = outcome.collection {

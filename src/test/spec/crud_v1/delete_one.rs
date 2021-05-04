@@ -18,7 +18,7 @@ struct Arguments {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ResultDoc {
-    pub deleted_count: i64,
+    pub deleted_count: u64,
 }
 
 #[function_name::named]

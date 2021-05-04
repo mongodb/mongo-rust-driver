@@ -108,14 +108,13 @@ where
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
-pub(crate) fn serialize_u32_as_i32<S: Serializer>(
+pub(crate) fn serialize_u32_option_as_i32<S: Serializer>(
     val: &Option<u32>,
     serializer: S,
 ) -> std::result::Result<S::Ok, S::Error> {
     match val {
-        Some(val) if { *val <= std::i32::MAX as u32 } => serializer.serialize_i32(*val as i32),
+        Some(ref val) => bson::serde_helpers::serialize_u32_as_i32(val, serializer),
         None => serializer.serialize_none(),
-        _ => Err(ser::Error::custom("u32 specified does not fit into an i32")),
     }
 }
 
@@ -133,6 +132,16 @@ pub(crate) fn serialize_batch_size<S: Serializer>(
         _ => Err(ser::Error::custom(
             "batch size must be able to fit into a signed 32-bit integer",
         )),
+    }
+}
+
+pub(crate) fn serialize_u64_option_as_i64<S: Serializer>(
+    val: &Option<u64>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    match val {
+        Some(ref v) => bson::serde_helpers::serialize_u64_as_i64(v, serializer),
+        None => serializer.serialize_none(),
     }
 }
 

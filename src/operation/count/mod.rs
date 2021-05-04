@@ -37,7 +37,7 @@ impl Count {
 }
 
 impl Operation for Count {
-    type O = i64;
+    type O = u64;
     const NAME: &'static str = "count";
 
     fn build(&self, description: &StreamDescription) -> Result<Command> {
@@ -122,5 +122,5 @@ impl Operation for Count {
 
 #[derive(Debug, Deserialize)]
 struct ResponseBody {
-    n: i64,
+    n: u64,
 }

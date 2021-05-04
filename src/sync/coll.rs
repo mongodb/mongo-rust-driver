@@ -184,7 +184,7 @@ where
     pub fn estimated_document_count(
         &self,
         options: impl Into<Option<EstimatedDocumentCountOptions>>,
-    ) -> Result<i64> {
+    ) -> Result<u64> {
         RUNTIME.block_on(
             self.async_collection
                 .estimated_document_count(options.into()),
@@ -199,7 +199,7 @@ where
         &self,
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<CountOptions>>,
-    ) -> Result<i64> {
+    ) -> Result<u64> {
         RUNTIME.block_on(
             self.async_collection
                 .count_documents(filter.into(), options.into()),
@@ -215,7 +215,7 @@ where
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<CountOptions>>,
         session: &mut ClientSession,
-    ) -> Result<i64> {
+    ) -> Result<u64> {
         RUNTIME.block_on(self.async_collection.count_documents_with_session(
             filter.into(),
             options.into(),

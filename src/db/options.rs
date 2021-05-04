@@ -39,12 +39,14 @@ pub struct CreateCollectionOptions {
 
     /// The maximum size (in bytes) for a capped collection. This option is ignored if `capped` is
     /// not set to true.
-    pub size: Option<i64>,
+    #[serde(serialize_with = "bson_util::serialize_u64_option_as_i64")]
+    pub size: Option<u64>,
 
     /// The maximum number of documents in a capped collection. The `size` limit takes precedence
     /// over this option. If a capped collection reaches the size limit before it reaches the
     /// maximum number of documents, MongoDB removes old documents.
-    pub max: Option<i64>,
+    #[serde(serialize_with = "bson_util::serialize_u64_option_as_i64")]
+    pub max: Option<u64>,
 
     /// The storage engine that the collection should use. The value should take the following
     /// form:

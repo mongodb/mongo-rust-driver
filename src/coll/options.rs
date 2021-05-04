@@ -10,7 +10,8 @@ use crate::{
         deserialize_duration_from_u64_millis,
         serialize_batch_size,
         serialize_duration_as_int_millis,
-        serialize_u32_as_i32,
+        serialize_u32_option_as_i32,
+        serialize_u64_option_as_i64,
     },
     concern::{ReadConcern, WriteConcern},
     options::Collation,
@@ -498,7 +499,8 @@ pub struct CountOptions {
     pub hint: Option<Hint>,
 
     /// The maximum number of documents to count.
-    pub limit: Option<i64>,
+    #[serde(serialize_with = "serialize_u64_option_as_i64")]
+    pub limit: Option<u64>,
 
     /// The maximum amount of time to allow the query to run.
     ///
@@ -508,7 +510,8 @@ pub struct CountOptions {
     pub max_time: Option<Duration>,
 
     /// The number of documents to skip before counting.
-    pub skip: Option<i64>,
+    #[serde(serialize_with = "serialize_u64_option_as_i64")]
+    pub skip: Option<u64>,
 
     /// The collation to use for the operation.
     ///
@@ -618,7 +621,7 @@ pub struct FindOptions {
     /// only the number of documents kept in memory at a given time (and by extension, the
     /// number of round trips needed to return the entire set of documents returned by the
     /// query.
-    #[serde(serialize_with = "serialize_u32_as_i32")]
+    #[serde(serialize_with = "serialize_u32_option_as_i32")]
     pub batch_size: Option<u32>,
 
     /// Tags the query with an arbitrary string to help trace the operation through the database
@@ -650,7 +653,8 @@ pub struct FindOptions {
     ///
     /// Note: this option is deprecated starting in MongoDB version 4.0 and removed in MongoDB 4.2.
     /// Use the maxTimeMS option instead.
-    pub max_scan: Option<i64>,
+    #[serde(serialize_with = "serialize_u64_option_as_i64")]
+    pub max_scan: Option<u64>,
 
     /// The maximum amount of time to allow the query to run.
     ///
@@ -689,7 +693,8 @@ pub struct FindOptions {
     pub show_record_id: Option<bool>,
 
     /// The number of documents to skip before counting.
-    pub skip: Option<i64>,
+    #[serde(serialize_with = "serialize_u64_option_as_i64")]
+    pub skip: Option<u64>,
 
     /// The order of the documents for the purposes of the operation.
     pub sort: Option<Document>,
@@ -774,7 +779,8 @@ pub struct FindOneOptions {
     ///
     /// Note: this option is deprecated starting in MongoDB version 4.0 and removed in MongoDB 4.2.
     /// Use the maxTimeMS option instead.
-    pub max_scan: Option<i64>,
+    #[serde(serialize_with = "serialize_u64_option_as_i64")]
+    pub max_scan: Option<u64>,
 
     /// The maximum amount of time to allow the query to run.
     ///
@@ -806,7 +812,8 @@ pub struct FindOneOptions {
     pub show_record_id: Option<bool>,
 
     /// The number of documents to skip before counting.
-    pub skip: Option<i64>,
+    #[serde(serialize_with = "crate::bson_util::serialize_u64_option_as_i64")]
+    pub skip: Option<u64>,
 
     /// The order of the documents for the purposes of the operation.
     pub sort: Option<Document>,
