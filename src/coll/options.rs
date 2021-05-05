@@ -809,7 +809,7 @@ pub struct FindOneOptions {
     pub show_record_id: Option<bool>,
 
     /// The number of documents to skip before counting.
-    #[serde(serialize_with = "crate::bson_util::serialize_u64_option_as_i64")]
+    #[serde(serialize_with = "serialize_u64_option_as_i64")]
     pub skip: Option<u64>,
 
     /// The order of the documents for the purposes of the operation.
