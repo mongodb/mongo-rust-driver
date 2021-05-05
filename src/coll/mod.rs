@@ -1,7 +1,7 @@
 mod batch;
 pub mod options;
 
-use std::{fmt, fmt::Debug, sync::Arc};
+use std::{borrow::Borrow, fmt, fmt::Debug, sync::Arc};
 
 use futures::StreamExt;
 use serde::{
@@ -539,11 +539,11 @@ where
     async fn find_one_and_replace_common(
         &self,
         filter: Document,
-        replacement: T,
+        replacement: impl Borrow<T>,
         options: impl Into<Option<FindOneAndReplaceOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<Option<T>> {
-        let replacement = to_document(&replacement)?;
+        let replacement = to_document(replacement.borrow())?;
 
         let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
@@ -562,7 +562,7 @@ where
     pub async fn find_one_and_replace(
         &self,
         filter: Document,
-        replacement: T,
+        replacement: impl Borrow<T>,
         options: impl Into<Option<FindOneAndReplaceOptions>>,
     ) -> Result<Option<T>> {
         self.find_one_and_replace_common(filter, replacement, options, None)
@@ -579,7 +579,7 @@ where
     pub async fn find_one_and_replace_with_session(
         &self,
         filter: Document,
-        replacement: T,
+        replacement: impl Borrow<T>,
         options: impl Into<Option<FindOneAndReplaceOptions>>,
         session: &mut ClientSession,
     ) -> Result<Option<T>> {
@@ -643,13 +643,13 @@ where
 
     async fn insert_many_common(
         &self,
-        docs: impl IntoIterator<Item = T>,
+        docs: impl IntoIterator<Item = impl Borrow<T>>,
         options: impl Into<Option<InsertManyOptions>>,
         mut session: Option<&mut ClientSession>,
     ) -> Result<InsertManyResult> {
         let docs: ser::Result<Vec<Document>> = docs
             .into_iter()
-            .map(|doc| bson::to_document(&doc))
+            .map(|doc| bson::to_document(doc.borrow()))
             .collect();
         let mut docs: Vec<Document> = docs?;
 
@@ -739,7 +739,7 @@ where
     /// retryable writes.
     pub async fn insert_many(
         &self,
-        docs: impl IntoIterator<Item = T>,
+        docs: impl IntoIterator<Item = impl Borrow<T>>,
         options: impl Into<Option<InsertManyOptions>>,
     ) -> Result<InsertManyResult> {
         self.insert_many_common(docs, options, None).await
@@ -753,7 +753,7 @@ where
     /// retryable writes.
     pub async fn insert_many_with_session(
         &self,
-        docs: impl IntoIterator<Item = T>,
+        docs: impl IntoIterator<Item = impl Borrow<T>>,
         options: impl Into<Option<InsertManyOptions>>,
         session: &mut ClientSession,
     ) -> Result<InsertManyResult> {
@@ -762,11 +762,11 @@ where
 
     async fn insert_one_common(
         &self,
-        doc: T,
+        doc: impl Borrow<T>,
         options: impl Into<Option<InsertOneOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<InsertOneResult> {
-        let doc = to_document(&doc)?;
+        let doc = to_document(doc.borrow())?;
 
         let mut options = options.into();
         resolve_options!(self, options, [write_concern]);
@@ -791,7 +791,7 @@ where
     /// retryable writes.
     pub async fn insert_one(
         &self,
-        doc: T,
+        doc: impl Borrow<T>,
         options: impl Into<Option<InsertOneOptions>>,
     ) -> Result<InsertOneResult> {
         self.insert_one_common(doc, options, None).await
@@ -805,7 +805,7 @@ where
     /// retryable writes.
     pub async fn insert_one_with_session(
         &self,
-        doc: T,
+        doc: impl Borrow<T>,
         options: impl Into<Option<InsertOneOptions>>,
         session: &mut ClientSession,
     ) -> Result<InsertOneResult> {
@@ -815,11 +815,11 @@ where
     async fn replace_one_common(
         &self,
         query: Document,
-        replacement: T,
+        replacement: impl Borrow<T>,
         options: impl Into<Option<ReplaceOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<UpdateResult> {
-        let replacement = to_document(&replacement)?;
+        let replacement = to_document(replacement.borrow())?;
 
         bson_util::replacement_document_check(&replacement)?;
 
@@ -845,7 +845,7 @@ where
     pub async fn replace_one(
         &self,
         query: Document,
-        replacement: T,
+        replacement: impl Borrow<T>,
         options: impl Into<Option<ReplaceOptions>>,
     ) -> Result<UpdateResult> {
         self.replace_one_common(query, replacement, options, None)
@@ -862,7 +862,7 @@ where
     pub async fn replace_one_with_session(
         &self,
         query: Document,
-        replacement: T,
+        replacement: impl Borrow<T>,
         options: impl Into<Option<ReplaceOptions>>,
         session: &mut ClientSession,
     ) -> Result<UpdateResult> {

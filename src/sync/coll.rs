@@ -1,7 +1,4 @@
-use std::{
-    fmt::Debug,
-    marker::{Send, Sync},
-};
+use std::{borrow::Borrow, fmt::Debug};
 
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -76,14 +73,14 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct Collection<T>
 where
-    T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
+    T: Serialize + DeserializeOwned + Unpin + Debug,
 {
     async_collection: AsyncCollection<T>,
 }
 
 impl<T> Collection<T>
 where
-    T: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
+    T: Serialize + DeserializeOwned + Unpin + Debug,
 {
     pub(crate) fn new(async_collection: AsyncCollection<T>) -> Self {
         Self { async_collection }
@@ -92,7 +89,7 @@ where
     /// Gets a clone of the `Collection` with a different type `U`.
     pub fn clone_with_type<U>(&self) -> Collection<U>
     where
-        U: Serialize + DeserializeOwned + Unpin + Debug + Send + Sync,
+        U: Serialize + DeserializeOwned + Unpin + Debug,
     {
         Collection::new(self.async_collection.clone_with_type())
     }
@@ -497,10 +494,9 @@ where
     /// retryable writes.
     pub fn insert_many(
         &self,
-        docs: impl IntoIterator<Item = T>,
+        docs: impl IntoIterator<Item = impl Borrow<T>>,
         options: impl Into<Option<InsertManyOptions>>,
     ) -> Result<InsertManyResult> {
-        let docs: Vec<T> = docs.into_iter().collect();
         RUNTIME.block_on(self.async_collection.insert_many(docs, options.into()))
     }
 
@@ -512,11 +508,10 @@ where
     /// retryable writes.
     pub fn insert_many_with_session(
         &self,
-        docs: impl IntoIterator<Item = T>,
+        docs: impl IntoIterator<Item = impl Borrow<T>>,
         options: impl Into<Option<InsertManyOptions>>,
         session: &mut ClientSession,
     ) -> Result<InsertManyResult> {
-        let docs: Vec<T> = docs.into_iter().collect();
         RUNTIME.block_on(self.async_collection.insert_many_with_session(
             docs,
             options.into(),
@@ -532,10 +527,13 @@ where
     /// retryable writes.
     pub fn insert_one(
         &self,
-        doc: T,
+        doc: impl Borrow<T>,
         options: impl Into<Option<InsertOneOptions>>,
     ) -> Result<InsertOneResult> {
-        RUNTIME.block_on(self.async_collection.insert_one(doc, options.into()))
+        RUNTIME.block_on(
+            self.async_collection
+                .insert_one(doc.borrow(), options.into()),
+        )
     }
 
     /// Inserts `doc` into the collection using the provided `ClientSession`.
@@ -546,12 +544,12 @@ where
     /// retryable writes.
     pub fn insert_one_with_session(
         &self,
-        doc: T,
+        doc: impl Borrow<T>,
         options: impl Into<Option<InsertOneOptions>>,
         session: &mut ClientSession,
     ) -> Result<InsertOneResult> {
         RUNTIME.block_on(self.async_collection.insert_one_with_session(
-            doc,
+            doc.borrow(),
             options.into(),
             session,
         ))
@@ -566,13 +564,14 @@ where
     pub fn replace_one(
         &self,
         query: Document,
-        replacement: T,
+        replacement: impl Borrow<T>,
         options: impl Into<Option<ReplaceOptions>>,
     ) -> Result<UpdateResult> {
-        RUNTIME.block_on(
-            self.async_collection
-                .replace_one(query, replacement, options.into()),
-        )
+        RUNTIME.block_on(self.async_collection.replace_one(
+            query,
+            replacement.borrow(),
+            options.into(),
+        ))
     }
 
     /// Replaces up to one document matching `query` in the collection with `replacement` using the
@@ -585,13 +584,13 @@ where
     pub fn replace_one_with_session(
         &self,
         query: Document,
-        replacement: T,
+        replacement: impl Borrow<T>,
         options: impl Into<Option<ReplaceOptions>>,
         session: &mut ClientSession,
     ) -> Result<UpdateResult> {
         RUNTIME.block_on(self.async_collection.replace_one_with_session(
             query,
-            replacement,
+            replacement.borrow(),
             options.into(),
             session,
         ))

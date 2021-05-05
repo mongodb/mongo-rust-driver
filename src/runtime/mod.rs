@@ -80,8 +80,7 @@ impl AsyncRuntime {
     #[cfg(any(feature = "sync", test))]
     pub(crate) fn block_on<F, T>(self, fut: F) -> T
     where
-        F: Future<Output = T> + Send,
-        T: Send,
+        F: Future<Output = T>,
     {
         #[cfg(all(feature = "tokio-runtime", not(feature = "async-std-runtime")))]
         {
