@@ -191,10 +191,13 @@ impl Database {
     /// not needed if no special options are required.
     pub fn create_collection(
         &self,
-        name: &str,
+        name: impl AsRef<str>,
         options: impl Into<Option<CreateCollectionOptions>>,
     ) -> Result<()> {
-        RUNTIME.block_on(self.async_database.create_collection(name, options.into()))
+        RUNTIME.block_on(
+            self.async_database
+                .create_collection(name.as_ref(), options.into()),
+        )
     }
 
     /// Creates a new collection in the database with the given `name` and `options` using the
@@ -204,12 +207,12 @@ impl Database {
     /// not needed if no special options are required.
     pub fn create_collection_with_session(
         &self,
-        name: &str,
+        name: impl AsRef<str>,
         options: impl Into<Option<CreateCollectionOptions>>,
         session: &mut ClientSession,
     ) -> Result<()> {
         RUNTIME.block_on(self.async_database.create_collection_with_session(
-            name,
+            name.as_ref(),
             options.into(),
             session,
         ))

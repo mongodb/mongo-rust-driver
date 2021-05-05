@@ -284,7 +284,7 @@ impl Database {
 
     async fn create_collection_common(
         &self,
-        name: &str,
+        name: impl AsRef<str>,
         options: impl Into<Option<CreateCollectionOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<()> {
@@ -294,7 +294,7 @@ impl Database {
         let create = Create::new(
             Namespace {
                 db: self.name().to_string(),
-                coll: name.to_string(),
+                coll: name.as_ref().to_string(),
             },
             options,
         );
@@ -307,7 +307,7 @@ impl Database {
     /// not needed if no special options are required.
     pub async fn create_collection(
         &self,
-        name: &str,
+        name: impl AsRef<str>,
         options: impl Into<Option<CreateCollectionOptions>>,
     ) -> Result<()> {
         self.create_collection_common(name, options, None).await
@@ -320,7 +320,7 @@ impl Database {
     /// not needed if no special options are required.
     pub async fn create_collection_with_session(
         &self,
-        name: &str,
+        name: impl AsRef<str>,
         options: impl Into<Option<CreateCollectionOptions>>,
         session: &mut ClientSession,
     ) -> Result<()> {

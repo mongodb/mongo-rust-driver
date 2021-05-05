@@ -280,27 +280,28 @@ where
     /// Finds the distinct values of the field specified by `field_name` across the collection.
     pub fn distinct(
         &self,
-        field_name: &str,
+        field_name: impl AsRef<str>,
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<DistinctOptions>>,
     ) -> Result<Vec<Bson>> {
-        RUNTIME.block_on(
-            self.async_collection
-                .distinct(field_name, filter.into(), options.into()),
-        )
+        RUNTIME.block_on(self.async_collection.distinct(
+            field_name.as_ref(),
+            filter.into(),
+            options.into(),
+        ))
     }
 
     /// Finds the distinct values of the field specified by `field_name` across the collection using
     /// the provided `ClientSession`.
     pub fn distinct_with_session(
         &self,
-        field_name: &str,
+        field_name: impl AsRef<str>,
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<DistinctOptions>>,
         session: &mut ClientSession,
     ) -> Result<Vec<Bson>> {
         RUNTIME.block_on(self.async_collection.distinct_with_session(
-            field_name,
+            field_name.as_ref(),
             filter.into(),
             options.into(),
             session,
