@@ -66,8 +66,8 @@ impl Client {
     /// See the documentation on
     /// [`ClientOptions::parse`](../options/struct.ClientOptions.html#method.parse) for more
     /// details.
-    pub fn with_uri_str(uri: &str) -> Result<Self> {
-        let async_client = RUNTIME.block_on(AsyncClient::with_uri_str(uri))?;
+    pub fn with_uri_str(uri: impl AsRef<str>) -> Result<Self> {
+        let async_client = RUNTIME.block_on(AsyncClient::with_uri_str(uri.as_ref()))?;
         Ok(Self { async_client })
     }
 

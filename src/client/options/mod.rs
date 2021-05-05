@@ -148,7 +148,8 @@ impl Hash for StreamAddress {
 
 impl StreamAddress {
     /// Parses an address string into a `StreamAddress`.
-    pub fn parse(address: &str) -> Result<Self> {
+    pub fn parse(address: impl AsRef<str>) -> Result<Self> {
+        let address = address.as_ref();
         let mut parts = address.split(':');
 
         let hostname = match parts.next() {
@@ -776,7 +777,7 @@ impl ClientOptions {
     /// Note: if the `sync` feature is enabled, then this method will be replaced with [the sync
     /// version](#method.parse-1).
     #[cfg(not(feature = "sync"))]
-    pub async fn parse(s: &str) -> Result<Self> {
+    pub async fn parse(s: impl AsRef<str>) -> Result<Self> {
         Self::parse_uri(s, None).await
     }
 
@@ -784,8 +785,8 @@ impl ClientOptions {
     /// [the async version](#method.parse)
     #[cfg(any(feature = "sync", docsrs))]
     #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
-    pub fn parse(s: &str) -> Result<Self> {
-        crate::RUNTIME.block_on(Self::parse_uri(s, None))
+    pub fn parse(s: impl AsRef<str>) -> Result<Self> {
+        crate::RUNTIME.block_on(Self::parse_uri(s.as_ref(), None))
     }
 
     /// Parses a MongoDB connection string into a `ClientOptions` struct.
@@ -804,7 +805,7 @@ impl ClientOptions {
     /// version](#method.parse_with_resolver_config-1).
     #[cfg(not(feature = "sync"))]
     pub async fn parse_with_resolver_config(
-        uri: &str,
+        uri: impl AsRef<str>,
         resolver_config: ResolverConfig,
     ) -> Result<Self> {
         Self::parse_uri(uri, Some(resolver_config)).await
@@ -821,10 +822,10 @@ impl ClientOptions {
     /// Populate this `ClientOptions` from the given URI, optionally using the resolver config for
     /// DNS lookups.
     pub(crate) async fn parse_uri(
-        uri: &str,
+        uri: impl AsRef<str>,
         resolver_config: Option<ResolverConfig>,
     ) -> Result<Self> {
-        let parser = ClientOptionsParser::parse(uri)?;
+        let parser = ClientOptionsParser::parse(uri.as_ref())?;
         let srv = parser.srv;
         let auth_source_present = parser.auth_source.is_some();
         let mut options: Self = parser.into();

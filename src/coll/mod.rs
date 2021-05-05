@@ -384,7 +384,7 @@ where
 
     async fn distinct_common(
         &self,
-        field_name: &str,
+        field_name: impl AsRef<str>,
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<DistinctOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
@@ -394,7 +394,7 @@ where
 
         let op = Distinct::new(
             self.namespace(),
-            field_name.to_string(),
+            field_name.as_ref().to_string(),
             filter.into(),
             options,
         );
@@ -404,7 +404,7 @@ where
     /// Finds the distinct values of the field specified by `field_name` across the collection.
     pub async fn distinct(
         &self,
-        field_name: &str,
+        field_name: impl AsRef<str>,
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<DistinctOptions>>,
     ) -> Result<Vec<Bson>> {
@@ -416,7 +416,7 @@ where
     /// the provided `ClientSession`.
     pub async fn distinct_with_session(
         &self,
-        field_name: &str,
+        field_name: impl AsRef<str>,
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<DistinctOptions>>,
         session: &mut ClientSession,
