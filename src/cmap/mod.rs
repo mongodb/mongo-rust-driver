@@ -86,9 +86,9 @@ impl ConnectionPool {
             address,
             manager,
             connection_requester,
+            generation_subscriber,
             wait_queue_timeout,
             event_handler,
-            generation_subscriber,
         }
     }
 
