@@ -10,6 +10,7 @@ use std::{
     fs::File,
     hash::{Hash, Hasher},
     io::{BufReader, Seek, SeekFrom},
+    path::PathBuf,
     str::FromStr,
     sync::Arc,
     time::Duration,
@@ -564,13 +565,13 @@ pub struct TlsOptions {
     /// The path to the CA file that the [`Client`](../struct.Client.html) should use for TLS. If
     /// none is specified, then the driver will use the Mozilla root certificates from the
     /// `webpki-roots` crate.
-    pub ca_file_path: Option<String>,
+    pub ca_file_path: Option<PathBuf>,
 
     /// The path to the certificate file that the [`Client`](../struct.Client.html) should present
     /// to the server to verify its identify. If none is specified, then the
     /// [`Client`](../struct.Client.html) will not attempt to verify its identity to the
     /// server.
-    pub cert_key_file_path: Option<String>,
+    pub cert_key_file_path: Option<PathBuf>,
 }
 
 struct NoCertVerifier {}
@@ -603,7 +604,10 @@ impl TlsOptions {
             store
                 .add_pem_file(&mut BufReader::new(File::open(&path)?))
                 .map_err(|_| ErrorKind::InvalidTlsConfig {
-                    message: format!("Unable to parse PEM-encoded root certificate from {}", path),
+                    message: format!(
+                        "Unable to parse PEM-encoded root certificate from {}",
+                        path.display()
+                    ),
                 })?;
         } else {
             store.add_server_trust_anchors(&TLS_SERVER_ROOTS);
@@ -619,7 +623,7 @@ impl TlsOptions {
                     return Err(ErrorKind::InvalidTlsConfig {
                         message: format!(
                             "Unable to parse PEM-encoded client certificate from {}",
-                            path
+                            path.display()
                         ),
                     }
                     .into())
@@ -631,7 +635,10 @@ impl TlsOptions {
                 Ok(key) => key,
                 Err(()) => {
                     return Err(ErrorKind::InvalidTlsConfig {
-                        message: format!("Unable to parse PEM-encoded RSA key from {}", path),
+                        message: format!(
+                            "Unable to parse PEM-encoded RSA key from {}",
+                            path.display()
+                        ),
                     }
                     .into())
                 }
@@ -1623,13 +1630,11 @@ impl ClientOptionsParser {
                     .into());
                 }
                 Some(Tls::Enabled(ref mut options)) => {
-                    options.ca_file_path = Some(value.to_string());
+                    options.ca_file_path = Some(value.into());
                 }
                 None => {
                     self.tls = Some(Tls::Enabled(
-                        TlsOptions::builder()
-                            .ca_file_path(value.to_string())
-                            .build(),
+                        TlsOptions::builder().ca_file_path(value.into()).build(),
                     ))
                 }
             },
@@ -1641,12 +1646,12 @@ impl ClientOptionsParser {
                     .into());
                 }
                 Some(Tls::Enabled(ref mut options)) => {
-                    options.cert_key_file_path = Some(value.to_string());
+                    options.cert_key_file_path = Some(value.into());
                 }
                 None => {
                     self.tls = Some(Tls::Enabled(
                         TlsOptions::builder()
-                            .cert_key_file_path(value.to_string())
+                            .cert_key_file_path(value.into())
                             .build(),
                     ))
                 }

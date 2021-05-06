@@ -360,7 +360,7 @@ async fn auth_test_uri(
             uri.push_str("&tlsCAFile=");
             uri.push_str(
                 &percent_encoding::utf8_percent_encode(
-                    ca_file_path,
+                    ca_file_path.to_str().unwrap(),
                     percent_encoding::NON_ALPHANUMERIC,
                 )
                 .to_string(),
@@ -371,7 +371,7 @@ async fn auth_test_uri(
             uri.push_str("&tlsCertificateKeyFile=");
             uri.push_str(
                 &percent_encoding::utf8_percent_encode(
-                    cert_key_file_path,
+                    cert_key_file_path.to_str().unwrap(),
                     percent_encoding::NON_ALPHANUMERIC,
                 )
                 .to_string(),
