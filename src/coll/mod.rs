@@ -3,7 +3,7 @@ pub mod options;
 
 use std::{borrow::Borrow, fmt, fmt::Debug, sync::Arc};
 
-use futures::StreamExt;
+use futures_util::stream::StreamExt;
 use serde::{
     de::{DeserializeOwned, Error},
     Deserialize,

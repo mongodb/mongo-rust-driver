@@ -1,11 +1,11 @@
 use async_trait::async_trait;
-use futures::io::AsyncRead;
+use futures_io::AsyncRead;
 
 use crate::error::Result;
 
 /// Trait providing helpers that read various integer types in little-endian order.
 #[async_trait]
-pub(crate) trait AsyncLittleEndianRead: Unpin + futures::io::AsyncReadExt {
+pub(crate) trait AsyncLittleEndianRead: Unpin + futures_util::AsyncReadExt {
     /// Read an `i32` in little-endian order.
     async fn read_i32(&mut self) -> Result<i32> {
         let mut buf: [u8; 4] = [0; 4];

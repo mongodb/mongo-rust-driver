@@ -108,7 +108,7 @@ impl AsyncRuntime {
         F: Future<Output = T> + Send,
         T: Send,
     {
-        futures::executor::block_on(fut)
+        futures_executor::block_on(fut)
     }
 
     /// Delay for the specified duration.

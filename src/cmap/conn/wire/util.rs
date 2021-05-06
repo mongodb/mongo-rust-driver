@@ -4,7 +4,8 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::io::{self, AsyncRead, AsyncWrite, AsyncWriteExt};
+use futures_io::{self, AsyncRead, AsyncWrite};
+use futures_util::AsyncWriteExt;
 use lazy_static::lazy_static;
 
 use crate::error::Result;
@@ -32,7 +33,7 @@ pub(super) async fn write_cstring<W: AsyncWrite + Unpin>(
     Ok(())
 }
 
-/// A wrapper around `futures::io::AsyncRead` that keeps track of the number of bytes it has read.
+/// A wrapper around `futures_io::AsyncRead` that keeps track of the number of bytes it has read.
 pub(super) struct CountReader<'a, R: AsyncRead + Unpin + Send + 'a> {
     reader: &'a mut R,
     bytes_read: usize,
@@ -58,7 +59,7 @@ impl<'a, R: AsyncRead + Unpin + Send + 'a> AsyncRead for CountReader<'a, R> {
         mut self: Pin<&mut Self>,
         cx: &mut Context,
         buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+    ) -> Poll<futures_io::Result<usize>> {
         let result = Pin::new(&mut self.reader).poll_read(cx, buf);
 
         if let Poll::Ready(Ok(count)) = result {

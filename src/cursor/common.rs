@@ -6,7 +6,7 @@ use std::{
 };
 
 use derivative::Derivative;
-use futures::{Future, Stream};
+use futures_core::{Future, Stream};
 
 use crate::{
     bson::Document,

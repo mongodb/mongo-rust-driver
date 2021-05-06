@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use futures::io::{AsyncRead, AsyncWrite};
+use futures_io::{AsyncRead, AsyncWrite};
 use tokio::io::{AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite, ReadBuf};
 use tokio_rustls::TlsConnector;
 use webpki::DNSNameRef;
