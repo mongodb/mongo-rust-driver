@@ -1103,7 +1103,7 @@ impl ClientOptionsParser {
                     None
                 } else {
                     let port_string_without_colon = &port[1..];
-                    let p = u16::from_str_radix(port_string_without_colon, 10).map_err(|_| {
+                    let p = port_string_without_colon.parse::<u16>().map_err(|_| {
                         ErrorKind::ArgumentError {
                             message: format!(
                                 "invalid port specified in connection string: {}",
@@ -1348,7 +1348,7 @@ impl ClientOptionsParser {
 
         macro_rules! get_duration {
             ($value:expr, $option:expr) => {
-                match u64::from_str_radix($value, 10) {
+                match $value.parse::<u64>() {
                     Ok(i) => i,
                     _ => {
                         return Err(ErrorKind::ArgumentError {
@@ -1365,7 +1365,7 @@ impl ClientOptionsParser {
 
         macro_rules! get_u32 {
             ($value:expr, $option:expr) => {
-                match u32::from_str_radix(value, 10) {
+                match value.parse::<u32>() {
                     Ok(u) => u,
                     Err(_) => {
                         return Err(ErrorKind::ArgumentError {
@@ -1382,7 +1382,7 @@ impl ClientOptionsParser {
 
         macro_rules! get_i32 {
             ($value:expr, $option:expr) => {
-                match i32::from_str_radix(value, 10) {
+                match value.parse::<i32>() {
                     Ok(u) => u,
                     Err(_) => {
                         return Err(ErrorKind::ArgumentError {
@@ -1654,7 +1654,7 @@ impl ClientOptionsParser {
             "w" => {
                 let mut write_concern = self.write_concern.get_or_insert_with(Default::default);
 
-                match i32::from_str_radix(value, 10) {
+                match value.parse::<i32>() {
                     Ok(w) => match u32::try_from(w) {
                         Ok(uw) => write_concern.w = Some(Acknowledgment::from(uw)),
                         Err(_) => {

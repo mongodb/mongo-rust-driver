@@ -17,7 +17,7 @@ pub trait Matchable: Sized + 'static {
         if expected.is_placeholder() {
             return true;
         }
-        if let Some(expected) = Any::downcast_ref::<Self>(expected) {
+        if let Some(expected) = <dyn Any>::downcast_ref::<Self>(expected) {
             self.content_matches(expected)
         } else {
             false
