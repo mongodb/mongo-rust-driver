@@ -32,7 +32,7 @@ fn write_concern_from_document(write_concern_doc: Document) -> Option<WriteConce
     for (key, value) in write_concern_doc {
         match (&key[..], value) {
             ("w", Bson::Int32(i)) => {
-                write_concern.w = Some(Acknowledgment::from(i));
+                write_concern.w = Some(Acknowledgment::from(i as u32));
             }
             ("w", Bson::String(s)) => {
                 write_concern.w = Some(Acknowledgment::from(s));

@@ -10,7 +10,7 @@ use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    bson::doc,
+    bson::{doc, serde_helpers},
     bson_util,
     error::{ErrorKind, Result},
 };
@@ -169,9 +169,11 @@ pub enum Acknowledgment {
     /// the driver will not receive a response indicating whether an operation succeeded or failed.
     /// It also means that the operation cannot be associated with a session. It is reccommended to
     /// avoid using unacknowledged write concerns.
-    Nodes(i32),
+    Nodes(u32),
+
     /// Requires acknowledgement that the write has reached the majority of nodes.
     Majority,
+
     /// Requires acknowledgement according to the given custom write concern. See [here](https://docs.mongodb.com/manual/tutorial/configure-replica-set-tag-sets/#tag-sets-and-custom-write-concern-behavior)
     /// for more information.
     Custom(String),
@@ -184,7 +186,7 @@ impl Serialize for Acknowledgment {
     {
         match self {
             Acknowledgment::Majority => serializer.serialize_str("majority"),
-            Acknowledgment::Nodes(n) => serializer.serialize_i32(*n),
+            Acknowledgment::Nodes(n) => serde_helpers::serialize_u32_as_i32(n, serializer),
             Acknowledgment::Custom(name) => serializer.serialize_str(name),
         }
     }
@@ -198,7 +200,7 @@ impl<'de> Deserialize<'de> for Acknowledgment {
         #[derive(Deserialize)]
         #[serde(untagged)]
         enum IntOrString {
-            Int(i32),
+            Int(u32),
             String(String),
         }
         match IntOrString::deserialize(deserializer)? {
@@ -208,8 +210,8 @@ impl<'de> Deserialize<'de> for Acknowledgment {
     }
 }
 
-impl From<i32> for Acknowledgment {
-    fn from(i: i32) -> Self {
+impl From<u32> for Acknowledgment {
+    fn from(i: u32) -> Self {
         Acknowledgment::Nodes(i)
     }
 }
@@ -231,7 +233,7 @@ impl Acknowledgment {
     #[cfg(all(test, not(feature = "sync")))]
     pub(crate) fn to_bson(&self) -> Bson {
         match self {
-            Acknowledgment::Nodes(i) => Bson::Int32(*i),
+            Acknowledgment::Nodes(i) => Bson::Int32(*i as i32),
             Acknowledgment::Majority => Bson::String("majority".to_string()),
             Acknowledgment::Custom(s) => Bson::String(s.to_string()),
         }
@@ -244,18 +246,9 @@ impl WriteConcern {
         self.w != Some(Acknowledgment::Nodes(0)) || self.journal == Some(true)
     }
 
-    /// Validates that the write concern. A write concern is invalid if the `w` field is 0
+    /// Validates that the write concern. A write concern is invalid if both the `w` field is 0
     /// and the `j` field is `true`.
-    pub fn validate(&self) -> Result<()> {
-        if let Some(Acknowledgment::Nodes(i)) = self.w {
-            if i < 0 {
-                return Err(ErrorKind::ArgumentError {
-                    message: "write concern `w` field cannot be negative integer".to_string(),
-                }
-                .into());
-            }
-        }
-
+    pub(crate) fn validate(&self) -> Result<()> {
         if self.w == Some(Acknowledgment::Nodes(0)) && self.journal == Some(true) {
             return Err(ErrorKind::ArgumentError {
                 message: "write concern cannot have w=0 and j=true".to_string(),

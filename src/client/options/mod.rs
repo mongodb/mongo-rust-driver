@@ -5,6 +5,7 @@ mod resolver_config;
 
 use std::{
     collections::HashSet,
+    convert::TryFrom,
     fmt::{self, Display, Formatter},
     fs::File,
     hash::{Hash, Hasher},
@@ -1654,18 +1655,17 @@ impl ClientOptionsParser {
                 let mut write_concern = self.write_concern.get_or_insert_with(Default::default);
 
                 match i32::from_str_radix(value, 10) {
-                    Ok(w) => {
-                        if w < 0 {
+                    Ok(w) => match u32::try_from(w) {
+                        Ok(uw) => write_concern.w = Some(Acknowledgment::from(uw)),
+                        Err(_) => {
                             return Err(ErrorKind::ArgumentError {
                                 message: "connection string `w` option cannot be a negative \
                                           integer"
                                     .to_string(),
                             }
-                            .into());
+                            .into())
                         }
-
-                        write_concern.w = Some(Acknowledgment::from(w));
-                    }
+                    },
                     Err(_) => {
                         write_concern.w = Some(Acknowledgment::from(value.to_string()));
                     }

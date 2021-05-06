@@ -64,7 +64,7 @@ impl CountDocuments {
 }
 
 impl Operation for CountDocuments {
-    type O = i64;
+    type O = u64;
     const NAME: &'static str = Aggregate::NAME;
 
     fn build(&self, description: &StreamDescription) -> Result<Command> {
@@ -98,7 +98,7 @@ impl Operation for CountDocuments {
             }
         };
 
-        bson_util::get_int(n).ok_or_else(|| {
+        bson_util::get_u64(n).ok_or_else(|| {
             ErrorKind::ResponseError {
                 message: format!(
                     "server response to count_documents aggregate should have contained integer \

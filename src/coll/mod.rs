@@ -260,7 +260,7 @@ where
     pub async fn estimated_document_count(
         &self,
         options: impl Into<Option<EstimatedDocumentCountOptions>>,
-    ) -> Result<i64> {
+    ) -> Result<u64> {
         let mut options = options.into();
         resolve_options!(self, options, [read_concern, selection_criteria]);
 
@@ -274,7 +274,7 @@ where
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<CountOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<i64> {
+    ) -> Result<u64> {
         let mut options = options.into();
         resolve_options!(self, options, [read_concern, selection_criteria]);
 
@@ -290,7 +290,7 @@ where
         &self,
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<CountOptions>>,
-    ) -> Result<i64> {
+    ) -> Result<u64> {
         self.count_documents_common(filter, options, None).await
     }
 
@@ -303,7 +303,7 @@ where
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<CountOptions>>,
         session: &mut ClientSession,
-    ) -> Result<i64> {
+    ) -> Result<u64> {
         self.count_documents_common(filter, options, session).await
     }
 

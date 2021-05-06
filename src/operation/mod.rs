@@ -155,7 +155,7 @@ struct WriteResponseBody<T = EmptyBody> {
     #[serde(flatten)]
     body: T,
 
-    n: i64,
+    n: u64,
 
     #[serde(rename = "writeErrors")]
     write_errors: Option<Vec<BulkWriteError>>,

@@ -13,7 +13,7 @@ use crate::{
 #[serde(rename_all = "camelCase")]
 struct Arguments {
     pub filter: Document,
-    pub skip: Option<i64>,
+    pub skip: Option<u64>,
     pub limit: Option<i64>,
     pub batch_size: Option<u32>,
     pub collation: Option<Collation>,

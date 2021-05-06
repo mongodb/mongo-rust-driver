@@ -152,6 +152,6 @@ impl Operation for Update {
 #[derive(Deserialize)]
 struct UpdateBody {
     #[serde(rename = "nModified")]
-    n_modified: i64,
+    n_modified: u64,
     upserted: Option<Vec<Document>>,
 }

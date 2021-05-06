@@ -20,9 +20,9 @@ struct Arguments {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ResultDoc {
-    pub matched_count: i64,
-    pub modified_count: i64,
-    pub upserted_count: Option<i64>,
+    pub matched_count: u64,
+    pub modified_count: u64,
+    pub upserted_count: Option<u64>,
     pub upserted_id: Option<Bson>,
 }
 
