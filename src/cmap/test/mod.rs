@@ -323,10 +323,26 @@ impl Matchable for TlsOptions {
     fn content_matches(&self, expected: &TlsOptions) -> bool {
         self.allow_invalid_certificates
             .matches(&expected.allow_invalid_certificates)
-            && self.ca_file_path.matches(&expected.ca_file_path)
+            && self
+                .ca_file_path
+                .as_ref()
+                .map(|pb| pb.display().to_string())
+                .matches(
+                    &expected
+                        .ca_file_path
+                        .as_ref()
+                        .map(|pb| pb.display().to_string()),
+                )
             && self
                 .cert_key_file_path
-                .matches(&expected.cert_key_file_path)
+                .as_ref()
+                .map(|pb| pb.display().to_string())
+                .matches(
+                    &expected
+                        .cert_key_file_path
+                        .as_ref()
+                        .map(|pb| pb.display().to_string()),
+                )
     }
 }
 

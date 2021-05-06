@@ -153,11 +153,11 @@ fn document_from_client_options(mut options: ClientOptions) -> Document {
 
         if let Some(s) = ca_file_path {
             doc.insert("tls", true);
-            doc.insert("tlscafile", s);
+            doc.insert("tlscafile", s.to_str().unwrap());
         }
 
         if let Some(s) = cert_key_file_path {
-            doc.insert("tlscertificatekeyfile", s);
+            doc.insert("tlscertificatekeyfile", s.to_str().unwrap());
         }
 
         if let Some(b) = allow_invalid_certificates {
