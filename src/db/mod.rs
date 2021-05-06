@@ -2,7 +2,7 @@ pub mod options;
 
 use std::{fmt::Debug, sync::Arc};
 
-use futures::stream::TryStreamExt;
+use futures_util::stream::TryStreamExt;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
@@ -235,8 +235,8 @@ impl Database {
     ) -> Result<Vec<String>> {
         cursor
             .and_then(|doc| match doc.get("name").and_then(Bson::as_str) {
-                Some(name) => futures::future::ok(name.into()),
-                None => futures::future::err(
+                Some(name) => futures_util::future::ok(name.into()),
+                None => futures_util::future::err(
                     ErrorKind::InvalidResponse {
                         message: "Expected name field in server response, but there was none."
                             .to_string(),
