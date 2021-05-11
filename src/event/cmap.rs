@@ -88,15 +88,6 @@ pub struct ConnectionPoolOptions {
     /// The default is not to use TLS for connections.
     #[serde(skip)]
     pub tls_options: Option<TlsOptions>,
-
-    /// Rather than wait indefinitely for a connection to become available, instead return an error
-    /// after the given duration.
-    ///
-    /// The default is to block indefinitely until a connection becomes available.
-    #[serde(rename = "waitQueueTimeoutMS")]
-    #[serde(default)]
-    #[serde(deserialize_with = "crate::bson_util::deserialize_duration_from_u64_millis")]
-    pub wait_queue_timeout: Option<Duration>,
 }
 
 /// Event emitted when a connection pool becomes ready.

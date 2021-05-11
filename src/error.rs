@@ -392,13 +392,6 @@ pub enum ErrorKind {
     #[non_exhaustive]
     InvalidTlsConfig { message: String },
 
-    /// The Client timed out while checking out a connection from connection pool.
-    #[error(
-        "Timed out while checking out a connection from connection pool with address {address}"
-    )]
-    #[non_exhaustive]
-    WaitQueueTimeout { address: StreamAddress },
-
     /// An error occurred when trying to execute a write operation
     #[error("An error occurred when trying to execute a write operation: {0:?}")]
     Write(WriteFailure),

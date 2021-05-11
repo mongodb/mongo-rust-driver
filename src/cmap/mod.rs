@@ -9,7 +9,7 @@ pub(crate) mod options;
 mod status;
 mod worker;
 
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use derivative::Derivative;
 
@@ -21,7 +21,7 @@ pub(crate) use self::{
 };
 use self::{connection_requester::ConnectionRequestResult, options::ConnectionPoolOptions};
 use crate::{
-    error::{Error, ErrorKind, Result},
+    error::{Error, Result},
     event::cmap::{
         CmapEventHandler,
         ConnectionCheckoutFailedEvent,
@@ -52,8 +52,6 @@ pub(crate) struct ConnectionPool {
     connection_requester: ConnectionRequester,
     generation_subscriber: PoolGenerationSubscriber,
 
-    wait_queue_timeout: Option<Duration>,
-
     #[derivative(Debug = "ignore")]
     event_handler: Option<Arc<dyn CmapEventHandler>>,
 }
@@ -73,7 +71,6 @@ impl ConnectionPool {
         );
 
         let event_handler = options.as_ref().and_then(|opts| opts.event_handler.clone());
-        let wait_queue_timeout = options.as_ref().and_then(|opts| opts.wait_queue_timeout);
 
         if let Some(ref handler) = event_handler {
             handler.handle_pool_created_event(PoolCreatedEvent {
@@ -87,7 +84,6 @@ impl ConnectionPool {
             manager,
             connection_requester,
             generation_subscriber,
-            wait_queue_timeout,
             event_handler,
         }
     }
@@ -104,7 +100,6 @@ impl ConnectionPool {
             manager,
             connection_requester,
             generation_subscriber,
-            wait_queue_timeout: None,
             event_handler: None,
         }
     }
@@ -120,9 +115,7 @@ impl ConnectionPool {
 
     /// Checks out a connection from the pool. This method will yield until this thread is at the
     /// front of the wait queue, and then will block again if no available connections are in the
-    /// pool and the total number of connections is not less than the max pool size. If the method
-    /// blocks for longer than `wait_queue_timeout` waiting for an available connection or to
-    /// start establishing a new one, a `WaitQueueTimeoutError` will be returned.
+    /// pool and the total number of connections is not less than the max pool size.
     pub(crate) async fn check_out(&self) -> Result<Connection> {
         self.emit_event(|handler| {
             let event = ConnectionCheckoutStartedEvent {
@@ -132,21 +125,12 @@ impl ConnectionPool {
             handler.handle_connection_checkout_started_event(event);
         });
 
-        let response = self
-            .connection_requester
-            .request(self.wait_queue_timeout)
-            .await;
+        let response = self.connection_requester.request().await;
 
         let conn = match response {
-            Some(ConnectionRequestResult::Pooled(c)) => Ok(c),
-            Some(ConnectionRequestResult::Establishing(task)) => task.await,
-            Some(ConnectionRequestResult::PoolCleared) => {
-                Err(Error::pool_cleared_error(&self.address))
-            }
-            None => Err(ErrorKind::WaitQueueTimeout {
-                address: self.address.clone(),
-            }
-            .into()),
+            ConnectionRequestResult::Pooled(c) => Ok(c),
+            ConnectionRequestResult::Establishing(task) => task.await,
+            ConnectionRequestResult::PoolCleared => Err(Error::pool_cleared_error(&self.address)),
         };
 
         match conn {
@@ -155,17 +139,11 @@ impl ConnectionPool {
                     handler.handle_connection_checked_out_event(conn.checked_out_event());
                 });
             }
-            Err(ref e) => {
-                let failure_reason = if let ErrorKind::WaitQueueTimeout { .. } = *e.kind {
-                    ConnectionCheckoutFailedReason::Timeout
-                } else {
-                    ConnectionCheckoutFailedReason::ConnectionError
-                };
-
+            Err(_) => {
                 self.emit_event(|handler| {
                     handler.handle_connection_checkout_failed_event(ConnectionCheckoutFailedEvent {
                         address: self.address.clone(),
-                        reason: failure_reason,
+                        reason: ConnectionCheckoutFailedReason::ConnectionError,
                     })
                 });
             }

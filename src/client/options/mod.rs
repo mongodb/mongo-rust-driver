@@ -443,14 +443,6 @@ pub struct ClientOptions {
     #[builder(default, setter(strip_option))]
     pub tls: Option<Tls>,
 
-    /// The amount of time a thread should block while waiting to check out a connection before
-    /// returning an error. Note that if there are fewer than `max_pool_size` connections checked
-    /// out or if a connection is available in the pool, checking out a connection will not block.
-    ///
-    /// By default, threads will wait indefinitely for a connection to become available.
-    #[builder(default, setter(strip_option))]
-    pub wait_queue_timeout: Option<Duration>,
-
     /// Specifies the default write concern for operations performed on the Client. See the
     /// WriteConcern type documentation for more details.
     #[builder(default, setter(strip_option))]
@@ -689,7 +681,6 @@ impl From<ClientOptionsParser> for ClientOptions {
             max_pool_size: parser.max_pool_size,
             min_pool_size: parser.min_pool_size,
             max_idle_time: parser.max_idle_time,
-            wait_queue_timeout: parser.wait_queue_timeout,
             server_selection_timeout: parser.server_selection_timeout,
             compressors: parser.compressors,
             connect_timeout: parser.connect_timeout,
@@ -723,8 +714,8 @@ impl ClientOptions {
         }
     }
 
-    /// Parses a MongoDB connection string into a ClientOptions struct. If the string is malformed
-    /// or one of the options has an invalid value, an error will be returned.
+    /// Parses a MongoDB connection string into a [`ClientOptions`] struct. If the string is
+    /// malformed or one of the options has an invalid value, an error will be returned.
     ///
     /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done as
     /// part of this method.
@@ -759,7 +750,7 @@ impl ClientOptions {
     ///   * `retryWrites`: not yet implemented
     ///   * `retryReads`: maps to the `retry_reads` field
     ///   * `serverSelectionTimeoutMS`: maps to the `server_selection_timeout` field
-    ///   * `socketTimeoutMS`: maps to the `socket_timeout` field
+    ///   * `socketTimeoutMS`: unsupported, does not map to any field
     ///   * `ssl`: an alias of the `tls` option
     ///   * `tls`: maps to the TLS variant of the `tls` field`.
     ///   * `tlsInsecure`: relaxes the TLS constraints on connections being made; currently is just
@@ -770,7 +761,7 @@ impl ClientOptions {
     ///   * `tlsCAFile`: maps to the `ca_file_path` field of the `tls` field
     ///   * `tlsCertificateKeyFile`: maps to the `cert_key_file_path` field of the `tls` field
     ///   * `w`: maps to the `w` field of the `write_concern` field
-    ///   * `waitQueueTimeoutMS`: maps to the `wait_queue_timeout` field
+    ///   * `waitQueueTimeoutMS`: unsupported, does not map to any field
     ///   * `wTimeoutMS`: maps to the `w_timeout` field of the `write_concern` field
     ///   * `zlibCompressionLevel`: not yet implemented
     ///
@@ -939,7 +930,6 @@ impl ClientOptions {
                 server_selection_timeout,
                 socket_timeout,
                 tls,
-                wait_queue_timeout,
                 write_concern,
                 zlib_compression,
                 original_srv_hostname,

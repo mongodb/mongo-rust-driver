@@ -85,15 +85,6 @@ pub(crate) struct ConnectionPoolOptions {
     /// The default is not to use TLS for connections.
     #[serde(skip)]
     pub(crate) tls_options: Option<TlsOptions>,
-
-    /// Rather than wait indefinitely for a connection to become available, instead return an error
-    /// after the given duration.
-    ///
-    /// The default is to block indefinitely until a connection becomes available.
-    #[serde(rename = "waitQueueTimeoutMS")]
-    #[serde(default)]
-    #[serde(deserialize_with = "bson_util::deserialize_duration_from_u64_millis")]
-    pub(crate) wait_queue_timeout: Option<Duration>,
 }
 
 impl ConnectionPoolOptions {
@@ -107,7 +98,6 @@ impl ConnectionPoolOptions {
             max_pool_size: options.max_pool_size,
             server_api: options.server_api.clone(),
             tls_options: options.tls_options(),
-            wait_queue_timeout: options.wait_queue_timeout,
             credential: options.credential.clone(),
             event_handler: options.cmap_event_handler.clone(),
             #[cfg(test)]
@@ -127,7 +117,6 @@ impl ConnectionPoolOptions {
             max_pool_size: self.max_pool_size,
             server_api: self.server_api.clone(),
             tls_options: self.tls_options.clone(),
-            wait_queue_timeout: self.wait_queue_timeout,
         }
     }
 }
