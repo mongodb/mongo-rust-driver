@@ -23,7 +23,7 @@ use crate::{
         ConnectionCreatedEvent,
         ConnectionReadyEvent,
     },
-    options::{StreamAddress, TlsOptions},
+    options::{ServerAddress, TlsOptions},
     runtime::AsyncStream,
 };
 pub(crate) use command::{Command, CommandResponse};
@@ -37,7 +37,7 @@ pub struct ConnectionInfo {
     pub id: u32,
 
     /// The address that the connection is connected to.
-    pub address: StreamAddress,
+    pub address: ServerAddress,
 }
 
 /// A wrapper around Stream that contains all the CMAP information needed to maintain a connection.
@@ -45,7 +45,7 @@ pub struct ConnectionInfo {
 #[derivative(Debug)]
 pub(crate) struct Connection {
     pub(super) id: u32,
-    pub(super) address: StreamAddress,
+    pub(super) address: ServerAddress,
     pub(crate) generation: u32,
 
     /// The cached StreamDescription from the connection's handshake.
@@ -78,7 +78,7 @@ pub(crate) struct Connection {
 impl Connection {
     async fn new(
         id: u32,
-        address: StreamAddress,
+        address: ServerAddress,
         generation: u32,
         options: Option<ConnectionOptions>,
     ) -> Result<Self> {
@@ -117,7 +117,7 @@ impl Connection {
 
     /// Construct and connect a new connection used for monitoring.
     pub(crate) async fn connect_monitoring(
-        address: StreamAddress,
+        address: ServerAddress,
         connect_timeout: Option<Duration>,
         tls_options: Option<TlsOptions>,
     ) -> Result<Self> {
@@ -137,7 +137,7 @@ impl Connection {
     #[cfg(test)]
     pub(crate) async fn new_testing(
         id: u32,
-        address: StreamAddress,
+        address: ServerAddress,
         generation: u32,
         options: Option<ConnectionOptions>,
     ) -> Result<Self> {
@@ -151,7 +151,7 @@ impl Connection {
         }
     }
 
-    pub(crate) fn address(&self) -> &StreamAddress {
+    pub(crate) fn address(&self) -> &ServerAddress {
         &self.address
     }
 
@@ -325,7 +325,7 @@ impl Drop for Connection {
 #[derive(Debug)]
 pub(super) struct PendingConnection {
     pub(super) id: u32,
-    pub(super) address: StreamAddress,
+    pub(super) address: ServerAddress,
     pub(super) generation: u32,
     pub(super) options: Option<ConnectionOptions>,
 }

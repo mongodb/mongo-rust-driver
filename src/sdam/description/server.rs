@@ -6,7 +6,7 @@ use chrono::offset::Utc;
 use crate::{
     client::ClusterTime,
     is_master::IsMasterReply,
-    options::StreamAddress,
+    options::ServerAddress,
     selection_criteria::TagSet,
 };
 
@@ -57,7 +57,7 @@ impl Default for ServerType {
 
 #[derive(Debug, Clone)]
 pub(crate) struct ServerDescription {
-    pub(crate) address: StreamAddress,
+    pub(crate) address: ServerAddress,
     pub(crate) server_type: ServerType,
     pub(crate) last_update_time: Option<DateTime>,
     pub(crate) average_round_trip_time: Option<Duration>,
@@ -96,10 +96,10 @@ impl PartialEq for ServerDescription {
 
 impl ServerDescription {
     pub(crate) fn new(
-        mut address: StreamAddress,
+        mut address: ServerAddress,
         is_master_reply: Option<Result<IsMasterReply, String>>,
     ) -> Self {
-        address.hostname = address.hostname.to_lowercase();
+        address.host = address.host.to_lowercase();
 
         let mut description = Self {
             address,

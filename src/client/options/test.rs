@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 use crate::{
     bson::{Bson, Document},
-    client::options::{ClientOptions, ClientOptionsParser, StreamAddress},
+    client::options::{ClientOptions, ClientOptionsParser, ServerAddress},
     error::ErrorKind,
     selection_criteria::{ReadPreference, SelectionCriteria},
     test::run_spec_test,
@@ -249,7 +249,7 @@ async fn run_test(test_file: TestFile) {
                     let hosts: Vec<_> = options
                         .hosts
                         .into_iter()
-                        .map(StreamAddress::into_document)
+                        .map(ServerAddress::into_document)
                         .collect();
 
                     assert_eq!(hosts, json_hosts);

@@ -8,7 +8,7 @@ use crate::{
     bson::{doc, Bson, Document},
     bson_util::deserialize_duration_from_u64_seconds,
     error::{ErrorKind, Result},
-    options::StreamAddress,
+    options::ServerAddress,
     sdam::public::ServerInfo,
 };
 
@@ -68,7 +68,7 @@ impl SelectionCriteria {
         self.as_read_pref().and_then(|pref| pref.max_staleness())
     }
 
-    pub(crate) fn from_address(address: StreamAddress) -> Self {
+    pub(crate) fn from_address(address: ServerAddress) -> Self {
         SelectionCriteria::Predicate(Arc::new(move |server| server.address() == &address))
     }
 }

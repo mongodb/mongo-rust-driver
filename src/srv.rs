@@ -2,7 +2,7 @@ use trust_dns_resolver::config::ResolverConfig;
 
 use crate::{
     error::{ErrorKind, Result},
-    options::StreamAddress,
+    options::ServerAddress,
     runtime::AsyncResolver,
 };
 
@@ -13,7 +13,7 @@ pub(crate) struct SrvResolver {
 
 #[derive(Debug)]
 pub(crate) struct ResolvedConfig {
-    pub(crate) hosts: Vec<StreamAddress>,
+    pub(crate) hosts: Vec<ServerAddress>,
     pub(crate) auth_source: Option<String>,
     pub(crate) replica_set: Option<String>,
 }
@@ -51,7 +51,7 @@ impl SrvResolver {
     pub(crate) async fn get_srv_hosts<'a>(
         &'a mut self,
         original_hostname: &'a str,
-    ) -> Result<impl Iterator<Item = Result<StreamAddress>> + 'a> {
+    ) -> Result<impl Iterator<Item = Result<ServerAddress>> + 'a> {
         let hostname_parts: Vec<_> = original_hostname.split('.').collect();
 
         if hostname_parts.len() < 3 {
@@ -77,7 +77,7 @@ impl SrvResolver {
             .map(|record| {
                 let hostname = record.target().to_utf8();
                 let port = Some(record.port());
-                StreamAddress { hostname, port }
+                ServerAddress { host: hostname, port }
             })
             .collect();
 
@@ -91,7 +91,7 @@ impl SrvResolver {
         let results = srv_addresses.into_iter().map(move |mut address| {
             let domain_name = &hostname_parts[1..];
 
-            let mut hostname_parts: Vec<_> = address.hostname.split('.').collect();
+            let mut hostname_parts: Vec<_> = address.host.split('.').collect();
 
             // Remove empty final section, which indicates a trailing dot.
             if hostname_parts.last().map(|s| s.is_empty()).unwrap_or(false) {
@@ -112,7 +112,7 @@ impl SrvResolver {
 
             // The spec tests list the seeds without the trailing '.', so we remove it by
             // joining the parts we split rather than manipulating the string.
-            address.hostname = hostname_parts.join(".");
+            address.host = hostname_parts.join(".");
 
             Ok(address)
         });

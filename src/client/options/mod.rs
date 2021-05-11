@@ -101,6 +101,8 @@ lazy_static! {
 
 /// A hostname:port address pair.
 #[derive(Clone, Debug, Eq)]
+#[deprecated = "This type has been renamed to `SeverAddress` and will be removed in the 2.0.0 \
+                stable release"]
 pub struct StreamAddress {
     /// The hostname of the address.
     pub hostname: String,
@@ -111,31 +113,14 @@ pub struct StreamAddress {
     pub port: Option<u16>,
 }
 
-impl<'de> Deserialize<'de> for StreamAddress {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s: String = Deserialize::deserialize(deserializer)?;
-        Self::parse(s.as_str()).map_err(|e| D::Error::custom(format!("{}", e)))
-    }
-}
-
-impl Default for StreamAddress {
-    fn default() -> Self {
-        Self {
-            hostname: "localhost".into(),
-            port: None,
-        }
-    }
-}
-
+#[allow(deprecated)]
 impl PartialEq for StreamAddress {
     fn eq(&self, other: &Self) -> bool {
         self.hostname == other.hostname && self.port.unwrap_or(27017) == other.port.unwrap_or(27017)
     }
 }
 
+#[allow(deprecated)]
 impl Hash for StreamAddress {
     fn hash<H>(&self, state: &mut H)
     where
@@ -146,7 +131,64 @@ impl Hash for StreamAddress {
     }
 }
 
-impl StreamAddress {
+/// A struct representing the address of a MongoDB server - i.e. a host and port combination.
+#[derive(Clone, Debug, Eq)]
+pub struct ServerAddress {
+    /// The hostname or IP address where the MongoDB server can be found.
+    pub host: String,
+
+    /// The TCP port that the MongoDB server is listening on.
+    ///
+    /// The default is 27017.
+    pub port: Option<u16>,
+}
+
+impl<'de> Deserialize<'de> for ServerAddress {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s: String = Deserialize::deserialize(deserializer)?;
+        Self::parse(s.as_str()).map_err(|e| D::Error::custom(format!("{}", e)))
+    }
+}
+
+impl Default for ServerAddress {
+    fn default() -> Self {
+        Self {
+            host: "localhost".into(),
+            port: None,
+        }
+    }
+}
+
+impl PartialEq for ServerAddress {
+    fn eq(&self, other: &Self) -> bool {
+        self.host == other.host && self.port.unwrap_or(27017) == other.port.unwrap_or(27017)
+    }
+}
+
+impl Hash for ServerAddress {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        self.host.hash(state);
+        self.port.unwrap_or(27017).hash(state);
+    }
+}
+
+#[allow(deprecated)]
+impl From<StreamAddress> for ServerAddress {
+    fn from(sa: StreamAddress) -> Self {
+        Self {
+            host: sa.hostname,
+            port: sa.port,
+        }
+    }
+}
+
+impl ServerAddress {
     /// Parses an address string into a `StreamAddress`.
     pub fn parse(address: impl AsRef<str>) -> Result<Self> {
         let address = address.as_ref();
@@ -186,8 +228,8 @@ impl StreamAddress {
             None => None,
         };
 
-        Ok(StreamAddress {
-            hostname: hostname.to_string(),
+        Ok(ServerAddress {
+            host: hostname.to_string(),
             port,
         })
     }
@@ -196,7 +238,7 @@ impl StreamAddress {
     pub(crate) fn into_document(mut self) -> Document {
         let mut doc = Document::new();
 
-        doc.insert("host", &self.hostname);
+        doc.insert("host", &self.host);
 
         if let Some(i) = self.port.take() {
             doc.insert("port", i32::from(i));
@@ -208,14 +250,9 @@ impl StreamAddress {
     }
 }
 
-impl fmt::Display for StreamAddress {
+impl fmt::Display for ServerAddress {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            fmt,
-            "{}:{}",
-            self.hostname,
-            self.port.unwrap_or(DEFAULT_PORT)
-        )
+        write!(fmt, "{}:{}", self.host, self.port.unwrap_or(DEFAULT_PORT))
     }
 }
 
@@ -291,12 +328,12 @@ pub struct ClientOptions {
     /// Note that by default, the driver will autodiscover other nodes in the cluster. To connect
     /// directly to a single server (rather than autodiscovering the rest of the cluster), set the
     /// `direct` field to `true`.
-    #[builder(default_code = "vec![ StreamAddress {
-        hostname: \"localhost\".to_string(),
+    #[builder(default_code = "vec![ ServerAddress {
+        host: \"localhost\".to_string(),
         port: Some(27017),
     }]")]
     #[serde(default = "default_hosts")]
-    pub hosts: Vec<StreamAddress>,
+    pub hosts: Vec<ServerAddress>,
 
     /// The application name that the Client will send to the server as part of the handshake. This
     /// can be used in combination with the server logs to determine which Client is connected to a
@@ -472,9 +509,9 @@ pub struct ClientOptions {
     pub(crate) heartbeat_freq_test: Option<Duration>,
 }
 
-fn default_hosts() -> Vec<StreamAddress> {
-    vec![StreamAddress {
-        hostname: "localhost".to_string(),
+fn default_hosts() -> Vec<ServerAddress> {
+    vec![ServerAddress {
+        host: "localhost".to_string(),
         port: Some(27017),
     }]
 }
@@ -487,7 +524,7 @@ impl Default for ClientOptions {
 
 #[derive(Debug, Default, PartialEq)]
 struct ClientOptionsParser {
-    pub hosts: Vec<StreamAddress>,
+    pub hosts: Vec<ServerAddress>,
     pub srv: bool,
     pub app_name: Option<String>,
     pub tls: Option<Tls>,
@@ -825,11 +862,11 @@ impl ClientOptions {
         if srv {
             let mut resolver = SrvResolver::new(resolver_config.map(|config| config.inner)).await?;
             let mut config = resolver
-                .resolve_client_options(&options.hosts[0].hostname)
+                .resolve_client_options(&options.hosts[0].host)
                 .await?;
 
             // Save the original SRV hostname to allow mongos polling.
-            options.original_srv_hostname = Some(options.hosts[0].hostname.clone());
+            options.original_srv_hostname = Some(options.hosts[0].host.clone());
 
             // Set the ClientOptions hosts to those found during the SRV lookup.
             options.hosts = config.hosts;
@@ -1123,8 +1160,8 @@ impl ClientOptionsParser {
                     Some(p)
                 };
 
-                Ok(StreamAddress {
-                    hostname: hostname.to_lowercase(),
+                Ok(ServerAddress {
+                    host: hostname.to_lowercase(),
                     port,
                 })
             })
@@ -1722,7 +1759,7 @@ mod tests {
 
     use pretty_assertions::assert_eq;
 
-    use super::{ClientOptions, StreamAddress};
+    use super::{ClientOptions, ServerAddress};
     use crate::{
         concern::{Acknowledgment, ReadConcernLevel, WriteConcern},
         selection_criteria::{ReadPreference, ReadPreferenceOptions},
@@ -1745,9 +1782,9 @@ mod tests {
         }
     }
 
-    fn host_without_port(hostname: &str) -> StreamAddress {
-        StreamAddress {
-            hostname: hostname.to_string(),
+    fn host_without_port(hostname: &str) -> ServerAddress {
+        ServerAddress {
+            host: hostname.to_string(),
             port: None,
         }
     }
@@ -1822,8 +1859,8 @@ mod tests {
         assert_eq!(
             ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
-                hosts: vec![StreamAddress {
-                    hostname: "localhost".to_string(),
+                hosts: vec![ServerAddress {
+                    host: "localhost".to_string(),
                     port: Some(27017),
                 }],
                 original_uri: Some(uri.into()),
@@ -1840,8 +1877,8 @@ mod tests {
         assert_eq!(
             ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
-                hosts: vec![StreamAddress {
-                    hostname: "localhost".to_string(),
+                hosts: vec![ServerAddress {
+                    host: "localhost".to_string(),
                     port: Some(27017),
                 }],
                 original_uri: Some(uri.into()),
@@ -1858,8 +1895,8 @@ mod tests {
         assert_eq!(
             ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
-                hosts: vec![StreamAddress {
-                    hostname: "localhost".to_string(),
+                hosts: vec![ServerAddress {
+                    host: "localhost".to_string(),
                     port: Some(27017),
                 }],
                 read_concern: Some(ReadConcernLevel::Custom("foo".to_string()).into()),
@@ -1886,8 +1923,8 @@ mod tests {
         assert_eq!(
             ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
-                hosts: vec![StreamAddress {
-                    hostname: "localhost".to_string(),
+                hosts: vec![ServerAddress {
+                    host: "localhost".to_string(),
                     port: Some(27017),
                 }],
                 write_concern: Some(write_concern),
@@ -1908,8 +1945,8 @@ mod tests {
         assert_eq!(
             ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
-                hosts: vec![StreamAddress {
-                    hostname: "localhost".to_string(),
+                hosts: vec![ServerAddress {
+                    host: "localhost".to_string(),
                     port: Some(27017),
                 }],
                 write_concern: Some(write_concern),
@@ -1938,8 +1975,8 @@ mod tests {
         assert_eq!(
             ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
-                hosts: vec![StreamAddress {
-                    hostname: "localhost".to_string(),
+                hosts: vec![ServerAddress {
+                    host: "localhost".to_string(),
                     port: Some(27017),
                 }],
                 write_concern: Some(write_concern),
@@ -1980,8 +2017,8 @@ mod tests {
         assert_eq!(
             ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
-                hosts: vec![StreamAddress {
-                    hostname: "localhost".to_string(),
+                hosts: vec![ServerAddress {
+                    host: "localhost".to_string(),
                     port: Some(27017),
                 }],
                 write_concern: Some(write_concern),
@@ -2004,8 +2041,8 @@ mod tests {
         assert_eq!(
             ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
-                hosts: vec![StreamAddress {
-                    hostname: "localhost".to_string(),
+                hosts: vec![ServerAddress {
+                    host: "localhost".to_string(),
                     port: Some(27017),
                 }],
                 write_concern: Some(write_concern),
@@ -2037,12 +2074,12 @@ mod tests {
             ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
                 hosts: vec![
-                    StreamAddress {
-                        hostname: "localhost".to_string(),
+                    ServerAddress {
+                        host: "localhost".to_string(),
                         port: None,
                     },
-                    StreamAddress {
-                        hostname: "localhost".to_string(),
+                    ServerAddress {
+                        host: "localhost".to_string(),
                         port: Some(27018),
                     },
                 ],

@@ -6,7 +6,7 @@ use crate::{
     cmap::{CommandResponse, StreamDescription},
     cursor::CursorInformation,
     operation::{GetMore, Operation},
-    options::StreamAddress,
+    options::ServerAddress,
     sdam::{ServerDescription, ServerInfo, ServerType},
     Namespace,
 };
@@ -14,7 +14,7 @@ use crate::{
 fn build_test(
     ns: Namespace,
     cursor_id: i64,
-    address: StreamAddress,
+    address: ServerAddress,
     batch_size: Option<u32>,
     max_time: Option<Duration>,
     mut expected_body: Document,
@@ -48,8 +48,8 @@ async fn build() {
         coll: "test_coll".to_string(),
     };
     let cursor_id: i64 = 123;
-    let address = StreamAddress {
-        hostname: "localhost".to_string(),
+    let address = ServerAddress {
+        host: "localhost".to_string(),
         port: Some(1234),
     };
     let batch_size: u32 = 123;
@@ -80,8 +80,8 @@ async fn build_batch_size() {
         coll: "test_coll".to_string(),
     };
     let cursor_id: i64 = 123;
-    let address = StreamAddress {
-        hostname: "localhost".to_string(),
+    let address = ServerAddress {
+        host: "localhost".to_string(),
         port: Some(1234),
     };
 
@@ -124,8 +124,8 @@ async fn build_batch_size() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn op_selection_criteria() {
-    let address = StreamAddress {
-        hostname: "myhost.com".to_string(),
+    let address = ServerAddress {
+        host: "myhost.com".to_string(),
         port: Some(1234),
     };
 
@@ -154,7 +154,7 @@ async fn op_selection_criteria() {
     assert!(predicate(&server_info));
 
     let server_description = ServerDescription {
-        address: StreamAddress::default(),
+        address: ServerAddress::default(),
         ..server_description
     };
     let server_info = ServerInfo::new(&server_description);
@@ -169,8 +169,8 @@ async fn handle_success() {
         coll: "test_coll".to_string(),
     };
     let cursor_id: i64 = 123;
-    let address = StreamAddress {
-        hostname: "localhost".to_string(),
+    let address = ServerAddress {
+        host: "localhost".to_string(),
         port: Some(1234),
     };
 

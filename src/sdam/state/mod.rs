@@ -22,7 +22,7 @@ use crate::{
     client::ClusterTime,
     cmap::{Command, Connection},
     error::{Error, Result},
-    options::{ClientOptions, SelectionCriteria, StreamAddress},
+    options::{ClientOptions, SelectionCriteria, ServerAddress},
     runtime::HttpClient,
     sdam::{
         description::{
@@ -66,7 +66,7 @@ struct Common {
 struct TopologyState {
     http_client: HttpClient,
     description: TopologyDescription,
-    servers: HashMap<StreamAddress, Arc<Server>>,
+    servers: HashMap<ServerAddress, Arc<Server>>,
     #[cfg(test)]
     mocked: bool,
 }
@@ -171,7 +171,7 @@ impl Topology {
 
     /// Gets the addresses of the servers in the cluster.
     #[cfg(test)]
-    pub(crate) async fn servers(&self) -> HashSet<StreamAddress> {
+    pub(crate) async fn servers(&self) -> HashSet<ServerAddress> {
         self.state.read().await.servers.keys().cloned().collect()
     }
 
@@ -350,7 +350,7 @@ impl Topology {
     /// Updates the hosts included in this topology, starting and stopping monitors as necessary.
     pub(crate) async fn update_hosts(
         &self,
-        hosts: HashSet<StreamAddress>,
+        hosts: HashSet<ServerAddress>,
         options: &ClientOptions,
     ) -> bool {
         self.state
@@ -384,7 +384,7 @@ impl Topology {
     /// Updates the given `command` as needed based on the `critiera`.
     pub(crate) async fn update_command_with_read_pref(
         &self,
-        server_address: &StreamAddress,
+        server_address: &ServerAddress,
         command: &mut Command,
         criteria: Option<&SelectionCriteria>,
     ) {
@@ -409,7 +409,7 @@ impl Topology {
 
     pub(crate) async fn get_server_description(
         &self,
-        address: &StreamAddress,
+        address: &ServerAddress,
     ) -> Option<ServerDescription> {
         self.state
             .read()
@@ -420,7 +420,7 @@ impl Topology {
     }
 
     #[cfg(test)]
-    pub(crate) async fn get_servers(&self) -> HashMap<StreamAddress, Weak<Server>> {
+    pub(crate) async fn get_servers(&self) -> HashMap<ServerAddress, Weak<Server>> {
         self.state
             .read()
             .await
@@ -455,7 +455,7 @@ impl TopologyState {
     /// A reference to the containing Topology is needed in order to start the monitoring task.
     fn add_new_server(
         &mut self,
-        address: StreamAddress,
+        address: ServerAddress,
         options: ClientOptions,
         topology: &WeakTopology,
     ) {
@@ -483,7 +483,7 @@ impl TopologyState {
     /// Updates the given `command` as needed based on the `criteria`.
     pub(crate) fn update_command_with_read_pref(
         &self,
-        server_address: &StreamAddress,
+        server_address: &ServerAddress,
         command: &mut Command,
         criteria: Option<&SelectionCriteria>,
     ) {
@@ -519,7 +519,7 @@ impl TopologyState {
     /// removed servers in the topology description.
     fn update_hosts(
         &mut self,
-        hosts: &HashSet<StreamAddress>,
+        hosts: &HashSet<ServerAddress>,
         options: &ClientOptions,
         topology: WeakTopology,
     ) -> Option<TopologyDescriptionDiff> {
@@ -533,7 +533,7 @@ impl TopologyState {
 
     fn sync_hosts(
         &mut self,
-        hosts: &HashSet<StreamAddress>,
+        hosts: &HashSet<ServerAddress>,
         options: &ClientOptions,
         topology: &WeakTopology,
     ) {

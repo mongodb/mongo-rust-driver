@@ -8,7 +8,7 @@ use crate::{
     concern::{ReadConcern, ReadConcernLevel},
     error::{ErrorKind, WriteFailure},
     operation::{test, Aggregate, Operation},
-    options::{AggregateOptions, Hint, StreamAddress},
+    options::{AggregateOptions, Hint, ServerAddress},
     Namespace,
 };
 
@@ -182,8 +182,8 @@ async fn handle_success() {
         coll: "test_coll".to_string(),
     };
 
-    let address = StreamAddress {
-        hostname: "localhost".to_string(),
+    let address = ServerAddress {
+        host: "localhost".to_string(),
         port: None,
     };
 
@@ -252,7 +252,7 @@ async fn handle_success() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_max_await_time() {
     let response = CommandResponse::with_document_and_address(
-        StreamAddress::default(),
+        ServerAddress::default(),
         doc! {
             "cursor": {
                 "id": 123,

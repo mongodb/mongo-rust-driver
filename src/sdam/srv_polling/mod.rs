@@ -9,7 +9,7 @@ use super::{
 };
 use crate::{
     error::{Error, Result},
-    options::{ClientOptions, StreamAddress},
+    options::{ClientOptions, ServerAddress},
     srv::SrvResolver,
     RUNTIME,
 };
@@ -25,7 +25,7 @@ pub(crate) struct SrvPollingMonitor {
 }
 
 struct LookupHosts {
-    hosts: Vec<StreamAddress>,
+    hosts: Vec<ServerAddress>,
     min_ttl: Option<Duration>,
 }
 

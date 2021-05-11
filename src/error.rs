@@ -5,7 +5,7 @@ use std::{fmt::{self, Debug}, sync::Arc};
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::{bson::Document, options::StreamAddress};
+use crate::{bson::Document, options::ServerAddress};
 
 const RECOVERING_CODES: [i32; 5] = [11600, 11602, 13436, 189, 91];
 const NOTMASTER_CODES: [i32; 3] = [10107, 13435, 10058];
@@ -32,7 +32,7 @@ pub struct Error {
 }
 
 impl Error {
-    pub(crate) fn pool_cleared_error(address: &StreamAddress) -> Self {
+    pub(crate) fn pool_cleared_error(address: &ServerAddress) -> Self {
         ErrorKind::ConnectionPoolCleared {
             message: format!(
                 "Connection pool for {} cleared during operation execution",

@@ -8,7 +8,7 @@ use crate::{
     client::Client,
     error::{BulkWriteFailure, CommandError, Error, ErrorKind},
     is_master::{IsMasterCommandResponse, IsMasterReply},
-    options::{ClientOptions, ReadPreference, SelectionCriteria, StreamAddress},
+    options::{ClientOptions, ReadPreference, SelectionCriteria, ServerAddress},
     sdam::{
         description::{
             server::{ServerDescription, ServerType},
@@ -44,7 +44,7 @@ pub struct Response(String, IsMasterCommandResponse);
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApplicationError {
-    address: StreamAddress,
+    address: ServerAddress,
     generation: Option<u32>,
     max_wire_version: i32,
     when: ErrorHandshakePhase,
@@ -165,7 +165,7 @@ async fn run_test(test_file: TestFile) {
                 })
             };
 
-            let address = StreamAddress::parse(&address).unwrap_or_else(|_| {
+            let address = ServerAddress::parse(&address).unwrap_or_else(|_| {
                 panic!(
                     "{}: couldn't parse address \"{:?}\"",
                     test_description.as_str(),
@@ -260,7 +260,7 @@ async fn run_test(test_file: TestFile) {
         );
 
         for (address, server) in phase.outcome.servers {
-            let address = StreamAddress::parse(&address).unwrap_or_else(|_| {
+            let address = ServerAddress::parse(&address).unwrap_or_else(|_| {
                 panic!(
                     "{}: couldn't parse address \"{:?}\"",
                     test_description, address
@@ -422,7 +422,7 @@ async fn direct_connection() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn pool_cleared_error_does_not_mark_unknown() {
-    let address = StreamAddress::parse("a:1234").unwrap();
+    let address = ServerAddress::parse("a:1234").unwrap();
     let options = ClientOptions::builder()
         .hosts(vec![address.clone()])
         .build();

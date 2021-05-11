@@ -4,7 +4,7 @@ pub use crate::sdam::description::server::ServerType;
 use crate::{
     bson::DateTime,
     is_master::IsMasterCommandResponse,
-    options::StreamAddress,
+    options::ServerAddress,
     sdam::description::server::ServerDescription,
     selection_criteria::TagSet,
 };
@@ -32,7 +32,7 @@ impl<'a> ServerInfo<'a> {
     }
 
     /// Gets the address of the server.
-    pub fn address(&self) -> &StreamAddress {
+    pub fn address(&self) -> &ServerAddress {
         &self.description.address
     }
 

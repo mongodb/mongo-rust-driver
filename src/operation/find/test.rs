@@ -5,7 +5,7 @@ use crate::{
     bson_util,
     cmap::{CommandResponse, StreamDescription},
     operation::{test, Find, Operation},
-    options::{CursorType, FindOptions, Hint, ReadConcern, ReadConcernLevel, StreamAddress},
+    options::{CursorType, FindOptions, Hint, ReadConcern, ReadConcernLevel, ServerAddress},
     Namespace,
 };
 
@@ -200,8 +200,8 @@ async fn handle_success() {
         coll: "test_coll".to_string(),
     };
 
-    let address = StreamAddress {
-        hostname: "localhost".to_string(),
+    let address = ServerAddress {
+        host: "localhost".to_string(),
         port: None,
     };
 
@@ -262,8 +262,8 @@ async fn handle_success() {
 
 fn verify_max_await_time(max_await_time: Option<Duration>, cursor_type: Option<CursorType>) {
     let ns = Namespace::empty();
-    let address = StreamAddress {
-        hostname: "localhost".to_string(),
+    let address = ServerAddress {
+        host: "localhost".to_string(),
         port: None,
     };
     let find = Find::new(

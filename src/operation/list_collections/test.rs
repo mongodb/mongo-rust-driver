@@ -3,7 +3,7 @@ use crate::{
     bson_util,
     cmap::{CommandResponse, StreamDescription},
     operation::{ListCollections, Operation},
-    options::{ListCollectionsOptions, StreamAddress},
+    options::{ListCollectionsOptions, ServerAddress},
     Namespace,
 };
 
@@ -171,12 +171,12 @@ async fn handle_success() {
 
     let cursor_spec = list_collections
         .handle_response(
-            CommandResponse::with_document_and_address(StreamAddress::default(), response.clone()),
+            CommandResponse::with_document_and_address(ServerAddress::default(), response.clone()),
             &Default::default(),
         )
         .expect("handle should succeed");
 
-    assert_eq!(cursor_spec.address(), &StreamAddress::default());
+    assert_eq!(cursor_spec.address(), &ServerAddress::default());
     assert_eq!(cursor_spec.id(), 123);
     assert_eq!(cursor_spec.batch_size(), None);
     assert_eq!(cursor_spec.max_time(), None);
@@ -196,12 +196,12 @@ async fn handle_success() {
     );
     let cursor_spec = list_collections
         .handle_response(
-            CommandResponse::with_document_and_address(StreamAddress::default(), response),
+            CommandResponse::with_document_and_address(ServerAddress::default(), response),
             &Default::default(),
         )
         .expect("handle should succeed");
 
-    assert_eq!(cursor_spec.address(), &StreamAddress::default());
+    assert_eq!(cursor_spec.address(), &ServerAddress::default());
     assert_eq!(cursor_spec.id(), 123);
     assert_eq!(cursor_spec.batch_size(), Some(123));
     assert_eq!(cursor_spec.max_time(), None);

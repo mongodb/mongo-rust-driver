@@ -11,7 +11,7 @@ use futures_core::{Future, Stream};
 use crate::{
     bson::Document,
     error::{Error, ErrorKind, Result},
-    options::StreamAddress,
+    options::ServerAddress,
     results::GetMoreResult,
     Client,
     Namespace,
@@ -153,7 +153,7 @@ pub(crate) struct CursorSpecification {
 impl CursorSpecification {
     pub(crate) fn new(
         ns: Namespace,
-        address: StreamAddress,
+        address: ServerAddress,
         id: i64,
         batch_size: impl Into<Option<u32>>,
         max_time: impl Into<Option<Duration>>,
@@ -176,7 +176,7 @@ impl CursorSpecification {
     }
 
     #[cfg(test)]
-    pub(crate) fn address(&self) -> &StreamAddress {
+    pub(crate) fn address(&self) -> &ServerAddress {
         &self.info.address
     }
 
@@ -195,7 +195,7 @@ impl CursorSpecification {
 #[derive(Clone, Debug)]
 pub(crate) struct CursorInformation {
     pub(crate) ns: Namespace,
-    pub(crate) address: StreamAddress,
+    pub(crate) address: ServerAddress,
     pub(crate) id: i64,
     pub(crate) batch_size: Option<u32>,
     pub(crate) max_time: Option<Duration>,

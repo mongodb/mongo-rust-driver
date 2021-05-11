@@ -13,7 +13,7 @@ use crate::{
     bson::oid::ObjectId,
     client::ClusterTime,
     cmap::Command,
-    options::{ClientOptions, StreamAddress},
+    options::{ClientOptions, ServerAddress},
     sdam::description::server::{ServerDescription, ServerType},
     selection_criteria::{ReadPreference, SelectionCriteria},
 };
@@ -73,7 +73,7 @@ pub(crate) struct TopologyDescription {
     heartbeat_freq: Option<Duration>,
 
     /// The server descriptions of each member of the topology.
-    servers: HashMap<StreamAddress, ServerDescription>,
+    servers: HashMap<ServerAddress, ServerDescription>,
 }
 
 impl PartialEq for TopologyDescription {
@@ -134,7 +134,7 @@ impl TopologyDescription {
         self.topology_type
     }
 
-    pub(crate) fn server_addresses(&self) -> impl Iterator<Item = &StreamAddress> {
+    pub(crate) fn server_addresses(&self) -> impl Iterator<Item = &ServerAddress> {
         self.servers.keys()
     }
 
@@ -144,7 +144,7 @@ impl TopologyDescription {
 
     pub(crate) fn get_server_description(
         &self,
-        address: &StreamAddress,
+        address: &ServerAddress,
     ) -> Option<&ServerDescription> {
         self.servers.get(address)
     }
@@ -335,8 +335,8 @@ impl TopologyDescription {
             return None;
         }
 
-        let addresses: HashSet<&StreamAddress> = self.server_addresses().collect();
-        let other_addresses: HashSet<&StreamAddress> = other.server_addresses().collect();
+        let addresses: HashSet<&ServerAddress> = self.server_addresses().collect();
+        let other_addresses: HashSet<&ServerAddress> = other.server_addresses().collect();
 
         Some(TopologyDescriptionDiff {
             new_addresses: other_addresses
@@ -350,7 +350,7 @@ impl TopologyDescription {
     /// Syncs the set of servers in the description to those in `hosts`. Servers in the set not
     /// already present in the cluster will be added, and servers in the cluster not present in the
     /// set will be removed.
-    pub(crate) fn sync_hosts(&mut self, hosts: &HashSet<StreamAddress>) {
+    pub(crate) fn sync_hosts(&mut self, hosts: &HashSet<ServerAddress>) {
         self.add_new_servers_from_addresses(hosts.iter());
         self.servers.retain(|host, _| hosts.contains(host));
     }
@@ -638,7 +638,7 @@ impl TopologyDescription {
         servers: impl Iterator<Item = &'a String>,
     ) -> Result<(), String> {
         let servers: Result<Vec<_>, String> = servers
-            .map(|server| StreamAddress::parse(server).map_err(|e| e.to_string()))
+            .map(|server| ServerAddress::parse(server).map_err(|e| e.to_string()))
             .collect();
 
         self.add_new_servers_from_addresses(servers?.iter());
@@ -648,7 +648,7 @@ impl TopologyDescription {
     /// Create a new ServerDescription for each address and add it to the topology.
     fn add_new_servers_from_addresses<'a>(
         &mut self,
-        servers: impl Iterator<Item = &'a StreamAddress>,
+        servers: impl Iterator<Item = &'a ServerAddress>,
     ) {
         for server in servers {
             if !self.servers.contains_key(&server) {
@@ -705,7 +705,7 @@ impl SessionSupportStatus {
 /// Returned from `TopologyDescription::diff`.
 #[derive(Debug)]
 pub(crate) struct TopologyDescriptionDiff {
-    pub(crate) new_addresses: HashSet<StreamAddress>,
+    pub(crate) new_addresses: HashSet<ServerAddress>,
 }
 
 fn verify_max_staleness(max_staleness: Option<Duration>) -> crate::error::Result<()> {

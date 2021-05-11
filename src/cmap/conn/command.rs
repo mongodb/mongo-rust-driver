@@ -6,7 +6,7 @@ use crate::{
     bson_util,
     client::{options::ServerApi, ClusterTime},
     error::{CommandError, ErrorKind, Result},
-    options::StreamAddress,
+    options::ServerAddress,
     selection_criteria::ReadPreference,
     ClientSession,
 };
@@ -71,14 +71,14 @@ impl Command {
 
 #[derive(Debug, Clone)]
 pub(crate) struct CommandResponse {
-    source: StreamAddress,
+    source: ServerAddress,
     pub(crate) raw_response: Document,
     cluster_time: Option<ClusterTime>,
 }
 
 impl CommandResponse {
     #[cfg(test)]
-    pub(crate) fn with_document_and_address(source: StreamAddress, doc: Document) -> Self {
+    pub(crate) fn with_document_and_address(source: ServerAddress, doc: Document) -> Self {
         Self {
             source,
             raw_response: doc,
@@ -90,15 +90,15 @@ impl CommandResponse {
     #[cfg(test)]
     pub(crate) fn with_document(doc: Document) -> Self {
         Self::with_document_and_address(
-            StreamAddress {
-                hostname: "localhost".to_string(),
+            ServerAddress {
+                host: "localhost".to_string(),
                 port: None,
             },
             doc,
         )
     }
 
-    pub(crate) fn new(source: StreamAddress, message: Message) -> Result<Self> {
+    pub(crate) fn new(source: ServerAddress, message: Message) -> Result<Self> {
         let raw_response = message.single_document_response()?;
         let cluster_time = raw_response
             .get("$clusterTime")
@@ -151,7 +151,7 @@ impl CommandResponse {
     }
 
     /// The address of the server that sent this response.
-    pub(crate) fn source_address(&self) -> &StreamAddress {
+    pub(crate) fn source_address(&self) -> &ServerAddress {
         &self.source
     }
 }

@@ -8,7 +8,7 @@ use crate::{
     bson_util,
     client::{auth::Credential, options::ServerApi},
     event::cmap::{CmapEventHandler, ConnectionPoolOptions as EventOptions},
-    options::{ClientOptions, DriverInfo, StreamAddress, TlsOptions},
+    options::{ClientOptions, DriverInfo, ServerAddress, TlsOptions},
 };
 
 /// Contains the options for creating a connection pool.
@@ -146,7 +146,7 @@ impl From<ConnectionPoolOptions> for ConnectionOptions {
 
 #[derive(Clone, Debug, TypedBuilder)]
 pub(crate) struct StreamOptions {
-    pub(crate) address: StreamAddress,
+    pub(crate) address: ServerAddress,
 
     #[builder(default, setter(strip_option))]
     pub(crate) connect_timeout: Option<Duration>,

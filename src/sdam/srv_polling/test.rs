@@ -5,25 +5,25 @@ use pretty_assertions::assert_eq;
 use super::{LookupHosts, SrvPollingMonitor};
 use crate::{
     error::Result,
-    options::{ClientOptions, StreamAddress},
+    options::{ClientOptions, ServerAddress},
     sdam::Topology,
 };
 
-fn localhost_test_build_10gen(port: u16) -> StreamAddress {
-    StreamAddress {
-        hostname: "localhost.test.build.10gen.cc".into(),
+fn localhost_test_build_10gen(port: u16) -> ServerAddress {
+    ServerAddress {
+        host: "localhost.test.build.10gen.cc".into(),
         port: Some(port),
     }
 }
 
 lazy_static::lazy_static! {
-    static ref DEFAULT_HOSTS: Vec<StreamAddress> = vec![
+    static ref DEFAULT_HOSTS: Vec<ServerAddress> = vec![
         localhost_test_build_10gen(27017),
         localhost_test_build_10gen(27108),
     ];
 }
 
-async fn run_test(new_hosts: Result<Vec<StreamAddress>>, expected_hosts: HashSet<StreamAddress>) {
+async fn run_test(new_hosts: Result<Vec<ServerAddress>>, expected_hosts: HashSet<ServerAddress>) {
     let mut options = ClientOptions::new_srv();
     options.hosts = DEFAULT_HOSTS.clone();
     let topology = Topology::new_mocked(options);
