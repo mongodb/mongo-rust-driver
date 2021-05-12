@@ -12,7 +12,7 @@ use crate::{
         CollectionOptions,
         DatabaseOptions,
         FindOptions,
-        StreamAddress,
+        ServerAddress,
         WriteConcern,
     },
     sync::{Client, Collection},
@@ -43,8 +43,8 @@ fn client_options() {
     assert_eq!(
         options,
         ClientOptions::builder()
-            .hosts(vec![StreamAddress {
-                hostname: "localhost".into(),
+            .hosts(vec![ServerAddress {
+                host: "localhost".into(),
                 port: Some(27017)
             }])
             .build()

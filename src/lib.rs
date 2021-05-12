@@ -20,7 +20,7 @@
 //! ```rust
 //! # use mongodb::{
 //! #     error::Result,
-//! #     options::{StreamAddress, ClientOptions},
+//! #     options::{ServerAddress, ClientOptions},
 //! # };
 //! # #[cfg(feature = "sync")]
 //! # use mongodb::sync::Client;
@@ -30,8 +30,8 @@
 //! # fn make_client() -> Result<Client> {
 //! let options = ClientOptions::builder()
 //!                   .hosts(vec![
-//!                       StreamAddress {
-//!                           hostname: "localhost".into(),
+//!                       ServerAddress {
+//!                           host: "localhost".into(),
 //!                           port: Some(27017),
 //!                       }
 //!                   ])
