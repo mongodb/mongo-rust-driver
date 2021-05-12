@@ -31,7 +31,6 @@ pub(super) struct ConnectionRequester {
 
 impl ConnectionRequester {
     /// Request a connection from the pool that owns the receiver end of this requester.
-    /// Returns None if it takes longer than wait_queue_timeout before the pool returns a result.
     pub(super) async fn request(&self) -> ConnectionRequestResult {
         let (sender, receiver) = oneshot::channel();
 
