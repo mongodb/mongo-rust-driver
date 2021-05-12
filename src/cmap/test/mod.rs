@@ -34,6 +34,9 @@ use bson::doc;
 const TEST_DESCRIPTIONS_TO_SKIP: &[&str] = &[
     "must destroy checked in connection if pool has been closed",
     "must throw error if checkOut is called on a closed pool",
+    // WaitQueueTimeoutMS is not supported
+    "must aggressively timeout threads enqueued longer than waitQueueTimeoutMS",
+    "waiting on maxConnecting is limited by WaitQueueTimeoutMS",
 ];
 
 /// Many different types of CMAP events are emitted from tasks spawned in the drop
@@ -185,9 +188,6 @@ impl Executor {
         }
 
         match (self.error, error) {
-            (Some(ref expected), Some(ref actual)) => {
-                expected.assert_matches(actual, self.description.as_str())
-            }
             (Some(ref expected), None) => {
                 panic!("Expected {}, but no error occurred", expected.type_)
             }
@@ -195,7 +195,7 @@ impl Executor {
                 "Expected no error to occur, but the following error was returned: {:?}",
                 actual
             ),
-            (None, None) => {}
+            (None, None) | (Some(_), Some(_)) => {}
         }
 
         let ignored_event_names = self.ignored_event_names;
@@ -354,9 +354,6 @@ impl Matchable for EventOptions {
             && self.max_pool_size.matches(&expected.max_pool_size)
             && self.min_pool_size.matches(&expected.min_pool_size)
             && self.tls_options.matches(&expected.tls_options)
-            && self
-                .wait_queue_timeout
-                .matches(&expected.wait_queue_timeout)
     }
 }
 

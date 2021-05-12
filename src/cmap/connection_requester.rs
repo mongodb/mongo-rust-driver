@@ -1,8 +1,7 @@
 use tokio::sync::{mpsc, oneshot};
 
 use super::{worker::PoolWorkerHandle, Connection};
-use crate::{error::Result, options::StreamAddress, runtime::AsyncJoinHandle, RUNTIME};
-use std::time::Duration;
+use crate::{error::Result, options::StreamAddress, runtime::AsyncJoinHandle};
 
 /// Returns a new requester/receiver pair.
 pub(super) fn channel(
@@ -32,28 +31,16 @@ pub(super) struct ConnectionRequester {
 
 impl ConnectionRequester {
     /// Request a connection from the pool that owns the receiver end of this requester.
-    /// Returns None if it takes longer than wait_queue_timeout before the pool returns a result.
-    pub(super) async fn request(
-        &self,
-        wait_queue_timeout: Option<Duration>,
-    ) -> Option<ConnectionRequestResult> {
+    pub(super) async fn request(&self) -> ConnectionRequestResult {
         let (sender, receiver) = oneshot::channel();
 
         // this only errors if the receiver end is dropped, which can't happen because
         // we own a handle to the worker, keeping it alive.
         self.sender.send(sender).unwrap();
 
-        match wait_queue_timeout {
-            Some(timeout) => RUNTIME
-                .timeout(timeout, receiver)
-                .await
-                .map(|r| r.unwrap()) // see comment below as to why this is safe
-                .ok(),
-
-            // similarly, the receiver only returns an error if the sender is dropped, which
-            // can't happen due to the handle.
-            None => Some(receiver.await.unwrap()),
-        }
+        // similarly, the receiver only returns an error if the sender is dropped, which
+        // can't happen due to the handle.
+        receiver.await.unwrap()
     }
 }
 

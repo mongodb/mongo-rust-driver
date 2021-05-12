@@ -3,12 +3,7 @@ use std::{sync::Arc, time::Duration};
 use serde::Deserialize;
 
 use super::{event::Event, State};
-use crate::{
-    bson_util,
-    cmap::options::ConnectionPoolOptions,
-    error::{ErrorKind, Result},
-    test::RunOn,
-};
+use crate::{bson_util, cmap::options::ConnectionPoolOptions, error::Result, test::RunOn};
 use bson::Document;
 
 #[derive(Debug, Deserialize)]
@@ -93,17 +88,4 @@ pub struct Error {
     pub type_: String,
     message: String,
     address: Option<String>,
-}
-
-impl Error {
-    pub fn assert_matches(&self, error: &crate::error::Error, description: &str) {
-        match error.kind.as_ref() {
-            ErrorKind::WaitQueueTimeout { .. } => {
-                assert_eq!(self.type_, "WaitQueueTimeoutError", "{}", description);
-            }
-            _ => {
-                panic!("Expected {}, but got {:?}", self.type_, error);
-            }
-        }
-    }
 }
