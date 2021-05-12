@@ -101,7 +101,7 @@ lazy_static! {
 
 /// A hostname:port address pair.
 #[derive(Clone, Debug, Eq)]
-#[deprecated = "This type has been renamed to `SeverAddress` and will be removed in the 2.0.0 \
+#[deprecated = "This type has been renamed to `ServerAddress` and will be removed in the 2.0.0 \
                 stable release"]
 pub struct StreamAddress {
     /// The hostname of the address.
