@@ -308,7 +308,7 @@ mod test {
             "i64": -126i64,
             "timestamp": Bson::Timestamp(Timestamp { time: 12233, increment: 34444 }),
             "binary": Bson::Binary(Binary{ subtype: BinarySubtype::Generic, bytes: vec![3, 222, 11] }),
-            "objectid": ObjectId::with_bytes([1; 12]),
+            "objectid": ObjectId::from_bytes([1; 12]),
             "datetime": DateTime::from_utc(
                 NaiveDateTime::from_timestamp(4444333221, 0),
                 Utc,
