@@ -278,7 +278,7 @@ impl Database {
             .await
             .map(|spec| SessionCursor::new(self.client().clone(), spec))?;
 
-        self.list_collection_names_common(cursor.with_session(session))
+        self.list_collection_names_common(cursor.stream(session))
             .await
     }
 

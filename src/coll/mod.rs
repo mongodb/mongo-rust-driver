@@ -488,7 +488,7 @@ where
         let mut cursor = self
             .find_with_session(filter, Some(options), session)
             .await?;
-        let mut cursor = cursor.with_session(session);
+        let mut cursor = cursor.stream(session);
         cursor.next().await.transpose()
     }
 

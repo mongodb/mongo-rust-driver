@@ -21,12 +21,13 @@ use crate::{
 pub(crate) use common::{CursorInformation, CursorSpecification};
 use common::{GenericCursor, GetMoreProvider, GetMoreProviderResult};
 
-/// A `Cursor` streams the result of a query. When a query is made, a `Cursor` will be returned with
-/// the first batch of results from the server; the documents will be returned as the `Cursor` is
-/// iterated. When the batch is exhausted and if there are more results, the `Cursor` will fetch the
-/// next batch of documents, and so forth until the results are exhausted. Note that because of this
-/// batching, additional network I/O may occur on any given call to `Cursor::next`. Because of this,
-/// a `Cursor` iterates over `Result<Document>` items rather than simply `Document` items.
+/// A [`Cursor`] streams the result of a query. When a query is made, the returned [`Cursor`] will
+/// contain the first batch of results from the server; the individual results will then be returned
+/// as the [`Cursor`] is iterated. When the batch is exhausted and if there are more results, the
+/// [`Cursor`] will fetch the next batch of documents, and so forth until the results are exhausted.
+/// Note that because of this batching, additional network I/O may occur on any given call to
+/// [`Cursor::next`]. Because of this, a [`Cursor`] iterates over `Result<T>` items rather than
+/// simply `T` items.
 ///
 /// The batch size of the `Cursor` can be configured using the options to the method that returns
 /// it. For example, setting the `batch_size` field of
@@ -38,45 +39,42 @@ use common::{GenericCursor, GetMoreProvider, GetMoreProviderResult};
 /// results from the server; both of these factors should be taken into account when choosing the
 /// optimal batch size.
 ///
-/// A cursor can be used like any other [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html). The simplest way is just to iterate over the
-/// documents it yields:
+/// [`Cursor`] implements [`Stream`](https://docs.rs/futures/latest/futures/stream/trait.Stream.html), which means
+/// it can be iterated over much in the same way that an `Iterator` can be in synchronous Rust. In
+/// order to do so, the [`StreamExt`](https://docs.rs/futures/latest/futures/stream/trait.StreamExt.html) trait must
+/// be imported. Because a [`Cursor`] iterates over a `Result<T>`, it also has access to the
+/// potentially more ergonomic functionality provided by
+/// [`TryStreamExt`](https://docs.rs/futures/latest/futures/stream/trait.TryStreamExt.html), which can be
+/// imported instead of or in addition to
+/// [`StreamExt`](https://docs.rs/futures/latest/futures/stream/trait.StreamExt.html). The methods from
+/// [`TryStreamExt`](https://docs.rs/futures/latest/futures/stream/trait.TryStreamExt.html) are especially useful when
+/// used in conjunction with the `?` operator.
 ///
 /// ```rust
-/// # use futures::stream::StreamExt;
 /// # use mongodb::{bson::Document, Client, error::Result};
 /// #
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// # let coll = client.database("foo").collection::<Document>("bar");
-/// # let mut cursor = coll.find(None, None).await?;
 /// #
+/// use futures::stream::{StreamExt, TryStreamExt};
+///
+/// let mut cursor = coll.find(None, None).await?;
+/// // regular Stream uses next() and iterates over Option<Result<T>>
 /// while let Some(doc) = cursor.next().await {
 ///   println!("{}", doc?)
 /// }
-/// #
-/// # Ok(())
-/// # }
-/// ```
+/// // regular Stream uses collect() and collects into a Vec<Result<T>>
+/// let v: Vec<Result<_>> = cursor.collect().await;
 ///
-/// Additionally, all the other methods that an [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html) has are available on `Cursor` as well.
-/// This includes all of the functionality provided by [`StreamExt`](https://docs.rs/futures/0.3.4/futures/stream/trait.StreamExt.html), which provides similar functionality to the standard library `Iterator` trait.
-/// For instance, if the number of results from a query is known to be small, it might make sense
-/// to collect them into a vector:
-///
-/// ```rust
-/// # use futures::stream::StreamExt;
-/// # use mongodb::{
-/// #     bson::{doc, Document},
-/// #     error::Result,
-/// #     Client,
-/// # };
+/// let mut cursor = coll.find(None, None).await?;
+/// // TryStream uses try_next() and iterates over Result<Option<T>>
+/// while let Some(doc) = cursor.try_next().await? {
+///   println!("{}", doc)
+/// }
+/// // TryStream uses try_collect() and collects into a Result<Vec<T>>
+/// let v: Vec<_> = cursor.try_collect().await?;
 /// #
-/// # async fn do_stuff() -> Result<()> {
-/// # let client = Client::with_uri_str("mongodb://example.com").await?;
-/// # let coll = client.database("foo").collection("bar");
-/// # let cursor = coll.find(Some(doc! { "x": 1 }), None).await?;
-/// #
-/// let results: Vec<Result<Document>> = cursor.collect().await;
 /// # Ok(())
 /// # }
 /// ```

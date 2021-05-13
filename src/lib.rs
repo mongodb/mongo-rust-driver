@@ -136,7 +136,7 @@ define_if_single_runtime_enabled! {
     pub use crate::{
         client::Client,
         coll::Collection,
-        cursor::{Cursor, session::{SessionCursor, SessionCursorHandle}},
+        cursor::{Cursor, session::{SessionCursor, SessionCursorStream}},
         db::Database,
     };
 
@@ -144,7 +144,7 @@ define_if_single_runtime_enabled! {
     pub(crate) use crate::{
         client::Client,
         coll::Collection,
-        cursor::{Cursor, session::{SessionCursor, SessionCursorHandle}},
+        cursor::{Cursor, session::{SessionCursor, SessionCursorStream}},
         db::Database,
     };
 

@@ -5,6 +5,7 @@ use std::{
 };
 
 use futures_core::{future::BoxFuture, Stream};
+use futures_util::StreamExt;
 use serde::de::DeserializeOwned;
 
 use super::common::{CursorInformation, GenericCursor, GetMoreProvider, GetMoreProviderResult};
@@ -19,22 +20,29 @@ use crate::{
     RUNTIME,
 };
 
-/// A `SessionCursor` is a cursor that was created with a `ClientSession` and must be iterated using
-/// one. To iterate, retrieve a `SessionCursorHandle` using `SessionCursor::with_session`:
+/// A [`SessionCursor`] is a cursor that was created with a [`ClientSession`] that must be iterated
+/// using one. To iterate, use [`SessionCursor::next`] or retrieve a [`SessionCursorStream`] using
+/// [`SessionCursor::stream`]:
 ///
 /// ```rust
-/// # use futures::stream::StreamExt;
 /// # use mongodb::{bson::Document, Client, error::Result, ClientSession, SessionCursor};
 /// #
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// # let mut session = client.start_session(None).await?;
 /// # let coll = client.database("foo").collection::<Document>("bar");
-/// # let mut cursor = coll.find_with_session(None, None, &mut session).await?;
 /// #
-/// while let Some(doc) = cursor.with_session(&mut session).next().await {
-///     println!("{}", doc?)
+/// // iterate using next()
+/// let mut cursor = coll.find_with_session(None, None, &mut session).await?;
+/// while let Some(doc) = cursor.next(&mut session).await.transpose()? {
+///     println!("{}", doc)
 /// }
+///
+/// // iterate using `Stream`:
+/// use futures::stream::TryStreamExt;
+///
+/// let mut cursor = coll.find_with_session(None, None, &mut session).await?;
+/// let results: Vec<_> = cursor.stream(&mut session).try_collect().await?;
 /// #
 /// # Ok(())
 /// # }
@@ -67,12 +75,52 @@ where
         }
     }
 
-    /// Retrieves a `SessionCursorHandle` to iterate this cursor. The session provided must be the
+    /// Retrieves a [`SessionCursorStream`] to iterate this cursor. The session provided must be the
     /// same session used to create the cursor.
-    pub fn with_session<'session>(
+    ///
+    /// Note that the borrow checker will not allow the session to be reused in between iterations
+    /// of this stream. In order to do that, either use [`SessionCursor::next`] instead or drop
+    /// the stream before using the session.
+    ///
+    /// ```
+    /// # use bson::{doc, Document};
+    /// # use mongodb::{Client, error::Result};
+    /// # fn main() {
+    /// # async {
+    /// # let client = Client::with_uri_str("foo").await?;
+    /// # let coll = client.database("foo").collection::<Document>("bar");
+    /// # let other_coll = coll.clone();
+    /// # let mut session = client.start_session(None).await?;
+    /// #
+    /// use futures::stream::TryStreamExt;
+    ///
+    /// // iterate over the results
+    /// let mut cursor = coll.find_with_session(doc! { "x": 1 }, None, &mut session).await?;
+    /// while let Some(doc) = cursor.stream(&mut session).try_next().await? {
+    ///     println!("{}", doc);
+    /// }
+    ///
+    /// // collect the results
+    /// let mut cursor1 = coll.find_with_session(doc! { "x": 1 }, None, &mut session).await?;
+    /// let v: Vec<Document> = cursor1.stream(&mut session).try_collect().await?;
+    ///
+    /// // use session between iterations
+    /// let mut cursor2 = coll.find_with_session(doc! { "x": 1 }, None, &mut session).await?;
+    /// loop {
+    ///     let doc = match cursor2.stream(&mut session).try_next().await? {
+    ///         Some(d) => d,
+    ///         None => break,
+    ///     };
+    ///     other_coll.insert_one_with_session(doc, None, &mut session).await?;
+    /// }
+    /// # Ok::<(), mongodb::error::Error>(())
+    /// # };
+    /// # }
+    /// ```
+    pub fn stream<'session>(
         &mut self,
         session: &'session mut ClientSession,
-    ) -> SessionCursorHandle<'_, 'session, T> {
+    ) -> SessionCursorStream<'_, 'session, T> {
         let get_more_provider = ExplicitSessionGetMoreProvider::new(session);
 
         // Pass the buffer into this cursor handle for iteration.
@@ -81,7 +129,7 @@ where
             info: self.info.clone(),
             initial_buffer: std::mem::take(&mut self.buffer),
         };
-        SessionCursorHandle {
+        SessionCursorStream {
             generic_cursor: ExplicitSessionCursor::new(
                 self.client.clone(),
                 spec,
@@ -89,6 +137,33 @@ where
             ),
             session_cursor: self,
         }
+    }
+
+    /// Retrieve the next result from the cursor.
+    /// The session provided must be the same session used to create the cursor.
+    ///
+    /// Use this method when the session needs to be used again between iterations or when the added
+    /// functionality of `Stream` is not needed.
+    ///
+    /// ```
+    /// # use bson::{doc, Document};
+    /// # use mongodb::Client;
+    /// # fn main() {
+    /// # async {
+    /// # let client = Client::with_uri_str("foo").await?;
+    /// # let coll = client.database("foo").collection::<Document>("bar");
+    /// # let other_coll = coll.clone();
+    /// # let mut session = client.start_session(None).await?;
+    /// let mut cursor = coll.find_with_session(doc! { "x": 1 }, None, &mut session).await?;
+    /// while let Some(doc) = cursor.next(&mut session).await.transpose()? {
+    ///     other_coll.insert_one_with_session(doc, None, &mut session).await?;
+    /// }
+    /// # Ok::<(), mongodb::error::Error>(())
+    /// # };
+    /// # }
+    /// ```
+    pub async fn next(&mut self, session: &mut ClientSession) -> Option<Result<T>> {
+        self.stream(session).next().await
     }
 }
 
@@ -115,11 +190,12 @@ where
 /// This is to be used with cursors associated with explicit sessions borrowed from the user.
 type ExplicitSessionCursor<'session> = GenericCursor<ExplicitSessionGetMoreProvider<'session>>;
 
-/// A handle that borrows a `ClientSession` temporarily for executing getMores or iterating through
-/// the current buffer of a `SessionCursor`.
+/// A type that implements [`Stream`](https://docs.rs/futures/latest/futures/stream/index.html) which can be used to
+/// stream the results of a [`SessionCursor`]. Returned from [`SessionCursor::stream`].
 ///
-/// This updates the buffer of the parent `SessionCursor` when dropped.
-pub struct SessionCursorHandle<'cursor, 'session, T = Document>
+/// This updates the buffer of the parent [`SessionCursor`] when dropped. [`SessionCursor::next`] or
+/// any further streams created from [`SessionCursor::stream`] will pick up where this one left off.
+pub struct SessionCursorStream<'cursor, 'session, T = Document>
 where
     T: DeserializeOwned + Unpin,
 {
@@ -127,7 +203,7 @@ where
     generic_cursor: ExplicitSessionCursor<'session>,
 }
 
-impl<'cursor, 'session, T> Stream for SessionCursorHandle<'cursor, 'session, T>
+impl<'cursor, 'session, T> Stream for SessionCursorStream<'cursor, 'session, T>
 where
     T: DeserializeOwned + Unpin,
 {
@@ -144,7 +220,7 @@ where
     }
 }
 
-impl<'cursor, 'session, T> Drop for SessionCursorHandle<'cursor, 'session, T>
+impl<'cursor, 'session, T> Drop for SessionCursorStream<'cursor, 'session, T>
 where
     T: DeserializeOwned + Unpin,
 {
