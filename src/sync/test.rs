@@ -43,7 +43,7 @@ fn client_options() {
     assert_eq!(
         options,
         ClientOptions::builder()
-            .hosts(vec![ServerAddress {
+            .hosts(vec![ServerAddress::Tcp {
                 host: "localhost".into(),
                 port: Some(27017)
             }])

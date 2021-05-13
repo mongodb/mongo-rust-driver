@@ -10,7 +10,7 @@ use crate::{
 };
 
 fn localhost_test_build_10gen(port: u16) -> ServerAddress {
-    ServerAddress {
+    ServerAddress::Tcp {
         host: "localhost.test.build.10gen.cc".into(),
         port: Some(port),
     }

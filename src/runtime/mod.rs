@@ -170,7 +170,7 @@ impl AsyncRuntime {
 
             #[cfg(feature = "async-std-runtime")]
             Self::AsyncStd => {
-                let host = (address.host.as_str(), address.port.unwrap_or(27017));
+                let host = (address.host(), address.port().unwrap_or(27017));
                 let socket_addrs = async_std::net::ToSocketAddrs::to_socket_addrs(&host).await?;
                 Ok(socket_addrs)
             }

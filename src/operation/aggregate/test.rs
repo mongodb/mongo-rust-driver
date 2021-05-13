@@ -182,7 +182,7 @@ async fn handle_success() {
         coll: "test_coll".to_string(),
     };
 
-    let address = ServerAddress {
+    let address = ServerAddress::Tcp {
         host: "localhost".to_string(),
         port: None,
     };

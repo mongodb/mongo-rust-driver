@@ -131,16 +131,23 @@ impl Hash for StreamAddress {
     }
 }
 
-/// A struct representing the address of a MongoDB server - i.e. a host and port combination.
+/// An enum representing the address of a MongoDB server.
+///
+/// Currently this just supports addresses that can be connected to over TCP, but alternative
+/// address types may be supported in the future (e.g. Unix Domain Socket paths).
 #[derive(Clone, Debug, Eq)]
-pub struct ServerAddress {
-    /// The hostname or IP address where the MongoDB server can be found.
-    pub host: String,
+#[non_exhaustive]
+pub enum ServerAddress {
+    /// A TCP/IP host and port combination.
+    Tcp {
+        /// The hostname or IP address where the MongoDB server can be found.
+        host: String,
 
-    /// The TCP port that the MongoDB server is listening on.
-    ///
-    /// The default is 27017.
-    pub port: Option<u16>,
+        /// The TCP port that the MongoDB server is listening on.
+        ///
+        /// The default is 27017.
+        port: Option<u16>,
+    },
 }
 
 impl<'de> Deserialize<'de> for ServerAddress {
@@ -155,7 +162,7 @@ impl<'de> Deserialize<'de> for ServerAddress {
 
 impl Default for ServerAddress {
     fn default() -> Self {
-        Self {
+        Self::Tcp {
             host: "localhost".into(),
             port: None,
         }
@@ -164,7 +171,15 @@ impl Default for ServerAddress {
 
 impl PartialEq for ServerAddress {
     fn eq(&self, other: &Self) -> bool {
-        self.host == other.host && self.port.unwrap_or(27017) == other.port.unwrap_or(27017)
+        match (self, other) {
+            (
+                Self::Tcp { host, port },
+                Self::Tcp {
+                    host: other_host,
+                    port: other_port,
+                },
+            ) => host == other_host && port.unwrap_or(27017) == other_port.unwrap_or(27017),
+        }
     }
 }
 
@@ -173,15 +188,19 @@ impl Hash for ServerAddress {
     where
         H: Hasher,
     {
-        self.host.hash(state);
-        self.port.unwrap_or(27017).hash(state);
+        match self {
+            Self::Tcp { host, port } => {
+                host.hash(state);
+                port.unwrap_or(27017).hash(state);
+            }
+        }
     }
 }
 
 #[allow(deprecated)]
 impl From<StreamAddress> for ServerAddress {
     fn from(sa: StreamAddress) -> Self {
-        Self {
+        Self::Tcp {
             host: sa.hostname,
             port: sa.port,
         }
@@ -228,31 +247,44 @@ impl ServerAddress {
             None => None,
         };
 
-        Ok(ServerAddress {
+        Ok(ServerAddress::Tcp {
             host: hostname.to_string(),
             port,
         })
     }
 
     #[cfg(all(test, not(feature = "sync")))]
-    pub(crate) fn into_document(mut self) -> Document {
-        let mut doc = Document::new();
-
-        doc.insert("host", &self.host);
-
-        if let Some(i) = self.port.take() {
-            doc.insert("port", i32::from(i));
-        } else {
-            doc.insert("port", Bson::Null);
+    pub(crate) fn into_document(self) -> Document {
+        match self {
+            Self::Tcp { host, port } => {
+                doc! {
+                    "host": host,
+                    "port": port.map(|i| Bson::Int32(i.into())).unwrap_or(Bson::Null)
+                }
+            }
         }
+    }
 
-        doc
+    pub(crate) fn host(&self) -> &str {
+        match self {
+            Self::Tcp { host, .. } => host.as_str(),
+        }
+    }
+
+    pub(crate) fn port(&self) -> Option<u16> {
+        match self {
+            Self::Tcp { port, .. } => *port,
+        }
     }
 }
 
 impl fmt::Display for ServerAddress {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "{}:{}", self.host, self.port.unwrap_or(DEFAULT_PORT))
+        match self {
+            Self::Tcp { host, port } => {
+                write!(fmt, "{}:{}", host, port.unwrap_or(DEFAULT_PORT))
+            }
+        }
     }
 }
 
@@ -328,7 +360,7 @@ pub struct ClientOptions {
     /// Note that by default, the driver will autodiscover other nodes in the cluster. To connect
     /// directly to a single server (rather than autodiscovering the rest of the cluster), set the
     /// `direct` field to `true`.
-    #[builder(default_code = "vec![ ServerAddress {
+    #[builder(default_code = "vec![ServerAddress::Tcp {
         host: \"localhost\".to_string(),
         port: Some(27017),
     }]")]
@@ -510,10 +542,7 @@ pub struct ClientOptions {
 }
 
 fn default_hosts() -> Vec<ServerAddress> {
-    vec![ServerAddress {
-        host: "localhost".to_string(),
-        port: Some(27017),
-    }]
+    vec![ServerAddress::default()]
 }
 
 impl Default for ClientOptions {
@@ -862,11 +891,11 @@ impl ClientOptions {
         if srv {
             let mut resolver = SrvResolver::new(resolver_config.map(|config| config.inner)).await?;
             let mut config = resolver
-                .resolve_client_options(&options.hosts[0].host)
+                .resolve_client_options(&options.hosts[0].host())
                 .await?;
 
             // Save the original SRV hostname to allow mongos polling.
-            options.original_srv_hostname = Some(options.hosts[0].host.clone());
+            options.original_srv_hostname = Some(options.hosts[0].host().to_string());
 
             // Set the ClientOptions hosts to those found during the SRV lookup.
             options.hosts = config.hosts;
@@ -1160,7 +1189,7 @@ impl ClientOptionsParser {
                     Some(p)
                 };
 
-                Ok(ServerAddress {
+                Ok(ServerAddress::Tcp {
                     host: hostname.to_lowercase(),
                     port,
                 })
@@ -1177,7 +1206,7 @@ impl ClientOptionsParser {
                 .into());
             }
 
-            if hosts[0].port.is_some() {
+            if hosts[0].port().is_some() {
                 return Err(ErrorKind::InvalidArgument {
                     message: "a port cannot be specified with 'mongodb+srv'".into(),
                 }
@@ -1783,7 +1812,7 @@ mod tests {
     }
 
     fn host_without_port(hostname: &str) -> ServerAddress {
-        ServerAddress {
+        ServerAddress::Tcp {
             host: hostname.to_string(),
             port: None,
         }
@@ -1859,7 +1888,7 @@ mod tests {
         assert_eq!(
             ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
-                hosts: vec![ServerAddress {
+                hosts: vec![ServerAddress::Tcp {
                     host: "localhost".to_string(),
                     port: Some(27017),
                 }],
@@ -1877,7 +1906,7 @@ mod tests {
         assert_eq!(
             ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
-                hosts: vec![ServerAddress {
+                hosts: vec![ServerAddress::Tcp {
                     host: "localhost".to_string(),
                     port: Some(27017),
                 }],
@@ -1895,7 +1924,7 @@ mod tests {
         assert_eq!(
             ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
-                hosts: vec![ServerAddress {
+                hosts: vec![ServerAddress::Tcp {
                     host: "localhost".to_string(),
                     port: Some(27017),
                 }],
@@ -1923,7 +1952,7 @@ mod tests {
         assert_eq!(
             ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
-                hosts: vec![ServerAddress {
+                hosts: vec![ServerAddress::Tcp {
                     host: "localhost".to_string(),
                     port: Some(27017),
                 }],
@@ -1945,7 +1974,7 @@ mod tests {
         assert_eq!(
             ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
-                hosts: vec![ServerAddress {
+                hosts: vec![ServerAddress::Tcp {
                     host: "localhost".to_string(),
                     port: Some(27017),
                 }],
@@ -1975,7 +2004,7 @@ mod tests {
         assert_eq!(
             ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
-                hosts: vec![ServerAddress {
+                hosts: vec![ServerAddress::Tcp {
                     host: "localhost".to_string(),
                     port: Some(27017),
                 }],
@@ -2017,7 +2046,7 @@ mod tests {
         assert_eq!(
             ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
-                hosts: vec![ServerAddress {
+                hosts: vec![ServerAddress::Tcp {
                     host: "localhost".to_string(),
                     port: Some(27017),
                 }],
@@ -2041,7 +2070,7 @@ mod tests {
         assert_eq!(
             ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
-                hosts: vec![ServerAddress {
+                hosts: vec![ServerAddress::Tcp {
                     host: "localhost".to_string(),
                     port: Some(27017),
                 }],
@@ -2074,11 +2103,11 @@ mod tests {
             ClientOptions::parse(uri).await.unwrap(),
             ClientOptions {
                 hosts: vec![
-                    ServerAddress {
+                    ServerAddress::Tcp {
                         host: "localhost".to_string(),
                         port: None,
                     },
-                    ServerAddress {
+                    ServerAddress::Tcp {
                         host: "localhost".to_string(),
                         port: Some(27018),
                     },

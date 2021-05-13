@@ -48,7 +48,7 @@ async fn build() {
         coll: "test_coll".to_string(),
     };
     let cursor_id: i64 = 123;
-    let address = ServerAddress {
+    let address = ServerAddress::Tcp {
         host: "localhost".to_string(),
         port: Some(1234),
     };
@@ -80,7 +80,7 @@ async fn build_batch_size() {
         coll: "test_coll".to_string(),
     };
     let cursor_id: i64 = 123;
-    let address = ServerAddress {
+    let address = ServerAddress::Tcp {
         host: "localhost".to_string(),
         port: Some(1234),
     };
@@ -124,7 +124,7 @@ async fn build_batch_size() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn op_selection_criteria() {
-    let address = ServerAddress {
+    let address = ServerAddress::Tcp {
         host: "myhost.com".to_string(),
         port: Some(1234),
     };
@@ -169,7 +169,7 @@ async fn handle_success() {
         coll: "test_coll".to_string(),
     };
     let cursor_id: i64 = 123;
-    let address = ServerAddress {
+    let address = ServerAddress::Tcp {
         host: "localhost".to_string(),
         port: Some(1234),
     };

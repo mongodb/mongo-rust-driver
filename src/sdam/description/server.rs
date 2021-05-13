@@ -99,7 +99,10 @@ impl ServerDescription {
         mut address: ServerAddress,
         is_master_reply: Option<Result<IsMasterReply, String>>,
     ) -> Self {
-        address.host = address.host.to_lowercase();
+        address = ServerAddress::Tcp {
+            host: address.host().to_lowercase(),
+            port: address.port(),
+        };
 
         let mut description = Self {
             address,

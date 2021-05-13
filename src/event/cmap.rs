@@ -16,7 +16,7 @@ use crate::{
 /// deserializing, we define a private `empty_address` function that the events can specify as the
 /// custom deserialization value for each address field.
 fn empty_address() -> ServerAddress {
-    ServerAddress {
+    ServerAddress::Tcp {
         host: Default::default(),
         port: None,
     }

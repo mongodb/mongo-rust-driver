@@ -77,7 +77,7 @@ impl SrvResolver {
             .map(|record| {
                 let hostname = record.target().to_utf8();
                 let port = Some(record.port());
-                ServerAddress { host: hostname, port }
+                ServerAddress::Tcp { host: hostname, port }
             })
             .collect();
 
@@ -91,7 +91,7 @@ impl SrvResolver {
         let results = srv_addresses.into_iter().map(move |mut address| {
             let domain_name = &hostname_parts[1..];
 
-            let mut hostname_parts: Vec<_> = address.host.split('.').collect();
+            let mut hostname_parts: Vec<_> = address.host().split('.').collect();
 
             // Remove empty final section, which indicates a trailing dot.
             if hostname_parts.last().map(|s| s.is_empty()).unwrap_or(false) {
@@ -112,7 +112,7 @@ impl SrvResolver {
 
             // The spec tests list the seeds without the trailing '.', so we remove it by
             // joining the parts we split rather than manipulating the string.
-            address.host = hostname_parts.join(".");
+            address = ServerAddress::Tcp { host: hostname_parts.join("."), port: address.port() };
 
             Ok(address)
         });

@@ -30,7 +30,7 @@
 //! # fn make_client() -> Result<Client> {
 //! let options = ClientOptions::builder()
 //!                   .hosts(vec![
-//!                       ServerAddress {
+//!                       ServerAddress::Tcp {
 //!                           host: "localhost".into(),
 //!                           port: Some(27017),
 //!                       }

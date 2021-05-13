@@ -206,7 +206,7 @@ where
     };
 
     Ok(PoolCreatedEvent {
-        address: ServerAddress {
+        address: ServerAddress::Tcp {
             host: Default::default(),
             port: None,
         },
@@ -248,7 +248,7 @@ where
     };
 
     Ok(ConnectionCheckoutFailedEvent {
-        address: ServerAddress {
+        address: ServerAddress::Tcp {
             host: Default::default(),
             port: None,
         },

@@ -617,7 +617,7 @@ async fn plain_auth() {
     }
 
     let options = ClientOptions::builder()
-        .hosts(vec![ServerAddress {
+        .hosts(vec![ServerAddress::Tcp {
             host: "ldaptest.10gen.cc".into(),
             port: None,
         }])

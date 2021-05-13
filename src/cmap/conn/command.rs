@@ -90,7 +90,7 @@ impl CommandResponse {
     #[cfg(test)]
     pub(crate) fn with_document(doc: Document) -> Self {
         Self::with_document_and_address(
-            ServerAddress {
+            ServerAddress::Tcp {
                 host: "localhost".to_string(),
                 port: None,
             },
