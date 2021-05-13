@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-use bson::{doc, DateTime as BsonDateTime};
-use chrono::{DateTime, NaiveDateTime, Utc};
+use bson::doc;
+use chrono::{TimeZone, Utc};
 use serde::Deserialize;
 
 use crate::{
@@ -89,7 +89,7 @@ impl TestServerDescription {
         let mut command_response = is_master_response_from_server_type(server_type);
         command_response.tags = self.tags;
         command_response.last_write = self.last_write.map(|last_write| LastWrite {
-            last_write_date: utc_datetime_from_millis(last_write.last_write_date),
+            last_write_date: Utc.timestamp_millis(last_write.last_write_date).into(),
         });
 
         let is_master = IsMasterReply {
@@ -104,7 +104,7 @@ impl TestServerDescription {
         );
         server_desc.last_update_time = self
             .last_update_time
-            .map(|i| utc_datetime_from_millis(i as i64));
+            .map(|i| Utc.timestamp_millis(i.into()).into());
 
         Some(server_desc)
     }
@@ -148,16 +148,6 @@ impl TestServerType {
             TestServerType::PossiblePrimary => None,
         }
     }
-}
-
-fn utc_datetime_from_millis(millis: i64) -> BsonDateTime {
-    let seconds_portion = millis / 1000;
-    let nanos_portion = (millis % 1000) * 1_000_000;
-
-    let naive_datetime = NaiveDateTime::from_timestamp(seconds_portion, nanos_portion as u32);
-    let datetime = DateTime::from_utc(naive_datetime, Utc);
-
-    BsonDateTime(datetime)
 }
 
 fn is_master_response_from_server_type(server_type: ServerType) -> IsMasterCommandResponse {
