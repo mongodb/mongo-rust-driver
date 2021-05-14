@@ -342,7 +342,7 @@ impl TestOperation for Find {
                     .find_with_session(self.filter.clone(), self.options.clone(), session)
                     .await?;
                 cursor
-                    .with_session(session)
+                    .stream(session)
                     .try_collect::<Vec<Document>>()
                     .await?
             }
@@ -607,7 +607,7 @@ impl TestOperation for Aggregate {
                     .aggregate_with_session(self.pipeline.clone(), self.options.clone(), session)
                     .await?;
                 cursor
-                    .with_session(session)
+                    .stream(session)
                     .try_collect::<Vec<Document>>()
                     .await?
             }
@@ -632,7 +632,7 @@ impl TestOperation for Aggregate {
                     .aggregate_with_session(self.pipeline.clone(), self.options.clone(), session)
                     .await?;
                 cursor
-                    .with_session(session)
+                    .stream(session)
                     .try_collect::<Vec<Document>>()
                     .await?
             }
@@ -875,7 +875,7 @@ impl TestOperation for ListCollections {
                         session,
                     )
                     .await?;
-                cursor.with_session(session).try_collect::<Vec<_>>().await?
+                cursor.stream(session).try_collect::<Vec<_>>().await?
             }
             None => {
                 let cursor = database

@@ -78,3 +78,34 @@ async fn tailable_cursor() {
         }
     };
 }
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn session_cursor_next() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+    let mut session = client.start_session(None).await.unwrap();
+
+    let coll = client
+        .create_fresh_collection(function_name!(), function_name!(), None)
+        .await;
+
+    coll.insert_many_with_session((0..5).map(|i| doc! { "_id": i }), None, &mut session)
+        .await
+        .unwrap();
+
+    let opts = FindOptions::builder().batch_size(1).build();
+    let mut cursor = coll
+        .find_with_session(None, opts, &mut session)
+        .await
+        .unwrap();
+
+    for i in 0..5 {
+        assert_eq!(
+            cursor.next(&mut session).await.transpose().unwrap(),
+            Some(doc! { "_id": i })
+        );
+    }
+}

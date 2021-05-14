@@ -7,7 +7,7 @@ use crate::{
     ClientSession,
     Cursor as AsyncCursor,
     SessionCursor as AsyncSessionCursor,
-    SessionCursorHandle as AsyncSessionCursorHandle,
+    SessionCursorStream,
     RUNTIME,
 };
 
@@ -97,7 +97,7 @@ where
 }
 
 /// A `SessionCursor` is a cursor that was created with a `ClientSession` must be iterated using
-/// one. To iterate, retrieve a `SessionCursorHandle` using `SessionCursor::with_session`:
+/// one. To iterate, retrieve a [`SessionCursorIter]` using [`SessionCursor::iter`]:
 ///
 /// ```rust
 /// # use mongodb::{bson::Document, sync::Client, error::Result};
@@ -108,7 +108,7 @@ where
 /// # let coll = client.database("foo").collection::<Document>("bar");
 /// # let mut cursor = coll.find_with_session(None, None, &mut session)?;
 /// #
-/// for doc in cursor.with_session(&mut session) {
+/// for doc in cursor.iter(&mut session) {
 ///   println!("{}", doc?)
 /// }
 /// #
@@ -131,15 +131,40 @@ where
         Self { async_cursor }
     }
 
-    /// Retrieves a `SessionCursorHandle` to iterate this cursor. The session provided must be the
-    /// same session used to create the cursor.
-    pub fn with_session<'session>(
+    /// Retrieves a [`SessionCursorIter`] to iterate this cursor. The session provided must be
+    /// the same session used to create the cursor.
+    pub fn iter<'session>(
         &mut self,
         session: &'session mut ClientSession,
-    ) -> SessionCursorHandle<'_, 'session, T> {
-        SessionCursorHandle {
-            async_handle: self.async_cursor.with_session(session),
+    ) -> SessionCursorIter<'_, 'session, T> {
+        SessionCursorIter {
+            async_stream: self.async_cursor.stream(session),
         }
+    }
+
+    /// Retrieve the next result from the cursor.
+    /// The session provided must be the same session used to create the cursor.
+    ///
+    /// Use this method when the session needs to be used again between iterations or when the added
+    /// functionality of `Iterator` is not needed.
+    ///
+    /// ```
+    /// # use bson::{doc, Document};
+    /// # use mongodb::sync::Client;
+    /// # fn foo() -> mongodb::error::Result<()> {
+    /// # let client = Client::with_uri_str("foo")?;
+    /// # let coll = client.database("foo").collection::<Document>("bar");
+    /// # let other_coll = coll.clone();
+    /// # let mut session = client.start_session(None)?;
+    /// let mut cursor = coll.find_with_session(doc! { "x": 1 }, None, &mut session)?;
+    /// while let Some(doc) = cursor.next(&mut session).transpose()? {
+    ///     other_coll.insert_one_with_session(doc, None, &mut session)?;
+    /// }
+    /// # Ok::<(), mongodb::error::Error>(())
+    /// # }
+    /// ```
+    pub fn next(&mut self, session: &mut ClientSession) -> Option<Result<T>> {
+        self.iter(session).next()
     }
 }
 
@@ -147,20 +172,20 @@ where
 /// the current buffer of a `SessionCursor`.
 ///
 /// This updates the buffer of the parent `SessionCursor` when dropped.
-pub struct SessionCursorHandle<'cursor, 'session, T = Document>
+pub struct SessionCursorIter<'cursor, 'session, T = Document>
 where
     T: DeserializeOwned + Unpin,
 {
-    async_handle: AsyncSessionCursorHandle<'cursor, 'session, T>,
+    async_stream: SessionCursorStream<'cursor, 'session, T>,
 }
 
-impl<T> Iterator for SessionCursorHandle<'_, '_, T>
+impl<T> Iterator for SessionCursorIter<'_, '_, T>
 where
     T: DeserializeOwned + Unpin,
 {
     type Item = Result<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        RUNTIME.block_on(self.async_handle.next())
+        RUNTIME.block_on(self.async_stream.next())
     }
 }
