@@ -97,7 +97,7 @@ where
 }
 
 /// A `SessionCursor` is a cursor that was created with a `ClientSession` must be iterated using
-/// one. To iterate, retrieve a [`SessionCursorIterator]` using [`SessionCursor::iter`]:
+/// one. To iterate, retrieve a [`SessionCursorIter]` using [`SessionCursor::iter`]:
 ///
 /// ```rust
 /// # use mongodb::{bson::Document, sync::Client, error::Result};
@@ -131,13 +131,13 @@ where
         Self { async_cursor }
     }
 
-    /// Retrieves a [`SessionCursorIterator`] to iterate this cursor. The session provided must be
+    /// Retrieves a [`SessionCursorIter`] to iterate this cursor. The session provided must be
     /// the same session used to create the cursor.
     pub fn iter<'session>(
         &mut self,
         session: &'session mut ClientSession,
-    ) -> SessionCursorIterator<'_, 'session, T> {
-        SessionCursorIterator {
+    ) -> SessionCursorIter<'_, 'session, T> {
+        SessionCursorIter {
             async_stream: self.async_cursor.stream(session),
         }
     }
@@ -172,14 +172,14 @@ where
 /// the current buffer of a `SessionCursor`.
 ///
 /// This updates the buffer of the parent `SessionCursor` when dropped.
-pub struct SessionCursorIterator<'cursor, 'session, T = Document>
+pub struct SessionCursorIter<'cursor, 'session, T = Document>
 where
     T: DeserializeOwned + Unpin,
 {
     async_stream: SessionCursorStream<'cursor, 'session, T>,
 }
 
-impl<T> Iterator for SessionCursorIterator<'_, '_, T>
+impl<T> Iterator for SessionCursorIter<'_, '_, T>
 where
     T: DeserializeOwned + Unpin,
 {

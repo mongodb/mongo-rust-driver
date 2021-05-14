@@ -10,5 +10,5 @@ mod test;
 
 pub use client::Client;
 pub use coll::Collection;
-pub use cursor::{Cursor, SessionCursor};
+pub use cursor::{Cursor, SessionCursor, SessionCursorIter};
 pub use db::Database;
