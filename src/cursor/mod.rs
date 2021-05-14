@@ -26,7 +26,7 @@ use common::{GenericCursor, GetMoreProvider, GetMoreProviderResult};
 /// as the [`Cursor`] is iterated. When the batch is exhausted and if there are more results, the
 /// [`Cursor`] will fetch the next batch of documents, and so forth until the results are exhausted.
 /// Note that because of this batching, additional network I/O may occur on any given call to
-/// [`Cursor::next`]. Because of this, a [`Cursor`] iterates over `Result<T>` items rather than
+/// `next`. Because of this, a [`Cursor`] iterates over `Result<T>` items rather than
 /// simply `T` items.
 ///
 /// The batch size of the `Cursor` can be configured using the options to the method that returns
