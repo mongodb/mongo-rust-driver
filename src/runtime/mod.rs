@@ -18,7 +18,7 @@ pub(crate) use self::{
     resolver::AsyncResolver,
     stream::AsyncStream,
 };
-use crate::{error::Result, options::StreamAddress};
+use crate::{error::Result, options::ServerAddress};
 pub(crate) use http::HttpClient;
 #[cfg(feature = "async-std-runtime")]
 use interval::Interval;
@@ -159,7 +159,7 @@ impl AsyncRuntime {
 
     pub(crate) async fn resolve_address(
         self,
-        address: &StreamAddress,
+        address: &ServerAddress,
     ) -> Result<impl Iterator<Item = SocketAddr>> {
         match self {
             #[cfg(feature = "tokio-runtime")]
@@ -170,7 +170,7 @@ impl AsyncRuntime {
 
             #[cfg(feature = "async-std-runtime")]
             Self::AsyncStd => {
-                let host = (address.hostname.as_str(), address.port.unwrap_or(27017));
+                let host = (address.host(), address.port().unwrap_or(27017));
                 let socket_addrs = async_std::net::ToSocketAddrs::to_socket_addrs(&host).await?;
                 Ok(socket_addrs)
             }

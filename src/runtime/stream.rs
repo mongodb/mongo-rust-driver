@@ -15,7 +15,7 @@ use webpki::DNSNameRef;
 use crate::{
     cmap::options::StreamOptions,
     error::{ErrorKind, Result},
-    options::StreamAddress,
+    options::ServerAddress,
     RUNTIME,
 };
 
@@ -108,7 +108,7 @@ impl AsyncTcpStream {
         Ok(stream.into())
     }
 
-    async fn connect(address: &StreamAddress, connect_timeout: Option<Duration>) -> Result<Self> {
+    async fn connect(address: &ServerAddress, connect_timeout: Option<Duration>) -> Result<Self> {
         let timeout = connect_timeout.unwrap_or(DEFAULT_CONNECT_TIMEOUT);
 
         let mut socket_addrs: Vec<_> = RUNTIME.resolve_address(address).await?.collect();
@@ -151,7 +151,7 @@ impl AsyncStream {
         match options.tls_options {
             Some(cfg) => {
                 let name =
-                    DNSNameRef::try_from_ascii_str(&options.address.hostname).map_err(|e| {
+                    DNSNameRef::try_from_ascii_str(&options.address.host()).map_err(|e| {
                         ErrorKind::DnsResolve {
                             message: e.to_string(),
                         }

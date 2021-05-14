@@ -5,7 +5,7 @@ use std::{
 
 use serde::{de::Unexpected, Deserialize, Deserializer};
 
-use crate::{event::cmap::*, options::StreamAddress, RUNTIME};
+use crate::{event::cmap::*, options::ServerAddress, RUNTIME};
 use tokio::sync::broadcast::error::{RecvError, SendError};
 
 #[derive(Clone, Debug)]
@@ -206,8 +206,8 @@ where
     };
 
     Ok(PoolCreatedEvent {
-        address: StreamAddress {
-            hostname: Default::default(),
+        address: ServerAddress::Tcp {
+            host: Default::default(),
             port: None,
         },
         options,
@@ -248,8 +248,8 @@ where
     };
 
     Ok(ConnectionCheckoutFailedEvent {
-        address: StreamAddress {
-            hostname: Default::default(),
+        address: ServerAddress::Tcp {
+            host: Default::default(),
             port: None,
         },
         reason,

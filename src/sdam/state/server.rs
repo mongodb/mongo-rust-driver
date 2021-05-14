@@ -7,7 +7,7 @@ use super::WeakTopology;
 use crate::{
     cmap::{options::ConnectionPoolOptions, ConnectionPool},
     error::Error,
-    options::{ClientOptions, StreamAddress},
+    options::{ClientOptions, ServerAddress},
     runtime::{AcknowledgedMessage, HttpClient},
     sdam::monitor::Monitor,
 };
@@ -15,7 +15,7 @@ use crate::{
 /// Contains the state for a given server in the topology.
 #[derive(Debug)]
 pub(crate) struct Server {
-    pub(crate) address: StreamAddress,
+    pub(crate) address: ServerAddress,
 
     /// The connection pool for the server.
     pub(crate) pool: ConnectionPool,
@@ -26,7 +26,7 @@ pub(crate) struct Server {
 
 impl Server {
     #[cfg(test)]
-    pub(crate) fn new_mocked(address: StreamAddress, operation_count: u32) -> Self {
+    pub(crate) fn new_mocked(address: ServerAddress, operation_count: u32) -> Self {
         Self {
             address: address.clone(),
             pool: ConnectionPool::new_mocked(address),
@@ -37,7 +37,7 @@ impl Server {
     /// Create a new reference counted `Server` instance and a `Monitor` for that server.
     /// The monitor is not started as part of this; call `Monitor::execute` to start it.
     pub(crate) fn create(
-        address: StreamAddress,
+        address: ServerAddress,
         options: &ClientOptions,
         topology: WeakTopology,
         http_client: HttpClient,

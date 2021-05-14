@@ -7,7 +7,7 @@ use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 use crate::{
     bson::{doc, Bson},
     error::{CommandError, Error, ErrorKind},
-    options::{AuthMechanism, ClientOptions, Credential, ListDatabasesOptions, StreamAddress},
+    options::{AuthMechanism, ClientOptions, Credential, ListDatabasesOptions, ServerAddress},
     selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria},
     test::{util::TestClient, CLIENT_OPTIONS, LOCK},
     Client,
@@ -617,8 +617,8 @@ async fn plain_auth() {
     }
 
     let options = ClientOptions::builder()
-        .hosts(vec![StreamAddress {
-            hostname: "ldaptest.10gen.cc".into(),
+        .hosts(vec![ServerAddress::Tcp {
+            host: "ldaptest.10gen.cc".into(),
             port: None,
         }])
         .credential(

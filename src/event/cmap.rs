@@ -7,7 +7,7 @@ use serde::Deserialize;
 
 use crate::{
     client::options::{DriverInfo, ServerApi, TlsOptions},
-    options::StreamAddress,
+    options::ServerAddress,
 };
 
 /// We implement `Deserialize` for all of the event types so that we can more easily parse the CMAP
@@ -15,9 +15,9 @@ use crate::{
 /// even present). To facilitate populating the address field with an empty value when
 /// deserializing, we define a private `empty_address` function that the events can specify as the
 /// custom deserialization value for each address field.
-fn empty_address() -> StreamAddress {
-    StreamAddress {
-        hostname: Default::default(),
+fn empty_address() -> ServerAddress {
+    ServerAddress::Tcp {
+        host: Default::default(),
         port: None,
     }
 }
@@ -29,7 +29,7 @@ pub struct PoolCreatedEvent {
     /// The address of the server that the pool's connections will connect to.
     #[serde(default = "self::empty_address")]
     #[serde(skip)]
-    pub address: StreamAddress,
+    pub address: ServerAddress,
 
     /// The options used for the pool.
     pub options: Option<ConnectionPoolOptions>,
@@ -97,7 +97,7 @@ pub struct PoolReadyEvent {
     /// The address of the server that the pool's connections will connect to.
     #[serde(default = "self::empty_address")]
     #[serde(skip)]
-    pub address: StreamAddress,
+    pub address: ServerAddress,
 }
 
 /// Event emitted when a connection pool is cleared.
@@ -107,7 +107,7 @@ pub struct PoolClearedEvent {
     /// The address of the server that the pool's connections will connect to.
     #[serde(default = "self::empty_address")]
     #[serde(skip)]
-    pub address: StreamAddress,
+    pub address: ServerAddress,
 }
 
 /// Event emitted when a connection pool is cleared.
@@ -117,7 +117,7 @@ pub struct PoolClosedEvent {
     /// The address of the server that the pool's connections will connect to.
     #[serde(default = "self::empty_address")]
     #[serde(skip)]
-    pub address: StreamAddress,
+    pub address: ServerAddress,
 }
 
 /// Event emitted when a connection is created.
@@ -128,7 +128,7 @@ pub struct ConnectionCreatedEvent {
     /// The address of the server that the connection will connect to.
     #[serde(default = "self::empty_address")]
     #[serde(skip)]
-    pub address: StreamAddress,
+    pub address: ServerAddress,
 
     /// The unique ID of the connection. This is not used for anything internally, but can be used
     /// to identify other events related to this connection.
@@ -145,7 +145,7 @@ pub struct ConnectionReadyEvent {
     /// The address of the server that the connection is connected to.
     #[serde(default = "self::empty_address")]
     #[serde(skip)]
-    pub address: StreamAddress,
+    pub address: ServerAddress,
 
     /// The unique ID of the connection. This is not used for anything internally, but can be used
     /// to identify other events related to this connection.
@@ -161,7 +161,7 @@ pub struct ConnectionClosedEvent {
     /// The address of the server that the connection was connected to.
     #[serde(default = "self::empty_address")]
     #[serde(skip)]
-    pub address: StreamAddress,
+    pub address: ServerAddress,
 
     /// The unique ID of the connection. This is not used for anything internally, but can be used
     /// to identify other events related to this connection.
@@ -200,7 +200,7 @@ pub struct ConnectionCheckoutStartedEvent {
     /// The address of the server that the connection will connect to.
     #[serde(default = "self::empty_address")]
     #[serde(skip)]
-    pub address: StreamAddress,
+    pub address: ServerAddress,
 }
 
 /// Event emitted when a thread is unable to check out a connection.
@@ -210,7 +210,7 @@ pub struct ConnectionCheckoutFailedEvent {
     /// The address of the server that the connection would have connected to.
     #[serde(default = "self::empty_address")]
     #[serde(skip)]
-    pub address: StreamAddress,
+    pub address: ServerAddress,
 
     /// The reason a connection was unable to be checked out.
     pub reason: ConnectionCheckoutFailedReason,
@@ -237,7 +237,7 @@ pub struct ConnectionCheckedOutEvent {
     /// The address of the server that the connection will connect to.
     #[serde(default = "self::empty_address")]
     #[serde(skip)]
-    pub address: StreamAddress,
+    pub address: ServerAddress,
 
     /// The unique ID of the connection. This is not used for anything internally, but can be used
     /// to identify other events related to this connection.
@@ -253,7 +253,7 @@ pub struct ConnectionCheckedInEvent {
     /// The address of the server that the connection was connected to.
     #[serde(default = "self::empty_address")]
     #[serde(skip)]
-    pub address: StreamAddress,
+    pub address: ServerAddress,
 
     /// The unique ID of the connection. This is not used for anything internally, but can be used
     /// to identify other events related to this connection.

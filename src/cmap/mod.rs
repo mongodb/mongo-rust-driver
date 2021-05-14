@@ -29,7 +29,7 @@ use crate::{
         ConnectionCheckoutStartedEvent,
         PoolCreatedEvent,
     },
-    options::StreamAddress,
+    options::ServerAddress,
     runtime::HttpClient,
     sdam::ServerUpdateSender,
 };
@@ -47,7 +47,7 @@ const DEFAULT_MAX_POOL_SIZE: u32 = 100;
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
 pub(crate) struct ConnectionPool {
-    address: StreamAddress,
+    address: ServerAddress,
     manager: PoolManager,
     connection_requester: ConnectionRequester,
     generation_subscriber: PoolGenerationSubscriber,
@@ -58,7 +58,7 @@ pub(crate) struct ConnectionPool {
 
 impl ConnectionPool {
     pub(crate) fn new(
-        address: StreamAddress,
+        address: ServerAddress,
         http_client: HttpClient,
         server_updater: ServerUpdateSender,
         options: Option<ConnectionPoolOptions>,
@@ -89,7 +89,7 @@ impl ConnectionPool {
     }
 
     #[cfg(test)]
-    pub(crate) fn new_mocked(address: StreamAddress) -> Self {
+    pub(crate) fn new_mocked(address: ServerAddress) -> Self {
         let (manager, _) = manager::channel();
         let handle = PoolWorkerHandle::new_mocked();
         let (connection_requester, _) = connection_requester::channel(Default::default(), handle);

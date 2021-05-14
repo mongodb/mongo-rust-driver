@@ -10,7 +10,7 @@ use derivative::Derivative;
 use std::time::Instant;
 
 #[cfg(test)]
-use crate::options::StreamAddress;
+use crate::options::ServerAddress;
 use crate::{
     bson::Document,
     concern::{ReadConcern, WriteConcern},
@@ -263,7 +263,7 @@ impl Client {
     pub(crate) async fn test_select_server(
         &self,
         criteria: Option<&SelectionCriteria>,
-    ) -> Result<StreamAddress> {
+    ) -> Result<ServerAddress> {
         let server = self.select_server(criteria).await?;
         Ok(server.address.clone())
     }

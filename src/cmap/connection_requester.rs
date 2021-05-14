@@ -1,11 +1,11 @@
 use tokio::sync::{mpsc, oneshot};
 
 use super::{worker::PoolWorkerHandle, Connection};
-use crate::{error::Result, options::StreamAddress, runtime::AsyncJoinHandle};
+use crate::{error::Result, options::ServerAddress, runtime::AsyncJoinHandle};
 
 /// Returns a new requester/receiver pair.
 pub(super) fn channel(
-    address: StreamAddress,
+    address: ServerAddress,
     handle: PoolWorkerHandle,
 ) -> (ConnectionRequester, ConnectionRequestReceiver) {
     let (sender, receiver) = mpsc::unbounded_channel();
@@ -24,7 +24,7 @@ pub(super) fn channel(
 /// the pool will stop servicing requests, drop its available connections, and close.
 #[derive(Clone, Debug)]
 pub(super) struct ConnectionRequester {
-    address: StreamAddress,
+    address: ServerAddress,
     sender: mpsc::UnboundedSender<oneshot::Sender<ConnectionRequestResult>>,
     handle: PoolWorkerHandle,
 }

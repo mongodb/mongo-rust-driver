@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use crate::{
     is_master::{IsMasterCommandResponse, IsMasterReply, LastWrite},
-    options::StreamAddress,
+    options::ServerAddress,
     sdam::{
         description::topology::{test::f64_ms_as_duration, TopologyType},
         ServerDescription,
@@ -99,7 +99,7 @@ impl TestServerDescription {
         };
 
         let mut server_desc = ServerDescription::new(
-            StreamAddress::parse(&self.address).unwrap(),
+            ServerAddress::parse(&self.address).unwrap(),
             Some(Ok(is_master)),
         );
         server_desc.last_update_time = self

@@ -7,7 +7,7 @@ use serde::Deserialize;
 use tokio::sync::RwLockWriteGuard;
 
 use crate::{
-    options::StreamAddress,
+    options::ServerAddress,
     runtime::AsyncJoinHandle,
     sdam::{description::topology::server_selection, Server},
     selection_criteria::ReadPreference,
@@ -38,21 +38,21 @@ struct TestFile {
 #[derive(Debug, Deserialize)]
 struct TestOutcome {
     tolerance: f64,
-    expected_frequencies: HashMap<StreamAddress, f64>,
+    expected_frequencies: HashMap<ServerAddress, f64>,
 }
 
 #[derive(Debug, Deserialize)]
 struct TestServer {
-    address: StreamAddress,
+    address: ServerAddress,
     operation_count: u32,
 }
 
 async fn run_test(test_file: TestFile) {
     println!("Running {}", test_file.description);
 
-    let mut tallies: HashMap<StreamAddress, u32> = HashMap::new();
+    let mut tallies: HashMap<ServerAddress, u32> = HashMap::new();
 
-    let servers: HashMap<StreamAddress, Arc<Server>> = test_file
+    let servers: HashMap<ServerAddress, Arc<Server>> = test_file
         .mocked_topology_state
         .into_iter()
         .map(|desc| {
@@ -172,7 +172,7 @@ async fn load_balancing_test() {
 
         futures::future::join_all(handles).await;
 
-        let mut tallies: HashMap<StreamAddress, u32> = HashMap::new();
+        let mut tallies: HashMap<ServerAddress, u32> = HashMap::new();
         for event in client.get_command_started_events(&["find"]) {
             *tallies.entry(event.connection.address.clone()).or_insert(0) += 1;
         }

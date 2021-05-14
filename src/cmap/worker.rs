@@ -28,7 +28,7 @@ use crate::{
         PoolClosedEvent,
         PoolReadyEvent,
     },
-    options::StreamAddress,
+    options::ServerAddress,
     runtime::HttpClient,
     sdam::ServerUpdateSender,
     RUNTIME,
@@ -45,7 +45,7 @@ const MAINTENACE_FREQUENCY: Duration = Duration::from_millis(500);
 #[derivative(Debug)]
 pub(crate) struct ConnectionPoolWorker {
     /// The address the pool's connections will connect to.
-    address: StreamAddress,
+    address: ServerAddress,
 
     /// Current state of the pool. Determines if connections may be checked out
     /// and if min_pool_size connection creation should continue.
@@ -132,7 +132,7 @@ impl ConnectionPoolWorker {
     /// Once all connection requesters are dropped, the worker will stop executing
     /// and close the pool.
     pub(super) fn start(
-        address: StreamAddress,
+        address: ServerAddress,
         http_client: HttpClient,
         server_updater: ServerUpdateSender,
         options: Option<ConnectionPoolOptions>,

@@ -14,7 +14,7 @@ use crate::{
     cmap::{is_master, Command, Connection, Handshaker},
     error::{Error, Result},
     is_master::IsMasterReply,
-    options::{ClientOptions, StreamAddress},
+    options::{ClientOptions, ServerAddress},
     RUNTIME,
 };
 
@@ -23,7 +23,7 @@ pub(super) const DEFAULT_HEARTBEAT_FREQUENCY: Duration = Duration::from_secs(10)
 pub(crate) const MIN_HEARTBEAT_FREQUENCY: Duration = Duration::from_millis(500);
 
 pub(crate) struct Monitor {
-    address: StreamAddress,
+    address: ServerAddress,
     server: Arc<Server>,
     client_options: ClientOptions,
     update_receiver: ServerUpdateReceiver,
@@ -34,7 +34,7 @@ impl Monitor {
     /// Creates a monitor associated with a given Server.
     /// This method does not start the monitor. Use `Monitor::start` to do so.
     pub(super) fn new(
-        address: StreamAddress,
+        address: ServerAddress,
         server: &Arc<Server>,
         topology: WeakTopology,
         client_options: ClientOptions,
@@ -76,7 +76,7 @@ impl Monitor {
 
 /// Monitor that performs regular heartbeats to determine server status.
 struct HeartbeatMonitor {
-    address: StreamAddress,
+    address: ServerAddress,
     connection: Option<Connection>,
     handshaker: Handshaker,
     server: Weak<Server>,
@@ -86,7 +86,7 @@ struct HeartbeatMonitor {
 
 impl HeartbeatMonitor {
     fn new(
-        address: StreamAddress,
+        address: ServerAddress,
         server: Weak<Server>,
         topology: WeakTopology,
         client_options: ClientOptions,

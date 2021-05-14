@@ -8,7 +8,7 @@ use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
 use super::TopologyDescription;
 use crate::{
     error::{ErrorKind, Result},
-    options::StreamAddress,
+    options::ServerAddress,
     sdam::{
         description::{
             server::{ServerDescription, ServerType},
@@ -54,7 +54,7 @@ impl Drop for SelectedServer {
 pub(crate) fn attempt_to_select_server<'a>(
     criteria: &'a SelectionCriteria,
     topology_description: &'a TopologyDescription,
-    servers: &'a HashMap<StreamAddress, Arc<Server>>,
+    servers: &'a HashMap<ServerAddress, Arc<Server>>,
 ) -> Result<Option<SelectedServer>> {
     let in_window = topology_description.suitable_servers_in_latency_window(criteria)?;
     let in_window_servers = in_window
