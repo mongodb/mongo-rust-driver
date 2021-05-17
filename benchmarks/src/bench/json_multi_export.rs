@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
-use mongodb::{bson::doc, Client, Collection, Database};
+use mongodb::{Client, Collection, Database, bson::{Document, doc}};
 
 use crate::{
     bench::{parse_json_file_to_documents, Benchmark, COLL_NAME, DATABASE_NAME},
@@ -13,7 +13,7 @@ const TOTAL_FILES: usize = 100;
 
 pub struct JsonMultiExportBenchmark {
     db: Database,
-    coll: Collection,
+    coll: Collection<Document>,
 }
 
 // Specifies the options to a `JsonMultiExportBenchmark::setup` operation.

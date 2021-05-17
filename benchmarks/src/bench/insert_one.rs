@@ -14,7 +14,7 @@ use crate::bench::{Benchmark, COLL_NAME, DATABASE_NAME};
 pub struct InsertOneBenchmark {
     db: Database,
     num_iter: usize,
-    coll: Collection,
+    coll: Collection<Document>,
     doc: Document,
 }
 
@@ -60,7 +60,7 @@ impl Benchmark for InsertOneBenchmark {
 
     async fn before_task(&mut self) -> Result<()> {
         self.coll.drop(None).await?;
-        self.db.create_collection(&COLL_NAME, None).await?;
+        self.db.create_collection(COLL_NAME.as_str(), None).await?;
 
         Ok(())
     }

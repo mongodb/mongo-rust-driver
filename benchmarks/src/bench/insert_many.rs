@@ -14,7 +14,7 @@ use crate::bench::{Benchmark, COLL_NAME, DATABASE_NAME};
 pub struct InsertManyBenchmark {
     db: Database,
     num_copies: usize,
-    coll: Collection,
+    coll: Collection<Document>,
     doc: Document,
 }
 
@@ -45,7 +45,7 @@ impl Benchmark for InsertManyBenchmark {
         let mut file = spawn_blocking_and_await!(File::open(options.path))?;
         let json: Value = spawn_blocking_and_await!(serde_json::from_reader(&mut file))?;
 
-        let coll = db.collection(&COLL_NAME);
+        let coll = db.collection(COLL_NAME.as_str());
 
         Ok(InsertManyBenchmark {
             db,
@@ -60,7 +60,7 @@ impl Benchmark for InsertManyBenchmark {
 
     async fn before_task(&mut self) -> Result<()> {
         self.coll.drop(None).await?;
-        self.db.create_collection(&COLL_NAME, None).await?;
+        self.db.create_collection(COLL_NAME.as_str(), None).await?;
 
         Ok(())
     }

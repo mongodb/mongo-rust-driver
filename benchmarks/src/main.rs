@@ -37,7 +37,6 @@ use crate::bench::{
     json_multi_export::JsonMultiExportBenchmark,
     json_multi_import::JsonMultiImportBenchmark,
     run_command::RunCommandBenchmark,
-    TARGET_ITERATION_COUNT,
 };
 
 lazy_static! {
