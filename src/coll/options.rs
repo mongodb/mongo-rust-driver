@@ -452,7 +452,8 @@ pub struct AggregateOptions {
     /// This option will have no effect on non-tailable cursors that result from this operation.
     #[serde(
         skip_serializing,
-        deserialize_with = "deserialize_duration_from_u64_millis"
+        deserialize_with = "deserialize_duration_from_u64_millis",
+        default
     )]
     pub max_await_time: Option<Duration>,
 
@@ -463,7 +464,8 @@ pub struct AggregateOptions {
     #[serde(
         serialize_with = "serialize_duration_as_int_millis",
         rename = "maxTimeMS",
-        deserialize_with = "deserialize_duration_from_u64_millis"
+        deserialize_with = "deserialize_duration_from_u64_millis",
+        default
     )]
     pub max_time: Option<Duration>,
 
@@ -471,6 +473,8 @@ pub struct AggregateOptions {
     ///
     /// If none is specified, the read concern defined on the object executing this operation will
     /// be used.
+    #[builder(default)]
+    #[serde(default)]
     pub read_concern: Option<ReadConcern>,
 
     /// The criteria used to select a server for this operation.
@@ -819,7 +823,7 @@ pub struct FindOneOptions {
 /// Specifies the options to a [`Collection::drop`](../struct.Collection.html#method.drop)
 /// operation.
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Default, TypedBuilder, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(strip_option)))]
 #[non_exhaustive]

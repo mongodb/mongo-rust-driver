@@ -10,7 +10,7 @@ use crate::{
     bson::doc,
     coll::options::DropCollectionOptions,
     concern::{Acknowledgment, WriteConcern},
-    options::{CreateCollectionOptions, InsertManyOptions},
+    options::{ClientOptions, CreateCollectionOptions, InsertManyOptions},
     test::{assert_matches, util::get_default_name, EventClient, TestClient},
     RUNTIME,
 };
@@ -22,6 +22,7 @@ use test_file::{TestData, TestFile};
 const SKIPPED_OPERATIONS: &[&str] = &[
     "bulkWrite",
     "count",
+    "createIndex",
     "download",
     "download_by_name",
     "listCollectionObjects",
@@ -33,10 +34,12 @@ const SKIPPED_OPERATIONS: &[&str] = &[
 ];
 
 pub async fn run_v2_test(test_file: TestFile) {
-    let client = TestClient::new().await;
+    let internal_client = TestClient::new().await;
 
     if let Some(requirements) = test_file.run_on {
-        let can_run_on = requirements.iter().any(|run_on| run_on.can_run_on(&client));
+        let can_run_on = requirements
+            .iter()
+            .any(|run_on| run_on.can_run_on(&internal_client));
         if !can_run_on {
             println!("Client topology not compatible with test");
             return;
@@ -44,6 +47,8 @@ pub async fn run_v2_test(test_file: TestFile) {
     }
 
     for test in test_file.tests {
+        println!("Running {}", &test.description);
+
         if test
             .operations
             .iter()
@@ -57,7 +62,7 @@ pub async fn run_v2_test(test_file: TestFile) {
             continue;
         }
 
-        match client
+        match internal_client
             .database("admin")
             .run_command(doc! { "killAllSessions": [] }, None)
             .await
@@ -78,14 +83,14 @@ pub async fn run_v2_test(test_file: TestFile) {
             .clone()
             .unwrap_or_else(|| get_default_name(&test.description));
 
-        let coll = client.database(&db_name).collection(&coll_name);
+        let coll = internal_client.database(&db_name).collection(&coll_name);
         let options = DropCollectionOptions::builder()
             .write_concern(majority_write_concern())
             .build();
         let req = VersionReq::parse(">=4.7").unwrap();
         if !(db_name.as_str() == "admin"
-            && client.is_sharded()
-            && req.matches(&client.server_version))
+            && internal_client.is_sharded()
+            && req.matches(&internal_client.server_version))
         {
             coll.drop(options).await.unwrap();
         }
@@ -93,7 +98,7 @@ pub async fn run_v2_test(test_file: TestFile) {
         let options = CreateCollectionOptions::builder()
             .write_concern(majority_write_concern())
             .build();
-        client
+        internal_client
             .database(&db_name)
             .create_collection(&coll_name, options)
             .await
@@ -113,13 +118,13 @@ pub async fn run_v2_test(test_file: TestFile) {
             }
         }
 
-        let client = EventClient::with_additional_options(
-            test.client_options.clone(),
-            None,
-            test.use_multiple_mongoses,
-            None,
-        )
-        .await;
+        let options = match test.client_uri {
+            Some(ref uri) => Some(ClientOptions::parse_uri(uri, None).await.unwrap()),
+            None => None,
+        };
+        let client =
+            EventClient::with_additional_options(options, None, test.use_multiple_mongoses, None)
+                .await;
 
         let _fp_guard = match test.fail_point {
             Some(fail_point) => Some(fail_point.enable(client.deref(), None).await.unwrap()),
@@ -179,24 +184,24 @@ pub async fn run_v2_test(test_file: TestFile) {
                         let session = session0.take();
                         drop(session);
                         RUNTIME.delay_for(Duration::from_secs(1)).await;
+                        continue;
                     } else {
                         operation
-                            .execute_on_session(session0.as_ref().unwrap())
-                            .await;
+                            .execute_on_session(session0.as_mut().unwrap())
+                            .await
                     }
-                    continue;
                 }
                 Some(OperationObject::Session1) => {
                     if operation.name == "endSession" {
                         let session = session1.take();
                         drop(session);
                         RUNTIME.delay_for(Duration::from_secs(1)).await;
+                        continue;
                     } else {
                         operation
-                            .execute_on_session(session1.as_ref().unwrap())
-                            .await;
+                            .execute_on_session(session1.as_mut().unwrap())
+                            .await
                     }
-                    continue;
                 }
                 Some(OperationObject::TestRunner) => {
                     match operation.name.as_str() {
@@ -211,6 +216,18 @@ pub async fn run_v2_test(test_file: TestFile) {
                         }
                         "assertSessionNotDirty" => {
                             assert!(!session.unwrap().is_dirty())
+                        }
+                        "assertSessionTransactionState" => {
+                            operation
+                                .execute_on_session(session.unwrap())
+                                .await
+                                .unwrap();
+                        }
+                        "assertCollectionExists" => {
+                            operation.execute_on_client(&internal_client).await.unwrap();
+                        }
+                        "assertCollectionNotExists" => {
+                            operation.execute_on_client(&internal_client).await.unwrap();
                         }
                         other => panic!("unknown operation: {}", other),
                     }
@@ -234,7 +251,7 @@ pub async fn run_v2_test(test_file: TestFile) {
                     OperationResult::Error(operation_error) => {
                         let error = result.unwrap_err();
                         if let Some(error_contains) = operation_error.error_contains {
-                            let message = error.server_message().unwrap();
+                            let message = error.message().unwrap();
                             assert!(message.contains(&error_contains));
                         }
                         if let Some(error_code_name) = operation_error.error_code_name {
@@ -260,6 +277,11 @@ pub async fn run_v2_test(test_file: TestFile) {
 
         drop(session0);
         drop(session1);
+
+        // wait for the transaction in progress to be aborted implicitly when the session is dropped
+        if test.description.as_str() == "implicit abort" {
+            RUNTIME.delay_for(Duration::from_secs(1)).await;
+        }
 
         if let Some(expectations) = test.expectations {
             let events: Vec<CommandStartedEvent> = client

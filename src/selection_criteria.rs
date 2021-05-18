@@ -171,6 +171,7 @@ pub struct ReadPreferenceOptions {
     /// specified for an operation, the operation will return an error.
     #[serde(
         rename = "maxStalenessSeconds",
+        default,
         deserialize_with = "deserialize_duration_from_u64_seconds"
     )]
     pub max_staleness: Option<Duration>,

@@ -2,10 +2,9 @@ use std::fmt::Debug;
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use super::{Collection, Cursor, SessionCursor};
+use super::{ClientSession, Collection, Cursor, SessionCursor};
 use crate::{
     bson::Document,
-    client::session::ClientSession,
     error::Result,
     options::{
         AggregateOptions,
@@ -128,7 +127,7 @@ impl Database {
     ) -> Result<()> {
         RUNTIME.block_on(
             self.async_database
-                .drop_with_session(options.into(), session),
+                .drop_with_session(options.into(), &mut session.async_client_session),
         )
     }
 
@@ -160,7 +159,7 @@ impl Database {
             .block_on(self.async_database.list_collections_with_session(
                 filter.into(),
                 options.into(),
-                session,
+                &mut session.async_client_session,
             ))
             .map(SessionCursor::new)
     }
@@ -180,8 +179,10 @@ impl Database {
         session: &mut ClientSession,
     ) -> Result<Vec<String>> {
         RUNTIME.block_on(
-            self.async_database
-                .list_collection_names_with_session(filter.into(), session),
+            self.async_database.list_collection_names_with_session(
+                filter.into(),
+                &mut session.async_client_session,
+            ),
         )
     }
 
@@ -214,7 +215,7 @@ impl Database {
         RUNTIME.block_on(self.async_database.create_collection_with_session(
             name.as_ref(),
             options.into(),
-            session,
+            &mut session.async_client_session,
         ))
     }
 
@@ -248,7 +249,7 @@ impl Database {
         RUNTIME.block_on(self.async_database.run_command_with_session(
             command,
             selection_criteria.into(),
-            session,
+            &mut session.async_client_session,
         ))
     }
 
@@ -279,10 +280,11 @@ impl Database {
     ) -> Result<SessionCursor<Document>> {
         let pipeline: Vec<Document> = pipeline.into_iter().collect();
         RUNTIME
-            .block_on(
-                self.async_database
-                    .aggregate_with_session(pipeline, options.into(), session),
-            )
+            .block_on(self.async_database.aggregate_with_session(
+                pipeline,
+                options.into(),
+                &mut session.async_client_session,
+            ))
             .map(SessionCursor::new)
     }
 }

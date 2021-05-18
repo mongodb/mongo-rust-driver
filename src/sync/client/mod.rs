@@ -1,4 +1,6 @@
-use super::Database;
+pub mod session;
+
+use super::{ClientSession, Database};
 use crate::{
     bson::Document,
     concern::{ReadConcern, WriteConcern},
@@ -12,7 +14,6 @@ use crate::{
     },
     results::DatabaseSpecification,
     Client as AsyncClient,
-    ClientSession,
     RUNTIME,
 };
 
@@ -57,6 +58,12 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct Client {
     async_client: AsyncClient,
+}
+
+impl From<AsyncClient> for Client {
+    fn from(async_client: AsyncClient) -> Self {
+        Self { async_client }
+    }
 }
 
 impl Client {
@@ -138,6 +145,8 @@ impl Client {
 
     /// Starts a new `ClientSession`.
     pub fn start_session(&self, options: Option<SessionOptions>) -> Result<ClientSession> {
-        RUNTIME.block_on(self.async_client.start_session(options))
+        RUNTIME
+            .block_on(self.async_client.start_session(options))
+            .map(Into::into)
     }
 }

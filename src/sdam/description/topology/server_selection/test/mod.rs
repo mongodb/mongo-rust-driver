@@ -53,6 +53,7 @@ impl TestTopologyDescription {
             max_election_id: None,
             compatibility_error: None,
             session_support_status: Default::default(),
+            transaction_support_status: Default::default(),
             cluster_time: None,
             local_threshold: None,
             heartbeat_freq: heartbeat_frequency,

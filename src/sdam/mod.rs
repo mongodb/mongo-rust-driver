@@ -17,6 +17,7 @@ pub(crate) use self::{
         server_selection::SelectedServer,
         SessionSupportStatus,
         TopologyDescription,
+        TransactionSupportStatus,
     },
     message_manager::TopologyMessageManager,
     monitor::MIN_HEARTBEAT_FREQUENCY,

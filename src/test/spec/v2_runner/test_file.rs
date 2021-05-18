@@ -7,9 +7,8 @@ use serde::{Deserialize, Deserializer};
 
 use crate::{
     bson::Document,
-    client::options::ClientOptions,
-    options::{FindOptions, SessionOptions},
-    test::{EventClient, FailPoint, TestClient},
+    options::{FindOptions, ReadPreference, SelectionCriteria, SessionOptions},
+    test::{spec::deserialize_uri_options_to_uri_string, EventClient, FailPoint, TestClient},
 };
 
 use super::{operation::Operation, test_event::CommandStartedEvent};
@@ -70,13 +69,27 @@ pub struct Test {
     pub description: String,
     pub skip_reason: Option<String>,
     pub use_multiple_mongoses: Option<bool>,
-    pub client_options: Option<ClientOptions>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_uri_options_to_uri_string_option",
+        rename = "clientOptions"
+    )]
+    pub client_uri: Option<String>,
     pub fail_point: Option<FailPoint>,
     pub session_options: Option<HashMap<String, SessionOptions>>,
     pub operations: Vec<Operation>,
     #[serde(default, deserialize_with = "deserialize_command_started_events")]
     pub expectations: Option<Vec<CommandStartedEvent>>,
     pub outcome: Option<Outcome>,
+}
+
+fn deserialize_uri_options_to_uri_string_option<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(Some(deserialize_uri_options_to_uri_string(deserializer)?))
 }
 
 #[derive(Debug, Deserialize)]
@@ -96,7 +109,11 @@ impl Outcome {
             None => coll_name,
         };
         let coll = client.database(&db_name).collection(&coll_name);
-        let options = FindOptions::builder().sort(doc! { "_id": 1 }).build();
+        let selection_criteria = SelectionCriteria::ReadPreference(ReadPreference::Primary);
+        let options = FindOptions::builder()
+            .sort(doc! { "_id": 1 })
+            .selection_criteria(selection_criteria)
+            .build();
         let actual_data: Vec<Document> = coll
             .find(None, options)
             .await

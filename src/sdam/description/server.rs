@@ -275,7 +275,6 @@ impl ServerDescription {
         Ok(me)
     }
 
-    #[cfg(test)]
     pub(crate) fn max_wire_version(&self) -> Result<Option<i32>, String> {
         let me = self
             .reply

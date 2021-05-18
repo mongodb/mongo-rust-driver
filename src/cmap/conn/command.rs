@@ -46,7 +46,6 @@ impl Command {
     }
 
     pub(crate) fn set_server_api(&mut self, server_api: &ServerApi) {
-        // TODO RUST-90: Don't include version fields for commands run as part of a transaction
         if matches!(self.name.as_str(), "getMore") {
             return;
         }
@@ -66,6 +65,24 @@ impl Command {
     pub(crate) fn set_read_preference(&mut self, read_preference: ReadPreference) {
         self.body
             .insert("$readPreference", read_preference.into_document());
+    }
+
+    pub(crate) fn set_start_transaction(&mut self) {
+        self.body.insert("startTransaction", true);
+    }
+
+    pub(crate) fn set_autocommit(&mut self) {
+        self.body.insert("autocommit", false);
+    }
+
+    pub(crate) fn set_txn_read_concern(&mut self, session: &ClientSession) -> Result<()> {
+        if let Some(ref options) = session.transaction.options {
+            if let Some(ref read_concern) = options.read_concern {
+                self.body
+                    .insert("readConcern", bson::to_document(read_concern)?);
+            }
+        }
+        Ok(())
     }
 }
 

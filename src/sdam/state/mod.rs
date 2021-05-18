@@ -13,7 +13,7 @@ use tokio::sync::{RwLock, RwLockWriteGuard};
 
 use self::server::Server;
 use super::{
-    description::topology::server_selection::SelectedServer,
+    description::topology::{server_selection::SelectedServer, TransactionSupportStatus},
     message_manager::TopologyMessageSubscriber,
     SessionSupportStatus,
     TopologyDescription,
@@ -397,6 +397,15 @@ impl Topology {
     /// Gets the latest information on whether sessions are supported or not.
     pub(crate) async fn session_support_status(&self) -> SessionSupportStatus {
         self.state.read().await.description.session_support_status()
+    }
+
+    /// Gets the latest information on whether transactions are support or not.
+    pub(crate) async fn transaction_support_status(&self) -> TransactionSupportStatus {
+        self.state
+            .read()
+            .await
+            .description
+            .transaction_support_status()
     }
 
     pub(super) async fn is_sharded(&self) -> bool {

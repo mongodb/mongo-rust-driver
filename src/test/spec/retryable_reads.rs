@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use bson::doc;
+use futures::FutureExt;
 use tokio::sync::RwLockWriteGuard;
 
 use crate::{
@@ -53,7 +54,10 @@ async fn retry_releases_connection() {
     let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
 
     RUNTIME
-        .timeout(Duration::from_secs(1), collection.find_one(doc! {}, None))
+        .timeout(
+            Duration::from_secs(1),
+            collection.find_one(doc! {}, None).boxed(),
+        )
         .await
         .expect("operation should not time out")
         .expect("find should succeed");

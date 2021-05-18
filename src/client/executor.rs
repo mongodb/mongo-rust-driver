@@ -1,4 +1,4 @@
-use super::{Client, ClientSession};
+use super::{session::TransactionState, Client, ClientSession};
 
 use std::{collections::HashSet, sync::Arc};
 
@@ -8,11 +8,19 @@ use std::time::Instant;
 use crate::{
     bson::Document,
     cmap::Connection,
-    error::{Error, ErrorKind, Result},
+    error::{
+        Error,
+        ErrorKind,
+        Result,
+        RETRYABLE_WRITE_ERROR,
+        TRANSIENT_TRANSACTION_ERROR,
+        UNKNOWN_TRANSACTION_COMMIT_RESULT,
+    },
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
-    operation::{Operation, Retryability},
+    operation::{AbortTransaction, CommitTransaction, Operation, Retryability},
     options::SelectionCriteria,
-    sdam::{HandshakePhase, SelectedServer, SessionSupportStatus},
+    sdam::{HandshakePhase, SelectedServer, SessionSupportStatus, TransactionSupportStatus},
+    selection_criteria::ReadPreference,
 };
 
 lazy_static! {
@@ -50,7 +58,19 @@ impl Client {
             .into());
         }
         match session.into() {
-            Some(session) => self.execute_operation_with_retry(op, Some(session)).await,
+            Some(session) => {
+                if let Some(SelectionCriteria::ReadPreference(read_preference)) =
+                    op.selection_criteria()
+                {
+                    if session.in_transaction() && read_preference != &ReadPreference::Primary {
+                        return Err(ErrorKind::Transaction {
+                            message: "read preference in a transaction must be primary".into(),
+                        }
+                        .into());
+                    }
+                }
+                self.execute_operation_with_retry(op, Some(session)).await
+            }
             None => {
                 let mut implicit_session = self.start_implicit_session(&op).await?;
                 self.execute_operation_with_retry(op, implicit_session.as_mut())
@@ -76,38 +96,69 @@ impl Client {
     /// session. Retries the operation upon failure if retryability is supported.
     async fn execute_operation_with_retry<T: Operation>(
         &self,
-        op: T,
+        mut op: T,
         mut session: Option<&mut ClientSession>,
     ) -> Result<T::O> {
-        let server = self.select_server(op.selection_criteria()).await?;
+        // If the current transaction has been committed/aborted and it is not being
+        // re-committed/re-aborted, reset the transaction's state to TransactionState::None.
+        if let Some(ref mut session) = session {
+            if matches!(
+                session.transaction.state,
+                TransactionState::Committed { .. }
+            ) && op.name() != CommitTransaction::NAME
+                || session.transaction.state == TransactionState::Aborted
+                    && op.name() != AbortTransaction::NAME
+            {
+                session.transaction.reset();
+            }
+        }
 
-        let mut conn = server.pool.check_out().await?;
+        let server = match self.select_server(op.selection_criteria()).await {
+            Ok(server) => server,
+            Err(mut err) => {
+                err.add_labels(None, &session, None)?;
+                return Err(err);
+            }
+        };
 
-        let retryability = self.get_retryability(&conn, &op).await?;
+        let mut conn = match server.pool.check_out().await {
+            Ok(conn) => conn,
+            Err(mut err) => {
+                err.add_labels(None, &session, None)?;
+                return Err(err);
+            }
+        };
+
+        let retryability = self.get_retryability(&conn, &op, &session).await?;
 
         let txn_number = match session {
-            Some(ref mut session) if retryability == Retryability::Write => {
-                Some(session.get_and_increment_txn_number())
+            Some(ref mut session) => {
+                if session.transaction.state != TransactionState::None {
+                    Some(session.txn_number())
+                } else {
+                    match retryability {
+                        Retryability::Write => Some(session.get_and_increment_txn_number()),
+                        _ => None,
+                    }
+                }
             }
-            _ => None,
+            None => None,
         };
 
         let first_error = match self
-            .execute_operation_on_connection(&op, &mut conn, &mut session, txn_number)
+            .execute_operation_on_connection(
+                &op,
+                &mut conn,
+                &mut session,
+                txn_number,
+                &retryability,
+            )
             .await
         {
             Ok(result) => {
                 return Ok(result);
             }
-            Err(err) => {
-                // For a pre-4.4 connection, an error label should be added to any write-retryable
-                // error as long as the retry_writes client option is not set to false. For a 4.4+
-                // connection, a label should be added only to network errors.
-                let mut err = match retryability {
-                    Retryability::Write => get_error_with_retryable_write_label(&conn, err).await?,
-                    _ => err,
-                };
-
+            Err(mut err) => {
                 // Retryable writes are only supported by storage engines with document-level
                 // locking, so users need to disable retryable writes if using mmapv1.
                 if let ErrorKind::Command(ref mut command_error) = *err.kind {
@@ -134,7 +185,6 @@ impl Client {
                 // release the selected server to decrement its operation count
                 drop(server);
 
-                // TODO RUST-90: Do not retry read if session is in a transaction
                 if retryability == Retryability::Read && err.is_read_retryable()
                     || retryability == Retryability::Write && err.is_write_retryable()
                 {
@@ -157,21 +207,25 @@ impl Client {
             Err(_) => return Err(first_error),
         };
 
-        let retryability = self.get_retryability(&conn, &op).await?;
+        let retryability = self.get_retryability(&conn, &op, &session).await?;
         if retryability == Retryability::None {
             return Err(first_error);
         }
 
+        op.update_for_retry();
+
         match self
-            .execute_operation_on_connection(&op, &mut conn, &mut session, txn_number)
+            .execute_operation_on_connection(
+                &op,
+                &mut conn,
+                &mut session,
+                txn_number,
+                &retryability,
+            )
             .await
         {
             Ok(result) => Ok(result),
             Err(err) => {
-                let err = match retryability {
-                    Retryability::Write => get_error_with_retryable_write_label(&conn, err).await?,
-                    _ => err,
-                };
                 self.inner
                     .topology
                     .handle_application_error(
@@ -198,6 +252,7 @@ impl Client {
         connection: &mut Connection,
         session: &mut Option<&mut ClientSession>,
         txn_number: Option<u64>,
+        retryability: &Retryability,
     ) -> Result<T::O> {
         if let Some(wc) = op.write_concern() {
             wc.validate()?;
@@ -214,6 +269,20 @@ impl Client {
                 cmd.set_session(session);
                 if let Some(txn_number) = txn_number {
                     cmd.set_txn_number(txn_number);
+                }
+                match session.transaction.state {
+                    TransactionState::Starting => {
+                        cmd.set_start_transaction();
+                        cmd.set_autocommit();
+                        cmd.set_txn_read_concern(&*session)?;
+                        session.transaction.state = TransactionState::InProgress;
+                    }
+                    TransactionState::InProgress
+                    | TransactionState::Committed { .. }
+                    | TransactionState::Aborted => {
+                        cmd.set_autocommit();
+                    }
+                    _ => {}
                 }
                 session.update_last_use();
             }
@@ -284,12 +353,12 @@ impl Client {
         let duration = start_time.elapsed();
 
         match response_result {
-            Err(error) => {
+            Err(mut err) => {
                 self.emit_command_event(|handler| {
                     let command_failed_event = CommandFailedEvent {
                         duration,
                         command_name: cmd.name,
-                        failure: error.clone(),
+                        failure: err.clone(),
                         request_id,
                         connection: connection_info,
                     };
@@ -298,12 +367,13 @@ impl Client {
                 });
 
                 if let Some(session) = session {
-                    if error.is_network_error() {
+                    if err.is_network_error() {
                         session.mark_dirty();
                     }
                 }
 
-                op.handle_error(error)
+                err.add_labels(Some(&connection), session, Some(&retryability))?;
+                op.handle_error(err)
             }
             Ok(response) => {
                 self.emit_command_event(|handler| {
@@ -325,7 +395,13 @@ impl Client {
                     handler.handle_command_succeeded_event(command_succeeded_event);
                 });
 
-                op.handle_response(response, connection.stream_description()?)
+                match op.handle_response(response, connection.stream_description()?) {
+                    Ok(response) => Ok(response),
+                    Err(mut err) => {
+                        err.add_labels(Some(&connection), session, Some(&retryability))?;
+                        Err(err)
+                    }
+                }
             }
         }
     }
@@ -363,36 +439,117 @@ impl Client {
         }
     }
 
+    /// Gets whether the topology supports transactions. If it has yet to be determined if the
+    /// topology supports transactions, this method will perform a server selection that will force
+    /// that determination to be made.
+    pub(crate) async fn transaction_support_status(&self) -> Result<TransactionSupportStatus> {
+        let initial_status = self.inner.topology.transaction_support_status().await;
+
+        // Need to guarantee that we're connected to at least one server that can determine if
+        // sessions are supported or not.
+        match initial_status {
+            TransactionSupportStatus::Undetermined => {
+                let criteria = SelectionCriteria::Predicate(Arc::new(move |server_info| {
+                    server_info.server_type().is_data_bearing()
+                }));
+                let _: SelectedServer = self.select_server(Some(&criteria)).await?;
+                Ok(self.inner.topology.transaction_support_status().await)
+            }
+            _ => Ok(initial_status),
+        }
+    }
+
     /// Returns the retryability level for the execution of this operation.
     async fn get_retryability<T: Operation>(
         &self,
         conn: &Connection,
         op: &T,
+        session: &Option<&mut ClientSession>,
     ) -> Result<Retryability> {
-        match op.retryability() {
-            Retryability::Read if self.inner.options.retry_reads != Some(false) => {
-                Ok(Retryability::Read)
+        if !session
+            .as_ref()
+            .map(|session| session.in_transaction())
+            .unwrap_or(false)
+        {
+            match op.retryability() {
+                Retryability::Read if self.inner.options.retry_reads != Some(false) => {
+                    return Ok(Retryability::Read);
+                }
+                Retryability::Write if conn.stream_description()?.supports_retryable_writes() => {
+                    // commitTransaction and abortTransaction should be retried regardless of the
+                    // value for retry_writes set on the Client
+                    if op.name() == CommitTransaction::NAME
+                        || op.name() == AbortTransaction::NAME
+                        || self.inner.options.retry_writes != Some(false)
+                    {
+                        return Ok(Retryability::Write);
+                    }
+                }
+                _ => {}
             }
-            Retryability::Write
-                if self.inner.options.retry_writes != Some(false)
-                    && conn.stream_description()?.supports_retryable_writes() =>
-            {
-                Ok(Retryability::Write)
-            }
-            _ => Ok(Retryability::None),
         }
+        Ok(Retryability::None)
     }
 }
 
-/// Returns an Error with a "RetryableWriteError" label added if necessary. On a pre-4.4
-/// connection, a label should be added to any write-retryable error. On a 4.4+ connection, a
-/// label should only be added to network errors. Regardless of server version, a label should
-/// only be added if the `retry_writes` client option is not set to `false`.
-async fn get_error_with_retryable_write_label(conn: &Connection, err: Error) -> Result<Error> {
-    if let Some(max_wire_version) = conn.stream_description()?.max_wire_version {
-        if err.should_add_retryable_write_label(max_wire_version) {
-            return Ok(err.with_label("RetryableWriteError"));
+impl Error {
+    /// Adds the necessary labels to this Error.
+    ///
+    /// A TransientTransactionError label should be added if a transaction is in progress and the
+    /// error is a network or server selection error.
+    ///
+    /// On a pre-4.4 connection, a RetryableWriteError label should be added to any write-retryable
+    /// error. On a 4.4+ connection, a label should only be added to network errors. Regardless of
+    /// server version, a label should only be added if the `retry_writes` client option is not set
+    /// to `false`, the operation during which the error occured is write-retryable, and a
+    /// TransientTransactionError label has not already been added.
+    fn add_labels(
+        &mut self,
+        conn: Option<&Connection>,
+        session: &Option<&mut ClientSession>,
+        retryability: Option<&Retryability>,
+    ) -> Result<()> {
+        let transaction_state = session.as_ref().map_or(&TransactionState::None, |session| {
+            &session.transaction.state
+        });
+        let max_wire_version = if let Some(conn) = conn {
+            conn.stream_description()?.max_wire_version
+        } else {
+            None
+        };
+        match transaction_state {
+            TransactionState::Starting | TransactionState::InProgress => {
+                if self.is_network_error() || self.is_server_selection_error() {
+                    self.add_label(TRANSIENT_TRANSACTION_ERROR);
+                }
+            }
+            TransactionState::Committed { .. } => {
+                if let Some(max_wire_version) = max_wire_version {
+                    if self.should_add_retryable_write_label(max_wire_version) {
+                        self.add_label(RETRYABLE_WRITE_ERROR);
+                    }
+                }
+                if self.should_add_unknown_transaction_commit_result_label() {
+                    self.add_label(UNKNOWN_TRANSACTION_COMMIT_RESULT);
+                }
+            }
+            TransactionState::Aborted => {
+                if let Some(max_wire_version) = max_wire_version {
+                    if self.should_add_retryable_write_label(max_wire_version) {
+                        self.add_label(RETRYABLE_WRITE_ERROR);
+                    }
+                }
+            }
+            TransactionState::None => {
+                if retryability == Some(&Retryability::Write) {
+                    if let Some(max_wire_version) = max_wire_version {
+                        if self.should_add_retryable_write_label(max_wire_version) {
+                            self.add_label(RETRYABLE_WRITE_ERROR);
+                        }
+                    }
+                }
+            }
         }
+        Ok(())
     }
-    Ok(err)
 }
