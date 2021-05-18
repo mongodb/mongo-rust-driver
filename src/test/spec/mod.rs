@@ -16,6 +16,7 @@ mod sessions;
 mod transactions;
 mod unified_runner;
 mod v2_runner;
+mod versioned_api;
 
 use std::{
     convert::TryFrom,

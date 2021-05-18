@@ -2,14 +2,12 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
-    bson::{serde_helpers::serialize_u64_as_i32, Document},
+    bson::{doc, serde_helpers::serialize_u64_as_i32, Document},
     client::session::TransactionState,
     test::{run_spec_test, TestClient, LOCK},
 };
 
 use super::run_v2_test;
-
-use crate::bson::doc;
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
