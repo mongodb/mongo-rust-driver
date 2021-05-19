@@ -187,12 +187,10 @@ fn typed_collection() {
 #[test]
 #[function_name::named]
 fn transactions() {
-    let (should_skip, should_create_collection) = RUNTIME.block_on(async {
+    let should_skip = RUNTIME.block_on(async {
         let test_client = AsyncTestClient::new().await;
         // TODO RUST-122: Unskip this test on sharded clusters
-        let should_skip = !test_client.is_replica_set() || test_client.server_version_lt(4, 0);
-        let should_create_collection = test_client.server_version_lt(4, 4);
-        (should_skip, should_create_collection)
+        !test_client.is_replica_set() || test_client.server_version_lt(4, 0)
     });
     if should_skip {
         return;
@@ -205,12 +203,10 @@ fn transactions() {
         .expect("session creation should succeed");
     let coll = init_db_and_typed_coll(&client, function_name!(), function_name!());
 
-    if should_create_collection {
-        client
-            .database(function_name!())
-            .create_collection(function_name!(), None)
-            .expect("create collection should succeed");
-    }
+    client
+        .database(function_name!())
+        .create_collection(function_name!(), None)
+        .expect("create collection should succeed");
 
     session
         .start_transaction(None)
