@@ -54,7 +54,7 @@ async fn transaction_handling() {
     session
         .abort_transaction()
         .await
-        .expect("aborting twice should fail");
+        .expect_err("aborting twice should fail");
 
     let events = client.get_all_command_started_events();
     for event in events {
