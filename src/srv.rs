@@ -77,10 +77,7 @@ impl SrvResolver {
             .map(|record| {
                 let hostname = record.target().to_utf8();
                 let port = Some(record.port());
-                ServerAddress::Tcp {
-                    host: hostname,
-                    port,
-                }
+                ServerAddress::Tcp { host: hostname, port }
             })
             .collect();
 
@@ -115,10 +112,7 @@ impl SrvResolver {
 
             // The spec tests list the seeds without the trailing '.', so we remove it by
             // joining the parts we split rather than manipulating the string.
-            address = ServerAddress::Tcp {
-                host: hostname_parts.join("."),
-                port: address.port(),
-            };
+            address = ServerAddress::Tcp { host: hostname_parts.join("."), port: address.port() };
 
             Ok(address)
         });

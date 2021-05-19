@@ -82,6 +82,7 @@
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(test, type_length_limit = "80000000")]
+
 #![doc(html_root_url = "https://docs.rs/mongodb/2.0.0-beta")]
 
 macro_rules! define_if_single_runtime_enabled {
