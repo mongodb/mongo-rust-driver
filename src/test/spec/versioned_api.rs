@@ -3,7 +3,7 @@ use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 use crate::{
     bson::doc,
     options::{ServerApi, ServerApiVersion},
-    test::{run_spec_test, EventClient, CLIENT_OPTIONS, LOCK},
+    test::{run_spec_test, EventClient, TestClient, CLIENT_OPTIONS, LOCK},
 };
 
 use super::run_unified_format_test;
@@ -12,6 +12,9 @@ use super::run_unified_format_test;
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+    if TestClient::new().await.server_version_gte(5, 0) {
+        return;
+    }
     run_spec_test(&["versioned-api"], run_unified_format_test).await;
 }
 
