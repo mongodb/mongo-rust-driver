@@ -1,9 +1,9 @@
-use futures_io::AsyncWrite;
+use futures_io::{AsyncRead, AsyncWrite};
 use futures_util::AsyncWriteExt;
 
 use crate::{
     error::{ErrorKind, Result},
-    runtime::{AsyncLittleEndianRead, AsyncStream},
+    runtime::AsyncLittleEndianRead,
 };
 
 /// The wire protocol op codes.
@@ -52,11 +52,11 @@ impl Header {
     }
 
     /// Reads bytes from `r` and deserializes them into a header.
-    pub(crate) async fn read_from(stream: &mut AsyncStream) -> Result<Self> {
-        let length = stream.read_i32().await?;
-        let request_id = stream.read_i32().await?;
-        let response_to = stream.read_i32().await?;
-        let op_code = OpCode::from_i32(stream.read_i32().await?)?;
+    pub(crate) async fn read_from<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self> {
+        let length = reader.read_i32().await?;
+        let request_id = reader.read_i32().await?;
+        let response_to = reader.read_i32().await?;
+        let op_code = OpCode::from_i32(reader.read_i32().await?)?;
         Ok(Self {
             length,
             request_id,

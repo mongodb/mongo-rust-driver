@@ -71,13 +71,17 @@ impl Message {
 
     /// Reads bytes from `reader` and deserializes them into a Message.
     pub(crate) async fn read_from(reader: &mut AsyncStream) -> Result<Self> {
-        let header = Header::read_from(reader).await?;
+        let mut reader = BufReader::new(reader);
+        let header = Header::read_from(&mut reader).await?;
         let mut length_remaining = header.length - Header::LENGTH as i32;
+        let mut buf = vec![0u8; length_remaining as usize];
+        reader.read_exact(&mut buf).await?;
+        let mut reader = buf.as_slice();
 
         let flags = MessageFlags::from_bits_truncate(reader.read_u32().await?);
         length_remaining -= std::mem::size_of::<u32>() as i32;
 
-        let mut count_reader = CountReader::new(reader);
+        let mut count_reader = CountReader::new(&mut reader);
         let mut sections = Vec::new();
 
         while length_remaining - count_reader.bytes_read() as i32 > 4 {
