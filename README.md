@@ -1,7 +1,7 @@
 # MongoDB Rust Driver
 [![Crates.io](https://img.shields.io/crates/v/mongodb.svg)](https://crates.io/crates/mongodb) [![docs.rs](https://docs.rs/mongodb/badge.svg)](https://docs.rs/mongodb) [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-This repository contains the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the [`bson`](https://docs.rs/bson) crate for BSON support. The driver contains a fully async API that supports either [`tokio`](https://crates.io/crates/tokio) (default) or [`async-std`](https://crates.io/crates/async-std), depending on the feature flags set. The driver also has a sync API that may be enabled via feature flag. 
+This repository contains the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the [`bson`](https://docs.rs/bson/2.0.0-beta) crate for BSON support. The driver contains a fully async API that supports either [`tokio`](https://crates.io/crates/tokio) (default) or [`async-std`](https://crates.io/crates/async-std), depending on the feature flags set. The driver also has a sync API that may be enabled via feature flag. 
 
 ## Index
 - [Installation](#installation)
@@ -63,7 +63,7 @@ features = ["sync"]
 **Note:** if the sync API is enabled, the async-specific types will be privatized (e.g. `mongodb::Client`). The sync-specific types can be imported from `mongodb::sync` (e.g. `mongodb::sync::Client`).
 
 ## Example Usage
-Below are simple examples of using the driver. For more specific examples and the API reference, see the driver's [docs.rs page](https://docs.rs/mongodb).
+Below are simple examples of using the driver. For more specific examples and the API reference, see the driver's [docs.rs page](https://docs.rs/mongodb/2.0.0-beta).
 
 ### Using the async API
 #### Connecting to a MongoDB deployment
@@ -112,32 +112,64 @@ let docs = vec![
 // Insert some documents into the "mydb.books" collection.
 collection.insert_many(docs, None).await?;
 ```
+
+A [`Collection`](https://docs.rs/mongodb/2.0.0-beta/mongodb/struct.Collection.html) can be parameterized with any type that implements the `Serialize` and `Deserialize` traits from the [`serde`](https://serde.rs/) crate, not just `Document`:
+
+``` toml
+# In Cargo.toml, add the following dependency.
+serde = { version = "1.0", features = ["derive"] }
+```
+
+``` rust
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Book {
+    title: String,
+    author: String,
+}
+```
+
+``` rust
+// Get a handle to a collection of `Book`.
+let typed_collection = db.collection::<Book>("books");
+
+let books = vec![
+    Book {
+        title: "The Grapes of Wrath".to_string(),
+        author: "John Steinbeck".to_string(),
+    },
+    Book {
+        title: "To Kill a Mockingbird".to_string(),
+        author: "Harper Lee".to_string(),
+    },
+];
+
+// Insert the books into "mydb.books" collection, no manual conversion to BSON necessary.
+typed_collection.insert_many(books, None).await?;
+```
+
 #### Finding documents in a collection
-```rust
-use futures::stream::StreamExt;
-use mongodb::{
-    bson::{doc, Bson},
-    options::FindOptions,
-};
+Results from queries are generally returned via [`Cursor`](https://docs.rs/mongodb/2.0.0-beta/mongodb/struct.Cursor.html), a struct which streams the results back from the server as requested. The [`Cursor`](https://docs.rs/mongodb/2.0.0-beta/mongodb/struct.Cursor.html) type implements the [`Stream`](https://docs.rs/futures/latest/futures/stream/index.html) trait from the [`futures`](https://crates.io/crates/futures) crate, and in order to access its streaming functionality you need to import at least one of the [`StreamExt`](https://docs.rs/futures/latest/futures/stream/trait.StreamExt.html) or [`TryStreamExt`](https://docs.rs/futures/latest/futures/stream/trait.TryStreamExt.html) traits. 
+
+``` toml
+# In Cargo.toml, add the following dependency.
+futures = "0.3"
 ```
 ```rust
-// Query the documents in the collection with a filter and an option.
+// This trait is required to use `try_next()` on the cursor
+use futures::stream::TryStreamExt;
+use mongodb::{bson::doc, options::FindOptions};
+```
+```rust
+// Query the books in the collection with a filter and an option.
 let filter = doc! { "author": "George Orwell" };
 let find_options = FindOptions::builder().sort(doc! { "title": 1 }).build();
-let mut cursor = collection.find(filter, find_options).await?;
+let mut cursor = typed_collection.find(filter, find_options).await?;
 
 // Iterate over the results of the cursor.
-while let Some(result) = cursor.next().await {
-    match result {
-        Ok(document) => {
-            if let Some(title) = document.get("title").and_then(Bson::as_str) {
-                println!("title: {}", title);
-            }  else {
-                println!("no title found");
-            }
-        }
-        Err(e) => return Err(e.into()),
-    }
+while let Some(book) = cursor.try_next().await? {
+    println!("title: {}", book.title);
 }
 ```
 
@@ -147,36 +179,43 @@ The driver also provides a blocking sync API. See the [Installation](#enabling-t
 The various sync-specific types are found in the `mongodb::sync` submodule rather than in the crate's top level like in the async API. The sync API calls through to the async API internally though, so it looks and behaves similarly to it.
 ```rust
 use mongodb::{
-    bson::{doc, Bson, Document},
+    bson::doc,
     sync::Client,
 };
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Book {
+    title: String,
+    author: String,
+}
 ```
 ```rust
 let client = Client::with_uri_str("mongodb://localhost:27017")?;
 let database = client.database("mydb");
-let collection = database.collection::<Document>("books");
+let collection = database.collection::<Book>("books");
 
 let docs = vec![
-    doc! { "title": "1984", "author": "George Orwell" },
-    doc! { "title": "Animal Farm", "author": "George Orwell" },
-    doc! { "title": "The Great Gatsby", "author": "F. Scott Fitzgerald" },
+    Book {
+        title: "1984".to_string(),
+        author: "George Orwell".to_string(),
+    },
+    Book {
+        title: "Animal Farm".to_string(),
+        author: "George Orwell".to_string(),
+    },
+    Book {
+        title: "The Great Gatsby".to_string(),
+        author: "F. Scott Fitzgerald".to_string(),
+    },
 ];
 
-// Insert some documents into the "mydb.books" collection.
+// Insert some books into the "mydb.books" collection.
 collection.insert_many(docs, None)?;
 
 let cursor = collection.find(doc! { "author": "George Orwell" }, None)?;
 for result in cursor {
-    match result {
-        Ok(document) => {
-            if let Some(title) = document.get("title").and_then(Bson::as_str) {
-                println!("title: {}", title);
-            } else {
-                println!("no title found");
-            }
-        }
-        Err(e) => return Err(e.into()),
-    }
+    println!("title: {}", result?.title);
 }
 ```
 
@@ -194,6 +233,12 @@ On Windows, there is a known issue in the `trust-dns-resolver` crate, which the 
 
 e.g.
 
+``` rust
+use mongodb::{
+    options::{ClientOptions, ResolverConfig},
+    Client,
+};
+```
 ``` rust
 let options = ClientOptions::parse_with_resolver_config(
     "mongodb+srv://my.host.com",

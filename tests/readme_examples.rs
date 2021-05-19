@@ -64,33 +64,51 @@ async fn _inserting_documents_into_a_collection(db: mongodb::Database) -> Result
     Ok(())
 }
 
+use serde::{Deserialize, Serialize};
+#[derive(Debug, Serialize, Deserialize)]
+struct Book {
+    title: String,
+    author: String,
+}
+
+#[cfg(not(feature = "sync"))]
+async fn _inserting_documents_into_a_typed_collection(db: mongodb::Database) -> Result<()> {
+    // Get a handle to a collection of `Book`.
+    let typed_collection = db.collection::<Book>("books");
+
+    let books = vec![
+        Book {
+            title: "The Grapes of Wrath".to_string(),
+            author: "John Steinbeck".to_string(),
+        },
+        Book {
+            title: "To Kill a Mockingbird".to_string(),
+            author: "Harper Lee".to_string(),
+        },
+    ];
+
+    // Insert the books into "mydb.books" collection, no manual conversion to BSON necessary.
+    typed_collection.insert_many(books, None).await?;
+
+    Ok(())
+}
+
 #[cfg(not(feature = "sync"))]
 async fn _finding_documents_into_a_collection(
-    collection: mongodb::Collection<mongodb::bson::Document>,
+    typed_collection: mongodb::Collection<Book>,
 ) -> Result<()> {
-    use futures::stream::StreamExt;
-    use mongodb::{
-        bson::{doc, Bson},
-        options::FindOptions,
-    };
+    // This trait is required to use `try_next()` on the cursor
+    use futures::stream::TryStreamExt;
+    use mongodb::{bson::doc, options::FindOptions};
 
-    // Query the documents in the collection with a filter and an option.
+    // Query the books in the collection with a filter and an option.
     let filter = doc! { "author": "George Orwell" };
     let find_options = FindOptions::builder().sort(doc! { "title": 1 }).build();
-    let mut cursor = collection.find(filter, find_options).await?;
+    let mut cursor = typed_collection.find(filter, find_options).await?;
 
     // Iterate over the results of the cursor.
-    while let Some(result) = cursor.next().await {
-        match result {
-            Ok(document) => {
-                if let Some(title) = document.get("title").and_then(Bson::as_str) {
-                    println!("title: {}", title);
-                } else {
-                    println!("no title found");
-                }
-            }
-            Err(e) => return Err(e.into()),
-        }
+    while let Some(book) = cursor.try_next().await? {
+        println!("title: {}", book.title);
     }
 
     Ok(())
@@ -98,37 +116,52 @@ async fn _finding_documents_into_a_collection(
 
 #[cfg(feature = "sync")]
 async fn _using_the_sync_api() -> Result<()> {
-    use mongodb::{
-        bson::{doc, Bson, Document},
-        sync::Client,
-    };
+    use mongodb::{bson::doc, sync::Client};
 
     let client = Client::with_uri_str("mongodb://localhost:27017")?;
     let database = client.database("mydb");
-    let collection = database.collection::<Document>("books");
+    let collection = database.collection::<Book>("books");
 
     let docs = vec![
-        doc! { "title": "1984", "author": "George Orwell" },
-        doc! { "title": "Animal Farm", "author": "George Orwell" },
-        doc! { "title": "The Great Gatsby", "author": "F. Scott Fitzgerald" },
+        Book {
+            title: "1984".to_string(),
+            author: "George Orwell".to_string(),
+        },
+        Book {
+            title: "Animal Farm".to_string(),
+            author: "George Orwell".to_string(),
+        },
+        Book {
+            title: "The Great Gatsby".to_string(),
+            author: "F. Scott Fitzgerald".to_string(),
+        },
     ];
 
-    // Insert some documents into the "mydb.books" collection.
+    // Insert some books into the "mydb.books" collection.
     collection.insert_many(docs, None)?;
 
     let cursor = collection.find(doc! { "author": "George Orwell" }, None)?;
     for result in cursor {
-        match result {
-            Ok(document) => {
-                if let Some(title) = document.get("title").and_then(Bson::as_str) {
-                    println!("title: {}", title);
-                } else {
-                    println!("no title found");
-                }
-            }
-            Err(e) => return Err(e.into()),
-        }
+        println!("title: {}", result?.title);
     }
 
+    Ok(())
+}
+
+#[cfg(not(feature = "sync"))]
+async fn _windows_dns_note() -> Result<()> {
+    use mongodb::{
+        options::{ClientOptions, ResolverConfig},
+        Client,
+    };
+
+    let options = ClientOptions::parse_with_resolver_config(
+        "mongodb+srv://my.host.com",
+        ResolverConfig::cloudflare(),
+    )
+    .await?;
+    let client = Client::with_options(options)?;
+
+    drop(client);
     Ok(())
 }
