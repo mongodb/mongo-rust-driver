@@ -84,7 +84,7 @@ async fn insert_err_details() {
                     let result = doc.get_document("writeConcern");
                     match result {
                         Ok(write_concern_doc) => {
-                            assert_eq!(write_concern_doc.contains_key("provenance"), true);
+                            assert!(write_concern_doc.contains_key("provenance"));
                         }
                         Err(e) => panic!("{:?}", e),
                     }

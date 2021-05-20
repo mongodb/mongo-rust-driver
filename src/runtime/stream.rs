@@ -95,7 +95,7 @@ impl AsyncTcpStream {
         let conf = socket2::TcpKeepalive::new().with_time(KEEPALIVE_TIME);
         socket.set_tcp_keepalive(&conf)?;
 
-        let address: SockAddr = address.clone().into();
+        let address: SockAddr = (*address).into();
         if connect_timeout == Duration::from_secs(0) {
             socket.connect(&address)?;
         } else {
