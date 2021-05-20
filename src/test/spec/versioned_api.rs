@@ -19,6 +19,8 @@ async fn run() {
     run_spec_test(&["versioned-api"], run_unified_format_test).await;
 }
 
+// TODO RUST-817 Remove this test in favor of transaction-handling.json versioned API spec test when
+// transactions are implemented in the unified runner
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
