@@ -37,6 +37,57 @@ lazy_static! {
 ///
 /// `ClientSession` instances are not thread safe or fork safe. They can only be used by one thread
 /// or process at a time.
+///
+/// ## Transactions
+/// Replica set transactions are supported on MongoDB 4.0+. Transactions are associated with a
+/// `ClientSession`. To begin a transaction, call [ClientSession::start_transaction] on a
+/// `ClientSession`. The `ClientSession` must be passed to operations to be executed within the
+/// transaction.
+///
+/// ```rust
+/// # use mongodb::{
+/// #     bson::doc,
+/// #     error::{Result, TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT},
+/// #     Client,
+/// #     ClientSession,
+/// #     Collection,
+/// # };
+/// # async fn do_stuff() -> Result<()> {
+/// # let client = Client::with_uri_str("mongodb://example.com").await?;
+/// # let coll = client.database("foo").collection("bar");
+/// # let mut session = client.start_session(None).await?;
+/// session.start_transaction(None).await?;
+/// // A "TransientTransactionError" label indicates that the entire transaction can be retried
+/// // with a reasonable expectation that it will succeed.
+/// while let Err(error) = execute_transaction(&coll, &mut session).await {
+///     if !error.contains_label(TRANSIENT_TRANSACTION_ERROR) {
+///         break;
+///     }
+/// }
+/// # Ok(())
+/// # }
+///
+/// async fn execute_transaction(coll: &Collection, session: &mut ClientSession) -> Result<()> {
+///     coll.insert_one_with_session(doc! { "x": 1 }, None, session).await?;
+///     coll.delete_one_with_session(doc! { "y": 2 }, None, session).await?;
+///     // An "UnknownTransactionCommitResult" label indicates that it is unknown whether the
+///     // commit has satisfied the write concern associated with the transaction. If an error
+///     // with this label is returned, it is safe to retry the commit until the write concern is
+///     // satisfied or an error without the label is returned.
+///     loop {
+///         let result = session.commit_transaction().await;
+///         if let Err(ref error) = result {
+///             if error.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT) {
+///                 continue;
+///             }
+///         }
+///         result?
+///     }
+/// }
+/// ```
+// TODO RUST-122 Remove this note and adjust the above description to indicate that sharded
+// transactions are supported on 4.2+
+/// Note: transactions are currently not supported on sharded clusters.
 #[derive(Clone, Debug)]
 pub struct ClientSession {
     cluster_time: Option<ClusterTime>,
@@ -344,14 +395,14 @@ impl ClientSession {
     /// # let coll = client.database("foo").collection::<Document>("bar");
     /// # let mut session = client.start_session(None).await?;
     /// session.start_transaction(None).await?;
-    /// match execute_transaction(coll, &mut session).await {
+    /// match execute_transaction(&coll, &mut session).await {
     ///     Ok(_) => session.commit_transaction().await?,
     ///     Err(_) => session.abort_transaction().await?,
     /// }
     /// # Ok(())
     /// # }
     ///
-    /// async fn execute_transaction(coll: Collection, session: &mut ClientSession) -> Result<()> {
+    /// async fn execute_transaction(coll: &Collection, session: &mut ClientSession) -> Result<()> {
     ///     coll.insert_one_with_session(doc! { "x": 1 }, None, session).await?;
     ///     coll.delete_one_with_session(doc! { "y": 2 }, None, session).await?;
     ///     Ok(())
