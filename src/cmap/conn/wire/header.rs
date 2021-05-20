@@ -1,6 +1,9 @@
+use futures_io::AsyncWrite;
+use futures_util::AsyncWriteExt;
+
 use crate::{
     error::{ErrorKind, Result},
-    runtime::{AsyncLittleEndianRead, AsyncLittleEndianWrite, AsyncStream},
+    runtime::{AsyncLittleEndianRead, AsyncStream},
 };
 
 /// The wire protocol op codes.
@@ -39,11 +42,11 @@ impl Header {
     pub(crate) const LENGTH: usize = 4 * std::mem::size_of::<i32>();
 
     /// Serializes the Header and writes the bytes to `w`.
-    pub(crate) async fn write_to(&self, stream: &mut AsyncStream) -> Result<()> {
-        stream.write_i32(self.length).await?;
-        stream.write_i32(self.request_id).await?;
-        stream.write_i32(self.response_to).await?;
-        stream.write_i32(self.op_code as i32).await?;
+    pub(crate) async fn write_to<W: AsyncWrite + Unpin>(&self, stream: &mut W) -> Result<()> {
+        stream.write(&self.length.to_le_bytes()).await?;
+        stream.write(&self.request_id.to_le_bytes()).await?;
+        stream.write(&self.response_to.to_le_bytes()).await?;
+        stream.write(&(self.op_code as i32).to_le_bytes()).await?;
 
         Ok(())
     }

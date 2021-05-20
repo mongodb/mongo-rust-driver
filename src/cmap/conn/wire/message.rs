@@ -1,6 +1,6 @@
 use bitflags::bitflags;
 use futures_io::{AsyncRead, AsyncWrite};
-use futures_util::{AsyncReadExt, AsyncWriteExt};
+use futures_util::{AsyncReadExt, AsyncWriteExt, io::{BufReader, BufWriter}};
 
 use super::{
     header::{Header, OpCode},
@@ -112,7 +112,8 @@ impl Message {
     }
 
     /// Serializes the Message to bytes and writes them to `writer`.
-    pub(crate) async fn write_to(&self, writer: &mut AsyncStream) -> Result<()> {
+    pub(crate) async fn write_to(&self, stream: &mut AsyncStream) -> Result<()> {
+        let mut writer = BufWriter::new(stream);
         let mut sections_bytes = Vec::new();
 
         for section in &self.sections {
@@ -135,7 +136,7 @@ impl Message {
             op_code: OpCode::Message,
         };
 
-        header.write_to(writer).await?;
+        header.write_to(&mut writer).await?;
         writer.write_u32(self.flags.bits()).await?;
         writer.write_all(&sections_bytes).await?;
 
