@@ -1,10 +1,14 @@
+use std::time::{Duration, Instant};
+
 use serde::Deserialize;
+use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::doc,
     client::{auth::AuthMechanism, Client},
     options::{ClientOptions, ResolverConfig, Tls, TlsOptions},
-    test::{run_spec_test, TestClient},
+    test::{run_spec_test, TestClient, LOCK},
+    RUNTIME,
 };
 
 #[derive(Debug, Deserialize)]
@@ -125,12 +129,28 @@ async fn run() {
                 .run_command(doc! { "ping" : 1 }, None)
                 .await
                 .unwrap();
-            let mut actual_hosts = client.get_hosts().await;
 
             test_file.hosts.sort();
-            actual_hosts.sort();
 
-            assert_eq!(test_file.hosts, actual_hosts);
+            // This loop allows for some time to allow SDAM to discover the desired topology
+            // TODO: RUST-232 or RUST-585: use SDAM monitoring / channels / timeouts to improve
+            // this.
+            let start = Instant::now();
+            loop {
+                let mut actual_hosts = client.get_hosts().await;
+                actual_hosts.sort();
+
+                if actual_hosts == test_file.hosts {
+                    break;
+                } else if start.elapsed() < Duration::from_secs(5) {
+                    panic!(
+                        "expected to eventually discover {:?}, instead found {:?}",
+                        test_file.hosts, actual_hosts
+                    )
+                }
+
+                RUNTIME.delay_for(Duration::from_millis(500)).await;
+            }
         }
 
         if let Some(ref mut resolved_options) = test_file.options {
@@ -162,5 +182,6 @@ async fn run() {
         }
     }
 
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
     run_spec_test(&["initial-dns-seedlist-discovery"], run_test).await;
 }
