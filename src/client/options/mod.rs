@@ -47,7 +47,7 @@ use crate::{
     options::ReadConcernLevel,
     sdam::MIN_HEARTBEAT_FREQUENCY,
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
-    srv::SrvResolver,
+    srv::{OriginalSrvInfo, SrvResolver},
 };
 
 pub use resolver_config::ResolverConfig;
@@ -523,8 +523,10 @@ pub struct ClientOptions {
     #[builder(default, setter(skip))]
     pub(crate) zlib_compression: Option<i32>,
 
+    /// Information from the SRV URI that generated these client options, if applicable.
     #[builder(default, setter(skip))]
-    pub(crate) original_srv_hostname: Option<String>,
+    #[serde(skip)]
+    pub(crate) original_srv_info: Option<OriginalSrvInfo>,
 
     #[builder(default, setter(skip))]
     pub(crate) original_uri: Option<String>,
@@ -762,7 +764,7 @@ impl From<ClientOptionsParser> for ClientOptions {
             credential: parser.credential,
             cmap_event_handler: None,
             command_event_handler: None,
-            original_srv_hostname: None,
+            original_srv_info: None,
             original_uri: Some(parser.original_uri),
             resolver_config: None,
             server_api: None,
@@ -778,7 +780,10 @@ impl ClientOptions {
     #[cfg(test)]
     pub(crate) fn new_srv() -> Self {
         Self {
-            original_srv_hostname: Some("localhost.test.test.build.10gen.cc".into()),
+            original_srv_info: Some(OriginalSrvInfo {
+                hostname: "localhost.test.test.build.10gen.cc".into(),
+                min_ttl: Duration::from_secs(60),
+            }),
             ..Default::default()
         }
     }
@@ -897,8 +902,12 @@ impl ClientOptions {
                 .resolve_client_options(&options.hosts[0].host())
                 .await?;
 
-            // Save the original SRV hostname to allow mongos polling.
-            options.original_srv_hostname = Some(options.hosts[0].host().to_string());
+            // Save the original SRV info to allow mongos polling.
+            options.original_srv_info = OriginalSrvInfo {
+                hostname: options.hosts[0].host().to_string(),
+                min_ttl: config.min_ttl,
+            }
+            .into();
 
             // Set the ClientOptions hosts to those found during the SRV lookup.
             options.hosts = config.hosts;
@@ -939,11 +948,6 @@ impl ClientOptions {
         options.validate()?;
 
         Ok(options)
-    }
-
-    /// Gets the original SRV hostname specified when this ClientOptions was parsed from a URI.
-    pub(crate) fn original_srv_hostname(&self) -> Option<&String> {
-        self.original_srv_hostname.as_ref()
     }
 
     pub(crate) fn tls_options(&self) -> Option<TlsOptions> {
@@ -1001,7 +1005,7 @@ impl ClientOptions {
                 tls,
                 write_concern,
                 zlib_compression,
-                original_srv_hostname,
+                original_srv_info,
                 original_uri
             ]
         );

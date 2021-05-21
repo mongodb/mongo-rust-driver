@@ -6,8 +6,8 @@ use tokio::sync::RwLockReadGuard;
 use crate::{
     bson::doc,
     client::{auth::AuthMechanism, Client},
-    options::{ClientOptions, ResolverConfig, Tls, TlsOptions},
-    test::{run_spec_test, TestClient, LOCK},
+    options::{ClientOptions, ResolverConfig},
+    test::{run_spec_test, TestClient, CLIENT_OPTIONS, LOCK},
     RUNTIME,
 };
 
@@ -117,10 +117,7 @@ async fn run() {
 
             let mut options_with_tls = options.clone();
             if requires_tls {
-                let tls_options = TlsOptions::builder()
-                    .allow_invalid_certificates(true)
-                    .build();
-                options_with_tls.tls = Some(Tls::Enabled(tls_options));
+                options_with_tls.tls = CLIENT_OPTIONS.tls.clone();
             }
 
             let client = Client::with_options(options_with_tls).unwrap();

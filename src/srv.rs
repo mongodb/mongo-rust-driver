@@ -1,3 +1,6 @@
+use std::time::Duration;
+
+use trust_dns_proto::rr::RData;
 use trust_dns_resolver::config::ResolverConfig;
 
 use crate::{
@@ -8,14 +11,25 @@ use crate::{
 
 pub(crate) struct SrvResolver {
     resolver: AsyncResolver,
-    min_ttl: Option<u32>,
 }
 
 #[derive(Debug)]
 pub(crate) struct ResolvedConfig {
     pub(crate) hosts: Vec<ServerAddress>,
+    pub(crate) min_ttl: Duration,
     pub(crate) auth_source: Option<String>,
     pub(crate) replica_set: Option<String>,
+}
+
+pub(crate) struct LookupHosts {
+    pub(crate) hosts: Vec<Result<ServerAddress>>,
+    pub(crate) min_ttl: Duration,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct OriginalSrvInfo {
+    pub(crate) hostname: String,
+    pub(crate) min_ttl: Duration,
 }
 
 impl SrvResolver {
@@ -24,7 +38,6 @@ impl SrvResolver {
 
         Ok(Self {
             resolver,
-            min_ttl: None,
         })
     }
 
@@ -32,9 +45,10 @@ impl SrvResolver {
         &mut self,
         hostname: &str,
     ) -> Result<ResolvedConfig> {
-        let hosts = self.get_srv_hosts(hostname).await?.collect::<Result<_>>()?;
+        let lookup_result = self.get_srv_hosts(hostname).await?;
         let mut config = ResolvedConfig {
-            hosts,
+            hosts: lookup_result.hosts.into_iter().collect::<Result<Vec<ServerAddress>>>()?,
+            min_ttl: lookup_result.min_ttl,
             auth_source: None,
             replica_set: None,
         };
@@ -44,14 +58,10 @@ impl SrvResolver {
         Ok(config)
     }
 
-    pub(crate) fn min_ttl(&self) -> Option<u32> {
-        self.min_ttl
-    }
-
-    pub(crate) async fn get_srv_hosts<'a>(
-        &'a mut self,
-        original_hostname: &'a str,
-    ) -> Result<impl Iterator<Item = Result<ServerAddress>> + 'a> {
+    pub(crate) async fn get_srv_hosts(
+        &self,
+        original_hostname: &str,
+    ) -> Result<LookupHosts> {
         let hostname_parts: Vec<_> = original_hostname.split('.').collect();
 
         if hostname_parts.len() < 3 {
@@ -65,33 +75,19 @@ impl SrvResolver {
         let lookup_hostname = format!("_mongodb._tcp.{}", original_hostname);
 
         let srv_lookup = self.resolver.srv_lookup(lookup_hostname.as_str()).await?;
+        let mut srv_addresses: Vec<Result<ServerAddress>> = Vec::new();
+        let mut min_ttl = u32::MAX;
 
-        self.min_ttl = srv_lookup
-            .as_lookup()
-            .record_iter()
-            .map(|record| record.ttl())
-            .min();
+        for record in srv_lookup.as_lookup().record_iter() {
+            let srv = match record.rdata() {
+                RData::SRV(s) => s,
+                _ => continue,
+            };
 
-        let srv_addresses: Vec<_> = srv_lookup
-            .iter()
-            .map(|record| {
-                let hostname = record.target().to_utf8();
-                let port = Some(record.port());
-                ServerAddress::Tcp {
-                    host: hostname,
-                    port,
-                }
-            })
-            .collect();
+            let hostname = srv.target().to_utf8();
+            let port = Some(srv.port());
+            let mut address = ServerAddress::Tcp { host: hostname, port };
 
-        if srv_addresses.is_empty() {
-            return Err(ErrorKind::DnsResolve {
-                message: format!("SRV lookup for {} returned no records", original_hostname),
-            }
-            .into());
-        }
-
-        let results = srv_addresses.into_iter().map(move |mut address| {
             let domain_name = &hostname_parts[1..];
 
             let mut hostname_parts: Vec<_> = address.host().split('.').collect();
@@ -102,7 +98,7 @@ impl SrvResolver {
             }
 
             if !&hostname_parts[1..].ends_with(domain_name) {
-                return Err(ErrorKind::DnsResolve {
+                srv_addresses.push(Err(ErrorKind::DnsResolve {
                     message: format!(
                         "SRV lookup for {} returned result {}, which does not match domain name {}",
                         original_hostname,
@@ -110,7 +106,7 @@ impl SrvResolver {
                         domain_name.join(".")
                     ),
                 }
-                .into());
+                           .into()));
             }
 
             // The spec tests list the seeds without the trailing '.', so we remove it by
@@ -120,10 +116,18 @@ impl SrvResolver {
                 port: address.port(),
             };
 
-            Ok(address)
-        });
+            min_ttl = std::cmp::min(min_ttl, record.ttl());
+            srv_addresses.push(Ok(address));
+        }
 
-        Ok(results)
+        if srv_addresses.is_empty() {
+            return Err(ErrorKind::DnsResolve {
+                message: format!("SRV lookup for {} returned no records", original_hostname),
+            }
+            .into());
+        }
+
+        Ok(LookupHosts { hosts: srv_addresses, min_ttl: Duration::from_secs(min_ttl.into()) })
     }
 
     async fn get_txt_options(
