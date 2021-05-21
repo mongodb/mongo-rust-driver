@@ -142,7 +142,7 @@ async fn run() {
 
                 if actual_hosts == test_file.hosts {
                     break;
-                } else if start.elapsed() < Duration::from_secs(5) {
+                } else if start.elapsed() > Duration::from_secs(5) {
                     panic!(
                         "expected to eventually discover {:?}, instead found {:?}",
                         test_file.hosts, actual_hosts
