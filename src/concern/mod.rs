@@ -52,6 +52,12 @@ impl ReadConcern {
         ReadConcernLevel::Available.into()
     }
 
+    /// Creates a read concern with level "snapshot".
+    /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-snapshot/).
+    pub fn snapshot() -> Self {
+        ReadConcernLevel::Snapshot.into()
+    }
+
     /// Creates a read concern with a custom read concern level. This is present to provide forwards
     /// compatibility with any future read concerns which may be added to new versions of
     /// MongoDB.
@@ -85,6 +91,9 @@ pub enum ReadConcernLevel {
     /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-available/).
     Available,
 
+    /// See the specific documentation for this read concern level [here](https://docs.mongodb.com/manual/reference/read-concern-snapshot/).
+    Snapshot,
+
     /// Specify a custom read concern level. This is present to provide forwards compatibility with
     /// any future read concerns which may be added to new versions of MongoDB.
     Custom(String),
@@ -97,6 +106,7 @@ impl ReadConcernLevel {
             "majority" => ReadConcernLevel::Majority,
             "linearizable" => ReadConcernLevel::Linearizable,
             "available" => ReadConcernLevel::Available,
+            "snapshot" => ReadConcernLevel::Snapshot,
             s => ReadConcernLevel::Custom(s.to_string()),
         }
     }
@@ -108,6 +118,7 @@ impl ReadConcernLevel {
             ReadConcernLevel::Majority => "majority",
             ReadConcernLevel::Linearizable => "linearizable",
             ReadConcernLevel::Available => "available",
+            ReadConcernLevel::Snapshot => "snapshot",
             ReadConcernLevel::Custom(ref s) => s,
         }
     }
