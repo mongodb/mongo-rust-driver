@@ -159,18 +159,20 @@ async fn snapshot_read_concern() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = EventClient::new().await;
-    let mut session = client.start_session(None).await.unwrap();
     let coll = client
         .database(function_name!())
         .collection::<Document>(function_name!());
 
-    let options = TransactionOptions::builder()
-        .read_concern(ReadConcern::snapshot())
-        .build();
-    session.start_transaction(options).await.unwrap();
-    let result = coll.find_one_with_session(None, None, &mut session).await;
-    assert!(result.is_ok());
-    assert_event_contains_read_concern(&client).await;
+    if client.is_replica_set() && client.server_version_gte(4, 0) {
+        let mut session = client.start_session(None).await.unwrap();
+        let options = TransactionOptions::builder()
+            .read_concern(ReadConcern::snapshot())
+            .build();
+        session.start_transaction(options).await.unwrap();
+        let result = coll.find_one_with_session(None, None, &mut session).await;
+        assert!(result.is_ok());
+        assert_event_contains_read_concern(&client).await;
+    }
 
     let options = FindOneOptions::builder()
         .read_concern(ReadConcern::snapshot())
