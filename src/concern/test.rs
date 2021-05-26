@@ -159,6 +159,11 @@ async fn snapshot_read_concern() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = EventClient::new().await;
+    // snapshot read concern was introduced in 4.0
+    if client.server_version_lt(4, 0) {
+        return;
+    }
+
     let coll = client
         .database(function_name!())
         .collection::<Document>(function_name!());
@@ -174,16 +179,19 @@ async fn snapshot_read_concern() {
         assert_event_contains_read_concern(&client).await;
     }
 
-    let options = FindOneOptions::builder()
-        .read_concern(ReadConcern::snapshot())
-        .build();
-    let error = coll
-        .find_one(None, options)
-        .await
-        .expect_err("non-transaction find one with snapshot read concern should fail");
-    // ensure that an error from the server is returned
-    assert!(matches!(*error.kind, ErrorKind::Command(_)));
-    assert_event_contains_read_concern(&client).await;
+    if client.server_version_lt(4, 9) {
+        let options = FindOneOptions::builder()
+            .read_concern(ReadConcern::snapshot())
+            .build();
+        let error = coll
+            .find_one(None, options)
+            .await
+            .expect_err("non-transaction find one with snapshot read concern should fail");
+        dbg!("{}", &error);
+        // ensure that an error from the server is returned
+        assert!(matches!(*error.kind, ErrorKind::Command(_)));
+        assert_event_contains_read_concern(&client).await;
+    }
 }
 
 async fn assert_event_contains_read_concern(client: &EventClient) {
