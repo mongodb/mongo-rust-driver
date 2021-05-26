@@ -40,7 +40,7 @@ use worker::ConnectionPoolWorker;
 #[cfg(test)]
 use self::worker::PoolWorkerHandle;
 
-const DEFAULT_MAX_POOL_SIZE: u32 = 100;
+const DEFAULT_MAX_POOL_SIZE: u32 = 10;
 
 /// A pool of connections implementing the CMAP spec. All state is kept internally in an `Arc`, and
 /// internal state that is mutable is additionally wrapped by a lock.
