@@ -187,7 +187,6 @@ async fn snapshot_read_concern() {
             .find_one(None, options)
             .await
             .expect_err("non-transaction find one with snapshot read concern should fail");
-        dbg!("{}", &error);
         // ensure that an error from the server is returned
         assert!(matches!(*error.kind, ErrorKind::Command(_)));
         assert_event_contains_read_concern(&client).await;
