@@ -1,9 +1,6 @@
 //! Contains the `Error` and `Result` types that `mongodb` uses.
 
-use std::{
-    fmt::{self, Debug},
-    sync::Arc,
-};
+use std::{collections::HashSet, fmt::{self, Debug}, sync::Arc};
 
 use serde::Deserialize;
 use thiserror::Error;
@@ -43,10 +40,17 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub struct Error {
     /// The type of error that occurred.
     pub kind: Box<ErrorKind>,
-    labels: Vec<String>,
+    pub(crate) labels: HashSet<String>,
 }
 
 impl Error {
+    pub(crate) fn new(kind: ErrorKind, labels: Option<impl IntoIterator<Item=String>>) -> Self {
+        Self {
+            kind: Box::new(kind),
+            labels: labels.map(|labels| labels.into_iter().collect()).unwrap_or_default(),
+        }
+    }
+
     pub(crate) fn pool_cleared_error(address: &ServerAddress) -> Self {
         ErrorKind::ConnectionPoolCleared {
             message: format!(
@@ -159,19 +163,8 @@ impl Error {
     }
 
     /// Returns the labels for this error.
-    pub fn labels(&self) -> &[String] {
-        match self.kind.as_ref() {
-            ErrorKind::Command(ref err) => &err.labels,
-            ErrorKind::Write(ref err) => match err {
-                WriteFailure::WriteError(_) => &self.labels,
-                WriteFailure::WriteConcernError(ref err) => &err.labels,
-            },
-            ErrorKind::BulkWrite(ref err) => match err.write_concern_error {
-                Some(ref err) => &err.labels,
-                None => &self.labels,
-            },
-            _ => &self.labels,
-        }
+    pub fn labels(&self) -> &HashSet<String> {
+        &self.labels
     }
 
     /// Whether this error contains the specified label.
@@ -184,30 +177,7 @@ impl Error {
     /// Adds the given label to this error.
     pub(crate) fn add_label<T: AsRef<str>>(&mut self, label: T) {
         let label = label.as_ref().to_string();
-        match self.kind.as_mut() {
-            ErrorKind::Command(err) => {
-                err.labels.push(label);
-            }
-            ErrorKind::Write(err) => match err {
-                WriteFailure::WriteError(_) => {
-                    self.labels.push(label);
-                }
-                WriteFailure::WriteConcernError(err) => {
-                    err.labels.push(label);
-                }
-            },
-            ErrorKind::BulkWrite(err) => match err.write_concern_error.as_mut() {
-                Some(write_concern_error) => {
-                    write_concern_error.labels.push(label);
-                }
-                None => {
-                    self.labels.push(label);
-                }
-            },
-            _ => {
-                self.labels.push(label);
-            }
-        }
+        self.labels.insert(label);
     }
 
     pub(crate) fn from_resolve_error(error: trust_dns_resolver::error::ResolveError) -> Self {
@@ -325,7 +295,7 @@ where
     fn from(err: E) -> Self {
         Self {
             kind: Box::new(err.into()),
-            labels: Vec::new(),
+            labels: Default::default(),
         }
     }
 }
@@ -447,10 +417,6 @@ pub struct CommandError {
     /// A description of the error that occurred.
     #[serde(rename = "errmsg")]
     pub message: String,
-
-    /// The error labels that the server returned.
-    #[serde(rename = "errorLabels", default)]
-    pub labels: Vec<String>,
 }
 
 impl fmt::Display for CommandError {
@@ -477,10 +443,6 @@ pub struct WriteConcernError {
     /// A document identifying the write concern setting related to the error.
     #[serde(rename = "errInfo")]
     pub details: Option<Document>,
-
-    /// The error labels that the server returned.
-    #[serde(rename = "errorLabels", default)]
-    pub labels: Vec<String>,
 }
 
 /// An error that occurred during a write operation that wasn't due to being unable to satisfy a
@@ -584,9 +546,9 @@ impl WriteFailure {
 /// untouched.
 pub(crate) fn convert_bulk_errors(error: Error) -> Error {
     match *error.kind {
-        ErrorKind::BulkWrite(ref bulk_failure) => {
-            match WriteFailure::from_bulk_failure(bulk_failure.clone()) {
-                Ok(failure) => ErrorKind::Write(failure).into(),
+        ErrorKind::BulkWrite(bulk_failure) => {
+            match WriteFailure::from_bulk_failure(bulk_failure) {
+                Ok(failure) => Error::new(ErrorKind::Write(failure), Some(error.labels)),
                 Err(e) => e,
             }
         }

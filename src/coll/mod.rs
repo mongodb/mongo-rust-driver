@@ -1,11 +1,11 @@
 mod batch;
 pub mod options;
 
-use std::{borrow::Borrow, fmt, fmt::Debug, sync::Arc};
+use std::{borrow::Borrow, collections::HashSet, fmt, fmt::Debug, sync::Arc};
 
 use futures_util::stream::StreamExt;
 use serde::{
-    de::{DeserializeOwned, Error},
+    de::{DeserializeOwned, Error as DeError},
     Deserialize,
     Deserializer,
     Serialize,
@@ -17,7 +17,7 @@ use crate::{
     bson_util,
     client::session::TransactionState,
     concern::{ReadConcern, WriteConcern},
-    error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, ErrorKind, Result},
+    error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
     operation::{
         Aggregate,
         Count,
@@ -689,6 +689,7 @@ where
         let ordered = options.as_ref().and_then(|o| o.ordered).unwrap_or(true);
 
         let mut cumulative_failure: Option<BulkWriteFailure> = None;
+        let mut error_labels: HashSet<String> = Default::default();
         let mut cumulative_result: Option<InsertManyResult> = None;
 
         let mut n_attempted = 0;
@@ -736,11 +737,15 @@ where
                             failure_ref.write_concern_error = Some(write_concern_error.clone());
                         }
 
+                        error_labels.extend(e.labels);
+
                         if ordered {
-                            return Err(ErrorKind::BulkWrite(
-                                cumulative_failure.unwrap_or_else(BulkWriteFailure::new),
-                            )
-                            .into());
+                            return Err(Error::new(
+                                ErrorKind::BulkWrite(
+                                    cumulative_failure.unwrap_or_else(BulkWriteFailure::new),
+                                ),
+                                Some(error_labels),
+                            ));
                         }
                     }
                     _ => return Err(e),
@@ -749,7 +754,10 @@ where
         }
 
         match cumulative_failure {
-            Some(failure) => Err(ErrorKind::BulkWrite(failure).into()),
+            Some(failure) => Err(Error::new(
+                ErrorKind::BulkWrite(failure),
+                Some(error_labels),
+            )),
             None => Ok(cumulative_result.unwrap_or_else(InsertManyResult::new)),
         }
     }

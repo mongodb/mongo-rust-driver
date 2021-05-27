@@ -259,13 +259,13 @@ pub async fn run_v2_test(test_file: TestFile) {
                             assert_eq!(error_code_name, code_name);
                         }
                         if let Some(error_labels_contain) = operation_error.error_labels_contain {
-                            let labels = error.labels().to_vec();
+                            let labels = error.labels();
                             error_labels_contain
                                 .iter()
                                 .for_each(|label| assert!(labels.contains(label)));
                         }
                         if let Some(error_labels_omit) = operation_error.error_labels_omit {
-                            let labels = error.labels().to_vec();
+                            let labels = error.labels();
                             error_labels_omit
                                 .iter()
                                 .for_each(|label| assert!(!labels.contains(label)));
