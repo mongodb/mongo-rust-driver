@@ -2,10 +2,17 @@ use std::time::Duration;
 use tokio::sync::RwLockReadGuard;
 
 use crate::{
-    bson::{doc, Bson},
+    bson::{doc, Bson, Document},
     error::ErrorKind,
-    options::{Acknowledgment, InsertOneOptions, WriteConcern},
-    test::{TestClient, LOCK},
+    options::{
+        Acknowledgment,
+        FindOneOptions,
+        InsertOneOptions,
+        ReadConcern,
+        TransactionOptions,
+        WriteConcern,
+    },
+    test::{EventClient, TestClient, LOCK},
 };
 
 #[test]
@@ -143,4 +150,63 @@ async fn unacknowledged_write_concern_rejected() {
         .await
         .expect_err("insert should fail");
     assert!(matches!(*error.kind, ErrorKind::InvalidArgument { .. }));
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn snapshot_read_concern() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
+    let client = EventClient::new().await;
+    // snapshot read concern was introduced in 4.0
+    if client.server_version_lt(4, 0) {
+        return;
+    }
+
+    let coll = client
+        .database(function_name!())
+        .collection::<Document>(function_name!());
+
+    // TODO RUST-122 run this test on sharded clusters
+    if client.is_replica_set() && client.server_version_gte(4, 0) {
+        let mut session = client.start_session(None).await.unwrap();
+        let options = TransactionOptions::builder()
+            .read_concern(ReadConcern::snapshot())
+            .build();
+        session.start_transaction(options).await.unwrap();
+        let result = coll.find_one_with_session(None, None, &mut session).await;
+        assert!(result.is_ok());
+        assert_event_contains_read_concern(&client).await;
+    }
+
+    if client.server_version_lt(4, 9) {
+        let options = FindOneOptions::builder()
+            .read_concern(ReadConcern::snapshot())
+            .build();
+        let error = coll
+            .find_one(None, options)
+            .await
+            .expect_err("non-transaction find one with snapshot read concern should fail");
+        // ensure that an error from the server is returned
+        assert!(matches!(*error.kind, ErrorKind::Command(_)));
+        assert_event_contains_read_concern(&client).await;
+    }
+}
+
+async fn assert_event_contains_read_concern(client: &EventClient) {
+    let event = client
+        .get_command_started_events(&["find"])
+        .into_iter()
+        .next()
+        .unwrap();
+    assert_eq!(
+        event
+            .command
+            .get_document("readConcern")
+            .unwrap()
+            .get_str("level")
+            .unwrap(),
+        "snapshot"
+    );
 }
