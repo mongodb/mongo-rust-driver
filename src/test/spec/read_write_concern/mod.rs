@@ -1,5 +1,6 @@
 mod connection_string;
 mod document;
+mod operation;
 
 use crate::{
     bson::{Bson, Document},
