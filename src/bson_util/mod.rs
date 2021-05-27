@@ -277,11 +277,11 @@ mod test {
         spec::BinarySubtype,
         Binary,
         Bson,
+        DateTime,
         JavaScriptCodeWithScope,
         Regex,
         Timestamp,
     };
-    use chrono::{DateTime, NaiveDateTime, Utc};
 
     use super::doc_size_bytes;
 
@@ -309,10 +309,7 @@ mod test {
             "timestamp": Bson::Timestamp(Timestamp { time: 12233, increment: 34444 }),
             "binary": Bson::Binary(Binary{ subtype: BinarySubtype::Generic, bytes: vec![3, 222, 11] }),
             "objectid": ObjectId::from_bytes([1; 12]),
-            "datetime": DateTime::from_utc(
-                NaiveDateTime::from_timestamp(4444333221, 0),
-                Utc,
-            ),
+            "datetime": DateTime::from_millis(4444333221),
             "symbol": Bson::Symbol("foobar".into()),
         };
 

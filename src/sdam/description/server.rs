@@ -1,9 +1,7 @@
 use std::time::Duration;
 
-use crate::bson::{oid::ObjectId, DateTime};
-use chrono::offset::Utc;
-
 use crate::{
+    bson::{oid::ObjectId, DateTime},
     client::ClusterTime,
     is_master::IsMasterReply,
     options::ServerAddress,
@@ -115,7 +113,7 @@ impl ServerDescription {
         // We want to set last_update_time if we got any sort of response from the server.
         match description.reply {
             Ok(None) => {}
-            _ => description.last_update_time = Some(Utc::now().into()),
+            _ => description.last_update_time = Some(DateTime::now()),
         };
 
         if let Ok(Some(ref mut reply)) = description.reply {
