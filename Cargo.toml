@@ -29,12 +29,16 @@ sync = ["async-std-runtime"]
 # whose implementation cannot be changed; otherwise, it is preferred to use the helper functions
 # provided in the bson::serde_helpers module.
 bson-u2i = ["bson/u2i"]
+# Enable support for v0.4 of the chrono crate in the public API of the BSON library.
+bson-chrono-0_4 = ["bson/chrono-0_4"]
+# Enable support for v0.8 of the uuid crate in the public API of the BSON library.
+bson-uuid-0_8 = ["bson/uuid-0_8"]
 
 [dependencies]
 async-trait = "0.1.42"
 base64 = "0.13.0"
 bitflags = "1.1.0"
-bson = "2.0.0-beta"
+bson = { git = "https://github.com/mongodb/bson-rust" }
 chrono = "0.4.7"
 derivative = "2.1.1"
 futures-core = "0.3.14"

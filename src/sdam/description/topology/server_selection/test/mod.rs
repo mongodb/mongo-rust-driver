@@ -1,7 +1,6 @@
 use std::time::Duration;
 
-use bson::doc;
-use chrono::{TimeZone, Utc};
+use bson::{doc, DateTime};
 use serde::Deserialize;
 
 use crate::{
@@ -90,7 +89,7 @@ impl TestServerDescription {
         let mut command_response = is_master_response_from_server_type(server_type);
         command_response.tags = self.tags;
         command_response.last_write = self.last_write.map(|last_write| LastWrite {
-            last_write_date: Utc.timestamp_millis(last_write.last_write_date).into(),
+            last_write_date: DateTime::from_millis(last_write.last_write_date),
         });
 
         let is_master = IsMasterReply {
@@ -105,7 +104,7 @@ impl TestServerDescription {
         );
         server_desc.last_update_time = self
             .last_update_time
-            .map(|i| Utc.timestamp_millis(i.into()).into());
+            .map(|i| DateTime::from_millis(i.into()));
 
         Some(server_desc)
     }
