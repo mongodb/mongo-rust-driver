@@ -6,7 +6,7 @@ use futures::Future;
 use mongodb::{
     bson::{doc, Document},
     error::{Result, TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT},
-    options::{Acknowledgment, TransactionOptions, WriteConcern},
+    options::{Acknowledgment, ReadConcern, TransactionOptions, WriteConcern},
     ClientSession,
 };
 
@@ -33,9 +33,7 @@ where
 async fn commit_with_retry(session: &mut ClientSession) -> Result<()> {
     while let Err(err) = session.commit_transaction().await {
         if err.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT) {
-            println!(
-                "Encountered UnknownTransactionCommitResult, retrying commit operation."
-            );
+            println!("Encountered UnknownTransactionCommitResult, retrying commit operation.");
             continue;
         } else {
             println!("Encountered non-retryable error during commit.");
@@ -73,8 +71,8 @@ async fn execute_employee_info_transaction(session: &mut ClientSession) -> Resul
 }
 
 async fn update_employee_info(session: &mut ClientSession) -> Result<()> {
-    // TODO RUST-824 add snapshot read concern
     let transaction_options = TransactionOptions::builder()
+        .read_concern(ReadConcern::snapshot())
         .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
         .build();
     session.start_transaction(transaction_options).await?;
