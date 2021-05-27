@@ -6,7 +6,6 @@ mod test_file;
 mod test_runner;
 
 use futures::stream::TryStreamExt;
-use lazy_static::lazy_static;
 use semver::Version;
 use tokio::sync::RwLockWriteGuard;
 
@@ -32,12 +31,7 @@ pub use self::{
     test_runner::{EntityMap, TestRunner},
 };
 
-lazy_static! {
-    static ref SPEC_VERSIONS: Vec<Version> = vec![
-        Version::parse("1.0.0").unwrap(),
-        Version::parse("1.1.0").unwrap()
-    ];
-}
+static SPEC_VERSIONS: &[Version] = &[Version::new(1, 0, 0), Version::new(1, 1, 0)];
 
 const SKIPPED_OPERATIONS: &[&str] = &[
     "bulkWrite",
