@@ -120,7 +120,7 @@ function_name = "0.2.0"
 futures = "0.3"
 pretty_assertions = "0.7.1"
 serde_json = "1.0.64"
-semver = "0.11.0"
+semver = "1.0.0"
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]
