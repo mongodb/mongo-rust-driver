@@ -2,6 +2,7 @@ mod test_file;
 
 use std::time::Duration;
 
+use bson::Bson;
 use futures::stream::TryStreamExt;
 use semver::VersionReq;
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
@@ -27,7 +28,7 @@ use crate::{
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_spec_tests() {
     async fn run_test(test_file: TestFile) {
-        for test_case in test_file.tests {
+        for mut test_case in test_file.tests {
             if test_case.operation.name == "bulkWrite" {
                 continue;
             }
@@ -63,7 +64,15 @@ async fn run_spec_tests() {
                     .expect(&test_case.description);
             }
 
-            if let Some(ref fail_point) = test_case.fail_point {
+            if let Some(ref mut fail_point) = test_case.fail_point {
+                // TODO: DRIVERS-1385 remove this logic for moving errorLabels to the top level.
+                if let Some(Bson::Document(data)) = fail_point.get_mut("data") {
+                    if let Some(Bson::Document(wc_error)) = data.get_mut("writeConcernError") {
+                        if let Some(labels) = wc_error.remove("errorLabels") {
+                            data.insert("errorLabels", labels);
+                        }
+                    }
+                }
                 client
                     .database("admin")
                     .run_command(fail_point.clone(), None)
@@ -89,9 +98,14 @@ async fn run_spec_tests() {
                 match expected_result {
                     Result::Value(value) => {
                         let description = &test_case.description;
-                        let result = result.unwrap().unwrap_or_else(|| {
-                            panic!("{:?}: operation should succeed", description)
-                        });
+                        let result = result
+                            .unwrap_or_else(|e| {
+                                panic!(
+                                    "{:?}: operation should succeed, got error: {}",
+                                    description, e
+                                )
+                            })
+                            .unwrap();
                         assert_matches(&result, &value, Some(description));
                     }
                     Result::Labels(expected_labels) => {

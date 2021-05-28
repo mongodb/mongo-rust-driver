@@ -1,11 +1,11 @@
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Deserialize};
 
 use super::wire::Message;
 use crate::{
     bson::{Bson, Document},
     bson_util,
     client::{options::ServerApi, ClusterTime},
-    error::{CommandError, ErrorKind, Result},
+    error::{CommandError, Error, ErrorKind, Result},
     options::ServerAddress,
     selection_criteria::ReadPreference,
     ClientSession,
@@ -136,16 +136,19 @@ impl CommandResponse {
         }
     }
 
-    /// Retunrs a result indicating whether this response corresponds to a command failure.
+    /// Returns a result indicating whether this response corresponds to a command failure.
     pub(crate) fn validate(&self) -> Result<()> {
         if !self.is_success() {
-            let command_error: CommandError =
+            let error_response: CommandErrorResponse =
                 bson::from_bson(Bson::Document(self.raw_response.clone())).map_err(|_| {
                     ErrorKind::InvalidResponse {
                         message: "invalid server response".to_string(),
                     }
                 })?;
-            Err(ErrorKind::Command(command_error).into())
+            Err(Error::new(
+                ErrorKind::Command(error_response.command_error),
+                error_response.error_labels,
+            ))
         } else {
             Ok(())
         }
@@ -171,4 +174,13 @@ impl CommandResponse {
     pub(crate) fn source_address(&self) -> &ServerAddress {
         &self.source
     }
+}
+
+#[derive(Deserialize, Debug)]
+struct CommandErrorResponse {
+    #[serde(rename = "errorLabels")]
+    error_labels: Option<Vec<String>>,
+
+    #[serde(flatten)]
+    command_error: CommandError,
 }

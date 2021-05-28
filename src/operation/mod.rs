@@ -148,14 +148,18 @@ struct EmptyBody {}
 struct WriteConcernOnlyBody {
     #[serde(rename = "writeConcernError")]
     write_concern_error: Option<WriteConcernError>,
+
+    #[serde(rename = "errorLabels")]
+    labels: Option<Vec<String>>,
 }
 
 impl WriteConcernOnlyBody {
     fn validate(&self) -> Result<()> {
         match self.write_concern_error {
-            Some(ref wc_error) => {
-                Err(ErrorKind::Write(WriteFailure::WriteConcernError(wc_error.clone())).into())
-            }
+            Some(ref wc_error) => Err(Error::new(
+                ErrorKind::Write(WriteFailure::WriteConcernError(wc_error.clone())),
+                self.labels.clone(),
+            )),
             None => Ok(()),
         }
     }
@@ -184,24 +188,15 @@ impl<T> WriteResponseBody<T> {
             return Ok(());
         };
 
-        // Error labels for WriteConcernErrors are sent from the server in a separate field.
-        let write_concern_error = match self.write_concern_error {
-            Some(ref write_concern_error) => {
-                let mut write_concern_error = write_concern_error.clone();
-                if let Some(ref labels) = self.labels {
-                    write_concern_error.labels.append(&mut labels.clone());
-                }
-                Some(write_concern_error)
-            }
-            None => None,
-        };
-
         let failure = BulkWriteFailure {
             write_errors: self.write_errors.clone(),
-            write_concern_error,
+            write_concern_error: self.write_concern_error.clone(),
         };
 
-        Err(ErrorKind::BulkWrite(failure).into())
+        Err(Error::new(
+            ErrorKind::BulkWrite(failure),
+            self.labels.clone(),
+        ))
     }
 }
 
