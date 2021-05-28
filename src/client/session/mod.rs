@@ -39,24 +39,34 @@ lazy_static! {
 /// or process at a time.
 ///
 /// ## Transactions
+/// Transactions are used to execute a series of operations across multiple documents and
+/// collections atomically. For more information about when and how to use transactions in MongoDB,
+/// see the [manual](https://docs.mongodb.com/manual/core/transactions/).
+///
 /// Replica set transactions are supported on MongoDB 4.0+. Transactions are associated with a
-/// `ClientSession`. To begin a transaction, call [ClientSession::start_transaction] on a
+/// `ClientSession`. To begin a transaction, call [`ClientSession::start_transaction`] on a
 /// `ClientSession`. The `ClientSession` must be passed to operations to be executed within the
 /// transaction.
 ///
 /// ```rust
-/// # use mongodb::{
-/// #     bson::doc,
-/// #     error::{Result, TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT},
-/// #     Client,
-/// #     ClientSession,
-/// #     Collection,
-/// # };
+/// use mongodb::{
+///     bson::doc,
+///     error::{Result, TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT},
+///     options::{Acknowledgment, ReadConcern, TransactionOptions, WriteConcern},
+/// #   Client,
+///     ClientSession,
+///     Collection,
+/// };
+///
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// # let coll = client.database("foo").collection("bar");
-/// # let mut session = client.start_session(None).await?;
-/// session.start_transaction(None).await?;
+/// let mut session = client.start_session(None).await?;
+/// let options = TransactionOptions::builder()
+///     .read_concern(ReadConcern::majority())
+///     .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
+///     .build();
+/// session.start_transaction(options).await?;
 /// // A "TransientTransactionError" label indicates that the entire transaction can be retried
 /// // with a reasonable expectation that it will succeed.
 /// while let Err(error) = execute_transaction(&coll, &mut session).await {
@@ -87,7 +97,7 @@ lazy_static! {
 /// ```
 // TODO RUST-122 Remove this note and adjust the above description to indicate that sharded
 // transactions are supported on 4.2+
-/// Note: transactions are currently not supported on sharded clusters.
+/// Note: the driver does not currently support transactions on sharded clusters.
 #[derive(Clone, Debug)]
 pub struct ClientSession {
     cluster_time: Option<ClusterTime>,
@@ -244,6 +254,10 @@ impl ClientSession {
     /// be passed into each operation within the transaction; otherwise, the operation will be
     /// executed outside of the transaction.
     ///
+    /// Errors returned from operations executed within a transaction may include a
+    /// [`crate::error::TRANSIENT_TRANSACTION_ERROR`] label. This label indicates that the entire
+    /// transaction can be retried with a reasonable expectation that it will succeed.
+    ///
     /// Transactions are supported on MongoDB 4.0+. The Rust driver currently only supports
     /// transactions on replica sets.
     ///
@@ -326,6 +340,13 @@ impl ClientSession {
     }
 
     /// Commits the transaction that is currently active on this session.
+    ///
+    ///
+    /// This method may return an error with a [`crate::error::UNKNOWN_TRANSACTION_COMMIT_RESULT`]
+    /// label. This label indicates that it is unknown whether the commit has satisfied the write
+    /// concern associated with the transaction. If an error with this label is returned, it is
+    /// safe to retry the commit until the write concern is satisfied or an error without the label
+    /// is returned.
     ///
     /// ```rust
     /// # use mongodb::{bson::{doc, Document}, error::Result, Client, ClientSession};

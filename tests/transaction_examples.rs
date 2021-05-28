@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 
-extern crate mongodb;
-
 use futures::Future;
 use mongodb::{
     bson::{doc, Document},

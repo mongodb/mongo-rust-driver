@@ -23,7 +23,7 @@ impl FailPoint {
     }
 
     /// Create a failCommand failpoint.
-    /// See https://github.com/mongodb/mongo/wiki/The-%22failCommand%22-fail-point for more info.
+    /// See <https://github.com/mongodb/mongo/wiki/The-%22failCommand%22-fail-point> for more info.
     pub fn fail_command(
         fail_commands: &[&str],
         mode: FailPointMode,
