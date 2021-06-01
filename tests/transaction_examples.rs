@@ -1,6 +1,7 @@
 #![allow(dead_code)]
+#![cfg(not(feature = "sync"))]
 
-use futures::Future;
+// START TRANSACTIONS EXAMPLE
 use mongodb::{
     bson::{doc, Document},
     error::{Result, TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT},
@@ -8,15 +9,18 @@ use mongodb::{
     ClientSession,
 };
 
-async fn execute_transaction_with_retry<F, G>(
-    execute_transaction: F,
-    session: &mut ClientSession,
-) -> Result<()>
-where
-    F: Fn(&mut ClientSession) -> G,
-    G: Future<Output = Result<()>>,
-{
-    while let Err(err) = execute_transaction(session).await {
+async fn update_employee_info(session: &mut ClientSession) -> Result<()> {
+    let transaction_options = TransactionOptions::builder()
+        .read_concern(ReadConcern::snapshot())
+        .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
+        .build();
+    session.start_transaction(transaction_options).await?;
+
+    execute_transaction_with_retry(session).await
+}
+
+async fn execute_transaction_with_retry(session: &mut ClientSession) -> Result<()> {
+    while let Err(err) = execute_employee_info_transaction(session).await {
         println!("Transaction aborted. Error returned during transaction.");
         if err.contains_label(TRANSIENT_TRANSACTION_ERROR) {
             println!("Encountered TransientTransactionError, retrying transaction.");
@@ -25,20 +29,6 @@ where
             return Err(err);
         }
     }
-    Ok(())
-}
-
-async fn commit_with_retry(session: &mut ClientSession) -> Result<()> {
-    while let Err(err) = session.commit_transaction().await {
-        if err.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT) {
-            println!("Encountered UnknownTransactionCommitResult, retrying commit operation.");
-            continue;
-        } else {
-            println!("Encountered non-retryable error during commit.");
-            return Err(err);
-        }
-    }
-    println!("Transaction committed.");
     Ok(())
 }
 
@@ -68,12 +58,17 @@ async fn execute_employee_info_transaction(session: &mut ClientSession) -> Resul
     commit_with_retry(session).await
 }
 
-async fn update_employee_info(session: &mut ClientSession) -> Result<()> {
-    let transaction_options = TransactionOptions::builder()
-        .read_concern(ReadConcern::snapshot())
-        .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
-        .build();
-    session.start_transaction(transaction_options).await?;
-
-    execute_transaction_with_retry(execute_employee_info_transaction, session).await
+async fn commit_with_retry(session: &mut ClientSession) -> Result<()> {
+    while let Err(err) = session.commit_transaction().await {
+        if err.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT) {
+            println!("Encountered UnknownTransactionCommitResult, retrying commit operation.");
+            continue;
+        } else {
+            println!("Encountered non-retryable error during commit.");
+            return Err(err);
+        }
+    }
+    println!("Transaction committed.");
+    Ok(())
 }
+// END TRANSACTIONS EXAMPLE
