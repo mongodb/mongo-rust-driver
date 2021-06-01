@@ -146,7 +146,7 @@ impl AsyncRuntime {
     }
 
     /// Create a new `Interval` that yields with interval of `duration`.
-    /// See: https://docs.rs/tokio/latest/tokio/time/fn.interval.html
+    /// See: <https://docs.rs/tokio/latest/tokio/time/fn.interval.html>
     pub(crate) fn interval(self, duration: Duration) -> Interval {
         match self {
             #[cfg(feature = "tokio-runtime")]
