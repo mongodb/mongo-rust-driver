@@ -1,6 +1,10 @@
 use bitflags::bitflags;
 use futures_io::{AsyncRead, AsyncWrite};
-use futures_util::{AsyncReadExt, AsyncWriteExt, io::{BufReader, BufWriter}};
+use futures_util::{
+    io::{BufReader, BufWriter},
+    AsyncReadExt,
+    AsyncWriteExt,
+};
 
 use super::{
     header::{Header, OpCode},
