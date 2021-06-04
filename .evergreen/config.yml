@@ -1330,9 +1330,9 @@ buildvariants:
 - matrix_name: "aws-auth"
   matrix_spec:
     os:
-      - ubuntu-18.04
+      - ubuntu-20.04
     async-runtime: "tokio"
-  display_name: "AWS Auth ${os} with ${async-runtime}"
+  display_name: "${os} AWS Auth with ${async-runtime}"
   tasks:
     - ".aws-auth"
 # TODO: RUST-361 enable these tests once OCSP support is implemented
