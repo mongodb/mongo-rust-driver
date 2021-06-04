@@ -1279,7 +1279,7 @@ buildvariants:
       then:
         remove_tasks: [".3.6", ".4.0", ".4.2"]
     - if:
-        os: "ubuntu-18.04"
+        os: ["ubuntu-18.04", "ubuntu-18.04-arm64"]
         auth-and-tls: "auth-and-tls"
         async-runtime: "*"
       then:
