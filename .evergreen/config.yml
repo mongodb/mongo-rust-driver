@@ -1330,7 +1330,7 @@ buildvariants:
 - matrix_name: "aws-auth"
   matrix_spec:
     os:
-      - ubuntu-20.04
+      - ubuntu-18.04
     async-runtime: "tokio"
   display_name: "${os} AWS Auth with ${async-runtime}"
   tasks:
