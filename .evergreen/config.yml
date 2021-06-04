@@ -1274,11 +1274,14 @@ buildvariants:
     # the SSL tests on them.
     - if:
         os: "ubuntu-20.04"
+        auth-and-tls: "*"
+        async-runtime: "*"
       then:
         remove_tasks: [".3.6", ".4.0", ".4.2"]
     - if:
         os: "ubuntu-18.04"
         auth-and-tls: "auth-and-tls"
+        async-runtime: "*"
       then:
         remove_tasks: ".3.6"
 - matrix_name: "x509-auth"
