@@ -1261,7 +1261,7 @@ buildvariants:
       - windows-64-vs2017
     auth-and-tls: "*"
     async-runtime: "*"
-  display_name: "${os} ${auth-and-tls} with ${async-runtime}"
+  display_name: "! ${os} ${auth-and-tls} with ${async-runtime}"
   tasks:
      - ".latest"
      - ".4.4"
@@ -1370,13 +1370,13 @@ buildvariants:
       - ubuntu-18.04
     async-runtime: "*"
     extra-rust-versions: "*"
-  display_name: "Compile on Rust ${extra-rust-versions} with ${async-runtime}"
+  display_name: "! Compile on Rust ${extra-rust-versions} with ${async-runtime}"
   tasks:
     - "compile-only"
 
 -
   name: "lint"
-  display_name: "Lint"
+  display_name: "! Lint"
   run_on:
     - ubuntu1804-test
   tasks:
