@@ -1231,7 +1231,7 @@ axes:
           VENV_BIN_DIR: "bin"
       - id: ubuntu-18.04-arm64
         display_name: "ARM64 Ubuntu 18.04"
-        run_on: ubuntu-1804-arm64-small
+        run_on: ubuntu-1804-arm64-test
         variables:
           PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
           VENV_BIN_DIR: "bin"
@@ -1242,9 +1242,9 @@ axes:
           SINGLE_THREAD: true
           PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
           VENV_BIN_DIR: "bin"
-      - id: windows-64-vs2017-small
+      - id: windows-64-vs2017
         display_name: "Windows (VS 2017)"
-        run_on: windows-64-vs2017-small
+        run_on: windows-64-vs2017-test
         variables:
           PYTHON: "/cygdrive/c/python/Python36/python"
           VENV_BIN_DIR: "Scripts"
@@ -1258,7 +1258,7 @@ buildvariants:
       - ubuntu-20.04
       - ubuntu-18.04-arm64
       - macos-10.15
-      - windows-64-vs2017-small
+      - windows-64-vs2017
     auth-and-tls: "*"
     async-runtime: "*"
   display_name: "${os} ${auth-and-tls} with ${async-runtime}"
@@ -1274,7 +1274,7 @@ buildvariants:
       - ubuntu-20.04
       - ubuntu-18.04-arm64
       - macos-10.15
-      - windows-64-vs2017-small
+      - windows-64-vs2017
     auth-and-tls: "auth-and-tls"
     async-runtime: "*"
   display_name: "${os} X.509 auth with ${async-runtime}"
@@ -1287,7 +1287,7 @@ buildvariants:
       - ubuntu-20.04
       - ubuntu-18.04-arm64
       - macos-10.15
-      - windows-64-vs2017-small
+      - windows-64-vs2017
     async-runtime: "*"
   display_name: "${os} PLAIN auth with ${async-runtime}"
   tasks:
@@ -1299,7 +1299,7 @@ buildvariants:
       - ubuntu-20.04
       - ubuntu-18.04-arm64
       - macos-10.15
-      - windows-64-vs2017-small
+      - windows-64-vs2017
     async-runtime: "*"
   display_name: "Atlas Connectivity ${os} with ${async-runtime}"
   tasks:
@@ -1341,7 +1341,7 @@ buildvariants:
 # - matrix_name: "ocsp-windows"
 #   matrix_spec:
 #     os:
-#       - windows-64-vs2017-small
+#       - windows-64-vs2017
 #     async-runtime: "*"
 #     mongodb-version:
 #       - latest
