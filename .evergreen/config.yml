@@ -1268,6 +1268,20 @@ buildvariants:
      - ".4.2"
      - ".4.0"
      - ".3.6"
+  rules:
+    # Some older versions of MongoDB do not have specific Linux builds, so we just use
+    # generic Linux builds on them. These do not link to OpenSSL, so we have to skip
+    # the SSL tests on them.
+    - if:
+        os: "ubuntu-20.04"
+        auth-and-tls: "auth-and-tls"
+      then:
+        remove_tasks: [".3.6", ".4.0"]
+    - if:
+        os: "ubuntu-18.04"
+        auth-and-tls: "auth-and-tls"
+      then:
+        remove_tasks: ".3.6"
 - matrix_name: "x509-auth"
   matrix_spec:
     os:
