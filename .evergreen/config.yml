@@ -1279,11 +1279,18 @@ buildvariants:
       then:
         remove_tasks: [".3.6", ".4.0", ".4.2"]
     - if:
-        os: ["ubuntu-18.04", "ubuntu-18.04-arm64"]
+        os: "ubuntu-18.04"
         auth-and-tls: "auth-and-tls"
         async-runtime: "*"
       then:
         remove_tasks: ".3.6"
+    # ubuntu 1804 ARM64 only has downloads for 4.2+
+    - if:
+        os: ["ubuntu-18.04-arm64"]
+        auth-and-tls: "*"
+        async-runtime: "*"
+      then:
+        remove_tasks: [".3.6", ".4.0"]
 - matrix_name: "x509-auth"
   matrix_spec:
     os:
