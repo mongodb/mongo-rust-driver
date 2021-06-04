@@ -1,6 +1,10 @@
 use bitflags::bitflags;
 use futures_io::{AsyncRead, AsyncWrite};
-use futures_util::{AsyncReadExt, AsyncWriteExt};
+use futures_util::{
+    io::{BufReader, BufWriter},
+    AsyncReadExt,
+    AsyncWriteExt,
+};
 
 use super::{
     header::{Header, OpCode},
@@ -71,13 +75,17 @@ impl Message {
 
     /// Reads bytes from `reader` and deserializes them into a Message.
     pub(crate) async fn read_from(reader: &mut AsyncStream) -> Result<Self> {
-        let header = Header::read_from(reader).await?;
+        let mut reader = BufReader::new(reader);
+        let header = Header::read_from(&mut reader).await?;
         let mut length_remaining = header.length - Header::LENGTH as i32;
+        let mut buf = vec![0u8; length_remaining as usize];
+        reader.read_exact(&mut buf).await?;
+        let mut reader = buf.as_slice();
 
         let flags = MessageFlags::from_bits_truncate(reader.read_u32().await?);
         length_remaining -= std::mem::size_of::<u32>() as i32;
 
-        let mut count_reader = CountReader::new(reader);
+        let mut count_reader = CountReader::new(&mut reader);
         let mut sections = Vec::new();
 
         while length_remaining - count_reader.bytes_read() as i32 > 4 {
@@ -112,7 +120,8 @@ impl Message {
     }
 
     /// Serializes the Message to bytes and writes them to `writer`.
-    pub(crate) async fn write_to(&self, writer: &mut AsyncStream) -> Result<()> {
+    pub(crate) async fn write_to(&self, stream: &mut AsyncStream) -> Result<()> {
+        let mut writer = BufWriter::new(stream);
         let mut sections_bytes = Vec::new();
 
         for section in &self.sections {
@@ -135,7 +144,7 @@ impl Message {
             op_code: OpCode::Message,
         };
 
-        header.write_to(writer).await?;
+        header.write_to(&mut writer).await?;
         writer.write_u32(self.flags.bits()).await?;
         writer.write_all(&sections_bytes).await?;
 

@@ -1,6 +1,9 @@
+use futures_io::{AsyncRead, AsyncWrite};
+use futures_util::AsyncWriteExt;
+
 use crate::{
     error::{ErrorKind, Result},
-    runtime::{AsyncLittleEndianRead, AsyncLittleEndianWrite, AsyncStream},
+    runtime::AsyncLittleEndianRead,
 };
 
 /// The wire protocol op codes.
@@ -39,21 +42,21 @@ impl Header {
     pub(crate) const LENGTH: usize = 4 * std::mem::size_of::<i32>();
 
     /// Serializes the Header and writes the bytes to `w`.
-    pub(crate) async fn write_to(&self, stream: &mut AsyncStream) -> Result<()> {
-        stream.write_i32(self.length).await?;
-        stream.write_i32(self.request_id).await?;
-        stream.write_i32(self.response_to).await?;
-        stream.write_i32(self.op_code as i32).await?;
+    pub(crate) async fn write_to<W: AsyncWrite + Unpin>(&self, stream: &mut W) -> Result<()> {
+        stream.write(&self.length.to_le_bytes()).await?;
+        stream.write(&self.request_id.to_le_bytes()).await?;
+        stream.write(&self.response_to.to_le_bytes()).await?;
+        stream.write(&(self.op_code as i32).to_le_bytes()).await?;
 
         Ok(())
     }
 
     /// Reads bytes from `r` and deserializes them into a header.
-    pub(crate) async fn read_from(stream: &mut AsyncStream) -> Result<Self> {
-        let length = stream.read_i32().await?;
-        let request_id = stream.read_i32().await?;
-        let response_to = stream.read_i32().await?;
-        let op_code = OpCode::from_i32(stream.read_i32().await?)?;
+    pub(crate) async fn read_from<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self> {
+        let length = reader.read_i32().await?;
+        let request_id = reader.read_i32().await?;
+        let response_to = reader.read_i32().await?;
+        let op_code = OpCode::from_i32(reader.read_i32().await?)?;
         Ok(Self {
             length,
             request_id,
