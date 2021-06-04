@@ -1223,9 +1223,9 @@ axes:
         variables:
           PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
           VENV_BIN_DIR: "bin"
-      - id: ubuntu-16.04
-        display_name: "Ubuntu 16.04"
-        run_on: ubuntu1604-test
+      - id: ubuntu-20.04
+        display_name: "Ubuntu 20.04"
+        run_on: ubuntu2004-test
         variables:
           PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
           VENV_BIN_DIR: "bin"
@@ -1254,7 +1254,8 @@ buildvariants:
   matrix_name: "tests"
   matrix_spec:
     os:
-      - ubuntu-16.04
+      - ubuntu-18.04
+      - ubuntu-20.04
       - ubuntu-18.04-arm64
       - macos-10.14
       - windows-64-vs2017-small
@@ -1270,7 +1271,8 @@ buildvariants:
 - matrix_name: "x509-auth"
   matrix_spec:
     os:
-      - ubuntu-16.04
+      - ubuntu-20.04
+      - ubuntu-18.04-arm64
       - macos-10.14
       - windows-64-vs2017-small
     auth-and-tls: "auth-and-tls"
@@ -1282,7 +1284,8 @@ buildvariants:
 - matrix_name: "plain-auth"
   matrix_spec:
     os:
-      - ubuntu-16.04
+      - ubuntu-20.04
+      - ubuntu-18.04-arm64
       - macos-10.14
       - windows-64-vs2017-small
     async-runtime: "*"
@@ -1293,7 +1296,8 @@ buildvariants:
 - matrix_name: "atlas-connect"
   matrix_spec:
     os:
-      - ubuntu-16.04
+      - ubuntu-20.04
+      - ubuntu-18.04-arm64
       - macos-10.14
       - windows-64-vs2017-small
     async-runtime: "*"
