@@ -1235,8 +1235,8 @@ axes:
         variables:
           PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
           VENV_BIN_DIR: "bin"
-      - id: macos-10.14
-        display_name: "MacOS 10.14"
+      - id: macos-10.15
+        display_name: "MacOS 10.15"
         run_on: macos-1014
         variables:
           SINGLE_THREAD: true
@@ -1257,7 +1257,7 @@ buildvariants:
       - ubuntu-18.04
       - ubuntu-20.04
       - ubuntu-18.04-arm64
-      - macos-10.14
+      - macos-10.15
       - windows-64-vs2017-small
     auth-and-tls: "*"
     async-runtime: "*"
@@ -1273,7 +1273,7 @@ buildvariants:
     os:
       - ubuntu-20.04
       - ubuntu-18.04-arm64
-      - macos-10.14
+      - macos-10.15
       - windows-64-vs2017-small
     auth-and-tls: "auth-and-tls"
     async-runtime: "*"
@@ -1286,7 +1286,7 @@ buildvariants:
     os:
       - ubuntu-20.04
       - ubuntu-18.04-arm64
-      - macos-10.14
+      - macos-10.15
       - windows-64-vs2017-small
     async-runtime: "*"
   display_name: "${os} PLAIN auth with ${async-runtime}"
@@ -1298,7 +1298,7 @@ buildvariants:
     os:
       - ubuntu-20.04
       - ubuntu-18.04-arm64
-      - macos-10.14
+      - macos-10.15
       - windows-64-vs2017-small
     async-runtime: "*"
   display_name: "Atlas Connectivity ${os} with ${async-runtime}"
@@ -1328,7 +1328,7 @@ buildvariants:
 # - matrix_name: "ocsp-macos"
 #   matrix_spec:
 #     os:
-#       - macos-10.14
+#       - macos-10.15
 #     async-runtime: "*"
 #     mongodb-version:
 #       - latest
