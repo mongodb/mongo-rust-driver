@@ -1223,9 +1223,15 @@ axes:
         variables:
           PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
           VENV_BIN_DIR: "bin"
-      - id: ubuntu-16.04
-        display_name: "Ubuntu 16.04"
-        run_on: ubuntu1604-test
+      - id: ubuntu-20.04
+        display_name: "Ubuntu 20.04"
+        run_on: ubuntu2004-test
+        variables:
+          PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
+          VENV_BIN_DIR: "bin"
+      - id: ubuntu-18.04-arm64
+        display_name: "ARM64 Ubuntu 18.04"
+        run_on: ubuntu1804-arm64-test
         variables:
           PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
           VENV_BIN_DIR: "bin"
@@ -1236,9 +1242,9 @@ axes:
           SINGLE_THREAD: true
           PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
           VENV_BIN_DIR: "bin"
-      - id: windows-64-vs2017-small
+      - id: windows-64-vs2017
         display_name: "Windows (VS 2017)"
-        run_on: windows-64-vs2017-small
+        run_on: windows-64-vs2017-test
         variables:
           PYTHON: "/cygdrive/c/python/Python36/python"
           VENV_BIN_DIR: "Scripts"
@@ -1248,24 +1254,50 @@ buildvariants:
   matrix_name: "tests"
   matrix_spec:
     os:
-      - ubuntu-16.04
+      - ubuntu-18.04
+      - ubuntu-20.04
+      - ubuntu-18.04-arm64
       - macos-10.14
-      - windows-64-vs2017-small
+      - windows-64-vs2017
     auth-and-tls: "*"
     async-runtime: "*"
-  display_name: "${os} ${auth-and-tls} with ${async-runtime}"
+  display_name: "! ${os} ${auth-and-tls} with ${async-runtime}"
   tasks:
      - ".latest"
      - ".4.4"
      - ".4.2"
      - ".4.0"
      - ".3.6"
+  rules:
+    # Some older versions of MongoDB do not have specific Linux builds, so we just use
+    # generic Linux builds on them. These do not link to OpenSSL, so we have to skip
+    # the SSL tests on them.
+    - if:
+        os: "ubuntu-20.04"
+        auth-and-tls: "*"
+        async-runtime: "*"
+      then:
+        remove_tasks: [".3.6", ".4.0", ".4.2"]
+    - if:
+        os: "ubuntu-18.04"
+        auth-and-tls: "auth-and-tls"
+        async-runtime: "*"
+      then:
+        remove_tasks: ".3.6"
+    # ubuntu 1804 ARM64 only has downloads for 4.2+
+    - if:
+        os: ["ubuntu-18.04-arm64"]
+        auth-and-tls: "*"
+        async-runtime: "*"
+      then:
+        remove_tasks: [".3.6", ".4.0"]
 - matrix_name: "x509-auth"
   matrix_spec:
     os:
-      - ubuntu-16.04
+      - ubuntu-20.04
+      - ubuntu-18.04-arm64
       - macos-10.14
-      - windows-64-vs2017-small
+      - windows-64-vs2017
     auth-and-tls: "auth-and-tls"
     async-runtime: "*"
   display_name: "${os} X.509 auth with ${async-runtime}"
@@ -1275,9 +1307,10 @@ buildvariants:
 - matrix_name: "plain-auth"
   matrix_spec:
     os:
-      - ubuntu-16.04
+      - ubuntu-20.04
+      - ubuntu-18.04-arm64
       - macos-10.14
-      - windows-64-vs2017-small
+      - windows-64-vs2017
     async-runtime: "*"
   display_name: "${os} PLAIN auth with ${async-runtime}"
   tasks:
@@ -1286,9 +1319,10 @@ buildvariants:
 - matrix_name: "atlas-connect"
   matrix_spec:
     os:
-      - ubuntu-16.04
+      - ubuntu-20.04
+      - ubuntu-18.04-arm64
       - macos-10.14
-      - windows-64-vs2017-small
+      - windows-64-vs2017
     async-runtime: "*"
   display_name: "Atlas Connectivity ${os} with ${async-runtime}"
   tasks:
@@ -1298,7 +1332,7 @@ buildvariants:
     os:
       - ubuntu-18.04
     async-runtime: "tokio"
-  display_name: "AWS Auth ${os} with ${async-runtime}"
+  display_name: "${os} AWS Auth with ${async-runtime}"
   tasks:
     - ".aws-auth"
 # TODO: RUST-361 enable these tests once OCSP support is implemented
@@ -1330,7 +1364,7 @@ buildvariants:
 # - matrix_name: "ocsp-windows"
 #   matrix_spec:
 #     os:
-#       - windows-64-vs2017-small
+#       - windows-64-vs2017
 #     async-runtime: "*"
 #     mongodb-version:
 #       - latest
@@ -1346,13 +1380,13 @@ buildvariants:
       - ubuntu-18.04
     async-runtime: "*"
     extra-rust-versions: "*"
-  display_name: "Compile on Rust ${extra-rust-versions} with ${async-runtime}"
+  display_name: "! Compile on Rust ${extra-rust-versions} with ${async-runtime}"
   tasks:
     - "compile-only"
 
 -
   name: "lint"
-  display_name: "Lint"
+  display_name: "! Lint"
   run_on:
     - ubuntu1804-test
   tasks:
