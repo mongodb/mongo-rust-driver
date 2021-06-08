@@ -408,12 +408,8 @@ impl Topology {
             .transaction_support_status()
     }
 
-    pub(super) async fn is_sharded(&self) -> bool {
-        self.state.read().await.description.topology_type() == TopologyType::Sharded
-    }
-
-    pub(super) async fn is_unknown(&self) -> bool {
-        self.state.read().await.description.topology_type() == TopologyType::Unknown
+    pub(super) async fn topology_type(&self) -> TopologyType {
+        self.state.read().await.description.topology_type()
     }
 
     pub(crate) async fn get_server_description(

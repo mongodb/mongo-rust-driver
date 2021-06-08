@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, time::Duration};
 
 use pretty_assertions::assert_eq;
 
@@ -32,8 +32,8 @@ async fn run_test(new_hosts: Result<Vec<ServerAddress>>, expected_hosts: HashSet
     monitor
         .update_hosts(
             new_hosts.map(|hosts| LookupHosts {
-                hosts,
-                min_ttl: None,
+                hosts: hosts.into_iter().map(Result::Ok).collect(),
+                min_ttl: Duration::from_secs(60),
             }),
             topology.clone(),
         )
