@@ -10,7 +10,7 @@ mod scram;
 mod test;
 mod x509;
 
-use std::{borrow::Cow, str::FromStr};
+use std::{borrow::Cow, fmt::Debug, str::FromStr};
 
 use hmac::Mac;
 use rand::Rng;
@@ -324,7 +324,7 @@ impl FromStr for AuthMechanism {
 ///
 /// Some fields (mechanism and source) may be omitted and will either be negotiated or assigned a
 /// default value, depending on the values of other fields in the credential.
-#[derive(Clone, Debug, Default, Deserialize, TypedBuilder, PartialEq)]
+#[derive(Clone, Default, Deserialize, TypedBuilder, PartialEq)]
 #[non_exhaustive]
 pub struct Credential {
     /// The username to authenticate with. This applies to all mechanisms but may be omitted when
@@ -434,6 +434,14 @@ impl Credential {
         mechanism
             .authenticate_stream(conn, self, server_api, http_client)
             .await
+    }
+}
+
+impl Debug for Credential {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Credential")
+            .field(&"REDACTED".to_string())
+            .finish()
     }
 }
 

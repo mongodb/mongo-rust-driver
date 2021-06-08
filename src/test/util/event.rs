@@ -14,7 +14,7 @@ use crate::{
     bson::doc,
     client::options::ServerApi,
     event::{
-        cmap::{CmapEventHandler, PoolClearedEvent, PoolReadyEvent},
+        cmap::{CmapEventHandler, PoolClearedEvent, PoolCreatedEvent, PoolReadyEvent},
         command::{
             CommandEventHandler,
             CommandFailedEvent,
@@ -107,6 +107,10 @@ impl EventHandler {
 }
 
 impl CmapEventHandler for EventHandler {
+    fn handle_pool_created_event(&self, event: PoolCreatedEvent) {
+        self.handle(CmapEvent::ConnectionPoolCreated(event));
+    }
+
     fn handle_pool_cleared_event(&self, event: PoolClearedEvent) {
         self.handle(CmapEvent::ConnectionPoolCleared(event.clone()));
         self.pool_cleared_events.write().unwrap().push_back(event);
