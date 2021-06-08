@@ -1134,6 +1134,11 @@ tasks:
 
 
 axes:
+  - id: "required"
+    values:
+      - id: "required"
+        display_name: "!"
+        tags: ["required"]
   - id: "extra-rust-versions"
     values:
       - id: "min"
@@ -1261,7 +1266,8 @@ buildvariants:
       - windows-64-vs2017
     auth-and-tls: "*"
     async-runtime: "*"
-  display_name: "! ${os} ${auth-and-tls} with ${async-runtime}"
+    required: "required"
+  display_name: "${required} ${os} ${auth-and-tls} with ${async-runtime}"
   tasks:
      - ".latest"
      - ".4.4"
@@ -1380,12 +1386,12 @@ buildvariants:
       - ubuntu-18.04
     async-runtime: "*"
     extra-rust-versions: "*"
-  display_name: "! Compile on Rust ${extra-rust-versions} with ${async-runtime}"
+    required: "required"
+  display_name: "${required} Compile on Rust ${extra-rust-versions} with ${async-runtime}"
   tasks:
     - "compile-only"
 
--
-  name: "lint"
+- name: "lint"
   display_name: "! Lint"
   run_on:
     - ubuntu1804-test
