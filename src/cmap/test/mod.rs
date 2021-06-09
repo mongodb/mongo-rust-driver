@@ -465,12 +465,14 @@ async fn redact_credential() {
     subscriber
         .wait_for_event(EVENT_TIMEOUT, |e| {
             if let crate::test::Event::CmapEvent(CmapEvent::ConnectionPoolCreated(event)) = e {
+                let event_debug = format!("{:?}", event);
                 if let Some(ref pass) = credential.password {
-                    assert!(!format!("{:?}", event).contains(pass))
+                    assert!(!event_debug.contains(pass))
                 }
                 if let Some(ref user) = credential.username {
-                    assert!(!format!("{:?}", event).contains(user))
+                    assert!(!event_debug.contains(user))
                 }
+                assert!(event_debug.contains("REDACTED"));
                 true
             } else {
                 false
