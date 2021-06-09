@@ -134,9 +134,11 @@ impl EventSubscriber<'_> {
 #[derive(Clone, Debug, Deserialize, From, PartialEq)]
 #[serde(tag = "type")]
 pub enum Event {
-    #[serde(deserialize_with = "self::deserialize_pool_created")]
+    #[serde(deserialize_with = "self::deserialize_pool_created", rename = "ConnectionPoolCreated")]
     PoolCreated(PoolCreatedEvent),
+    #[serde(rename = "ConnectionPoolClosed")]
     PoolClosed(PoolClosedEvent),
+    #[serde(rename = "ConnectionPoolReady")]
     PoolReady(PoolReadyEvent),
     ConnectionCreated(ConnectionCreatedEvent),
     ConnectionReady(ConnectionReadyEvent),
@@ -145,6 +147,7 @@ pub enum Event {
     #[serde(deserialize_with = "self::deserialize_checkout_failed")]
     ConnectionCheckOutFailed(ConnectionCheckoutFailedEvent),
     ConnectionCheckedOut(ConnectionCheckedOutEvent),
+    #[serde(rename = "ConnectionPoolCleared")]
     PoolCleared(PoolClearedEvent),
     ConnectionCheckedIn(ConnectionCheckedInEvent),
 }
