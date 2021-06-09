@@ -224,8 +224,8 @@ impl Handshaker {
         });
 
         Ok(HandshakeResult {
-            first_round,
             is_master_reply,
+            first_round,
         })
     }
 }

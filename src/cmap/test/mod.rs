@@ -20,12 +20,15 @@ use crate::{
     test::{
         assert_matches,
         run_spec_test,
+        CmapEvent,
         EventClient,
         Matchable,
+        TestClient,
         CLIENT_OPTIONS,
         LOCK,
         SERVER_API,
     },
+    Client,
     RUNTIME,
 };
 use bson::doc;
@@ -434,4 +437,47 @@ async fn cmap_spec_tests() {
     }
 
     run_spec_test(&["connection-monitoring-and-pooling"], run_cmap_spec_tests).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn redact_credential() {
+    let _lock = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+    if !client.auth_enabled() {
+        println!("skipping redact_credential due to auth not being enabled");
+        return;
+    }
+
+    let mut options = CLIENT_OPTIONS.clone();
+    options.direct_connection = Some(true);
+    options.hosts.drain(1..);
+
+    let credential = options.credential.clone().unwrap();
+
+    let handler = Arc::new(crate::test::EventHandler::new());
+    let mut subscriber = handler.subscribe();
+    options.cmap_event_handler = Some(handler.clone());
+
+    let _client = Client::with_options(options).unwrap();
+
+    subscriber
+        .wait_for_event(EVENT_TIMEOUT, |e| {
+            if let crate::test::Event::CmapEvent(CmapEvent::ConnectionPoolCreated(event)) = e {
+                let event_debug = format!("{:?}", event);
+                if let Some(ref pass) = credential.password {
+                    assert!(!event_debug.contains(pass))
+                }
+                if let Some(ref user) = credential.username {
+                    assert!(!event_debug.contains(user))
+                }
+                assert!(event_debug.contains("REDACTED"));
+                true
+            } else {
+                false
+            }
+        })
+        .await
+        .expect("expected connection pool created event");
 }

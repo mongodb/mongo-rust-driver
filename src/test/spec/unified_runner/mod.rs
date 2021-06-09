@@ -13,7 +13,7 @@ use tokio::sync::RwLockWriteGuard;
 use crate::{
     bson::{doc, Document},
     options::{CollectionOptions, FindOptions, ReadConcern, ReadPreference, SelectionCriteria},
-    test::{run_spec_test, LOCK},
+    test::{run_spec_test, TestClient, LOCK},
 };
 
 pub use self::{
@@ -245,5 +245,10 @@ async fn test_examples() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn test_versioned_api() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+
+    // TODO RUST-725 Unskip these tests on 5.0
+    if TestClient::new().await.server_version_gte(5, 0) {
+        return;
+    }
     run_spec_test(&["versioned-api"], run_unified_format_test).await;
 }

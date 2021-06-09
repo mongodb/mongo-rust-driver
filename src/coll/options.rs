@@ -449,8 +449,8 @@ pub struct FindOneAndUpdateOptions {
 /// Specifies the options to a [`Collection::aggregate`](../struct.Collection.html#method.aggregate)
 /// operation.
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct AggregateOptions {
     /// Enables writing to temporary files. When set to true, aggregation stages can write data to
