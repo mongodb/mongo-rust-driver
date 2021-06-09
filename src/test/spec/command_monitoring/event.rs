@@ -6,34 +6,32 @@ use crate::{
 };
 
 #[derive(Debug, Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
 pub enum TestEvent {
-    CommandStartedEvent {
+    #[serde(rename = "command_started_event")]
+    Started {
         command_name: String,
         database_name: String,
         command: Document,
     },
-
-    CommandSucceededEvent {
+    #[serde(rename = "command_succeeded_event")]
+    Succeeded {
         command_name: String,
         reply: Document,
     },
-
-    CommandFailedEvent {
-        command_name: String,
-    },
+    #[serde(rename = "command_failed_event")]
+    Failed { command_name: String },
 }
 
 impl Matchable for TestEvent {
     fn content_matches(&self, actual: &TestEvent) -> bool {
         match (self, actual) {
             (
-                TestEvent::CommandStartedEvent {
+                TestEvent::Started {
                     command_name: actual_command_name,
                     database_name: actual_database_name,
                     command: actual_command,
                 },
-                TestEvent::CommandStartedEvent {
+                TestEvent::Started {
                     command_name: expected_command_name,
                     database_name: expected_database_name,
                     command: expected_command,
@@ -44,11 +42,11 @@ impl Matchable for TestEvent {
                     && actual_command.matches(expected_command)
             }
             (
-                TestEvent::CommandSucceededEvent {
+                TestEvent::Succeeded {
                     command_name: actual_command_name,
                     reply: actual_reply,
                 },
-                TestEvent::CommandSucceededEvent {
+                TestEvent::Succeeded {
                     command_name: expected_command_name,
                     reply: expected_reply,
                 },
@@ -56,10 +54,10 @@ impl Matchable for TestEvent {
                 actual_command_name == expected_command_name && actual_reply.matches(expected_reply)
             }
             (
-                TestEvent::CommandFailedEvent {
+                TestEvent::Failed {
                     command_name: actual_command_name,
                 },
-                TestEvent::CommandFailedEvent {
+                TestEvent::Failed {
                     command_name: expected_command_name,
                 },
             ) => actual_command_name == expected_command_name,
@@ -71,15 +69,15 @@ impl Matchable for TestEvent {
 impl From<CommandEvent> for TestEvent {
     fn from(event: CommandEvent) -> Self {
         match event {
-            CommandEvent::CommandStartedEvent(event) => TestEvent::CommandStartedEvent {
+            CommandEvent::Started(event) => TestEvent::Started {
                 command_name: event.command_name,
                 database_name: event.db,
                 command: event.command,
             },
-            CommandEvent::CommandFailedEvent(event) => TestEvent::CommandFailedEvent {
+            CommandEvent::Failed(event) => TestEvent::Failed {
                 command_name: event.command_name,
             },
-            CommandEvent::CommandSucceededEvent(event) => TestEvent::CommandSucceededEvent {
+            CommandEvent::Succeeded(event) => TestEvent::Succeeded {
                 command_name: event.command_name,
                 reply: event.reply,
             },

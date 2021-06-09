@@ -274,7 +274,7 @@ impl Client {
                     TransactionState::Starting => {
                         cmd.set_start_transaction();
                         cmd.set_autocommit();
-                        cmd.set_txn_read_concern(&*session)?;
+                        cmd.set_txn_read_concern(*session)?;
                         session.transaction.state = TransactionState::InProgress;
                     }
                     TransactionState::InProgress
@@ -372,7 +372,7 @@ impl Client {
                     }
                 }
 
-                err.add_labels(Some(&connection), session, Some(&retryability))?;
+                err.add_labels(Some(connection), session, Some(retryability))?;
                 op.handle_error(err)
             }
             Ok(response) => {
@@ -398,7 +398,7 @@ impl Client {
                 match op.handle_response(response, connection.stream_description()?) {
                     Ok(response) => Ok(response),
                     Err(mut err) => {
-                        err.add_labels(Some(&connection), session, Some(&retryability))?;
+                        err.add_labels(Some(connection), session, Some(retryability))?;
                         Err(err)
                     }
                 }

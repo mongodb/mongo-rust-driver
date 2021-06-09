@@ -39,38 +39,38 @@ pub enum Event {
 #[derive(Clone, Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum CommandEvent {
-    CommandStartedEvent(CommandStartedEvent),
-    CommandSucceededEvent(CommandSucceededEvent),
-    CommandFailedEvent(CommandFailedEvent),
+    Started(CommandStartedEvent),
+    Succeeded(CommandSucceededEvent),
+    Failed(CommandFailedEvent),
 }
 
 impl CommandEvent {
     pub fn command_name(&self) -> &str {
         match self {
-            CommandEvent::CommandStartedEvent(event) => event.command_name.as_str(),
-            CommandEvent::CommandFailedEvent(event) => event.command_name.as_str(),
-            CommandEvent::CommandSucceededEvent(event) => event.command_name.as_str(),
+            CommandEvent::Started(event) => event.command_name.as_str(),
+            CommandEvent::Failed(event) => event.command_name.as_str(),
+            CommandEvent::Succeeded(event) => event.command_name.as_str(),
         }
     }
 
     fn request_id(&self) -> i32 {
         match self {
-            CommandEvent::CommandStartedEvent(event) => event.request_id,
-            CommandEvent::CommandFailedEvent(event) => event.request_id,
-            CommandEvent::CommandSucceededEvent(event) => event.request_id,
+            CommandEvent::Started(event) => event.request_id,
+            CommandEvent::Failed(event) => event.request_id,
+            CommandEvent::Succeeded(event) => event.request_id,
         }
     }
 
     fn as_command_started(&self) -> Option<&CommandStartedEvent> {
         match self {
-            CommandEvent::CommandStartedEvent(e) => Some(e),
+            CommandEvent::Started(e) => Some(e),
             _ => None,
         }
     }
 
     fn as_command_succeeded(&self) -> Option<&CommandSucceededEvent> {
         match self {
-            CommandEvent::CommandSucceededEvent(e) => Some(e),
+            CommandEvent::Succeeded(e) => Some(e),
             _ => None,
         }
     }
@@ -112,7 +112,7 @@ impl EventHandler {
         events
             .iter()
             .filter_map(|event| match event {
-                CommandEvent::CommandStartedEvent(event) => {
+                CommandEvent::Started(event) => {
                     if command_names.contains(&event.command_name.as_str()) {
                         Some(event.clone())
                     } else {
@@ -135,38 +135,38 @@ impl EventHandler {
 
 impl CmapEventHandler for EventHandler {
     fn handle_pool_cleared_event(&self, event: PoolClearedEvent) {
-        self.handle(CmapEvent::ConnectionPoolCleared(event.clone()));
+        self.handle(CmapEvent::PoolCleared(event.clone()));
         self.pool_cleared_events.write().unwrap().push_back(event);
     }
 
     fn handle_pool_ready_event(&self, event: PoolReadyEvent) {
-        self.handle(CmapEvent::ConnectionPoolReady(event))
+        self.handle(CmapEvent::PoolReady(event))
     }
 }
 
 impl CommandEventHandler for EventHandler {
     fn handle_command_started_event(&self, event: CommandStartedEvent) {
-        self.handle(CommandEvent::CommandStartedEvent(event.clone()));
+        self.handle(CommandEvent::Started(event.clone()));
         self.command_events
             .write()
             .unwrap()
-            .push_back(CommandEvent::CommandStartedEvent(event))
+            .push_back(CommandEvent::Started(event))
     }
 
     fn handle_command_failed_event(&self, event: CommandFailedEvent) {
-        self.handle(CommandEvent::CommandFailedEvent(event.clone()));
+        self.handle(CommandEvent::Failed(event.clone()));
         self.command_events
             .write()
             .unwrap()
-            .push_back(CommandEvent::CommandFailedEvent(event))
+            .push_back(CommandEvent::Failed(event))
     }
 
     fn handle_command_succeeded_event(&self, event: CommandSucceededEvent) {
-        self.handle(CommandEvent::CommandSucceededEvent(event.clone()));
+        self.handle(CommandEvent::Succeeded(event.clone()));
         self.command_events
             .write()
             .unwrap()
-            .push_back(CommandEvent::CommandSucceededEvent(event))
+            .push_back(CommandEvent::Succeeded(event))
     }
 }
 
@@ -315,9 +315,7 @@ impl EventClient {
         events
             .iter()
             .filter_map(|event| match event {
-                CommandEvent::CommandStartedEvent(event)
-                    if event.command_name != "configureFailPoint" =>
-                {
+                CommandEvent::Started(event) if event.command_name != "configureFailPoint" => {
                     Some(event.clone())
                 }
                 _ => None,

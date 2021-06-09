@@ -39,7 +39,7 @@ impl SrvResolver {
             replica_set: None,
         };
 
-        self.get_txt_options(&hostname, &mut config).await?;
+        self.get_txt_options(hostname, &mut config).await?;
 
         Ok(config)
     }

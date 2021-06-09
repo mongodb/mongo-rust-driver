@@ -1,6 +1,10 @@
 //! Contains the `Error` and `Result` types that `mongodb` uses.
 
-use std::{collections::HashSet, fmt::{self, Debug}, sync::Arc};
+use std::{
+    collections::HashSet,
+    fmt::{self, Debug},
+    sync::Arc,
+};
 
 use serde::Deserialize;
 use thiserror::Error;
@@ -44,10 +48,12 @@ pub struct Error {
 }
 
 impl Error {
-    pub(crate) fn new(kind: ErrorKind, labels: Option<impl IntoIterator<Item=String>>) -> Self {
+    pub(crate) fn new(kind: ErrorKind, labels: Option<impl IntoIterator<Item = String>>) -> Self {
         Self {
             kind: Box::new(kind),
-            labels: labels.map(|labels| labels.into_iter().collect()).unwrap_or_default(),
+            labels: labels
+                .map(|labels| labels.into_iter().collect())
+                .unwrap_or_default(),
         }
     }
 
@@ -132,7 +138,7 @@ impl Error {
             return true;
         }
         match &self.code() {
-            Some(code) => RETRYABLE_WRITE_CODES.contains(&code),
+            Some(code) => RETRYABLE_WRITE_CODES.contains(code),
             None => false,
         }
     }
@@ -546,12 +552,10 @@ impl WriteFailure {
 /// untouched.
 pub(crate) fn convert_bulk_errors(error: Error) -> Error {
     match *error.kind {
-        ErrorKind::BulkWrite(bulk_failure) => {
-            match WriteFailure::from_bulk_failure(bulk_failure) {
-                Ok(failure) => Error::new(ErrorKind::Write(failure), Some(error.labels)),
-                Err(e) => e,
-            }
-        }
+        ErrorKind::BulkWrite(bulk_failure) => match WriteFailure::from_bulk_failure(bulk_failure) {
+            Ok(failure) => Error::new(ErrorKind::Write(failure), Some(error.labels)),
+            Err(e) => e,
+        },
         _ => error,
     }
 }

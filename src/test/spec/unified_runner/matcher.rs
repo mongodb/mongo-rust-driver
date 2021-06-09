@@ -17,12 +17,12 @@ pub fn results_match(
 pub fn events_match(actual: &TestEvent, expected: &TestEvent) -> bool {
     match (actual, expected) {
         (
-            TestEvent::CommandStartedEvent {
+            TestEvent::Started {
                 command_name: actual_command_name,
                 database_name: actual_database_name,
                 command: actual_command,
             },
-            TestEvent::CommandStartedEvent {
+            TestEvent::Started {
                 command_name: expected_command_name,
                 database_name: expected_database_name,
                 command: expected_command,
@@ -49,11 +49,11 @@ pub fn events_match(actual: &TestEvent, expected: &TestEvent) -> bool {
             }
         }
         (
-            TestEvent::CommandSucceededEvent {
+            TestEvent::Succeeded {
                 command_name: actual_command_name,
                 reply: actual_reply,
             },
-            TestEvent::CommandSucceededEvent {
+            TestEvent::Succeeded {
                 command_name: expected_command_name,
                 reply: expected_reply,
             },
@@ -74,10 +74,10 @@ pub fn events_match(actual: &TestEvent, expected: &TestEvent) -> bool {
             }
         }
         (
-            TestEvent::CommandFailedEvent {
+            TestEvent::Failed {
                 command_name: actual_command_name,
             },
-            TestEvent::CommandFailedEvent {
+            TestEvent::Failed {
                 command_name: expected_command_name,
             },
         ) => match (expected_command_name, actual_command_name) {

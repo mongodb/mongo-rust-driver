@@ -690,7 +690,7 @@ impl TopologyDescription {
         servers: impl Iterator<Item = &'a ServerAddress>,
     ) {
         for server in servers {
-            if !self.servers.contains_key(&server) {
+            if !self.servers.contains_key(server) {
                 self.servers
                     .insert(server.clone(), ServerDescription::new(server.clone(), None));
             }
