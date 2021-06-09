@@ -42,7 +42,7 @@ impl Operation for Aggregate {
     type O = CursorSpecification;
     const NAME: &'static str = "aggregate";
 
-    fn build(&self, _description: &StreamDescription) -> Result<Command> {
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = doc! {
             Self::NAME: self.target.to_bson(),
             "pipeline": bson_util::to_bson_array(&self.pipeline),

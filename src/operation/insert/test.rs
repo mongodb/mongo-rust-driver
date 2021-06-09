@@ -9,7 +9,7 @@ use crate::{
 };
 
 struct TestFixtures {
-    op: Insert,
+    op: Insert<Document>,
     documents: Vec<Document>,
     options: InsertManyOptions,
 }
@@ -47,7 +47,7 @@ fn fixtures() -> TestFixtures {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build() {
-    let fixtures = fixtures();
+    let mut fixtures = fixtures();
 
     let description = StreamDescription::new_testing();
     let cmd = fixtures.op.build(&description).unwrap();
@@ -105,15 +105,15 @@ async fn build() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_ordered() {
-    let insert = Insert::new(Namespace::empty(), Vec::new(), None);
+    let mut insert = Insert::new(Namespace::empty(), Vec::<Document>::new(), None);
     let cmd = insert
         .build(&StreamDescription::new_testing())
         .expect("should succeed");
     assert_eq!(cmd.body.get("ordered"), Some(&Bson::Boolean(true)));
 
-    let insert = Insert::new(
+    let mut insert = Insert::new(
         Namespace::empty(),
-        Vec::new(),
+        Vec::<Document>::new(),
         Some(InsertManyOptions::builder().ordered(false).build()),
     );
     let cmd = insert
@@ -121,9 +121,9 @@ async fn build_ordered() {
         .expect("should succeed");
     assert_eq!(cmd.body.get("ordered"), Some(&Bson::Boolean(false)));
 
-    let insert = Insert::new(
+    let mut insert = Insert::new(
         Namespace::empty(),
-        Vec::new(),
+        Vec::<Document>::new(),
         Some(InsertManyOptions::builder().ordered(true).build()),
     );
     let cmd = insert
@@ -135,16 +135,22 @@ async fn build_ordered() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success() {
-    let fixtures = fixtures();
+    let mut fixtures = fixtures();
 
+    // populate _id for documents that don't provide it
+    fixtures
+        .op
+        .build(&StreamDescription::new_testing())
+        .unwrap();
     let ok_response = CommandResponse::with_document(doc! { "ok": 1.0, "n": 3 });
     let ok_result = fixtures
         .op
         .handle_response(ok_response, &Default::default());
     assert!(ok_result.is_ok());
 
-    let inserted_ids = ok_result.unwrap().inserted_ids;
-    assert_eq!(inserted_ids.len(), 3); // populate _id for documents that don't provide it
+    let response = ok_result.unwrap();
+    let inserted_ids = response.inserted_ids;
+    assert_eq!(inserted_ids.len(), 3);
     assert_eq!(
         inserted_ids.get(&1).unwrap(),
         fixtures.documents[1].get("_id").unwrap()
@@ -192,14 +198,14 @@ async fn handle_write_failure() {
         }
     });
 
-    let write_error_result = fixtures
+    let write_error_response = fixtures
         .op
-        .handle_response(write_error_response, &Default::default());
-    assert!(write_error_result.is_err());
+        .handle_response(write_error_response, &Default::default())
+        .expect_err("result should be err");
 
-    match *write_error_result.unwrap_err().kind {
-        ErrorKind::BulkWrite(ref error) => {
-            let write_errors = error.write_errors.clone().unwrap();
+    match *write_error_response.kind {
+        ErrorKind::BulkWrite(bwe) => {
+            let write_errors = bwe.write_errors.expect("write errors should be present");
             assert_eq!(write_errors.len(), 1);
             let expected_err = BulkWriteError {
                 index: 1,
@@ -209,7 +215,9 @@ async fn handle_write_failure() {
             };
             assert_eq!(write_errors.first().unwrap(), &expected_err);
 
-            let write_concern_error = error.write_concern_error.clone().unwrap();
+            let write_concern_error = bwe
+                .write_concern_error
+                .expect("write concern error should be present");
             let expected_wc_err = WriteConcernError {
                 code: 123,
                 code_name: "woohoo".to_string(),
@@ -221,7 +229,9 @@ async fn handle_write_failure() {
                 } }),
             };
             assert_eq!(write_concern_error, expected_wc_err);
+
+            assert_eq!(bwe.inserted_ids.len(), 1);
         }
-        ref e => panic!("expected bulk write error, got {:?}", e),
+        e => panic!("expected bulk write error, got {:?}", e),
     };
 }

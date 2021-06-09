@@ -1,4 +1,3 @@
-mod batch;
 pub mod options;
 
 use std::{borrow::Borrow, collections::HashSet, fmt, fmt::Debug, sync::Arc};
@@ -13,7 +12,7 @@ use serde::{
 
 use self::options::*;
 use crate::{
-    bson::{doc, ser, to_document, Bson, Document},
+    bson::{doc, to_document, Bson, Document},
     bson_util,
     client::session::TransactionState,
     concern::{ReadConcern, WriteConcern},
@@ -38,11 +37,6 @@ use crate::{
     Database,
     SessionCursor,
 };
-
-/// Maximum size in bytes of an insert batch.
-/// This is intentionally less than the actual max document size, which is 16*1024*1024 bytes, to
-/// allow for overhead in the command document.
-const MAX_INSERT_DOCS_BYTES: usize = 16 * 1000 * 1000;
 
 /// `Collection` is the client-side abstraction of a MongoDB Collection. It can be used to
 /// perform collection-level operations such as CRUD operations. A `Collection` can be obtained
@@ -665,22 +659,17 @@ where
             .await
     }
 
-    async fn insert_many_common(
+    async fn insert_many_common<D: Borrow<T>>(
         &self,
-        docs: impl IntoIterator<Item = impl Borrow<T>>,
+        docs: impl IntoIterator<Item = D>,
         options: impl Into<Option<InsertManyOptions>>,
         mut session: Option<&mut ClientSession>,
     ) -> Result<InsertManyResult> {
-        let docs: ser::Result<Vec<Document>> = docs
-            .into_iter()
-            .map(|doc| bson::to_document(doc.borrow()))
-            .collect();
-        let mut docs: Vec<Document> = docs?;
-
+        let ds: Vec<D> = docs.into_iter().collect();
         let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
-        if docs.is_empty() {
+        if ds.is_empty() {
             return Err(ErrorKind::InvalidArgument {
                 message: "No documents provided to insert_many".to_string(),
             }
@@ -695,59 +684,65 @@ where
 
         let mut n_attempted = 0;
 
-        while !docs.is_empty() {
-            let mut remaining_docs =
-                batch::split_off_batch(&mut docs, MAX_INSERT_DOCS_BYTES, bson_util::doc_size_bytes);
-            std::mem::swap(&mut docs, &mut remaining_docs);
-            let current_batch = remaining_docs;
+        while n_attempted < ds.len() {
+            let docs: Vec<&T> = ds.iter().skip(n_attempted).map(Borrow::borrow).collect();
+            let insert = Insert::new(self.namespace(), docs, options.clone());
 
-            let current_batch_size = current_batch.len();
-            n_attempted += current_batch_size;
-
-            let insert = Insert::new(self.namespace(), current_batch, options.clone());
             match self
                 .client()
                 .execute_operation(insert, session.as_deref_mut())
                 .await
             {
                 Ok(result) => {
-                    if cumulative_failure.is_none() {
-                        let cumulative_result =
-                            cumulative_result.get_or_insert_with(InsertManyResult::new);
-                        for (index, id) in result.inserted_ids {
-                            cumulative_result
-                                .inserted_ids
-                                .insert(index + n_attempted - current_batch_size, id);
-                        }
+                    let current_batch_size = result.inserted_ids.len();
+
+                    let cumulative_result =
+                        cumulative_result.get_or_insert_with(InsertManyResult::new);
+                    for (index, id) in result.inserted_ids {
+                        cumulative_result
+                            .inserted_ids
+                            .insert(index + n_attempted, id);
                     }
+
+                    n_attempted += current_batch_size;
                 }
                 Err(e) => match *e.kind {
-                    ErrorKind::BulkWrite(failure) => {
+                    ErrorKind::BulkWrite(bw) => {
+                        // for ordered inserts this size will be incorrect, but knowing the batch
+                        // size isn't needed for ordered failures since we
+                        // return immediately from them anyways.
+                        let current_batch_size = bw.inserted_ids.len()
+                            + bw.write_errors.as_ref().map(|we| we.len()).unwrap_or(0);
+
                         let failure_ref =
                             cumulative_failure.get_or_insert_with(BulkWriteFailure::new);
-                        if let Some(ref write_errors) = failure.write_errors {
-                            failure_ref
-                                .write_errors
-                                .get_or_insert_with(Default::default)
-                                .extend(write_errors.iter().map(|error| BulkWriteError {
-                                    index: error.index + n_attempted - current_batch_size,
-                                    ..error.clone()
-                                }));
+                        if let Some(write_errors) = bw.write_errors {
+                            for err in write_errors {
+                                let index = n_attempted + err.index;
+
+                                failure_ref
+                                    .write_errors
+                                    .get_or_insert_with(Default::default)
+                                    .push(BulkWriteError { index, ..err });
+                            }
                         }
-                        if let Some(ref write_concern_error) = failure.write_concern_error {
-                            failure_ref.write_concern_error = Some(write_concern_error.clone());
+
+                        if let Some(wc_error) = bw.write_concern_error {
+                            failure_ref.write_concern_error = Some(wc_error);
                         }
 
                         error_labels.extend(e.labels);
 
                         if ordered {
-                            return Err(Error::new(
-                                ErrorKind::BulkWrite(
-                                    cumulative_failure.unwrap_or_else(BulkWriteFailure::new),
-                                ),
-                                Some(error_labels),
-                            ));
+                            // this will always be true since we invoked get_or_insert_with above.
+                            if let Some(failure) = cumulative_failure {
+                                return Err(Error {
+                                    kind: Box::new(ErrorKind::BulkWrite(failure)),
+                                    labels: error_labels,
+                                });
+                            }
                         }
+                        n_attempted += current_batch_size;
                     }
                     _ => return Err(e),
                 },
@@ -794,12 +789,10 @@ where
 
     async fn insert_one_common(
         &self,
-        doc: impl Borrow<T>,
+        doc: &T,
         options: impl Into<Option<InsertOneOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<InsertOneResult> {
-        let doc = to_document(doc.borrow())?;
-
         let session = session.into();
 
         let mut options = options.into();
@@ -828,7 +821,7 @@ where
         doc: impl Borrow<T>,
         options: impl Into<Option<InsertOneOptions>>,
     ) -> Result<InsertOneResult> {
-        self.insert_one_common(doc, options, None).await
+        self.insert_one_common(doc.borrow(), options, None).await
     }
 
     /// Inserts `doc` into the collection using the provided `ClientSession`.
@@ -843,7 +836,7 @@ where
         options: impl Into<Option<InsertOneOptions>>,
         session: &mut ClientSession,
     ) -> Result<InsertOneResult> {
-        self.insert_one_common(doc, options, session).await
+        self.insert_one_common(doc.borrow(), options, session).await
     }
 
     async fn replace_one_common(

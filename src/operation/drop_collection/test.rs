@@ -23,7 +23,7 @@ async fn build() {
         coll: "test_coll".to_string(),
     };
 
-    let op = DropCollection::new(ns.clone(), Some(options));
+    let mut op = DropCollection::new(ns.clone(), Some(options));
 
     let description = StreamDescription::new_testing();
     let cmd = op.build(&description).expect("build should succeed");
@@ -38,7 +38,7 @@ async fn build() {
         }
     );
 
-    let op = DropCollection::new(ns, None);
+    let mut op = DropCollection::new(ns, None);
     let cmd = op.build(&description).expect("build should succeed");
     assert_eq!(cmd.name.as_str(), "drop");
     assert_eq!(cmd.target_db.as_str(), "test_db");

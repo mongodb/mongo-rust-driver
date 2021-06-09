@@ -26,7 +26,7 @@ async fn build_many() {
     };
     let options = DeleteOptions::builder().write_concern(wc).build();
 
-    let op = Delete::new(ns, filter.clone(), None, Some(options));
+    let mut op = Delete::new(ns, filter.clone(), None, Some(options));
 
     let description = StreamDescription::new_testing();
     let mut cmd = op.build(&description).unwrap();
@@ -69,7 +69,7 @@ async fn build_one() {
     };
     let options = DeleteOptions::builder().write_concern(wc).build();
 
-    let op = Delete::new(ns, filter.clone(), Some(1), Some(options));
+    let mut op = Delete::new(ns, filter.clone(), Some(1), Some(options));
 
     let description = StreamDescription::new_testing();
     let mut cmd = op.build(&description).unwrap();

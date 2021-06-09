@@ -43,7 +43,7 @@ impl Operation for ListCollections {
     type O = CursorSpecification;
     const NAME: &'static str = "listCollections";
 
-    fn build(&self, _description: &StreamDescription) -> Result<Command> {
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = doc! {
             Self::NAME: 1,
         };

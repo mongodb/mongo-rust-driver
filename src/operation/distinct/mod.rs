@@ -52,7 +52,7 @@ impl Operation for Distinct {
     type O = Vec<Bson>;
     const NAME: &'static str = "distinct";
 
-    fn build(&self, _description: &StreamDescription) -> Result<Command> {
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body: Document = doc! {
             Self::NAME: self.ns.coll.clone(),
             "key": self.field_name.clone(),

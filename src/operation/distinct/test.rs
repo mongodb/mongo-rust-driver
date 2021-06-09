@@ -16,7 +16,7 @@ async fn build() {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
     };
-    let distinct_op = Distinct::new(ns, field_name.clone(), None, None);
+    let mut distinct_op = Distinct::new(ns, field_name.clone(), None, None);
     let distinct_command = distinct_op
         .build(&StreamDescription::new_testing())
         .expect("error on build");
@@ -39,7 +39,7 @@ async fn build_with_query() {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
     };
-    let distinct_op = Distinct::new(ns, field_name.clone(), Some(query.clone()), None);
+    let mut distinct_op = Distinct::new(ns, field_name.clone(), Some(query.clone()), None);
     let distinct_command = distinct_op
         .build(&StreamDescription::new_testing())
         .expect("error on build");
@@ -64,7 +64,7 @@ async fn build_with_options() {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
     };
-    let distinct_op = Distinct::new(ns, field_name.clone(), None, Some(options));
+    let mut distinct_op = Distinct::new(ns, field_name.clone(), None, Some(options));
     let distinct_command = distinct_op
         .build(&StreamDescription::new_testing())
         .expect("error on build");

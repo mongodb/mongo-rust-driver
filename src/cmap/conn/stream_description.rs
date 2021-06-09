@@ -20,6 +20,14 @@ pub(crate) struct StreamDescription {
     /// How long sessions started on this server will stay alive without
     /// without executing an operation before the server kills them.
     pub(crate) logical_session_timeout: Option<Duration>,
+
+    /// The maximum size of writes (excluding command overhead) that should be sent to the server.
+    pub(crate) max_bson_object_size: i64,
+
+    /// The maximum number of inserts, updates, or deletes that
+    /// can be included in a write batch.  If more than this number of writes are included, the
+    /// server cannot guarantee space in the response document to reply to the batch.
+    pub(crate) max_write_batch_size: i64,
 }
 
 impl StreamDescription {
@@ -35,6 +43,8 @@ impl StreamDescription {
                 .command_response
                 .logical_session_timeout_minutes
                 .map(|mins| Duration::from_secs(mins as u64 * 60)),
+            max_bson_object_size: reply.command_response.max_bson_object_size,
+            max_write_batch_size: reply.command_response.max_write_batch_size,
         }
     }
 
@@ -54,6 +64,8 @@ impl StreamDescription {
             min_wire_version: Some(8),
             sasl_supported_mechs: Default::default(),
             logical_session_timeout: Some(Duration::from_secs(30 * 60)),
+            max_bson_object_size: 16 * 1024 * 1024,
+            max_write_batch_size: 100_000,
         }
     }
 }

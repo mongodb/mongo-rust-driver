@@ -44,7 +44,7 @@ async fn build_with_delete_hint() {
         ..Default::default()
     };
 
-    let op = FindAndModify::<Document>::with_delete(ns, filter.clone(), Some(options));
+    let mut op = FindAndModify::<Document>::with_delete(ns, filter.clone(), Some(options));
 
     let description = StreamDescription::new_testing();
     let mut cmd = op.build(&description).unwrap();
@@ -77,7 +77,7 @@ async fn build_with_delete_no_options() {
     };
     let filter = doc! { "x": { "$gt": 1 } };
 
-    let op = FindAndModify::<Document>::with_delete(ns, filter.clone(), None);
+    let mut op = FindAndModify::<Document>::with_delete(ns, filter.clone(), None);
 
     let description = StreamDescription::new_testing();
     let mut cmd = op.build(&description).unwrap();
@@ -111,7 +111,7 @@ async fn build_with_delete() {
         ..Default::default()
     };
 
-    let op = FindAndModify::<Document>::with_delete(ns, filter.clone(), Some(options));
+    let mut op = FindAndModify::<Document>::with_delete(ns, filter.clone(), Some(options));
 
     let description = StreamDescription::new_testing();
     let mut cmd = op.build(&description).unwrap();
@@ -213,7 +213,7 @@ async fn build_with_replace_hint() {
         ..Default::default()
     };
 
-    let op = FindAndModify::<Document>::with_replace(
+    let mut op = FindAndModify::<Document>::with_replace(
         ns,
         filter.clone(),
         replacement.clone(),
@@ -256,8 +256,9 @@ async fn build_with_replace_no_options() {
     let filter = doc! { "x": { "$gt": 1 } };
     let replacement = doc! { "x": { "inc": 1 } };
 
-    let op = FindAndModify::<Document>::with_replace(ns, filter.clone(), replacement.clone(), None)
-        .unwrap();
+    let mut op =
+        FindAndModify::<Document>::with_replace(ns, filter.clone(), replacement.clone(), None)
+            .unwrap();
 
     let description = StreamDescription::new_testing();
     let mut cmd = op.build(&description).unwrap();
@@ -293,7 +294,7 @@ async fn build_with_replace() {
         ..Default::default()
     };
 
-    let op = FindAndModify::<Document>::with_replace(
+    let mut op = FindAndModify::<Document>::with_replace(
         ns,
         filter.clone(),
         replacement.clone(),
@@ -402,7 +403,7 @@ async fn build_with_update_hint() {
         ..Default::default()
     };
 
-    let op =
+    let mut op =
         FindAndModify::<Document>::with_update(ns, filter.clone(), update.clone(), Some(options))
             .unwrap();
 
@@ -439,7 +440,7 @@ async fn build_with_update_no_options() {
     };
     let filter = doc! { "x": { "$gt": 1 } };
     let update = UpdateModifications::Document(doc! { "$x": { "$inc": 1 } });
-    let op =
+    let mut op =
         FindAndModify::<Document>::with_update(ns, filter.clone(), update.clone(), None).unwrap();
 
     let description = StreamDescription::new_testing();
@@ -475,7 +476,7 @@ async fn build_with_update() {
         ..Default::default()
     };
 
-    let op =
+    let mut op =
         FindAndModify::<Document>::with_update(ns, filter.clone(), update.clone(), Some(options))
             .unwrap();
 

@@ -32,7 +32,7 @@ async fn build() {
         ..Default::default()
     };
 
-    let op = Update::new(ns, filter.clone(), update.clone(), false, Some(options));
+    let mut op = Update::new(ns, filter.clone(), update.clone(), false, Some(options));
 
     let description = StreamDescription::new_testing();
     let mut cmd = op.build(&description).unwrap();
@@ -83,7 +83,7 @@ async fn build_hint() {
         ..Default::default()
     };
 
-    let op = Update::new(ns, filter.clone(), update.clone(), false, Some(options));
+    let mut op = Update::new(ns, filter.clone(), update.clone(), false, Some(options));
 
     let description = StreamDescription::new_testing();
     let mut cmd = op.build(&description).unwrap();
@@ -127,7 +127,7 @@ async fn build_many() {
     let filter = doc! { "x": { "$gt": 1 } };
     let update = UpdateModifications::Document(doc! { "x": { "$inc": 1 } });
 
-    let op = Update::new(ns, filter.clone(), update.clone(), true, None);
+    let mut op = Update::new(ns, filter.clone(), update.clone(), true, None);
 
     let description = StreamDescription::new_testing();
     let mut cmd = op.build(&description).unwrap();

@@ -1,11 +1,8 @@
 //! Contains the `Error` and `Result` types that `mongodb` uses.
 
-use std::{
-    collections::HashSet,
-    fmt::{self, Debug},
-    sync::Arc,
-};
+use std::{collections::{HashMap, HashSet}, fmt::{self, Debug}, sync::Arc};
 
+use bson::Bson;
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -233,6 +230,7 @@ impl Error {
             ErrorKind::BulkWrite(BulkWriteFailure {
                 write_concern_error,
                 write_errors,
+                inserted_ids: _,
             }) => {
                 let mut msg = "".to_string();
                 if let Some(wc_error) = write_concern_error {
@@ -510,6 +508,8 @@ pub struct BulkWriteFailure {
 
     /// The error that occurred on account of write concern failure.
     pub write_concern_error: Option<WriteConcernError>,
+
+    pub(crate) inserted_ids: HashMap<usize, Bson>,
 }
 
 impl BulkWriteFailure {
@@ -517,6 +517,7 @@ impl BulkWriteFailure {
         BulkWriteFailure {
             write_errors: None,
             write_concern_error: None,
+            inserted_ids: Default::default(),
         }
     }
 }

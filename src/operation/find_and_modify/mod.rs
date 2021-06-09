@@ -102,7 +102,7 @@ where
     type O = Option<T>;
     const NAME: &'static str = "findAndModify";
 
-    fn build(&self, description: &StreamDescription) -> Result<Command> {
+    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         if self.options.hint.is_some() && description.max_wire_version.unwrap_or(0) < 8 {
             return Err(ErrorKind::InvalidArgument {
                 message: "Specifying a hint to find_one_and_x is not supported on server versions \

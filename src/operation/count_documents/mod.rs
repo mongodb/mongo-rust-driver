@@ -67,7 +67,7 @@ impl Operation for CountDocuments {
     type O = u64;
     const NAME: &'static str = Aggregate::NAME;
 
-    fn build(&self, description: &StreamDescription) -> Result<Command> {
+    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         self.aggregate.build(description)
     }
 

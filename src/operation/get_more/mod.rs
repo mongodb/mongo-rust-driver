@@ -41,7 +41,7 @@ impl Operation for GetMore {
     type O = GetMoreResult;
     const NAME: &'static str = "getMore";
 
-    fn build(&self, _description: &StreamDescription) -> Result<Command> {
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = doc! {
             Self::NAME: self.cursor_id,
             "collection": self.ns.coll.clone(),

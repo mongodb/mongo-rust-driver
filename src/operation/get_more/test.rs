@@ -26,7 +26,7 @@ fn build_test(
         batch_size,
         max_time,
     };
-    let get_more = GetMore::new(info);
+    let mut get_more = GetMore::new(info);
 
     let build_result = get_more.build(&StreamDescription::new_testing());
     assert!(build_result.is_ok());
@@ -117,7 +117,7 @@ async fn build_batch_size() {
         batch_size: Some((std::i32::MAX as u32) + 1),
         max_time: None,
     };
-    let op = GetMore::new(info);
+    let mut op = GetMore::new(info);
     assert!(op.build(&StreamDescription::new_testing()).is_err())
 }
 
