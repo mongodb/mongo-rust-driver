@@ -28,7 +28,7 @@ async fn transaction_handling() {
     let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
 
     let version = ServerApi::builder()
-        .version(ServerApiVersion::Version1)
+        .version(ServerApiVersion::V1)
         .build();
 
     let mut options = CLIENT_OPTIONS.clone();

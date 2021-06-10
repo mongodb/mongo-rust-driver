@@ -1380,7 +1380,7 @@ async fn versioned_api_examples() -> Result<()> {
     // Start 1. Declare an API version on a client
     let mut options = ClientOptions::parse(&uri).await?;
     let server_api = ServerApi::builder()
-        .version(ServerApiVersion::Version1)
+        .version(ServerApiVersion::V1)
         .build();
     options.server_api = Some(server_api);
     let client = Client::with_options(options)?;
@@ -1394,7 +1394,7 @@ async fn versioned_api_examples() -> Result<()> {
     // Start 2. Strict option
     let mut options = ClientOptions::parse(&uri).await?;
     let server_api = ServerApi::builder()
-        .version(ServerApiVersion::Version1)
+        .version(ServerApiVersion::V1)
         .strict(true)
         .build();
     options.server_api = Some(server_api);
@@ -1414,7 +1414,7 @@ async fn versioned_api_examples() -> Result<()> {
     // Start 3. deprecationErrors option
     let mut options = ClientOptions::parse(&uri).await?;
     let server_api = ServerApi::builder()
-        .version(ServerApiVersion::Version1)
+        .version(ServerApiVersion::V1)
         .deprecation_errors(true)
         .build();
     options.server_api = Some(server_api);
