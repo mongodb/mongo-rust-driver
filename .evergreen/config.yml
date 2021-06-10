@@ -763,7 +763,7 @@ tasks:
       - func: "bootstrap mongo-orchestration"
         vars:
           ORCHESTRATION_FILE: "auth-aws.json"
-          MONGODB_VERSION: "4.4"
+          MONGODB_VERSION: "5.0"
           AUTH: "auth"
           TOPOLOGY: "server"
       - func: "add aws auth variables to file"
