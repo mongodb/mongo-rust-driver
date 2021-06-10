@@ -111,6 +111,20 @@ async fn run_command_monitoring_test(test_file: TestFile) {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn command_monitoring() {
-    crate::test::run_spec_test(&["command-monitoring"], run_command_monitoring_test).await;
+async fn command_monitoring_legacy() {
+    crate::test::run_spec_test(
+        &["command-monitoring", "legacy"],
+        run_command_monitoring_test,
+    )
+    .await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn command_monitoring_unified() {
+    crate::test::run_spec_test(
+        &["command-monitoring", "unified"],
+        super::run_unified_format_test,
+    )
+    .await;
 }

@@ -37,6 +37,12 @@ lazy_static! {
         hash_set.insert("copydb");
         hash_set
     };
+    static ref HELLO_COMMAND_NAMES: HashSet<&'static str> = {
+        let mut hash_set = HashSet::new();
+        hash_set.insert("hello");
+        hash_set.insert("ismaster");
+        hash_set
+    };
 }
 
 impl Client {
@@ -317,7 +323,10 @@ impl Client {
         }
 
         self.emit_command_event(|handler| {
-            let should_redact = REDACTED_COMMANDS.contains(cmd.name.to_lowercase().as_str());
+            let name = cmd.name.to_lowercase();
+            let should_redact = REDACTED_COMMANDS.contains(name.as_str())
+                || HELLO_COMMAND_NAMES.contains(name.as_str())
+                    && cmd.body.contains_key("speculativeAuthenticate");
 
             let command_body = if should_redact {
                 Document::new()
