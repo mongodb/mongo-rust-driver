@@ -54,11 +54,9 @@ impl ClientEntity {
             }
             if let Some(observe_events) = observe_events {
                 if !observe_events.iter().any(|name| match event {
-                    CommandEvent::CommandStartedEvent(_) => name.as_str() == "commandStartedEvent",
-                    CommandEvent::CommandSucceededEvent(_) => {
-                        name.as_str() == "commandSucceededEvent"
-                    }
-                    CommandEvent::CommandFailedEvent(_) => name.as_str() == "commandFailedEvent",
+                    CommandEvent::Started(_) => name.as_str() == "commandStartedEvent",
+                    CommandEvent::Succeeded(_) => name.as_str() == "commandSucceededEvent",
+                    CommandEvent::Failed(_) => name.as_str() == "commandFailedEvent",
                 }) {
                     return false;
                 }

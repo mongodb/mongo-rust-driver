@@ -131,7 +131,7 @@ impl CommandResponse {
     /// Returns whether this response indicates a success or not (i.e. if "ok: 1")
     pub(crate) fn is_success(&self) -> bool {
         match self.raw_response.get("ok") {
-            Some(ref b) => bson_util::get_int(b) == Some(1),
+            Some(b) => bson_util::get_int(b) == Some(1),
             _ => false,
         }
     }

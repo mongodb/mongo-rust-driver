@@ -899,7 +899,7 @@ impl ClientOptions {
         if srv {
             let mut resolver = SrvResolver::new(resolver_config.map(|config| config.inner)).await?;
             let mut config = resolver
-                .resolve_client_options(&options.hosts[0].host())
+                .resolve_client_options(options.hosts[0].host())
                 .await?;
 
             // Save the original SRV info to allow mongos polling.
@@ -1284,7 +1284,7 @@ impl ClientOptionsParser {
                     credential.mechanism_properties = Some(doc);
                 }
 
-                mechanism.validate_credential(&credential)?;
+                mechanism.validate_credential(credential)?;
                 credential.mechanism = options.auth_mechanism.take();
             }
             None => {

@@ -56,7 +56,7 @@ async fn run_spec_tests() {
             let db_name = get_default_name(&test_case.description);
             let coll_name = "coll";
 
-            let coll = client.init_db_and_coll(&db_name, &coll_name).await;
+            let coll = client.init_db_and_coll(&db_name, coll_name).await;
 
             if !test_file.data.is_empty() {
                 coll.insert_many(test_file.data.clone(), None)
@@ -80,7 +80,7 @@ async fn run_spec_tests() {
                     .unwrap();
             }
 
-            let coll = client.database(&db_name).collection(&coll_name);
+            let coll = client.database(&db_name).collection(coll_name);
             let result = test_case.operation.execute_on_collection(&coll, None).await;
 
             if let Some(error) = test_case.outcome.error {

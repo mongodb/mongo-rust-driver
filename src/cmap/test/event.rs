@@ -134,10 +134,15 @@ impl EventSubscriber<'_> {
 #[derive(Clone, Debug, Deserialize, From, PartialEq)]
 #[serde(tag = "type")]
 pub enum Event {
-    #[serde(deserialize_with = "self::deserialize_pool_created")]
-    ConnectionPoolCreated(PoolCreatedEvent),
-    ConnectionPoolClosed(PoolClosedEvent),
-    ConnectionPoolReady(PoolReadyEvent),
+    #[serde(
+        deserialize_with = "self::deserialize_pool_created",
+        rename = "ConnectionPoolCreated"
+    )]
+    PoolCreated(PoolCreatedEvent),
+    #[serde(rename = "ConnectionPoolClosed")]
+    PoolClosed(PoolClosedEvent),
+    #[serde(rename = "ConnectionPoolReady")]
+    PoolReady(PoolReadyEvent),
     ConnectionCreated(ConnectionCreatedEvent),
     ConnectionReady(ConnectionReadyEvent),
     ConnectionClosed(ConnectionClosedEvent),
@@ -145,23 +150,24 @@ pub enum Event {
     #[serde(deserialize_with = "self::deserialize_checkout_failed")]
     ConnectionCheckOutFailed(ConnectionCheckoutFailedEvent),
     ConnectionCheckedOut(ConnectionCheckedOutEvent),
-    ConnectionPoolCleared(PoolClearedEvent),
+    #[serde(rename = "ConnectionPoolCleared")]
+    PoolCleared(PoolClearedEvent),
     ConnectionCheckedIn(ConnectionCheckedInEvent),
 }
 
 impl Event {
     pub fn name(&self) -> &'static str {
         match self {
-            Event::ConnectionPoolCreated(_) => "ConnectionPoolCreated",
-            Event::ConnectionPoolReady(_) => "ConnectionPoolReady",
-            Event::ConnectionPoolClosed(_) => "ConnectionPoolClosed",
+            Event::PoolCreated(_) => "ConnectionPoolCreated",
+            Event::PoolReady(_) => "ConnectionPoolReady",
+            Event::PoolClosed(_) => "ConnectionPoolClosed",
             Event::ConnectionCreated(_) => "ConnectionCreated",
             Event::ConnectionReady(_) => "ConnectionReady",
             Event::ConnectionClosed(_) => "ConnectionClosed",
             Event::ConnectionCheckOutStarted(_) => "ConnectionCheckOutStarted",
             Event::ConnectionCheckOutFailed(_) => "ConnectionCheckOutFailed",
             Event::ConnectionCheckedOut(_) => "ConnectionCheckedOut",
-            Event::ConnectionPoolCleared(_) => "ConnectionPoolCleared",
+            Event::PoolCleared(_) => "ConnectionPoolCleared",
             Event::ConnectionCheckedIn(_) => "ConnectionCheckedIn",
         }
     }
