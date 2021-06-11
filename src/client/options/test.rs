@@ -5,7 +5,6 @@ use crate::{
     bson::{Bson, Document},
     client::options::{ClientOptions, ClientOptionsParser, ServerAddress},
     error::ErrorKind,
-    selection_criteria::{ReadPreference, SelectionCriteria},
     test::run_spec_test,
 };
 #[derive(Debug, Deserialize)]
@@ -23,191 +22,6 @@ struct TestCase {
     pub hosts: Option<Vec<Document>>,
     pub auth: Option<Document>,
     pub options: Option<Document>,
-}
-
-fn document_from_client_options(mut options: ClientOptions) -> Document {
-    let mut doc = Document::new();
-
-    if let Some(s) = options.app_name.take() {
-        doc.insert("appname", s);
-    }
-
-    if let Some(mechanism) = options
-        .credential
-        .get_or_insert_with(Default::default)
-        .mechanism
-        .take()
-    {
-        doc.insert("authmechanism", mechanism.as_str().to_string());
-    }
-
-    if let Some(d) = options
-        .credential
-        .get_or_insert_with(Default::default)
-        .mechanism_properties
-        .take()
-    {
-        doc.insert("authmechanismproperties", d);
-    }
-
-    if let Some(s) = options
-        .credential
-        .get_or_insert_with(Default::default)
-        .source
-        .take()
-    {
-        doc.insert("authsource", s);
-    }
-
-    if let Some(i) = options.connect_timeout.take() {
-        doc.insert("connecttimeoutms", i.as_millis() as i32);
-    }
-
-    if let Some(b) = options.direct_connection.take() {
-        doc.insert("directconnection", b);
-    }
-
-    if let Some(i) = options.heartbeat_freq.take() {
-        doc.insert("heartbeatfrequencyms", i.as_millis() as i32);
-    }
-
-    if let Some(i) = options.local_threshold.take() {
-        doc.insert("localthresholdms", i.as_millis() as i32);
-    }
-
-    if let Some(i) = options.max_idle_time.take() {
-        doc.insert("maxidletimems", i.as_millis() as i32);
-    }
-
-    if let Some(i) = options.max_pool_size.take() {
-        doc.insert("maxpoolsize", i as i32);
-    }
-
-    if let Some(i) = options.min_pool_size.take() {
-        doc.insert("minpoolsize", i as i32);
-    }
-
-    if let Some(s) = options.repl_set_name.take() {
-        doc.insert("replicaset", s);
-    }
-
-    if let Some(SelectionCriteria::ReadPreference(read_pref)) = options.selection_criteria.take() {
-        let (level, tag_sets, max_staleness) = match read_pref {
-            ReadPreference::Primary => ("primary", None, None),
-            ReadPreference::PrimaryPreferred { options } => {
-                ("primaryPreferred", options.tag_sets, options.max_staleness)
-            }
-            ReadPreference::Secondary { options } => {
-                ("secondary", options.tag_sets, options.max_staleness)
-            }
-            ReadPreference::SecondaryPreferred { options } => (
-                "secondaryPreferred",
-                options.tag_sets,
-                options.max_staleness,
-            ),
-            ReadPreference::Nearest { options } => {
-                ("nearest", options.tag_sets, options.max_staleness)
-            }
-        };
-
-        doc.insert("readpreference", level);
-
-        if let Some(tag_sets) = tag_sets {
-            let tags: Vec<Bson> = tag_sets
-                .into_iter()
-                .map(|tag_set| {
-                    let mut tag_set: Vec<_> = tag_set.into_iter().collect();
-                    tag_set.sort();
-                    Bson::Document(tag_set.into_iter().map(|(k, v)| (k, v.into())).collect())
-                })
-                .collect();
-
-            doc.insert("readpreferencetags", tags);
-        }
-
-        if let Some(i) = max_staleness {
-            doc.insert("maxstalenessseconds", i.as_secs() as i32);
-        }
-    }
-
-    if let Some(b) = options.retry_reads.take() {
-        doc.insert("retryreads", b);
-    }
-
-    if let Some(b) = options.retry_writes.take() {
-        doc.insert("retrywrites", b);
-    }
-
-    if let Some(i) = options.server_selection_timeout.take() {
-        doc.insert("serverselectiontimeoutms", i.as_millis() as i32);
-    }
-
-    if let Some(i) = options.socket_timeout.take() {
-        doc.insert("sockettimeoutms", i.as_millis() as i32);
-    }
-
-    if let Some(mut opt) = options.tls_options() {
-        let ca_file_path = opt.ca_file_path.take();
-        let cert_key_file_path = opt.cert_key_file_path.take();
-        let allow_invalid_certificates = opt.allow_invalid_certificates.take();
-
-        if let Some(s) = ca_file_path {
-            doc.insert("tls", true);
-            doc.insert("tlscafile", s.to_str().unwrap());
-        }
-
-        if let Some(s) = cert_key_file_path {
-            doc.insert("tlscertificatekeyfile", s.to_str().unwrap());
-        }
-
-        if let Some(b) = allow_invalid_certificates {
-            doc.insert("tlsallowinvalidcertificates", b);
-        }
-    }
-
-    if let Some(vec) = options.compressors.take() {
-        doc.insert(
-            "compressors",
-            Bson::Array(vec.into_iter().map(Bson::String).collect()),
-        );
-    }
-
-    if let Some(s) = options.read_concern.take() {
-        doc.insert("readconcernlevel", s.level.as_str());
-    }
-
-    if let Some(i_or_s) = options
-        .write_concern
-        .get_or_insert_with(Default::default)
-        .w
-        .take()
-    {
-        doc.insert("w", i_or_s.to_bson());
-    }
-
-    if let Some(i) = options
-        .write_concern
-        .get_or_insert_with(Default::default)
-        .w_timeout
-        .take()
-    {
-        doc.insert("wtimeoutms", i.as_millis() as i32);
-    }
-
-    if let Some(b) = options
-        .write_concern
-        .get_or_insert_with(Default::default)
-        .journal
-        .take()
-    {
-        doc.insert("journal", b);
-    }
-
-    if let Some(i) = options.zlib_compression.take() {
-        doc.insert("zlibcompressionlevel", i);
-    }
-
-    doc
 }
 
 async fn run_test(test_file: TestFile) {
@@ -260,7 +74,7 @@ async fn run_test(test_file: TestFile) {
                 let options = ClientOptions::parse(&test_case.uri)
                     .await
                     .expect(&test_case.description);
-                let mut options_doc = document_from_client_options(options);
+                let mut options_doc = bson::to_document(&options).expect(&test_case.description);
                 if let Some(json_options) = test_case.options {
                     let mut json_options: Document = json_options
                         .into_iter()

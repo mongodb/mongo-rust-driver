@@ -14,7 +14,7 @@ use std::{borrow::Cow, fmt::Debug, str::FromStr};
 
 use hmac::{Mac, NewMac};
 use rand::Rng;
-use serde::Deserialize;
+use serde::{Deserialize, Serializer, ser::SerializeStruct};
 use typed_builder::TypedBuilder;
 
 use self::scram::ScramVersion;
@@ -430,6 +430,22 @@ impl Credential {
         mechanism
             .authenticate_stream(conn, self, server_api, http_client)
             .await
+    }
+
+    pub(crate) fn serialize_for_client_options<S>(cred: &Option<Credential>, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer
+    {
+        match cred {
+            None => serializer.serialize_none(),
+            Some(c) => {
+                let mut state = serializer.serialize_struct("Credential", 3)?;
+                state.serialize_field("authsource", &c.source)?;
+                state.serialize_field("authmechanism", &c.mechanism.as_ref().map(|s| s.as_str().to_string()))?;
+                state.serialize_field("authmechanismproperties", &c.mechanism_properties)?;
+                state.end()
+            }
+        }
     }
 }
 

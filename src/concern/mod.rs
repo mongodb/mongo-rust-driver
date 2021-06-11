@@ -5,7 +5,7 @@ mod test;
 
 use std::time::Duration;
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeStruct};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
@@ -63,6 +63,20 @@ impl ReadConcern {
     /// MongoDB.
     pub fn custom(level: String) -> Self {
         ReadConcernLevel::from_str(level.as_str()).into()
+    }
+
+    pub(crate) fn serialize_for_client_options<S>(read_concern: &Option<ReadConcern>, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer
+    {
+        match read_concern {
+            None => serializer.serialize_none(),
+            Some(concern) => {
+                let mut state = serializer.serialize_struct("ReadConcern", 1)?;
+                state.serialize_field("readconcernlevel", &concern.level.as_str())?;
+                state.end()
+            }
+        }
     }
 }
 
@@ -235,19 +249,6 @@ impl From<String> for Acknowledgment {
     }
 }
 
-#[cfg(all(test, not(feature = "sync")))]
-use bson::Bson;
-
-impl Acknowledgment {
-    #[cfg(all(test, not(feature = "sync")))]
-    pub(crate) fn to_bson(&self) -> Bson {
-        match self {
-            Acknowledgment::Nodes(i) => Bson::Int32(*i as i32),
-            Acknowledgment::Majority => Bson::String("majority".to_string()),
-            Acknowledgment::Custom(s) => Bson::String(s.to_string()),
-        }
-    }
-}
 
 impl WriteConcern {
     #[allow(dead_code)]
@@ -275,5 +276,32 @@ impl WriteConcern {
         }
 
         Ok(())
+    }
+
+    pub(crate) fn serialize_for_client_options<S>(write_concern: &Option<WriteConcern>, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer
+    {
+        match write_concern {
+            None => serializer.serialize_none(),
+            Some(concern) => {
+                #[derive(Serialize)]
+                struct WriteConcernHelper {
+                    w: Option<Acknowledgment>,
+
+                    #[serde(serialize_with = "bson_util::serialize_duration_as_int_millis")]
+                    wtimeoutms: Option<Duration>,
+
+                    journal: Option<bool>,
+                }
+
+                let concern_helper = WriteConcernHelper {
+                    w: concern.w.clone(),
+                    wtimeoutms: concern.w_timeout,
+                    journal: concern.journal,
+                };
+                concern_helper.serialize(serializer)
+            }
+        }
     }
 }
