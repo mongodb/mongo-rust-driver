@@ -5,7 +5,7 @@ mod test;
 
 use std::time::Duration;
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeStruct};
+use serde::{ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
@@ -65,9 +65,12 @@ impl ReadConcern {
         ReadConcernLevel::from_str(level.as_str()).into()
     }
 
-    pub(crate) fn serialize_for_client_options<S>(read_concern: &Option<ReadConcern>, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    pub(crate) fn serialize_for_client_options<S>(
+        read_concern: &Option<ReadConcern>,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
     where
-        S: Serializer
+        S: Serializer,
     {
         match read_concern {
             None => serializer.serialize_none(),
@@ -249,7 +252,6 @@ impl From<String> for Acknowledgment {
     }
 }
 
-
 impl WriteConcern {
     #[allow(dead_code)]
     pub(crate) fn is_acknowledged(&self) -> bool {
@@ -278,9 +280,12 @@ impl WriteConcern {
         Ok(())
     }
 
-    pub(crate) fn serialize_for_client_options<S>(write_concern: &Option<WriteConcern>, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    pub(crate) fn serialize_for_client_options<S>(
+        write_concern: &Option<WriteConcern>,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
     where
-        S: Serializer
+        S: Serializer,
     {
         match write_concern {
             None => serializer.serialize_none(),

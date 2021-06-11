@@ -92,7 +92,9 @@ pub(crate) fn serialize_duration_as_secs<S: Serializer>(
     serializer: S,
 ) -> std::result::Result<S::Ok, S::Error> {
     match val {
-        Some(duration) if duration.as_secs() > i32::MAX as u64 => serializer.serialize_i64(duration.as_secs() as i64),
+        Some(duration) if duration.as_secs() > i32::MAX as u64 => {
+            serializer.serialize_i64(duration.as_secs() as i64)
+        }
         Some(duration) => serializer.serialize_i32(duration.as_secs() as i32),
         None => serializer.serialize_none(),
     }

@@ -26,7 +26,14 @@ use rustls::{
     ServerCertVerifier,
     TLSError,
 };
-use serde::{Deserialize, Deserializer, Serialize, Serializer, de::{Error, Unexpected}, ser::SerializeStruct};
+use serde::{
+    de::{Error, Unexpected},
+    ser::SerializeStruct,
+    Deserialize,
+    Deserializer,
+    Serialize,
+    Serializer,
+};
 use serde_with::skip_serializing_none;
 use strsim::jaro_winkler;
 use typed_builder::TypedBuilder;
@@ -554,7 +561,7 @@ impl Default for ClientOptions {
 impl Serialize for ClientOptions {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
-        S: Serializer
+        S: Serializer,
     {
         #[derive(Serialize)]
         struct ClientOptionsHelper<'a> {
@@ -591,7 +598,10 @@ impl Serialize for ClientOptions {
 
             retrywrites: &'a Option<bool>,
 
-            #[serde(flatten, serialize_with = "SelectionCriteria::serialize_for_client_options")]
+            #[serde(
+                flatten,
+                serialize_with = "SelectionCriteria::serialize_for_client_options"
+            )]
             selectioncriteria: &'a Option<SelectionCriteria>,
 
             #[serde(serialize_with = "serialize_duration_as_int_millis")]
@@ -695,12 +705,17 @@ impl From<TlsOptions> for Option<Tls> {
 }
 
 impl Tls {
-    pub(crate) fn serialize_for_client_options<S>(tls: &Option<Tls>, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    pub(crate) fn serialize_for_client_options<S>(
+        tls: &Option<Tls>,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
     where
-        S: Serializer
+        S: Serializer,
     {
         match tls {
-            Some(Tls::Enabled(tls_options)) => TlsOptions::serialize_for_client_options(tls_options, serializer),
+            Some(Tls::Enabled(tls_options)) => {
+                TlsOptions::serialize_for_client_options(tls_options, serializer)
+            }
             _ => serializer.serialize_none(),
         }
     }
@@ -811,9 +826,12 @@ impl TlsOptions {
         Ok(config)
     }
 
-    pub(crate) fn serialize_for_client_options<S>(tls_options: &TlsOptions, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    pub(crate) fn serialize_for_client_options<S>(
+        tls_options: &TlsOptions,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
     where
-        S: Serializer
+        S: Serializer,
     {
         let mut state = serializer.serialize_struct("tlsoptions", 4)?;
         if let Some(s) = &tls_options.ca_file_path {

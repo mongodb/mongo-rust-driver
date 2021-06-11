@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use derivative::Derivative;
-use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error};
+use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -72,12 +72,17 @@ impl SelectionCriteria {
         SelectionCriteria::Predicate(Arc::new(move |server| server.address() == &address))
     }
 
-    pub(crate) fn serialize_for_client_options<S>(selection_criteria: &Option<SelectionCriteria>, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where 
-        S: Serializer
+    pub(crate) fn serialize_for_client_options<S>(
+        selection_criteria: &Option<SelectionCriteria>,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
     {
         match selection_criteria {
-            Some(SelectionCriteria::ReadPreference(pref)) => ReadPreference::serialize_for_client_options(pref, serializer),
+            Some(SelectionCriteria::ReadPreference(pref)) => {
+                ReadPreference::serialize_for_client_options(pref, serializer)
+            }
             _ => serializer.serialize_none(),
         }
     }
@@ -318,9 +323,12 @@ impl ReadPreference {
         doc
     }
 
-    pub(crate) fn serialize_for_client_options<S>(read_preference: &ReadPreference, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    pub(crate) fn serialize_for_client_options<S>(
+        read_preference: &ReadPreference,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
     where
-        S: Serializer
+        S: Serializer,
     {
         #[derive(Serialize)]
         struct ReadPreferenceHelper<'a> {
@@ -334,9 +342,9 @@ impl ReadPreference {
 
         let state = match read_preference {
             ReadPreference::Primary => ReadPreferenceHelper {
-               readpreference: "primary",
-               readpreferencetags: None,
-               maxstalenessseconds: None,
+                readpreference: "primary",
+                readpreferencetags: None,
+                maxstalenessseconds: None,
             },
             ReadPreference::PrimaryPreferred { options } => ReadPreferenceHelper {
                 readpreference: "primaryPreferred",
