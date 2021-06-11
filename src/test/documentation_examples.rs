@@ -1379,9 +1379,7 @@ async fn versioned_api_examples() -> Result<()> {
     let uri = DEFAULT_URI.clone();
     // Start 1. Declare an API version on a client
     let mut options = ClientOptions::parse(&uri).await?;
-    let server_api = ServerApi::builder()
-        .version(ServerApiVersion::V1)
-        .build();
+    let server_api = ServerApi::builder().version(ServerApiVersion::V1).build();
     options.server_api = Some(server_api);
     let client = Client::with_options(options)?;
     let cursor = client
