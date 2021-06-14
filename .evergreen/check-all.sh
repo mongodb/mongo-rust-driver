@@ -2,7 +2,8 @@
 
 set -o errexit
 
-EVERGREEN_DIR=$(dirname "$0")
+# Note: This script must run from root, or it won't check src/ files correctly.
+EVERGREEN_DIR=".evergreen"
 
 bash "${EVERGREEN_DIR}/check-clippy.sh"
 bash "${EVERGREEN_DIR}/check-rustdoc.sh"
