@@ -295,7 +295,7 @@ impl fmt::Display for ServerAddress {
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub(crate) enum ServerApiVersion {
-    Version1,
+    V1,
 }
 
 impl FromStr for ServerApiVersion {
@@ -303,7 +303,7 @@ impl FromStr for ServerApiVersion {
 
     fn from_str(str: &str) -> Result<Self> {
         match str {
-            "1" => Ok(Self::Version1),
+            "1" => Ok(Self::V1),
             _ => Err(ErrorKind::InvalidArgument {
                 message: format!("invalid server api version string: {}", str),
             }
@@ -315,7 +315,7 @@ impl FromStr for ServerApiVersion {
 impl Display for ServerApiVersion {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Self::Version1 => write!(f, "1"),
+            Self::V1 => write!(f, "1"),
         }
     }
 }
