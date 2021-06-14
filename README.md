@@ -310,9 +310,9 @@ rustup component add rustfmt --toolchain nightly
 ```
 Our linter tests also use `rustdoc` to verify that all necessary documentation is present and properly formatted. `rustdoc` is included in the standard Rust distribution.
 
-To run the linter tests, run the `check-clippy.sh`, `check-rustfmt.sh`, and `check-rustdoc.sh` scripts in the `.evergreen` directory:
+To run the linter tests, run the `check-clippy.sh`, `check-rustfmt.sh`, and `check-rustdoc.sh` scripts in the `.evergreen` directory. To run all three, use the `check-all.sh` script.
 ```bash
-bash .evergreen/check-clippy.sh && bash .evergreen/check-rustfmt.sh && bash .evergreen/check-rustdoc.sh
+bash .evergreen/check-all.sh
 ```
 
 ## Continuous Integration
