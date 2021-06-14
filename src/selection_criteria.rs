@@ -1,12 +1,14 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use derivative::Derivative;
-use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{de::Error, Deserialize, Deserializer};
+#[cfg(test)]
+use serde::{Serialize, Serializer};
 use typed_builder::TypedBuilder;
 
 use crate::{
     bson::{doc, Bson, Document},
-    bson_util::{deserialize_duration_from_u64_seconds, serialize_duration_as_secs},
+    bson_util::deserialize_duration_from_u64_seconds,
     error::{ErrorKind, Result},
     options::ServerAddress,
     sdam::public::ServerInfo,
@@ -72,6 +74,7 @@ impl SelectionCriteria {
         SelectionCriteria::Predicate(Arc::new(move |server| server.address() == &address))
     }
 
+    #[cfg(test)]
     pub(crate) fn serialize_for_client_options<S>(
         selection_criteria: &Option<SelectionCriteria>,
         serializer: S,
@@ -323,6 +326,7 @@ impl ReadPreference {
         doc
     }
 
+    #[cfg(test)]
     pub(crate) fn serialize_for_client_options<S>(
         read_preference: &ReadPreference,
         serializer: S,
@@ -336,7 +340,7 @@ impl ReadPreference {
 
             readpreferencetags: Option<&'a Vec<HashMap<String, String>>>,
 
-            #[serde(serialize_with = "serialize_duration_as_secs")]
+            #[serde(serialize_with = "crate::bson_util::serialize_duration_option_as_int_secs")]
             maxstalenessseconds: Option<Duration>,
         }
 

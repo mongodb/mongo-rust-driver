@@ -14,7 +14,7 @@ use std::{borrow::Cow, fmt::Debug, str::FromStr};
 
 use hmac::{Mac, NewMac};
 use rand::Rng;
-use serde::{ser::SerializeStruct, Deserialize, Serializer};
+use serde::Deserialize;
 use typed_builder::TypedBuilder;
 
 use self::scram::ScramVersion;
@@ -432,26 +432,27 @@ impl Credential {
             .await
     }
 
+    #[cfg(test)]
     pub(crate) fn serialize_for_client_options<S>(
-        cred: &Option<Credential>,
+        credential: &Option<Credential>,
         serializer: S,
     ) -> std::result::Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
-        match cred {
-            None => serializer.serialize_none(),
-            Some(c) => {
-                let mut state = serializer.serialize_struct("Credential", 3)?;
-                state.serialize_field("authsource", &c.source)?;
-                state.serialize_field(
-                    "authmechanism",
-                    &c.mechanism.as_ref().map(|s| s.as_str().to_string()),
-                )?;
-                state.serialize_field("authmechanismproperties", &c.mechanism_properties)?;
-                state.end()
-            }
+        #[derive(serde::Serialize)]
+        struct CredentialHelper<'a> {
+            authsource: Option<&'a String>,
+            authmechanism: Option<&'a str>,
+            authmechanismproperties: Option<&'a Document>,
         }
+
+        let state = credential.as_ref().map(|c| CredentialHelper {
+            authsource: c.source.as_ref(),
+            authmechanism: c.mechanism.as_ref().map(|s| s.as_str()),
+            authmechanismproperties: c.mechanism_properties.as_ref(),
+        });
+        serde::Serialize::serialize(&state, serializer)
     }
 }
 

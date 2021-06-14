@@ -74,7 +74,12 @@ async fn run_test(test_file: TestFile) {
                 let options = ClientOptions::parse(&test_case.uri)
                     .await
                     .expect(&test_case.description);
-                let mut options_doc = bson::to_document(&options).expect(&test_case.description);
+                let mut options_doc = bson::to_document(&options).unwrap_or_else(|_| {
+                    panic!(
+                        "{}: Failed to serialize ClientOptions",
+                        &test_case.description
+                    )
+                });
                 if let Some(json_options) = test_case.options {
                     let mut json_options: Document = json_options
                         .into_iter()

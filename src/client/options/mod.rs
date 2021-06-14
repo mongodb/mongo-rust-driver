@@ -28,11 +28,9 @@ use rustls::{
 };
 use serde::{
     de::{Error, Unexpected},
-    ser::SerializeStruct,
     Deserialize,
     Deserializer,
     Serialize,
-    Serializer,
 };
 use serde_with::skip_serializing_none;
 use strsim::jaro_winkler;
@@ -558,10 +556,11 @@ impl Default for ClientOptions {
     }
 }
 
+#[cfg(test)]
 impl Serialize for ClientOptions {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
         #[derive(Serialize)]
         struct ClientOptionsHelper<'a> {
@@ -705,12 +704,13 @@ impl From<TlsOptions> for Option<Tls> {
 }
 
 impl Tls {
+    #[cfg(test)]
     pub(crate) fn serialize_for_client_options<S>(
         tls: &Option<Tls>,
         serializer: S,
     ) -> std::result::Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
         match tls {
             Some(Tls::Enabled(tls_options)) => {
@@ -826,35 +826,35 @@ impl TlsOptions {
         Ok(config)
     }
 
+    #[cfg(test)]
     pub(crate) fn serialize_for_client_options<S>(
         tls_options: &TlsOptions,
         serializer: S,
     ) -> std::result::Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("tlsoptions", 4)?;
-        if let Some(s) = &tls_options.ca_file_path {
-            state.serialize_field("tls", &true)?;
-            state.serialize_field("tlscafile", s.to_str().unwrap())?;
-        } else {
-            state.skip_field("tls")?;
-            state.skip_field("tlscafile")?;
+        #[derive(Serialize)]
+        struct TlsOptionsHelper<'a> {
+            tls: Option<bool>,
+            tlscafile: Option<&'a str>,
+            tlscertificatekeyfile: Option<&'a str>,
+            tlsallowinvalidcertificates: Option<bool>,
         }
 
-        if let Some(s) = &tls_options.cert_key_file_path {
-            state.serialize_field("tlscertificatekeyfile", s.to_str().unwrap())?;
-        } else {
-            state.skip_field("tlscertificatekeyfile")?;
-        }
-
-        if let Some(b) = &tls_options.allow_invalid_certificates {
-            state.serialize_field("tlsallowinvalidcertificates", &b)?;
-        } else {
-            state.skip_field("tlsallowinvalidcertificates")?;
-        }
-
-        state.end()
+        let state = TlsOptionsHelper {
+            tls: tls_options.ca_file_path.as_ref().map(|_| true),
+            tlscafile: tls_options
+                .ca_file_path
+                .as_ref()
+                .map(|s| s.to_str().unwrap()),
+            tlscertificatekeyfile: tls_options
+                .cert_key_file_path
+                .as_ref()
+                .map(|s| s.to_str().unwrap()),
+            tlsallowinvalidcertificates: tls_options.allow_invalid_certificates,
+        };
+        state.serialize(serializer)
     }
 }
 
