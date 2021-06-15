@@ -2,8 +2,6 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use derivative::Derivative;
 use serde::{de::Error, Deserialize, Deserializer};
-#[cfg(test)]
-use serde::{Serialize, Serializer};
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -80,7 +78,7 @@ impl SelectionCriteria {
         serializer: S,
     ) -> std::result::Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
         match selection_criteria {
             Some(SelectionCriteria::ReadPreference(pref)) => {
@@ -332,9 +330,11 @@ impl ReadPreference {
         serializer: S,
     ) -> std::result::Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
-        #[derive(Serialize)]
+        use serde::ser::Serialize;
+
+        #[derive(serde::Serialize)]
         struct ReadPreferenceHelper<'a> {
             readpreference: &'a str,
 

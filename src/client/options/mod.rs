@@ -836,14 +836,14 @@ impl TlsOptions {
     {
         #[derive(Serialize)]
         struct TlsOptionsHelper<'a> {
-            tls: Option<bool>,
+            tls: bool,
             tlscafile: Option<&'a str>,
             tlscertificatekeyfile: Option<&'a str>,
             tlsallowinvalidcertificates: Option<bool>,
         }
 
         let state = TlsOptionsHelper {
-            tls: tls_options.ca_file_path.as_ref().map(|_| true),
+            tls: true,
             tlscafile: tls_options
                 .ca_file_path
                 .as_ref()

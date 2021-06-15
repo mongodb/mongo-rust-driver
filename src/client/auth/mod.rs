@@ -440,6 +440,8 @@ impl Credential {
     where
         S: serde::Serializer,
     {
+        use serde::ser::Serialize;
+
         #[derive(serde::Serialize)]
         struct CredentialHelper<'a> {
             authsource: Option<&'a String>,
@@ -452,7 +454,7 @@ impl Credential {
             authmechanism: c.mechanism.as_ref().map(|s| s.as_str()),
             authmechanismproperties: c.mechanism_properties.as_ref(),
         });
-        serde::Serialize::serialize(&state, serializer)
+        state.serialize(serializer)
     }
 }
 
