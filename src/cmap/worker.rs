@@ -444,7 +444,7 @@ impl ConnectionPoolWorker {
         let previous_state = std::mem::replace(&mut self.state, PoolState::Paused(cause.clone()));
         self.generation_publisher.publish(self.generation);
 
-        if !matches!(previous_state, PoolState::Paused(_) | PoolState::New) {
+        if matches!(previous_state, PoolState::Ready) {
             self.emit_event(|handler| {
                 let event = PoolClearedEvent {
                     address: self.address.clone(),
