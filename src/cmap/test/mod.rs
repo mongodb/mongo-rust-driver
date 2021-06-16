@@ -13,19 +13,14 @@ use self::{
 
 use crate::{
     cmap::{Connection, ConnectionPool, ConnectionPoolOptions},
+    error::ErrorKind,
     error::{Error, Result},
     event::cmap::ConnectionPoolOptions as EventOptions,
     options::TlsOptions,
     runtime::AsyncJoinHandle,
     sdam::{ServerUpdate, ServerUpdateSender},
     test::{
-        assert_matches,
-        run_spec_test,
-        EventClient,
-        Matchable,
-        CLIENT_OPTIONS,
-        LOCK,
-        SERVER_API,
+        assert_matches, run_spec_test, EventClient, Matchable, CLIENT_OPTIONS, LOCK, SERVER_API,
     },
     RUNTIME,
 };
@@ -168,7 +163,7 @@ impl Executor {
         RUNTIME.execute(async move {
             while let Some(update) = update_receiver.recv().await {
                 match update.into_message() {
-                    ServerUpdate::Error { .. } => manager.clear().await,
+                    ServerUpdate::Error { error, .. } => manager.clear(error).await,
                 }
             }
         });
@@ -285,7 +280,13 @@ impl Operation {
             }
             Operation::Clear => {
                 if let Some(pool) = state.pool.read().await.as_ref() {
-                    pool.clear().await;
+                    pool.clear(
+                        ErrorKind::Internal {
+                            message: "test error".to_string(),
+                        }
+                        .into(),
+                    )
+                    .await;
                 }
             }
             Operation::Ready => {
