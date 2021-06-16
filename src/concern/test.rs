@@ -1,18 +1,25 @@
-use std::time::Duration;
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, Bson, Document},
-    error::ErrorKind,
+    error::{ErrorKind, Result},
+    event::command::{CommandEventHandler, CommandStartedEvent},
     options::{
         Acknowledgment,
         FindOneOptions,
+        InsertManyOptions,
         InsertOneOptions,
         ReadConcern,
         TransactionOptions,
+        UpdateOptions,
         WriteConcern,
     },
-    test::{EventClient, TestClient, LOCK},
+    test::{EventClient, TestClient, CLIENT_OPTIONS, LOCK},
+    Collection,
 };
 
 #[test]
@@ -209,4 +216,252 @@ async fn assert_event_contains_read_concern(client: &EventClient) {
             .unwrap(),
         "snapshot"
     );
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn command_contains_write_concern_insert_one() {
+    let _guard = LOCK.run_concurrently().await;
+    let (buffer, coll) = get_monitored_collection(function_name!()).await.unwrap();
+
+    coll.insert_one(
+        doc! { "foo": "bar" },
+        InsertOneOptions::builder()
+            .write_concern(
+                WriteConcern::builder()
+                    .w(Acknowledgment::Nodes(1))
+                    .journal(true)
+                    .build(),
+            )
+            .build(),
+    )
+    .await
+    .unwrap();
+    coll.insert_one(
+        doc! { "foo": "bar" },
+        InsertOneOptions::builder()
+            .write_concern(
+                WriteConcern::builder()
+                    .w(Acknowledgment::Nodes(1))
+                    .journal(false)
+                    .build(),
+            )
+            .build(),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        buffer.write_concerns("insert"),
+        vec![
+            doc! {
+                "w": 1,
+                "j": true,
+            },
+            doc! {
+                "w": 1,
+                "j": false,
+            },
+        ]
+    );
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn command_contains_write_concern_insert_many() {
+    let _guard = LOCK.run_concurrently().await;
+    let (buffer, coll) = get_monitored_collection(function_name!()).await.unwrap();
+
+    coll.insert_many(
+        &[doc! { "foo": "bar" }],
+        InsertManyOptions::builder()
+            .write_concern(
+                WriteConcern::builder()
+                    .w(Acknowledgment::Nodes(1))
+                    .journal(true)
+                    .build(),
+            )
+            .build(),
+    )
+    .await
+    .unwrap();
+    coll.insert_many(
+        &[doc! { "foo": "bar" }],
+        InsertManyOptions::builder()
+            .write_concern(
+                WriteConcern::builder()
+                    .w(Acknowledgment::Nodes(1))
+                    .journal(false)
+                    .build(),
+            )
+            .build(),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        buffer.write_concerns("insert"),
+        vec![
+            doc! {
+                "w": 1,
+                "j": true,
+            },
+            doc! {
+                "w": 1,
+                "j": false,
+            },
+        ]
+    );
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn command_contains_write_concern_update_one() {
+    let _guard = LOCK.run_concurrently().await;
+    let (buffer, coll) = get_monitored_collection(function_name!()).await.unwrap();
+
+    coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
+    coll.update_one(
+        doc! { "foo": "bar" },
+        doc! { "$set": { "foo": "baz" } },
+        UpdateOptions::builder()
+            .write_concern(
+                WriteConcern::builder()
+                    .w(Acknowledgment::Nodes(1))
+                    .journal(true)
+                    .build(),
+            )
+            .build(),
+    )
+    .await
+    .unwrap();
+    coll.update_one(
+        doc! { "foo": "baz" },
+        doc! { "$set": { "foo": "quux" } },
+        UpdateOptions::builder()
+            .write_concern(
+                WriteConcern::builder()
+                    .w(Acknowledgment::Nodes(1))
+                    .journal(false)
+                    .build(),
+            )
+            .build(),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        buffer.write_concerns("update"),
+        vec![
+            doc! {
+                "w": 1,
+                "j": true,
+            },
+            doc! {
+                "w": 1,
+                "j": false,
+            },
+        ]
+    );
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn command_contains_write_concern_update_many() {
+    let _guard = LOCK.run_concurrently().await;
+    let (buffer, coll) = get_monitored_collection(function_name!()).await.unwrap();
+
+    coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
+        .await
+        .unwrap();
+    coll.update_many(
+        doc! { "foo": "bar" },
+        doc! { "$set": { "foo": "baz" } },
+        UpdateOptions::builder()
+            .write_concern(
+                WriteConcern::builder()
+                    .w(Acknowledgment::Nodes(1))
+                    .journal(true)
+                    .build(),
+            )
+            .build(),
+    )
+    .await
+    .unwrap();
+    coll.update_many(
+        doc! { "foo": "baz" },
+        doc! { "$set": { "foo": "quux" } },
+        UpdateOptions::builder()
+            .write_concern(
+                WriteConcern::builder()
+                    .w(Acknowledgment::Nodes(1))
+                    .journal(false)
+                    .build(),
+            )
+            .build(),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        buffer.write_concerns("update"),
+        vec![
+            doc! {
+                "w": 1,
+                "j": true,
+            },
+            doc! {
+                "w": 1,
+                "j": false,
+            },
+        ]
+    );
+}
+
+async fn get_monitored_collection(name: &str) -> Result<(Arc<CommandBuffer>, Collection)> {
+    let buffer = Arc::new(CommandBuffer::new());
+    let mut options = CLIENT_OPTIONS.clone();
+    options.command_event_handler = Some(buffer.clone());
+    let client = TestClient::with_options(Some(options)).await;
+    let db = client.database("test");
+    let coll: Collection = db.collection(name);
+    coll.drop(None).await?;
+    Ok((buffer, coll))
+}
+
+struct CommandBuffer {
+    commands: Mutex<Vec<Document>>,
+}
+
+impl CommandBuffer {
+    fn new() -> Self {
+        CommandBuffer {
+            commands: Mutex::new(vec![]),
+        }
+    }
+    fn write_concerns(&self, key: &str) -> Vec<Document> {
+        self.commands
+            .lock()
+            .unwrap()
+            .iter()
+            .cloned()
+            .filter(|d| d.contains_key(key))
+            .map(|d| d.get_document("writeConcern").unwrap().clone())
+            .collect()
+    }
+}
+
+impl CommandEventHandler for CommandBuffer {
+    fn handle_command_started_event(&self, event: CommandStartedEvent) {
+        self.commands.lock().unwrap().push(event.command);
+    }
+
+    fn handle_command_succeeded_event(&self, _event: crate::event::command::CommandSucceededEvent) {
+    }
+
+    fn handle_command_failed_event(&self, _event: crate::event::command::CommandFailedEvent) {}
 }
