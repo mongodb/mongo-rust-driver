@@ -1,27 +1,30 @@
 mod test_file;
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use bson::Bson;
 use futures::stream::TryStreamExt;
 use semver::VersionReq;
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
-use test_file::{Result, TestFile};
+use test_file::{TestFile, TestResult};
 
 use crate::{
     bson::{doc, Document},
-    error::ErrorKind,
+    error::{ErrorKind, Result},
+    event::cmap::CmapEventHandler,
+    event::{cmap::ConnectionCheckoutFailedReason, command::CommandEventHandler},
     options::{ClientOptions, FindOptions, InsertManyOptions},
+    runtime::AsyncJoinHandle,
+    test::CmapEvent,
+    test::Event,
+    test::EventHandler,
+    test::FailCommandOptions,
     test::{
-        assert_matches,
-        run_spec_test,
-        util::get_default_name,
-        EventClient,
-        TestClient,
-        CLIENT_OPTIONS,
-        LOCK,
+        assert_matches, run_spec_test, util::get_default_name, EventClient, FailPoint,
+        FailPointMode, TestClient, CLIENT_OPTIONS, LOCK,
     },
+    RUNTIME,
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -96,7 +99,7 @@ async fn run_spec_tests() {
 
             if let Some(expected_result) = test_case.outcome.result {
                 match expected_result {
-                    Result::Value(value) => {
+                    TestResult::Value(value) => {
                         let description = &test_case.description;
                         let result = result
                             .unwrap_or_else(|e| {
@@ -108,7 +111,7 @@ async fn run_spec_tests() {
                             .unwrap();
                         assert_matches(&result, &value, Some(description));
                     }
-                    Result::Labels(expected_labels) => {
+                    TestResult::Labels(expected_labels) => {
                         let error = result.expect_err(&format!(
                             "{:?}: operation should fail",
                             &test_case.description
@@ -379,4 +382,83 @@ async fn label_not_added(retry_reads: bool) {
     let err = coll.find(doc! {}, None).await.unwrap_err();
 
     assert!(!err.contains_label("RetryableWriteError"));
+}
+
+/// Prose test from retryable writes spec verifying that PoolClearedErrors are retried.
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn retry_write_pool_cleared() {
+    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
+
+    let handler = Arc::new(EventHandler::new());
+
+    let mut client_options = CLIENT_OPTIONS.clone();
+    client_options.retry_reads = Some(true);
+    client_options.max_pool_size = Some(1);
+    client_options.cmap_event_handler = Some(handler.clone() as Arc<dyn CmapEventHandler>);
+    client_options.command_event_handler = Some(handler.clone() as Arc<dyn CommandEventHandler>);
+    // on sharded clusters, ensure only a single mongos is used
+    if client_options.repl_set_name.is_none() {
+        client_options.hosts.drain(1..);
+    }
+
+    let client = TestClient::with_options(Some(client_options.clone())).await;
+    if !client.supports_fail_command().await {
+        println!("skipping retry_write_pool_cleared due to failCommand not being supported");
+        return;
+    }
+
+    let collection = client
+        .database("retry_write_pool_cleared")
+        .collection("retry_write_pool_cleared");
+
+    let options = FailCommandOptions::builder()
+        .error_code(91)
+        .block_connection(Duration::from_secs(1))
+        .build();
+    let failpoint = FailPoint::fail_command(&["insert"], FailPointMode::Times(1), Some(options));
+    let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
+
+    let mut subscriber = handler.subscribe();
+
+    let mut tasks: Vec<AsyncJoinHandle<_>> = Vec::new();
+    for _ in 0..2 {
+        let coll = collection.clone();
+        let task = RUNTIME
+            .spawn(async move { coll.insert_one(doc! {}, None).await })
+            .unwrap();
+        tasks.push(task);
+    }
+
+    futures::future::join_all(tasks)
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>>>()
+        .expect("all should succeeed");
+
+    let _ = subscriber
+        .wait_for_event(Duration::from_millis(500), |event| {
+            matches!(event, Event::CmapEvent(CmapEvent::ConnectionCheckedOut(_)))
+        })
+        .await
+        .expect("first checkout should succeed");
+
+    let _ = subscriber
+        .wait_for_event(Duration::from_millis(500), |event| {
+            matches!(event, Event::CmapEvent(CmapEvent::PoolCleared(_)))
+        })
+        .await
+        .expect("pool clear should occur");
+
+    let _ = subscriber
+        .wait_for_event(Duration::from_millis(500), |event| match event {
+            Event::CmapEvent(CmapEvent::ConnectionCheckOutFailed(e)) => {
+                matches!(e.reason, ConnectionCheckoutFailedReason::ConnectionError)
+            }
+            _ => false,
+        })
+        .await
+        .expect("second checkout should fail");
+
+    assert_eq!(handler.get_command_started_events(&["insert"]).len(), 3);
 }

@@ -292,6 +292,10 @@ impl Error {
             .map(|code| SHUTTING_DOWN_CODES.contains(&code))
             .unwrap_or(false)
     }
+
+    pub(crate) fn is_pool_cleared(&self) -> bool {
+        matches!(self.kind.as_ref(), ErrorKind::ConnectionPoolCleared { .. })
+    }
 }
 
 impl<E> From<E> for Error

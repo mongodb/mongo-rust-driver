@@ -1,18 +1,20 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use bson::doc;
 use futures::FutureExt;
 use tokio::sync::RwLockWriteGuard;
 
 use crate::{
+    error::Result,
+    event::{
+        cmap::{CmapEventHandler, ConnectionCheckoutFailedReason},
+        command::CommandEventHandler,
+    },
+    runtime::AsyncJoinHandle,
+    test::EventHandler,
     test::{
-        run_spec_test,
-        FailCommandOptions,
-        FailPoint,
-        FailPointMode,
-        TestClient,
-        CLIENT_OPTIONS,
-        LOCK,
+        run_spec_test, CmapEvent, Event, FailCommandOptions, FailPoint, FailPointMode, TestClient,
+        CLIENT_OPTIONS, LOCK,
     },
     RUNTIME,
 };
@@ -61,4 +63,84 @@ async fn retry_releases_connection() {
         .await
         .expect("operation should not time out")
         .expect("find should succeed");
+}
+
+/// Prose test from retryable reads spec verifying that PoolClearedErrors are retried.
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn retry_read_pool_cleared() {
+    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
+
+    let handler = Arc::new(EventHandler::new());
+
+    let mut client_options = CLIENT_OPTIONS.clone();
+    client_options.retry_reads = Some(true);
+    client_options.max_pool_size = Some(1);
+    client_options.cmap_event_handler = Some(handler.clone() as Arc<dyn CmapEventHandler>);
+    client_options.command_event_handler = Some(handler.clone() as Arc<dyn CommandEventHandler>);
+    // on sharded clusters, ensure only a single mongos is used
+    if client_options.repl_set_name.is_none() {
+        client_options.hosts.drain(1..);
+    }
+
+    let client = TestClient::with_options(Some(client_options.clone())).await;
+    if !client.supports_fail_command().await {
+        println!("skipping retry_read_pool_cleared due to failCommand not being supported");
+        return;
+    }
+
+    let collection = client
+        .database("retry_read_pool_cleared")
+        .collection("retry_read_pool_cleared");
+    collection.insert_one(doc! { "x": 1 }, None).await.unwrap();
+
+    let options = FailCommandOptions::builder()
+        .error_code(91)
+        .block_connection(Duration::from_secs(1))
+        .build();
+    let failpoint = FailPoint::fail_command(&["find"], FailPointMode::Times(1), Some(options));
+    let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
+
+    let mut subscriber = handler.subscribe();
+
+    let mut tasks: Vec<AsyncJoinHandle<_>> = Vec::new();
+    for _ in 0..2 {
+        let coll = collection.clone();
+        let task = RUNTIME
+            .spawn(async move { coll.find_one(doc! {}, None).await })
+            .unwrap();
+        tasks.push(task);
+    }
+
+    futures::future::join_all(tasks)
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>>>()
+        .expect("all should succeeed");
+
+    let _ = subscriber
+        .wait_for_event(Duration::from_millis(500), |event| {
+            matches!(event, Event::CmapEvent(CmapEvent::ConnectionCheckedOut(_)))
+        })
+        .await
+        .expect("first checkout should succeed");
+
+    let _ = subscriber
+        .wait_for_event(Duration::from_millis(500), |event| {
+            matches!(event, Event::CmapEvent(CmapEvent::PoolCleared(_)))
+        })
+        .await
+        .expect("pool clear should occur");
+
+    let _ = subscriber
+        .wait_for_event(Duration::from_millis(500), |event| match event {
+            Event::CmapEvent(CmapEvent::ConnectionCheckOutFailed(e)) => {
+                matches!(e.reason, ConnectionCheckoutFailedReason::ConnectionError)
+            }
+            _ => false,
+        })
+        .await
+        .expect("second checkout should fail");
+
+    assert_eq!(handler.get_command_started_events(&["find"]).len(), 3);
 }

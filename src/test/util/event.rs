@@ -10,9 +10,7 @@ use tokio::sync::{
 };
 
 use super::TestClient;
-use crate::{
-    bson::doc,
-    event::{
+use crate::{RUNTIME, bson::doc, event::{
         cmap::{CmapEventHandler, PoolClearedEvent, PoolReadyEvent},
         command::{
             CommandEventHandler,
@@ -20,11 +18,7 @@ use crate::{
             CommandStartedEvent,
             CommandSucceededEvent,
         },
-    },
-    options::ClientOptions,
-    test::{CLIENT_OPTIONS, LOCK},
-    RUNTIME,
-};
+    }, event::cmap::ConnectionCheckedInEvent, event::cmap::ConnectionCheckedOutEvent, event::cmap::ConnectionCheckoutStartedEvent, event::cmap::ConnectionClosedEvent, event::cmap::ConnectionCreatedEvent, event::cmap::ConnectionReadyEvent, event::cmap::PoolClosedEvent, event::cmap::PoolCreatedEvent, options::ClientOptions, event::cmap::ConnectionCheckoutFailedEvent, test::{CLIENT_OPTIONS, LOCK}};
 
 pub type EventQueue<T> = Arc<RwLock<VecDeque<T>>>;
 pub type CmapEvent = crate::cmap::test::event::Event;
@@ -134,6 +128,14 @@ impl EventHandler {
 }
 
 impl CmapEventHandler for EventHandler {
+    fn handle_connection_checked_out_event(&self, event: ConnectionCheckedOutEvent) {
+        self.handle(CmapEvent::ConnectionCheckedOut(event))
+    }
+
+    fn handle_connection_checkout_failed_event(&self, event: ConnectionCheckoutFailedEvent) {
+        self.handle(CmapEvent::ConnectionCheckOutFailed(event))
+    }
+
     fn handle_pool_cleared_event(&self, event: PoolClearedEvent) {
         self.handle(CmapEvent::PoolCleared(event.clone()));
         self.pool_cleared_events.write().unwrap().push_back(event);
@@ -141,6 +143,34 @@ impl CmapEventHandler for EventHandler {
 
     fn handle_pool_ready_event(&self, event: PoolReadyEvent) {
         self.handle(CmapEvent::PoolReady(event))
+    }
+
+    fn handle_pool_created_event(&self, event: PoolCreatedEvent) {
+        self.handle(CmapEvent::PoolCreated(event));
+    }
+
+    fn handle_pool_closed_event(&self, event: PoolClosedEvent) {
+        self.handle(CmapEvent::PoolClosed(event))
+    }
+
+    fn handle_connection_created_event(&self, event: ConnectionCreatedEvent) {
+        self.handle(CmapEvent::ConnectionCreated(event))
+    }
+
+    fn handle_connection_ready_event(&self, event: ConnectionReadyEvent) {
+        self.handle(CmapEvent::ConnectionReady(event))
+    }
+
+    fn handle_connection_closed_event(&self, event: ConnectionClosedEvent) {
+        self.handle(CmapEvent::ConnectionClosed(event))
+    }
+
+    fn handle_connection_checkout_started_event(&self, event: ConnectionCheckoutStartedEvent) {
+        self.handle(CmapEvent::ConnectionCheckOutStarted(event))
+    }
+
+    fn handle_connection_checked_in_event(&self, event: ConnectionCheckedInEvent) {
+        self.handle(CmapEvent::ConnectionCheckedIn(event))
     }
 }
 
