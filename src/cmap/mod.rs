@@ -130,7 +130,9 @@ impl ConnectionPool {
         let conn = match response {
             ConnectionRequestResult::Pooled(c) => Ok(c),
             ConnectionRequestResult::Establishing(task) => task.await,
-            ConnectionRequestResult::PoolCleared(e) => Err(Error::pool_cleared_error(&self.address, &e)),
+            ConnectionRequestResult::PoolCleared(e) => {
+                Err(Error::pool_cleared_error(&self.address, &e))
+            }
         };
 
         match conn {

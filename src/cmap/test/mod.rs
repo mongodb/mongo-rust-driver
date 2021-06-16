@@ -13,14 +13,19 @@ use self::{
 
 use crate::{
     cmap::{Connection, ConnectionPool, ConnectionPoolOptions},
-    error::ErrorKind,
-    error::{Error, Result},
+    error::{Error, ErrorKind, Result},
     event::cmap::ConnectionPoolOptions as EventOptions,
     options::TlsOptions,
     runtime::AsyncJoinHandle,
     sdam::{ServerUpdate, ServerUpdateSender},
     test::{
-        assert_matches, run_spec_test, EventClient, Matchable, CLIENT_OPTIONS, LOCK, SERVER_API,
+        assert_matches,
+        run_spec_test,
+        EventClient,
+        Matchable,
+        CLIENT_OPTIONS,
+        LOCK,
+        SERVER_API,
     },
     RUNTIME,
 };

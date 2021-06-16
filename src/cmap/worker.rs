@@ -4,7 +4,10 @@ use super::{
     conn::PendingConnection,
     connection_requester,
     connection_requester::{
-        ConnectionRequest, ConnectionRequestReceiver, ConnectionRequestResult, ConnectionRequester,
+        ConnectionRequest,
+        ConnectionRequestReceiver,
+        ConnectionRequestResult,
+        ConnectionRequester,
     },
     establish::ConnectionEstablisher,
     manager,
@@ -12,13 +15,18 @@ use super::{
     options::{ConnectionOptions, ConnectionPoolOptions},
     status,
     status::{PoolGenerationPublisher, PoolGenerationSubscriber},
-    Connection, DEFAULT_MAX_POOL_SIZE,
+    Connection,
+    DEFAULT_MAX_POOL_SIZE,
 };
 use crate::{
     error::{Error, ErrorKind, Result},
     event::cmap::{
-        CmapEventHandler, ConnectionClosedEvent, ConnectionClosedReason, PoolClearedEvent,
-        PoolClosedEvent, PoolReadyEvent,
+        CmapEventHandler,
+        ConnectionClosedEvent,
+        ConnectionClosedReason,
+        PoolClearedEvent,
+        PoolClosedEvent,
+        PoolReadyEvent,
     },
     options::ServerAddress,
     runtime::HttpClient,
@@ -244,7 +252,8 @@ impl ConnectionPoolWorker {
                         let _ = request.fulfill(ConnectionRequestResult::PoolCleared(
                             ErrorKind::Internal {
                                 message: "check out attempted from new pool".to_string(),
-                            }.into(),
+                            }
+                            .into(),
                         ));
                     }
                 },

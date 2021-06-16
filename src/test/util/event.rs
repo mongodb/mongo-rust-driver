@@ -10,15 +10,34 @@ use tokio::sync::{
 };
 
 use super::TestClient;
-use crate::{RUNTIME, bson::doc, event::{
-        cmap::{CmapEventHandler, PoolClearedEvent, PoolReadyEvent},
+use crate::{
+    bson::doc,
+    event::{
+        cmap::{
+            CmapEventHandler,
+            ConnectionCheckedInEvent,
+            ConnectionCheckedOutEvent,
+            ConnectionCheckoutFailedEvent,
+            ConnectionCheckoutStartedEvent,
+            ConnectionClosedEvent,
+            ConnectionCreatedEvent,
+            ConnectionReadyEvent,
+            PoolClearedEvent,
+            PoolClosedEvent,
+            PoolCreatedEvent,
+            PoolReadyEvent,
+        },
         command::{
             CommandEventHandler,
             CommandFailedEvent,
             CommandStartedEvent,
             CommandSucceededEvent,
         },
-    }, event::cmap::ConnectionCheckedInEvent, event::cmap::ConnectionCheckedOutEvent, event::cmap::ConnectionCheckoutStartedEvent, event::cmap::ConnectionClosedEvent, event::cmap::ConnectionCreatedEvent, event::cmap::ConnectionReadyEvent, event::cmap::PoolClosedEvent, event::cmap::PoolCreatedEvent, options::ClientOptions, event::cmap::ConnectionCheckoutFailedEvent, test::{CLIENT_OPTIONS, LOCK}};
+    },
+    options::ClientOptions,
+    test::{CLIENT_OPTIONS, LOCK},
+    RUNTIME,
+};
 
 pub type EventQueue<T> = Arc<RwLock<VecDeque<T>>>;
 pub type CmapEvent = crate::cmap::test::event::Event;

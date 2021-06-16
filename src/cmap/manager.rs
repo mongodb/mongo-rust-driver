@@ -1,8 +1,7 @@
 use tokio::sync::mpsc;
 
 use super::Connection;
-use crate::runtime::AcknowledgedMessage;
-use crate::error::Error;
+use crate::{error::Error, runtime::AcknowledgedMessage};
 
 pub(super) fn channel() -> (PoolManager, ManagementRequestReceiver) {
     let (sender, receiver) = mpsc::unbounded_channel();
@@ -25,9 +24,9 @@ impl PoolManager {
         let (message, acknowledgment_receiver) = AcknowledgedMessage::package(());
         if self
             .sender
-            .send(PoolManagementRequest::Clear{
+            .send(PoolManagementRequest::Clear {
                 completion_handler: message,
-                cause
+                cause,
             })
             .is_ok()
         {
@@ -90,7 +89,7 @@ pub(super) enum PoolManagementRequest {
     /// Clear the pool, transitioning it to Paused.
     Clear {
         completion_handler: AcknowledgedMessage<()>,
-        cause: Error
+        cause: Error,
     },
 
     /// Mark the pool as Ready, allowing connections to be created and checked out.

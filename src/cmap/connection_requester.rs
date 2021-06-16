@@ -1,7 +1,11 @@
 use tokio::sync::{mpsc, oneshot};
 
 use super::{worker::PoolWorkerHandle, Connection};
-use crate::{runtime::AsyncJoinHandle, options::ServerAddress, error::{Error, Result}};
+use crate::{
+    error::{Error, Result},
+    options::ServerAddress,
+    runtime::AsyncJoinHandle,
+};
 
 /// Returns a new requester/receiver pair.
 pub(super) fn channel(

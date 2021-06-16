@@ -129,7 +129,9 @@ impl Client {
 
         let mut conn = match server.pool.check_out().await {
             Ok(conn) => conn,
-            Err(err) if err.is_pool_cleared() => return self.execute_retry(&mut op, &mut session, None, err).await,
+            Err(err) if err.is_pool_cleared() => {
+                return self.execute_retry(&mut op, &mut session, None, err).await
+            }
             Err(mut err) => {
                 err.add_labels(None, &session, None)?;
                 return Err(err);
@@ -162,9 +164,7 @@ impl Client {
             )
             .await
         {
-            Ok(result) => {
-                Ok(result)
-            }
+            Ok(result) => Ok(result),
             Err(mut err) => {
                 // Retryable writes are only supported by storage engines with document-level
                 // locking, so users need to disable retryable writes if using mmapv1.
@@ -195,7 +195,8 @@ impl Client {
                 if retryability == Retryability::Read && err.is_read_retryable()
                     || retryability == Retryability::Write && err.is_write_retryable()
                 {
-                    self.execute_retry(&mut op, &mut session, txn_number, err).await
+                    self.execute_retry(&mut op, &mut session, txn_number, err)
+                        .await
                 } else {
                     Err(err)
                 }
@@ -230,13 +231,7 @@ impl Client {
         op.update_for_retry();
 
         match self
-            .execute_operation_on_connection(
-                op,
-                &mut conn,
-                session,
-                txn_number,
-                &retryability,
-            )
+            .execute_operation_on_connection(op, &mut conn, session, txn_number, &retryability)
             .await
         {
             Ok(result) => Ok(result),
