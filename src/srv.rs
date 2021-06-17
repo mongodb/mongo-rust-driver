@@ -36,9 +36,7 @@ impl SrvResolver {
     pub(crate) async fn new(config: Option<ResolverConfig>) -> Result<Self> {
         let resolver = AsyncResolver::new(config).await?;
 
-        Ok(Self {
-            resolver,
-        })
+        Ok(Self { resolver })
     }
 
     pub(crate) async fn resolve_client_options(
@@ -47,7 +45,10 @@ impl SrvResolver {
     ) -> Result<ResolvedConfig> {
         let lookup_result = self.get_srv_hosts(hostname).await?;
         let mut config = ResolvedConfig {
-            hosts: lookup_result.hosts.into_iter().collect::<Result<Vec<ServerAddress>>>()?,
+            hosts: lookup_result
+                .hosts
+                .into_iter()
+                .collect::<Result<Vec<ServerAddress>>>()?,
             min_ttl: lookup_result.min_ttl,
             auth_source: None,
             replica_set: None,
@@ -58,10 +59,7 @@ impl SrvResolver {
         Ok(config)
     }
 
-    pub(crate) async fn get_srv_hosts(
-        &self,
-        original_hostname: &str,
-    ) -> Result<LookupHosts> {
+    pub(crate) async fn get_srv_hosts(&self, original_hostname: &str) -> Result<LookupHosts> {
         let hostname_parts: Vec<_> = original_hostname.split('.').collect();
 
         if hostname_parts.len() < 3 {
@@ -86,7 +84,10 @@ impl SrvResolver {
 
             let hostname = srv.target().to_utf8();
             let port = Some(srv.port());
-            let mut address = ServerAddress::Tcp { host: hostname, port };
+            let mut address = ServerAddress::Tcp {
+                host: hostname,
+                port,
+            };
 
             let domain_name = &hostname_parts[1..];
 
@@ -106,7 +107,7 @@ impl SrvResolver {
                         domain_name.join(".")
                     ),
                 }
-                           .into()));
+                .into()));
             }
 
             // The spec tests list the seeds without the trailing '.', so we remove it by
@@ -127,7 +128,10 @@ impl SrvResolver {
             .into());
         }
 
-        Ok(LookupHosts { hosts: srv_addresses, min_ttl: Duration::from_secs(min_ttl.into()) })
+        Ok(LookupHosts {
+            hosts: srv_addresses,
+            min_ttl: Duration::from_secs(min_ttl.into()),
+        })
     }
 
     async fn get_txt_options(
