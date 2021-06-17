@@ -1,13 +1,9 @@
-use std::{
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::time::Duration;
 use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, Bson, Document},
-    error::{ErrorKind, Result},
-    event::command::{CommandEventHandler, CommandStartedEvent},
+    error::ErrorKind,
     options::{
         Acknowledgment,
         FindOneOptions,
@@ -18,7 +14,7 @@ use crate::{
         UpdateOptions,
         WriteConcern,
     },
-    test::{EventClient, TestClient, CLIENT_OPTIONS, LOCK},
+    test::{EventClient, TestClient, LOCK},
     Collection,
 };
 
@@ -223,8 +219,10 @@ async fn assert_event_contains_read_concern(client: &EventClient) {
 #[function_name::named]
 async fn command_contains_write_concern_insert_one() {
     let _guard = LOCK.run_concurrently().await;
-    let (buffer, coll) = get_monitored_collection(function_name!()).await.unwrap();
+    let client = EventClient::new().await;
+    let coll: Collection = client.database("test").collection(function_name!());
 
+    coll.drop(None).await.unwrap();
     coll.insert_one(
         doc! { "foo": "bar" },
         InsertOneOptions::builder()
@@ -253,7 +251,7 @@ async fn command_contains_write_concern_insert_one() {
     .unwrap();
 
     assert_eq!(
-        buffer.write_concerns("insert"),
+        command_write_concerns(&client, "insert"),
         vec![
             doc! {
                 "w": 1,
@@ -272,8 +270,10 @@ async fn command_contains_write_concern_insert_one() {
 #[function_name::named]
 async fn command_contains_write_concern_insert_many() {
     let _guard = LOCK.run_concurrently().await;
-    let (buffer, coll) = get_monitored_collection(function_name!()).await.unwrap();
+    let client = EventClient::new().await;
+    let coll: Collection = client.database("test").collection(function_name!());
 
+    coll.drop(None).await.unwrap();
     coll.insert_many(
         &[doc! { "foo": "bar" }],
         InsertManyOptions::builder()
@@ -302,7 +302,7 @@ async fn command_contains_write_concern_insert_many() {
     .unwrap();
 
     assert_eq!(
-        buffer.write_concerns("insert"),
+        command_write_concerns(&client, "insert"),
         vec![
             doc! {
                 "w": 1,
@@ -321,8 +321,10 @@ async fn command_contains_write_concern_insert_many() {
 #[function_name::named]
 async fn command_contains_write_concern_update_one() {
     let _guard = LOCK.run_concurrently().await;
-    let (buffer, coll) = get_monitored_collection(function_name!()).await.unwrap();
+    let client = EventClient::new().await;
+    let coll: Collection = client.database("test").collection(function_name!());
 
+    coll.drop(None).await.unwrap();
     coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
     coll.update_one(
         doc! { "foo": "bar" },
@@ -354,7 +356,7 @@ async fn command_contains_write_concern_update_one() {
     .unwrap();
 
     assert_eq!(
-        buffer.write_concerns("update"),
+        command_write_concerns(&client, "update"),
         vec![
             doc! {
                 "w": 1,
@@ -373,8 +375,10 @@ async fn command_contains_write_concern_update_one() {
 #[function_name::named]
 async fn command_contains_write_concern_update_many() {
     let _guard = LOCK.run_concurrently().await;
-    let (buffer, coll) = get_monitored_collection(function_name!()).await.unwrap();
+    let client = EventClient::new().await;
+    let coll: Collection = client.database("test").collection(function_name!());
 
+    coll.drop(None).await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
         .await
         .unwrap();
@@ -408,7 +412,7 @@ async fn command_contains_write_concern_update_many() {
     .unwrap();
 
     assert_eq!(
-        buffer.write_concerns("update"),
+        command_write_concerns(&client, "update"),
         vec![
             doc! {
                 "w": 1,
@@ -422,46 +426,10 @@ async fn command_contains_write_concern_update_many() {
     );
 }
 
-async fn get_monitored_collection(name: &str) -> Result<(Arc<CommandBuffer>, Collection)> {
-    let buffer = Arc::new(CommandBuffer::new());
-    let mut options = CLIENT_OPTIONS.clone();
-    options.command_event_handler = Some(buffer.clone());
-    let client = TestClient::with_options(Some(options)).await;
-    let db = client.database("test");
-    let coll: Collection = db.collection(name);
-    coll.drop(None).await?;
-    Ok((buffer, coll))
-}
-
-struct CommandBuffer {
-    commands: Mutex<Vec<Document>>,
-}
-
-impl CommandBuffer {
-    fn new() -> Self {
-        CommandBuffer {
-            commands: Mutex::new(vec![]),
-        }
-    }
-    fn write_concerns(&self, key: &str) -> Vec<Document> {
-        self.commands
-            .lock()
-            .unwrap()
-            .iter()
-            .cloned()
-            .filter(|d| d.contains_key(key))
-            .map(|d| d.get_document("writeConcern").unwrap().clone())
-            .collect()
-    }
-}
-
-impl CommandEventHandler for CommandBuffer {
-    fn handle_command_started_event(&self, event: CommandStartedEvent) {
-        self.commands.lock().unwrap().push(event.command);
-    }
-
-    fn handle_command_succeeded_event(&self, _event: crate::event::command::CommandSucceededEvent) {
-    }
-
-    fn handle_command_failed_event(&self, _event: crate::event::command::CommandFailedEvent) {}
+fn command_write_concerns(client: &EventClient, key: &str) -> Vec<Document> {
+    client
+        .get_command_started_events(&[key])
+        .into_iter()
+        .map(|d| d.command.get_document("writeConcern").unwrap().clone())
+        .collect()
 }
