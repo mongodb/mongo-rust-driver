@@ -11,7 +11,7 @@ use test_file::{TestFile, TestResult};
 
 use crate::{
     bson::{doc, Document},
-    error::{ErrorKind, Result},
+    error::{ErrorKind, Result, RETRYABLE_WRITE_ERROR},
     event::{
         cmap::{CmapEventHandler, ConnectionCheckoutFailedReason},
         command::CommandEventHandler,
@@ -402,7 +402,7 @@ async fn retry_write_pool_cleared() {
     let handler = Arc::new(EventHandler::new());
 
     let mut client_options = CLIENT_OPTIONS.clone();
-    client_options.retry_reads = Some(true);
+    client_options.retry_writes = Some(true);
     client_options.max_pool_size = Some(1);
     client_options.cmap_event_handler = Some(handler.clone() as Arc<dyn CmapEventHandler>);
     client_options.command_event_handler = Some(handler.clone() as Arc<dyn CommandEventHandler>);
@@ -417,6 +417,11 @@ async fn retry_write_pool_cleared() {
         return;
     }
 
+    if client.is_standalone() {
+        println!("skipping retry_write_pool_cleared due standalone topology");
+        return;
+    }
+
     let collection = client
         .database("retry_write_pool_cleared")
         .collection("retry_write_pool_cleared");
@@ -424,6 +429,7 @@ async fn retry_write_pool_cleared() {
     let options = FailCommandOptions::builder()
         .error_code(91)
         .block_connection(Duration::from_secs(1))
+        .error_labels(vec![RETRYABLE_WRITE_ERROR.to_string()])
         .build();
     let failpoint = FailPoint::fail_command(&["insert"], FailPointMode::Times(1), Some(options));
     let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
