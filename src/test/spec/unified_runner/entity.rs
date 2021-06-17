@@ -2,8 +2,10 @@ use std::{ops::Deref, sync::Arc};
 
 use crate::{
     bson::{Bson, Document},
+    event::command::CommandStartedEvent,
     test::{CommandEvent, EventHandler},
     Client,
+    ClientSession,
     Collection,
     Database,
 };
@@ -13,6 +15,7 @@ pub enum Entity {
     Client(ClientEntity),
     Database(Database),
     Collection(Collection<Document>),
+    Session(ClientSession),
     Bson(Bson),
     None,
 }
@@ -72,6 +75,11 @@ impl ClientEntity {
             true
         })
     }
+
+    /// Gets all events of type commandStartedEvent, excluding configureFailPoint events.
+    pub fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
+        self.observer.get_all_command_started_events()
+    }
 }
 
 impl From<Database> for Entity {
@@ -119,6 +127,13 @@ impl Entity {
         match self {
             Self::Collection(collection) => collection,
             _ => panic!("Expected collection entity, got {:?}", &self),
+        }
+    }
+
+    pub fn as_client_session(&self) -> &ClientSession {
+        match self {
+            Self::Session(client_session) => client_session,
+            _ => panic!("Expected client session entity, got {:?}", &self),
         }
     }
 

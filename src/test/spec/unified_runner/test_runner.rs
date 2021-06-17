@@ -1,8 +1,9 @@
+use bson::from_document;
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     bson::Document,
-    client::options::ClientOptions,
+    client::options::{ClientOptions, SessionOptions},
     concern::{Acknowledgment, WriteConcern},
     options::CollectionOptions,
     test::{util::FailPointGuard, EventHandler, TestClient, SERVER_API},
@@ -115,8 +116,17 @@ impl TestRunner {
                     };
                     (id, collection.into())
                 }
-                TestFileEntity::Session(_) => {
-                    panic!("Explicit sessions not implemented");
+                TestFileEntity::Session(session) => {
+                    let id = session.id.clone();
+                    let client = self.get_client(&session.client);
+                    let options: Option<SessionOptions> = session
+                        .session_options
+                        .as_ref()
+                        .map(|doc| from_document(doc.clone()).unwrap());
+                    (
+                        id,
+                        Entity::Session(client.start_session(options).await.unwrap()),
+                    )
                 }
                 TestFileEntity::Bucket(_) => {
                     panic!("GridFS not implemented");

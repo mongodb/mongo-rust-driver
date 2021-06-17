@@ -137,6 +137,20 @@ impl EventHandler {
             .collect()
     }
 
+    /// Gets all of the command started events, excluding configureFailPoint events.
+    pub fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
+        let events = self.command_events.read().unwrap();
+        events
+            .iter()
+            .filter_map(|event| match event {
+                CommandEvent::Started(event) if event.command_name != "configureFailPoint" => {
+                    Some(event.clone())
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
     pub fn get_filtered_command_events<F>(&self, filter: F) -> Vec<CommandEvent>
     where
         F: Fn(&CommandEvent) -> bool,
@@ -360,16 +374,7 @@ impl EventClient {
 
     /// Gets all command started events, excluding configureFailPoint events.
     pub fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
-        let events = self.handler.command_events.read().unwrap();
-        events
-            .iter()
-            .filter_map(|event| match event {
-                CommandEvent::Started(event) if event.command_name != "configureFailPoint" => {
-                    Some(event.clone())
-                }
-                _ => None,
-            })
-            .collect()
+        self.handler.get_all_command_started_events()
     }
 
     pub fn get_command_events(&self, command_names: &[&str]) -> Vec<CommandEvent> {
