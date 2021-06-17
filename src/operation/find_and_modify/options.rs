@@ -32,44 +32,45 @@ fn serialize_true<S: Serializer>(s: S) -> std::result::Result<S::Ok, S::Error> {
 
 #[serde_with::skip_serializing_none]
 #[derive(Debug, TypedBuilder, Serialize)]
+#[builder(field_defaults(setter(into)))]
 #[serde(rename_all = "camelCase")]
 pub(super) struct FindAndModifyOptions {
     #[serde(flatten)]
     pub(crate) modification: Modification,
 
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub(crate) sort: Option<Document>,
 
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub(crate) new: Option<bool>,
 
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub(crate) upsert: Option<bool>,
 
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub(crate) bypass_document_validation: Option<bool>,
 
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub(crate) write_concern: Option<WriteConcern>,
 
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub(crate) array_filters: Option<Vec<Document>>,
 
     #[serde(
         serialize_with = "bson_util::serialize_duration_as_int_millis",
         rename = "maxTimeMS"
     )]
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub(crate) max_time: Option<Duration>,
 
     #[serde(rename = "fields")]
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub(crate) projection: Option<Document>,
 
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub(crate) collation: Option<Collation>,
 
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub(crate) hint: Option<Hint>,
 }
 

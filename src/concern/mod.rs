@@ -165,7 +165,7 @@ impl Serialize for ReadConcernLevel {
 /// information about write concerns.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Default, PartialEq, TypedBuilder, Serialize, Deserialize)]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct WriteConcern {
     /// Requests acknowledgement that the operation has propagated to a specific number or variety

@@ -334,6 +334,7 @@ impl<'de> Deserialize<'de> for ServerApiVersion {
 
 /// Options used to declare a versioned server API.
 #[derive(Clone, Debug, Deserialize, PartialEq, TypedBuilder)]
+#[builder(field_defaults(setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub(crate) struct ServerApi {
@@ -342,18 +343,19 @@ pub(crate) struct ServerApi {
 
     /// Whether the MongoDB server should reject all commands that are not part of the
     /// declared API version. This includes command options and aggregation pipeline stages.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub strict: Option<bool>,
 
     /// Whether the MongoDB server should return command failures when functionality that is
     /// deprecated from the declared API version is used.
     /// Note that at the time of this writing, no deprecations in version 1 exist.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub deprecation_errors: Option<bool>,
 }
 
 /// Contains the options that can be used to create a new [`Client`](../struct.Client.html).
 #[derive(Clone, Derivative, Deserialize, TypedBuilder)]
+#[builder(field_defaults(setter(into)))]
 #[derivative(Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -373,7 +375,7 @@ pub struct ClientOptions {
     /// The application name that the Client will send to the server as part of the handshake. This
     /// can be used in combination with the server logs to determine which Client is connected to a
     /// server.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub app_name: Option<String>,
 
     #[builder(default, setter(skip))]
@@ -382,14 +384,14 @@ pub struct ClientOptions {
     /// The handler that should process all Connection Monitoring and Pooling events. See the
     /// CmapEventHandler type documentation for more details.
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     #[serde(skip)]
     pub cmap_event_handler: Option<Arc<dyn CmapEventHandler>>,
 
     /// The handler that should process all command-related events. See the CommandEventHandler
     /// type documentation for more details.
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     #[serde(skip)]
     pub command_event_handler: Option<Arc<dyn CommandEventHandler>>,
 
@@ -397,30 +399,30 @@ pub struct ClientOptions {
     /// server.
     ///
     /// The default value is 10 seconds.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub connect_timeout: Option<Duration>,
 
     /// The credential to use for authenticating connections made by this client.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub credential: Option<Credential>,
 
     /// Specifies whether the Client should directly connect to a single host rather than
     /// autodiscover all servers in the cluster.
     ///
     /// The default value is false.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub direct_connection: Option<bool>,
 
     /// Extra information to append to the driver version in the metadata of the handshake with the
     /// server. This should be used by libraries wrapping the driver, e.g. ODMs.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub driver_info: Option<DriverInfo>,
 
     /// The amount of time each monitoring thread should wait between sending an isMaster command
     /// to its respective server.
     ///
     /// The default value is 10 seconds.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub heartbeat_freq: Option<Duration>,
 
     /// When running a read operation with a ReadPreference that allows selecting secondaries,
@@ -434,14 +436,14 @@ pub struct ClientOptions {
     /// lowest average round trip time is eligible.
     ///
     /// The default value is 15 ms.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub local_threshold: Option<Duration>,
 
     /// The amount of time that a connection can remain idle in a connection pool before being
     /// closed. A value of zero indicates that connections should not be closed due to being idle.
     ///
     /// By default, connections will not be closed due to being idle.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub max_idle_time: Option<Duration>,
 
     /// The maximum amount of connections that the Client should allow to be created in a
@@ -450,7 +452,7 @@ pub struct ClientOptions {
     /// operation finishes and its connection is checked back into the pool.
     ///
     /// The default value is 100.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub max_pool_size: Option<u32>,
 
     /// The minimum number of connections that should be available in a server's connection pool at
@@ -458,33 +460,33 @@ pub struct ClientOptions {
     /// be added to the pool in the background until `min_pool_size` is reached.
     ///
     /// The default value is 0.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub min_pool_size: Option<u32>,
 
     /// Specifies the default read concern for operations performed on the Client. See the
     /// ReadConcern type documentation for more details.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub read_concern: Option<ReadConcern>,
 
     /// The name of the replica set that the Client should connect to.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub repl_set_name: Option<String>,
 
     /// Whether or not the client should retry a read operation if the operation fails.
     ///
     /// The default value is true.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub retry_reads: Option<bool>,
 
     /// Whether or not the client should retry a write operation if the operation fails.
     ///
     /// The default value is true.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub retry_writes: Option<bool>,
 
     /// The default selection criteria for operations performed on the Client. See the
     /// SelectionCriteria type documentation for more details.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub selection_criteria: Option<SelectionCriteria>,
 
     /// The declared API version for this client.
@@ -503,7 +505,7 @@ pub struct ClientOptions {
     /// timing outs
     ///
     /// The default value is 30 seconds.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub server_selection_timeout: Option<Duration>,
 
     #[builder(default, setter(skip))]
@@ -512,12 +514,12 @@ pub struct ClientOptions {
     /// The TLS configuration for the Client to use in its connections with the server.
     ///
     /// By default, TLS is disabled.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub tls: Option<Tls>,
 
     /// Specifies the default write concern for operations performed on the Client. See the
     /// WriteConcern type documentation for more details.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 
     #[builder(default, setter(skip))]
@@ -541,7 +543,7 @@ pub struct ClientOptions {
     pub(crate) resolver_config: Option<ResolverConfig>,
 
     /// Used by tests to override MIN_HEARTBEAT_FREQUENCY.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     #[cfg(test)]
     pub(crate) heartbeat_freq_test: Option<Duration>,
 }
@@ -723,7 +725,7 @@ impl Tls {
 
 /// Specifies the TLS configuration that the [`Client`](../struct.Client.html) should use.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, TypedBuilder)]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct TlsOptions {
     /// Whether or not the [`Client`](../struct.Client.html) should return an error if the server
@@ -861,17 +863,18 @@ impl TlsOptions {
 /// Extra information to append to the driver version in the metadata of the handshake with the
 /// server. This should be used by libraries wrapping the driver, e.g. ODMs.
 #[derive(Clone, Debug, Deserialize, TypedBuilder, PartialEq)]
+#[builder(field_defaults(setter(into)))]
 #[non_exhaustive]
 pub struct DriverInfo {
     /// The name of the library wrapping the driver.
     pub name: String,
 
     /// The version of the library wrapping the driver.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub version: Option<String>,
 
     /// Optional platform information for the wrapping driver.
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub platform: Option<String>,
 }
 
@@ -1836,7 +1839,9 @@ impl ClientOptionsParser {
                 }
                 None => {
                     self.tls = Some(Tls::Enabled(
-                        TlsOptions::builder().ca_file_path(value.into()).build(),
+                        TlsOptions::builder()
+                            .ca_file_path(PathBuf::from(value))
+                            .build(),
                     ))
                 }
             },
@@ -1853,7 +1858,7 @@ impl ClientOptionsParser {
                 None => {
                     self.tls = Some(Tls::Enabled(
                         TlsOptions::builder()
-                            .cert_key_file_path(value.into())
+                            .cert_key_file_path(PathBuf::from(value))
                             .build(),
                     ))
                 }
@@ -2290,7 +2295,7 @@ mod tests {
 /// Contains the options that can be used to create a new
 /// [`ClientSession`](../struct.ClientSession.html).
 #[derive(Clone, Debug, Deserialize, TypedBuilder)]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct SessionOptions {
@@ -2307,7 +2312,7 @@ pub struct SessionOptions {
 /// Contains the options that can be used for a transaction.
 #[skip_serializing_none]
 #[derive(Debug, Default, Serialize, Deserialize, TypedBuilder, Clone)]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct TransactionOptions {

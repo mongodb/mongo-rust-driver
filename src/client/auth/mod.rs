@@ -325,7 +325,7 @@ impl FromStr for AuthMechanism {
 /// Some fields (mechanism and source) may be omitted and will either be negotiated or assigned a
 /// default value, depending on the values of other fields in the credential.
 #[derive(Clone, Default, Deserialize, TypedBuilder, PartialEq)]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct Credential {
     /// The username to authenticate with. This applies to all mechanisms but may be omitted when

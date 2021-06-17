@@ -171,7 +171,7 @@ impl<'de> Deserialize<'de> for ReadPreference {
 
 /// Specifies read preference options for non-primary read preferences.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, TypedBuilder)]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ReadPreferenceOptions {

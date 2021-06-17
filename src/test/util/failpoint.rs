@@ -101,7 +101,7 @@ pub enum FailPointMode {
 
 #[serde_with::skip_serializing_none]
 #[derive(Debug, TypedBuilder, Serialize)]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 pub struct FailCommandOptions {
     /// The appName that a client must use in order to hit this fail point.

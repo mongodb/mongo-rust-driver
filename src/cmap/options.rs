@@ -14,7 +14,7 @@ use crate::{
 /// Contains the options for creating a connection pool.
 #[derive(Clone, Default, Deserialize, TypedBuilder, Derivative)]
 #[derivative(Debug, PartialEq)]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ConnectionPoolOptions {
     /// The application name specified by the user. This is sent to the server as part of the
@@ -140,12 +140,13 @@ impl From<ConnectionPoolOptions> for ConnectionOptions {
 }
 
 #[derive(Clone, Debug, TypedBuilder)]
+#[builder(field_defaults(setter(into)))]
 pub(crate) struct StreamOptions {
     pub(crate) address: ServerAddress,
 
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub(crate) connect_timeout: Option<Duration>,
 
-    #[builder(default, setter(strip_option))]
+    #[builder(default)]
     pub(crate) tls_options: Option<TlsOptions>,
 }
