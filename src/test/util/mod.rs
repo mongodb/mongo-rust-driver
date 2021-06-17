@@ -242,6 +242,11 @@ impl TestClient {
         version.matches(&self.server_version)
     }
 
+    pub fn supports_block_connection(&self) -> bool {
+        let version = VersionReq::parse(">= 4.2.9").unwrap();
+        version.matches(&self.server_version)
+    }
+
     pub async fn enable_failpoint(
         &self,
         fp: FailPoint,

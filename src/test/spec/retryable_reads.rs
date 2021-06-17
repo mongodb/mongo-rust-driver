@@ -91,8 +91,8 @@ async fn retry_read_pool_cleared() {
     }
 
     let client = TestClient::with_options(Some(client_options.clone())).await;
-    if !client.supports_fail_command().await {
-        println!("skipping retry_read_pool_cleared due to failCommand not being supported");
+    if !client.supports_block_connection() {
+        println!("skipping retry_read_pool_cleared due to blockConnection not being supported");
         return;
     }
 
