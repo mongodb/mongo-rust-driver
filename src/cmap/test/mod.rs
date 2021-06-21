@@ -346,12 +346,9 @@ impl Matchable for TlsOptions {
 
 impl Matchable for EventOptions {
     fn content_matches(&self, expected: &EventOptions) -> bool {
-        self.app_name.matches(&expected.app_name)
-            && self.connect_timeout.matches(&expected.connect_timeout)
-            && self.max_idle_time.matches(&expected.max_idle_time)
+        self.max_idle_time.matches(&expected.max_idle_time)
             && self.max_pool_size.matches(&expected.max_pool_size)
             && self.min_pool_size.matches(&expected.min_pool_size)
-            && self.tls_options.matches(&expected.tls_options)
     }
 }
 

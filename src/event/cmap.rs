@@ -5,10 +5,7 @@ use std::time::Duration;
 
 use serde::Deserialize;
 
-use crate::{
-    client::options::{DriverInfo, ServerApi, TlsOptions},
-    options::ServerAddress,
-};
+use crate::options::ServerAddress;
 
 /// We implement `Deserialize` for all of the event types so that we can more easily parse the CMAP
 /// spec tests. However, we have no need to parse the address field from the JSON files (if it's
@@ -41,20 +38,6 @@ pub struct PoolCreatedEvent {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ConnectionPoolOptions {
-    /// The application name specified by the user. This is sent to the server as part of the
-    /// handshake that each connection makes when it's created.
-    pub app_name: Option<String>,
-
-    /// The connect timeout passed to each underlying TcpStream when attempting to connect to the
-    /// server.
-    #[serde(skip)]
-    pub connect_timeout: Option<Duration>,
-
-    /// Extra information to append to the driver version in the metadata of the handshake with the
-    /// server. This should be used by libraries wrapping the driver, e.g. ODMs.
-    #[serde(skip)]
-    pub driver_info: Option<DriverInfo>,
-
     /// Connections that have been ready for usage in the pool for longer than `max_idle_time` will
     /// not be used.
     ///
@@ -76,18 +59,6 @@ pub struct ConnectionPoolOptions {
     ///
     /// The default is that no minimum is enforced
     pub min_pool_size: Option<u32>,
-
-    /// The declared API version
-    ///
-    /// The default value is to have no declared API version
-    pub(crate) server_api: Option<ServerApi>,
-
-    /// The options specifying how a TLS connection should be configured. If `tls_options` is
-    /// `None`, then TLS will not be used for the connections.
-    ///
-    /// The default is not to use TLS for connections.
-    #[serde(skip)]
-    pub tls_options: Option<TlsOptions>,
 }
 
 /// Event emitted when a connection pool becomes ready.

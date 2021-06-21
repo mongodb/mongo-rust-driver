@@ -109,14 +109,9 @@ impl ConnectionPoolOptions {
 
     pub(crate) fn to_event_options(&self) -> EventOptions {
         EventOptions {
-            app_name: self.app_name.clone(),
-            connect_timeout: self.connect_timeout,
-            driver_info: self.driver_info.clone(),
             max_idle_time: self.max_idle_time,
             min_pool_size: self.min_pool_size,
             max_pool_size: self.max_pool_size,
-            server_api: self.server_api.clone(),
-            tls_options: self.tls_options.clone(),
         }
     }
 }
