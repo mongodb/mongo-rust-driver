@@ -100,11 +100,12 @@ impl Operation for Find {
         response: CommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
+        let source_address = response.source_address().clone();
         let body: CursorBody = response.body()?;
 
         Ok(CursorSpecification::new(
             self.ns.clone(),
-            response.source_address().clone(),
+            source_address,
             body.cursor.id,
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),

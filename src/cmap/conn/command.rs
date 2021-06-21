@@ -155,8 +155,8 @@ impl CommandResponse {
     }
 
     /// Deserialize the body of the response.
-    pub(crate) fn body<T: DeserializeOwned>(&self) -> Result<T> {
-        match bson::from_bson(Bson::Document(self.raw_response.clone())) {
+    pub(crate) fn body<T: DeserializeOwned>(self) -> Result<T> {
+        match bson::from_document(self.raw_response) {
             Ok(body) => Ok(body),
             Err(e) => Err(ErrorKind::InvalidResponse {
                 message: format!("{}", e),
