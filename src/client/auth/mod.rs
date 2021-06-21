@@ -431,6 +431,31 @@ impl Credential {
             .authenticate_stream(conn, self, server_api, http_client)
             .await
     }
+
+    #[cfg(test)]
+    pub(crate) fn serialize_for_client_options<S>(
+        credential: &Option<Credential>,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::Serialize;
+
+        #[derive(serde::Serialize)]
+        struct CredentialHelper<'a> {
+            authsource: Option<&'a String>,
+            authmechanism: Option<&'a str>,
+            authmechanismproperties: Option<&'a Document>,
+        }
+
+        let state = credential.as_ref().map(|c| CredentialHelper {
+            authsource: c.source.as_ref(),
+            authmechanism: c.mechanism.as_ref().map(|s| s.as_str()),
+            authmechanismproperties: c.mechanism_properties.as_ref(),
+        });
+        state.serialize(serializer)
+    }
 }
 
 impl Debug for Credential {

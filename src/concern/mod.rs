@@ -64,6 +64,25 @@ impl ReadConcern {
     pub fn custom(level: String) -> Self {
         ReadConcernLevel::from_str(level.as_str()).into()
     }
+
+    #[cfg(test)]
+    pub(crate) fn serialize_for_client_options<S>(
+        read_concern: &Option<ReadConcern>,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        #[derive(Serialize)]
+        struct ReadConcernHelper<'a> {
+            readconcernlevel: &'a str,
+        }
+
+        let state = read_concern.as_ref().map(|concern| ReadConcernHelper {
+            readconcernlevel: concern.level.as_str(),
+        });
+        state.serialize(serializer)
+    }
 }
 
 impl From<ReadConcernLevel> for ReadConcern {
@@ -235,20 +254,6 @@ impl From<String> for Acknowledgment {
     }
 }
 
-#[cfg(all(test, not(feature = "sync")))]
-use bson::Bson;
-
-impl Acknowledgment {
-    #[cfg(all(test, not(feature = "sync")))]
-    pub(crate) fn to_bson(&self) -> Bson {
-        match self {
-            Acknowledgment::Nodes(i) => Bson::Int32(*i as i32),
-            Acknowledgment::Majority => Bson::String("majority".to_string()),
-            Acknowledgment::Custom(s) => Bson::String(s.to_string()),
-        }
-    }
-}
-
 impl WriteConcern {
     #[allow(dead_code)]
     pub(crate) fn is_acknowledged(&self) -> bool {
@@ -275,5 +280,32 @@ impl WriteConcern {
         }
 
         Ok(())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn serialize_for_client_options<S>(
+        write_concern: &Option<WriteConcern>,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        #[derive(Serialize)]
+        struct WriteConcernHelper<'a> {
+            w: Option<&'a Acknowledgment>,
+
+            #[serde(serialize_with = "bson_util::serialize_duration_as_int_millis")]
+            wtimeoutms: Option<Duration>,
+
+            journal: Option<bool>,
+        }
+
+        let state = write_concern.as_ref().map(|concern| WriteConcernHelper {
+            w: concern.w.as_ref(),
+            wtimeoutms: concern.w_timeout,
+            journal: concern.journal,
+        });
+
+        state.serialize(serializer)
     }
 }

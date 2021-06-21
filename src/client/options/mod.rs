@@ -138,7 +138,7 @@ impl Hash for StreamAddress {
 ///
 /// Currently this just supports addresses that can be connected to over TCP, but alternative
 /// address types may be supported in the future (e.g. Unix Domain Socket paths).
-#[derive(Clone, Debug, Eq)]
+#[derive(Clone, Debug, Eq, Serialize)]
 #[non_exhaustive]
 pub enum ServerAddress {
     /// A TCP/IP host and port combination.
@@ -556,6 +556,95 @@ impl Default for ClientOptions {
     }
 }
 
+#[cfg(test)]
+impl Serialize for ClientOptions {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        #[derive(Serialize)]
+        struct ClientOptionsHelper<'a> {
+            appname: &'a Option<String>,
+            compressors: &'a Option<Vec<String>>,
+
+            #[serde(serialize_with = "serialize_duration_as_int_millis")]
+            connecttimeoutms: &'a Option<Duration>,
+
+            #[serde(flatten, serialize_with = "Credential::serialize_for_client_options")]
+            credential: &'a Option<Credential>,
+
+            directconnection: &'a Option<bool>,
+
+            #[serde(serialize_with = "serialize_duration_as_int_millis")]
+            heartbeatfrequencyms: &'a Option<Duration>,
+
+            #[serde(serialize_with = "serialize_duration_as_int_millis")]
+            localthresholdms: &'a Option<Duration>,
+
+            #[serde(serialize_with = "serialize_duration_as_int_millis")]
+            maxidletimems: &'a Option<Duration>,
+
+            maxpoolsize: &'a Option<u32>,
+
+            minpoolsize: &'a Option<u32>,
+
+            #[serde(flatten, serialize_with = "ReadConcern::serialize_for_client_options")]
+            readconcern: &'a Option<ReadConcern>,
+
+            replicaset: &'a Option<String>,
+
+            retryreads: &'a Option<bool>,
+
+            retrywrites: &'a Option<bool>,
+
+            #[serde(
+                flatten,
+                serialize_with = "SelectionCriteria::serialize_for_client_options"
+            )]
+            selectioncriteria: &'a Option<SelectionCriteria>,
+
+            #[serde(serialize_with = "serialize_duration_as_int_millis")]
+            serverselectiontimeoutms: &'a Option<Duration>,
+
+            #[serde(serialize_with = "serialize_duration_as_int_millis")]
+            sockettimeoutms: &'a Option<Duration>,
+
+            #[serde(flatten, serialize_with = "Tls::serialize_for_client_options")]
+            tls: &'a Option<Tls>,
+
+            #[serde(flatten, serialize_with = "WriteConcern::serialize_for_client_options")]
+            writeconcern: &'a Option<WriteConcern>,
+
+            zlibcompressionlevel: &'a Option<i32>,
+        }
+
+        let client_options = ClientOptionsHelper {
+            appname: &self.app_name,
+            compressors: &self.compressors,
+            connecttimeoutms: &self.connect_timeout,
+            credential: &self.credential,
+            directconnection: &self.direct_connection,
+            heartbeatfrequencyms: &self.heartbeat_freq,
+            localthresholdms: &self.local_threshold,
+            maxidletimems: &self.max_idle_time,
+            maxpoolsize: &self.max_pool_size,
+            minpoolsize: &self.min_pool_size,
+            readconcern: &self.read_concern,
+            replicaset: &self.repl_set_name,
+            retryreads: &self.retry_reads,
+            retrywrites: &self.retry_writes,
+            selectioncriteria: &self.selection_criteria,
+            serverselectiontimeoutms: &self.server_selection_timeout,
+            sockettimeoutms: &self.socket_timeout,
+            tls: &self.tls,
+            writeconcern: &self.write_concern,
+            zlibcompressionlevel: &self.zlib_compression,
+        };
+
+        client_options.serialize(serializer)
+    }
+}
+
 #[derive(Debug, Default, PartialEq)]
 struct ClientOptionsParser {
     pub hosts: Vec<ServerAddress>,
@@ -611,6 +700,24 @@ impl From<TlsOptions> for Tls {
 impl From<TlsOptions> for Option<Tls> {
     fn from(options: TlsOptions) -> Self {
         Some(Tls::Enabled(options))
+    }
+}
+
+impl Tls {
+    #[cfg(test)]
+    pub(crate) fn serialize_for_client_options<S>(
+        tls: &Option<Tls>,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match tls {
+            Some(Tls::Enabled(tls_options)) => {
+                TlsOptions::serialize_for_client_options(tls_options, serializer)
+            }
+            _ => serializer.serialize_none(),
+        }
     }
 }
 
@@ -717,6 +824,37 @@ impl TlsOptions {
         }
 
         Ok(config)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn serialize_for_client_options<S>(
+        tls_options: &TlsOptions,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        #[derive(Serialize)]
+        struct TlsOptionsHelper<'a> {
+            tls: bool,
+            tlscafile: Option<&'a str>,
+            tlscertificatekeyfile: Option<&'a str>,
+            tlsallowinvalidcertificates: Option<bool>,
+        }
+
+        let state = TlsOptionsHelper {
+            tls: true,
+            tlscafile: tls_options
+                .ca_file_path
+                .as_ref()
+                .map(|s| s.to_str().unwrap()),
+            tlscertificatekeyfile: tls_options
+                .cert_key_file_path
+                .as_ref()
+                .map(|s| s.to_str().unwrap()),
+            tlsallowinvalidcertificates: tls_options.allow_invalid_certificates,
+        };
+        state.serialize(serializer)
     }
 }
 

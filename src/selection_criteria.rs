@@ -71,6 +71,22 @@ impl SelectionCriteria {
     pub(crate) fn from_address(address: ServerAddress) -> Self {
         SelectionCriteria::Predicate(Arc::new(move |server| server.address() == &address))
     }
+
+    #[cfg(test)]
+    pub(crate) fn serialize_for_client_options<S>(
+        selection_criteria: &Option<SelectionCriteria>,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match selection_criteria {
+            Some(SelectionCriteria::ReadPreference(pref)) => {
+                ReadPreference::serialize_for_client_options(pref, serializer)
+            }
+            _ => serializer.serialize_none(),
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for SelectionCriteria {
@@ -306,6 +322,57 @@ impl ReadPreference {
         }
 
         doc
+    }
+
+    #[cfg(test)]
+    pub(crate) fn serialize_for_client_options<S>(
+        read_preference: &ReadPreference,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::Serialize;
+
+        #[derive(serde::Serialize)]
+        struct ReadPreferenceHelper<'a> {
+            readpreference: &'a str,
+
+            readpreferencetags: Option<&'a Vec<HashMap<String, String>>>,
+
+            #[serde(serialize_with = "crate::bson_util::serialize_duration_option_as_int_secs")]
+            maxstalenessseconds: Option<Duration>,
+        }
+
+        let state = match read_preference {
+            ReadPreference::Primary => ReadPreferenceHelper {
+                readpreference: "primary",
+                readpreferencetags: None,
+                maxstalenessseconds: None,
+            },
+            ReadPreference::PrimaryPreferred { options } => ReadPreferenceHelper {
+                readpreference: "primaryPreferred",
+                readpreferencetags: options.tag_sets.as_ref(),
+                maxstalenessseconds: options.max_staleness,
+            },
+            ReadPreference::Secondary { options } => ReadPreferenceHelper {
+                readpreference: "secondary",
+                readpreferencetags: options.tag_sets.as_ref(),
+                maxstalenessseconds: options.max_staleness,
+            },
+            ReadPreference::SecondaryPreferred { options } => ReadPreferenceHelper {
+                readpreference: "secondaryPreferred",
+                readpreferencetags: options.tag_sets.as_ref(),
+                maxstalenessseconds: options.max_staleness,
+            },
+            ReadPreference::Nearest { options } => ReadPreferenceHelper {
+                readpreference: "nearest",
+                readpreferencetags: options.tag_sets.as_ref(),
+                maxstalenessseconds: options.max_staleness,
+            },
+        };
+
+        state.serialize(serializer)
     }
 }
 

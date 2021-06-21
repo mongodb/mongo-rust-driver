@@ -87,6 +87,20 @@ pub(crate) fn serialize_duration_as_int_millis<S: Serializer>(
     }
 }
 
+#[cfg(test)]
+pub(crate) fn serialize_duration_option_as_int_secs<S: Serializer>(
+    val: &Option<Duration>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    match val {
+        Some(duration) if duration.as_secs() > i32::MAX as u64 => {
+            serializer.serialize_i64(duration.as_secs() as i64)
+        }
+        Some(duration) => serializer.serialize_i32(duration.as_secs() as i32),
+        None => serializer.serialize_none(),
+    }
+}
+
 pub(crate) fn deserialize_duration_from_u64_millis<'de, D>(
     deserializer: D,
 ) -> std::result::Result<Option<Duration>, D::Error>
