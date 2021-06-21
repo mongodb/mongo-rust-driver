@@ -778,7 +778,7 @@ async fn command_contains_write_concern_aggregate() {
     coll.aggregate(
         vec![
             doc! { "$match": { "foo": "bar" } },
-            doc! { "$set": { "foo": "baz" } },
+            doc! { "$addFields": { "foo": "baz" } },
             doc! { "$out": format!("{}-out", function_name!()) },
         ],
         AggregateOptions::builder()
@@ -795,7 +795,7 @@ async fn command_contains_write_concern_aggregate() {
     coll.aggregate(
         vec![
             doc! { "$match": { "foo": "bar" } },
-            doc! { "$set": { "foo": "baz" } },
+            doc! { "$addFields": { "foo": "baz" } },
             doc! { "$out": format!("{}-out", function_name!()) },
         ],
         AggregateOptions::builder()
