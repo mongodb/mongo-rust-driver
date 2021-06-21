@@ -51,7 +51,12 @@ fn get_nth_percentile(durations: &[Duration], n: f64) -> Duration {
 fn score_test(durations: Vec<Duration>, name: &str, task_size: f64, more_info: bool) -> f64 {
     let median = get_nth_percentile(&durations, 50.0);
     let score = task_size / (median.as_millis() as f64 / 1000.0);
-    println!("TEST: {} -- Score: {}\n", name, score);
+    println!(
+        "TEST: {} -- Score: {}, Median Iteration Time: {:.3}ms\n",
+        name,
+        score,
+        median.as_secs_f64()
+    );
 
     if more_info {
         println!(
