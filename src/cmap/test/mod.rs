@@ -21,15 +21,12 @@ use crate::{
     test::{
         assert_matches,
         run_spec_test,
-        CmapEvent,
         EventClient,
         Matchable,
-        TestClient,
         CLIENT_OPTIONS,
         LOCK,
         SERVER_API,
     },
-    Client,
     RUNTIME,
 };
 use bson::doc;
