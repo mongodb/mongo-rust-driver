@@ -148,7 +148,7 @@ impl std::fmt::Display for CollationStrength {
 }
 
 /// Setting that determines sort order of case differences during case tertiary level comparisons.
-/// For more info, see http://userguide.icu-project.org/collation/customization.
+/// For more info, see <http://userguide.icu-project.org/collation/customization>.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[non_exhaustive]
@@ -160,7 +160,7 @@ pub enum CollationCaseFirst {
     Lower,
 
     /// Default value. Similar to `Lower` with slight differences.
-    /// See http://userguide.icu-project.org/collation/customization for details of differences.
+    /// See <http://userguide.icu-project.org/collation/customization> for details of differences.
     Off,
 }
 
