@@ -129,12 +129,14 @@ impl Client {
 
         let mut conn = match server.pool.check_out().await {
             Ok(conn) => conn,
-            Err(err) if err.is_pool_cleared() => {
-                return self.execute_retry(&mut op, &mut session, None, err).await
-            }
             Err(mut err) => {
                 err.add_labels(None, &session, None)?;
-                return Err(err);
+
+                if err.is_pool_cleared() {
+                    return self.execute_retry(&mut op, &mut session, None, err).await;
+                } else {
+                    return Err(err);
+                }
             }
         };
 
