@@ -285,9 +285,9 @@ cargo test --verbose # auth tests included
 #### Topology-specific tests
 Certain tests will only be run against certain topologies. To ensure that the entire test suite is run, make sure to run the tests separately against standalone, replicated, and sharded deployments.
 ```bash
-export MONGODB_URI="mongodb://my-standalone-host:20717" # mongod running on 27017
+export MONGODB_URI="mongodb://my-standalone-host:27017" # mongod running on 27017
 cargo test --verbose
-export MONGODB_URI="mongodb://localhost:27018,localhost:27019,localhost:27020/?replSet=repl"
+export MONGODB_URI="mongodb://localhost:27018,localhost:27019,localhost:27020/?replicaSet=repl" # replicaset running on ports 27018, 27019, 27020 with name repl
 cargo test --verbose
 export MONGODB_URI="mongodb://localhost:27021" # mongos running on 27021
 cargo test --verbose
