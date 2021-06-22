@@ -84,7 +84,7 @@ const MAX_INSERT_DOCS_BYTES: usize = 16 * 1000 * 1000;
 /// ```
 
 #[derive(Debug, Clone)]
-pub struct Collection<T = Document>
+pub struct Collection<T>
 where
     T: Serialize + DeserializeOwned + Unpin + Debug,
 {

@@ -1,7 +1,7 @@
 use std::{ops::Deref, sync::Arc};
 
 use crate::{
-    bson::Bson,
+    bson::{Bson, Document},
     test::{CommandEvent, EventHandler},
     Client,
     Collection,
@@ -12,7 +12,7 @@ use crate::{
 pub enum Entity {
     Client(ClientEntity),
     Database(Database),
-    Collection(Collection),
+    Collection(Collection<Document>),
     Bson(Bson),
     None,
 }
@@ -80,8 +80,8 @@ impl From<Database> for Entity {
     }
 }
 
-impl From<Collection> for Entity {
-    fn from(collection: Collection) -> Self {
+impl From<Collection<Document>> for Entity {
+    fn from(collection: Collection<Document>) -> Self {
         Self::Collection(collection)
     }
 }
@@ -115,7 +115,7 @@ impl Entity {
         }
     }
 
-    pub fn as_collection(&self) -> &Collection {
+    pub fn as_collection(&self) -> &Collection<Document> {
         match self {
             Self::Collection(collection) => collection,
             _ => panic!("Expected collection entity, got {:?}", &self),

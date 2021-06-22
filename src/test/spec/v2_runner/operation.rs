@@ -47,7 +47,7 @@ use crate::{
 pub trait TestOperation: Debug {
     async fn execute_on_collection(
         &self,
-        collection: &Collection,
+        collection: &Collection<Document>,
         session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>>;
 
@@ -297,7 +297,7 @@ pub(super) struct DeleteMany {
 impl TestOperation for DeleteMany {
     async fn execute_on_collection(
         &self,
-        collection: &Collection,
+        collection: &Collection<Document>,
         session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         let result = match session {
@@ -344,7 +344,7 @@ pub(super) struct DeleteOne {
 impl TestOperation for DeleteOne {
     async fn execute_on_collection(
         &self,
-        collection: &Collection,
+        collection: &Collection<Document>,
         session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         let result = match session {
@@ -391,7 +391,7 @@ pub(super) struct Find {
 impl TestOperation for Find {
     async fn execute_on_collection(
         &self,
-        collection: &Collection,
+        collection: &Collection<Document>,
         session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         let result = match session {
@@ -442,7 +442,7 @@ pub(super) struct InsertMany {
 impl TestOperation for InsertMany {
     async fn execute_on_collection(
         &self,
-        collection: &Collection,
+        collection: &Collection<Document>,
         session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         let result = match session {
@@ -494,7 +494,7 @@ pub(super) struct InsertOne {
 impl TestOperation for InsertOne {
     async fn execute_on_collection(
         &self,
-        collection: &Collection,
+        collection: &Collection<Document>,
         session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         let result = match session {
@@ -542,7 +542,7 @@ pub(super) struct UpdateMany {
 impl TestOperation for UpdateMany {
     async fn execute_on_collection(
         &self,
-        collection: &Collection,
+        collection: &Collection<Document>,
         session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         let result = match session {
@@ -599,7 +599,7 @@ pub(super) struct UpdateOne {
 impl TestOperation for UpdateOne {
     async fn execute_on_collection(
         &self,
-        collection: &Collection,
+        collection: &Collection<Document>,
         session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         let result = match session {
@@ -656,7 +656,7 @@ pub(super) struct Aggregate {
 impl TestOperation for Aggregate {
     async fn execute_on_collection(
         &self,
-        collection: &Collection,
+        collection: &Collection<Document>,
         session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         let result = match session {
@@ -727,7 +727,7 @@ pub(super) struct Distinct {
 impl TestOperation for Distinct {
     async fn execute_on_collection(
         &self,
-        collection: &Collection,
+        collection: &Collection<Document>,
         session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         let result = match session {
@@ -778,7 +778,7 @@ pub(super) struct CountDocuments {
 impl TestOperation for CountDocuments {
     async fn execute_on_collection(
         &self,
-        collection: &Collection,
+        collection: &Collection<Document>,
         session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         let result = match session {
@@ -827,7 +827,7 @@ pub(super) struct EstimatedDocumentCount {
 impl TestOperation for EstimatedDocumentCount {
     async fn execute_on_collection(
         &self,
-        collection: &Collection,
+        collection: &Collection<Document>,
         _session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         let result = collection
@@ -864,7 +864,7 @@ pub(super) struct FindOne {
 impl TestOperation for FindOne {
     async fn execute_on_collection(
         &self,
-        collection: &Collection,
+        collection: &Collection<Document>,
         session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         let result = match session {
@@ -913,7 +913,7 @@ pub(super) struct ListCollections {
 impl TestOperation for ListCollections {
     async fn execute_on_collection(
         &self,
-        _collection: &Collection,
+        _collection: &Collection<Document>,
         _session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         unimplemented!()
@@ -963,7 +963,7 @@ pub(super) struct ListCollectionNames {
 impl TestOperation for ListCollectionNames {
     async fn execute_on_collection(
         &self,
-        _collection: &Collection,
+        _collection: &Collection<Document>,
         _session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         unimplemented!()
@@ -1007,7 +1007,7 @@ pub(super) struct ReplaceOne {
 impl TestOperation for ReplaceOne {
     async fn execute_on_collection(
         &self,
-        collection: &Collection,
+        collection: &Collection<Document>,
         session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         let result = match session {
@@ -1064,7 +1064,7 @@ pub(super) struct FindOneAndUpdate {
 impl TestOperation for FindOneAndUpdate {
     async fn execute_on_collection(
         &self,
-        collection: &Collection,
+        collection: &Collection<Document>,
         session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         let result = match session {
@@ -1121,7 +1121,7 @@ pub(super) struct FindOneAndReplace {
 impl TestOperation for FindOneAndReplace {
     async fn execute_on_collection(
         &self,
-        collection: &Collection,
+        collection: &Collection<Document>,
         session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         let result = match session {
@@ -1177,7 +1177,7 @@ pub(super) struct FindOneAndDelete {
 impl TestOperation for FindOneAndDelete {
     async fn execute_on_collection(
         &self,
-        collection: &Collection,
+        collection: &Collection<Document>,
         session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         let result = match session {
@@ -1228,7 +1228,7 @@ pub(super) struct ListDatabases {
 impl TestOperation for ListDatabases {
     async fn execute_on_collection(
         &self,
-        _collection: &Collection,
+        _collection: &Collection<Document>,
         _session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         unimplemented!()
@@ -1265,7 +1265,7 @@ pub(super) struct ListDatabaseNames {
 impl TestOperation for ListDatabaseNames {
     async fn execute_on_collection(
         &self,
-        _collection: &Collection,
+        _collection: &Collection<Document>,
         _session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         unimplemented!()
@@ -1301,7 +1301,7 @@ pub(super) struct AssertSessionTransactionState {
 impl TestOperation for AssertSessionTransactionState {
     async fn execute_on_collection(
         &self,
-        _collection: &Collection,
+        _collection: &Collection<Document>,
         _session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         unimplemented!()
@@ -1353,7 +1353,7 @@ pub(super) struct StartTransaction {
 impl TestOperation for StartTransaction {
     async fn execute_on_collection(
         &self,
-        _collection: &Collection,
+        _collection: &Collection<Document>,
         _session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         unimplemented!()
@@ -1386,7 +1386,7 @@ pub(super) struct CommitTransaction {}
 impl TestOperation for CommitTransaction {
     async fn execute_on_collection(
         &self,
-        _collection: &Collection,
+        _collection: &Collection<Document>,
         _session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         unimplemented!()
@@ -1416,7 +1416,7 @@ pub(super) struct AbortTransaction {}
 impl TestOperation for AbortTransaction {
     async fn execute_on_collection(
         &self,
-        _collection: &Collection,
+        _collection: &Collection<Document>,
         _session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         unimplemented!()
@@ -1450,7 +1450,7 @@ pub(super) struct RunCommand {
 impl TestOperation for RunCommand {
     async fn execute_on_collection(
         &self,
-        _collection: &Collection,
+        _collection: &Collection<Document>,
         _session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         unimplemented!()
@@ -1496,7 +1496,7 @@ pub(super) struct DropCollection {
 impl TestOperation for DropCollection {
     async fn execute_on_collection(
         &self,
-        _collection: &Collection,
+        _collection: &Collection<Document>,
         _session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         unimplemented!()
@@ -1544,7 +1544,7 @@ pub(super) struct CreateCollection {
 impl TestOperation for CreateCollection {
     async fn execute_on_collection(
         &self,
-        _collection: &Collection,
+        _collection: &Collection<Document>,
         _session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         unimplemented!()
@@ -1589,7 +1589,7 @@ pub(super) struct AssertCollectionExists {
 impl TestOperation for AssertCollectionExists {
     async fn execute_on_collection(
         &self,
-        _collection: &Collection,
+        _collection: &Collection<Document>,
         _session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         unimplemented!()
@@ -1628,7 +1628,7 @@ pub(super) struct AssertCollectionNotExists {
 impl TestOperation for AssertCollectionNotExists {
     async fn execute_on_collection(
         &self,
-        _collection: &Collection,
+        _collection: &Collection<Document>,
         _session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         unimplemented!()
@@ -1664,7 +1664,7 @@ pub(super) struct UnimplementedOperation;
 impl TestOperation for UnimplementedOperation {
     async fn execute_on_collection(
         &self,
-        _collection: &Collection,
+        _collection: &Collection<Document>,
         _session: Option<&mut ClientSession>,
     ) -> Result<Option<Bson>> {
         unimplemented!()

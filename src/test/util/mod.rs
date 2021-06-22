@@ -178,11 +178,11 @@ impl TestClient {
         self.create_user(user, pwd, roles, mechanisms, db).await
     }
 
-    pub fn get_coll(&self, db_name: &str, coll_name: &str) -> Collection {
+    pub fn get_coll(&self, db_name: &str, coll_name: &str) -> Collection<Document> {
         self.database(db_name).collection(coll_name)
     }
 
-    pub async fn init_db_and_coll(&self, db_name: &str, coll_name: &str) -> Collection {
+    pub async fn init_db_and_coll(&self, db_name: &str, coll_name: &str) -> Collection<Document> {
         let coll = self.get_coll(db_name, coll_name);
         drop_collection(&coll).await;
         coll
@@ -202,7 +202,7 @@ impl TestClient {
         db_name: &str,
         coll_name: &str,
         options: CollectionOptions,
-    ) -> Collection {
+    ) -> Collection<Document> {
         self.database(db_name)
             .collection_with_options(coll_name, options)
     }
@@ -212,7 +212,7 @@ impl TestClient {
         db_name: &str,
         coll_name: &str,
         options: CollectionOptions,
-    ) -> Collection {
+    ) -> Collection<Document> {
         let coll = self.get_coll_with_options(db_name, coll_name, options);
         drop_collection(&coll).await;
         coll
@@ -223,7 +223,7 @@ impl TestClient {
         db_name: &str,
         coll_name: &str,
         options: impl Into<Option<CreateCollectionOptions>>,
-    ) -> Collection {
+    ) -> Collection<Document> {
         self.drop_collection(db_name, coll_name).await;
         self.database(db_name)
             .create_collection(coll_name, options)

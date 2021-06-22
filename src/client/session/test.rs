@@ -479,7 +479,11 @@ async fn find_and_getmore_share_session() {
         },
     ];
 
-    async fn run_test(client: &EventClient, coll: &Collection, read_preference: ReadPreference) {
+    async fn run_test(
+        client: &EventClient,
+        coll: &Collection<Document>,
+        read_preference: ReadPreference,
+    ) {
         let options = FindOptions::builder()
             .batch_size(2)
             .selection_criteria(read_preference.into())

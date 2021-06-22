@@ -32,7 +32,7 @@ macro_rules! run_on_each_doc {
     }};
 }
 
-async fn insert_examples(collection: &Collection) -> Result<()> {
+async fn insert_examples(collection: &Collection<Document>) -> Result<()> {
     collection.drop(None).await.unwrap();
 
     // Start Example 1
@@ -103,7 +103,7 @@ async fn insert_examples(collection: &Collection) -> Result<()> {
     Ok(())
 }
 
-async fn query_top_level_fields_examples(collection: &Collection) -> Result<()> {
+async fn query_top_level_fields_examples(collection: &Collection<Document>) -> Result<()> {
     collection.drop(None).await.unwrap();
 
     // Start Example 6
@@ -248,7 +248,7 @@ async fn query_top_level_fields_examples(collection: &Collection) -> Result<()> 
     Ok(())
 }
 
-async fn query_embedded_documents_examples(collection: &Collection) -> Result<()> {
+async fn query_embedded_documents_examples(collection: &Collection<Document>) -> Result<()> {
     collection.drop(None).await.unwrap();
 
     // Start Example 14
@@ -381,7 +381,7 @@ async fn query_embedded_documents_examples(collection: &Collection) -> Result<()
     Ok(())
 }
 
-async fn query_arrays_examples(collection: &Collection) -> Result<()> {
+async fn query_arrays_examples(collection: &Collection<Document>) -> Result<()> {
     collection.drop(None).await?;
 
     // Start Example 20
@@ -540,7 +540,7 @@ async fn query_arrays_examples(collection: &Collection) -> Result<()> {
     Ok(())
 }
 
-async fn query_array_embedded_documents_examples(collection: &Collection) -> Result<()> {
+async fn query_array_embedded_documents_examples(collection: &Collection<Document>) -> Result<()> {
     collection.drop(None).await?;
 
     // Start Example 29
@@ -713,7 +713,7 @@ async fn query_array_embedded_documents_examples(collection: &Collection) -> Res
     Ok(())
 }
 
-async fn query_null_or_missing_fields_examples(collection: &Collection) -> Result<()> {
+async fn query_null_or_missing_fields_examples(collection: &Collection<Document>) -> Result<()> {
     collection.drop(None).await.unwrap();
 
     // Start Example 38
@@ -774,7 +774,7 @@ async fn query_null_or_missing_fields_examples(collection: &Collection) -> Resul
     Ok(())
 }
 
-async fn projection_examples(collection: &Collection) -> Result<()> {
+async fn projection_examples(collection: &Collection<Document>) -> Result<()> {
     collection.drop(None).await?;
 
     // Start Example 42
@@ -1056,7 +1056,7 @@ async fn projection_examples(collection: &Collection) -> Result<()> {
     Ok(())
 }
 
-async fn update_examples(collection: &Collection) -> Result<()> {
+async fn update_examples(collection: &Collection<Document>) -> Result<()> {
     collection.drop(None).await.unwrap();
 
     // Start Example 51
@@ -1284,7 +1284,7 @@ async fn update_examples(collection: &Collection) -> Result<()> {
     Ok(())
 }
 
-async fn delete_examples(collection: &Collection) -> Result<()> {
+async fn delete_examples(collection: &Collection<Document>) -> Result<()> {
     collection.drop(None).await.unwrap();
 
     // Start Example 55
