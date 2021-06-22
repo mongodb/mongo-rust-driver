@@ -50,7 +50,7 @@ pub struct CollectionOutcome {
     pub data: Vec<Document>,
 }
 
-pub async fn find_all(coll: &Collection) -> Vec<Document> {
+pub async fn find_all(coll: &Collection<Document>) -> Vec<Document> {
     coll.find(None, None)
         .await
         .unwrap()

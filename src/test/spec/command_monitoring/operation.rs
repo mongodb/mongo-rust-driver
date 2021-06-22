@@ -21,7 +21,7 @@ pub(super) trait TestOperation {
     /// The command names to monitor as part of this test.
     fn command_names(&self) -> &[&str];
 
-    async fn execute(&self, collection: Collection) -> Result<()>;
+    async fn execute(&self, collection: Collection<Document>) -> Result<()>;
 }
 
 pub(super) struct AnyTestOperation {
@@ -81,7 +81,7 @@ impl TestOperation for DeleteMany {
         &["delete"]
     }
 
-    async fn execute(&self, collection: Collection) -> Result<()> {
+    async fn execute(&self, collection: Collection<Document>) -> Result<()> {
         collection
             .delete_many(self.filter.clone(), None)
             .await
@@ -100,7 +100,7 @@ impl TestOperation for DeleteOne {
         &["delete"]
     }
 
-    async fn execute(&self, collection: Collection) -> Result<()> {
+    async fn execute(&self, collection: Collection<Document>) -> Result<()> {
         collection
             .delete_one(self.filter.clone(), None)
             .await
@@ -165,7 +165,7 @@ impl TestOperation for Find {
         &["find", "getMore"]
     }
 
-    async fn execute(&self, collection: Collection) -> Result<()> {
+    async fn execute(&self, collection: Collection<Document>) -> Result<()> {
         let mut options = FindOptions {
             sort: self.sort.clone(),
             skip: self.skip,
@@ -200,7 +200,7 @@ impl TestOperation for InsertMany {
         &["insert"]
     }
 
-    async fn execute(&self, collection: Collection) -> Result<()> {
+    async fn execute(&self, collection: Collection<Document>) -> Result<()> {
         collection
             .insert_many(self.documents.clone(), self.options.clone())
             .await
@@ -219,7 +219,7 @@ impl TestOperation for InsertOne {
         &["insert"]
     }
 
-    async fn execute(&self, collection: Collection) -> Result<()> {
+    async fn execute(&self, collection: Collection<Document>) -> Result<()> {
         collection
             .insert_one(self.document.clone(), None)
             .await
@@ -239,7 +239,7 @@ impl TestOperation for UpdateMany {
         &["update"]
     }
 
-    async fn execute(&self, collection: Collection) -> Result<()> {
+    async fn execute(&self, collection: Collection<Document>) -> Result<()> {
         collection
             .update_many(self.filter.clone(), self.update.clone(), None)
             .await
@@ -261,7 +261,7 @@ impl TestOperation for UpdateOne {
         &["update"]
     }
 
-    async fn execute(&self, collection: Collection) -> Result<()> {
+    async fn execute(&self, collection: Collection<Document>) -> Result<()> {
         let options = self.upsert.map(|b| UpdateOptions {
             upsert: Some(b),
             ..Default::default()

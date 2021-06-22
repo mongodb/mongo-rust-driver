@@ -228,7 +228,7 @@ async fn assert_event_contains_read_concern(client: &EventClient) {
 async fn command_contains_write_concern_insert_one() {
     let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
-    let coll: Collection = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop(None).await.unwrap();
     coll.insert_one(
@@ -279,7 +279,7 @@ async fn command_contains_write_concern_insert_one() {
 async fn command_contains_write_concern_insert_many() {
     let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
-    let coll: Collection = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop(None).await.unwrap();
     coll.insert_many(
@@ -330,7 +330,7 @@ async fn command_contains_write_concern_insert_many() {
 async fn command_contains_write_concern_update_one() {
     let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
-    let coll: Collection = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop(None).await.unwrap();
     coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
@@ -384,7 +384,7 @@ async fn command_contains_write_concern_update_one() {
 async fn command_contains_write_concern_update_many() {
     let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
-    let coll: Collection = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop(None).await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
@@ -440,7 +440,7 @@ async fn command_contains_write_concern_update_many() {
 async fn command_contains_write_concern_replace_one() {
     let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
-    let coll: Collection = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop(None).await.unwrap();
     coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
@@ -494,7 +494,7 @@ async fn command_contains_write_concern_replace_one() {
 async fn command_contains_write_concern_delete_one() {
     let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
-    let coll: Collection = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop(None).await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
@@ -548,7 +548,7 @@ async fn command_contains_write_concern_delete_one() {
 async fn command_contains_write_concern_delete_many() {
     let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
-    let coll: Collection = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop(None).await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
@@ -605,7 +605,7 @@ async fn command_contains_write_concern_delete_many() {
 async fn command_contains_write_concern_find_one_and_delete() {
     let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
-    let coll: Collection = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop(None).await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
@@ -659,7 +659,7 @@ async fn command_contains_write_concern_find_one_and_delete() {
 async fn command_contains_write_concern_find_one_and_replace() {
     let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
-    let coll: Collection = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop(None).await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
@@ -715,7 +715,7 @@ async fn command_contains_write_concern_find_one_and_replace() {
 async fn command_contains_write_concern_find_one_and_update() {
     let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
-    let coll: Collection = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop(None).await.unwrap();
     coll.insert_many(&[doc! { "foo": "bar" }, doc! { "foo": "bar" }], None)
@@ -771,7 +771,7 @@ async fn command_contains_write_concern_find_one_and_update() {
 async fn command_contains_write_concern_aggregate() {
     let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
-    let coll: Collection = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop(None).await.unwrap();
     coll.insert_one(doc! { "foo": "bar" }, None).await.unwrap();
@@ -831,7 +831,7 @@ async fn command_contains_write_concern_aggregate() {
 async fn command_contains_write_concern_drop() {
     let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
-    let coll: Collection = client.database("test").collection(function_name!());
+    let coll: Collection<Document> = client.database("test").collection(function_name!());
 
     coll.drop(None).await.unwrap();
     client.clear_cached_events();
@@ -884,7 +884,7 @@ async fn command_contains_write_concern_create_collection() {
     let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
     let db = client.database("test");
-    let coll: Collection = db.collection(function_name!());
+    let coll: Collection<Document> = db.collection(function_name!());
 
     coll.drop(None).await.unwrap();
     db.create_collection(

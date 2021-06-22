@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
+    bson::Document,
     client::options::ClientOptions,
     concern::{Acknowledgment, WriteConcern},
     options::CollectionOptions,
@@ -135,7 +136,7 @@ impl TestRunner {
         self.entities.get(id).unwrap().as_database()
     }
 
-    pub fn get_collection(&self, id: &str) -> &Collection {
+    pub fn get_collection(&self, id: &str) -> &Collection<Document> {
         self.entities.get(id).unwrap().as_collection()
     }
 }
