@@ -50,7 +50,7 @@ lazy_static! {
 ///
 /// ```rust
 /// use mongodb::{
-///     bson::doc,
+///     bson::{doc, Document},
 ///     error::{Result, TRANSIENT_TRANSACTION_ERROR, UNKNOWN_TRANSACTION_COMMIT_RESULT},
 ///     options::{Acknowledgment, ReadConcern, TransactionOptions, WriteConcern},
 /// #   Client,
@@ -60,7 +60,7 @@ lazy_static! {
 ///
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
-/// # let coll = client.database("foo").collection("bar");
+/// # let coll: Collection<Document> = client.database("foo").collection("bar");
 /// let mut session = client.start_session(None).await?;
 /// let options = TransactionOptions::builder()
 ///     .read_concern(ReadConcern::majority())
@@ -77,7 +77,7 @@ lazy_static! {
 /// # Ok(())
 /// # }
 ///
-/// async fn execute_transaction(coll: &Collection, session: &mut ClientSession) -> Result<()> {
+/// async fn execute_transaction(coll: &Collection<Document>, session: &mut ClientSession) -> Result<()> {
 ///     coll.insert_one_with_session(doc! { "x": 1 }, None, session).await?;
 ///     coll.delete_one_with_session(doc! { "y": 2 }, None, session).await?;
 ///     // An "UnknownTransactionCommitResult" label indicates that it is unknown whether the
@@ -423,7 +423,7 @@ impl ClientSession {
     /// # Ok(())
     /// # }
     ///
-    /// async fn execute_transaction(coll: &Collection, session: &mut ClientSession) -> Result<()> {
+    /// async fn execute_transaction(coll: &Collection<Document>, session: &mut ClientSession) -> Result<()> {
     ///     coll.insert_one_with_session(doc! { "x": 1 }, None, session).await?;
     ///     coll.delete_one_with_session(doc! { "y": 2 }, None, session).await?;
     ///     Ok(())
