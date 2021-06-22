@@ -287,7 +287,7 @@ Certain tests will only be run against certain topologies. To ensure that the en
 ```bash
 export MONGODB_URI="mongodb://my-standalone-host:27017" # mongod running on 27017
 cargo test --verbose
-export MONGODB_URI="mongodb://localhost:27018,localhost:27019,localhost:27020/?replicaSet=repl" # replicaset running on 27018 with name repl
+export MONGODB_URI="mongodb://localhost:27018,localhost:27019,localhost:27020/?replicaSet=repl" # replicaset running on ports 27018, 27019, 27020 with name repl
 cargo test --verbose
 export MONGODB_URI="mongodb://localhost:27021" # mongos running on 27021
 cargo test --verbose
