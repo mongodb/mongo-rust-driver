@@ -21,7 +21,7 @@ use crate::{
 /// These are the valid options for creating a [`Collection`](../struct.Collection.html) with
 /// [`Database::collection_with_options`](../struct.Database.html#method.collection_with_options).
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CollectionOptions {
@@ -102,7 +102,7 @@ pub enum CursorType {
 /// [`Collection::insert_one`](../struct.Collection.html#method.insert_one) operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct InsertOneOptions {
     /// Opt out of document-level validation.
@@ -116,7 +116,7 @@ pub struct InsertOneOptions {
 /// [`Collection::insert_many`](../struct.Collection.html#method.insert_many) operation.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Default, TypedBuilder, Serialize, Deserialize)]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct InsertManyOptions {
@@ -187,7 +187,7 @@ impl From<Vec<Document>> for UpdateModifications {
 /// [`Collection::update_many`](../struct.Collection.html#method.update_many) operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct UpdateOptions {
     /// A set of filters specifying to which array elements an update should apply.
@@ -235,7 +235,7 @@ impl UpdateOptions {
 /// [`Collection::replace_one`](../struct.Collection.html#method.replace_one) operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct ReplaceOptions {
     /// Opt out of document-level validation.
@@ -266,7 +266,7 @@ pub struct ReplaceOptions {
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct DeleteOptions {
     /// The collation to use for the operation.
@@ -288,7 +288,7 @@ pub struct DeleteOptions {
 /// operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct FindOneAndDeleteOptions {
     /// The maximum amount of time to allow the query to run.
@@ -321,7 +321,7 @@ pub struct FindOneAndDeleteOptions {
 /// [`Collection::find_one_and_replace`](../struct.Collection.html#method.find_one_and_replace)
 /// operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct FindOneAndReplaceOptions {
@@ -365,7 +365,7 @@ pub struct FindOneAndReplaceOptions {
 /// operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct FindOneAndUpdateOptions {
     /// A set of filters specifying to which array elements an update should apply.
@@ -414,7 +414,7 @@ pub struct FindOneAndUpdateOptions {
 #[skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct AggregateOptions {
     /// Enables writing to temporary files. When set to true, aggregation stages can write data to
@@ -496,7 +496,7 @@ pub struct AggregateOptions {
 /// [`Collection::count_documents`](../struct.Collection.html#method.count_documents) operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct CountOptions {
     /// The index to use for the operation.
@@ -540,7 +540,7 @@ pub struct CountOptions {
 #[serde_with::skip_serializing_none]
 #[derive(Debug, Default, Deserialize, TypedBuilder, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct EstimatedDocumentCountOptions {
     /// The maximum amount of time to allow the query to run.
@@ -568,7 +568,7 @@ pub struct EstimatedDocumentCountOptions {
 /// operation.
 #[serde_with::skip_serializing_none]
 #[derive(Debug, Default, Deserialize, TypedBuilder, Serialize, Clone)]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct DistinctOptions {
@@ -603,7 +603,7 @@ pub struct DistinctOptions {
 /// operation.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct FindOptions {
@@ -753,7 +753,7 @@ where
 /// operation.
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct FindOneOptions {
     /// If true, partial results will be returned from a mongos rather than an error being
@@ -825,7 +825,7 @@ pub struct FindOneOptions {
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[builder(field_defaults(default, setter(strip_option)))]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct DropCollectionOptions {
     /// The write concern for the operation.

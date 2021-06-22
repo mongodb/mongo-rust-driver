@@ -135,10 +135,11 @@ where
     pub fn clone_with_type<U: Serialize + DeserializeOwned + Unpin + Debug>(
         &self,
     ) -> Collection<U> {
-        let mut options = CollectionOptions::builder().build();
-        options.selection_criteria = self.inner.selection_criteria.clone();
-        options.read_concern = self.inner.read_concern.clone();
-        options.write_concern = self.inner.write_concern.clone();
+        let options = CollectionOptions::builder()
+            .selection_criteria(self.inner.selection_criteria.clone())
+            .read_concern(self.inner.read_concern.clone())
+            .write_concern(self.inner.write_concern.clone())
+            .build();
 
         Collection::new(self.inner.db.clone(), &self.inner.name, Some(options))
     }

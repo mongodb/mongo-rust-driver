@@ -8,6 +8,7 @@ use crate::{
     bson::{doc, Bson},
     error::Result,
     options::{Acknowledgment, FindOptions, InsertOneOptions, ReadPreference, WriteConcern},
+    selection_criteria::SelectionCriteria,
     test::{EventClient, TestClient, CLIENT_OPTIONS, LOCK},
     Collection,
     RUNTIME,
@@ -486,7 +487,7 @@ async fn find_and_getmore_share_session() {
     ) {
         let options = FindOptions::builder()
             .batch_size(2)
-            .selection_criteria(read_preference.into())
+            .selection_criteria(SelectionCriteria::ReadPreference(read_preference))
             .build();
 
         let mut cursor = coll

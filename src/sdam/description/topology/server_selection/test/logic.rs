@@ -32,9 +32,10 @@ fn convert_read_preference(test_read_pref: TestReadPreference) -> Option<ReadPre
     let max_staleness = test_read_pref
         .max_staleness_seconds
         .map(Duration::from_secs);
-    let mut options = ReadPreferenceOptions::builder().build();
-    options.tag_sets = test_read_pref.tag_sets;
-    options.max_staleness = max_staleness;
+    let options = ReadPreferenceOptions::builder()
+        .tag_sets(test_read_pref.tag_sets)
+        .max_staleness(max_staleness)
+        .build();
 
     let read_pref = match &test_read_pref.mode.as_ref()?[..] {
         "Primary" => ReadPreference::Primary,
