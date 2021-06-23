@@ -105,7 +105,7 @@ async fn build() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_ordered() {
-    let mut insert = Insert::new(Namespace::empty(), Vec::<Document>::new(), None);
+    let mut insert = Insert::new(Namespace::empty(), vec![Document::new()], None);
     let cmd = insert
         .build(&StreamDescription::new_testing())
         .expect("should succeed");
@@ -113,7 +113,7 @@ async fn build_ordered() {
 
     let mut insert = Insert::new(
         Namespace::empty(),
-        Vec::<Document>::new(),
+        vec![Document::new()],
         Some(InsertManyOptions::builder().ordered(false).build()),
     );
     let cmd = insert
@@ -123,7 +123,7 @@ async fn build_ordered() {
 
     let mut insert = Insert::new(
         Namespace::empty(),
-        Vec::<Document>::new(),
+        vec![Document::new()],
         Some(InsertManyOptions::builder().ordered(true).build()),
     );
     let cmd = insert
@@ -172,7 +172,13 @@ async fn handle_invalid_response() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_write_failure() {
-    let fixtures = fixtures();
+    let mut fixtures = fixtures();
+
+    // generate _id for operations missing it.
+    let _ = fixtures
+        .op
+        .build(&StreamDescription::new_testing())
+        .unwrap();
 
     let write_error_response = CommandResponse::with_document(doc! {
         "ok": 1.0,
