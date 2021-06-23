@@ -67,7 +67,7 @@ impl Benchmark for InsertOneBenchmark {
 
     async fn do_task(&self) -> Result<()> {
         for _ in 0..self.num_iter {
-            self.coll.insert_one(self.doc.clone(), None).await?;
+            self.coll.insert_one(&self.doc, None).await?;
         }
 
         Ok(())
