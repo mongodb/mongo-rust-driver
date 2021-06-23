@@ -28,13 +28,13 @@ pub struct TestCase {
 #[derive(Debug, Deserialize)]
 pub struct Outcome {
     pub error: Option<bool>,
-    pub result: Option<Result>,
+    pub result: Option<TestResult>,
     pub collection: CollectionOutcome,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
-pub enum Result {
+pub enum TestResult {
     Labels(Labels),
     Value(Bson),
 }

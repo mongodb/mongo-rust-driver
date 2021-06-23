@@ -257,7 +257,7 @@ impl Topology {
                 .await;
 
             if updated && (error.is_shutting_down() || handshake.wire_version().unwrap_or(0) < 8) {
-                server.pool.clear().await;
+                server.pool.clear(error).await;
             }
             self.request_topology_check();
 
@@ -272,7 +272,7 @@ impl Topology {
                 .mark_server_as_unknown(error.to_string(), server, state_lock)
                 .await;
             if updated {
-                server.pool.clear().await;
+                server.pool.clear(error).await;
             }
             updated
         } else {
@@ -286,7 +286,7 @@ impl Topology {
             .mark_server_as_unknown(error.to_string(), server, state_lock)
             .await;
         if updated {
-            server.pool.clear().await;
+            server.pool.clear(error).await;
         }
         updated
     }

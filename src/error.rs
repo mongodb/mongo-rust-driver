@@ -57,11 +57,12 @@ impl Error {
         }
     }
 
-    pub(crate) fn pool_cleared_error(address: &ServerAddress) -> Self {
+    pub(crate) fn pool_cleared_error(address: &ServerAddress, cause: &Error) -> Self {
         ErrorKind::ConnectionPoolCleared {
             message: format!(
-                "Connection pool for {} cleared during operation execution",
-                address
+                "Connection pool for {} cleared because another operation failed with: {}",
+                address,
+                cause
             ),
         }
         .into()
@@ -291,6 +292,10 @@ impl Error {
         self.code()
             .map(|code| SHUTTING_DOWN_CODES.contains(&code))
             .unwrap_or(false)
+    }
+
+    pub(crate) fn is_pool_cleared(&self) -> bool {
+        matches!(self.kind.as_ref(), ErrorKind::ConnectionPoolCleared { .. })
     }
 }
 

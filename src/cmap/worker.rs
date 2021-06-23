@@ -19,7 +19,7 @@ use super::{
     DEFAULT_MAX_POOL_SIZE,
 };
 use crate::{
-    error::Result,
+    error::{Error, ErrorKind, Result},
     event::cmap::{
         CmapEventHandler,
         ConnectionClosedEvent,
@@ -172,7 +172,7 @@ impl ConnectionPoolWorker {
         {
             PoolState::Ready
         } else {
-            PoolState::Paused
+            PoolState::New
         };
         #[cfg(test)]
         let maintenance_frequency = options
@@ -181,7 +181,7 @@ impl ConnectionPoolWorker {
             .unwrap_or(MAINTENACE_FREQUENCY);
 
         #[cfg(not(test))]
-        let (state, maintenance_frequency) = (PoolState::Paused, MAINTENACE_FREQUENCY);
+        let (state, maintenance_frequency) = (PoolState::New, MAINTENACE_FREQUENCY);
 
         let worker = ConnectionPoolWorker {
             address,
@@ -244,16 +244,27 @@ impl ConnectionPoolWorker {
                     PoolState::Ready => {
                         self.wait_queue.push_back(request);
                     }
-                    PoolState::Paused => {
+                    PoolState::Paused(ref e) => {
                         // if receiver doesn't listen to error that's ok.
-                        let _ = request.fulfill(ConnectionRequestResult::PoolCleared);
+                        let _ = request.fulfill(ConnectionRequestResult::PoolCleared(e.clone()));
+                    }
+                    PoolState::New => {
+                        let _ = request.fulfill(ConnectionRequestResult::PoolCleared(
+                            ErrorKind::Internal {
+                                message: "check out attempted from new pool".to_string(),
+                            }
+                            .into(),
+                        ));
                     }
                 },
                 PoolTask::HandleManagementRequest(PoolManagementRequest::CheckIn(connection)) => {
                     self.check_in(connection)
                 }
-                PoolTask::HandleManagementRequest(PoolManagementRequest::Clear(_message)) => {
-                    self.clear();
+                PoolTask::HandleManagementRequest(PoolManagementRequest::Clear {
+                    completion_handler: _,
+                    cause,
+                }) => {
+                    self.clear(cause);
                 }
                 PoolTask::HandleManagementRequest(PoolManagementRequest::MarkAsReady {
                     completion_handler: _handler,
@@ -428,12 +439,12 @@ impl ConnectionPoolWorker {
         }
     }
 
-    fn clear(&mut self) {
+    fn clear(&mut self, cause: Error) {
         self.generation += 1;
-        let previous_state = std::mem::replace(&mut self.state, PoolState::Paused);
+        let previous_state = std::mem::replace(&mut self.state, PoolState::Paused(cause.clone()));
         self.generation_publisher.publish(self.generation);
 
-        if !matches!(previous_state, PoolState::Paused) {
+        if matches!(previous_state, PoolState::Ready) {
             self.emit_event(|handler| {
                 let event = PoolClearedEvent {
                     address: self.address.clone(),
@@ -446,7 +457,7 @@ impl ConnectionPoolWorker {
                 // an error means the other end hung up already, which is okay because we were
                 // returning an error anyways
                 let _: std::result::Result<_, _> =
-                    request.fulfill(ConnectionRequestResult::PoolCleared);
+                    request.fulfill(ConnectionRequestResult::PoolCleared(cause.clone()));
             }
         }
     }
@@ -583,8 +594,11 @@ async fn establish_connection(
 /// once it goes out of scope and cannot be manually closed before then.
 #[derive(Debug)]
 enum PoolState {
+    /// Same as Paused, but only for a new pool, not one that has been cleared due to an error.
+    New,
+
     /// Connections may not be checked out nor created in the background to satisfy minPoolSize.
-    Paused,
+    Paused(Error),
 
     /// Pool is operational.
     Ready,

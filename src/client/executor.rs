@@ -131,7 +131,12 @@ impl Client {
             Ok(conn) => conn,
             Err(mut err) => {
                 err.add_labels(None, &session, None)?;
-                return Err(err);
+
+                if err.is_pool_cleared() {
+                    return self.execute_retry(&mut op, &mut session, None, err).await;
+                } else {
+                    return Err(err);
+                }
             }
         };
 
@@ -151,7 +156,7 @@ impl Client {
             None => None,
         };
 
-        let first_error = match self
+        match self
             .execute_operation_on_connection(
                 &op,
                 &mut conn,
@@ -161,9 +166,7 @@ impl Client {
             )
             .await
         {
-            Ok(result) => {
-                return Ok(result);
-            }
+            Ok(result) => Ok(result),
             Err(mut err) => {
                 // Retryable writes are only supported by storage engines with document-level
                 // locking, so users need to disable retryable writes if using mmapv1.
@@ -194,13 +197,22 @@ impl Client {
                 if retryability == Retryability::Read && err.is_read_retryable()
                     || retryability == Retryability::Write && err.is_write_retryable()
                 {
-                    err
+                    self.execute_retry(&mut op, &mut session, txn_number, err)
+                        .await
                 } else {
-                    return Err(err);
+                    Err(err)
                 }
             }
-        };
+        }
+    }
 
+    async fn execute_retry<T: Operation>(
+        &self,
+        op: &mut T,
+        session: &mut Option<&mut ClientSession>,
+        txn_number: Option<u64>,
+        first_error: Error,
+    ) -> Result<T::O> {
         let server = match self.select_server(op.selection_criteria()).await {
             Ok(server) => server,
             Err(_) => {
@@ -213,7 +225,7 @@ impl Client {
             Err(_) => return Err(first_error),
         };
 
-        let retryability = self.get_retryability(&conn, &op, &session).await?;
+        let retryability = self.get_retryability(&conn, op, &session).await?;
         if retryability == Retryability::None {
             return Err(first_error);
         }
@@ -221,13 +233,7 @@ impl Client {
         op.update_for_retry();
 
         match self
-            .execute_operation_on_connection(
-                &op,
-                &mut conn,
-                &mut session,
-                txn_number,
-                &retryability,
-            )
+            .execute_operation_on_connection(op, &mut conn, session, txn_number, &retryability)
             .await
         {
             Ok(result) => Ok(result),

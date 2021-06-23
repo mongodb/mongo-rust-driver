@@ -130,7 +130,9 @@ impl ConnectionPool {
         let conn = match response {
             ConnectionRequestResult::Pooled(c) => Ok(c),
             ConnectionRequestResult::Establishing(task) => task.await,
-            ConnectionRequestResult::PoolCleared => Err(Error::pool_cleared_error(&self.address)),
+            ConnectionRequestResult::PoolCleared(e) => {
+                Err(Error::pool_cleared_error(&self.address, &e))
+            }
         };
 
         match conn {
@@ -154,8 +156,8 @@ impl ConnectionPool {
 
     /// Increments the generation of the pool. Rather than eagerly removing stale connections from
     /// the pool, they are left for the background thread to clean up.
-    pub(crate) async fn clear(&self) {
-        self.manager.clear().await
+    pub(crate) async fn clear(&self, cause: Error) {
+        self.manager.clear(cause).await
     }
 
     /// Mark the pool as "ready", allowing connections to be created and checked out.

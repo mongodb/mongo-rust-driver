@@ -1,7 +1,11 @@
 use tokio::sync::{mpsc, oneshot};
 
 use super::{worker::PoolWorkerHandle, Connection};
-use crate::{error::Result, options::ServerAddress, runtime::AsyncJoinHandle};
+use crate::{
+    error::{Error, Result},
+    options::ServerAddress,
+    runtime::AsyncJoinHandle,
+};
 
 /// Returns a new requester/receiver pair.
 pub(super) fn channel(
@@ -86,8 +90,8 @@ pub(super) enum ConnectionRequestResult {
     Establishing(AsyncJoinHandle<Result<Connection>>),
 
     /// The request was rejected because the pool was cleared before it could
-    /// be fulfilled.
-    PoolCleared,
+    /// be fulfilled. The error that caused the pool to be cleared is returned.
+    PoolCleared(Error),
 }
 
 impl ConnectionRequestResult {
