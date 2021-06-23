@@ -87,7 +87,7 @@ impl<T: Serialize> Operation for Insert<T> {
 
         if docs.is_empty() {
             return Err(ErrorKind::InvalidArgument {
-                message: "document exceeds maxBsonObjSize".to_string(),
+                message: "document exceeds maxBsonObjectSize".to_string(),
             }
             .into());
         }
