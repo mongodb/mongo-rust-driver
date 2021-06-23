@@ -233,13 +233,7 @@ impl Client {
         op.update_for_retry();
 
         match self
-            .execute_operation_on_connection(
-                op,
-                &mut conn,
-                session,
-                txn_number,
-                &retryability,
-            )
+            .execute_operation_on_connection(op, &mut conn, session, txn_number, &retryability)
             .await
         {
             Ok(result) => Ok(result),
