@@ -52,14 +52,15 @@ impl<T: Serialize> Operation for Insert<T> {
     const NAME: &'static str = "insert";
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
-        let max_docs = std::cmp::min(
-            self.documents.len(),
-            description.max_write_batch_size as usize,
-        );
         let mut docs: Vec<Document> = vec![];
         let mut size = 0;
 
-        for (i, d) in self.documents.iter().take(max_docs).enumerate() {
+        for (i, d) in self
+            .documents
+            .iter()
+            .take(description.max_write_batch_size as usize)
+            .enumerate()
+        {
             let mut doc = bson::to_document(d)?;
             let id = doc
                 .entry("_id".to_string())
