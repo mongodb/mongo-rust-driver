@@ -262,6 +262,7 @@ pub fn size_bytes(val: &Bson) -> u64 {
     }
 }
 
+/// The size in bytes of the provided document's entry in a BSON array at the given index.
 pub(crate) fn array_entry_size_bytes(index: usize, doc: &Document) -> u64 {
     // 
     //   * type (1 byte)
