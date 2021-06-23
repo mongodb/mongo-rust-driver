@@ -16,7 +16,7 @@ use crate::{
 };
 
 pub use self::{
-    entity::{ClientEntity, Entity},
+    entity::{ClientEntity, Entity, SessionEntity},
     matcher::{events_match, results_match},
     operation::{Operation, OperationObject},
     test_event::TestEvent,
@@ -34,8 +34,11 @@ pub use self::{
 static SPEC_VERSIONS: &[Version] = &[Version::new(1, 0, 0), Version::new(1, 1, 0)];
 
 const SKIPPED_OPERATIONS: &[&str] = &[
+    "assertIndexExists",
+    "assertIndexNotExists",
     "bulkWrite",
     "count",
+    "createIndex",
     "download",
     "download_by_name",
     "listCollectionObjects",
@@ -43,9 +46,6 @@ const SKIPPED_OPERATIONS: &[&str] = &[
     "listIndexNames",
     "listIndexes",
     "mapReduce",
-    "startTransaction",
-    "abortTransaction",
-    "commitTransaction",
     "watch",
 ];
 

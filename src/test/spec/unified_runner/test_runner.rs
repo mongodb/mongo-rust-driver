@@ -12,7 +12,7 @@ use crate::{
     Database,
 };
 
-use super::{ClientEntity, CollectionData, Entity, TestFileEntity};
+use super::{ClientEntity, CollectionData, Entity, SessionEntity, TestFileEntity};
 
 pub type EntityMap = HashMap<String, Entity>;
 
@@ -123,9 +123,11 @@ impl TestRunner {
                         .session_options
                         .as_ref()
                         .map(|doc| from_document(doc.clone()).unwrap());
+                    let client_session = client.start_session(options).await.unwrap();
+                    let lsid = client_session.id().clone();
                     (
                         id,
-                        Entity::Session(client.start_session(options).await.unwrap()),
+                        Entity::Session(SessionEntity::new(client_session, lsid)),
                     )
                 }
                 TestFileEntity::Bucket(_) => {
@@ -148,5 +150,13 @@ impl TestRunner {
 
     pub fn get_collection(&self, id: &str) -> &Collection<Document> {
         self.entities.get(id).unwrap().as_collection()
+    }
+
+    pub fn get_session(&self, id: &str) -> &SessionEntity {
+        self.entities.get(id).unwrap().as_session_entity()
+    }
+
+    pub fn get_mut_session(&mut self, id: &str) -> &mut SessionEntity {
+        self.entities.get_mut(id).unwrap().as_mut_session_entity()
     }
 }

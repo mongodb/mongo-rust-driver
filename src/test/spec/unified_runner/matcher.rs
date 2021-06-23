@@ -14,7 +14,11 @@ pub fn results_match(
     results_match_inner(actual, expected, returns_root_documents, true, entities)
 }
 
-pub fn events_match(actual: &TestEvent, expected: &TestEvent, entities: Option<&EntityMap>) -> bool {
+pub fn events_match(
+    actual: &TestEvent,
+    expected: &TestEvent,
+    entities: Option<&EntityMap>,
+) -> bool {
     match (actual, expected) {
         (
             TestEvent::Started {
@@ -195,8 +199,14 @@ fn special_operator_matches(
         "$$sessionLsid" => match entities {
             Some(entity_map) => {
                 let session_id = value.as_str().unwrap();
-                let session = entity_map.get(session_id).unwrap().as_client_session();
-                results_match_inner(actual, &Bson::from(session.id()), false, false, entities)
+                let session = entity_map.get(session_id).unwrap().as_session_entity();
+                results_match_inner(
+                    actual,
+                    &Bson::from(session.lsid.clone()),
+                    false,
+                    false,
+                    entities,
+                )
             }
             None => panic!("Could not find entity: {}", value),
         },

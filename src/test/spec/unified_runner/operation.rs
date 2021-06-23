@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug, ops::Deref};
+use std::{collections::HashMap, fmt::Debug, ops::Deref, time::Duration};
 
 use async_trait::async_trait;
 use futures::stream::TryStreamExt;
@@ -8,13 +8,15 @@ use super::{Entity, ExpectError, TestRunner};
 
 use crate::{
     bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
-    client::session::TransactionState,
+    client::session::{ClientSession, TransactionState},
     error::Result,
     options::{
         AggregateOptions,
         CountOptions,
+        CreateCollectionOptions,
         DeleteOptions,
         DistinctOptions,
+        DropCollectionOptions,
         EstimatedDocumentCountOptions,
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
@@ -32,6 +34,7 @@ use crate::{
     },
     selection_criteria::ReadPreference,
     test::FailPoint,
+    RUNTIME,
 };
 
 #[async_trait]
@@ -169,6 +172,14 @@ impl<'de> Deserialize<'de> for Operation {
                 AssertCollectionNotExists::deserialize(BsonDeserializer::new(definition.arguments))
                     .map(|op| Box::new(op) as Box<dyn TestOperation>)
             }
+            "createCollection" => {
+                CreateCollection::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "dropCollection" => {
+                DropCollection::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
             "runCommand" => RunCommand::deserialize(BsonDeserializer::new(definition.arguments))
                 .map(|op| Box::new(op) as Box<dyn TestOperation>),
             "endSession" => EndSession::deserialize(BsonDeserializer::new(definition.arguments))
@@ -193,6 +204,18 @@ impl<'de> Deserialize<'de> for Operation {
             }
             "assertSessionNotDirty" => {
                 AssertSessionNotDirty::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "startTransaction" => {
+                StartTransaction::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "commitTransaction" => {
+                CommitTransaction::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "abortTransaction" => {
+                AbortTransaction::deserialize(BsonDeserializer::new(definition.arguments))
                     .map(|op| Box::new(op) as Box<dyn TestOperation>)
             }
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
@@ -355,19 +378,14 @@ impl TestOperation for InsertOne {
         id: &str,
         test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
-        let collection = test_runner.get_collection(id);
+        let collection = test_runner.get_collection(id).clone();
         let result = match &self.session {
             Some(session_id) => {
-                let session = test_runner
-                    .entities
-                    .get(session_id)
-                    .unwrap()
-                    .as_client_session();
                 collection
                     .insert_one_with_session(
                         self.document.clone(),
                         self.options.clone(),
-                        &mut session.clone(),
+                        test_runner.get_mut_session(session_id),
                     )
                     .await?
             }
@@ -426,6 +444,7 @@ pub(super) struct UpdateOne {
     update: UpdateModifications,
     #[serde(flatten)]
     options: Option<UpdateOptions>,
+    session: Option<String>,
 }
 
 #[async_trait]
@@ -435,14 +454,28 @@ impl TestOperation for UpdateOne {
         id: &str,
         test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
-        let collection = test_runner.get_collection(id);
-        let result = collection
-            .update_one(
-                self.filter.clone(),
-                self.update.clone(),
-                self.options.clone(),
-            )
-            .await?;
+        let collection = test_runner.get_collection(id).clone();
+        let result = match &self.session {
+            Some(session_id) => {
+                collection
+                    .update_one_with_session(
+                        self.filter.clone(),
+                        self.update.clone(),
+                        self.options.clone(),
+                        test_runner.get_mut_session(session_id),
+                    )
+                    .await?
+            }
+            None => {
+                collection
+                    .update_one(
+                        self.filter.clone(),
+                        self.update.clone(),
+                        self.options.clone(),
+                    )
+                    .await?
+            }
+        };
         let result = to_bson(&result)?;
         Ok(Some(result.into()))
     }
@@ -920,6 +953,82 @@ impl TestOperation for AssertCollectionNotExists {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct CreateCollection {
+    collection: String,
+    #[serde(flatten)]
+    options: Option<CreateCollectionOptions>,
+    session: Option<String>,
+}
+
+#[async_trait]
+impl TestOperation for CreateCollection {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
+        unimplemented!()
+    }
+
+    async fn execute_entity_operation(
+        &self,
+        id: &str,
+        test_runner: &mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let database = test_runner.get_database(id).clone();
+
+        if let Some(session_id) = &self.session {
+            database
+                .create_collection_with_session(
+                    &self.collection,
+                    self.options.clone(),
+                    test_runner.get_mut_session(session_id),
+                )
+                .await?;
+        } else {
+            database
+                .create_collection(&self.collection, self.options.clone())
+                .await?;
+        }
+        Ok(None)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct DropCollection {
+    collection: String,
+    #[serde(flatten)]
+    options: Option<DropCollectionOptions>,
+    session: Option<String>,
+}
+
+#[async_trait]
+impl TestOperation for DropCollection {
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
+        unimplemented!()
+    }
+
+    async fn execute_entity_operation(
+        &self,
+        id: &str,
+        test_runner: &mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let database = test_runner.entities.get(id).unwrap().as_database();
+        let collection = database.collection::<Document>(&self.collection).clone();
+
+        if let Some(session_id) = &self.session {
+            collection
+                .drop_with_session(
+                    self.options.clone(),
+                    test_runner.get_mut_session(session_id),
+                )
+                .await?;
+        } else {
+            collection.drop(self.options.clone()).await?;
+        }
+        Ok(None)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct RunCommand {
     command: Document,
     command_name: String,
@@ -972,8 +1081,9 @@ impl TestOperation for EndSession {
         id: &str,
         test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
-        let session = test_runner.entities.get(id).unwrap().as_client_session();
+        let session = test_runner.get_mut_session(id).client_session.take();
         drop(session);
+        RUNTIME.delay_for(Duration::from_secs(1)).await;
         Ok(None)
     }
 }
@@ -988,11 +1098,7 @@ pub(super) struct AssertSessionTransactionState {
 #[async_trait]
 impl TestOperation for AssertSessionTransactionState {
     async fn execute_test_runner_operation(&self, test_runner: &mut TestRunner) {
-        let session = test_runner
-            .entities
-            .get(&self.session)
-            .unwrap()
-            .as_client_session();
+        let session: &ClientSession = test_runner.get_session(&self.session);
         let session_state = match &session.transaction.state {
             TransactionState::None => "none",
             TransactionState::Starting => "starting",
@@ -1073,11 +1179,7 @@ pub(super) struct AssertSessionDirty {
 #[async_trait]
 impl TestOperation for AssertSessionDirty {
     async fn execute_test_runner_operation(&self, test_runner: &mut TestRunner) {
-        let session = test_runner
-            .entities
-            .get(&self.session)
-            .unwrap()
-            .as_client_session();
+        let session: &ClientSession = test_runner.get_session(&self.session);
         assert!(session.is_dirty());
     }
 
@@ -1099,11 +1201,7 @@ pub(super) struct AssertSessionNotDirty {
 #[async_trait]
 impl TestOperation for AssertSessionNotDirty {
     async fn execute_test_runner_operation(&self, test_runner: &mut TestRunner) {
-        let session = test_runner
-            .entities
-            .get(&self.session)
-            .unwrap()
-            .as_client_session();
+        let session: &ClientSession = test_runner.get_session(&self.session);
         assert!(!session.is_dirty());
     }
 
@@ -1112,6 +1210,69 @@ impl TestOperation for AssertSessionNotDirty {
         _id: &str,
         _test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct StartTransaction {}
+
+#[async_trait]
+impl TestOperation for StartTransaction {
+    async fn execute_entity_operation(
+        &self,
+        id: &str,
+        test_runner: &mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let session: &mut ClientSession = test_runner.get_mut_session(id);
+        session.start_transaction(None).await?;
+        Ok(None)
+    }
+
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct CommitTransaction {}
+
+#[async_trait]
+impl TestOperation for CommitTransaction {
+    async fn execute_entity_operation(
+        &self,
+        id: &str,
+        test_runner: &mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let session: &mut ClientSession = test_runner.get_mut_session(id);
+        session.commit_transaction().await?;
+        Ok(None)
+    }
+
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct AbortTransaction {}
+
+#[async_trait]
+impl TestOperation for AbortTransaction {
+    async fn execute_entity_operation(
+        &self,
+        id: &str,
+        test_runner: &mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        let session: &mut ClientSession = test_runner.get_mut_session(id);
+        session.abort_transaction().await?;
+        Ok(None)
+    }
+
+    async fn execute_test_runner_operation(&self, _test_runner: &mut TestRunner) {
         unimplemented!()
     }
 }
