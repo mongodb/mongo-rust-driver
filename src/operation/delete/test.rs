@@ -149,6 +149,7 @@ async fn handle_write_failure() {
                 code: 1234,
                 code_name: None,
                 message: "my error string".to_string(),
+                details: None,
             };
             assert_eq!(error, &expected_err);
         }
