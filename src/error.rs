@@ -509,6 +509,7 @@ pub struct BulkWriteFailure {
     /// The error that occurred on account of write concern failure.
     pub write_concern_error: Option<WriteConcernError>,
 
+    #[serde(skip)]
     pub(crate) inserted_ids: HashMap<usize, Bson>,
 }
 
