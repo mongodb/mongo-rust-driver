@@ -5,6 +5,8 @@ mod test_event;
 mod test_file;
 mod test_runner;
 
+use std::time::Duration;
+
 use futures::stream::TryStreamExt;
 use semver::Version;
 use tokio::sync::RwLockWriteGuard;
@@ -13,6 +15,7 @@ use crate::{
     bson::{doc, Document},
     options::{CollectionOptions, FindOptions, ReadConcern, ReadPreference, SelectionCriteria},
     test::{run_spec_test, LOCK},
+    RUNTIME,
 };
 
 pub use self::{
@@ -184,6 +187,14 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                         expect_error.verify_result(error);
                     }
                 }
+            }
+            // This test (in src/test/spec/json/sessions/server-support.json) runs two
+            // operations with implicit sessions in sequence and then checks to see if they
+            // used the same lsid. We delay for one second to ensure that the
+            // implicit session used in the first operation is returned to the pool before
+            // the second operation is executed.
+            if test_case.description == "Server supports implicit sessions" {
+                RUNTIME.delay_for(Duration::from_secs(1)).await;
             }
         }
 
