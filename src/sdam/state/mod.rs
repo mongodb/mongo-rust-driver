@@ -316,7 +316,7 @@ impl Topology {
         server_description: ServerDescription,
         mut state_lock: RwLockWriteGuard<'_, TopologyState>,
     ) -> bool {
-        let is_available = server_description.is_available();
+        let server_type = server_description.server_type;
         // TODO RUST-232: Theoretically, `TopologyDescription::update` can return an error. However,
         // this can only happen if we try to access a field from the isMaster response when an error
         // occurred during the check. In practice, this can't happen, because the SDAM algorithm
@@ -325,7 +325,10 @@ impl Topology {
         // properly inform users of errors that occur here.
         match state_lock.update(server_description, &self.common.options, self.downgrade()) {
             Ok(Some(_)) => {
-                if is_available {
+                if server_type.is_data_bearing()
+                    || (server_type != ServerType::Unknown
+                        && state_lock.description.topology_type() == TopologyType::Single)
+                {
                     server.pool.mark_as_ready().await;
                 }
                 true
