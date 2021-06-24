@@ -19,6 +19,7 @@ pub(crate) struct IsMasterReply {
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct IsMasterCommandResponse {
+    pub is_writable_primary: Option<bool>,
     #[serde(rename = "ismaster")]
     pub is_master: Option<bool>,
     pub ok: Option<f32>,
@@ -72,6 +73,8 @@ impl IsMasterCommandResponse {
         } else if self.set_name.is_some() {
             if let Some(true) = self.hidden {
                 ServerType::RsOther
+            } else if let Some(true) = self.is_writable_primary {
+                ServerType::RsPrimary
             } else if let Some(true) = self.is_master {
                 ServerType::RsPrimary
             } else if let Some(true) = self.secondary {
