@@ -659,13 +659,13 @@ where
             .await
     }
 
-    async fn insert_many_common<D: Borrow<T>>(
+    async fn insert_many_common(
         &self,
-        docs: impl IntoIterator<Item = D>,
+        docs: impl IntoIterator<Item = impl Borrow<T>>,
         options: impl Into<Option<InsertManyOptions>>,
         mut session: Option<&mut ClientSession>,
     ) -> Result<InsertManyResult> {
-        let ds: Vec<D> = docs.into_iter().collect();
+        let ds: Vec<_> = docs.into_iter().collect();
         let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
