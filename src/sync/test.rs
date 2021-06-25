@@ -226,3 +226,27 @@ fn transactions() {
         .abort_transaction()
         .expect("abort transaction should succeed");
 }
+
+#[test]
+#[function_name::named]
+fn collection_generic_bounds() {
+    #[derive(Deserialize)]
+    struct Foo;
+
+    let client = Client::with_uri_str("uri").unwrap();
+
+    // ensure this code successfully compiles
+    let coll: Collection<Foo> = client
+        .database(function_name!())
+        .collection(function_name!());
+    let _result: Result<Option<Foo>> = coll.find_one(None, None);
+
+    #[derive(Serialize)]
+    struct Bar;
+
+    // ensure this code successfully compiles
+    let coll: Collection<Bar> = client
+        .database(function_name!())
+        .collection(function_name!());
+    let _result = coll.insert_one(Bar {}, None);
+}

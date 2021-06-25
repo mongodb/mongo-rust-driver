@@ -1,7 +1,5 @@
 use std::fmt::Debug;
 
-use serde::{de::DeserializeOwned, Serialize};
-
 use super::{ClientSession, Collection, Cursor, SessionCursor};
 use crate::{
     bson::Document,
@@ -89,10 +87,7 @@ impl Database {
     ///
     /// This method does not send or receive anything across the wire to the database, so it can be
     /// used repeatedly without incurring any costs from I/O.
-    pub fn collection<T>(&self, name: &str) -> Collection<T>
-    where
-        T: Serialize + DeserializeOwned + Unpin + Debug,
-    {
+    pub fn collection<T>(&self, name: &str) -> Collection<T> {
         Collection::new(self.async_database.collection(name))
     }
 
@@ -106,10 +101,7 @@ impl Database {
         &self,
         name: &str,
         options: CollectionOptions,
-    ) -> Collection<T>
-    where
-        T: Serialize + DeserializeOwned + Unpin + Debug,
-    {
+    ) -> Collection<T> {
         Collection::new(self.async_database.collection_with_options(name, options))
     }
 

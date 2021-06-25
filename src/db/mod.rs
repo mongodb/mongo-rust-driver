@@ -3,7 +3,6 @@ pub mod options;
 use std::{fmt::Debug, sync::Arc};
 
 use futures_util::stream::TryStreamExt;
-use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     bson::{Bson, Document},
@@ -137,10 +136,7 @@ impl Database {
     ///
     /// This method does not send or receive anything across the wire to the database, so it can be
     /// used repeatedly without incurring any costs from I/O.
-    pub fn collection<T>(&self, name: &str) -> Collection<T>
-    where
-        T: Serialize + DeserializeOwned + Unpin + Debug,
-    {
+    pub fn collection<T>(&self, name: &str) -> Collection<T> {
         Collection::new(self.clone(), name, None)
     }
 
@@ -154,10 +150,7 @@ impl Database {
         &self,
         name: &str,
         options: CollectionOptions,
-    ) -> Collection<T>
-    where
-        T: Serialize + DeserializeOwned + Unpin + Debug,
-    {
+    ) -> Collection<T> {
         Collection::new(self.clone(), name, Some(options))
     }
 

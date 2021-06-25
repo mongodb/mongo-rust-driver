@@ -1020,3 +1020,28 @@ async fn drop_skip_serializing_none() {
     let options = DropCollectionOptions::builder().build();
     assert!(coll.drop(options).await.is_ok());
 }
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn collection_generic_bounds() {
+    #[derive(Deserialize)]
+    struct Foo;
+
+    let client = TestClient::new().await;
+
+    // ensure this code successfully compiles
+    let coll: Collection<Foo> = client
+        .database(function_name!())
+        .collection(function_name!());
+    let _result: Result<Option<Foo>> = coll.find_one(None, None).await;
+
+    #[derive(Serialize)]
+    struct Bar;
+
+    // ensure this code successfully compiles
+    let coll: Collection<Bar> = client
+        .database(function_name!())
+        .collection(function_name!());
+    let _result = coll.insert_one(Bar {}, None).await;
+}

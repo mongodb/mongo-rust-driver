@@ -4,7 +4,7 @@ mod test;
 
 use std::fmt::Debug;
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize};
 
 use self::options::FindAndModifyOptions;
 use crate::{
@@ -27,7 +27,7 @@ use crate::{
 
 pub(crate) struct FindAndModify<T = Document>
 where
-    T: Serialize + DeserializeOwned + Unpin + Debug,
+    T: DeserializeOwned,
 {
     ns: Namespace,
     query: Document,
@@ -37,7 +37,7 @@ where
 
 impl<T> FindAndModify<T>
 where
-    T: Serialize + DeserializeOwned + Unpin + Debug,
+    T: DeserializeOwned,
 {
     pub fn with_delete(
         ns: Namespace,
@@ -97,7 +97,7 @@ where
 
 impl<T> Operation for FindAndModify<T>
 where
-    T: Serialize + DeserializeOwned + Unpin + Debug,
+    T: DeserializeOwned,
 {
     type O = Option<T>;
     const NAME: &'static str = "findAndModify";

@@ -60,7 +60,7 @@ pub(crate) use update::Update;
 /// A trait modeling the behavior of a server side operation.
 pub(crate) trait Operation {
     /// The output type of this operation.
-    type O: Debug;
+    type O;
 
     /// The name of the server side command associated with this operation.
     const NAME: &'static str;
