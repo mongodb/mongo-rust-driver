@@ -472,6 +472,11 @@ pub struct WriteError {
     /// A description of the error that occurred.
     #[serde(rename = "errmsg")]
     pub message: String,
+
+    /// A document providing more information about the write error (e.g. details
+    /// pertaining to document validation).
+    #[serde(rename = "errInfo")]
+    pub details: Option<Document>,
 }
 
 /// An error that occurred during a write operation consisting of multiple writes that wasn't due to
@@ -496,6 +501,11 @@ pub struct BulkWriteError {
     /// A description of the error that occurred.
     #[serde(rename = "errmsg")]
     pub message: String,
+
+    /// A document providing more information about the write error (e.g. details
+    /// pertaining to document validation).
+    #[serde(rename = "errInfo")]
+    pub details: Option<Document>,
 }
 
 /// The set of errors that occurred during a write operation.
@@ -542,6 +552,7 @@ impl WriteFailure {
                 code: bulk_write_error.code,
                 code_name: bulk_write_error.code_name,
                 message: bulk_write_error.message,
+                details: bulk_write_error.details,
             };
             Ok(WriteFailure::WriteError(write_error))
         } else if let Some(wc_error) = bulk.write_concern_error {

@@ -187,7 +187,10 @@ async fn handle_write_failure() {
             {
                 "index": 1,
                 "code": 11000,
-                "errmsg": "duplicate key"
+                "errmsg": "duplicate key",
+                "errInfo": {
+                    "test key": "test value",
+                }
             }
         ],
         "writeConcernError": {
@@ -218,6 +221,7 @@ async fn handle_write_failure() {
                 code: 11000,
                 code_name: None,
                 message: "duplicate key".to_string(),
+                details: Some(doc! { "test key": "test value" }),
             };
             assert_eq!(write_errors.first().unwrap(), &expected_err);
 
