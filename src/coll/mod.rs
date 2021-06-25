@@ -78,10 +78,7 @@ use crate::{
 /// ```
 
 #[derive(Debug, Clone)]
-pub struct Collection<T>
-where
-    T: Serialize + DeserializeOwned + Unpin + Debug,
-{
+pub struct Collection<T> {
     inner: Arc<CollectionInner>,
     _phantom: std::marker::PhantomData<T>,
 }
@@ -96,10 +93,7 @@ struct CollectionInner {
     write_concern: Option<WriteConcern>,
 }
 
-impl<T> Collection<T>
-where
-    T: Serialize + DeserializeOwned + Unpin + Debug,
-{
+impl<T> Collection<T> {
     pub(crate) fn new(db: Database, name: &str, options: Option<CollectionOptions>) -> Self {
         let options = options.unwrap_or_default();
         let selection_criteria = options
@@ -126,9 +120,7 @@ where
     }
 
     /// Gets a clone of the `Collection` with a different type `U`.
-    pub fn clone_with_type<U: Serialize + DeserializeOwned + Unpin + Debug>(
-        &self,
-    ) -> Collection<U> {
+    pub fn clone_with_type<U>(&self) -> Collection<U> {
         let options = CollectionOptions::builder()
             .selection_criteria(self.inner.selection_criteria.clone())
             .read_concern(self.inner.read_concern.clone())
@@ -431,6 +423,146 @@ where
             .await
     }
 
+    async fn update_many_common(
+        &self,
+        query: Document,
+        update: impl Into<UpdateModifications>,
+        options: impl Into<Option<UpdateOptions>>,
+        session: impl Into<Option<&mut ClientSession>>,
+    ) -> Result<UpdateResult> {
+        let update = update.into();
+
+        if let UpdateModifications::Document(ref d) = update {
+            bson_util::update_document_check(d)?;
+        }
+
+        let session = session.into();
+
+        let mut options = options.into();
+        resolve_write_concern_with_session!(self, options, session.as_ref())?;
+
+        let update = Update::new(self.namespace(), query, update, true, options);
+        self.client().execute_operation(update, session).await
+    }
+
+    /// Updates all documents matching `query` in the collection.
+    ///
+    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
+    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
+    /// in MongoDB 4.2+. See the official MongoDB
+    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#behavior) for more information on specifying updates.
+    pub async fn update_many(
+        &self,
+        query: Document,
+        update: impl Into<UpdateModifications>,
+        options: impl Into<Option<UpdateOptions>>,
+    ) -> Result<UpdateResult> {
+        self.update_many_common(query, update, options, None).await
+    }
+
+    /// Updates all documents matching `query` in the collection using the provided `ClientSession`.
+    ///
+    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
+    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
+    /// in MongoDB 4.2+. See the official MongoDB
+    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#behavior) for more information on specifying updates.
+    pub async fn update_many_with_session(
+        &self,
+        query: Document,
+        update: impl Into<UpdateModifications>,
+        options: impl Into<Option<UpdateOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<UpdateResult> {
+        self.update_many_common(query, update, options, session)
+            .await
+    }
+
+    async fn update_one_common(
+        &self,
+        query: Document,
+        update: impl Into<UpdateModifications>,
+        options: impl Into<Option<UpdateOptions>>,
+        session: impl Into<Option<&mut ClientSession>>,
+    ) -> Result<UpdateResult> {
+        let update = update.into();
+        if let UpdateModifications::Document(ref d) = update {
+            bson_util::update_document_check(d)?;
+        }
+
+        let session = session.into();
+
+        let mut options = options.into();
+        resolve_write_concern_with_session!(self, options, session.as_ref())?;
+
+        let update = Update::new(self.namespace(), query, update, false, options);
+        self.client().execute_operation(update, session).await
+    }
+
+    /// Updates up to one document matching `query` in the collection.
+    ///
+    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
+    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
+    /// in MongoDB 4.2+. See the official MongoDB
+    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#behavior) for more information on specifying updates.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
+    pub async fn update_one(
+        &self,
+        query: Document,
+        update: impl Into<UpdateModifications>,
+        options: impl Into<Option<UpdateOptions>>,
+    ) -> Result<UpdateResult> {
+        self.update_one_common(query, update, options, None).await
+    }
+
+    /// Updates up to one document matching `query` in the collection using the provided
+    /// `ClientSession`.
+    ///
+    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
+    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
+    /// in MongoDB 4.2+. See the official MongoDB
+    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#behavior) for more information on specifying updates.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
+    pub async fn update_one_with_session(
+        &self,
+        query: Document,
+        update: impl Into<UpdateModifications>,
+        options: impl Into<Option<UpdateOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<UpdateResult> {
+        self.update_one_common(query, update, options, session)
+            .await
+    }
+
+    /// Kill the server side cursor that id corresponds to.
+    pub(super) async fn kill_cursor(&self, cursor_id: i64) -> Result<()> {
+        let ns = self.namespace();
+
+        self.client()
+            .database(ns.db.as_str())
+            .run_command(
+                doc! {
+                    "killCursors": ns.coll.as_str(),
+                    "cursors": [cursor_id]
+                },
+                None,
+            )
+            .await?;
+        Ok(())
+    }
+}
+
+impl<T> Collection<T>
+where
+    T: DeserializeOwned + Unpin,
+{
     /// Finds the documents in the collection matching `filter`.
     pub async fn find(
         &self,
@@ -502,7 +634,12 @@ where
         let mut cursor = cursor.stream(session);
         cursor.next().await.transpose()
     }
+}
 
+impl<T> Collection<T>
+where
+    T: DeserializeOwned,
+{
     async fn find_one_and_delete_common(
         &self,
         filter: Document,
@@ -546,59 +683,6 @@ where
         session: &mut ClientSession,
     ) -> Result<Option<T>> {
         self.find_one_and_delete_common(filter, options, session)
-            .await
-    }
-
-    async fn find_one_and_replace_common(
-        &self,
-        filter: Document,
-        replacement: impl Borrow<T>,
-        options: impl Into<Option<FindOneAndReplaceOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<Option<T>> {
-        let replacement = to_document(replacement.borrow())?;
-
-        let session = session.into();
-
-        let mut options = options.into();
-        resolve_write_concern_with_session!(self, options, session.as_ref())?;
-
-        let op = FindAndModify::<T>::with_replace(self.namespace(), filter, replacement, options)?;
-        self.client().execute_operation(op, session).await
-    }
-
-    /// Atomically finds up to one document in the collection matching `filter` and replaces it with
-    /// `replacement`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub async fn find_one_and_replace(
-        &self,
-        filter: Document,
-        replacement: impl Borrow<T>,
-        options: impl Into<Option<FindOneAndReplaceOptions>>,
-    ) -> Result<Option<T>> {
-        self.find_one_and_replace_common(filter, replacement, options, None)
-            .await
-    }
-
-    /// Atomically finds up to one document in the collection matching `filter` and replaces it with
-    /// `replacement` using the provided `ClientSession`.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub async fn find_one_and_replace_with_session(
-        &self,
-        filter: Document,
-        replacement: impl Borrow<T>,
-        options: impl Into<Option<FindOneAndReplaceOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<Option<T>> {
-        self.find_one_and_replace_common(filter, replacement, options, session)
             .await
     }
 
@@ -658,7 +742,71 @@ where
         self.find_one_and_update_common(filter, update, options, session)
             .await
     }
+}
 
+impl<T> Collection<T>
+where
+    T: Serialize + DeserializeOwned,
+{
+    async fn find_one_and_replace_common(
+        &self,
+        filter: Document,
+        replacement: impl Borrow<T>,
+        options: impl Into<Option<FindOneAndReplaceOptions>>,
+        session: impl Into<Option<&mut ClientSession>>,
+        // isabeltodo decide whether to split this out
+    ) -> Result<Option<T>> {
+        let replacement = to_document(replacement.borrow())?;
+
+        let session = session.into();
+
+        let mut options = options.into();
+        resolve_write_concern_with_session!(self, options, session.as_ref())?;
+
+        let op = FindAndModify::<T>::with_replace(self.namespace(), filter, replacement, options)?;
+        self.client().execute_operation(op, session).await
+    }
+
+    /// Atomically finds up to one document in the collection matching `filter` and replaces it with
+    /// `replacement`.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
+    pub async fn find_one_and_replace(
+        &self,
+        filter: Document,
+        replacement: impl Borrow<T>,
+        options: impl Into<Option<FindOneAndReplaceOptions>>,
+    ) -> Result<Option<T>> {
+        self.find_one_and_replace_common(filter, replacement, options, None)
+            .await
+    }
+
+    /// Atomically finds up to one document in the collection matching `filter` and replaces it with
+    /// `replacement` using the provided `ClientSession`.
+    ///
+    /// This operation will retry once upon failure if the connection and encountered error support
+    /// retryability. See the documentation
+    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
+    /// retryable writes.
+    pub async fn find_one_and_replace_with_session(
+        &self,
+        filter: Document,
+        replacement: impl Borrow<T>,
+        options: impl Into<Option<FindOneAndReplaceOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<Option<T>> {
+        self.find_one_and_replace_common(filter, replacement, options, session)
+            .await
+    }
+}
+
+impl<T> Collection<T>
+where
+    T: Serialize,
+{
     async fn insert_many_common(
         &self,
         docs: impl IntoIterator<Item = impl Borrow<T>>,
@@ -897,141 +1045,6 @@ where
     ) -> Result<UpdateResult> {
         self.replace_one_common(query, replacement, options, session)
             .await
-    }
-
-    async fn update_many_common(
-        &self,
-        query: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<UpdateOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<UpdateResult> {
-        let update = update.into();
-
-        if let UpdateModifications::Document(ref d) = update {
-            bson_util::update_document_check(d)?;
-        }
-
-        let session = session.into();
-
-        let mut options = options.into();
-        resolve_write_concern_with_session!(self, options, session.as_ref())?;
-
-        let update = Update::new(self.namespace(), query, update, true, options);
-        self.client().execute_operation(update, session).await
-    }
-
-    /// Updates all documents matching `query` in the collection.
-    ///
-    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#behavior) for more information on specifying updates.
-    pub async fn update_many(
-        &self,
-        query: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<UpdateOptions>>,
-    ) -> Result<UpdateResult> {
-        self.update_many_common(query, update, options, None).await
-    }
-
-    /// Updates all documents matching `query` in the collection using the provided `ClientSession`.
-    ///
-    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#behavior) for more information on specifying updates.
-    pub async fn update_many_with_session(
-        &self,
-        query: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<UpdateOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<UpdateResult> {
-        self.update_many_common(query, update, options, session)
-            .await
-    }
-
-    async fn update_one_common(
-        &self,
-        query: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<UpdateOptions>>,
-        session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<UpdateResult> {
-        let update = update.into();
-        if let UpdateModifications::Document(ref d) = update {
-            bson_util::update_document_check(d)?;
-        }
-
-        let session = session.into();
-
-        let mut options = options.into();
-        resolve_write_concern_with_session!(self, options, session.as_ref())?;
-
-        let update = Update::new(self.namespace(), query, update, false, options);
-        self.client().execute_operation(update, session).await
-    }
-
-    /// Updates up to one document matching `query` in the collection.
-    ///
-    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#behavior) for more information on specifying updates.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub async fn update_one(
-        &self,
-        query: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<UpdateOptions>>,
-    ) -> Result<UpdateResult> {
-        self.update_one_common(query, update, options, None).await
-    }
-
-    /// Updates up to one document matching `query` in the collection using the provided
-    /// `ClientSession`.
-    ///
-    /// Both `Document` and `Vec<Document>` implement `Into<UpdateModifications>`, so either can be
-    /// passed in place of constructing the enum case. Note: pipeline updates are only supported
-    /// in MongoDB 4.2+. See the official MongoDB
-    /// [documentation](https://docs.mongodb.com/manual/reference/command/update/#behavior) for more information on specifying updates.
-    ///
-    /// This operation will retry once upon failure if the connection and encountered error support
-    /// retryability. See the documentation
-    /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
-    /// retryable writes.
-    pub async fn update_one_with_session(
-        &self,
-        query: Document,
-        update: impl Into<UpdateModifications>,
-        options: impl Into<Option<UpdateOptions>>,
-        session: &mut ClientSession,
-    ) -> Result<UpdateResult> {
-        self.update_one_common(query, update, options, session)
-            .await
-    }
-
-    /// Kill the server side cursor that id corresponds to.
-    pub(super) async fn kill_cursor(&self, cursor_id: i64) -> Result<()> {
-        let ns = self.namespace();
-
-        self.client()
-            .database(ns.db.as_str())
-            .run_command(
-                doc! {
-                    "killCursors": ns.coll.as_str(),
-                    "cursors": [cursor_id]
-                },
-                None,
-            )
-            .await?;
-        Ok(())
     }
 }
 

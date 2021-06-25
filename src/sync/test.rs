@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use pretty_assertions::assert_eq;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, Document},
@@ -16,7 +17,7 @@ use crate::{
         WriteConcern,
     },
     sync::{Client, Collection},
-    test::{TestClient as AsyncTestClient, CLIENT_OPTIONS},
+    test::{TestClient as AsyncTestClient, CLIENT_OPTIONS, LOCK},
     RUNTIME,
 };
 
@@ -37,6 +38,8 @@ where
 
 #[test]
 fn client_options() {
+    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
+
     let mut options = ClientOptions::parse("mongodb://localhost:27017/").unwrap();
 
     options.original_uri.take();
@@ -55,6 +58,8 @@ fn client_options() {
 #[test]
 #[function_name::named]
 fn client() {
+    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
+
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
 
@@ -73,6 +78,8 @@ fn client() {
 #[test]
 #[function_name::named]
 fn database() {
+    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
+
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
     let db = client.database(function_name!());
@@ -116,6 +123,8 @@ fn database() {
 #[test]
 #[function_name::named]
 fn collection() {
+    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
+
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
     let coll = init_db_and_coll(&client, function_name!(), function_name!());
@@ -167,6 +176,8 @@ fn collection() {
 #[test]
 #[function_name::named]
 fn typed_collection() {
+    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
+
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
     let coll = init_db_and_typed_coll(&client, function_name!(), function_name!());
@@ -187,6 +198,8 @@ fn typed_collection() {
 #[test]
 #[function_name::named]
 fn transactions() {
+    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
+
     let should_skip = RUNTIME.block_on(async {
         let test_client = AsyncTestClient::new().await;
         // TODO RUST-122: Unskip this test on sharded clusters
@@ -225,4 +238,31 @@ fn transactions() {
     session
         .abort_transaction()
         .expect("abort transaction should succeed");
+}
+
+#[test]
+#[function_name::named]
+fn collection_generic_bounds() {
+    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
+
+    #[derive(Deserialize)]
+    struct Foo;
+
+    let options = CLIENT_OPTIONS.clone();
+    let client = Client::with_options(options).expect("client creation should succeed");
+
+    // ensure this code successfully compiles
+    let coll: Collection<Foo> = client
+        .database(function_name!())
+        .collection(function_name!());
+    let _result: Result<Option<Foo>> = coll.find_one(None, None);
+
+    #[derive(Serialize)]
+    struct Bar;
+
+    // ensure this code successfully compiles
+    let coll: Collection<Bar> = client
+        .database(function_name!())
+        .collection(function_name!());
+    let _result = coll.insert_one(Bar {}, None);
 }
