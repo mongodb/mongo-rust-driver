@@ -20,7 +20,7 @@ fn build_test(
 ) {
     let target = target.into();
 
-    let aggregate = Aggregate::new(target.clone(), pipeline, options);
+    let mut aggregate = Aggregate::new(target.clone(), pipeline, options);
 
     let mut cmd = aggregate.build(&StreamDescription::new_testing()).unwrap();
 

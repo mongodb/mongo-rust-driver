@@ -5,7 +5,7 @@ use std::{convert::TryFrom, time::Duration};
 use serde::{de::Error, ser, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
-    bson::{doc, oid::ObjectId, Binary, Bson, Document, JavaScriptCodeWithScope, Regex},
+    bson::{doc, Binary, Bson, Document, JavaScriptCodeWithScope, Regex},
     error::{ErrorKind, Result},
 };
 
@@ -29,11 +29,6 @@ pub(crate) fn get_u64(val: &Bson) -> Option<u64> {
         Bson::Double(f) if (f - (f as u64 as f64)).abs() <= f64::EPSILON => Some(f as u64),
         _ => None,
     }
-}
-
-pub(crate) fn add_id(doc: &mut Document) {
-    doc.entry("_id".to_string())
-        .or_insert_with(|| Bson::ObjectId(ObjectId::new()));
 }
 
 pub(crate) fn to_bson_array(docs: &[Document]) -> Bson {
@@ -171,7 +166,7 @@ where
         .ok_or_else(|| D::Error::custom(format!("could not deserialize u64 from {:?}", bson)))
 }
 
-pub fn doc_size_bytes(doc: &Document) -> usize {
+pub fn doc_size_bytes(doc: &Document) -> u64 {
     // 
     // * i32 length prefix (4 bytes)
     // * for each element:
@@ -182,19 +177,19 @@ pub fn doc_size_bytes(doc: &Document) -> usize {
     // * null terminator (1 byte)
     4 + doc
         .into_iter()
-        .map(|(key, val)| 1 + key.len() + 1 + size_bytes(val))
-        .sum::<usize>()
+        .map(|(key, val)| 1 + key.len() as u64 + 1 + size_bytes(val))
+        .sum::<u64>()
         + 1
 }
 
-pub fn size_bytes(val: &Bson) -> usize {
+pub fn size_bytes(val: &Bson) -> u64 {
     match val {
         Bson::Double(_) => 8,
         // 
         // * length prefix (4 bytes)
         // * number of UTF-8 bytes
         // * null terminator (1 byte)
-        Bson::String(s) => 4 + s.len() + 1,
+        Bson::String(s) => 4 + s.len() as u64 + 1,
         // An array is serialized as a document with the keys "0", "1", "2", etc., so the size of
         // an array is:
         //
@@ -210,7 +205,7 @@ pub fn size_bytes(val: &Bson) -> usize {
                 .iter()
                 .enumerate()
                 .map(|(i, val)| 1 + num_decimal_digits(i) + 1 + size_bytes(val))
-                .sum::<usize>()
+                .sum::<u64>()
                 + 1
         }
         Bson::Document(doc) => doc_size_bytes(doc),
@@ -220,13 +215,13 @@ pub fn size_bytes(val: &Bson) -> usize {
         //   * number of UTF-8 bytes
         //   * null terminator (1 byte)
         Bson::RegularExpression(Regex { pattern, options }) => {
-            pattern.len() + 1 + options.len() + 1
+            pattern.len() as u64 + 1 + options.len() as u64 + 1
         }
         // 
         // * length prefix (4 bytes)
         // * number of UTF-8 bytes
         // * null terminator (1 byte)
-        Bson::JavaScriptCode(code) => 4 + code.len() + 1,
+        Bson::JavaScriptCode(code) => 4 + code.len() as u64 + 1,
         // 
         // * i32 length prefix (4 bytes)
         // * i32 length prefix for code (4 bytes)
@@ -234,7 +229,7 @@ pub fn size_bytes(val: &Bson) -> usize {
         // * null terminator for code (1 byte)
         // * length of document
         Bson::JavaScriptCodeWithScope(JavaScriptCodeWithScope { code, scope }) => {
-            4 + 4 + code.len() + 1 + doc_size_bytes(scope)
+            4 + 4 + code.len() as u64 + 1 + doc_size_bytes(scope)
         }
         Bson::Int32(_) => 4,
         Bson::Int64(_) => 8,
@@ -243,14 +238,14 @@ pub fn size_bytes(val: &Bson) -> usize {
         // * i32 length prefix (4 bytes)
         // * subtype (1 byte)
         // * number of bytes
-        Bson::Binary(Binary { bytes, .. }) => 4 + 1 + bytes.len(),
+        Bson::Binary(Binary { bytes, .. }) => 4 + 1 + bytes.len() as u64,
         Bson::ObjectId(_) => 12,
         Bson::DateTime(_) => 8,
         // 
         // * i32 length prefix (4 bytes)
         // * subtype (1 byte)
         // * number of UTF-8 bytes
-        Bson::Symbol(s) => 4 + 1 + s.len(),
+        Bson::Symbol(s) => 4 + 1 + s.len() as u64,
         Bson::Decimal128(..) => 128 / 8,
         Bson::Undefined | Bson::MaxKey | Bson::MinKey => 0,
         // DbPointer doesn't have public details exposed by the BSON library, but it comprises of a
@@ -267,7 +262,19 @@ pub fn size_bytes(val: &Bson) -> usize {
     }
 }
 
-fn num_decimal_digits(n: usize) -> usize {
+/// The size in bytes of the provided document's entry in a BSON array at the given index.
+pub(crate) fn array_entry_size_bytes(index: usize, doc: &Document) -> u64 {
+    // 
+    //   * type (1 byte)
+    //   * number of decimal digits in key
+    //   * null terminator for the key (1 byte)
+    //   * size of value
+    1 + num_decimal_digits(index) + 1 + doc_size_bytes(&doc)
+}
+
+/// The number of digits in `n` in base 10.
+/// Useful for calculating the size of an array entry in BSON.
+fn num_decimal_digits(n: usize) -> u64 {
     let mut digits = 1;
     let mut curr = 10;
 
@@ -332,6 +339,6 @@ mod test {
         let mut serialized_bytes = Vec::new();
         doc.to_writer(&mut serialized_bytes).unwrap();
 
-        assert_eq!(size_bytes, serialized_bytes.len());
+        assert_eq!(size_bytes, serialized_bytes.len() as u64);
     }
 }

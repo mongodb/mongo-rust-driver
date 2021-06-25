@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
+use bson::Document;
 use serde::Deserialize;
 use tokio::sync::RwLockReadGuard;
 
@@ -7,7 +8,7 @@ use crate::{
     bson::{doc, oid::ObjectId},
     client::Client,
     error::{BulkWriteFailure, CommandError, Error, ErrorKind},
-    is_master::{IsMasterCommandResponse, IsMasterReply},
+    is_master::{IsMasterCommandResponse, IsMasterReply, LastWrite},
     options::{ClientOptions, ReadPreference, SelectionCriteria, ServerAddress},
     sdam::{
         description::{
@@ -17,6 +18,7 @@ use crate::{
         HandshakePhase,
         Topology,
     },
+    selection_criteria::TagSet,
     test::{run_spec_test, TestClient, CLIENT_OPTIONS, LOCK},
 };
 
@@ -39,7 +41,75 @@ pub struct Phase {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Response(String, IsMasterCommandResponse);
+pub struct Response(String, TestIsMasterCommandResponse);
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TestIsMasterCommandResponse {
+    #[serde(rename = "ismaster")]
+    pub is_master: Option<bool>,
+    pub ok: Option<f32>,
+    pub hosts: Option<Vec<String>>,
+    pub passives: Option<Vec<String>>,
+    pub arbiters: Option<Vec<String>>,
+    pub msg: Option<String>,
+    pub me: Option<String>,
+    pub set_version: Option<i32>,
+    pub set_name: Option<String>,
+    pub hidden: Option<bool>,
+    pub secondary: Option<bool>,
+    pub arbiter_only: Option<bool>,
+    #[serde(rename = "isreplicaset")]
+    pub is_replica_set: Option<bool>,
+    pub logical_session_timeout_minutes: Option<i64>,
+    pub last_write: Option<LastWrite>,
+    pub min_wire_version: Option<i32>,
+    pub max_wire_version: Option<i32>,
+    pub tags: Option<TagSet>,
+    pub election_id: Option<ObjectId>,
+    pub primary: Option<String>,
+    pub sasl_supported_mechs: Option<Vec<String>>,
+    pub speculative_authenticate: Option<Document>,
+    pub max_bson_object_size: Option<i64>,
+    pub max_write_batch_size: Option<i64>,
+}
+
+impl From<TestIsMasterCommandResponse> for IsMasterCommandResponse {
+    fn from(test: TestIsMasterCommandResponse) -> Self {
+        IsMasterCommandResponse {
+            is_master: test.is_master,
+            ok: test.ok,
+            hosts: test.hosts,
+            passives: test.passives,
+            arbiters: test.arbiters,
+            msg: test.msg,
+            me: test.me,
+            set_version: test.set_version,
+            set_name: test.set_name,
+            hidden: test.hidden,
+            secondary: test.secondary,
+            arbiter_only: test.arbiter_only,
+            is_replica_set: test.is_replica_set,
+            logical_session_timeout_minutes: test.logical_session_timeout_minutes,
+            last_write: test.last_write,
+            min_wire_version: test.min_wire_version,
+            max_wire_version: test.max_wire_version,
+            tags: test.tags,
+            election_id: test.election_id,
+            primary: test.primary,
+            sasl_supported_mechs: test.sasl_supported_mechs,
+            speculative_authenticate: test.speculative_authenticate,
+            max_bson_object_size: test.max_bson_object_size.unwrap_or(1234),
+            max_write_batch_size: test.max_write_batch_size.unwrap_or(1234),
+        }
+    }
+}
+
+impl PartialEq for TestIsMasterCommandResponse {
+    fn eq(&self, other: &Self) -> bool {
+        IsMasterCommandResponse::from(self.clone()) == other.clone().into()
+    }
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -159,7 +229,7 @@ async fn run_test(test_file: TestFile) {
                 Err("dummy error".to_string())
             } else {
                 Ok(IsMasterReply {
-                    command_response,
+                    command_response: command_response.into(),
                     round_trip_time: Some(Duration::from_millis(1234)), // Doesn't matter for tests.
                     cluster_time: None,
                 })
@@ -443,7 +513,9 @@ async fn pool_cleared_error_does_not_mark_unknown() {
         "ok": 1,
         "ismaster": true,
         "minWireVersion": 0,
-        "maxWireVersion": 6
+        "maxWireVersion": 6,
+        "maxBsonObjectSize": 16_000,
+        "maxWriteBatchSize": 10_000,
     })
     .unwrap();
 

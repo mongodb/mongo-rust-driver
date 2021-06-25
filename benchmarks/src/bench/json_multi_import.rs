@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use futures::stream::{FuturesUnordered, StreamExt};
-use mongodb::{options::InsertManyOptions, Client, Collection, Database};
+use mongodb::{Client, Collection, Database, bson::Document, options::InsertManyOptions};
 
 use crate::{
     bench::{parse_json_file_to_documents, Benchmark, COLL_NAME, DATABASE_NAME},
@@ -13,7 +13,7 @@ const TOTAL_FILES: usize = 100;
 
 pub struct JsonMultiImportBenchmark {
     db: Database,
-    coll: Collection,
+    coll: Collection<Document>,
     path: PathBuf,
 }
 
@@ -43,7 +43,7 @@ impl Benchmark for JsonMultiImportBenchmark {
 
     async fn before_task(&mut self) -> Result<()> {
         self.coll.drop(None).await?;
-        self.db.create_collection(&COLL_NAME, None).await?;
+        self.db.create_collection(COLL_NAME.as_str(), None).await?;
 
         Ok(())
     }
@@ -68,7 +68,7 @@ impl Benchmark for JsonMultiImportBenchmark {
 
                 docs.append(&mut new_docs);
 
-                let opts = Some(InsertManyOptions::builder().ordered(Some(false)).build());
+                let opts = Some(InsertManyOptions::builder().ordered(false).build());
                 coll_ref.insert_many(docs, opts).await.unwrap();
             });
         }

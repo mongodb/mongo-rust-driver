@@ -1,12 +1,7 @@
 use std::{convert::TryInto, path::PathBuf};
 
 use anyhow::{bail, Result};
-use mongodb::{
-    bson::{doc, Bson},
-    Client,
-    Collection,
-    Database,
-};
+use mongodb::{Client, Collection, Database, bson::{Bson, Document, doc}};
 use serde_json::Value;
 
 use crate::{
@@ -17,7 +12,7 @@ use crate::{
 pub struct FindOneBenchmark {
     db: Database,
     num_iter: usize,
-    coll: Collection,
+    coll: Collection<Document>,
 }
 
 // Specifies the options to a `FindOneBenchmark::setup` operation.

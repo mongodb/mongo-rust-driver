@@ -17,7 +17,7 @@ async fn build() {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
     };
-    let count_op = CountDocuments::new(ns, Some(doc! { "x": 1 }), None);
+    let mut count_op = CountDocuments::new(ns, Some(doc! { "x": 1 }), None);
     let mut count_command = count_op
         .build(&StreamDescription::new_testing())
         .expect("error on build");
@@ -53,7 +53,7 @@ async fn build_with_options() {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
     };
-    let count_op = CountDocuments::new(ns, None, Some(options));
+    let mut count_op = CountDocuments::new(ns, None, Some(options));
     let mut count_command = count_op
         .build(&StreamDescription::new_testing())
         .expect("error on build");

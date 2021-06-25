@@ -42,7 +42,7 @@ impl Operation for Aggregate {
     type O = CursorSpecification;
     const NAME: &'static str = "aggregate";
 
-    fn build(&self, _description: &StreamDescription) -> Result<Command> {
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = doc! {
             Self::NAME: self.target.to_bson(),
             "pipeline": bson_util::to_bson_array(&self.pipeline),
@@ -68,16 +68,18 @@ impl Operation for Aggregate {
         response: CommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
-        let body: CursorBody = response.body()?;
+        let source_address = response.source_address().clone();
 
         if self.is_out_or_merge() {
-            let error_body: WriteConcernOnlyBody = response.body()?;
+            let error_body: WriteConcernOnlyBody = response.clone().body()?;
             error_body.validate()?;
-        }
+        };
+
+        let body: CursorBody = response.body()?;
 
         Ok(CursorSpecification::new(
             body.cursor.ns,
-            response.source_address().clone(),
+            source_address,
             body.cursor.id,
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),

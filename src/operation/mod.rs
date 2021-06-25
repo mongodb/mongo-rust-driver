@@ -66,7 +66,8 @@ pub(crate) trait Operation {
     const NAME: &'static str;
 
     /// Returns the command that should be sent to the server as part of this operation.
-    fn build(&self, description: &StreamDescription) -> Result<Command>;
+    /// The operation may store some additional state that is required for handling the response.
+    fn build(&mut self, description: &StreamDescription) -> Result<Command>;
 
     /// Interprets the server response to the command.
     fn handle_response(
@@ -140,7 +141,7 @@ pub(crate) fn append_options<T: Serialize + Debug>(
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct EmptyBody {}
 
 /// Body of a write response that could possibly have a write concern error but not write errors.
@@ -165,7 +166,7 @@ impl WriteConcernOnlyBody {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct WriteResponseBody<T = EmptyBody> {
     #[serde(flatten)]
     body: T,
@@ -191,6 +192,7 @@ impl<T> WriteResponseBody<T> {
         let failure = BulkWriteFailure {
             write_errors: self.write_errors.clone(),
             write_concern_error: self.write_concern_error.clone(),
+            inserted_ids: Default::default(),
         };
 
         Err(Error::new(

@@ -2,7 +2,7 @@ use std::{convert::TryInto, path::PathBuf};
 
 use anyhow::{bail, Result};
 use futures::stream::StreamExt;
-use mongodb::{bson::Bson, Client, Collection, Database};
+use mongodb::{Client, Collection, Database, bson::{Bson, Document}};
 use serde_json::Value;
 
 use crate::{
@@ -12,7 +12,7 @@ use crate::{
 
 pub struct FindManyBenchmark {
     db: Database,
-    coll: Collection,
+    coll: Collection<Document>,
 }
 
 // Specifies the options to `FindManyBenchmark::setup` operation.

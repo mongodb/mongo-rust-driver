@@ -43,7 +43,7 @@ impl Operation for ListCollections {
     type O = CursorSpecification;
     const NAME: &'static str = "listCollections";
 
-    fn build(&self, _description: &StreamDescription) -> Result<Command> {
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = doc! {
             Self::NAME: 1,
         };
@@ -68,11 +68,12 @@ impl Operation for ListCollections {
         response: CommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
+        let source_address = response.source_address().clone();
         let body: CursorBody = response.body()?;
 
         Ok(CursorSpecification::new(
             body.cursor.ns,
-            response.source_address().clone(),
+            source_address,
             body.cursor.id,
             self.options.as_ref().and_then(|opts| opts.batch_size),
             None,

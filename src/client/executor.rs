@@ -158,7 +158,7 @@ impl Client {
 
         match self
             .execute_operation_on_connection(
-                &op,
+                &mut op,
                 &mut conn,
                 &mut session,
                 txn_number,
@@ -260,7 +260,7 @@ impl Client {
     /// Executes an operation on a given connection, optionally using a provided session.
     async fn execute_operation_on_connection<T: Operation>(
         &self,
-        op: &T,
+        op: &mut T,
         connection: &mut Connection,
         session: &mut Option<&mut ClientSession>,
         txn_number: Option<u64>,
@@ -351,8 +351,9 @@ impl Client {
         });
 
         let start_time = Instant::now();
+        let cmd_name = cmd.name.clone();
 
-        let response_result = match connection.send_command(cmd.clone(), request_id).await {
+        let response_result = match connection.send_command(cmd, request_id).await {
             Ok(response) => {
                 if let Some(cluster_time) = response.cluster_time() {
                     self.inner.topology.advance_cluster_time(cluster_time).await;
@@ -372,7 +373,7 @@ impl Client {
                 self.emit_command_event(|handler| {
                     let command_failed_event = CommandFailedEvent {
                         duration,
-                        command_name: cmd.name,
+                        command_name: cmd_name,
                         failure: err.clone(),
                         request_id,
                         connection: connection_info,
@@ -393,7 +394,7 @@ impl Client {
             Ok(response) => {
                 self.emit_command_event(|handler| {
                     let should_redact =
-                        REDACTED_COMMANDS.contains(cmd.name.to_lowercase().as_str());
+                        REDACTED_COMMANDS.contains(cmd_name.to_lowercase().as_str());
                     let reply = if should_redact {
                         Document::new()
                     } else {
@@ -403,7 +404,7 @@ impl Client {
                     let command_succeeded_event = CommandSucceededEvent {
                         duration,
                         reply,
-                        command_name: cmd.name.clone(),
+                        command_name: cmd_name.clone(),
                         request_id,
                         connection: connection_info,
                     };

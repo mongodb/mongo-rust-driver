@@ -7,7 +7,7 @@ use crate::{
     Namespace,
 };
 
-fn build_test(db_name: &str, list_collections: ListCollections, mut expected_body: Document) {
+fn build_test(db_name: &str, mut list_collections: ListCollections, mut expected_body: Document) {
     let mut cmd = list_collections
         .build(&StreamDescription::new_testing())
         .expect("build should succeed");

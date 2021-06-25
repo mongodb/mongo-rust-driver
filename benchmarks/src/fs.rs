@@ -59,6 +59,14 @@ impl BufReader {
     }
 
     pub(crate) fn lines(self) -> impl Stream<Item = std::io::Result<String>> {
-        self.inner.lines()
+        #[cfg(feature = "tokio-runtime")]
+        {
+            tokio_stream::wrappers::LinesStream::new(self.inner.lines())
+        }
+
+        #[cfg(feature = "async-std-runtime")]
+        {
+            self.inner.lines()
+        }
     }
 }

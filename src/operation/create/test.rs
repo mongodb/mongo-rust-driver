@@ -11,7 +11,7 @@ use crate::{
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build() {
-    let op = Create::new(
+    let mut op = Create::new(
         Namespace {
             db: "test_db".to_string(),
             coll: "test_coll".to_string(),
@@ -47,7 +47,7 @@ async fn build() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_validator() {
     let query = doc! { "x": { "$gt": 1 } };
-    let op = Create::new(
+    let mut op = Create::new(
         Namespace {
             db: "test_db".to_string(),
             coll: "test_coll".to_string(),

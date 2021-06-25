@@ -15,7 +15,7 @@ fn build_test(
     options: Option<FindOptions>,
     mut expected_body: Document,
 ) {
-    let find = Find::new(ns.clone(), filter, options);
+    let mut find = Find::new(ns.clone(), filter, options);
 
     let mut cmd = find.build(&StreamDescription::new_testing()).unwrap();
 
@@ -176,7 +176,7 @@ async fn build_batch_size() {
     let options = FindOptions::builder()
         .batch_size((std::i32::MAX as u32) + 1)
         .build();
-    let op = Find::new(Namespace::empty(), None, Some(options));
+    let mut op = Find::new(Namespace::empty(), None, Some(options));
     assert!(op.build(&StreamDescription::new_testing()).is_err())
 }
 
