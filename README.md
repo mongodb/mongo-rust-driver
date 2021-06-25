@@ -1,7 +1,7 @@
 # MongoDB Rust Driver
 [![Crates.io](https://img.shields.io/crates/v/mongodb.svg)](https://crates.io/crates/mongodb) [![docs.rs](https://docs.rs/mongodb/badge.svg)](https://docs.rs/mongodb) [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-This repository contains the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the [`bson`](https://docs.rs/bson/2.0.0-beta.1) crate for BSON support. The driver contains a fully async API that supports either [`tokio`](https://crates.io/crates/tokio) (default) or [`async-std`](https://crates.io/crates/async-std), depending on the feature flags set. The driver also has a sync API that may be enabled via feature flag. 
+This repository contains the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the [`bson`](https://docs.rs/bson/2.0.0-beta.2) crate for BSON support. The driver contains a fully async API that supports either [`tokio`](https://crates.io/crates/tokio) (default) or [`async-std`](https://crates.io/crates/async-std), depending on the feature flags set. The driver also has a sync API that may be enabled via feature flag. 
 
 ## Index
 - [Installation](#installation)
@@ -38,7 +38,7 @@ issue. For more information, see https://github.com/rust-lang/rust/issues/75992.
 The driver is available on [crates.io](https://crates.io/crates/mongodb). To use the driver in your application, simply add it to your project's `Cargo.toml`.
 ```toml
 [dependencies]
-mongodb = "2.0.0-beta.1"
+mongodb = "2.0.0-beta.2"
 ```
 
 #### Configuring the async runtime
@@ -47,7 +47,7 @@ The driver supports both of the most popular async runtime crates, namely [`toki
 For example, to instruct the driver to work with [`async-std`](https://crates.io/crates/async-std), add the following to your `Cargo.toml`:
 ```toml
 [dependencies.mongodb]
-version = "2.0.0-beta.1"
+version = "2.0.0-beta.2"
 default-features = false
 features = ["async-std-runtime"]
 ```
@@ -56,14 +56,14 @@ features = ["async-std-runtime"]
 The driver also provides a blocking sync API. To enable this, add the `"sync"` feature to your `Cargo.toml`:
 ```toml
 [dependencies.mongodb]
-version = "2.0.0-beta.1"
+version = "2.0.0-beta.2"
 default-features = false
 features = ["sync"]
 ```
 **Note:** if the sync API is enabled, the async-specific types will be privatized (e.g. `mongodb::Client`). The sync-specific types can be imported from `mongodb::sync` (e.g. `mongodb::sync::Client`).
 
 ## Example Usage
-Below are simple examples of using the driver. For more specific examples and the API reference, see the driver's [docs.rs page](https://docs.rs/mongodb/2.0.0-beta.1).
+Below are simple examples of using the driver. For more specific examples and the API reference, see the driver's [docs.rs page](https://docs.rs/mongodb/2.0.0-beta.2).
 
 ### Using the async API
 #### Connecting to a MongoDB deployment
@@ -113,7 +113,7 @@ let docs = vec![
 collection.insert_many(docs, None).await?;
 ```
 
-A [`Collection`](https://docs.rs/mongodb/2.0.0-beta.1/mongodb/struct.Collection.html) can be parameterized with any type that implements the `Serialize` and `Deserialize` traits from the [`serde`](https://serde.rs/) crate, not just `Document`:
+A [`Collection`](https://docs.rs/mongodb/2.0.0-beta.2/mongodb/struct.Collection.html) can be parameterized with any type that implements the `Serialize` and `Deserialize` traits from the [`serde`](https://serde.rs/) crate, not just `Document`:
 
 ``` toml
 # In Cargo.toml, add the following dependency.
@@ -150,7 +150,7 @@ typed_collection.insert_many(books, None).await?;
 ```
 
 #### Finding documents in a collection
-Results from queries are generally returned via [`Cursor`](https://docs.rs/mongodb/2.0.0-beta.1/mongodb/struct.Cursor.html), a struct which streams the results back from the server as requested. The [`Cursor`](https://docs.rs/mongodb/2.0.0-beta/mongodb/struct.Cursor.html) type implements the [`Stream`](https://docs.rs/futures/latest/futures/stream/index.html) trait from the [`futures`](https://crates.io/crates/futures) crate, and in order to access its streaming functionality you need to import at least one of the [`StreamExt`](https://docs.rs/futures/latest/futures/stream/trait.StreamExt.html) or [`TryStreamExt`](https://docs.rs/futures/latest/futures/stream/trait.TryStreamExt.html) traits. 
+Results from queries are generally returned via [`Cursor`](https://docs.rs/mongodb/2.0.0-beta.2/mongodb/struct.Cursor.html), a struct which streams the results back from the server as requested. The [`Cursor`](https://docs.rs/mongodb/2.0.0-beta.2/mongodb/struct.Cursor.html) type implements the [`Stream`](https://docs.rs/futures/latest/futures/stream/index.html) trait from the [`futures`](https://crates.io/crates/futures) crate, and in order to access its streaming functionality you need to import at least one of the [`StreamExt`](https://docs.rs/futures/latest/futures/stream/trait.StreamExt.html) or [`TryStreamExt`](https://docs.rs/futures/latest/futures/stream/trait.TryStreamExt.html) traits. 
 
 ``` toml
 # In Cargo.toml, add the following dependency.
