@@ -1014,7 +1014,7 @@ async fn assert_options_inherited(client: &EventClient, command_name: &str) {
 #[function_name::named]
 async fn drop_skip_serializing_none() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-    
+
     let client = TestClient::new().await;
     let coll: Collection<Document> = client
         .database(function_name!())

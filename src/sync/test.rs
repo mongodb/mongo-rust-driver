@@ -38,9 +38,7 @@ where
 
 #[test]
 fn client_options() {
-    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async {
-        LOCK.run_concurrently().await
-    });
+    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
 
     let mut options = ClientOptions::parse("mongodb://localhost:27017/").unwrap();
 
@@ -60,9 +58,7 @@ fn client_options() {
 #[test]
 #[function_name::named]
 fn client() {
-    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async {
-        LOCK.run_concurrently().await
-    });
+    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
 
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
@@ -82,9 +78,7 @@ fn client() {
 #[test]
 #[function_name::named]
 fn database() {
-    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async {
-        LOCK.run_concurrently().await
-    });
+    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
 
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
@@ -129,9 +123,7 @@ fn database() {
 #[test]
 #[function_name::named]
 fn collection() {
-    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async {
-        LOCK.run_concurrently().await
-    });
+    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
 
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
@@ -184,9 +176,7 @@ fn collection() {
 #[test]
 #[function_name::named]
 fn typed_collection() {
-    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async {
-        LOCK.run_concurrently().await
-    });
+    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
 
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
@@ -208,9 +198,7 @@ fn typed_collection() {
 #[test]
 #[function_name::named]
 fn transactions() {
-    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async {
-        LOCK.run_concurrently().await
-    });
+    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
 
     let should_skip = RUNTIME.block_on(async {
         let test_client = AsyncTestClient::new().await;
@@ -255,9 +243,7 @@ fn transactions() {
 #[test]
 #[function_name::named]
 fn collection_generic_bounds() {
-    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async {
-        LOCK.run_concurrently().await
-    });
+    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
 
     #[derive(Deserialize)]
     struct Foo;
