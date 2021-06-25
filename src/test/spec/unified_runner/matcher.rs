@@ -14,7 +14,11 @@ pub fn results_match(
     results_match_inner(actual, expected, returns_root_documents, true, entities)
 }
 
-pub fn events_match(actual: &TestEvent, expected: &TestEvent) -> bool {
+pub fn events_match(
+    actual: &TestEvent,
+    expected: &TestEvent,
+    entities: Option<&EntityMap>,
+) -> bool {
     match (actual, expected) {
         (
             TestEvent::Started {
@@ -42,7 +46,7 @@ pub fn events_match(actual: &TestEvent, expected: &TestEvent) -> bool {
                     actual_command.as_ref(),
                     &Bson::Document(expected_command.clone()),
                     false,
-                    None,
+                    entities,
                 )
             } else {
                 true
@@ -181,8 +185,8 @@ fn special_operator_matches(
         "$$exists" => value.as_bool().unwrap() == actual.is_some(),
         "$$type" => type_matches(value, actual.unwrap()),
         "$$unsetOrMatches" => {
-            if let Some(bson) = actual {
-                results_match_inner(Some(value), bson, false, false, entities)
+            if actual.is_some() {
+                results_match_inner(actual, value, false, false, entities)
             } else {
                 true
             }
@@ -192,7 +196,20 @@ fn special_operator_matches(
             entity_matches(id, actual, entities.unwrap())
         }
         "$$matchesHexBytes" => panic!("GridFS not implemented"),
-        "$$sessionLsid" => panic!("Explicit sessions not implemented"),
+        "$$sessionLsid" => match entities {
+            Some(entity_map) => {
+                let session_id = value.as_str().unwrap();
+                let session = entity_map.get(session_id).unwrap().as_session_entity();
+                results_match_inner(
+                    actual,
+                    &Bson::from(session.lsid.clone()),
+                    false,
+                    false,
+                    entities,
+                )
+            }
+            None => panic!("Could not find entity: {}", value),
+        },
         other => panic!("unknown special operator: {}", other),
     }
 }

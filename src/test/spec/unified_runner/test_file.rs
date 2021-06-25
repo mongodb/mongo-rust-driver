@@ -7,7 +7,7 @@ use super::{Operation, TestEvent};
 
 use crate::{
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
-    client::options::ServerApi,
+    client::options::{ServerApi, SessionOptions},
     concern::{Acknowledgment, ReadConcernLevel},
     error::Error,
     options::{
@@ -205,7 +205,7 @@ pub struct Collection {
 pub struct Session {
     pub id: String,
     pub client: String,
-    pub session_options: Option<Document>,
+    pub session_options: Option<SessionOptions>,
 }
 
 #[derive(Debug, Deserialize)]

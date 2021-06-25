@@ -11,7 +11,7 @@ use crate::{
     Database,
 };
 
-use super::{ClientEntity, CollectionData, Entity, TestFileEntity};
+use super::{ClientEntity, CollectionData, Entity, SessionEntity, TestFileEntity};
 
 pub type EntityMap = HashMap<String, Entity>;
 
@@ -115,8 +115,14 @@ impl TestRunner {
                     };
                     (id, collection.into())
                 }
-                TestFileEntity::Session(_) => {
-                    panic!("Explicit sessions not implemented");
+                TestFileEntity::Session(session) => {
+                    let id = session.id.clone();
+                    let client = self.get_client(&session.client);
+                    let client_session = client
+                        .start_session(session.session_options.clone())
+                        .await
+                        .unwrap();
+                    (id, Entity::Session(SessionEntity::new(client_session)))
                 }
                 TestFileEntity::Bucket(_) => {
                     panic!("GridFS not implemented");
@@ -138,5 +144,13 @@ impl TestRunner {
 
     pub fn get_collection(&self, id: &str) -> &Collection<Document> {
         self.entities.get(id).unwrap().as_collection()
+    }
+
+    pub fn get_session(&self, id: &str) -> &SessionEntity {
+        self.entities.get(id).unwrap().as_session_entity()
+    }
+
+    pub fn get_mut_session(&mut self, id: &str) -> &mut SessionEntity {
+        self.entities.get_mut(id).unwrap().as_mut_session_entity()
     }
 }

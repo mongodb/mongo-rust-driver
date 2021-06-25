@@ -5,6 +5,8 @@ mod test_event;
 mod test_file;
 mod test_runner;
 
+use std::time::Duration;
+
 use futures::stream::TryStreamExt;
 use semver::Version;
 use tokio::sync::RwLockWriteGuard;
@@ -13,10 +15,11 @@ use crate::{
     bson::{doc, Document},
     options::{CollectionOptions, FindOptions, ReadConcern, ReadPreference, SelectionCriteria},
     test::{run_spec_test, LOCK},
+    RUNTIME,
 };
 
 pub use self::{
-    entity::{ClientEntity, Entity},
+    entity::{ClientEntity, Entity, SessionEntity},
     matcher::{events_match, results_match},
     operation::{Operation, OperationObject},
     test_event::TestEvent,
@@ -34,8 +37,11 @@ pub use self::{
 static SPEC_VERSIONS: &[Version] = &[Version::new(1, 0, 0), Version::new(1, 1, 0)];
 
 const SKIPPED_OPERATIONS: &[&str] = &[
+    "assertIndexExists",
+    "assertIndexNotExists",
     "bulkWrite",
     "count",
+    "createIndex",
     "download",
     "download_by_name",
     "listCollectionObjects",
@@ -43,9 +49,6 @@ const SKIPPED_OPERATIONS: &[&str] = &[
     "listIndexNames",
     "listIndexes",
     "mapReduce",
-    "startTransaction",
-    "abortTransaction",
-    "commitTransaction",
     "watch",
 ];
 
@@ -70,6 +73,15 @@ pub async fn run_unified_format_test(test_file: TestFile) {
     let mut test_runner = TestRunner::new().await;
 
     if let Some(requirements) = test_file.run_on_requirements {
+        // TODO RUST-122: Unskip this test on sharded clusters
+        if test_runner.internal_client.is_sharded() && test_file.description == "poc-transactions" {
+            println!(
+                "Skipping {}: sharded transactions not supported",
+                &test_file.description
+            );
+            return;
+        }
+
         let mut can_run_on = false;
         for requirement in requirements {
             if requirement.can_run_on(&test_runner.internal_client).await {
@@ -185,6 +197,14 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                     }
                 }
             }
+            // This test (in src/test/spec/json/sessions/server-support.json) runs two
+            // operations with implicit sessions in sequence and then checks to see if they
+            // used the same lsid. We delay for one second to ensure that the
+            // implicit session used in the first operation is returned to the pool before
+            // the second operation is executed.
+            if test_case.description == "Server supports implicit sessions" {
+                RUNTIME.delay_for(Duration::from_secs(1)).await;
+            }
         }
 
         test_runner.fail_point_guards.clear();
@@ -205,7 +225,7 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                 assert_eq!(actual_events.len(), expected_events.len());
 
                 for (actual, expected) in actual_events.iter().zip(expected_events) {
-                    assert!(events_match(actual, expected));
+                    assert!(events_match(actual, expected, Some(&test_runner.entities)));
                 }
             }
         }

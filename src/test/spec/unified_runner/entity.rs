@@ -1,9 +1,14 @@
-use std::{ops::Deref, sync::Arc};
+use std::{
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use crate::{
     bson::{Bson, Document},
+    event::command::CommandStartedEvent,
     test::{CommandEvent, EventHandler},
     Client,
+    ClientSession,
     Collection,
     Database,
 };
@@ -13,6 +18,7 @@ pub enum Entity {
     Client(ClientEntity),
     Database(Database),
     Collection(Collection<Document>),
+    Session(SessionEntity),
     Bson(Bson),
     None,
 }
@@ -23,6 +29,12 @@ pub struct ClientEntity {
     observer: Arc<EventHandler>,
     pub observe_events: Option<Vec<String>>,
     pub ignore_command_names: Option<Vec<String>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct SessionEntity {
+    pub lsid: Document,
+    pub client_session: Option<Box<ClientSession>>,
 }
 
 impl ClientEntity {
@@ -72,6 +84,11 @@ impl ClientEntity {
             true
         })
     }
+
+    /// Gets all events of type commandStartedEvent, excluding configureFailPoint events.
+    pub fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
+        self.observer.get_all_command_started_events()
+    }
 }
 
 impl From<Database> for Entity {
@@ -100,6 +117,33 @@ impl Deref for ClientEntity {
     }
 }
 
+impl SessionEntity {
+    pub fn new(client_session: ClientSession) -> Self {
+        let lsid = client_session.id().clone();
+        Self {
+            client_session: Some(Box::new(client_session)),
+            lsid,
+        }
+    }
+}
+
+impl Deref for SessionEntity {
+    type Target = ClientSession;
+    fn deref(&self) -> &Self::Target {
+        self.client_session
+            .as_ref()
+            .unwrap_or_else(|| panic!("Tried to access dropped client session from entity map"))
+    }
+}
+
+impl DerefMut for SessionEntity {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.client_session
+            .as_mut()
+            .unwrap_or_else(|| panic!("Tried to access dropped client session from entity map"))
+    }
+}
+
 impl Entity {
     pub fn as_client(&self) -> &ClientEntity {
         match self {
@@ -119,6 +163,20 @@ impl Entity {
         match self {
             Self::Collection(collection) => collection,
             _ => panic!("Expected collection entity, got {:?}", &self),
+        }
+    }
+
+    pub fn as_session_entity(&self) -> &SessionEntity {
+        match self {
+            Self::Session(client_session) => client_session,
+            _ => panic!("Expected client session entity, got {:?}", &self),
+        }
+    }
+
+    pub fn as_mut_session_entity(&mut self) -> &mut SessionEntity {
+        match self {
+            Self::Session(client_session) => client_session,
+            _ => panic!("Expected mutable client session entity, got {:?}", &self),
         }
     }
 
