@@ -1013,6 +1013,8 @@ async fn assert_options_inherited(client: &EventClient, command_name: &str) {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn drop_skip_serializing_none() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+    
     let client = TestClient::new().await;
     let coll: Collection<Document> = client
         .database(function_name!())
@@ -1025,6 +1027,8 @@ async fn drop_skip_serializing_none() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn collection_generic_bounds() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
     #[derive(Deserialize)]
     struct Foo;
 
