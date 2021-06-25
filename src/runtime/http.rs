@@ -10,16 +10,14 @@ use hyper::{
     Response,
 };
 #[cfg(feature = "tokio-runtime")]
-use hyper_rustls::HttpsConnector;
-#[cfg(feature = "tokio-runtime")]
 use serde::Deserialize;
 #[cfg(feature = "tokio-runtime")]
 use serde_json::Error as SerdeError;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct HttpClient {
     #[cfg(feature = "tokio-runtime")]
-    inner: HyperClient<HttpsConnector<HttpConnector>>,
+    inner: HyperClient<HttpConnector>,
 }
 
 #[cfg(feature = "tokio-runtime")]
@@ -106,19 +104,6 @@ impl HttpClient {
         let response = self.inner.request(request).await?;
 
         Ok(response)
-    }
-}
-
-impl Default for HttpClient {
-    fn default() -> Self {
-        #[cfg(feature = "tokio-runtime")]
-        let connector = hyper_rustls::HttpsConnector::with_webpki_roots();
-        #[cfg(feature = "tokio-runtime")]
-        let client = HyperClient::builder().build(connector);
-        Self {
-            #[cfg(feature = "tokio-runtime")]
-            inner: client,
-        }
     }
 }
 

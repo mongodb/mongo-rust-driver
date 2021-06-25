@@ -21,7 +21,7 @@ exclude = [
 
 [features]
 default = ["tokio-runtime"]
-tokio-runtime = ["tokio/macros", "tokio/net", "tokio/rt", "tokio/time", "hyper", "hyper-rustls", "serde_bytes", "serde_json"]
+tokio-runtime = ["tokio/macros", "tokio/net", "tokio/rt", "tokio/time", "hyper", "serde_bytes", "serde_json"]
 async-std-runtime = ["async-std", "async-std/attributes", "async-std-resolver", "tokio-util/compat"]
 sync = ["async-std-runtime"]
 # The bson/u2i feature enables automatic conversion from unsigned to signed types during
@@ -47,8 +47,7 @@ futures-util = { version = "0.3.14", features = ["io"] }
 futures-executor = "0.3.14"
 hex = "0.4.0"
 hmac = "0.10.1"
-hyper = { version = "0.14", default-features = false, features = ["client", "http1", "http2", "runtime"], optional = true }
-hyper-rustls = { version = "0.22", default-features = false, features = ["webpki-tokio"], optional = true }
+hyper = { version = "0.14", default-features = false, features = ["client", "http1", "runtime"], optional = true }
 lazy_static = "1.4.0"
 md-5 = "0.9.1"
 os_info = { version = "3.0.1", default-features = false }
