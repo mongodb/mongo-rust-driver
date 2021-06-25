@@ -118,7 +118,8 @@ impl Deref for ClientEntity {
 }
 
 impl SessionEntity {
-    pub fn new(client_session: ClientSession, lsid: Document) -> Self {
+    pub fn new(client_session: ClientSession) -> Self {
+        let lsid = client_session.id().clone();
         Self {
             client_session: Some(Box::new(client_session)),
             lsid,
