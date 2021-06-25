@@ -26,7 +26,13 @@ use crate::{
         Retryability,
     },
     options::SelectionCriteria,
-    sdam::{HandshakePhase, SelectedServer, SessionSupportStatus, TransactionSupportStatus},
+    sdam::{
+        HandshakePhase,
+        SelectedServer,
+        ServerType,
+        SessionSupportStatus,
+        TransactionSupportStatus,
+    },
     selection_criteria::ReadPreference,
 };
 
@@ -126,7 +132,13 @@ impl Client {
             }
         }
 
-        let server = match self.select_server(op.selection_criteria()).await {
+        let selection_criteria = if let Some(session) = &session {
+            session.pinned_session.as_ref().or(op.selection_criteria())
+        } else {
+            op.selection_criteria()
+        };
+
+        let server = match self.select_server(selection_criteria).await {
             Ok(server) => server,
             Err(mut err) => {
                 err.add_labels(None, &session, None)?;
@@ -277,7 +289,8 @@ impl Client {
             wc.validate()?;
         }
 
-        let mut cmd = op.build(connection.stream_description()?)?;
+        let stream_description = connection.stream_description()?;
+        let mut cmd = op.build(stream_description)?;
         self.inner
             .topology
             .update_command_with_read_pref(connection.address(), &mut cmd, op.selection_criteria())
@@ -315,6 +328,9 @@ impl Client {
                         cmd.set_start_transaction();
                         cmd.set_autocommit();
                         cmd.set_txn_read_concern(*session)?;
+                        if stream_description.initial_server_type == ServerType::Mongos {
+                            session.pin_mongos(connection.address().clone());
+                        }
                         session.transaction.state = TransactionState::InProgress;
                     }
                     TransactionState::InProgress

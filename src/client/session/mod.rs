@@ -5,6 +5,7 @@ mod test;
 
 use std::{
     collections::HashSet,
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -16,12 +17,15 @@ use crate::{
     error::{ErrorKind, Result},
     operation::{AbortTransaction, CommitTransaction, Operation},
     options::{SessionOptions, TransactionOptions},
-    sdam::TransactionSupportStatus,
+    sdam::{ServerInfo, TransactionSupportStatus},
+    selection_criteria::SelectionCriteria,
     Client,
     RUNTIME,
 };
 pub(crate) use cluster_time::ClusterTime;
 pub(super) use pool::ServerSessionPool;
+
+use super::options::ServerAddress;
 
 lazy_static! {
     pub(crate) static ref SESSIONS_UNSUPPORTED_COMMANDS: HashSet<&'static str> = {
@@ -105,6 +109,7 @@ pub struct ClientSession {
     client: Client,
     is_implicit: bool,
     options: Option<SessionOptions>,
+    pub(crate) pinned_session: Option<SelectionCriteria>,
     pub(crate) transaction: Transaction,
     pub(crate) snapshot_time: Option<Timestamp>,
 }
@@ -173,6 +178,7 @@ impl ClientSession {
             cluster_time: None,
             is_implicit,
             options,
+            pinned_session: None,
             transaction: Default::default(),
             snapshot_time: None,
         }
@@ -243,6 +249,13 @@ impl ClientSession {
     pub(crate) fn get_and_increment_txn_number(&mut self) -> u64 {
         self.server_session.txn_number += 1;
         self.server_session.txn_number
+    }
+
+    /// Pin mongos to session.
+    pub(crate) fn pin_mongos(&mut self, address: ServerAddress) {
+        self.pinned_session = Some(SelectionCriteria::Predicate(Arc::new(
+            move |server_info: &ServerInfo| *server_info.address() == address,
+        )));
     }
 
     /// Whether this session is dirty.
@@ -510,6 +523,7 @@ impl From<DroppedClientSession> for ClientSession {
             client: dropped_session.client,
             is_implicit: dropped_session.is_implicit,
             options: dropped_session.options,
+            pinned_session: None,
             transaction: dropped_session.transaction,
             snapshot_time: dropped_session.snapshot_time,
         }
