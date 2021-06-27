@@ -2,17 +2,18 @@
 use hyper::{
     body::{self, Buf},
     client::HttpConnector,
+    header::LOCATION,
     Body,
     Client as HyperClient,
-    Error as HyperError,
     Method,
     Request,
     Response,
+    Uri,
 };
 #[cfg(feature = "tokio-runtime")]
 use serde::Deserialize;
 #[cfg(feature = "tokio-runtime")]
-use serde_json::Error as SerdeError;
+use std::{error::Error, future::Future, pin::Pin, str::FromStr};
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct HttpClient {
@@ -21,26 +22,19 @@ pub(crate) struct HttpClient {
 }
 
 #[cfg(feature = "tokio-runtime")]
-#[derive(Debug)]
-pub(crate) enum HttpError {
-    BuildingRequest,
-    Request(HyperError),
-    InvalidUTF8,
-    Parsing(SerdeError),
-}
-
-#[cfg(feature = "tokio-runtime")]
 impl HttpClient {
     /// Executes an HTTP GET request and deserializes the JSON response.
     pub(crate) async fn get_and_deserialize_json<'a, T>(
         &self,
         uri: &str,
-        headers: impl IntoIterator<Item = &'a (&'a str, &'a str)>,
-    ) -> Result<T, HttpError>
+        headers: &'a [(&'a str, &'a str)],
+    ) -> Result<T, Box<dyn Error>>
     where
         T: for<'de> Deserialize<'de>,
     {
-        let res = self.request(Method::GET, uri, headers).await?;
+        let res = self
+            .request(Method::GET, Uri::from_str(uri)?, headers)
+            .await?;
 
         let mut buf = body::aggregate(res.into_body()).await?;
         let mut bytes = vec![0; buf.remaining()];
@@ -54,8 +48,8 @@ impl HttpClient {
     pub(crate) async fn get_and_read_string<'a>(
         &self,
         uri: &str,
-        headers: impl IntoIterator<Item = &'a (&'a str, &'a str)>,
-    ) -> Result<String, HttpError> {
+        headers: &'a [(&'a str, &'a str)],
+    ) -> Result<String, Box<dyn Error>> {
         self.request_and_read_string(Method::GET, uri, headers)
             .await
     }
@@ -64,8 +58,8 @@ impl HttpClient {
     pub(crate) async fn put_and_read_string<'a>(
         &self,
         uri: &str,
-        headers: impl IntoIterator<Item = &'a (&'a str, &'a str)>,
-    ) -> Result<String, HttpError> {
+        headers: &'a [(&'a str, &'a str)],
+    ) -> Result<String, Box<dyn Error>> {
         self.request_and_read_string(Method::PUT, uri, headers)
             .await
     }
@@ -75,9 +69,9 @@ impl HttpClient {
         &self,
         method: Method,
         uri: &str,
-        headers: impl IntoIterator<Item = &'a (&'a str, &'a str)>,
-    ) -> Result<String, HttpError> {
-        let res = self.request(method, uri, headers).await?;
+        headers: &'a [(&'a str, &'a str)],
+    ) -> Result<String, Box<dyn Error>> {
+        let res = self.request(method, Uri::from_str(uri)?, headers).await?;
 
         let mut buf = body::aggregate(res.into_body()).await?;
         let mut bytes = vec![0; buf.remaining()];
@@ -87,50 +81,38 @@ impl HttpClient {
         Ok(text)
     }
 
+    #[allow(clippy::type_complexity)]
     /// Executes an HTTP equest and returns the response.
-    pub(crate) async fn request<'a>(
-        &self,
+    pub(crate) fn request<'a>(
+        &'a self,
         method: Method,
-        uri: &str,
-        headers: impl IntoIterator<Item = &'a (&'a str, &'a str)>,
-    ) -> Result<Response<Body>, HttpError> {
-        let mut request = Request::builder().uri(uri).method(method);
+        uri: Uri,
+        headers: &'a [(&'a str, &'a str)],
+    ) -> Pin<Box<dyn Future<Output = Result<Response<Body>, Box<dyn Error>>> + 'a + Send>> {
+        Box::pin(async move {
+            let mut request = Request::builder().uri(&uri).method(&method);
 
-        for header in headers {
-            request = request.header(header.0, header.1);
-        }
+            for header in headers {
+                request = request.header(header.0, header.1);
+            }
 
-        let request = request.body(Body::empty())?;
-        let response = self.inner.request(request).await?;
+            let request = request.body(Body::empty())?;
+            let response = self.inner.request(request).await?;
 
-        Ok(response)
-    }
-}
+            if response.status().is_redirection() {
+                if let Some(Ok(location)) = response.headers().get(LOCATION).map(|u| u.to_str()) {
+                    if let (Some(scheme), Some(authority)) = (uri.scheme_str(), uri.authority()) {
+                        let uri = Uri::builder()
+                            .scheme(scheme)
+                            .authority(authority.as_str())
+                            .path_and_query(location)
+                            .build()?;
+                        return self.request(method, uri, headers).await;
+                    }
+                }
+            }
 
-#[cfg(feature = "tokio-runtime")]
-impl From<hyper::http::Error> for HttpError {
-    fn from(_err: hyper::http::Error) -> Self {
-        Self::BuildingRequest
-    }
-}
-
-#[cfg(feature = "tokio-runtime")]
-impl From<HyperError> for HttpError {
-    fn from(err: HyperError) -> Self {
-        Self::Request(err)
-    }
-}
-
-#[cfg(feature = "tokio-runtime")]
-impl From<SerdeError> for HttpError {
-    fn from(err: SerdeError) -> Self {
-        Self::Parsing(err)
-    }
-}
-
-#[cfg(feature = "tokio-runtime")]
-impl From<std::string::FromUtf8Error> for HttpError {
-    fn from(_err: std::string::FromUtf8Error) -> Self {
-        Self::InvalidUTF8
+            Ok(response)
+        })
     }
 }

@@ -182,7 +182,7 @@ impl AwsCredential {
         let uri = format!("http://{}/{}", AWS_ECS_IP, relative_uri);
 
         http_client
-            .get_and_deserialize_json(&uri, None)
+            .get_and_deserialize_json(&uri, &[])
             .await
             .map_err(|_| Error::unknown_authentication_error("MONGODB-AWS"))
     }
