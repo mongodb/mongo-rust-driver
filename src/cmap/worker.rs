@@ -148,7 +148,9 @@ impl ConnectionPoolWorker {
         options: Option<ConnectionPoolOptions>,
     ) -> (PoolManager, ConnectionRequester, PoolGenerationSubscriber) {
         let establisher = ConnectionEstablisher::new(http_client, options.as_ref());
-        let event_handler = options.as_ref().and_then(|opts| opts.event_handler.clone());
+        let event_handler = options
+            .as_ref()
+            .and_then(|opts| opts.cmap_event_handler.clone());
 
         // The CMAP spec indicates that a max idle time of zero means that connections should not be
         // closed due to idleness.

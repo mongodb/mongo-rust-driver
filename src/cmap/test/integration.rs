@@ -6,9 +6,10 @@ use super::{
     EVENT_TIMEOUT,
 };
 use crate::{
-    bson::doc,
+    bson::{doc, Document},
     cmap::{options::ConnectionPoolOptions, Command, ConnectionPool},
     event::cmap::{CmapEventHandler, ConnectionClosedReason},
+    operation::CommandResponse,
     sdam::ServerUpdateSender,
     selection_criteria::ReadPreference,
     test::{FailCommandOptions, FailPoint, FailPointMode, TestClient, CLIENT_OPTIONS, LOCK},
@@ -55,13 +56,11 @@ async fn acquire_connection_and_send_command() {
     }
 
     let response = connection.send_command(cmd, None).await.unwrap();
-    let doc_response = response.into_document_response().unwrap();
+    let doc_response: CommandResponse<Document> = response.body().unwrap();
 
-    doc_response
-        .validate()
-        .expect("response should be successful");
+    assert!(doc_response.is_success());
 
-    let response: ListDatabasesResponse = doc_response.body().unwrap();
+    let response: ListDatabasesResponse = bson::from_document(doc_response.body).unwrap();
 
     let names: Vec<_> = response
         .databases
@@ -107,7 +106,7 @@ async fn concurrent_connections() {
     let handler = Arc::new(EventHandler::new());
     let client_options = CLIENT_OPTIONS.clone();
     let mut options = ConnectionPoolOptions::from_client_options(&client_options);
-    options.event_handler = Some(handler.clone() as Arc<dyn crate::cmap::CmapEventHandler>);
+    options.cmap_event_handler = Some(handler.clone() as Arc<dyn crate::cmap::CmapEventHandler>);
     options.ready = Some(true);
 
     let pool = ConnectionPool::new(
@@ -191,7 +190,7 @@ async fn connection_error_during_establishment() {
 
     let mut options = ConnectionPoolOptions::from_client_options(&client_options);
     options.ready = Some(true);
-    options.event_handler = Some(handler.clone() as Arc<dyn crate::cmap::CmapEventHandler>);
+    options.cmap_event_handler = Some(handler.clone() as Arc<dyn crate::cmap::CmapEventHandler>);
     let pool = ConnectionPool::new(
         client_options.hosts[0].clone(),
         Default::default(),

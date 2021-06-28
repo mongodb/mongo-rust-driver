@@ -188,7 +188,13 @@ impl HeartbeatMonitor {
         let result = match self.connection {
             Some(ref mut conn) => {
                 let command = is_master_command(self.client_options.server_api.as_ref());
-                run_is_master(command, conn).await
+                run_is_master(
+                    conn,
+                    command,
+                    Some(&self.topology),
+                    &self.client_options.sdam_event_handler,
+                )
+                .await
             }
             None => {
                 let mut connection = Connection::connect_monitoring(
@@ -200,7 +206,11 @@ impl HeartbeatMonitor {
 
                 let res = self
                     .handshaker
-                    .handshake(&mut connection)
+                    .handshake(
+                        &mut connection,
+                        Some(&self.topology),
+                        &self.client_options.sdam_event_handler,
+                    )
                     .await
                     .map(|r| r.is_master_reply);
                 self.connection = Some(connection);

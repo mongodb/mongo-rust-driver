@@ -4,7 +4,7 @@ mod lock;
 mod matchable;
 
 pub use self::{
-    event::{CmapEvent, CommandEvent, Event, EventClient, EventHandler},
+    event::{CmapEvent, CommandEvent, Event, EventClient, EventHandler, SdamEvent},
     failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     lock::TestLock,
     matchable::{assert_matches, Matchable},
@@ -57,15 +57,15 @@ impl TestClient {
     }
 
     async fn with_handler(
-        event_handler: Option<EventHandler>,
+        event_handler: Option<Arc<EventHandler>>,
         options: impl Into<Option<ClientOptions>>,
     ) -> Self {
         let mut options = options.into().unwrap_or_else(|| CLIENT_OPTIONS.clone());
 
-        if let Some(event_handler) = event_handler {
-            let handler = Arc::new(event_handler);
+        if let Some(handler) = event_handler {
             options.command_event_handler = Some(handler.clone());
-            options.cmap_event_handler = Some(handler);
+            options.cmap_event_handler = Some(handler.clone());
+            options.sdam_event_handler = Some(handler);
         }
 
         let client = Client::with_options(options.clone()).unwrap();

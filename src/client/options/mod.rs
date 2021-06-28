@@ -43,7 +43,7 @@ use crate::{
     client::auth::{AuthMechanism, Credential},
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::{ErrorKind, Result},
-    event::{cmap::CmapEventHandler, command::CommandEventHandler},
+    event::{cmap::CmapEventHandler, command::CommandEventHandler, sdam::SdamEventHandler},
     options::ReadConcernLevel,
     sdam::MIN_HEARTBEAT_FREQUENCY,
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
@@ -492,6 +492,13 @@ pub struct ClientOptions {
     #[builder(default)]
     pub retry_writes: Option<bool>,
 
+    /// The handler that should process all Server Discovery and Monitoring events. See the
+    /// [`SdamEventHandler`] type documentation for more details.
+    #[derivative(Debug = "ignore", PartialEq = "ignore")]
+    #[builder(default)]
+    #[serde(skip)]
+    pub sdam_event_handler: Option<Arc<dyn SdamEventHandler>>,
+
     /// The default selection criteria for operations performed on the Client. See the
     /// SelectionCriteria type documentation for more details.
     #[builder(default)]
@@ -934,6 +941,7 @@ impl From<ClientOptionsParser> for ClientOptions {
             heartbeat_freq_test: None,
             allow_load_balanced: false,
             load_balanced: parser.load_balanced,
+            sdam_event_handler: None,
         }
     }
 }

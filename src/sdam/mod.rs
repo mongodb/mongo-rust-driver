@@ -8,17 +8,17 @@ mod state;
 #[cfg(test)]
 mod test;
 
-pub use self::public::{ServerInfo, ServerType};
+pub use self::public::{ServerInfo, ServerType, TopologyType};
 
-#[cfg(test)]
-pub(crate) use self::description::server::ServerDescription;
 pub(crate) use self::{
-    description::topology::{
-        server_selection::SelectedServer,
-        SessionSupportStatus,
-        TopologyDescription,
-        TopologyType,
-        TransactionSupportStatus,
+    description::{
+        server::ServerDescription,
+        topology::{
+            server_selection::SelectedServer,
+            SessionSupportStatus,
+            TopologyDescription,
+            TransactionSupportStatus,
+        },
     },
     message_manager::TopologyMessageManager,
     monitor::MIN_HEARTBEAT_FREQUENCY,
@@ -26,5 +26,6 @@ pub(crate) use self::{
         server::{Server, ServerUpdate, ServerUpdateReceiver, ServerUpdateSender},
         HandshakePhase,
         Topology,
+        WeakTopology,
     },
 };

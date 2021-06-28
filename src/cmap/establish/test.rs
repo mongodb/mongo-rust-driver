@@ -1,8 +1,9 @@
 use tokio::sync::RwLockWriteGuard;
 
 use crate::{
-    bson::{doc, Bson},
+    bson::{doc, Bson, Document},
     cmap::{establish::Handshaker, Command, Connection, ConnectionPoolOptions},
+    operation::CommandResponse,
     options::{AuthMechanism, ClientOptions, Credential, ReadPreference},
     test::{TestClient, CLIENT_OPTIONS, LOCK},
 };
@@ -47,7 +48,11 @@ async fn speculative_auth_test(
         .await
         .unwrap();
 
-    let first_round = handshaker.handshake(&mut conn).await.unwrap().first_round;
+    let first_round = handshaker
+        .handshake(&mut conn, None, &None)
+        .await
+        .unwrap()
+        .first_round;
 
     // We expect that the server will return a response with the `speculativeAuthenticate` field if
     // and only if it's new enough to support it.
@@ -70,11 +75,9 @@ async fn speculative_auth_test(
     });
 
     let response = conn.send_command(command, None).await.unwrap();
-    let doc_response = response.into_document_response().unwrap();
+    let doc_response: CommandResponse<Document> = response.body().unwrap();
 
-    doc_response
-        .validate()
-        .expect("response should be successful");
+    assert!(doc_response.is_success());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

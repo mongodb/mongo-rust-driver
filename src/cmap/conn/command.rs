@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use serde::{de::DeserializeOwned, Serialize};
 
 use super::wire::Message;
@@ -5,7 +7,8 @@ use crate::{
     bson::Document,
     client::{options::ServerApi, ClusterTime},
     error::{Error, ErrorKind, Result},
-    operation::{CommandErrorBody, CommandResponse},
+    is_master::{IsMasterCommandResponse, IsMasterReply},
+    operation::{CommandErrorBody, CommandResponse, Response},
     options::{ReadConcern, ServerAddress},
     selection_criteria::ReadPreference,
     ClientSession,
@@ -168,53 +171,33 @@ impl RawCommandResponse {
             .map_err(|_| Error::invalid_authentication_response(mechanism_name))
     }
 
-    /// Deserialize the raw bytes into a response backed by a `Document` for further processing.
-    pub(crate) fn into_document_response(self) -> Result<DocumentCommandResponse> {
-        let response: CommandResponse<Document> = self.body()?;
-        Ok(DocumentCommandResponse { response })
+    pub(crate) fn to_is_master_response(&self, round_trip_time: Duration) -> Result<IsMasterReply> {
+        match self.body::<CommandResponse<IsMasterCommandResponse>>() {
+            Ok(response) if response.is_success() => {
+                let server_address = self.source_address().clone();
+                let cluster_time = response.cluster_time().cloned();
+                Ok(IsMasterReply {
+                    server_address,
+                    command_response: response.body,
+                    round_trip_time,
+                    cluster_time,
+                })
+            }
+            _ => match self.body::<CommandResponse<CommandErrorBody>>() {
+                Ok(command_error_body) => Err(Error::new(
+                    ErrorKind::Command(command_error_body.body.command_error),
+                    command_error_body.body.error_labels,
+                )),
+                Err(_) => Err(ErrorKind::InvalidResponse {
+                    message: "invalid server response".into(),
+                }
+                .into()),
+            },
+        }
     }
 
     /// The address of the server that sent this response.
     pub(crate) fn source_address(&self) -> &ServerAddress {
         &self.source
-    }
-}
-
-/// A command response backed by a `Document` rather than raw bytes.
-/// Use this for simple command responses where deserialization performance is not a high priority.
-pub(crate) struct DocumentCommandResponse {
-    response: CommandResponse<Document>,
-}
-
-impl DocumentCommandResponse {
-    /// Returns a result indicating whether this response corresponds to a command failure.
-    pub(crate) fn validate(&self) -> Result<()> {
-        if !self.response.is_success() {
-            let error_response: CommandErrorBody = bson::from_document(self.response.body.clone())
-                .map_err(|_| ErrorKind::InvalidResponse {
-                    message: "invalid server response".to_string(),
-                })?;
-            Err(Error::new(
-                ErrorKind::Command(error_response.command_error),
-                error_response.error_labels,
-            ))
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Deserialize the body of the response.
-    pub(crate) fn body<T: DeserializeOwned>(self) -> Result<T> {
-        match bson::from_document(self.response.body) {
-            Ok(body) => Ok(body),
-            Err(e) => Err(ErrorKind::InvalidResponse {
-                message: format!("{}", e),
-            }
-            .into()),
-        }
-    }
-
-    pub(crate) fn cluster_time(&self) -> Option<&ClusterTime> {
-        self.response.cluster_time.as_ref()
     }
 }

@@ -1,6 +1,6 @@
 pub(crate) mod server_selection;
 #[cfg(test)]
-mod test;
+pub(crate) mod test;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -20,15 +20,41 @@ use crate::{
 
 const DEFAULT_HEARTBEAT_FREQUENCY: Duration = Duration::from_secs(10);
 
-/// The TopologyType type, as described by the SDAM spec.
+/// The possible types for a topology.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize)]
-pub(crate) enum TopologyType {
+#[non_exhaustive]
+pub enum TopologyType {
+    /// A single mongod server.
     Single,
+
+    /// A replica set with no primary.
     ReplicaSetNoPrimary,
+
+    /// A replica set with a primary.
     ReplicaSetWithPrimary,
+
+    /// A sharded topology.
     Sharded,
+
+    /// A load balanced topology.
     LoadBalanced,
+
+    /// A topology whose type is not known.
     Unknown,
+}
+
+#[cfg(test)]
+impl TopologyType {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Single => "Single",
+            Self::ReplicaSetNoPrimary => "ReplicaSetNoPrimary",
+            Self::ReplicaSetWithPrimary => "ReplicaSetWithPrimary",
+            Self::Sharded => "Sharded",
+            Self::LoadBalanced => "LoadBalanced",
+            Self::Unknown => "Unknown",
+        }
+    }
 }
 
 impl Default for TopologyType {
@@ -37,47 +63,48 @@ impl Default for TopologyType {
     }
 }
 
-/// The TopologyDescription type, as described by the SDAM spec.
+/// A description of the most up-to-date information known about a topology.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub(crate) struct TopologyDescription {
     /// Whether or not the topology was initialized with a single seed.
-    single_seed: bool,
+    pub(crate) single_seed: bool,
 
     /// The current type of the topology.
-    topology_type: TopologyType,
+    pub(crate) topology_type: TopologyType,
 
     /// The replica set name of the topology.
-    set_name: Option<String>,
+    pub(crate) set_name: Option<String>,
 
     /// The highest replica set version the driver has seen by a member of the topology.
-    max_set_version: Option<i32>,
+    pub(crate) max_set_version: Option<i32>,
 
     /// The highest replica set election id the driver has seen by a member of the topology.
-    max_election_id: Option<ObjectId>,
+    pub(crate) max_election_id: Option<ObjectId>,
 
     /// Describes the compatibility issue between the driver and server with regards to the
     /// respective supported wire versions.
-    compatibility_error: Option<String>,
+    pub(crate) compatibility_error: Option<String>,
 
     /// Whether or not this topology supports sessions, and if so, what the logicalSessionTimeout
     /// is for them.
-    session_support_status: SessionSupportStatus,
+    pub(crate) session_support_status: SessionSupportStatus,
 
     /// Whether or not this topology supports transactions.
-    transaction_support_status: TransactionSupportStatus,
+    pub(crate) transaction_support_status: TransactionSupportStatus,
 
     /// The highest reported cluster time by any server in this topology.
-    cluster_time: Option<ClusterTime>,
+    pub(crate) cluster_time: Option<ClusterTime>,
 
     /// The amount of latency beyond that of the suitable server with the minimum latency that is
     /// acceptable for a read operation.
-    local_threshold: Option<Duration>,
+    pub(crate) local_threshold: Option<Duration>,
 
     /// The maximum amount of time to wait before checking a given server by sending an isMaster.
-    heartbeat_freq: Option<Duration>,
+    pub(crate) heartbeat_freq: Option<Duration>,
 
     /// The server descriptions of each member of the topology.
-    servers: HashMap<ServerAddress, ServerDescription>,
+    pub(crate) servers: HashMap<ServerAddress, ServerDescription>,
 }
 
 impl PartialEq for TopologyDescription {
@@ -146,6 +173,23 @@ impl TopologyDescription {
             heartbeat_freq: options.heartbeat_freq,
             servers,
         })
+    }
+
+    pub(crate) fn new_empty() -> Self {
+        Self {
+            single_seed: false,
+            topology_type: TopologyType::Unknown,
+            set_name: None,
+            max_set_version: None,
+            max_election_id: None,
+            compatibility_error: None,
+            session_support_status: SessionSupportStatus::Undetermined,
+            transaction_support_status: TransactionSupportStatus::Undetermined,
+            cluster_time: None,
+            local_threshold: None,
+            heartbeat_freq: None,
+            servers: HashMap::new(),
+        }
     }
 
     /// Gets the topology type of the cluster.
@@ -364,8 +408,11 @@ impl TopologyDescription {
     ///
     /// The returned `TopologyDescriptionDiff` refers to the changes reflected in the provided
     /// description. For example, if the provided description has a server in it that this
-    /// description does not, it will be returned in the `new_servers` field.
-    pub(crate) fn diff(&self, other: &TopologyDescription) -> Option<TopologyDescriptionDiff> {
+    /// description does not, it will be returned in the `added_addresses` field.
+    pub(crate) fn diff<'a>(
+        &'a self,
+        other: &'a TopologyDescription,
+    ) -> Option<TopologyDescriptionDiff> {
         if self == other {
             return None;
         }
@@ -373,12 +420,20 @@ impl TopologyDescription {
         let addresses: HashSet<&ServerAddress> = self.server_addresses().collect();
         let other_addresses: HashSet<&ServerAddress> = other.server_addresses().collect();
 
+        let changed_servers = self
+            .servers
+            .iter()
+            .filter_map(|(address, description)| match other.servers.get(address) {
+                Some(other_description) if description != other_description => {
+                    Some((address, (description, other_description)))
+                }
+                _ => None,
+            });
+
         Some(TopologyDescriptionDiff {
-            new_addresses: other_addresses
-                .difference(&addresses)
-                .cloned()
-                .cloned()
-                .collect(),
+            removed_addresses: addresses.difference(&other_addresses).cloned().collect(),
+            added_addresses: other_addresses.difference(&addresses).cloned().collect(),
+            changed_servers: changed_servers.collect(),
         })
     }
 
@@ -782,8 +837,11 @@ impl Default for TransactionSupportStatus {
 /// A struct representing the diff between two `TopologyDescription`s.
 /// Returned from `TopologyDescription::diff`.
 #[derive(Debug)]
-pub(crate) struct TopologyDescriptionDiff {
-    pub(crate) new_addresses: HashSet<ServerAddress>,
+pub(crate) struct TopologyDescriptionDiff<'a> {
+    pub(crate) removed_addresses: HashSet<&'a ServerAddress>,
+    pub(crate) added_addresses: HashSet<&'a ServerAddress>,
+    pub(crate) changed_servers:
+        HashMap<&'a ServerAddress, (&'a ServerDescription, &'a ServerDescription)>,
 }
 
 fn verify_max_staleness(max_staleness: Option<Duration>) -> crate::error::Result<()> {

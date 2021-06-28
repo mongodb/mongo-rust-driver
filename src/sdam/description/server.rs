@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use serde::Deserialize;
+
 use crate::{
     bson::{oid::ObjectId, DateTime},
     client::ClusterTime,
@@ -12,17 +14,23 @@ const DRIVER_MIN_DB_VERSION: &str = "3.6";
 const DRIVER_MIN_WIRE_VERSION: i32 = 6;
 const DRIVER_MAX_WIRE_VERSION: i32 = 13;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Deserialize, Clone, Copy, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum ServerType {
     Standalone,
     Mongos,
+    #[serde(rename = "RSPrimary")]
     RsPrimary,
+    #[serde(rename = "RSSecondary")]
     RsSecondary,
+    #[serde(rename = "RSArbiter")]
     RsArbiter,
+    #[serde(rename = "RSOther")]
     RsOther,
+    #[serde(rename = "RSGhost")]
     RsGhost,
     LoadBalancer,
+    #[serde(alias = "PossiblePrimary")]
     Unknown,
 }
 
@@ -59,11 +67,19 @@ impl Default for ServerType {
     }
 }
 
+/// A description of the most up-to-date information known about a server.
 #[derive(Debug, Clone)]
 pub(crate) struct ServerDescription {
+    /// The address of this server.
     pub(crate) address: ServerAddress,
+
+    /// The type of this server.
     pub(crate) server_type: ServerType,
+
+    /// The last time this server was updated.
     pub(crate) last_update_time: Option<DateTime>,
+
+    /// The average duration of this server's hello calls.
     pub(crate) average_round_trip_time: Option<Duration>,
 
     // The SDAM spec indicates that a ServerDescription needs to contain an error message if an
@@ -73,7 +89,7 @@ pub(crate) struct ServerDescription {
     // and when the first heartbeat occurs.
     //
     // In order to represent all these states, we store a Result directly in the ServerDescription,
-    // which either contains the aforementioned error message or an Option<IsMasterResult>. This
+    // which either contains the aforementioned error message or an Option<IsMasterReply>. This
     // allows us to ensure that only valid states are possible (e.g. preventing that both an error
     // and a reply are present) while still making it easy to define helper methods on
     // ServerDescription for information we need from the isMaster reply by propagating with `?`.
@@ -129,13 +145,7 @@ impl ServerDescription {
             // Initialize the average round trip time. If a previous value is present for the
             // server, this will be updated before the server description is added to the topology
             // description.
-            description.average_round_trip_time = reply.round_trip_time;
-
-            // If the server type is unknown, we don't want to take into account the round trip time
-            // when checking the latency during server selection.
-            if let ServerType::Unknown = description.server_type {
-                reply.round_trip_time.take();
-            }
+            description.average_round_trip_time = Some(reply.round_trip_time);
 
             // Normalize all instances of hostnames to lowercase.
             if let Some(ref mut hosts) = reply.command_response.hosts {

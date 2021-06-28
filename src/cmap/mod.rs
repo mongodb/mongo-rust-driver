@@ -72,7 +72,9 @@ impl ConnectionPool {
             options.clone(),
         );
 
-        let event_handler = options.as_ref().and_then(|opts| opts.event_handler.clone());
+        let event_handler = options
+            .as_ref()
+            .and_then(|opts| opts.cmap_event_handler.clone());
 
         if let Some(ref handler) = event_handler {
             handler.handle_pool_created_event(PoolCreatedEvent {

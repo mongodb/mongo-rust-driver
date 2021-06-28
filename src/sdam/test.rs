@@ -17,6 +17,7 @@ use crate::{
         FailCommandOptions,
         FailPoint,
         FailPointMode,
+        SdamEvent,
         TestClient,
         CLIENT_OPTIONS,
         LOCK,
@@ -83,7 +84,6 @@ async fn min_heartbeat_frequency() {
     );
 }
 
-// TODO: RUST-232 update this test to incorporate SDAM events
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn sdam_pool_management() {
@@ -118,10 +118,17 @@ async fn sdam_pool_management() {
 
     subscriber
         .wait_for_event(Duration::from_millis(500), |event| {
-            matches!(event, Event::CmapEvent(CmapEvent::PoolReady(_)))
+            matches!(event, Event::Cmap(CmapEvent::PoolReady(_)))
         })
         .await
         .expect("should see pool ready event");
+
+    subscriber
+        .wait_for_event(Duration::from_millis(500), |event| {
+            matches!(event, Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(_)))
+        })
+        .await
+        .expect("should see server heartbeat succeeded event");
 
     let fp_options = FailCommandOptions::builder()
         .app_name("SDAMPoolManagementTest".to_string())
@@ -137,21 +144,35 @@ async fn sdam_pool_management() {
 
     subscriber
         .wait_for_event(Duration::from_millis(1000), |event| {
-            matches!(event, Event::CmapEvent(CmapEvent::PoolCleared(_)))
+            matches!(event, Event::Sdam(SdamEvent::ServerHeartbeatFailed(_)))
+        })
+        .await
+        .expect("should see server heartbeat failed event");
+
+    subscriber
+        .wait_for_event(Duration::from_millis(1000), |event| {
+            matches!(event, Event::Cmap(CmapEvent::PoolCleared(_)))
         })
         .await
         .expect("should see pool cleared event");
 
     subscriber
         .wait_for_event(Duration::from_millis(1000), |event| {
-            matches!(event, Event::CmapEvent(CmapEvent::PoolReady(_)))
+            matches!(event, Event::Cmap(CmapEvent::PoolReady(_)))
         })
         .await
         .expect("should see pool ready event");
+
+    subscriber
+        .wait_for_event(Duration::from_millis(1000), |event| {
+            matches!(event, Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(_)))
+        })
+        .await
+        .expect("should see server heartbeat succeeded event");
 }
 
 // prose version of minPoolSize-error.yml SDAM integration test
-// TODO: RUST-232 replace this test with the spec runner
+// TODO: RUST-560 replace this test with the spec runner
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn sdam_min_pool_size_error() {
@@ -198,7 +219,7 @@ async fn sdam_min_pool_size_error() {
 
     subscriber
         .wait_for_event(Duration::from_millis(2000), |event| {
-            matches!(event, Event::CmapEvent(CmapEvent::PoolCleared(_)))
+            matches!(event, Event::Cmap(CmapEvent::PoolCleared(_)))
         })
         .await
         .expect("should see pool cleared event");
@@ -230,7 +251,7 @@ async fn sdam_min_pool_size_error() {
 
     subscriber
         .wait_for_event(Duration::from_millis(10), |event| {
-            matches!(event, Event::CmapEvent(CmapEvent::PoolReady(_)))
+            matches!(event, Event::Cmap(CmapEvent::PoolReady(_)))
         })
         .await
         .expect("should see pool ready event");
@@ -296,7 +317,7 @@ async fn auth_error() {
 
     subscriber
         .wait_for_event(Duration::from_millis(2000), |event| {
-            matches!(event, Event::CmapEvent(CmapEvent::PoolCleared(_)))
+            matches!(event, Event::Cmap(CmapEvent::PoolCleared(_)))
         })
         .await
         .expect("should see pool cleared event");
@@ -304,7 +325,6 @@ async fn auth_error() {
     // Wait a little while for the server to be marked as Unknown.
     // Once we have SDAM monitoring, this wait can be removed and be replaced
     // with another event waiting.
-    // TODO: RUST-232 replace this with monitoring.
     RUNTIME.delay_for(Duration::from_millis(750)).await;
 
     coll.insert_many(vec![doc! { "_id": 5 }, doc! { "_id": 6 }], None)
@@ -315,7 +335,7 @@ async fn auth_error() {
     assert!(
         subscriber
             .wait_for_event(Duration::from_millis(100), |event| {
-                matches!(event, Event::CmapEvent(CmapEvent::PoolCleared(_)))
+                matches!(event, Event::Cmap(CmapEvent::PoolCleared(_)))
             })
             .await
             .is_none(),

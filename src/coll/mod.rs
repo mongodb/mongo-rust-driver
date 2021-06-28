@@ -754,7 +754,6 @@ where
         replacement: impl Borrow<T>,
         options: impl Into<Option<FindOneAndReplaceOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
-        // isabeltodo decide whether to split this out
     ) -> Result<Option<T>> {
         let replacement = to_document(replacement.borrow())?;
 

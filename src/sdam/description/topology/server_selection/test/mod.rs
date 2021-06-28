@@ -1,9 +1,9 @@
 use std::time::Duration;
 
-use bson::{doc, DateTime};
 use serde::Deserialize;
 
 use crate::{
+    bson::{doc, DateTime},
     is_master::{IsMasterCommandResponse, IsMasterReply, LastWrite},
     options::ServerAddress,
     sdam::{
@@ -98,7 +98,9 @@ impl TestServerDescription {
             Ok(IsMasterReply {
                 server_address: server_address.clone(),
                 command_response,
-                round_trip_time: avg_rtt_ms.map(f64_ms_as_duration),
+                round_trip_time: avg_rtt_ms
+                    .map(f64_ms_as_duration)
+                    .unwrap_or_else(|| Duration::from_millis(1234)),
                 cluster_time: None,
             })
         });

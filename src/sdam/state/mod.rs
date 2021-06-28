@@ -15,6 +15,7 @@ use self::server::Server;
 use super::{
     description::topology::{server_selection::SelectedServer, TransactionSupportStatus},
     message_manager::TopologyMessageSubscriber,
+    ServerInfo,
     SessionSupportStatus,
     TopologyDescription,
 };
@@ -23,12 +24,20 @@ use crate::{
     client::ClusterTime,
     cmap::{conn::ConnectionGeneration, Command, Connection, PoolGeneration},
     error::{load_balanced_mode_mismatch, Error, Result},
+    event::sdam::{
+        ServerClosedEvent,
+        ServerDescriptionChangedEvent,
+        ServerOpeningEvent,
+        TopologyClosedEvent,
+        TopologyDescriptionChangedEvent,
+        TopologyOpeningEvent,
+    },
     options::{ClientOptions, SelectionCriteria, ServerAddress},
     runtime::HttpClient,
     sdam::{
         description::{
             server::{ServerDescription, ServerType},
-            topology::{server_selection, TopologyDescriptionDiff, TopologyType},
+            topology::{server_selection, TopologyType},
         },
         srv_polling::SrvPollingMonitor,
         TopologyMessageManager,
@@ -59,6 +68,7 @@ struct Common {
     is_alive: Arc<AtomicBool>,
     message_manager: TopologyMessageManager,
     options: ClientOptions,
+    id: ObjectId,
 }
 
 /// The current state of the topology, which includes the topology description and the set of
@@ -80,10 +90,17 @@ impl Topology {
     pub(super) fn new_mocked(options: ClientOptions) -> Self {
         let description = TopologyDescription::new(options.clone()).unwrap();
 
+        let id = ObjectId::new();
+        if let Some(ref handler) = options.sdam_event_handler {
+            let event = TopologyOpeningEvent { topology_id: id };
+            handler.handle_topology_opening_event(event);
+        }
+
         let common = Common {
             is_alive: Arc::new(AtomicBool::new(true)),
             message_manager: TopologyMessageManager::new(),
             options: options.clone(),
+            id,
         };
 
         let http_client = HttpClient::default();
@@ -104,17 +121,34 @@ impl Topology {
         // should be acquired immediately.
         let mut topology_state = RUNTIME.block_in_place(topology.state.write());
 
-        for address in options.hosts {
+        for address in &options.hosts {
             topology_state.servers.insert(
                 address.clone(),
                 Server::create(
-                    address,
-                    &ClientOptions::default(),
+                    address.clone(),
+                    &options,
                     topology.downgrade(),
                     http_client.clone(),
                 )
                 .0,
             );
+        }
+
+        if let Some(ref handler) = options.sdam_event_handler {
+            let event = TopologyDescriptionChangedEvent {
+                topology_id: id,
+                previous_description: TopologyDescription::new_empty().into(),
+                new_description: topology_state.description.clone().into(),
+            };
+            handler.handle_topology_description_changed_event(event);
+
+            for server_address in &options.hosts {
+                let event = ServerOpeningEvent {
+                    topology_id: id,
+                    address: server_address.clone(),
+                };
+                handler.handle_server_opening_event(event);
+            }
         }
 
         drop(topology_state);
@@ -126,12 +160,19 @@ impl Topology {
         let description = TopologyDescription::new(options.clone())?;
         let is_load_balanced = description.topology_type() == TopologyType::LoadBalanced;
 
+        let id = ObjectId::new();
+        if let Some(ref handler) = options.sdam_event_handler {
+            let event = TopologyOpeningEvent { topology_id: id };
+            handler.handle_topology_opening_event(event);
+        }
+
         let hosts: Vec<_> = options.hosts.drain(..).collect();
 
         let common = Common {
             is_alive: Arc::new(AtomicBool::new(true)),
             message_manager: TopologyMessageManager::new(),
             options: options.clone(),
+            id,
         };
 
         let http_client = HttpClient::default();
@@ -166,12 +207,37 @@ impl Topology {
             SrvPollingMonitor::start(topology.downgrade());
         }
 
+        if let Some(ref handler) = options.sdam_event_handler {
+            let event = TopologyDescriptionChangedEvent {
+                topology_id: id,
+                previous_description: TopologyDescription::new_empty().into(),
+                new_description: topology_state.description.clone().into(),
+            };
+            handler.handle_topology_description_changed_event(event);
+
+            for server_address in &options.hosts {
+                let event = ServerOpeningEvent {
+                    topology_id: id,
+                    address: server_address.clone(),
+                };
+                handler.handle_server_opening_event(event);
+            }
+        }
+
+        SrvPollingMonitor::start(topology.downgrade());
+
         drop(topology_state);
         Ok(topology)
     }
 
-    pub(crate) fn mark_closed(&self) {
+    pub(crate) fn close(&self) {
         self.common.is_alive.store(false, Ordering::SeqCst);
+        if let Some(ref handler) = self.common.options.sdam_event_handler {
+            let event = TopologyClosedEvent {
+                topology_id: self.common.id,
+            };
+            handler.handle_topology_closed_event(event);
+        }
     }
 
     /// Gets the addresses of the servers in the cluster.
@@ -346,14 +412,14 @@ impl Topology {
         mut state_lock: RwLockWriteGuard<'_, TopologyState>,
     ) -> bool {
         let server_type = server_description.server_type;
-        // TODO RUST-232: Theoretically, `TopologyDescription::update` can return an error. However,
+        // TODO RUST-580: Theoretically, `TopologyDescription::update` can return an error. However,
         // this can only happen if we try to access a field from the isMaster response when an error
         // occurred during the check. In practice, this can't happen, because the SDAM algorithm
         // doesn't check the fields of an Unknown server, and we only return Unknown server
-        // descriptions when errors occur. Once we implement SDAM monitoring, we can
-        // properly inform users of errors that occur here.
+        // descriptions when errors occur. Once we implement logging, we can properly inform users
+        // of errors that occur here.
         match state_lock.update(server_description, &self.common.options, self.downgrade()) {
-            Ok(Some(_)) => {
+            Ok(true) => {
                 if server_type.is_data_bearing()
                     || (server_type != ServerType::Unknown
                         && state_lock.description.topology_type() == TopologyType::Single)
@@ -540,7 +606,7 @@ impl TopologyState {
         server: ServerDescription,
         options: &ClientOptions,
         topology: WeakTopology,
-    ) -> std::result::Result<Option<TopologyDescriptionDiff>, String> {
+    ) -> std::result::Result<bool, String> {
         let old_description = self.description.clone();
         self.description.update(server)?;
 
@@ -548,7 +614,46 @@ impl TopologyState {
         self.sync_hosts(&hosts, options, &topology);
 
         let diff = old_description.diff(&self.description);
-        Ok(diff)
+        let topology_changed = diff.is_some();
+
+        if let Some(ref handler) = options.sdam_event_handler {
+            if let Some(diff) = diff {
+                for (address, (previous_description, new_description)) in diff.changed_servers {
+                    let event = ServerDescriptionChangedEvent {
+                        address: address.clone(),
+                        topology_id: topology.common.id,
+                        previous_description: ServerInfo::new_owned(previous_description.clone()),
+                        new_description: ServerInfo::new_owned(new_description.clone()),
+                    };
+                    handler.handle_server_description_changed_event(event);
+                }
+
+                for address in diff.removed_addresses {
+                    let event = ServerClosedEvent {
+                        address: address.clone(),
+                        topology_id: topology.common.id,
+                    };
+                    handler.handle_server_closed_event(event);
+                }
+
+                for address in diff.added_addresses {
+                    let event = ServerOpeningEvent {
+                        address: address.clone(),
+                        topology_id: topology.common.id,
+                    };
+                    handler.handle_server_opening_event(event);
+                }
+
+                let event = TopologyDescriptionChangedEvent {
+                    topology_id: topology.common.id,
+                    previous_description: old_description.clone().into(),
+                    new_description: self.description.clone().into(),
+                };
+                handler.handle_topology_description_changed_event(event);
+            }
+        }
+
+        Ok(topology_changed)
     }
 
     /// Start/stop monitoring tasks and create/destroy connection pools based on the new and
@@ -558,13 +663,9 @@ impl TopologyState {
         hosts: &HashSet<ServerAddress>,
         options: &ClientOptions,
         topology: WeakTopology,
-    ) -> Option<TopologyDescriptionDiff> {
-        let old_description = self.description.clone();
+    ) {
         self.description.sync_hosts(hosts);
-
         self.sync_hosts(hosts, options, &topology);
-
-        old_description.diff(&self.description)
     }
 
     fn sync_hosts(
