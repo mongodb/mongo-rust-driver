@@ -311,6 +311,9 @@ impl ClientSession {
                 }
                 .into());
             }
+            TransactionState::Committed { .. } => {
+                self.pinned_session = None; // Unpin session if previous transaction is committed.
+            }
             _ => {}
         }
         match self.client.transaction_support_status().await? {
@@ -475,6 +478,7 @@ impl ClientSession {
             }
             .into()),
             TransactionState::Starting => {
+                self.pinned_session = None;
                 self.transaction.abort();
                 Ok(())
             }
@@ -486,6 +490,7 @@ impl ClientSession {
                     .and_then(|options| options.write_concern.as_ref())
                     .cloned();
                 let abort_transaction = AbortTransaction::new(write_concern);
+                self.pinned_session = None;
                 self.transaction.abort();
                 // Errors returned from running an abortTransaction command should be ignored.
                 let _result = self

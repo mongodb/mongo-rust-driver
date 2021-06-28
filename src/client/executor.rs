@@ -88,6 +88,7 @@ impl Client {
                         .into());
                     }
                 }
+
                 self.execute_operation_with_retry(op, Some(session)).await
             }
             None => {
@@ -128,12 +129,16 @@ impl Client {
                 || session.transaction.state == TransactionState::Aborted
                     && op.name() != AbortTransaction::NAME
             {
+                session.pinned_session = None; // Unpin session during non-transactional operation.
                 session.transaction.reset();
             }
         }
 
         let selection_criteria = if let Some(session) = &session {
-            session.pinned_session.as_ref().or(op.selection_criteria())
+            session
+                .pinned_session
+                .as_ref()
+                .or_else(|| op.selection_criteria())
         } else {
             op.selection_criteria()
         };
@@ -212,6 +217,21 @@ impl Client {
                 drop(conn);
                 // release the selected server to decrement its operation count
                 drop(server);
+
+                if let Some(ref mut session) = session {
+                    if err.labels().get(TRANSIENT_TRANSACTION_ERROR).is_some() {
+                        session.pinned_session = None;
+                    }
+
+                    if op.name() == CommitTransaction::NAME
+                        && err
+                            .labels()
+                            .get(UNKNOWN_TRANSACTION_COMMIT_RESULT)
+                            .is_some()
+                    {
+                        session.pinned_session = None;
+                    }
+                }
 
                 if retryability == Retryability::Read && err.is_read_retryable()
                     || retryability == Retryability::Write && err.is_write_retryable()
