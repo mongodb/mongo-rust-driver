@@ -1,8 +1,6 @@
 #[cfg(test)]
 mod test;
 
-use std::time::Instant;
-
 use lazy_static::lazy_static;
 use os_info::{Type, Version};
 
@@ -10,8 +8,8 @@ use crate::{
     bson::{doc, Bson, Document},
     client::auth::{ClientFirst, FirstRound},
     cmap::{options::ConnectionPoolOptions, Command, Connection, StreamDescription},
-    error::{ErrorKind, Result},
-    is_master::{IsMasterCommandResponse, IsMasterReply},
+    error::Result,
+    is_master::{is_master_command, run_is_master, IsMasterReply},
     options::{AuthMechanism, ClientOptions, Credential, DriverInfo, ServerApi},
 };
 
@@ -148,12 +146,9 @@ impl Handshaker {
     pub(crate) fn new(options: Option<HandshakerOptions>) -> Self {
         let mut metadata = BASE_CLIENT_METADATA.clone();
         let mut credential = None;
-        let mut db = None;
-        let mut server_api = None;
 
-        let mut body = doc! {
-            "isMaster": 1,
-        };
+        let mut command =
+            is_master_command(options.as_ref().and_then(|opts| opts.server_api.as_ref()));
 
         if let Some(options) = options {
             if let Some(app_name) = options.app_name {
@@ -178,25 +173,13 @@ impl Handshaker {
             }
 
             if let Some(cred) = options.credential {
-                cred.append_needed_mechanism_negotiation(&mut body);
-                db = Some(cred.resolved_source().to_string());
+                cred.append_needed_mechanism_negotiation(&mut command.body);
+                command.target_db = cred.resolved_source().to_string();
                 credential = Some(cred);
             }
-
-            server_api = options.server_api;
         }
 
-        body.insert("client", metadata);
-
-        let mut command = Command::new(
-            "isMaster".to_string(),
-            db.unwrap_or_else(|| "admin".to_string()),
-            body,
-        );
-
-        if let Some(server_api) = server_api {
-            command.set_server_api(&server_api)
-        }
+        command.body.insert("client", metadata);
 
         Self {
             command,
@@ -210,7 +193,7 @@ impl Handshaker {
 
         let client_first = set_speculative_auth_info(&mut command.body, self.credential.as_ref())?;
 
-        let mut is_master_reply = is_master(command, conn).await?;
+        let mut is_master_reply = run_is_master(command, conn).await?;
         conn.stream_description = Some(StreamDescription::from_is_master(is_master_reply.clone()));
 
         // Record the client's message and the server's response from speculative authentication if
@@ -271,31 +254,6 @@ impl From<ClientOptions> for HandshakerOptions {
             server_api: options.server_api,
         }
     }
-}
-
-/// Run the given isMaster command.
-///
-/// If the given command is not an isMaster, this function will return an error.
-pub(crate) async fn is_master(command: Command, conn: &mut Connection) -> Result<IsMasterReply> {
-    if !command.name.eq_ignore_ascii_case("ismaster") {
-        return Err(ErrorKind::Internal {
-            message: format!("invalid ismaster command: {}", command.name),
-        }
-        .into());
-    }
-    let start_time = Instant::now();
-    let response = conn.send_command(command, None).await?;
-    let end_time = Instant::now();
-
-    response.validate()?;
-    let cluster_time = response.cluster_time().cloned();
-    let command_response: IsMasterCommandResponse = response.body()?;
-
-    Ok(IsMasterReply {
-        command_response,
-        round_trip_time: Some(end_time.duration_since(start_time)),
-        cluster_time,
-    })
 }
 
 /// Updates the handshake command document with the speculative authenitication info.

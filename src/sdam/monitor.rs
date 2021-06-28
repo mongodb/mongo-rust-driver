@@ -10,10 +10,9 @@ use super::{
     ServerUpdateReceiver,
 };
 use crate::{
-    bson::doc,
-    cmap::{is_master, Command, Connection, Handshaker},
+    cmap::{Connection, Handshaker},
     error::{Error, Result},
-    is_master::IsMasterReply,
+    is_master::{is_master_command, run_is_master, IsMasterReply},
     options::{ClientOptions, ServerAddress},
     RUNTIME,
 };
@@ -184,12 +183,8 @@ impl HeartbeatMonitor {
     async fn perform_is_master(&mut self) -> Result<IsMasterReply> {
         let result = match self.connection {
             Some(ref mut conn) => {
-                let mut command =
-                    Command::new("isMaster".into(), "admin".into(), doc! { "isMaster": 1 });
-                if let Some(ref server_api) = self.client_options.server_api {
-                    command.set_server_api(server_api);
-                }
-                is_master(command, conn).await
+                let command = is_master_command(self.client_options.server_api.as_ref());
+                run_is_master(command, conn).await
             }
             None => {
                 let mut connection = Connection::connect_monitoring(
