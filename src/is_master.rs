@@ -13,7 +13,8 @@ use crate::{
 
 /// Construct an isMaster command.
 pub(crate) fn is_master_command(api: Option<&ServerApi>) -> Command {
-    let mut command = Command::new("isMaster".into(), "admin".into(), doc! { "isMaster": 1 });
+    let command_name = if api.is_some() { "hello" } else { "isMaster" };
+    let mut command = Command::new(command_name.into(), "admin".into(), doc! { command_name: 1 });
     if let Some(server_api) = api {
         command.set_server_api(server_api);
     }
@@ -27,7 +28,8 @@ pub(crate) async fn run_is_master(
     command: Command,
     conn: &mut Connection,
 ) -> Result<IsMasterReply> {
-    if !command.name.eq_ignore_ascii_case("ismaster") {
+    if !command.name.eq_ignore_ascii_case("ismaster") &&
+        !command.name.eq_ignore_ascii_case("hello") {
         return Err(ErrorKind::Internal {
             message: format!("invalid ismaster command: {}", command.name),
         }
