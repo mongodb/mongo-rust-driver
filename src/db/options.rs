@@ -83,6 +83,9 @@ pub struct CreateCollectionOptions {
 
     /// The default configuration for indexes created on this collection, including the _id index.
     pub index_option_defaults: Option<IndexOptionDefaults>,
+
+    /// Specifies options for creating a timeseries collection.
+    pub timeseries: Option<TimeseriesOptions>,
 }
 
 /// Specifies how strictly the database should apply validation rules to existing documents during
@@ -121,6 +124,25 @@ pub struct IndexOptionDefaults {
     ///
     /// `{ <storage-engine-name>: <options> }`
     pub storage_engine: Document,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+
+/// Specifies options for creating a timeseries collection.
+pub struct TimeseriesOptions {
+    /// Name of the top-level field to be used for time. Inserted documents must have this field,
+    /// and the field must be of the BSON UTC datetime type.
+    pub time_field: String,
+
+    /// Name of the top-level field describing the series. This field is used to group related data
+    /// and may be of any BSON type, except for array. This name may not be the same as the
+    /// timeField or _id.
+    pub meta_field: Option<String>,
+
+    /// Number indicating after how many seconds old time-series data should be deleted.
+    pub expire_after_seconds: Option<u32>,
 }
 
 /// Specifies the options to a [`Database::drop`](../struct.Database.html#method.drop) operation.
