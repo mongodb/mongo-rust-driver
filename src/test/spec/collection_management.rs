@@ -1,6 +1,4 @@
-use crate::{
-    test::{run_spec_test, LOCK},
-};
+use crate::test::{run_spec_test, LOCK};
 
 use super::run_unified_format_test;
 

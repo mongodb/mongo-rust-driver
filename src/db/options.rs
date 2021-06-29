@@ -93,7 +93,8 @@ pub struct CreateCollectionOptions {
     #[serde(
         default,
         deserialize_with = "bson_util::deserialize_duration_from_u64_seconds",
-        serialize_with = "bson_util::serialize_duration_option_as_int_secs")]
+        serialize_with = "bson_util::serialize_duration_option_as_int_secs"
+    )]
     pub expire_after_seconds: Option<Duration>,
 }
 
