@@ -89,8 +89,10 @@ pub struct CreateCollectionOptions {
     /// Specifies options for creating a timeseries collection.
     pub timeseries: Option<TimeseriesOptions>,
 
-    /// Number indicating after how many seconds old time-series data should be deleted.
-    #[serde(deserialize_with = "bson_util::deserialize_duration_from_u64_seconds",
+    /// Duration indicating after how long old time-series data should be deleted.
+    #[serde(
+        default,
+        deserialize_with = "bson_util::deserialize_duration_from_u64_seconds",
         serialize_with = "bson_util::serialize_duration_option_as_int_secs")]
     pub expire_after_seconds: Option<Duration>,
 }
