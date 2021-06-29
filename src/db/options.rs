@@ -136,11 +136,10 @@ pub struct IndexOptionDefaults {
     pub storage_engine: Document,
 }
 
+/// Specifies options for creating a timeseries collection.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-
-/// Specifies options for creating a timeseries collection.
 pub struct TimeseriesOptions {
     /// Name of the top-level field to be used for time. Inserted documents must have this field,
     /// and the field must be of the BSON UTC datetime type.
