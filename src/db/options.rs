@@ -86,6 +86,9 @@ pub struct CreateCollectionOptions {
 
     /// Specifies options for creating a timeseries collection.
     pub timeseries: Option<TimeseriesOptions>,
+
+    /// Number indicating after how many seconds old time-series data should be deleted.
+    pub expire_after_seconds: Option<u32>,
 }
 
 /// Specifies how strictly the database should apply validation rules to existing documents during
@@ -140,9 +143,6 @@ pub struct TimeseriesOptions {
     /// and may be of any BSON type, except for array. This name may not be the same as the
     /// timeField or _id.
     pub meta_field: Option<String>,
-
-    /// Number indicating after how many seconds old time-series data should be deleted.
-    pub expire_after_seconds: Option<u32>,
 }
 
 /// Specifies the options to a [`Database::drop`](../struct.Database.html#method.drop) operation.
