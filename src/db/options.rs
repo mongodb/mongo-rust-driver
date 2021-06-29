@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
@@ -88,7 +90,9 @@ pub struct CreateCollectionOptions {
     pub timeseries: Option<TimeseriesOptions>,
 
     /// Number indicating after how many seconds old time-series data should be deleted.
-    pub expire_after_seconds: Option<u32>,
+    #[serde(deserialize_with = "bson_util::deserialize_duration_from_u64_seconds",
+        serialize_with = "bson_util::serialize_duration_option_as_int_secs")]
+    pub expire_after_seconds: Option<Duration>,
 }
 
 /// Specifies how strictly the database should apply validation rules to existing documents during
@@ -143,6 +147,24 @@ pub struct TimeseriesOptions {
     /// and may be of any BSON type, except for array. This name may not be the same as the
     /// timeField or _id.
     pub meta_field: Option<String>,
+
+    /// The units you'd use to describe the expected interval between subsequent measurements for a
+    /// time-series.  Defaults to `TimeseriesGranularity::Seconds` if unset.
+    pub granularity: Option<TimeseriesGranularity>,
+}
+
+/// The units you'd use to describe the expected interval between subsequent measurements for a
+/// time-series.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub enum TimeseriesGranularity {
+    /// The expected interval between subsequent measurements is in seconds.
+    Seconds,
+    /// The expected interval between subsequent measurements is in minutes.
+    Minutes,
+    /// The expected interval between subsequent measurements is in hours.
+    Hours,
 }
 
 /// Specifies the options to a [`Database::drop`](../struct.Database.html#method.drop) operation.
