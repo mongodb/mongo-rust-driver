@@ -86,22 +86,24 @@ impl TestServerDescription {
             None => return None,
         };
 
-        let mut command_response = is_master_response_from_server_type(server_type);
-        command_response.tags = self.tags;
-        command_response.last_write = self.last_write.map(|last_write| LastWrite {
-            last_write_date: DateTime::from_millis(last_write.last_write_date),
+        let server_address = ServerAddress::parse(self.address).ok()?;
+        let tags = self.tags;
+        let last_write = self.last_write;
+        let avg_rtt_ms = self.avg_rtt_ms;
+        let reply = is_master_response_from_server_type(server_type).map(|mut command_response| {
+            command_response.tags = tags;
+            command_response.last_write = last_write.map(|last_write| LastWrite {
+                last_write_date: DateTime::from_millis(last_write.last_write_date),
+            });
+            Ok(IsMasterReply {
+                server_address: server_address.clone(),
+                command_response,
+                round_trip_time: avg_rtt_ms.map(f64_ms_as_duration),
+                cluster_time: None,
+            })
         });
 
-        let is_master = IsMasterReply {
-            command_response,
-            round_trip_time: self.avg_rtt_ms.map(f64_ms_as_duration),
-            cluster_time: None,
-        };
-
-        let mut server_desc = ServerDescription::new(
-            ServerAddress::parse(&self.address).unwrap(),
-            Some(Ok(is_master)),
-        );
+        let mut server_desc = ServerDescription::new(server_address, reply);
         server_desc.last_update_time = self
             .last_update_time
             .map(|i| DateTime::from_millis(i.into()));
@@ -150,45 +152,37 @@ impl TestServerType {
     }
 }
 
-fn is_master_response_from_server_type(server_type: ServerType) -> IsMasterCommandResponse {
+fn is_master_response_from_server_type(server_type: ServerType) -> Option<IsMasterCommandResponse> {
     let mut response = IsMasterCommandResponse::default();
 
     match server_type {
         ServerType::Unknown => {
-            response.ok = Some(0.0);
+            return None;
         }
         ServerType::Mongos => {
-            response.ok = Some(1.0);
             response.msg = Some("isdbgrid".into());
         }
         ServerType::RsPrimary => {
-            response.ok = Some(1.0);
             response.set_name = Some("foo".into());
             response.is_writable_primary = Some(true);
         }
         ServerType::RsOther => {
-            response.ok = Some(1.0);
             response.set_name = Some("foo".into());
             response.hidden = Some(true);
         }
         ServerType::RsSecondary => {
-            response.ok = Some(1.0);
             response.set_name = Some("foo".into());
             response.secondary = Some(true);
         }
         ServerType::RsArbiter => {
-            response.ok = Some(1.0);
             response.set_name = Some("foo".into());
             response.arbiter_only = Some(true);
         }
         ServerType::RsGhost => {
-            response.ok = Some(1.0);
             response.is_replica_set = Some(true);
         }
-        ServerType::Standalone => {
-            response.ok = Some(1.0);
-        }
+        ServerType::Standalone => {}
     };
 
-    response
+    Some(response)
 }

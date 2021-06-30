@@ -3,7 +3,7 @@ mod test;
 
 use crate::{
     bson::{doc, Document},
-    cmap::{Command, CommandResponse, StreamDescription},
+    cmap::{Command, StreamDescription},
     coll::Namespace,
     collation::Collation,
     error::{convert_bulk_errors, Result},
@@ -11,6 +11,8 @@ use crate::{
     options::{DeleteOptions, Hint, WriteConcern},
     results::DeleteResult,
 };
+
+use super::CommandResponse;
 
 #[derive(Debug)]
 pub(crate) struct Delete {
@@ -55,6 +57,8 @@ impl Delete {
 
 impl Operation for Delete {
     type O = DeleteResult;
+    type Response = CommandResponse<WriteResponseBody>;
+
     const NAME: &'static str = "delete";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -88,14 +92,13 @@ impl Operation for Delete {
 
     fn handle_response(
         &self,
-        response: CommandResponse,
+        response: WriteResponseBody,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
-        let body: WriteResponseBody = response.body()?;
-        body.validate().map_err(convert_bulk_errors)?;
+        response.validate().map_err(convert_bulk_errors)?;
 
         Ok(DeleteResult {
-            deleted_count: body.n,
+            deleted_count: response.n,
         })
     }
 

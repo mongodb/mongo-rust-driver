@@ -1,16 +1,19 @@
 #[cfg(test)]
 mod test;
 
+use bson::Document;
 use serde::Deserialize;
 
 use crate::{
     bson::doc,
-    cmap::{Command, CommandResponse, StreamDescription},
+    cmap::{Command, StreamDescription},
     coll::{options::EstimatedDocumentCountOptions, Namespace},
     error::{Error, ErrorKind, Result},
     operation::{append_options, CursorBody, Operation, Retryability},
     selection_criteria::SelectionCriteria,
 };
+
+use super::CommandResponse;
 
 const SERVER_4_9_0_WIRE_VERSION: i32 = 12;
 
@@ -38,6 +41,8 @@ impl Count {
 
 impl Operation for Count {
     type O = u64;
+    type Response = CommandResponse<Response>;
+
     const NAME: &'static str = "count";
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
@@ -77,13 +82,13 @@ impl Operation for Count {
 
     fn handle_response(
         &self,
-        response: CommandResponse,
+        response: Response,
         description: &StreamDescription,
     ) -> Result<Self::O> {
-        let response_body: ResponseBody = match description.max_wire_version {
-            Some(v) if v >= SERVER_4_9_0_WIRE_VERSION => {
-                let CursorBody { mut cursor } = response.body()?;
-
+        let response_body: ResponseBody = match (description.max_wire_version, response) {
+            (Some(v), Response::Aggregate(CursorBody { mut cursor }))
+                if v >= SERVER_4_9_0_WIRE_VERSION =>
+            {
                 cursor
                     .first_batch
                     .pop_front()
@@ -94,7 +99,13 @@ impl Operation for Count {
                         })
                     })?
             }
-            _ => response.body()?,
+            (_, Response::Count(body)) => body,
+            _ => {
+                return Err(ErrorKind::InvalidResponse {
+                    message: "response from server did not match count command".to_string(),
+                }
+                .into())
+            }
         };
 
         Ok(response_body.n)
@@ -121,6 +132,13 @@ impl Operation for Count {
 }
 
 #[derive(Debug, Deserialize)]
-struct ResponseBody {
+#[serde(untagged)]
+pub(crate) enum Response {
+    Aggregate(CursorBody<Document>),
+    Count(ResponseBody),
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ResponseBody {
     n: u64,
 }

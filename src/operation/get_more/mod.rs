@@ -1,13 +1,13 @@
 #[cfg(test)]
 mod test;
 
-use std::{collections::VecDeque, time::Duration};
+use std::{collections::VecDeque, marker::PhantomData, time::Duration};
 
-use serde::Deserialize;
+use serde::{de::DeserializeOwned, Deserialize};
 
 use crate::{
-    bson::{doc, Document},
-    cmap::{Command, CommandResponse, StreamDescription},
+    bson::doc,
+    cmap::{Command, StreamDescription},
     cursor::CursorInformation,
     error::{ErrorKind, Result},
     operation::Operation,
@@ -16,16 +16,19 @@ use crate::{
     Namespace,
 };
 
+use super::CommandResponse;
+
 #[derive(Debug)]
-pub(crate) struct GetMore {
+pub(crate) struct GetMore<T> {
     ns: Namespace,
     cursor_id: i64,
     selection_criteria: SelectionCriteria,
     batch_size: Option<u32>,
     max_time: Option<Duration>,
+    _phantom: PhantomData<T>,
 }
 
-impl GetMore {
+impl<T> GetMore<T> {
     pub(crate) fn new(info: CursorInformation) -> Self {
         Self {
             ns: info.ns,
@@ -33,12 +36,15 @@ impl GetMore {
             selection_criteria: SelectionCriteria::from_address(info.address),
             batch_size: info.batch_size,
             max_time: info.max_time,
+            _phantom: Default::default(),
         }
     }
 }
 
-impl Operation for GetMore {
-    type O = GetMoreResult;
+impl<T: DeserializeOwned> Operation for GetMore<T> {
+    type O = GetMoreResult<T>;
+    type Response = CommandResponse<GetMoreResponseBody<T>>;
+
     const NAME: &'static str = "getMore";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -71,13 +77,12 @@ impl Operation for GetMore {
 
     fn handle_response(
         &self,
-        response: CommandResponse,
+        response: GetMoreResponseBody<T>,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
-        let body: GetMoreResponseBody = response.body()?;
         Ok(GetMoreResult {
-            batch: body.cursor.next_batch,
-            exhausted: body.cursor.id == 0,
+            batch: response.cursor.next_batch,
+            exhausted: response.cursor.id == 0,
         })
     }
 
@@ -87,13 +92,13 @@ impl Operation for GetMore {
 }
 
 #[derive(Debug, Deserialize)]
-struct GetMoreResponseBody {
-    cursor: NextBatchBody,
+pub(crate) struct GetMoreResponseBody<T> {
+    cursor: NextBatchBody<T>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct NextBatchBody {
+struct NextBatchBody<T> {
     id: i64,
-    next_batch: VecDeque<Document>,
+    next_batch: VecDeque<T>,
 }

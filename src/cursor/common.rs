@@ -7,9 +7,9 @@ use std::{
 
 use derivative::Derivative;
 use futures_core::{Future, Stream};
+use serde::de::DeserializeOwned;
 
 use crate::{
-    bson::Document,
     error::{Error, ErrorKind, Result},
     operation,
     options::ServerAddress,
@@ -21,17 +21,24 @@ use crate::{
 /// An internal cursor that can be used in a variety of contexts depending on its `GetMoreProvider`.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub(super) struct GenericCursor<T: GetMoreProvider> {
+pub(super) struct GenericCursor<P, T>
+where
+    P: GetMoreProvider<DocumentType = T>,
+{
     #[derivative(Debug = "ignore")]
-    provider: T,
+    provider: P,
     client: Client,
     info: CursorInformation,
-    buffer: VecDeque<Document>,
+    buffer: VecDeque<T>,
     exhausted: bool,
 }
 
-impl<T: GetMoreProvider> GenericCursor<T> {
-    pub(super) fn new(client: Client, spec: CursorSpecification, get_more_provider: T) -> Self {
+impl<P, T> GenericCursor<P, T>
+where
+    P: GetMoreProvider<DocumentType = T>,
+    T: DeserializeOwned,
+{
+    pub(super) fn new(client: Client, spec: CursorSpecification<T>, get_more_provider: P) -> Self {
         let exhausted = spec.id() == 0;
         Self {
             exhausted,
@@ -42,7 +49,7 @@ impl<T: GetMoreProvider> GenericCursor<T> {
         }
     }
 
-    pub(super) fn take_buffer(&mut self) -> VecDeque<Document> {
+    pub(super) fn take_buffer(&mut self) -> VecDeque<T> {
         std::mem::take(&mut self.buffer)
     }
 
@@ -65,8 +72,12 @@ impl<T: GetMoreProvider> GenericCursor<T> {
     }
 }
 
-impl<T: GetMoreProvider> Stream for GenericCursor<T> {
-    type Item = Result<Document>;
+impl<P, T> Stream for GenericCursor<P, T>
+where
+    P: GetMoreProvider<DocumentType = T>,
+    T: DeserializeOwned + Unpin,
+{
+    type Item = Result<T>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         loop {
@@ -105,11 +116,14 @@ impl<T: GetMoreProvider> Stream for GenericCursor<T> {
 /// A trait implemented by objects that can provide batches of documents to a cursor via the getMore
 /// command.
 pub(super) trait GetMoreProvider: Unpin {
+    /// The type that the invididual documents will be deserialized to.
+    type DocumentType;
+
     /// The result type that the future running the getMore evaluates to.
-    type GetMoreResult: GetMoreProviderResult;
+    type ResultType: GetMoreProviderResult<DocumentType = Self::DocumentType>;
 
     /// The type of future created by this provider when running a getMore.
-    type GetMoreFuture: Future<Output = Self::GetMoreResult> + Unpin;
+    type GetMoreFuture: Future<Output = Self::ResultType> + Unpin;
 
     /// Get the future being evaluated, if there is one.
     fn executing_future(&mut self) -> Option<&mut Self::GetMoreFuture>;
@@ -117,7 +131,7 @@ pub(super) trait GetMoreProvider: Unpin {
     /// Clear out any state remaining from previous getMore executions.
     fn clear_execution(
         &mut self,
-        session: <Self::GetMoreResult as GetMoreProviderResult>::Session,
+        session: <Self::ResultType as GetMoreProviderResult>::Session,
         exhausted: bool,
     );
 
@@ -128,10 +142,11 @@ pub(super) trait GetMoreProvider: Unpin {
 /// Trait describing results returned from a `GetMoreProvider`.
 pub(super) trait GetMoreProviderResult {
     type Session;
+    type DocumentType;
 
-    fn as_ref(&self) -> std::result::Result<&GetMoreResult, &Error>;
+    fn as_ref(&self) -> std::result::Result<&GetMoreResult<Self::DocumentType>, &Error>;
 
-    fn into_parts(self) -> (Result<GetMoreResult>, Self::Session);
+    fn into_parts(self) -> (Result<GetMoreResult<Self::DocumentType>>, Self::Session);
 
     /// Whether the response from the server indicated the cursor was exhausted or not.
     fn exhausted(&self) -> bool {
@@ -146,14 +161,14 @@ pub(super) trait GetMoreProviderResult {
 
 /// Specification used to create a new cursor.
 #[derive(Debug, Clone)]
-pub(crate) struct CursorSpecification {
+pub(crate) struct CursorSpecification<T> {
     pub(crate) info: CursorInformation,
-    pub(crate) initial_buffer: VecDeque<Document>,
+    pub(crate) initial_buffer: VecDeque<T>,
 }
 
-impl CursorSpecification {
+impl<T> CursorSpecification<T> {
     pub(crate) fn new(
-        info: operation::CursorInfo,
+        info: operation::CursorInfo<T>,
         address: ServerAddress,
         batch_size: impl Into<Option<u32>>,
         max_time: impl Into<Option<Duration>>,

@@ -12,8 +12,8 @@ use std::{future::Future, net::SocketAddr, time::Duration};
 
 pub(crate) use self::{
     acknowledged_message::AcknowledgedMessage,
-    async_read_ext::AsyncLittleEndianRead,
-    async_write_ext::AsyncLittleEndianWrite,
+    async_read_ext::{AsyncLittleEndianRead, SyncLittleEndianRead},
+    async_write_ext::{AsyncLittleEndianWrite, SyncLittleEndianWrite},
     join_handle::AsyncJoinHandle,
     resolver::AsyncResolver,
     stream::AsyncStream,

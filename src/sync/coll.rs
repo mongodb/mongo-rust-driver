@@ -390,7 +390,7 @@ impl<T> Collection<T> {
 
 impl<T> Collection<T>
 where
-    T: DeserializeOwned + Unpin,
+    T: DeserializeOwned + Unpin + Send + Sync,
 {
     /// Finds the documents in the collection matching `filter`.
     pub fn find(

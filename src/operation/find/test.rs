@@ -3,8 +3,12 @@ use std::time::Duration;
 use crate::{
     bson::{doc, Document},
     bson_util,
-    cmap::{CommandResponse, StreamDescription},
-    operation::{test, Find, Operation},
+    cmap::StreamDescription,
+    operation::{
+        test::{self, handle_response_test},
+        Find,
+        Operation,
+    },
     options::{CursorType, FindOptions, Hint, ReadConcern, ReadConcernLevel, ServerAddress},
     Namespace,
 };
@@ -15,7 +19,7 @@ fn build_test(
     options: Option<FindOptions>,
     mut expected_body: Document,
 ) {
-    let mut find = Find::new(ns.clone(), filter, options);
+    let mut find = Find::<Document>::new(ns.clone(), filter, options);
 
     let mut cmd = find.build(&StreamDescription::new_testing()).unwrap();
 
@@ -176,7 +180,7 @@ async fn build_batch_size() {
     let options = FindOptions::builder()
         .batch_size((std::i32::MAX as u32) + 1)
         .build();
-    let mut op = Find::new(Namespace::empty(), None, Some(options));
+    let mut op = Find::<Document>::new(Namespace::empty(), None, Some(options));
     assert!(op.build(&StreamDescription::new_testing()).is_err())
 }
 
@@ -188,7 +192,7 @@ async fn op_selection_criteria() {
             selection_criteria,
             ..Default::default()
         };
-        Find::new(Namespace::empty(), None, Some(options))
+        Find::<Document>::new(Namespace::empty(), None, Some(options))
     });
 }
 
@@ -205,7 +209,7 @@ async fn handle_success() {
         port: None,
     };
 
-    let find = Find::empty();
+    let find = Find::<Document>::empty();
 
     let first_batch = vec![doc! {"_id": 1}, doc! {"_id": 2}];
 
@@ -218,13 +222,7 @@ async fn handle_success() {
         "ok": 1.0
     };
 
-    let result = find.handle_response(
-        CommandResponse::with_document_and_address(address.clone(), response.clone()),
-        &Default::default(),
-    );
-    assert!(result.is_ok());
-
-    let cursor_spec = result.unwrap();
+    let cursor_spec = handle_response_test(&find, response.clone()).unwrap();
     assert_eq!(cursor_spec.address(), &address);
     assert_eq!(cursor_spec.id(), 123);
     assert_eq!(cursor_spec.batch_size(), None);
@@ -241,13 +239,7 @@ async fn handle_success() {
         None,
         Some(FindOptions::builder().batch_size(123).build()),
     );
-    let result = find.handle_response(
-        CommandResponse::with_document_and_address(address.clone(), response),
-        &Default::default(),
-    );
-    assert!(result.is_ok());
-
-    let cursor_spec = result.unwrap();
+    let cursor_spec = handle_response_test(&find, response).unwrap();
     assert_eq!(cursor_spec.address(), &address);
     assert_eq!(cursor_spec.id(), 123);
     assert_eq!(cursor_spec.batch_size(), Some(123));
@@ -262,11 +254,7 @@ async fn handle_success() {
 
 fn verify_max_await_time(max_await_time: Option<Duration>, cursor_type: Option<CursorType>) {
     let ns = Namespace::empty();
-    let address = ServerAddress::Tcp {
-        host: "localhost".to_string(),
-        port: None,
-    };
-    let find = Find::new(
+    let find = Find::<Document>::new(
         ns,
         None,
         Some(FindOptions {
@@ -276,8 +264,8 @@ fn verify_max_await_time(max_await_time: Option<Duration>, cursor_type: Option<C
         }),
     );
 
-    let response = CommandResponse::with_document_and_address(
-        address,
+    let spec = handle_response_test(
+        &find,
         doc! {
             "cursor": {
                 "id": 123,
@@ -286,11 +274,8 @@ fn verify_max_await_time(max_await_time: Option<Duration>, cursor_type: Option<C
             },
             "ok": 1
         },
-    );
-
-    let spec = find
-        .handle_response(response, &Default::default())
-        .expect("should handle correctly");
+    )
+    .unwrap();
     assert_eq!(spec.max_time(), max_await_time);
 }
 
@@ -313,12 +298,10 @@ async fn handle_max_await_time() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_invalid_response() {
-    let find = Find::empty();
+    let find = Find::<Document>::empty();
 
     let garbled = doc! { "asdfasf": "ASdfasdf" };
-    assert!(find
-        .handle_response(CommandResponse::with_document(garbled), &Default::default())
-        .is_err());
+    handle_response_test(&find, garbled).unwrap_err();
 
     let missing_cursor_field = doc! {
         "cursor": {
@@ -326,10 +309,5 @@ async fn handle_invalid_response() {
             "firstBatch": [],
         }
     };
-    assert!(find
-        .handle_response(
-            CommandResponse::with_document(missing_cursor_field),
-            &Default::default()
-        )
-        .is_err());
+    handle_response_test(&find, missing_cursor_field).unwrap_err();
 }

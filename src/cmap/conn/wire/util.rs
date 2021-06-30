@@ -1,10 +1,9 @@
 use std::{
-    pin::Pin,
+    io::Read,
     sync::atomic::{AtomicI32, Ordering},
-    task::{Context, Poll},
 };
 
-use futures_io::{self, AsyncRead, AsyncWrite};
+use futures_io::{self, AsyncWrite};
 use futures_util::AsyncWriteExt;
 use lazy_static::lazy_static;
 
@@ -33,16 +32,15 @@ pub(super) async fn write_cstring<W: AsyncWrite + Unpin>(
     Ok(())
 }
 
-/// A wrapper around `futures_io::AsyncRead` that keeps track of the number of bytes it has read.
-pub(super) struct CountReader<'a, R: AsyncRead + Unpin + Send + 'a> {
-    reader: &'a mut R,
+pub(super) struct SyncCountReader<R> {
+    reader: R,
     bytes_read: usize,
 }
 
-impl<'a, R: AsyncRead + Unpin + Send + 'a> CountReader<'a, R> {
+impl<R: Read> SyncCountReader<R> {
     /// Constructs a new CountReader that wraps `reader`.
-    pub(super) fn new(reader: &'a mut R) -> Self {
-        CountReader {
+    pub(super) fn new(reader: R) -> Self {
+        SyncCountReader {
             reader,
             bytes_read: 0,
         }
@@ -54,18 +52,10 @@ impl<'a, R: AsyncRead + Unpin + Send + 'a> CountReader<'a, R> {
     }
 }
 
-impl<'a, R: AsyncRead + Unpin + Send + 'a> AsyncRead for CountReader<'a, R> {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context,
-        buf: &mut [u8],
-    ) -> Poll<futures_io::Result<usize>> {
-        let result = Pin::new(&mut self.reader).poll_read(cx, buf);
-
-        if let Poll::Ready(Ok(count)) = result {
-            self.bytes_read += count;
-        }
-
-        result
+impl<R: Read> Read for SyncCountReader<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let bytes = self.reader.read(buf)?;
+        self.bytes_read += bytes;
+        Ok(bytes)
     }
 }

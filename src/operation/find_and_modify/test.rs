@@ -3,9 +3,9 @@ use std::time::Duration;
 use crate::{
     bson::{doc, oid::ObjectId, Bson, Document},
     bson_util,
-    cmap::{CommandResponse, StreamDescription},
+    cmap::StreamDescription,
     coll::options::ReturnDocument,
-    operation::{FindAndModify, Operation},
+    operation::{test::handle_response_test, FindAndModify, Operation},
     options::{
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
@@ -143,7 +143,7 @@ async fn handle_success_delete() {
         "rating" : 100,
         "score" : 5
     };
-    let ok_response = CommandResponse::with_document(doc! {
+    let ok_response = doc! {
         "lastErrorObject" : {
             "connectionId" : 1,
             "updatedExisting" : true,
@@ -155,13 +155,10 @@ async fn handle_success_delete() {
          },
         "value" : value.clone(),
         "ok" : 1
-    });
+    };
 
-    let result = op.handle_response(ok_response, &Default::default());
-    assert_eq!(
-        result.expect("handle failed").expect("result was None"),
-        value
-    );
+    let result = handle_response_test(&op, ok_response).unwrap();
+    assert_eq!(result.unwrap(), value);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -169,10 +166,8 @@ async fn handle_success_delete() {
 async fn handle_null_value_delete() {
     let op = empty_delete();
 
-    let null_value = CommandResponse::with_document(doc! { "ok": 1.0, "value": Bson::Null});
-    let result = op.handle_response(null_value, &Default::default());
-    assert!(result.is_ok());
-    assert_eq!(result.expect("handle failed"), None);
+    let result = handle_response_test(&op, doc! { "ok": 1.0, "value": Bson::Null }).unwrap();
+    assert_eq!(result, None);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -180,8 +175,7 @@ async fn handle_null_value_delete() {
 async fn handle_no_value_delete() {
     let op = empty_delete();
 
-    let no_value = CommandResponse::with_document(doc! { "ok": 1.0 });
-    assert!(op.handle_response(no_value, &Default::default()).is_err());
+    handle_response_test(&op, doc! { "ok": 1.0 }).unwrap_err();
 }
 
 // replace tests
@@ -334,7 +328,7 @@ async fn handle_success_replace() {
         "rating" : 100,
         "score" : 5
     };
-    let ok_response = CommandResponse::with_document(doc! {
+    let ok_response = doc! {
         "lastErrorObject" : {
             "connectionId" : 1,
             "updatedExisting" : true,
@@ -346,33 +340,25 @@ async fn handle_success_replace() {
          },
         "value" : value.clone(),
         "ok" : 1
-    });
+    };
 
-    let result = op.handle_response(ok_response, &Default::default());
-    assert_eq!(
-        result.expect("handle failed").expect("result was None"),
-        value
-    );
+    let result = handle_response_test(&op, ok_response).unwrap();
+    assert_eq!(result.unwrap(), value);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_null_value_replace() {
     let op = empty_replace();
-
-    let null_value = CommandResponse::with_document(doc! { "ok": 1.0, "value": Bson::Null});
-    let result = op.handle_response(null_value, &Default::default());
-    assert!(result.is_ok());
-    assert_eq!(result.expect("handle failed"), None);
+    let result = handle_response_test(&op, doc! { "ok": 1.0, "value": Bson::Null }).unwrap();
+    assert_eq!(result, None);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_no_value_replace() {
     let op = empty_replace();
-
-    let no_value = CommandResponse::with_document(doc! { "ok": 1.0 });
-    assert!(op.handle_response(no_value, &Default::default()).is_err());
+    handle_response_test(&op, doc! { "ok": 1.0 }).unwrap_err();
 }
 
 // update tests
@@ -511,7 +497,7 @@ async fn handle_success_update() {
         "rating" : 100,
         "score" : 5
     };
-    let ok_response = CommandResponse::with_document(doc! {
+    let ok_response = doc! {
         "lastErrorObject" : {
             "connectionId" : 1,
             "updatedExisting" : true,
@@ -523,31 +509,23 @@ async fn handle_success_update() {
          },
         "value" : value.clone(),
         "ok" : 1
-    });
+    };
 
-    let result = op.handle_response(ok_response, &Default::default());
-    assert_eq!(
-        result.expect("handle failed").expect("result was None"),
-        value
-    );
+    let result = handle_response_test(&op, ok_response).unwrap();
+    assert_eq!(result.unwrap(), value);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_null_value_update() {
     let op = empty_update();
-
-    let null_value = CommandResponse::with_document(doc! { "ok": 1.0, "value": Bson::Null});
-    let result = op.handle_response(null_value, &Default::default());
-    assert!(result.is_ok());
-    assert_eq!(result.expect("handle failed"), None);
+    let result = handle_response_test(&op, doc! { "ok": 1.0, "value": Bson::Null }).unwrap();
+    assert_eq!(result, None);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_no_value_update() {
     let op = empty_update();
-
-    let no_value = CommandResponse::with_document(doc! { "ok": 1.0 });
-    assert!(op.handle_response(no_value, &Default::default()).is_err());
+    handle_response_test(&op, doc! { "ok": 1.0 }).unwrap_err();
 }

@@ -3,10 +3,10 @@ mod test;
 
 use bson::{doc, Document};
 
-use super::{Operation, Retryability};
+use super::{CommandResponse, CursorBody, Operation, Retryability};
 use crate::{
     bson_util,
-    cmap::{Command, CommandResponse, StreamDescription},
+    cmap::{Command, StreamDescription},
     error::{ErrorKind, Result},
     operation::aggregate::Aggregate,
     options::{AggregateOptions, CountOptions},
@@ -65,6 +65,8 @@ impl CountDocuments {
 
 impl Operation for CountDocuments {
     type O = u64;
+    type Response = CommandResponse<CursorBody<Document>>;
+
     const NAME: &'static str = Aggregate::NAME;
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
@@ -73,15 +75,10 @@ impl Operation for CountDocuments {
 
     fn handle_response(
         &self,
-        response: CommandResponse,
-        description: &StreamDescription,
+        mut response: CursorBody<Document>,
+        _description: &StreamDescription,
     ) -> Result<Self::O> {
-        let result = self
-            .aggregate
-            .handle_response(response, description)
-            .map(|mut spec| spec.initial_buffer.pop_front())?;
-
-        let result_doc = match result {
+        let result_doc = match response.cursor.first_batch.pop_front() {
             Some(doc) => doc,
             None => return Ok(0),
         };

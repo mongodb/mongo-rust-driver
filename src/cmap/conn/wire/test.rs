@@ -1,8 +1,10 @@
+use bson::Document;
 use tokio::sync::RwLockReadGuard;
 
 use super::message::{Message, MessageFlags, MessageSection};
 use crate::{
     bson::{doc, Bson},
+    bson_util,
     cmap::options::StreamOptions,
     runtime::AsyncStream,
     test::{CLIENT_OPTIONS, LOCK},
@@ -21,7 +23,8 @@ async fn basic() {
         response_to: 0,
         flags: MessageFlags::empty(),
         sections: vec![MessageSection::Document(
-            doc! { "isMaster": 1, "$db": "admin", "apiVersion": "1" },
+            bson_util::document_to_vec(doc! { "isMaster": 1, "$db": "admin", "apiVersion": "1" })
+                .unwrap(),
         )],
         checksum: None,
         request_id: None,
@@ -38,10 +41,11 @@ async fn basic() {
 
     let reply = Message::read_from(&mut stream).await.unwrap();
 
-    let response_doc = match reply.sections.into_iter().next().unwrap() {
+    let response_doc_bytes = match reply.sections.into_iter().next().unwrap() {
         MessageSection::Document(doc) => doc,
         MessageSection::Sequence { documents, .. } => documents.into_iter().next().unwrap(),
     };
+    let response_doc: Document = bson::from_slice(&response_doc_bytes.as_slice()).unwrap();
 
     assert_eq!(response_doc.get("ok"), Some(&Bson::Double(1.0)));
 }

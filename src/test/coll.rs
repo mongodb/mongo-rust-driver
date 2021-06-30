@@ -796,7 +796,7 @@ async fn typed_insert_one() {
 
 async fn insert_one_and_find<T>(coll: &Collection<T>, insert_data: T)
 where
-    T: Serialize + DeserializeOwned + Clone + PartialEq + Debug + Unpin,
+    T: Serialize + DeserializeOwned + Clone + PartialEq + Debug + Unpin + Send + Sync,
 {
     coll.insert_one(insert_data.clone(), None).await.unwrap();
     let result = coll

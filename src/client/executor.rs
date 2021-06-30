@@ -1,13 +1,12 @@
-use super::{session::TransactionState, Client, ClientSession};
-
-use std::{collections::HashSet, sync::Arc};
-
+use bson::doc;
 use lazy_static::lazy_static;
-use std::time::Instant;
 
+use std::{collections::HashSet, sync::Arc, time::Instant};
+
+use super::{session::TransactionState, Client, ClientSession};
 use crate::{
     bson::Document,
-    cmap::Connection,
+    cmap::{Connection, RawCommandResponse},
     error::{
         Error,
         ErrorKind,
@@ -17,7 +16,15 @@ use crate::{
         UNKNOWN_TRANSACTION_COMMIT_RESULT,
     },
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
-    operation::{AbortTransaction, CommitTransaction, Operation, Retryability},
+    operation::{
+        AbortTransaction,
+        CommandErrorBody,
+        CommandResponse,
+        CommitTransaction,
+        Operation,
+        Response,
+        Retryability,
+    },
     options::SelectionCriteria,
     sdam::{HandshakePhase, SelectedServer, SessionSupportStatus, TransactionSupportStatus},
     selection_criteria::ReadPreference,
@@ -374,27 +381,78 @@ impl Client {
         let start_time = Instant::now();
         let cmd_name = cmd.name.clone();
 
-        let response_result = match connection.send_command(cmd, request_id).await {
+        let command_result = match connection.send_command(cmd, request_id).await {
             Ok(response) => {
-                if let Some(cluster_time) = response.cluster_time() {
-                    self.inner.topology.advance_cluster_time(cluster_time).await;
-                    if let Some(ref mut session) = session {
-                        session.advance_cluster_time(cluster_time)
+                match T::Response::deserialize_response(&response) {
+                    Ok(r) => {
+                        self.update_cluster_time(&r, session).await;
+                        if r.is_success() {
+                            Ok(CommandResult {
+                                raw: response,
+                                deserialized: r.into_body(),
+                            })
+                        } else {
+                            // if command was ok: 0, try to deserialize the command error.
+                            // if that fails, return a generic error.
+                            Err(response
+                                .body::<CommandErrorBody>()
+                                .map(|error_response| error_response.into())
+                                .unwrap_or_else(|e| {
+                                    Error::from(ErrorKind::InvalidResponse {
+                                        message: format!(
+                                            "error deserializing command error: {}",
+                                            e
+                                        ),
+                                    })
+                                }))
+                        }
+                    }
+                    Err(deserialize_error) => {
+                        // if we failed to deserialize the whole response, try deserializing
+                        // a generic command response without the operation's body.
+                        match response.body::<CommandResponse<Option<CommandErrorBody>>>() {
+                            Ok(error_response) => {
+                                self.update_cluster_time(&error_response, session).await;
+                                match error_response.body {
+                                    // if the response was ok: 0, return the command error.
+                                    Some(command_error_response)
+                                        if !error_response.is_success() =>
+                                    {
+                                        Err(command_error_response.into())
+                                    }
+                                    // if the response was ok: 0 but we couldnt deserialize the
+                                    // command error,
+                                    // return a generic error indicating so.
+                                    None if !error_response.is_success() => {
+                                        Err(Error::from(ErrorKind::InvalidResponse {
+                                            message: "got command error but failed to deserialize \
+                                                      response"
+                                                .to_string(),
+                                        }))
+                                    }
+                                    // for ok: 1 just return the original deserialization error.
+                                    _ => Err(deserialize_error),
+                                }
+                            }
+                            // We failed to deserialize even that, so just return the original
+                            // deserialization error.
+                            Err(_) => Err(deserialize_error),
+                        }
                     }
                 }
-                if let (Some(timestamp), Some(session)) =
-                    (response.snapshot_time(), session.as_mut())
-                {
-                    session.snapshot_time = Some(*timestamp);
-                }
-                response.validate().map(|_| response)
+                // if let (Some(timestamp), Some(session)) =
+                //     (response.snapshot_time(), session.as_mut())
+                // {
+                //     session.snapshot_time = Some(*timestamp);
+                // }
+                // response.validate().map(|_| response)
             }
-            err => err,
+            Err(err) => Err(err),
         };
 
         let duration = start_time.elapsed();
 
-        match response_result {
+        match command_result {
             Err(mut err) => {
                 self.emit_command_event(|handler| {
                     let command_failed_event = CommandFailedEvent {
@@ -424,7 +482,10 @@ impl Client {
                     let reply = if should_redact {
                         Document::new()
                     } else {
-                        response.raw_response.clone()
+                        response
+                            .raw
+                            .body()
+                            .unwrap_or_else(|_| doc! { "error": "failed to deserialize" })
                     };
 
                     let command_succeeded_event = CommandSucceededEvent {
@@ -437,7 +498,7 @@ impl Client {
                     handler.handle_command_succeeded_event(command_succeeded_event);
                 });
 
-                match op.handle_response(response, connection.stream_description()?) {
+                match op.handle_response(response.deserialized, connection.stream_description()?) {
                     Ok(response) => Ok(response),
                     Err(mut err) => {
                         err.add_labels(Some(connection), session, Some(retryability))?;
@@ -532,6 +593,19 @@ impl Client {
         }
         Ok(Retryability::None)
     }
+
+    async fn update_cluster_time<T: Response>(
+        &self,
+        command_response: &T,
+        session: &mut Option<&mut ClientSession>,
+    ) {
+        if let Some(cluster_time) = command_response.cluster_time() {
+            self.inner.topology.advance_cluster_time(cluster_time).await;
+            if let Some(ref mut session) = session {
+                session.advance_cluster_time(cluster_time)
+            }
+        }
+    }
 }
 
 impl Error {
@@ -594,4 +668,9 @@ impl Error {
         }
         Ok(())
     }
+}
+
+struct CommandResult<T> {
+    raw: RawCommandResponse,
+    deserialized: T,
 }

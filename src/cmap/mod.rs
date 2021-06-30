@@ -15,7 +15,7 @@ use derivative::Derivative;
 
 pub use self::conn::ConnectionInfo;
 pub(crate) use self::{
-    conn::{Command, CommandResponse, Connection, StreamDescription},
+    conn::{Command, Connection, RawCommandResponse, StreamDescription},
     establish::handshake::Handshaker,
     status::PoolGenerationSubscriber,
 };

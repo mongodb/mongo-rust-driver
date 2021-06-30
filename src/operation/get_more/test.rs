@@ -3,9 +3,9 @@ use std::time::Duration;
 use crate::{
     bson::{doc, Document},
     bson_util,
-    cmap::{CommandResponse, StreamDescription},
+    cmap::StreamDescription,
     cursor::CursorInformation,
-    operation::{GetMore, Operation},
+    operation::{test::handle_response_test, GetMore, Operation},
     options::ServerAddress,
     sdam::{ServerDescription, ServerInfo, ServerType},
     Namespace,
@@ -26,7 +26,7 @@ fn build_test(
         batch_size,
         max_time,
     };
-    let mut get_more = GetMore::new(info);
+    let mut get_more = GetMore::<Document>::new(info);
 
     let build_result = get_more.build(&StreamDescription::new_testing());
     assert!(build_result.is_ok());
@@ -117,7 +117,7 @@ async fn build_batch_size() {
         batch_size: Some((std::i32::MAX as u32) + 1),
         max_time: None,
     };
-    let mut op = GetMore::new(info);
+    let mut op = GetMore::<Document>::new(info);
     assert!(op.build(&StreamDescription::new_testing()).is_err())
 }
 
@@ -136,7 +136,7 @@ async fn op_selection_criteria() {
         batch_size: None,
         max_time: None,
     };
-    let get_more = GetMore::new(info);
+    let get_more = GetMore::<Document>::new(info);
     let server_description = ServerDescription {
         address,
         server_type: ServerType::Unknown,
@@ -181,36 +181,32 @@ async fn handle_success() {
         batch_size: None,
         max_time: None,
     };
-    let get_more = GetMore::new(info);
+    let get_more = GetMore::<Document>::new(info);
 
     let batch = vec![doc! { "_id": 1 }, doc! { "_id": 2 }, doc! { "_id": 3 }];
 
-    let response = CommandResponse::with_document(doc! {
+    let response = doc! {
         "cursor": {
             "id": 123,
             "ns": "test_db.test_coll",
             "nextBatch": bson_util::to_bson_array(&batch),
         },
         "ok": 1
-    });
+    };
 
-    let result = get_more
-        .handle_response(response, &Default::default())
-        .expect("handle success case failed");
+    let result = handle_response_test(&get_more, response).unwrap();
     assert!(!result.exhausted);
     assert_eq!(result.batch, batch);
 
-    let response = CommandResponse::with_document(doc! {
+    let response = doc! {
         "cursor": {
             "id": 0,
             "ns": "test_db.test_coll",
             "nextBatch": bson_util::to_bson_array(&batch),
         },
         "ok": 1
-    });
-    let result = get_more
-        .handle_response(response, &Default::default())
-        .expect("handle success case failed");
+    };
+    let result = handle_response_test(&get_more, response).unwrap();
     assert!(result.exhausted);
     assert_eq!(result.batch, batch);
 }

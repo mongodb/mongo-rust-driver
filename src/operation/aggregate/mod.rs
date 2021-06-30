@@ -1,16 +1,20 @@
 #[cfg(test)]
 mod test;
 
+use serde::Deserialize;
+
 use crate::{
     bson::{doc, Bson, Document},
     bson_util,
-    cmap::{Command, CommandResponse, StreamDescription},
+    cmap::{Command, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
-    operation::{append_options, CursorBody, Operation, Retryability, WriteConcernOnlyBody},
+    operation::{append_options, Operation, Retryability, WriteConcernOnlyBody},
     options::{AggregateOptions, SelectionCriteria, WriteConcern},
     Namespace,
 };
+
+use super::{CommandResponse, CursorInfo};
 
 #[derive(Debug)]
 pub(crate) struct Aggregate {
@@ -39,7 +43,8 @@ impl Aggregate {
 }
 
 impl Operation for Aggregate {
-    type O = CursorSpecification;
+    type O = CursorSpecification<Document>;
+    type Response = CommandResponse<Response>;
     const NAME: &'static str = "aggregate";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -65,21 +70,16 @@ impl Operation for Aggregate {
 
     fn handle_response(
         &self,
-        response: CommandResponse,
-        _description: &StreamDescription,
+        response: Response,
+        description: &StreamDescription,
     ) -> Result<Self::O> {
-        let source_address = response.source_address().clone();
-
         if self.is_out_or_merge() {
-            let error_body: WriteConcernOnlyBody = response.clone().body()?;
-            error_body.validate()?;
+            response.write_concern_info.validate()?;
         };
 
-        let body: CursorBody = response.body()?;
-
         Ok(CursorSpecification::new(
-            body.cursor,
-            source_address,
+            response.cursor,
+            description.server_address.clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),
         ))
@@ -151,4 +151,12 @@ impl From<String> for AggregateTarget {
     fn from(db_name: String) -> Self {
         AggregateTarget::Database(db_name)
     }
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub(crate) struct Response {
+    cursor: CursorInfo<Document>,
+
+    #[serde(flatten)]
+    write_concern_info: WriteConcernOnlyBody,
 }

@@ -1,12 +1,11 @@
-pub(crate) mod async_encoding;
-
-use std::{convert::TryFrom, time::Duration};
+use std::{convert::TryFrom, io::Read, time::Duration};
 
 use serde::{de::Error, ser, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
     bson::{doc, Binary, Bson, Document, JavaScriptCodeWithScope, Regex},
     error::{ErrorKind, Result},
+    runtime::{SyncLittleEndianRead, SyncLittleEndianWrite},
 };
 
 /// Coerce numeric types into an `i64` if it would be lossless to do so. If this Bson is not numeric
@@ -287,6 +286,26 @@ fn num_decimal_digits(n: usize) -> u64 {
     }
 
     digits
+}
+
+/// Read a document's raw BSON bytes from the provided reader.
+pub(crate) fn read_document_bytes<R: Read>(mut reader: R) -> Result<Vec<u8>> {
+    let length = reader.read_i32()?;
+
+    let mut bytes = Vec::with_capacity(length as usize);
+    bytes.write_i32(length)?;
+
+    reader.take(length as u64 - 4).read_to_end(&mut bytes)?;
+
+    Ok(bytes)
+}
+
+/// Serialize the document to raw BSON and return a vec containing the bytes.
+#[cfg(test)]
+pub(crate) fn document_to_vec(doc: Document) -> Result<Vec<u8>> {
+    let mut v = Vec::new();
+    doc.to_writer(&mut v)?;
+    Ok(v)
 }
 
 #[cfg(test)]

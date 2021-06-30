@@ -55,10 +55,13 @@ async fn acquire_connection_and_send_command() {
     }
 
     let response = connection.send_command(cmd, None).await.unwrap();
+    let doc_response = response.into_document_response().unwrap();
 
-    assert!(response.is_success());
+    doc_response
+        .validate()
+        .expect("response should be successful");
 
-    let response: ListDatabasesResponse = response.body().unwrap();
+    let response: ListDatabasesResponse = doc_response.body().unwrap();
 
     let names: Vec<_> = response
         .databases

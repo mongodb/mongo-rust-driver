@@ -3,11 +3,11 @@ use pretty_assertions::assert_eq;
 use crate::{
     bson::{doc, Bson},
     bson_util,
-    cmap::{CommandResponse, StreamDescription},
+    cmap::StreamDescription,
     coll::options::Hint,
     concern::{Acknowledgment, WriteConcern},
     error::{ErrorKind, WriteConcernError, WriteError, WriteFailure},
-    operation::{Operation, Update},
+    operation::{test::handle_response_test, Operation, Update},
     options::{UpdateModifications, UpdateOptions},
     Namespace,
 };
@@ -158,19 +158,16 @@ async fn build_many() {
 async fn handle_success() {
     let op = Update::empty();
 
-    let ok_response = CommandResponse::with_document(doc! {
+    let ok_response = doc! {
         "ok": 1.0,
         "n": 3,
         "nModified": 1,
         "upserted": [
             { "index": 0, "_id": 1 }
         ]
-    });
+    };
 
-    let ok_result = op.handle_response(ok_response, &Default::default());
-    assert!(ok_result.is_ok());
-
-    let update_result = ok_result.unwrap();
+    let update_result = handle_response_test(&op, ok_response).unwrap();
     assert_eq!(update_result.matched_count, 0);
     assert_eq!(update_result.modified_count, 1);
     assert_eq!(update_result.upserted_id, Some(Bson::Int32(1)));
@@ -181,16 +178,13 @@ async fn handle_success() {
 async fn handle_success_no_upsert() {
     let op = Update::empty();
 
-    let ok_response = CommandResponse::with_document(doc! {
+    let ok_response = doc! {
         "ok": 1.0,
         "n": 5,
         "nModified": 2
-    });
+    };
 
-    let ok_result = op.handle_response(ok_response, &Default::default());
-    assert!(ok_result.is_ok());
-
-    let update_result = ok_result.unwrap();
+    let update_result = handle_response_test(&op, ok_response).unwrap();
     assert_eq!(update_result.matched_count, 5);
     assert_eq!(update_result.modified_count, 2);
     assert_eq!(update_result.upserted_id, None);
@@ -198,21 +192,10 @@ async fn handle_success_no_upsert() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_invalid_response() {
-    let op = Update::empty();
-
-    let invalid_response = CommandResponse::with_document(doc! { "ok": 1.0, "asdfadsf": 123123 });
-    assert!(op
-        .handle_response(invalid_response, &Default::default())
-        .is_err());
-}
-
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_write_failure() {
     let op = Update::empty();
 
-    let write_error_response = CommandResponse::with_document(doc! {
+    let write_error_response = doc! {
         "ok": 1.0,
         "n": 12,
         "nModified": 0,
@@ -223,10 +206,10 @@ async fn handle_write_failure() {
                 "errmsg": "my error string"
             }
         ]
-    });
-    let write_error_result = op.handle_response(write_error_response, &Default::default());
-    assert!(write_error_result.is_err());
-    match *write_error_result.unwrap_err().kind {
+    };
+
+    let write_error = handle_response_test(&op, write_error_response).unwrap_err();
+    match *write_error.kind {
         ErrorKind::Write(WriteFailure::WriteError(ref error)) => {
             let expected_err = WriteError {
                 code: 1234,
@@ -245,7 +228,7 @@ async fn handle_write_failure() {
 async fn handle_write_concern_failure() {
     let op = Update::empty();
 
-    let wc_error_response = CommandResponse::with_document(doc! {
+    let wc_error_response = doc! {
         "ok": 1.0,
         "n": 0,
         "nModified": 0,
@@ -261,12 +244,10 @@ async fn handle_write_concern_failure() {
                 }
             }
         }
-    });
+    };
 
-    let wc_error_result = op.handle_response(wc_error_response, &Default::default());
-    assert!(wc_error_result.is_err());
-
-    match *wc_error_result.unwrap_err().kind {
+    let wc_error = handle_response_test(&op, wc_error_response).unwrap_err();
+    match *wc_error.kind {
         ErrorKind::Write(WriteFailure::WriteConcernError(ref wc_error)) => {
             let expected_wc_err = WriteConcernError {
                 code: 456,

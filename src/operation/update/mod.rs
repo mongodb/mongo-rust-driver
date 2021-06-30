@@ -6,13 +6,15 @@ use serde::Deserialize;
 use crate::{
     bson::{doc, Bson, Document},
     bson_util,
-    cmap::{Command, CommandResponse, StreamDescription},
+    cmap::{Command, StreamDescription},
     error::{convert_bulk_errors, Result},
     operation::{Operation, Retryability, WriteResponseBody},
     options::{UpdateModifications, UpdateOptions, WriteConcern},
     results::UpdateResult,
     Namespace,
 };
+
+use super::CommandResponse;
 
 #[derive(Debug)]
 pub(crate) struct Update {
@@ -57,6 +59,8 @@ impl Update {
 
 impl Operation for Update {
     type O = UpdateResult;
+    type Response = CommandResponse<WriteResponseBody<UpdateBody>>;
+
     const NAME: &'static str = "update";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -111,21 +115,20 @@ impl Operation for Update {
 
     fn handle_response(
         &self,
-        response: CommandResponse,
+        response: WriteResponseBody<UpdateBody>,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
-        let body: WriteResponseBody<UpdateBody> = response.body()?;
-        body.validate().map_err(convert_bulk_errors)?;
+        response.validate().map_err(convert_bulk_errors)?;
 
-        let modified_count = body.n_modified;
-        let upserted_id = body
+        let modified_count = response.n_modified;
+        let upserted_id = response
             .upserted
             .as_ref()
             .and_then(|v| v.first())
             .and_then(|doc| doc.get("_id"))
             .map(Clone::clone);
 
-        let matched_count = if upserted_id.is_some() { 0 } else { body.n };
+        let matched_count = if upserted_id.is_some() { 0 } else { response.n };
 
         Ok(UpdateResult {
             matched_count,
@@ -150,7 +153,7 @@ impl Operation for Update {
 }
 
 #[derive(Deserialize)]
-struct UpdateBody {
+pub(crate) struct UpdateBody {
     #[serde(rename = "nModified")]
     n_modified: u64,
     upserted: Option<Vec<Document>>,

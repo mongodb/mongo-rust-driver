@@ -1,9 +1,9 @@
 use crate::{
     bson::doc,
-    cmap::{CommandResponse, StreamDescription},
+    cmap::StreamDescription,
     concern::{Acknowledgment, WriteConcern},
     error::{ErrorKind, WriteFailure},
-    operation::{DropDatabase, Operation},
+    operation::{test::handle_response_test, DropDatabase, Operation},
     options::DropDatabaseOptions,
 };
 
@@ -53,10 +53,10 @@ async fn build() {
 async fn handle_success() {
     let op = DropDatabase::empty();
 
-    let ok_response = CommandResponse::with_document(doc! { "ok": 1.0 });
-    assert!(op.handle_response(ok_response, &Default::default()).is_ok());
-    let ok_extra = CommandResponse::with_document(doc! { "ok": 1.0, "hello": "world" });
-    assert!(op.handle_response(ok_extra, &Default::default()).is_ok());
+    let ok_response = doc! { "ok": 1.0 };
+    handle_response_test(&op, ok_response).unwrap();
+    let ok_extra = doc! { "ok": 1.0, "hello": "world" };
+    handle_response_test(&op, ok_extra).unwrap();
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -64,19 +64,18 @@ async fn handle_success() {
 async fn handle_write_concern_error() {
     let op = DropDatabase::empty();
 
-    let response = CommandResponse::with_document(doc! {
+    let response = doc! {
         "writeConcernError": {
             "code": 100,
             "codeName": "hello world",
             "errmsg": "12345"
         },
         "ok": 1
-    });
+    };
 
-    let result = op.handle_response(response, &Default::default());
-    assert!(result.is_err());
+    let err = handle_response_test(&op, response).unwrap_err();
 
-    match *result.unwrap_err().kind {
+    match *err.kind {
         ErrorKind::Write(WriteFailure::WriteConcernError(ref wc_err)) => {
             assert_eq!(wc_err.code, 100);
             assert_eq!(wc_err.code_name, "hello world");

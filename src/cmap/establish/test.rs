@@ -68,8 +68,11 @@ async fn speculative_auth_test(
     });
 
     let response = conn.send_command(command, None).await.unwrap();
+    let doc_response = response.into_document_response().unwrap();
 
-    assert!(response.is_success());
+    doc_response
+        .validate()
+        .expect("response should be successful");
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

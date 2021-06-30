@@ -5,12 +5,14 @@ use serde::Deserialize;
 
 use crate::{
     bson::{doc, Bson, Document},
-    cmap::{Command, CommandResponse, StreamDescription},
+    cmap::{Command, StreamDescription},
     coll::{options::DistinctOptions, Namespace},
     error::Result,
     operation::{append_options, Operation, Retryability},
     selection_criteria::SelectionCriteria,
 };
+
+use super::CommandResponse;
 
 pub(crate) struct Distinct {
     ns: Namespace,
@@ -50,6 +52,8 @@ impl Distinct {
 
 impl Operation for Distinct {
     type O = Vec<Bson>;
+    type Response = CommandResponse<Response>;
+
     const NAME: &'static str = "distinct";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -72,10 +76,10 @@ impl Operation for Distinct {
     }
     fn handle_response(
         &self,
-        response: CommandResponse,
+        response: Response,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
-        response.body::<ResponseBody>().map(|body| body.values)
+        Ok(response.values)
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
@@ -91,6 +95,6 @@ impl Operation for Distinct {
 }
 
 #[derive(Debug, Deserialize)]
-struct ResponseBody {
+pub(crate) struct Response {
     values: Vec<Bson>,
 }

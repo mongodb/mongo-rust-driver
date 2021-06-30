@@ -154,7 +154,7 @@ impl ScramVersion {
 
         Ok(FirstRound {
             client_first,
-            server_first: server_first.raw_response,
+            server_first: server_first.auth_response_body("SCRAM")?,
         })
     }
 
@@ -215,7 +215,7 @@ impl ScramVersion {
         let command = client_final.to_command();
 
         let server_final_response = conn.send_command(command, None).await?;
-        let server_final = ServerFinal::parse(server_final_response.raw_response)?;
+        let server_final = ServerFinal::parse(server_final_response.auth_response_body("SCRAM")?)?;
         server_final.validate(salted_password.as_slice(), &client_final, self)?;
 
         if !server_final.done {
@@ -231,9 +231,10 @@ impl ScramVersion {
             let command = noop.into_command();
 
             let server_noop_response = conn.send_command(command, None).await?;
+            let server_noop_response_document: Document =
+                server_noop_response.auth_response_body("SCRAM")?;
 
-            if server_noop_response
-                .raw_response
+            if server_noop_response_document
                 .get("conversationId")
                 .map(|id| id == server_final.conversation_id())
                 != Some(true)
@@ -244,8 +245,7 @@ impl ScramVersion {
                 ));
             };
 
-            if !server_noop_response
-                .raw_response
+            if !server_noop_response_document
                 .get_bool("done")
                 .unwrap_or(false)
             {

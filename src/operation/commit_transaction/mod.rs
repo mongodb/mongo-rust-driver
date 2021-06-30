@@ -3,13 +3,13 @@ use std::time::Duration;
 use bson::doc;
 
 use crate::{
-    cmap::{Command, CommandResponse, StreamDescription},
+    cmap::{Command, StreamDescription},
     error::Result,
     operation::{append_options, Operation, Retryability},
     options::{Acknowledgment, TransactionOptions, WriteConcern},
 };
 
-use super::WriteConcernOnlyBody;
+use super::{CommandResponse, WriteConcernOnlyBody};
 
 pub(crate) struct CommitTransaction {
     options: Option<TransactionOptions>,
@@ -23,6 +23,8 @@ impl CommitTransaction {
 
 impl Operation for CommitTransaction {
     type O = ();
+    type Response = CommandResponse<WriteConcernOnlyBody>;
+
     const NAME: &'static str = "commitTransaction";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -41,10 +43,10 @@ impl Operation for CommitTransaction {
 
     fn handle_response(
         &self,
-        response: CommandResponse,
+        response: WriteConcernOnlyBody,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
-        response.body::<WriteConcernOnlyBody>()?.validate()
+        response.validate()
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

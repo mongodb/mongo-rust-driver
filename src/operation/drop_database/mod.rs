@@ -3,11 +3,13 @@ mod test;
 
 use crate::{
     bson::doc,
-    cmap::{Command, CommandResponse, StreamDescription},
+    cmap::{Command, StreamDescription},
     error::Result,
     operation::{append_options, Operation, WriteConcernOnlyBody},
     options::{DropDatabaseOptions, WriteConcern},
 };
+
+use super::CommandResponse;
 
 #[derive(Debug)]
 pub(crate) struct DropDatabase {
@@ -28,6 +30,8 @@ impl DropDatabase {
 
 impl Operation for DropDatabase {
     type O = ();
+    type Response = CommandResponse<WriteConcernOnlyBody>;
+
     const NAME: &'static str = "dropDatabase";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -46,10 +50,10 @@ impl Operation for DropDatabase {
 
     fn handle_response(
         &self,
-        response: CommandResponse,
+        response: WriteConcernOnlyBody,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
-        response.body::<WriteConcernOnlyBody>()?.validate()
+        response.validate()
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

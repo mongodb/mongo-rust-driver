@@ -1,9 +1,9 @@
 use crate::{
     bson::{doc, Bson},
-    cmap::{CommandResponse, StreamDescription},
+    cmap::StreamDescription,
     concern::WriteConcern,
     error::{ErrorKind, WriteFailure},
-    operation::{Create, Operation},
+    operation::{test::handle_response_test, Create, Operation},
     options::{CreateCollectionOptions, ValidationAction, ValidationLevel},
     Namespace,
 };
@@ -76,11 +76,7 @@ async fn build_validator() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success() {
     let op = Create::empty();
-
-    let ok_response = CommandResponse::with_document(doc! { "ok": 1.0 });
-    assert!(op.handle_response(ok_response, &Default::default()).is_ok());
-    let ok_extra = CommandResponse::with_document(doc! { "ok": 1.0, "hello": "world" });
-    assert!(op.handle_response(ok_extra, &Default::default()).is_ok());
+    handle_response_test(&op, doc! { "ok": 1.0 }).unwrap();
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -88,19 +84,17 @@ async fn handle_success() {
 async fn handle_write_concern_error() {
     let op = Create::empty();
 
-    let response = CommandResponse::with_document(doc! {
+    let response = doc! {
         "writeConcernError": {
             "code": 100,
             "codeName": "hello world",
             "errmsg": "12345"
         },
         "ok": 1
-    });
+    };
 
-    let result = op.handle_response(response, &Default::default());
-    assert!(result.is_err());
-
-    match *result.unwrap_err().kind {
+    let err = handle_response_test(&op, response).unwrap_err();
+    match *err.kind {
         ErrorKind::Write(WriteFailure::WriteConcernError(ref wc_err)) => {
             assert_eq!(wc_err.code, 100);
             assert_eq!(wc_err.code_name, "hello world");
