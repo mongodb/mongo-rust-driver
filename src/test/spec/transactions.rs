@@ -7,7 +7,7 @@ use crate::{
     test::{run_spec_test, TestClient, LOCK},
 };
 
-use super::run_v2_test;
+use super::{run_unified_format_test, run_v2_test};
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
@@ -30,6 +30,7 @@ async fn test_sharded_transactions() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     // TODO RUST-97: Add RecoveryToken tests to this directory.
     run_spec_test(&["sharded-transactions"], run_v2_test).await;
+    run_spec_test(&["sharded-transactions-unified"], run_unified_format_test).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]

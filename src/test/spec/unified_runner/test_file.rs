@@ -60,6 +60,7 @@ pub struct RunOnRequirement {
     min_server_version: Option<String>,
     max_server_version: Option<String>,
     topologies: Option<Vec<Topology>>,
+    serverless: Option<String>,
     server_parameters: Option<Document>,
     serverless: Option<Serverless>,
 }
