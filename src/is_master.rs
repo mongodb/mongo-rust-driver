@@ -1,13 +1,54 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::Deserialize;
 
 use crate::{
-    bson::{oid::ObjectId, DateTime, Document, Timestamp},
-    client::ClusterTime,
+    bson::{doc, oid::ObjectId, DateTime, Document, Timestamp},
+    client::{options::ServerApi, ClusterTime},
+    cmap::{Command, Connection},
+    error::{ErrorKind, Result},
     sdam::ServerType,
     selection_criteria::TagSet,
 };
+
+/// Construct an isMaster command.
+pub(crate) fn is_master_command(api: Option<&ServerApi>) -> Command {
+    let command_name = if api.is_some() { "hello" } else { "isMaster" };
+    let mut command = Command::new(command_name.into(), "admin".into(), doc! { command_name: 1 });
+    if let Some(server_api) = api {
+        command.set_server_api(server_api);
+    }
+    command
+}
+
+/// Run the given isMaster command.
+///
+/// If the given command is not an isMaster, this function will return an error.
+pub(crate) async fn run_is_master(
+    command: Command,
+    conn: &mut Connection,
+) -> Result<IsMasterReply> {
+    if !command.name.eq_ignore_ascii_case("ismaster") &&
+        !command.name.eq_ignore_ascii_case("hello") {
+        return Err(ErrorKind::Internal {
+            message: format!("invalid ismaster command: {}", command.name),
+        }
+        .into());
+    }
+    let start_time = Instant::now();
+    let response = conn.send_command(command, None).await?;
+    let end_time = Instant::now();
+
+    response.validate()?;
+    let cluster_time = response.cluster_time().cloned();
+    let command_response: IsMasterCommandResponse = response.body()?;
+
+    Ok(IsMasterReply {
+        command_response,
+        round_trip_time: Some(end_time.duration_since(start_time)),
+        cluster_time,
+    })
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct IsMasterReply {
@@ -19,6 +60,7 @@ pub(crate) struct IsMasterReply {
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct IsMasterCommandResponse {
+    pub is_writable_primary: Option<bool>,
     #[serde(rename = "ismaster")]
     pub is_master: Option<bool>,
     pub ok: Option<f32>,
@@ -76,6 +118,8 @@ impl IsMasterCommandResponse {
         } else if self.set_name.is_some() {
             if let Some(true) = self.hidden {
                 ServerType::RsOther
+            } else if let Some(true) = self.is_writable_primary {
+                ServerType::RsPrimary
             } else if let Some(true) = self.is_master {
                 ServerType::RsPrimary
             } else if let Some(true) = self.secondary {

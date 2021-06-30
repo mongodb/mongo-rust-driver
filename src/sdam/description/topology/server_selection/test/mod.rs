@@ -164,7 +164,7 @@ fn is_master_response_from_server_type(server_type: ServerType) -> IsMasterComma
         ServerType::RsPrimary => {
             response.ok = Some(1.0);
             response.set_name = Some("foo".into());
-            response.is_master = Some(true);
+            response.is_writable_primary = Some(true);
         }
         ServerType::RsOther => {
             response.ok = Some(1.0);

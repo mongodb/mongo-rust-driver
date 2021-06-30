@@ -12,7 +12,7 @@ use super::run_unified_format_test;
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-    // TODO RUST-725 Unskip these tests on 5.0
+    // TODO RUST-768 Unskip these tests on 5.0
     if TestClient::new().await.server_version_gte(5, 0) {
         return;
     }
