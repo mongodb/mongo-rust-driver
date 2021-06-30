@@ -13,11 +13,23 @@ use super::run_v2_test;
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-    // TODO RUST-122: Unskip tests on sharded clusters
+    // TODO RUST-734: Unskip tests on sharded clusters when transactions are complete.
     if TestClient::new().await.is_sharded() {
         return;
     }
     run_spec_test(&["transactions"], run_v2_test).await;
+}
+
+// Note that this function is used to safely test sharded transactions as new features are added.
+// Right now, the sharded-transactions directory tests only pinning-related tests.
+// Transactions tests in other directories currently skip if the topology is sharded.
+// TODO RUST-734: Remove this function in favor of using run() above.
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn test_sharded_transactions() {
+    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
+    // TODO RUST-97: Add RecoveryToken tests to this directory.
+    run_spec_test(&["sharded-transactions"], run_v2_test).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]

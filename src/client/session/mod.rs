@@ -99,7 +99,7 @@ lazy_static! {
 ///     }
 /// }
 /// ```
-// TODO RUST-122 Remove this note and adjust the above description to indicate that sharded
+// TODO RUST-734 Remove this note and adjust the above description to indicate that sharded
 // transactions are supported on 4.2+
 /// Note: the driver does not currently support transactions on sharded clusters.
 #[derive(Clone, Debug)]

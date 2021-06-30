@@ -7,11 +7,16 @@ use std::{ops::Deref, time::Duration};
 use semver::VersionReq;
 
 use crate::{
-    bson::doc,
+    bson::{doc, from_bson},
     coll::options::DropCollectionOptions,
     concern::{Acknowledgment, WriteConcern},
     options::{ClientOptions, CreateCollectionOptions, InsertManyOptions},
-    test::{assert_matches, util::get_default_name, EventClient, TestClient},
+    test::{
+        assert_matches,
+        util::{get_default_name, FailPointGuard},
+        EventClient,
+        TestClient,
+    },
     RUNTIME,
 };
 
@@ -126,10 +131,10 @@ pub async fn run_v2_test(test_file: TestFile) {
             EventClient::with_additional_options(options, None, test.use_multiple_mongoses, None)
                 .await;
 
-        let _fp_guard = match test.fail_point {
-            Some(fail_point) => Some(fail_point.enable(client.deref(), None).await.unwrap()),
-            None => None,
-        };
+        let mut fail_point_guards: Vec<FailPointGuard> = Vec::new();
+        if let Some(fail_point) = test.fail_point {
+            fail_point_guards.push(fail_point.enable(client.deref(), None).await.unwrap());
+        }
 
         let options = match test.session_options {
             Some(ref options) => options.get("session0").cloned(),
@@ -217,7 +222,9 @@ pub async fn run_v2_test(test_file: TestFile) {
                         "assertSessionNotDirty" => {
                             assert!(!session.unwrap().is_dirty())
                         }
-                        "assertSessionTransactionState" => {
+                        "assertSessionTransactionState"
+                        | "assertSessionPinned"
+                        | "assertSessionUnpinned" => {
                             operation
                                 .execute_on_session(session.unwrap())
                                 .await
@@ -228,6 +235,29 @@ pub async fn run_v2_test(test_file: TestFile) {
                         }
                         "assertCollectionNotExists" => {
                             operation.execute_on_client(&internal_client).await.unwrap();
+                        }
+                        "targetedFailPoint" => {
+                            let fail_point = from_bson(
+                                operation
+                                    .execute_on_client(&internal_client)
+                                    .await
+                                    .unwrap()
+                                    .unwrap(),
+                            )
+                            .unwrap();
+
+                            let selection_criteria = session
+                                .unwrap()
+                                .pinned_session
+                                .clone()
+                                .unwrap_or_else(|| panic!("ClientSession is not pinned"));
+
+                            fail_point_guards.push(
+                                internal_client
+                                    .enable_failpoint(fail_point, Some(selection_criteria))
+                                    .await
+                                    .unwrap(),
+                            );
                         }
                         other => panic!("unknown operation: {}", other),
                     }
@@ -256,7 +286,15 @@ pub async fn run_v2_test(test_file: TestFile) {
                         }
                         if let Some(error_code_name) = operation_error.error_code_name {
                             let code_name = error.code_name().unwrap();
+                            // TODO RUST-97: Stop ignoring recoveryToken related errors.
+                            if code_name == "Location50940" {
+                                continue;
+                            }
                             assert_eq!(error_code_name, code_name);
+                        }
+                        if let Some(error_code) = operation_error.error_code {
+                            let code = error.code().unwrap();
+                            assert_eq!(error_code, code);
                         }
                         if let Some(error_labels_contain) = operation_error.error_labels_contain {
                             let labels = error.labels();
