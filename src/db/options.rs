@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
@@ -83,6 +85,18 @@ pub struct CreateCollectionOptions {
 
     /// The default configuration for indexes created on this collection, including the _id index.
     pub index_option_defaults: Option<IndexOptionDefaults>,
+
+    /// Specifies options for creating a timeseries collection.  This feature is only available on
+    /// server versions 5.0 and above.
+    pub timeseries: Option<TimeseriesOptions>,
+
+    /// Duration indicating after how long old time-series data should be deleted.
+    #[serde(
+        default,
+        deserialize_with = "bson_util::deserialize_duration_from_u64_seconds",
+        serialize_with = "bson_util::serialize_duration_option_as_int_secs"
+    )]
+    pub expire_after_seconds: Option<Duration>,
 }
 
 /// Specifies how strictly the database should apply validation rules to existing documents during
@@ -121,6 +135,39 @@ pub struct IndexOptionDefaults {
     ///
     /// `{ <storage-engine-name>: <options> }`
     pub storage_engine: Document,
+}
+
+/// Specifies options for creating a timeseries collection.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct TimeseriesOptions {
+    /// Name of the top-level field to be used for time. Inserted documents must have this field,
+    /// and the field must be of the BSON UTC datetime type.
+    pub time_field: String,
+
+    /// Name of the top-level field describing the series. This field is used to group related data
+    /// and may be of any BSON type, except for array. This name may not be the same as the
+    /// timeField or _id.
+    pub meta_field: Option<String>,
+
+    /// The units you'd use to describe the expected interval between subsequent measurements for a
+    /// time-series.  Defaults to `TimeseriesGranularity::Seconds` if unset.
+    pub granularity: Option<TimeseriesGranularity>,
+}
+
+/// The units you'd use to describe the expected interval between subsequent measurements for a
+/// time-series.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub enum TimeseriesGranularity {
+    /// The expected interval between subsequent measurements is in seconds.
+    Seconds,
+    /// The expected interval between subsequent measurements is in minutes.
+    Minutes,
+    /// The expected interval between subsequent measurements is in hours.
+    Hours,
 }
 
 /// Specifies the options to a [`Database::drop`](../struct.Database.html#method.drop) operation.

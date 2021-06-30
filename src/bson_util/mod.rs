@@ -82,7 +82,6 @@ pub(crate) fn serialize_duration_as_int_millis<S: Serializer>(
     }
 }
 
-#[cfg(test)]
 pub(crate) fn serialize_duration_option_as_int_secs<S: Serializer>(
     val: &Option<Duration>,
     serializer: S,
