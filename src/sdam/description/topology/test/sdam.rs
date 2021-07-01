@@ -46,6 +46,7 @@ pub struct Response(String, TestIsMasterCommandResponse);
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TestIsMasterCommandResponse {
+    pub is_writable_primary: Option<bool>,
     #[serde(rename = "ismaster")]
     pub is_master: Option<bool>,
     pub ok: Option<f32>,
@@ -77,6 +78,7 @@ pub(crate) struct TestIsMasterCommandResponse {
 impl From<TestIsMasterCommandResponse> for IsMasterCommandResponse {
     fn from(test: TestIsMasterCommandResponse) -> Self {
         IsMasterCommandResponse {
+            is_writable_primary: test.is_writable_primary,
             is_master: test.is_master,
             ok: test.ok,
             hosts: test.hosts,
