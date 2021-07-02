@@ -147,7 +147,10 @@ pub struct DatabaseSpecification {
     pub name: String,
 
     /// The amount of disk space in bytes that is consumed by the database.
-    #[serde(deserialize_with = "crate::bson_util::deserialize_u64_from_bson_number")]
+    #[serde(
+        deserialize_with = "crate::bson_util::deserialize_u64_from_bson_number",
+        serialize_with = "crate::bson::serde_helpers::serialize_u64_as_i64"
+    )]
     pub size_on_disk: u64,
 
     /// Whether the database has any data.

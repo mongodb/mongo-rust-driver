@@ -5,16 +5,16 @@ mod test_event;
 mod test_file;
 mod test_runner;
 
-use std::time::Duration;
+use std::{fs::read_dir, path::PathBuf, time::Duration};
 
-use futures::stream::TryStreamExt;
+use futures::{future::FutureExt, stream::TryStreamExt};
 use semver::Version;
 use tokio::sync::RwLockWriteGuard;
 
 use crate::{
     bson::{doc, Document},
     options::{CollectionOptions, FindOptions, ReadConcern, ReadPreference, SelectionCriteria},
-    test::{run_spec_test, LOCK},
+    test::{run_single_test, run_spec_test, LOCK},
     RUNTIME,
 };
 
@@ -165,40 +165,41 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                         }
                     }
 
-                    if let Some(ref expect_result) = operation.expect_result {
-                        let result = result
-                            .unwrap_or_else(|e| {
-                                panic!(
-                                    "{} should succeed, but the following error: {}",
-                                    operation.name, e
-                                )
-                            })
-                            .unwrap_or_else(|| {
-                                panic!("{} should return an entity", operation.name)
-                            });
-                        match result {
-                            Entity::Bson(ref result) => {
-                                assert!(
-                                    results_match(
-                                        Some(result),
-                                        expect_result,
-                                        operation.returns_root_documents(),
-                                        Some(&test_runner.entities),
-                                    ),
-                                    "result mismatch, expected = {:#?}  actual = {:#?}",
-                                    expect_result,
-                                    result
-                                );
-                            }
-                            _ => panic!(
-                                "Incorrect entity type returned from {}, expected BSON",
-                                operation.name
-                            ),
-                        }
-                    } else if let Some(expect_error) = operation.expect_error {
+                    if let Some(expect_error) = operation.expect_error {
                         let error = result
                             .expect_err(&format!("{} should return an error", operation.name));
                         expect_error.verify_result(error);
+                    } else {
+                        let result = result.unwrap_or_else(|e| {
+                            panic!(
+                                "{} should succeed, but the following error: {}",
+                                operation.name, e
+                            )
+                        });
+                        if let Some(ref expect_result) = operation.expect_result {
+                            let result = result.unwrap_or_else(|| {
+                                panic!("{} should return an entity", operation.name)
+                            });
+                            match result {
+                                Entity::Bson(ref result) => {
+                                    assert!(
+                                        results_match(
+                                            Some(result),
+                                            expect_result,
+                                            operation.returns_root_documents(),
+                                            Some(&test_runner.entities),
+                                        ),
+                                        "result mismatch, expected = {:#?}  actual = {:#?}",
+                                        expect_result,
+                                        result
+                                    );
+                                }
+                                _ => panic!(
+                                    "Incorrect entity type returned from {}, expected BSON",
+                                    operation.name
+                                ),
+                            }
+                        }
                     }
                 }
             }
@@ -272,5 +273,38 @@ pub async fn run_unified_format_test(test_file: TestFile) {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn test_examples() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-    run_spec_test(&["unified-runner-examples"], run_unified_format_test).await;
+    run_spec_test(
+        &["unified-test-format", "unified-runner-examples"],
+        run_unified_format_test,
+    )
+    .await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn valid_fail() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "src",
+        "test",
+        "spec",
+        "json",
+        "unified-test-format",
+        "valid-fail",
+    ]
+    .iter()
+    .collect();
+
+    for entry in read_dir(&path).unwrap() {
+        let test_file_path = PathBuf::from(entry.unwrap().file_name());
+        let path = path.join(&test_file_path);
+        let path_display = path.display().to_string();
+
+        std::panic::AssertUnwindSafe(run_single_test(path, &run_unified_format_test))
+            .catch_unwind()
+            .await
+            .expect_err(&format!("tests from {} should have failed", path_display));
+    }
 }
