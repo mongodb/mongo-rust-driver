@@ -268,7 +268,7 @@ pub(crate) fn array_entry_size_bytes(index: usize, doc: &Document) -> u64 {
     //   * number of decimal digits in key
     //   * null terminator for the key (1 byte)
     //   * size of value
-    1 + num_decimal_digits(index) + 1 + doc_size_bytes(&doc)
+    1 + num_decimal_digits(index) + 1 + doc_size_bytes(doc)
 }
 
 /// The number of digits in `n` in base 10.

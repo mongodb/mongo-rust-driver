@@ -225,7 +225,7 @@ impl Client {
             Err(_) => return Err(first_error),
         };
 
-        let retryability = self.get_retryability(&conn, op, &session).await?;
+        let retryability = self.get_retryability(&conn, op, session).await?;
         if retryability == Retryability::None {
             return Err(first_error);
         }
