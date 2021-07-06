@@ -4,7 +4,7 @@ mod test;
 use serde::Deserialize;
 
 use crate::{
-    bson::{doc, Bson, Document},
+    bson::{doc, Bson, Document, Timestamp},
     cmap::{Command, CommandResponse, StreamDescription},
     coll::{options::DistinctOptions, Namespace},
     error::Result,
@@ -93,4 +93,5 @@ impl Operation for Distinct {
 #[derive(Debug, Deserialize)]
 struct ResponseBody {
     values: Vec<Bson>,
+    at_cluster_time: Option<Timestamp>,
 }

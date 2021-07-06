@@ -22,7 +22,7 @@ use std::{collections::VecDeque, fmt::Debug, ops::Deref};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bson::{self, Bson, Document},
+    bson::{self, Bson, Document, Timestamp},
     cmap::{Command, CommandResponse, StreamDescription},
     error::{
         BulkWriteError,
@@ -221,6 +221,7 @@ struct CursorInfo {
     ns: Namespace,
     #[serde(rename = "firstBatch")]
     first_batch: VecDeque<Document>,
+    at_cluster_time: Option<Timestamp>,
 }
 
 #[derive(Debug, PartialEq)]
