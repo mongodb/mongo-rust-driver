@@ -2307,6 +2307,11 @@ pub struct SessionOptions {
     /// on the [`Database`](../struct.Database.html) or [`Collection`](../struct.Collection.html)
     /// associated with the operations within the transaction.
     pub default_transaction_options: Option<TransactionOptions>,
+
+    /// If true, all read operations performed using this client session will share the same
+    /// snapshot.  Defaults to false.
+    // TODO RUST-18 enforce snapshot exclusivity with causalConsistency.
+    pub snapshot: Option<bool>,
 }
 
 /// Contains the options that can be used for a transaction.
