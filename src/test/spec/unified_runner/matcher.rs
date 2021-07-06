@@ -116,6 +116,9 @@ fn results_match_inner(
             };
 
             for (key, value) in expected_doc {
+                if key == "upsertedCount" {
+                    continue;
+                }
                 if !results_match_inner(actual_doc.get(key), value, false, false, entities) {
                     return false;
                 }

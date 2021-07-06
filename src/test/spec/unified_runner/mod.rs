@@ -178,12 +178,17 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                             });
                         match result {
                             Entity::Bson(ref result) => {
-                                assert!(results_match(
-                                    Some(result),
+                                assert!(
+                                    results_match(
+                                        Some(result),
+                                        expect_result,
+                                        operation.returns_root_documents(),
+                                        Some(&test_runner.entities),
+                                    ),
+                                    "result mismatch, expected = {:#?}  actual = {:#?}",
                                     expect_result,
-                                    operation.returns_root_documents(),
-                                    Some(&test_runner.entities),
-                                ));
+                                    result
+                                );
                             }
                             _ => panic!(
                                 "Incorrect entity type returned from {}, expected BSON",
