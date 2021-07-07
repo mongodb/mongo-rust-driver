@@ -103,7 +103,7 @@ pub(crate) struct GetMoreResult {
 impl OperationResult for GetMoreResult {}
 
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 pub(crate) struct DistinctResult {
     pub(crate) values: Vec<Bson>,
     pub(crate) at_cluster_time: Option<Timestamp>,

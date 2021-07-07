@@ -25,6 +25,7 @@ fn build_test(
         address,
         batch_size,
         max_time,
+        at_cluster_time: None,
     };
     let mut get_more = GetMore::new(info);
 
@@ -116,6 +117,7 @@ async fn build_batch_size() {
         id: cursor_id,
         batch_size: Some((std::i32::MAX as u32) + 1),
         max_time: None,
+        at_cluster_time: None,
     };
     let mut op = GetMore::new(info);
     assert!(op.build(&StreamDescription::new_testing()).is_err())
@@ -135,6 +137,7 @@ async fn op_selection_criteria() {
         id: 123,
         batch_size: None,
         max_time: None,
+        at_cluster_time: None,
     };
     let get_more = GetMore::new(info);
     let server_description = ServerDescription {
@@ -180,6 +183,7 @@ async fn handle_success() {
         id: cursor_id,
         batch_size: None,
         max_time: None,
+        at_cluster_time: None,
     };
     let get_more = GetMore::new(info);
 
