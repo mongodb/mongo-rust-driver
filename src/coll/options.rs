@@ -509,7 +509,7 @@ pub struct CountOptions {
     ///
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
-    #[serde(deserialize_with = "deserialize_duration_from_u64_millis")]
+    #[serde(default, deserialize_with = "deserialize_duration_from_u64_millis")]
     pub max_time: Option<Duration>,
 
     /// The number of documents to skip before counting.
@@ -548,6 +548,7 @@ pub struct EstimatedDocumentCountOptions {
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
     #[serde(
+        default,
         serialize_with = "serialize_duration_as_int_millis",
         rename = "maxTimeMS",
         deserialize_with = "deserialize_duration_from_u64_millis"
@@ -577,6 +578,7 @@ pub struct DistinctOptions {
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
     #[serde(
+        default,
         serialize_with = "serialize_duration_as_int_millis",
         rename = "maxTimeMS",
         deserialize_with = "deserialize_duration_from_u64_millis"

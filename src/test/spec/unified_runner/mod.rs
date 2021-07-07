@@ -274,7 +274,7 @@ pub async fn run_unified_format_test(test_file: TestFile) {
 async fn test_examples() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
     run_spec_test(
-        &["unified-test-format", "unified-runner-examples"],
+        &["unified-test-format", "examples"],
         run_unified_format_test,
     )
     .await;
