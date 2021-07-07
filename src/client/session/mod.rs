@@ -516,6 +516,7 @@ struct DroppedClientSession {
     client: Client,
     is_implicit: bool,
     options: Option<SessionOptions>,
+    pinned_session: Option<SelectionCriteria>,
     transaction: Transaction,
     snapshot_time: Option<Timestamp>,
 }
@@ -528,7 +529,7 @@ impl From<DroppedClientSession> for ClientSession {
             client: dropped_session.client,
             is_implicit: dropped_session.is_implicit,
             options: dropped_session.options,
-            pinned_session: None,
+            pinned_session: dropped_session.pinned_session,
             transaction: dropped_session.transaction,
             snapshot_time: dropped_session.snapshot_time,
         }
@@ -544,6 +545,7 @@ impl Drop for ClientSession {
                 client: self.client.clone(),
                 is_implicit: self.is_implicit,
                 options: self.options.clone(),
+                pinned_session: self.pinned_session.clone(),
                 transaction: self.transaction.clone(),
                 snapshot_time: self.snapshot_time,
             };
