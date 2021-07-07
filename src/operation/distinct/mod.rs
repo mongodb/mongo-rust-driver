@@ -1,14 +1,13 @@
 #[cfg(test)]
 mod test;
 
-use serde::Deserialize;
-
 use crate::{
-    bson::{doc, Bson, Document, Timestamp},
+    bson::{doc, Document},
     cmap::{Command, CommandResponse, StreamDescription},
     coll::{options::DistinctOptions, Namespace},
     error::Result,
     operation::{append_options, Operation, Retryability},
+    results::DistinctResult,
     selection_criteria::SelectionCriteria,
 };
 
@@ -49,7 +48,7 @@ impl Distinct {
 }
 
 impl Operation for Distinct {
-    type O = Vec<Bson>;
+    type O = DistinctResult;
     const NAME: &'static str = "distinct";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -75,7 +74,7 @@ impl Operation for Distinct {
         response: CommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
-        response.body::<ResponseBody>().map(|body| body.values)
+        response.body::<DistinctResult>()
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
@@ -88,10 +87,4 @@ impl Operation for Distinct {
     fn retryability(&self) -> Retryability {
         Retryability::Read
     }
-}
-
-#[derive(Debug, Deserialize)]
-struct ResponseBody {
-    values: Vec<Bson>,
-    at_cluster_time: Option<Timestamp>,
 }

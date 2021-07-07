@@ -102,6 +102,19 @@ pub(crate) struct GetMoreResult {
 
 impl OperationResult for GetMoreResult {}
 
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct DistinctResult {
+    pub(crate) values: Vec<Bson>,
+    pub(crate) at_cluster_time: Option<Timestamp>,
+}
+
+impl OperationResult for DistinctResult {
+    fn snapshot_timestamp(&self) -> Option<&Timestamp> {
+        self.at_cluster_time.as_ref()
+    }
+}
+
 /// Describes the type of data store returned when executing
 /// [`Database::list_collections`](../struct.Database.html#method.list_collections).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

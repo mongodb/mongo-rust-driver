@@ -396,7 +396,7 @@ impl<T> Collection<T> {
             filter.into(),
             options,
         );
-        self.client().execute_operation(op, session).await
+        self.client().execute_operation(op, session).await.map(|r| r.values)
     }
 
     /// Finds the distinct values of the field specified by `field_name` across the collection.
