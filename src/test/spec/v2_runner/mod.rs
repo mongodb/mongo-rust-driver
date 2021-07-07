@@ -304,10 +304,6 @@ pub async fn run_v2_test(test_file: TestFile) {
                         }
                         if let Some(error_code_name) = operation_error.error_code_name {
                             let code_name = error.code_name().unwrap();
-                            // TODO RUST-97: Stop ignoring recoveryToken related errors.
-                            if code_name == "Location50940" {
-                                continue;
-                            }
                             assert_eq!(error_code_name, code_name);
                         }
                         if let Some(error_code) = operation_error.error_code {

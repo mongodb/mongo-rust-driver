@@ -290,6 +290,7 @@ impl Client {
         }
 
         let stream_description = connection.stream_description()?;
+        let is_sharded = stream_description.initial_server_type == ServerType::Mongos;
         let mut cmd = op.build(stream_description)?;
         self.inner
             .topology
@@ -328,15 +329,20 @@ impl Client {
                         cmd.set_start_transaction();
                         cmd.set_autocommit();
                         cmd.set_txn_read_concern(*session)?;
-                        if stream_description.initial_server_type == ServerType::Mongos {
+                        if is_sharded {
                             session.pin_mongos(connection.address().clone());
                         }
                         session.transaction.state = TransactionState::InProgress;
                     }
-                    TransactionState::InProgress
-                    | TransactionState::Committed { .. }
-                    | TransactionState::Aborted => {
+                    TransactionState::InProgress => cmd.set_autocommit(),
+                    TransactionState::Committed { .. } | TransactionState::Aborted => {
                         cmd.set_autocommit();
+                        if is_sharded && session.transaction.recovery_token.is_some() {
+                            // Recovery token
+                            cmd.set_recovery_token(
+                                session.transaction.recovery_token.as_ref().unwrap(),
+                            );
+                        }
                     }
                     _ => {}
                 }
@@ -403,6 +409,13 @@ impl Client {
                     Ok(r) => {
                         self.update_cluster_time(&r, session).await;
                         if r.is_success() {
+                            // Retrieve recovery token from successful response.
+                            if let Some(ref mut session) = session {
+                                if session.in_transaction() && is_sharded {
+                                    session.transaction.recovery_token = r.recovery_token();
+                                }
+                            }
+
                             Ok(CommandResult {
                                 raw: response,
                                 deserialized: r.into_body(),
