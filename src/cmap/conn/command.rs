@@ -87,11 +87,9 @@ impl Command {
     }
 
     pub(crate) fn set_snapshot_read_concern(&mut self, session: &ClientSession) -> Result<()> {
-        let mut concern_doc = bson::to_document(&ReadConcern::snapshot())?;
-        if let Some(timestamp) = session.snapshot_time {
-            concern_doc.insert("atClusterTime", timestamp);
-        }
-        self.body.insert("readConcern", concern_doc);
+        let mut concern = ReadConcern::snapshot();
+        concern.at_cluster_time = session.snapshot_time;
+        self.body.insert("readConcern", bson::to_document(&concern)?);
         Ok(())
     }
 }

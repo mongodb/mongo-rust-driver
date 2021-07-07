@@ -27,7 +27,7 @@ pub struct ReadConcern {
     pub level: ReadConcernLevel,
 
     /// The snapshot read timestamp.
-    at_cluster_time: Option<Timestamp>,
+    pub(crate) at_cluster_time: Option<Timestamp>,
 }
 
 impl ReadConcern {
