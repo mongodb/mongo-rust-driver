@@ -9,10 +9,11 @@ use derivative::Derivative;
 use futures_core::{Future, Stream};
 
 use crate::{
-    bson::Document,
+    bson::{Document, Timestamp},
     error::{Error, ErrorKind, Result},
+    operation,
     options::ServerAddress,
-    results::GetMoreResult,
+    results::{GetMoreResult, OperationResult},
     Client,
     Namespace,
 };
@@ -152,22 +153,21 @@ pub(crate) struct CursorSpecification {
 
 impl CursorSpecification {
     pub(crate) fn new(
-        ns: Namespace,
+        info: operation::CursorInfo,
         address: ServerAddress,
-        id: i64,
         batch_size: impl Into<Option<u32>>,
         max_time: impl Into<Option<Duration>>,
-        initial_buffer: VecDeque<Document>,
     ) -> Self {
         Self {
             info: CursorInformation {
-                ns,
-                id,
+                ns: info.ns,
+                id: info.id,
                 address,
                 batch_size: batch_size.into(),
                 max_time: max_time.into(),
+                at_cluster_time: info.at_cluster_time,
             },
-            initial_buffer,
+            initial_buffer: info.first_batch,
         }
     }
 
@@ -191,6 +191,12 @@ impl CursorSpecification {
     }
 }
 
+impl OperationResult for CursorSpecification {
+    fn snapshot_timestamp(&self) -> Option<&Timestamp> {
+        self.info.at_cluster_time.as_ref()
+    }
+}
+
 /// Static information about a cursor.
 #[derive(Clone, Debug)]
 pub(crate) struct CursorInformation {
@@ -199,4 +205,5 @@ pub(crate) struct CursorInformation {
     pub(crate) id: i64,
     pub(crate) batch_size: Option<u32>,
     pub(crate) max_time: Option<Duration>,
+    pub(crate) at_cluster_time: Option<Timestamp>,
 }

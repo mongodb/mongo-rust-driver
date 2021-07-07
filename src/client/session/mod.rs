@@ -106,7 +106,7 @@ pub struct ClientSession {
     is_implicit: bool,
     options: Option<SessionOptions>,
     pub(crate) transaction: Transaction,
-    snapshot_time: Option<Timestamp>,
+    pub(crate) snapshot_time: Option<Timestamp>,
 }
 
 #[derive(Clone, Debug)]

@@ -72,12 +72,10 @@ impl Operation for ListCollections {
         let body: CursorBody = response.body()?;
 
         Ok(CursorSpecification::new(
-            body.cursor.ns,
+            body.cursor,
             source_address,
-            body.cursor.id,
             self.options.as_ref().and_then(|opts| opts.batch_size),
             None,
-            body.cursor.first_batch,
         ))
     }
 

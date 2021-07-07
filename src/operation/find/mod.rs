@@ -101,15 +101,14 @@ impl Operation for Find {
         _description: &StreamDescription,
     ) -> Result<Self::O> {
         let source_address = response.source_address().clone();
-        let body: CursorBody = response.body()?;
+        let mut body: CursorBody = response.body()?;
+        body.cursor.ns = self.ns.clone();
 
         Ok(CursorSpecification::new(
-            self.ns.clone(),
+            body.cursor,
             source_address,
-            body.cursor.id,
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),
-            body.cursor.first_batch,
         ))
     }
 

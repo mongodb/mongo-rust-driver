@@ -78,12 +78,10 @@ impl Operation for Aggregate {
         let body: CursorBody = response.body()?;
 
         Ok(CursorSpecification::new(
-            body.cursor.ns,
+            body.cursor,
             source_address,
-            body.cursor.id,
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),
-            body.cursor.first_batch,
         ))
     }
 

@@ -19,6 +19,7 @@ use crate::{
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
     operation::{AbortTransaction, CommitTransaction, Operation, Retryability},
     options::SelectionCriteria,
+    results::OperationResult,
     sdam::{HandshakePhase, SelectedServer, SessionSupportStatus, TransactionSupportStatus},
     selection_criteria::ReadPreference,
 };
@@ -282,6 +283,9 @@ impl Client {
                 if let Some(txn_number) = txn_number {
                     cmd.set_txn_number(txn_number);
                 }
+                if session.options().and_then(|opts| opts.snapshot).unwrap_or(false) {
+                    cmd.set_snapshot_read_concern(session)?;
+                }
                 match session.transaction.state {
                     TransactionState::Starting => {
                         cmd.set_start_transaction();
@@ -412,7 +416,15 @@ impl Client {
                 });
 
                 match op.handle_response(response, connection.stream_description()?) {
-                    Ok(response) => Ok(response),
+                    Ok(response) => {
+                        match (response.snapshot_timestamp(), session.as_mut()) {
+                            (Some(timestamp), Some(session)) => {
+                                session.snapshot_time = Some(*timestamp);
+                            }
+                            _ => (),
+                        }
+                        Ok(response)
+                    }
                     Err(mut err) => {
                         err.add_labels(Some(connection), session, Some(retryability))?;
                         Err(err)

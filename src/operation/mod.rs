@@ -34,6 +34,7 @@ use crate::{
         WriteFailure,
     },
     options::WriteConcern,
+    results::OperationResult,
     selection_criteria::SelectionCriteria,
     Namespace,
 };
@@ -60,7 +61,7 @@ pub(crate) use update::Update;
 /// A trait modeling the behavior of a server side operation.
 pub(crate) trait Operation {
     /// The output type of this operation.
-    type O;
+    type O: OperationResult;
 
     /// The name of the server side command associated with this operation.
     const NAME: &'static str;
@@ -216,12 +217,12 @@ struct CursorBody {
 }
 
 #[derive(Debug, Deserialize)]
-struct CursorInfo {
-    id: i64,
-    ns: Namespace,
+pub(crate) struct CursorInfo {
+    pub(crate) id: i64,
+    pub(crate) ns: Namespace,
     #[serde(rename = "firstBatch")]
-    first_batch: VecDeque<Document>,
-    at_cluster_time: Option<Timestamp>,
+    pub(crate) first_batch: VecDeque<Document>,
+    pub(crate) at_cluster_time: Option<Timestamp>,
 }
 
 #[derive(Debug, PartialEq)]

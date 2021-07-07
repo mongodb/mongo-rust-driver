@@ -5,6 +5,7 @@ use crate::{
     bson::{Bson, Document},
     bson_util,
     client::{options::ServerApi, ClusterTime},
+    concern::ReadConcern,
     error::{CommandError, Error, ErrorKind, Result},
     options::ServerAddress,
     selection_criteria::ReadPreference,
@@ -82,6 +83,15 @@ impl Command {
                     .insert("readConcern", bson::to_document(read_concern)?);
             }
         }
+        Ok(())
+    }
+
+    pub(crate) fn set_snapshot_read_concern(&mut self, session: &ClientSession) -> Result<()> {
+        let mut concern_doc = bson::to_document(&ReadConcern::snapshot())?;
+        if let Some(timestamp) = session.snapshot_time {
+            concern_doc.insert("atClusterTime", timestamp);
+        }
+        self.body.insert("readConcern", concern_doc);
         Ok(())
     }
 }
