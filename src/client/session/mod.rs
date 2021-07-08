@@ -109,7 +109,6 @@ pub struct ClientSession {
     client: Client,
     is_implicit: bool,
     options: Option<SessionOptions>,
-    pub(crate) pinned_session: Option<SelectionCriteria>,
     pub(crate) transaction: Transaction,
     pub(crate) snapshot_time: Option<Timestamp>,
 }
@@ -118,6 +117,7 @@ pub struct ClientSession {
 pub(crate) struct Transaction {
     pub(crate) state: TransactionState,
     pub(crate) options: Option<TransactionOptions>,
+    pub(crate) pinned_mongos: Option<SelectionCriteria>,
 }
 
 impl Transaction {
@@ -138,6 +138,7 @@ impl Transaction {
     pub(crate) fn reset(&mut self) {
         self.state = TransactionState::None;
         self.options = None;
+        self.pinned_mongos = None;
     }
 }
 
@@ -146,6 +147,7 @@ impl Default for Transaction {
         Self {
             state: TransactionState::None,
             options: None,
+            pinned_mongos: None,
         }
     }
 }
@@ -178,7 +180,6 @@ impl ClientSession {
             cluster_time: None,
             is_implicit,
             options,
-            pinned_session: None,
             transaction: Default::default(),
             snapshot_time: None,
         }
@@ -253,9 +254,13 @@ impl ClientSession {
 
     /// Pin mongos to session.
     pub(crate) fn pin_mongos(&mut self, address: ServerAddress) {
-        self.pinned_session = Some(SelectionCriteria::Predicate(Arc::new(
+        self.transaction.pinned_mongos = Some(SelectionCriteria::Predicate(Arc::new(
             move |server_info: &ServerInfo| *server_info.address() == address,
         )));
+    }
+
+    pub(crate) fn unpin_mongos(&mut self) {
+        self.transaction.pinned_mongos = None;
     }
 
     /// Whether this session is dirty.
@@ -312,7 +317,7 @@ impl ClientSession {
                 .into());
             }
             TransactionState::Committed { .. } => {
-                self.pinned_session = None; // Unpin session if previous transaction is committed.
+                self.unpin_mongos(); // Unpin session if previous transaction is committed.
             }
             _ => {}
         }
@@ -514,7 +519,6 @@ struct DroppedClientSession {
     client: Client,
     is_implicit: bool,
     options: Option<SessionOptions>,
-    pinned_session: Option<SelectionCriteria>,
     transaction: Transaction,
     snapshot_time: Option<Timestamp>,
 }
@@ -527,7 +531,6 @@ impl From<DroppedClientSession> for ClientSession {
             client: dropped_session.client,
             is_implicit: dropped_session.is_implicit,
             options: dropped_session.options,
-            pinned_session: dropped_session.pinned_session,
             transaction: dropped_session.transaction,
             snapshot_time: dropped_session.snapshot_time,
         }
@@ -543,7 +546,6 @@ impl Drop for ClientSession {
                 client: self.client.clone(),
                 is_implicit: self.is_implicit,
                 options: self.options.clone(),
-                pinned_session: self.pinned_session.clone(),
                 transaction: self.transaction.clone(),
                 snapshot_time: self.snapshot_time,
             };

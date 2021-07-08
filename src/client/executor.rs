@@ -129,14 +129,14 @@ impl Client {
                 || session.transaction.state == TransactionState::Aborted
                     && op.name() != AbortTransaction::NAME
             {
-                session.pinned_session = None; // Unpin session during non-transactional operation.
                 session.transaction.reset();
             }
         }
 
         let selection_criteria = if let Some(ref session) = session {
             session
-                .pinned_session
+                .transaction
+                .pinned_mongos
                 .as_ref()
                 .or_else(|| op.selection_criteria())
         } else {
@@ -168,7 +168,7 @@ impl Client {
         // the command succeeds, fails, or is executed.
         if let Some(ref mut session) = session {
             if session.transaction.state == TransactionState::Aborted {
-                session.pinned_session = None;
+                session.unpin_mongos();
             }
         }
 
@@ -228,7 +228,7 @@ impl Client {
 
                 if let Some(ref mut session) = session {
                     if err.labels().get(TRANSIENT_TRANSACTION_ERROR).is_some() {
-                        session.pinned_session = None;
+                        session.unpin_mongos();
                     }
 
                     if op.name() == CommitTransaction::NAME
@@ -237,7 +237,7 @@ impl Client {
                             .get(UNKNOWN_TRANSACTION_COMMIT_RESULT)
                             .is_some()
                     {
-                        session.pinned_session = None;
+                        session.unpin_mongos();
                     }
                 }
 

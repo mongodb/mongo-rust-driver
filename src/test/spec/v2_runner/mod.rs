@@ -248,7 +248,8 @@ pub async fn run_v2_test(test_file: TestFile) {
 
                             let selection_criteria = session
                                 .unwrap()
-                                .pinned_session
+                                .transaction
+                                .pinned_mongos
                                 .clone()
                                 .unwrap_or_else(|| panic!("ClientSession is not pinned"));
 

@@ -1289,7 +1289,7 @@ impl TestOperation for AssertSessionPinned {
     }
 
     async fn execute_on_session(&self, session: &mut ClientSession) -> Result<Option<Bson>> {
-        assert!(session.pinned_session.is_some());
+        assert!(session.transaction.pinned_mongos.is_some());
         Ok(None)
     }
 }
@@ -1320,7 +1320,7 @@ impl TestOperation for AssertSessionUnpinned {
     }
 
     async fn execute_on_session(&self, session: &mut ClientSession) -> Result<Option<Bson>> {
-        assert!(session.pinned_session.is_none());
+        assert!(session.transaction.pinned_mongos.is_none());
         Ok(None)
     }
 }
