@@ -62,22 +62,26 @@ where
         }
 
         let test_file_full_path = base_path.join(&test_file_path);
-        let json: Value =
-            serde_json::from_reader(File::open(test_file_full_path.as_path()).unwrap()).unwrap();
-
-        // Printing the name of the test file makes it easier to debug deserialization errors.
-        println!(
-            "Running tests from {}",
-            test_file_full_path.display().to_string()
-        );
-
-        run_test_file(
-            bson::from_bson(
-                Bson::try_from(json)
-                    .unwrap_or_else(|_| panic!("{}", test_file_full_path.display().to_string())),
-            )
-            .unwrap_or_else(|e| panic!("{}: {}", test_file_full_path.display().to_string(), e)),
-        )
-        .await
+        run_single_test(test_file_full_path, &run_test_file).await;
     }
+}
+
+pub(crate) async fn run_single_test<T, F, G>(path: PathBuf, run_test_file: &F)
+where
+    F: Fn(T) -> G,
+    G: Future<Output = ()>,
+    T: DeserializeOwned,
+{
+    let json: Value = serde_json::from_reader(File::open(path.as_path()).unwrap()).unwrap();
+
+    // Printing the name of the test file makes it easier to debug deserialization errors.
+    println!("Running tests from {}", path.display().to_string());
+
+    run_test_file(
+        bson::from_bson(
+            Bson::try_from(json).unwrap_or_else(|_| panic!("{}", path.display().to_string())),
+        )
+        .unwrap_or_else(|e| panic!("{}: {}", path.display().to_string(), e)),
+    )
+    .await
 }

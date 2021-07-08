@@ -1,6 +1,10 @@
 //! Contains the `Error` and `Result` types that `mongodb` uses.
 
-use std::{collections::{HashMap, HashSet}, fmt::{self, Debug}, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::{self, Debug},
+    sync::Arc,
+};
 
 use bson::Bson;
 use serde::Deserialize;
@@ -58,8 +62,7 @@ impl Error {
         ErrorKind::ConnectionPoolCleared {
             message: format!(
                 "Connection pool for {} cleared because another operation failed with: {}",
-                address,
-                cause
+                address, cause
             ),
         }
         .into()

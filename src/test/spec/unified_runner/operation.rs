@@ -246,7 +246,7 @@ impl Deref for Operation {
 pub(super) struct DeleteMany {
     filter: Document,
     #[serde(flatten)]
-    options: Option<DeleteOptions>,
+    options: DeleteOptions,
 }
 
 #[async_trait]
@@ -274,7 +274,7 @@ impl TestOperation for DeleteMany {
 pub(super) struct DeleteOne {
     filter: Document,
     #[serde(flatten)]
-    options: Option<DeleteOptions>,
+    options: DeleteOptions,
 }
 
 #[async_trait]
@@ -302,7 +302,7 @@ impl TestOperation for DeleteOne {
 pub(super) struct Find {
     filter: Option<Document>,
     #[serde(flatten)]
-    options: Option<FindOptions>,
+    options: FindOptions,
 }
 
 #[async_trait]
@@ -334,7 +334,7 @@ impl TestOperation for Find {
 pub(super) struct InsertMany {
     documents: Vec<Document>,
     #[serde(flatten)]
-    options: Option<InsertManyOptions>,
+    options: InsertManyOptions,
 }
 
 #[async_trait]
@@ -368,7 +368,7 @@ pub(super) struct InsertOne {
     document: Document,
     session: Option<String>,
     #[serde(flatten)]
-    options: Option<InsertOneOptions>,
+    options: InsertOneOptions,
 }
 
 #[async_trait]
@@ -410,7 +410,7 @@ pub(super) struct UpdateMany {
     filter: Document,
     update: UpdateModifications,
     #[serde(flatten)]
-    options: Option<UpdateOptions>,
+    options: UpdateOptions,
 }
 
 #[async_trait]
@@ -443,7 +443,7 @@ pub(super) struct UpdateOne {
     filter: Document,
     update: UpdateModifications,
     #[serde(flatten)]
-    options: Option<UpdateOptions>,
+    options: UpdateOptions,
     session: Option<String>,
 }
 
@@ -490,7 +490,7 @@ impl TestOperation for UpdateOne {
 pub(super) struct Aggregate {
     pipeline: Vec<Document>,
     #[serde(flatten)]
-    options: Option<AggregateOptions>,
+    options: AggregateOptions,
 }
 
 #[async_trait]
@@ -531,7 +531,7 @@ pub(super) struct Distinct {
     field_name: String,
     filter: Option<Document>,
     #[serde(flatten)]
-    options: Option<DistinctOptions>,
+    options: DistinctOptions,
 }
 
 #[async_trait]
@@ -558,7 +558,7 @@ impl TestOperation for Distinct {
 pub(super) struct CountDocuments {
     filter: Document,
     #[serde(flatten)]
-    options: Option<CountOptions>,
+    options: CountOptions,
 }
 
 #[async_trait]
@@ -584,7 +584,7 @@ impl TestOperation for CountDocuments {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct EstimatedDocumentCount {
     #[serde(flatten)]
-    options: Option<EstimatedDocumentCountOptions>,
+    options: EstimatedDocumentCountOptions,
 }
 
 #[async_trait]
@@ -611,7 +611,7 @@ impl TestOperation for EstimatedDocumentCount {
 pub(super) struct FindOne {
     filter: Option<Document>,
     #[serde(flatten)]
-    options: Option<FindOneOptions>,
+    options: FindOneOptions,
 }
 
 #[async_trait]
@@ -641,7 +641,7 @@ impl TestOperation for FindOne {
 pub(super) struct ListDatabases {
     filter: Option<Document>,
     #[serde(flatten)]
-    options: Option<ListDatabasesOptions>,
+    options: ListDatabasesOptions,
 }
 
 #[async_trait]
@@ -668,7 +668,7 @@ impl TestOperation for ListDatabases {
 pub(super) struct ListDatabaseNames {
     filter: Option<Document>,
     #[serde(flatten)]
-    options: Option<ListDatabasesOptions>,
+    options: ListDatabasesOptions,
 }
 
 #[async_trait]
@@ -696,7 +696,7 @@ impl TestOperation for ListDatabaseNames {
 pub(super) struct ListCollections {
     filter: Option<Document>,
     #[serde(flatten)]
-    options: Option<ListCollectionsOptions>,
+    options: ListCollectionsOptions,
 }
 
 #[async_trait]
@@ -753,7 +753,7 @@ pub(super) struct ReplaceOne {
     filter: Document,
     replacement: Document,
     #[serde(flatten)]
-    options: Option<ReplaceOptions>,
+    options: ReplaceOptions,
 }
 
 #[async_trait]
@@ -786,7 +786,7 @@ pub(super) struct FindOneAndUpdate {
     filter: Document,
     update: UpdateModifications,
     #[serde(flatten)]
-    options: Option<FindOneAndUpdateOptions>,
+    options: FindOneAndUpdateOptions,
 }
 
 #[async_trait]
@@ -819,7 +819,7 @@ pub(super) struct FindOneAndReplace {
     filter: Document,
     replacement: Document,
     #[serde(flatten)]
-    options: Option<FindOneAndReplaceOptions>,
+    options: FindOneAndReplaceOptions,
 }
 
 #[async_trait]
@@ -851,7 +851,7 @@ impl TestOperation for FindOneAndReplace {
 pub(super) struct FindOneAndDelete {
     filter: Document,
     #[serde(flatten)]
-    options: Option<FindOneAndDeleteOptions>,
+    options: FindOneAndDeleteOptions,
 }
 
 #[async_trait]
@@ -956,7 +956,7 @@ impl TestOperation for AssertCollectionNotExists {
 pub(super) struct CreateCollection {
     collection: String,
     #[serde(flatten)]
-    options: Option<CreateCollectionOptions>,
+    options: CreateCollectionOptions,
     session: Option<String>,
 }
 
@@ -995,7 +995,7 @@ impl TestOperation for CreateCollection {
 pub(super) struct DropCollection {
     collection: String,
     #[serde(flatten)]
-    options: Option<DropCollectionOptions>,
+    options: DropCollectionOptions,
     session: Option<String>,
 }
 
