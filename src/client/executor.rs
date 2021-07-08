@@ -134,7 +134,7 @@ impl Client {
             }
         }
 
-        let selection_criteria = if let Some(session) = &session {
+        let selection_criteria = if let Some(ref session) = session {
             session
                 .pinned_session
                 .as_ref()
@@ -163,6 +163,14 @@ impl Client {
                 }
             }
         };
+
+        // If the transaction is being aborted, unpin session before retry and regardless of whether
+        // the command succeeds, fails, or is executed.
+        if let Some(ref mut session) = session {
+            if session.transaction.state == TransactionState::Aborted {
+                session.pinned_session = None;
+            }
+        }
 
         let retryability = self.get_retryability(&conn, &op, &session).await?;
 
