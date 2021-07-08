@@ -271,7 +271,8 @@ pub async fn run_v2_test(test_file: TestFile) {
                                 .unwrap_or_else(|| panic!("ClientSession is not pinned"));
 
                             fail_point_guards.push(
-                                internal_client
+                                client
+                                    .deref()
                                     .enable_failpoint(fail_point, Some(selection_criteria))
                                     .await
                                     .unwrap(),

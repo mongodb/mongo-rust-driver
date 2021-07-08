@@ -337,11 +337,13 @@ impl Client {
                     TransactionState::InProgress => cmd.set_autocommit(),
                     TransactionState::Committed { .. } | TransactionState::Aborted => {
                         cmd.set_autocommit();
-                        if is_sharded && session.transaction.recovery_token.is_some() {
-                            // Recovery token
-                            cmd.set_recovery_token(
-                                session.transaction.recovery_token.as_ref().unwrap(),
-                            );
+
+                        // Append the recovery token to the command if we are committing or aborting
+                        // on a sharded transaction.
+                        if is_sharded {
+                            if let Some(ref recovery_token) = session.transaction.recovery_token {
+                                cmd.set_recovery_token(recovery_token);
+                            }
                         }
                     }
                     _ => {}
