@@ -9,11 +9,11 @@ use derivative::Derivative;
 use futures_core::{Future, Stream};
 
 use crate::{
-    bson::{Document, Timestamp},
+    bson::{Document},
     error::{Error, ErrorKind, Result},
     operation,
     options::ServerAddress,
-    results::{GetMoreResult, OperationResult},
+    results::{GetMoreResult},
     Client,
     Namespace,
 };
@@ -165,7 +165,6 @@ impl CursorSpecification {
                 address,
                 batch_size: batch_size.into(),
                 max_time: max_time.into(),
-                at_cluster_time: info.at_cluster_time,
             },
             initial_buffer: info.first_batch,
         }
@@ -191,12 +190,6 @@ impl CursorSpecification {
     }
 }
 
-impl OperationResult for CursorSpecification {
-    fn snapshot_timestamp(&self) -> Option<&Timestamp> {
-        self.info.at_cluster_time.as_ref()
-    }
-}
-
 /// Static information about a cursor.
 #[derive(Clone, Debug)]
 pub(crate) struct CursorInformation {
@@ -205,5 +198,4 @@ pub(crate) struct CursorInformation {
     pub(crate) id: i64,
     pub(crate) batch_size: Option<u32>,
     pub(crate) max_time: Option<Duration>,
-    pub(crate) at_cluster_time: Option<Timestamp>,
 }

@@ -22,7 +22,7 @@ use std::{collections::VecDeque, fmt::Debug, ops::Deref};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bson::{self, Bson, Document, Timestamp},
+    bson::{self, Bson, Document},
     cmap::{Command, CommandResponse, StreamDescription},
     error::{
         BulkWriteError,
@@ -34,7 +34,6 @@ use crate::{
         WriteFailure,
     },
     options::WriteConcern,
-    results::OperationResult,
     selection_criteria::SelectionCriteria,
     Namespace,
 };
@@ -61,7 +60,7 @@ pub(crate) use update::Update;
 /// A trait modeling the behavior of a server side operation.
 pub(crate) trait Operation {
     /// The output type of this operation.
-    type O: OperationResult;
+    type O;
 
     /// The name of the server side command associated with this operation.
     const NAME: &'static str;
@@ -223,7 +222,6 @@ pub(crate) struct CursorInfo {
     pub(crate) ns: Namespace,
     #[serde(rename = "firstBatch")]
     pub(crate) first_batch: VecDeque<Document>,
-    pub(crate) at_cluster_time: Option<Timestamp>,
 }
 
 #[derive(Debug, PartialEq)]

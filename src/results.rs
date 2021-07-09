@@ -3,25 +3,12 @@
 use std::collections::{HashMap, VecDeque};
 
 use crate::{
-    bson::{Bson, Document, Timestamp},
+    bson::{Bson, Document},
     db::options::CreateCollectionOptions,
 };
 
 use bson::Binary;
 use serde::{Deserialize, Serialize};
-
-pub(crate) trait OperationResult {
-    /// Extracts the "atClusterTime" timestamp, if any.
-    fn snapshot_timestamp(&self) -> Option<&Timestamp> {
-        None
-    }
-}
-
-impl OperationResult for () {}
-impl OperationResult for u64 {}
-impl<T> OperationResult for Option<T> {}
-impl<T> OperationResult for Vec<T> {}
-impl OperationResult for Document {}
 
 /// The result of a [`Collection::insert_one`](../struct.Collection.html#method.insert_one)
 /// operation.
@@ -59,8 +46,6 @@ impl InsertManyResult {
     }
 }
 
-impl OperationResult for InsertManyResult {}
-
 /// The result of a [`Collection::update_one`](../struct.Collection.html#method.update_one) or
 /// [`Collection::update_many`](../struct.Collection.html#method.update_many) operation.
 #[derive(Debug, Serialize)]
@@ -79,8 +64,6 @@ pub struct UpdateResult {
     pub upserted_id: Option<Bson>,
 }
 
-impl OperationResult for UpdateResult {}
-
 /// The result of a [`Collection::delete_one`](../struct.Collection.html#method.delete_one) or
 /// [`Collection::delete_many`](../struct.Collection.html#method.delete_many) operation.
 #[derive(Debug, Serialize)]
@@ -92,28 +75,10 @@ pub struct DeleteResult {
     pub deleted_count: u64,
 }
 
-impl OperationResult for DeleteResult {}
-
 #[derive(Debug, Clone)]
 pub(crate) struct GetMoreResult {
     pub(crate) batch: VecDeque<Document>,
     pub(crate) exhausted: bool,
-}
-
-impl OperationResult for GetMoreResult {}
-
-
-#[derive(Debug, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct DistinctResult {
-    pub(crate) values: Vec<Bson>,
-    pub(crate) at_cluster_time: Option<Timestamp>,
-}
-
-impl OperationResult for DistinctResult {
-    fn snapshot_timestamp(&self) -> Option<&Timestamp> {
-        self.at_cluster_time.as_ref()
-    }
 }
 
 /// Describes the type of data store returned when executing

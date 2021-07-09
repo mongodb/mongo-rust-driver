@@ -19,7 +19,6 @@ use crate::{
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
     operation::{AbortTransaction, CommitTransaction, Operation, Retryability},
     options::SelectionCriteria,
-    results::OperationResult,
     sdam::{HandshakePhase, SelectedServer, SessionSupportStatus, TransactionSupportStatus},
     selection_criteria::ReadPreference,
 };

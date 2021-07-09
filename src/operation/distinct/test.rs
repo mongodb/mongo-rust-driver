@@ -6,7 +6,6 @@ use crate::{
     coll::{options::DistinctOptions, Namespace},
     error::ErrorKind,
     operation::{test, Distinct, Operation},
-    results::DistinctResult,
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -99,21 +98,17 @@ async fn handle_success() {
     let distinct_op = Distinct::empty();
 
     let expected_values = vec![Bson::String("A".to_string()), Bson::String("B".to_string())];
-    let expected_result = DistinctResult {
-        values: expected_values.clone(),
-        at_cluster_time: None,
-    };
 
     let response = CommandResponse::with_document(doc! {
-       "values" : expected_values,
+       "values" : expected_values.clone(),
        "ok" : 1
     });
 
-    let actual_result = distinct_op
+    let actual_values = distinct_op
         .handle_response(response, &Default::default())
         .expect("supposed to succeed");
 
-    assert_eq!(actual_result, expected_result);
+    assert_eq!(actual_values, expected_values);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -126,16 +121,13 @@ async fn handle_response_with_empty_values() {
        "ok" : 1
     });
 
-    let expected_result = DistinctResult {
-        values: Vec::new(),
-        at_cluster_time: None,
-    };
+    let expected_values = Vec::new();
 
-    let actual_result = distinct_op
+    let actual_values = distinct_op
         .handle_response(response, &Default::default())
         .expect("supposed to succeed");
 
-    assert_eq!(actual_result, expected_result);
+    assert_eq!(actual_values, expected_values);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
