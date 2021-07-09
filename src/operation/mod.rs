@@ -217,6 +217,7 @@ struct CursorBody {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct CursorInfo {
     pub(crate) id: i64,
     pub(crate) ns: Namespace,

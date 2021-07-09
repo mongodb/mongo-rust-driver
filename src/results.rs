@@ -104,6 +104,7 @@ impl OperationResult for GetMoreResult {}
 
 
 #[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct DistinctResult {
     pub(crate) values: Vec<Bson>,
     pub(crate) at_cluster_time: Option<Timestamp>,
