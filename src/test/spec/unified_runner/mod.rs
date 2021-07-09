@@ -189,7 +189,7 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                                             operation.returns_root_documents(),
                                             Some(&test_runner.entities),
                                         ),
-                                        "result mismatch, expected = {:#?}, actual = {:#?}",
+                                        "result mismatch, expected = {:#?} actual = {:#?}",
                                         expect_result,
                                         result
                                     );

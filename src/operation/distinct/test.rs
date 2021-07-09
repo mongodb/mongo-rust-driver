@@ -97,7 +97,8 @@ async fn op_selection_criteria() {
 async fn handle_success() {
     let distinct_op = Distinct::empty();
 
-    let expected_values = vec![Bson::String("A".to_string()), Bson::String("B".to_string())];
+    let expected_values: Vec<Bson> =
+        vec![Bson::String("A".to_string()), Bson::String("B".to_string())];
 
     let response = CommandResponse::with_document(doc! {
        "values" : expected_values.clone(),
@@ -121,7 +122,7 @@ async fn handle_response_with_empty_values() {
        "ok" : 1
     });
 
-    let expected_values = Vec::new();
+    let expected_values: Vec<Bson> = Vec::new();
 
     let actual_values = distinct_op
         .handle_response(response, &Default::default())
