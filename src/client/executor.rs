@@ -357,13 +357,22 @@ impl Client {
         let start_time = Instant::now();
         let cmd_name = cmd.name.clone();
 
+        //println!("===> command:\n\t{:?}", cmd.body);
         let response_result = match connection.send_command(cmd, request_id).await {
             Ok(response) => {
+                //println!("===> response:\n\t{:?}", response.raw_response);
                 if let Some(cluster_time) = response.cluster_time() {
                     self.inner.topology.advance_cluster_time(cluster_time).await;
                     if let Some(ref mut session) = session {
                         session.advance_cluster_time(cluster_time)
                     }
+                }
+                match (response.snapshot_time(), session.as_mut()) {
+                    (Some(timestamp), Some(session)) => {
+                        println!("===> updating snapshot timestamp to {:?}", timestamp);
+                        session.snapshot_time = Some(*timestamp);
+                    }
+                    _ => (),
                 }
                 response.validate().map(|_| response)
             }
@@ -417,12 +426,15 @@ impl Client {
 
                 match op.handle_response(response, connection.stream_description()?) {
                     Ok(response) => {
+                        /*
                         match (response.snapshot_timestamp(), session.as_mut()) {
                             (Some(timestamp), Some(session)) => {
+                                println!("===> updating snapshot timestamp to {:?}", timestamp);
                                 session.snapshot_time = Some(*timestamp);
                             }
                             _ => (),
                         }
+                        */
                         Ok(response)
                     }
                     Err(mut err) => {
