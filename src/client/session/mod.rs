@@ -282,7 +282,7 @@ impl ClientSession {
     ) -> Result<()> {
         if self.options.as_ref().and_then(|o| o.snapshot).unwrap_or(false) {
             return Err(ErrorKind::Transaction {
-                message: "transactions are not allowed on snapshot sessions".into(),
+                message: "Transactions are not supported in snapshot sessions".into(),
             }.into())
         }
         match self.transaction.state {
