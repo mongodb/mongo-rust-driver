@@ -293,9 +293,11 @@ impl TestOperation for DeleteOne {
                     .delete_one_with_session(self.filter.clone(), self.options.clone(), session)
                     .await?
             }
-            None => collection
-                .delete_one(self.filter.clone(), self.options.clone())
-                .await?
+            None => {
+                collection
+                    .delete_one(self.filter.clone(), self.options.clone())
+                    .await?
+            }
         };
         let result = to_bson(&result)?;
         Ok(Some(result.into()))
@@ -327,13 +329,12 @@ impl TestOperation for Find {
             Some(session_id) => {
                 let session = test_runner.get_mut_session(session_id);
                 let mut cursor = collection
-                    .find_with_session(
-                        self.filter.clone(),
-                        self.options.clone(),
-                        session,
-                    )
+                    .find_with_session(self.filter.clone(), self.options.clone(), session)
                     .await?;
-                cursor.stream(session).try_collect::<Vec<Document>>().await?
+                cursor
+                    .stream(session)
+                    .try_collect::<Vec<Document>>()
+                    .await?
             }
             None => {
                 let cursor = collection
@@ -377,10 +378,12 @@ impl TestOperation for InsertMany {
                 collection
                     .insert_many_with_session(self.documents.clone(), self.options.clone(), session)
                     .await?
-            },
-            None => collection
-                .insert_many(self.documents.clone(), self.options.clone())
-                .await?
+            }
+            None => {
+                collection
+                    .insert_many(self.documents.clone(), self.options.clone())
+                    .await?
+            }
         };
         let ids: HashMap<String, Bson> = result
             .inserted_ids
@@ -542,16 +545,27 @@ impl TestOperation for Aggregate {
                 let mut cursor = match entity {
                     Entity::Collection(collection) => {
                         collection
-                            .aggregate_with_session(self.pipeline.clone(), self.options.clone(), session)
+                            .aggregate_with_session(
+                                self.pipeline.clone(),
+                                self.options.clone(),
+                                session,
+                            )
                             .await?
                     }
                     Entity::Database(db) => {
-                        db.aggregate_with_session(self.pipeline.clone(), self.options.clone(), session)
-                            .await?
+                        db.aggregate_with_session(
+                            self.pipeline.clone(),
+                            self.options.clone(),
+                            session,
+                        )
+                        .await?
                     }
                     other => panic!("Cannot execute aggregate on {:?}", &other),
                 };
-                cursor.stream(session).try_collect::<Vec<Document>>().await?
+                cursor
+                    .stream(session)
+                    .try_collect::<Vec<Document>>()
+                    .await?
             }
             None => {
                 let cursor = match test_runner.entities.get(id).unwrap() {
@@ -566,7 +580,7 @@ impl TestOperation for Aggregate {
                     }
                     other => panic!("Cannot execute aggregate on {:?}", &other),
                 };
-                cursor.try_collect::<Vec<Document>>().await?        
+                cursor.try_collect::<Vec<Document>>().await?
             }
         };
         Ok(Some(Bson::from(result).into()))
@@ -603,12 +617,19 @@ impl TestOperation for Distinct {
             Some(session_id) => {
                 let session = test_runner.get_mut_session(session_id);
                 collection
-                    .distinct_with_session(&self.field_name, self.filter.clone(), self.options.clone(), session)
+                    .distinct_with_session(
+                        &self.field_name,
+                        self.filter.clone(),
+                        self.options.clone(),
+                        session,
+                    )
                     .await?
             }
-            None => collection
-                .distinct(&self.field_name, self.filter.clone(), self.options.clone())
-                .await?
+            None => {
+                collection
+                    .distinct(&self.field_name, self.filter.clone(), self.options.clone())
+                    .await?
+            }
         };
         Ok(Some(Bson::Array(result).into()))
     }
@@ -639,12 +660,18 @@ impl TestOperation for CountDocuments {
             Some(session_id) => {
                 let session = test_runner.get_mut_session(session_id);
                 collection
-                    .count_documents_with_session(self.filter.clone(), self.options.clone(), session)
+                    .count_documents_with_session(
+                        self.filter.clone(),
+                        self.options.clone(),
+                        session,
+                    )
                     .await?
             }
-            None => collection
-                .count_documents(self.filter.clone(), self.options.clone())
-                .await?
+            None => {
+                collection
+                    .count_documents(self.filter.clone(), self.options.clone())
+                    .await?
+            }
         };
         Ok(Some(Bson::from(result).into()))
     }
@@ -734,9 +761,11 @@ impl TestOperation for ListDatabases {
                     .list_databases_with_session(self.filter.clone(), self.options.clone(), session)
                     .await?
             }
-            None => client
-                .list_databases(self.filter.clone(), self.options.clone())
-                .await?
+            None => {
+                client
+                    .list_databases(self.filter.clone(), self.options.clone())
+                    .await?
+            }
         };
         Ok(Some(bson::to_bson(&result)?.into()))
     }
@@ -795,7 +824,11 @@ impl TestOperation for ListCollections {
             Some(session_id) => {
                 let session = test_runner.get_mut_session(session_id);
                 let mut cursor = db
-                    .list_collections_with_session(self.filter.clone(), self.options.clone(), session)
+                    .list_collections_with_session(
+                        self.filter.clone(),
+                        self.options.clone(),
+                        session,
+                    )
                     .await?;
                 cursor.stream(session).try_collect::<Vec<_>>().await?
             }
@@ -905,13 +938,15 @@ impl TestOperation for FindOneAndUpdate {
                     )
                     .await?
             }
-            None => collection
-                .find_one_and_update(
-                    self.filter.clone(),
-                    self.update.clone(),
-                    self.options.clone(),
-                )
-                .await?
+            None => {
+                collection
+                    .find_one_and_update(
+                        self.filter.clone(),
+                        self.update.clone(),
+                        self.options.clone(),
+                    )
+                    .await?
+            }
         };
         let result = to_bson(&result)?;
         Ok(Some(result.into()))
@@ -1166,13 +1201,13 @@ impl TestOperation for RunCommand {
         let result = match &self.session {
             Some(session_id) => {
                 let session = test_runner.get_mut_session(session_id);
-                db
-                    .run_command_with_session(command, self.read_preference.clone(), session)
+                db.run_command_with_session(command, self.read_preference.clone(), session)
                     .await?
             }
-            None => db
-                .run_command(command, self.read_preference.clone())
-                .await?
+            None => {
+                db.run_command(command, self.read_preference.clone())
+                    .await?
+            }
         };
         let result = to_bson(&result)?;
         Ok(Some(result.into()))

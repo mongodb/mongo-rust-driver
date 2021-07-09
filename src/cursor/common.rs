@@ -9,11 +9,11 @@ use derivative::Derivative;
 use futures_core::{Future, Stream};
 
 use crate::{
-    bson::{Document},
+    bson::Document,
     error::{Error, ErrorKind, Result},
     operation,
     options::ServerAddress,
-    results::{GetMoreResult},
+    results::GetMoreResult,
     Client,
     Namespace,
 };

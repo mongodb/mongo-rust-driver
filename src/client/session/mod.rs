@@ -280,10 +280,16 @@ impl ClientSession {
         &mut self,
         options: impl Into<Option<TransactionOptions>>,
     ) -> Result<()> {
-        if self.options.as_ref().and_then(|o| o.snapshot).unwrap_or(false) {
+        if self
+            .options
+            .as_ref()
+            .and_then(|o| o.snapshot)
+            .unwrap_or(false)
+        {
             return Err(ErrorKind::Transaction {
                 message: "Transactions are not supported in snapshot sessions".into(),
-            }.into())
+            }
+            .into());
         }
         match self.transaction.state {
             TransactionState::Starting | TransactionState::InProgress => {
@@ -520,7 +526,7 @@ impl Drop for ClientSession {
                 is_implicit: self.is_implicit,
                 options: self.options.clone(),
                 transaction: self.transaction.clone(),
-                snapshot_time: self.snapshot_time.clone(),
+                snapshot_time: self.snapshot_time,
             };
             RUNTIME.execute(async move {
                 let mut session: ClientSession = dropped_session.into();

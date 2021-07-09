@@ -282,7 +282,11 @@ impl Client {
                 if let Some(txn_number) = txn_number {
                     cmd.set_txn_number(txn_number);
                 }
-                if session.options().and_then(|opts| opts.snapshot).unwrap_or(false) {
+                if session
+                    .options()
+                    .and_then(|opts| opts.snapshot)
+                    .unwrap_or(false)
+                {
                     cmd.set_snapshot_read_concern(session)?;
                 }
                 match session.transaction.state {
@@ -364,11 +368,10 @@ impl Client {
                         session.advance_cluster_time(cluster_time)
                     }
                 }
-                match (response.snapshot_time(), session.as_mut()) {
-                    (Some(timestamp), Some(session)) => {
-                        session.snapshot_time = Some(*timestamp);
-                    }
-                    _ => (),
+                if let (Some(timestamp), Some(session)) =
+                    (response.snapshot_time(), session.as_mut())
+                {
+                    session.snapshot_time = Some(*timestamp);
                 }
                 response.validate().map(|_| response)
             }

@@ -188,7 +188,8 @@ impl Client {
         options: impl Into<Option<ListDatabasesOptions>>,
         session: &mut ClientSession,
     ) -> Result<Vec<DatabaseSpecification>> {
-        self.list_databases_common(filter, options, Some(session)).await
+        self.list_databases_common(filter, options, Some(session))
+            .await
     }
 
     /// Gets the names of the databases present in the cluster the Client is connected to.

@@ -92,7 +92,10 @@ impl ReadConcern {
 
 impl From<ReadConcernLevel> for ReadConcern {
     fn from(level: ReadConcernLevel) -> Self {
-        Self { level, at_cluster_time: None }
+        Self {
+            level,
+            at_cluster_time: None,
+        }
     }
 }
 
