@@ -287,6 +287,20 @@ impl Client {
                     .and_then(|opts| opts.snapshot)
                     .unwrap_or(false)
                 {
+                    if connection
+                        .stream_description()?
+                        .max_wire_version
+                        .unwrap_or(0)
+                        < 13
+                    {
+                        let labels: Option<Vec<_>> = None;
+                        return Err(Error::new(
+                            ErrorKind::ServerVersion {
+                                message: "Snapshot reads require MongoDB 5.0 or later".into(),
+                            },
+                            labels,
+                        ));
+                    }
                     cmd.set_snapshot_read_concern(session)?;
                 }
                 match session.transaction.state {
