@@ -1162,10 +1162,18 @@ impl TestOperation for RunCommand {
             command.insert("writeConcern", write_concern.clone());
         }
 
-        let db = test_runner.get_database(id);
-        let result = db
-            .run_command(command, self.read_preference.clone())
-            .await?;
+        let db = test_runner.get_database(id).clone();
+        let result = match &self.session {
+            Some(session_id) => {
+                let session = test_runner.get_mut_session(session_id);
+                db
+                    .run_command_with_session(command, self.read_preference.clone(), session)
+                    .await?
+            }
+            None => db
+                .run_command(command, self.read_preference.clone())
+                .await?
+        };
         let result = to_bson(&result)?;
         Ok(Some(result.into()))
     }
