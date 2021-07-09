@@ -231,7 +231,10 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                 assert_eq!(actual_events.len(), expected_events.len());
 
                 for (actual, expected) in actual_events.iter().zip(expected_events) {
-                    assert!(events_match(actual, expected, Some(&test_runner.entities)));
+                    assert!(
+                        events_match(actual, expected, Some(&test_runner.entities)),
+                        "event mismatch: expected = {:#?}, actual = {:#?}", expected, actual,
+                    );
                 }
             }
         }
