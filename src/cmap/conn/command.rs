@@ -89,7 +89,6 @@ impl Command {
     pub(crate) fn set_snapshot_read_concern(&mut self, session: &ClientSession) -> Result<()> {
         let mut concern = ReadConcern::snapshot();
         concern.at_cluster_time = session.snapshot_time;
-        println!("===> snapshot read concern: {:?}", concern);
         self.body.insert("readConcern", bson::to_document(&concern)?);
         Ok(())
     }
