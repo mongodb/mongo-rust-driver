@@ -11,7 +11,10 @@ use futures_util::{
 use super::header::{Header, OpCode};
 use crate::{
     bson_util,
-    cmap::conn::{command::Command, wire::util::SyncCountReader},
+    cmap::{
+        conn::{command::RawCommand, wire::util::SyncCountReader},
+        Command,
+    },
     error::{Error, ErrorKind, Result},
     runtime::{AsyncLittleEndianWrite, AsyncStream, SyncLittleEndianRead},
 };
@@ -39,6 +42,19 @@ impl Message {
             response_to: 0,
             flags: MessageFlags::empty(),
             sections: vec![MessageSection::Document(bytes)],
+            checksum: None,
+            request_id,
+        })
+    }
+
+    /// Creates a `Message` from a given `Command`.
+    ///
+    /// Note that `response_to` will need to be set manually.
+    pub(crate) fn with_raw_command(command: RawCommand, request_id: Option<i32>) -> Result<Self> {
+        Ok(Self {
+            response_to: 0,
+            flags: MessageFlags::empty(),
+            sections: vec![MessageSection::Document(command.bytes)],
             checksum: None,
             request_id,
         })

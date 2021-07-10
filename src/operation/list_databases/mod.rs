@@ -46,6 +46,7 @@ impl ListDatabases {
 
 impl Operation for ListDatabases {
     type O = Vec<Document>;
+    type Command = Document;
     type Response = CommandResponse<Response>;
 
     const NAME: &'static str = "listDatabases";

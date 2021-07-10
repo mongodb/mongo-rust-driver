@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::doc;
+use bson::{doc, Document};
 
 use crate::{
     cmap::{Command, StreamDescription},
@@ -23,11 +23,12 @@ impl CommitTransaction {
 
 impl Operation for CommitTransaction {
     type O = ();
+    type Command = Document;
     type Response = CommandResponse<WriteConcernOnlyBody>;
 
     const NAME: &'static str = "commitTransaction";
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command<Self::Command>> {
         let mut body = doc! {
             Self::NAME: 1,
         };

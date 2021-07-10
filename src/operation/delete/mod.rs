@@ -57,11 +57,12 @@ impl Delete {
 
 impl Operation for Delete {
     type O = DeleteResult;
+    type Command = Document;
     type Response = CommandResponse<WriteResponseBody>;
 
     const NAME: &'static str = "delete";
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command<Self::Command>> {
         let mut delete = doc! {
             "q": self.filter.clone(),
             "limit": self.limit,

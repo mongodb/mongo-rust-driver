@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod test;
 
+use bson::Document;
+
 use crate::{
     bson::doc,
     cmap::{Command, StreamDescription},
@@ -37,11 +39,12 @@ impl DropCollection {
 
 impl Operation for DropCollection {
     type O = ();
+    type Command = Document;
     type Response = CommandResponse<WriteConcernOnlyBody>;
 
     const NAME: &'static str = "drop";
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command<Self::Command>> {
         let mut body = doc! {
             Self::NAME: self.ns.coll.clone(),
         };

@@ -42,10 +42,12 @@ impl Aggregate {
 
 impl Operation for Aggregate {
     type O = CursorSpecification<Document>;
+    type Command = Document;
     type Response = CursorResponse<Document>;
+
     const NAME: &'static str = "aggregate";
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command<Self::Command>> {
         let mut body = doc! {
             Self::NAME: self.target.to_bson(),
             "pipeline": bson_util::to_bson_array(&self.pipeline),

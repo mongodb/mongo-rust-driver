@@ -4,7 +4,6 @@ use tokio::sync::RwLockReadGuard;
 use super::message::{Message, MessageFlags, MessageSection};
 use crate::{
     bson::{doc, Bson},
-    bson_util,
     cmap::options::StreamOptions,
     runtime::AsyncStream,
     test::{CLIENT_OPTIONS, LOCK},
@@ -23,8 +22,7 @@ async fn basic() {
         response_to: 0,
         flags: MessageFlags::empty(),
         sections: vec![MessageSection::Document(
-            bson_util::document_to_vec(doc! { "isMaster": 1, "$db": "admin", "apiVersion": "1" })
-                .unwrap(),
+            bson::to_vec(&doc! { "isMaster": 1, "$db": "admin", "apiVersion": "1" }).unwrap(),
         )],
         checksum: None,
         request_id: None,

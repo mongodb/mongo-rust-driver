@@ -26,7 +26,7 @@ use crate::{
     options::{ServerAddress, TlsOptions},
     runtime::AsyncStream,
 };
-pub(crate) use command::{Command, RawCommandResponse};
+pub(crate) use command::{Command, RawCommand, RawCommandResponse};
 pub(crate) use stream_description::StreamDescription;
 pub(crate) use wire::next_request_id;
 
@@ -229,6 +229,19 @@ impl Connection {
         }
     }
 
+    async fn send_message(&mut self, message: Message) -> Result<RawCommandResponse> {
+        self.command_executing = true;
+        let write_result = message.write_to(&mut self.stream).await;
+        self.error = write_result.is_err();
+        write_result?;
+
+        let response_message_result = Message::read_from(&mut self.stream).await;
+        self.command_executing = false;
+        self.error = response_message_result.is_err();
+
+        RawCommandResponse::new(self.address.clone(), response_message_result?)
+    }
+
     /// Executes a `Command` and returns a `CommandResponse` containing the result from the server.
     ///
     /// An `Ok(...)` result simply means the server received the command and that the driver
@@ -240,17 +253,22 @@ impl Connection {
         request_id: impl Into<Option<i32>>,
     ) -> Result<RawCommandResponse> {
         let message = Message::with_command(command, request_id.into())?;
+        self.send_message(message).await
+    }
 
-        self.command_executing = true;
-        let write_result = message.write_to(&mut self.stream).await;
-        self.error = write_result.is_err();
-        write_result?;
-
-        let response_message_result = Message::read_from(&mut self.stream).await;
-        self.command_executing = false;
-        self.error = response_message_result.is_err();
-
-        RawCommandResponse::new(self.address.clone(), response_message_result?)
+    /// Executes a `RawCommand` and returns a `CommandResponse` containing the result from the
+    /// server.
+    ///
+    /// An `Ok(...)` result simply means the server received the command and that the driver
+    /// driver received the response; it does not imply anything about the success of the command
+    /// itself.
+    pub(crate) async fn send_raw_command(
+        &mut self,
+        command: RawCommand,
+        request_id: impl Into<Option<i32>>,
+    ) -> Result<RawCommandResponse> {
+        let message = Message::with_raw_command(command, request_id.into())?;
+        self.send_message(message).await
     }
 
     /// Gets the connection's StreamDescription.

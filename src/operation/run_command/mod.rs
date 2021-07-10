@@ -47,6 +47,7 @@ impl RunCommand {
 
 impl Operation for RunCommand {
     type O = Document;
+    type Command = Document;
     type Response = Response;
 
     // Since we can't actually specify a string statically here, we just put a descriptive string

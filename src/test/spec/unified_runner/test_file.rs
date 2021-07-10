@@ -7,7 +7,7 @@ use super::{Operation, TestEvent};
 
 use crate::{
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
-    client::options::{ServerApi, SessionOptions},
+    client::options::{ServerApi, ServerApiVersion, SessionOptions},
     concern::{Acknowledgment, ReadConcernLevel},
     error::Error,
     options::{
@@ -145,13 +145,36 @@ pub struct Client {
     pub use_multiple_mongoses: Option<bool>,
     pub observe_events: Option<Vec<String>>,
     pub ignore_command_monitoring_events: Option<Vec<String>>,
-    pub observe_sensitive_commands: Option<bool>,
     #[serde(default)]
+    pub observe_sensitive_commands: Option<bool>,
+    #[serde(default, deserialize_with = "deserialize_server_api")]
     pub server_api: Option<ServerApi>,
 }
 
 fn default_uri() -> String {
     DEFAULT_URI.clone()
+}
+
+pub fn deserialize_server_api<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<ServerApi>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase", deny_unknown_fields)]
+    struct ApiHelper {
+        version: ServerApiVersion,
+        strict: Option<bool>,
+        deprecation_errors: Option<bool>,
+    }
+
+    let h = ApiHelper::deserialize(deserializer)?;
+    Ok(Some(ServerApi {
+        version: h.version,
+        strict: h.strict,
+        deprecation_errors: h.deprecation_errors,
+    }))
 }
 
 pub fn deserialize_uri_options_to_uri_string<'de, D>(

@@ -35,6 +35,7 @@ impl CommandStartedEvent {
                 other => panic!("unknown session name: {}", other),
             }
         }
+
         self.command.content_matches(&expected)
     }
 }

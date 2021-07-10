@@ -444,7 +444,7 @@ fn parse_ids(matches: ArgMatches) -> Vec<bool> {
     ids
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::main)]
+#[cfg_attr(feature = "tokio-runtime", tokio::main(flavor = "current_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::main)]
 async fn main() {
     let matches = App::new("RustDriverBenchmark")

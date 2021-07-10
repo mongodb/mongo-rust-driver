@@ -41,11 +41,12 @@ impl Count {
 
 impl Operation for Count {
     type O = u64;
+    type Command = Document;
     type Response = CommandResponse<Response>;
 
     const NAME: &'static str = "count";
 
-    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
+    fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
         let mut body = match description.max_wire_version {
             Some(v) if v >= SERVER_4_9_0_WIRE_VERSION => {
                 doc! {

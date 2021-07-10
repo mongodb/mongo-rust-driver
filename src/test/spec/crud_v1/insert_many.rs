@@ -58,8 +58,13 @@ async fn run_insert_many_test(test_file: TestFile) {
                 assert_ne!(outcome.error, Some(true), "{}", test_case.description);
                 result.inserted_ids
             }
-            Err(_) => {
-                assert!(outcome.error.unwrap_or(false), "{}", test_case.description);
+            Err(e) => {
+                assert!(
+                    outcome.error.unwrap_or(false),
+                    "{}: expected no error, got {:?}",
+                    test_case.description,
+                    e
+                );
                 Default::default()
             }
         };

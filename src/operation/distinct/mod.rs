@@ -52,11 +52,12 @@ impl Distinct {
 
 impl Operation for Distinct {
     type O = Vec<Bson>;
+    type Command = Document;
     type Response = CommandResponse<Response>;
 
     const NAME: &'static str = "distinct";
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command<Self::Command>> {
         let mut body: Document = doc! {
             Self::NAME: self.ns.coll.clone(),
             "key": self.field_name.clone(),

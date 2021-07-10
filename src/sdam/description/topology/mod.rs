@@ -153,10 +153,10 @@ impl TopologyDescription {
         self.servers.get(address)
     }
 
-    pub(crate) fn update_command_with_read_pref(
+    pub(crate) fn update_command_with_read_pref<T>(
         &self,
         server_type: ServerType,
-        command: &mut Command,
+        command: &mut Command<T>,
         criteria: Option<&SelectionCriteria>,
     ) -> crate::error::Result<()> {
         match (self.topology_type, server_type) {
@@ -192,9 +192,9 @@ impl TopologyDescription {
         }
     }
 
-    fn update_command_read_pref_for_mongos(
+    fn update_command_read_pref_for_mongos<T>(
         &self,
-        command: &mut Command,
+        command: &mut Command<T>,
         criteria: Option<&SelectionCriteria>,
     ) -> crate::error::Result<()> {
         match criteria {

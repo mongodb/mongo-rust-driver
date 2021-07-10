@@ -1,3 +1,15 @@
+use bson::{
+    oid::ObjectId,
+    spec::BinarySubtype,
+    Binary,
+    DateTime,
+    JavaScriptCodeWithScope,
+    Regex,
+    Timestamp,
+};
+use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
+
 use crate::{
     bson::{doc, Bson, Document},
     cmap::StreamDescription,
@@ -9,18 +21,20 @@ use crate::{
 };
 
 struct TestFixtures {
-    op: Insert<Document>,
+    op: Insert<'static, Document>,
     documents: Vec<Document>,
     options: InsertManyOptions,
 }
 
 /// Get an Insert operation and the documents/options used to construct it.
 fn fixtures() -> TestFixtures {
-    let documents = vec![
-        Document::new(),
-        doc! {"_id": 1234, "a": 1},
-        doc! {"a": 123, "b": "hello world" },
-    ];
+    lazy_static! {
+        static ref DOCUMENTS: Vec<Document> = vec![
+            Document::new(),
+            doc! {"_id": 1234, "a": 1},
+            doc! {"a": 123, "b": "hello world" },
+        ];
+    }
 
     let options = InsertManyOptions {
         ordered: Some(true),
@@ -33,13 +47,13 @@ fn fixtures() -> TestFixtures {
             db: "test_db".to_string(),
             coll: "test_coll".to_string(),
         },
-        documents.clone(),
+        DOCUMENTS.iter().collect(),
         Some(options.clone()),
     );
 
     TestFixtures {
         op,
-        documents,
+        documents: DOCUMENTS.clone(),
         options,
     }
 }
@@ -55,19 +69,14 @@ async fn build() {
     assert_eq!(cmd.name.as_str(), "insert");
     assert_eq!(cmd.target_db.as_str(), "test_db");
 
-    assert_eq!(
-        cmd.body.get("insert").unwrap(),
-        &Bson::String("test_coll".to_string())
-    );
+    assert_eq!(cmd.body.insert, "test_coll".to_string());
 
     let mut cmd_docs: Vec<Document> = cmd
         .body
-        .get("documents")
-        .unwrap()
-        .as_array()
-        .unwrap()
+        .documents
+        .documents
         .iter()
-        .map(|b| b.as_document().unwrap().clone())
+        .map(|b| Document::from_reader(b.as_slice()).unwrap())
         .collect();
     assert_eq!(cmd_docs.len(), fixtures.documents.len());
 
@@ -79,12 +88,15 @@ async fn build() {
         assert_eq!(original_doc, cmd_doc);
     }
 
+    let serialized = fixtures.op.serialize_command(cmd).unwrap();
+    let cmd_doc = Document::from_reader(serialized.as_slice()).unwrap();
+
     assert_eq!(
-        cmd.body.get("ordered"),
+        cmd_doc.get("ordered"),
         fixtures.options.ordered.map(Bson::Boolean).as_ref()
     );
     assert_eq!(
-        cmd.body.get("bypassDocumentValidation"),
+        cmd_doc.get("bypassDocumentValidation"),
         fixtures
             .options
             .bypass_document_validation
@@ -92,7 +104,7 @@ async fn build() {
             .as_ref()
     );
     assert_eq!(
-        cmd.body.get("writeConcern"),
+        cmd_doc.get("writeConcern"),
         fixtures
             .options
             .write_concern
@@ -105,31 +117,152 @@ async fn build() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_ordered() {
-    let mut insert = Insert::new(Namespace::empty(), vec![Document::new()], None);
+    let docs = vec![Document::new()];
+    let mut insert = Insert::new(Namespace::empty(), docs.iter().collect(), None);
     let cmd = insert
         .build(&StreamDescription::new_testing())
         .expect("should succeed");
-    assert_eq!(cmd.body.get("ordered"), Some(&Bson::Boolean(true)));
+    let serialized = insert.serialize_command(cmd).unwrap();
+    let cmd_doc = Document::from_reader(serialized.as_slice()).unwrap();
+    assert_eq!(cmd_doc.get("ordered"), Some(&Bson::Boolean(true)));
 
     let mut insert = Insert::new(
         Namespace::empty(),
-        vec![Document::new()],
+        docs.iter().collect(),
         Some(InsertManyOptions::builder().ordered(false).build()),
     );
     let cmd = insert
         .build(&StreamDescription::new_testing())
         .expect("should succeed");
-    assert_eq!(cmd.body.get("ordered"), Some(&Bson::Boolean(false)));
+    let serialized = insert.serialize_command(cmd).unwrap();
+    let cmd_doc = Document::from_reader(serialized.as_slice()).unwrap();
+    assert_eq!(cmd_doc.get("ordered"), Some(&Bson::Boolean(false)));
 
     let mut insert = Insert::new(
         Namespace::empty(),
-        vec![Document::new()],
+        docs.iter().collect(),
         Some(InsertManyOptions::builder().ordered(true).build()),
     );
     let cmd = insert
         .build(&StreamDescription::new_testing())
         .expect("should succeed");
-    assert_eq!(cmd.body.get("ordered"), Some(&Bson::Boolean(true)));
+    let serialized = insert.serialize_command(cmd).unwrap();
+    let cmd_doc = Document::from_reader(serialized.as_slice()).unwrap();
+    assert_eq!(cmd_doc.get("ordered"), Some(&Bson::Boolean(true)));
+
+    let mut insert = Insert::new(
+        Namespace::empty(),
+        docs.iter().collect(),
+        Some(InsertManyOptions::builder().build()),
+    );
+    let cmd = insert
+        .build(&StreamDescription::new_testing())
+        .expect("should succeed");
+    let serialized = insert.serialize_command(cmd).unwrap();
+    let cmd_doc = Document::from_reader(serialized.as_slice()).unwrap();
+    assert_eq!(cmd_doc.get("ordered"), Some(&Bson::Boolean(true)));
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Documents<D> {
+    documents: Vec<D>,
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn generate_ids() {
+    let docs = vec![doc! { "x": 1 }, doc! { "_id": 1_i32, "x": 2 }];
+
+    let mut insert = Insert::new(Namespace::empty(), docs.iter().collect(), None);
+    let cmd = insert.build(&StreamDescription::new_testing()).unwrap();
+    let serialized = insert.serialize_command(cmd).unwrap();
+
+    #[derive(Debug, Serialize, Deserialize)]
+    struct D {
+        x: i32,
+
+        #[serde(rename = "_id")]
+        id: Bson,
+    }
+
+    let docs: Documents<D> = bson::from_slice(serialized.as_slice()).unwrap();
+
+    assert_eq!(docs.documents.len(), 2);
+    let docs = docs.documents;
+
+    docs[0].id.as_object_id().unwrap();
+    assert_eq!(docs[0].x, 1);
+
+    assert_eq!(docs[1].id, Bson::Int32(1));
+    assert_eq!(docs[1].x, 2);
+
+    // ensure the _id was prepended to the document
+    let docs: Documents<Document> = bson::from_slice(serialized.as_slice()).unwrap();
+    assert_eq!(docs.documents[0].iter().next().unwrap().0, "_id")
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn serialize_all_types() {
+    let binary = Binary {
+        bytes: vec![36, 36, 36],
+        subtype: BinarySubtype::Generic,
+    };
+    let date = DateTime::now();
+    let regex = Regex {
+        pattern: "hello".to_string(),
+        options: "x".to_string(),
+    };
+    let timestamp = Timestamp {
+        time: 123,
+        increment: 456,
+    };
+    let code = Bson::JavaScriptCode("console.log(1)".to_string());
+    let code_w_scope = JavaScriptCodeWithScope {
+        code: "console.log(a)".to_string(),
+        scope: doc! { "a": 1 },
+    };
+    let oid = ObjectId::new();
+    let subdoc = doc! { "k": true, "b": { "hello": "world" } };
+
+    let decimal = {
+        let bytes = hex::decode("18000000136400D0070000000000000000000000003A3000").unwrap();
+        let d = Document::from_reader(bytes.as_slice()).unwrap();
+        d.get("d").unwrap().clone()
+    };
+
+    let docs = vec![doc! {
+        "x": 1_i32,
+        "y": 2_i64,
+        "s": "oke",
+        "array": [ true, "oke", { "12": 24 } ],
+        "bson": 1234.5,
+        "oid": oid,
+        "null": Bson::Null,
+        "subdoc": subdoc.clone(),
+        "b": true,
+        "d": 12.5,
+        "binary": binary.clone(),
+        "date": date,
+        "regex": regex.clone(),
+        "ts": timestamp,
+        "i": { "a": 300, "b": 12345 },
+        "undefined": Bson::Undefined,
+        "code": code.clone(),
+        "code_w_scope": code_w_scope.clone(),
+        "decimal": decimal.clone(),
+        "symbol": Bson::Symbol("ok".to_string()),
+        "min_key": Bson::MinKey,
+        "max_key": Bson::MaxKey,
+        "_id": ObjectId::new(),
+    }];
+
+    let mut insert = Insert::new(Namespace::empty(), docs.iter().collect(), None);
+    let cmd = insert.build(&StreamDescription::new_testing()).unwrap();
+    let serialized = insert.serialize_command(cmd).unwrap();
+    let cmd: Documents<Document> = bson::from_slice(serialized.as_slice()).unwrap();
+
+    assert_eq!(cmd.documents, docs);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

@@ -52,6 +52,7 @@ where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
     type O = CursorSpecification<T>;
+    type Command = Document;
     type Response = CursorResponse<T>;
 
     const NAME: &'static str = "listCollections";

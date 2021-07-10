@@ -1,4 +1,4 @@
-pub(crate) use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Serialize};
 
 use super::wire::Message;
 use crate::{
@@ -11,34 +11,71 @@ use crate::{
     ClientSession,
 };
 
-/// `Command` is a driver side abstraction of a server command containing all the information
-/// necessary to serialize it to a wire message.
-#[derive(Debug, Clone)]
-pub(crate) struct Command {
+/// A command that has been serialized to BSON.
+#[derive(Debug)]
+pub(crate) struct RawCommand {
     pub(crate) name: String,
     pub(crate) target_db: String,
-    pub(crate) body: Document,
+    pub(crate) bytes: Vec<u8>,
 }
 
-impl Command {
-    /// Constructs a new command.
-    pub(crate) fn new(name: String, target_db: String, body: Document) -> Self {
+/// Driver-side model of a database command.
+#[serde_with::skip_serializing_none]
+#[derive(Clone, Debug, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Command<T = Document> {
+    #[serde(skip)]
+    pub(crate) name: String,
+
+    #[serde(flatten)]
+    pub(crate) body: T,
+
+    #[serde(rename = "$db")]
+    pub(crate) target_db: String,
+
+    lsid: Option<Document>,
+
+    #[serde(rename = "$clusterTime")]
+    cluster_time: Option<ClusterTime>,
+
+    #[serde(flatten)]
+    server_api: Option<ServerApi>,
+
+    #[serde(rename = "$readPreference")]
+    read_preference: Option<ReadPreference>,
+
+    txn_number: Option<i64>,
+
+    start_transaction: Option<bool>,
+
+    autocommit: Option<bool>,
+
+    read_concern: Option<ReadConcern>,
+}
+
+impl<T> Command<T> {
+    pub(crate) fn new(name: String, target_db: String, body: T) -> Self {
         Self {
             name,
             target_db,
             body,
+            lsid: None,
+            cluster_time: None,
+            server_api: None,
+            read_preference: None,
+            txn_number: None,
+            start_transaction: None,
+            autocommit: None,
+            read_concern: None,
         }
     }
 
     pub(crate) fn set_session(&mut self, session: &ClientSession) {
-        self.body.insert("lsid", session.id());
+        self.lsid = Some(session.id().clone())
     }
 
     pub(crate) fn set_cluster_time(&mut self, cluster_time: &ClusterTime) {
-        // this should never fail.
-        if let Ok(doc) = bson::to_bson(cluster_time) {
-            self.body.insert("$clusterTime", doc);
-        }
+        self.cluster_time = Some(cluster_time.clone());
     }
 
     pub(crate) fn set_recovery_token(&mut self, recovery_token: &Document) {
@@ -46,41 +83,30 @@ impl Command {
     }
 
     pub(crate) fn set_txn_number(&mut self, txn_number: i64) {
-        self.body.insert("txnNumber", txn_number);
+        self.txn_number = Some(txn_number);
     }
 
     pub(crate) fn set_server_api(&mut self, server_api: &ServerApi) {
-        self.body
-            .insert("apiVersion", format!("{}", server_api.version));
-
-        if let Some(strict) = server_api.strict {
-            self.body.insert("apiStrict", strict);
-        }
-
-        if let Some(deprecation_errors) = server_api.deprecation_errors {
-            self.body.insert("apiDeprecationErrors", deprecation_errors);
-        }
+        self.server_api = Some(server_api.clone());
     }
 
     pub(crate) fn set_read_preference(&mut self, read_preference: ReadPreference) -> Result<()> {
-        self.body
-            .insert("$readPreference", read_preference.into_document()?);
+        self.read_preference = Some(read_preference);
         Ok(())
     }
 
     pub(crate) fn set_start_transaction(&mut self) {
-        self.body.insert("startTransaction", true);
+        self.start_transaction = Some(true);
     }
 
     pub(crate) fn set_autocommit(&mut self) {
-        self.body.insert("autocommit", false);
+        self.autocommit = Some(false);
     }
 
     pub(crate) fn set_txn_read_concern(&mut self, session: &ClientSession) -> Result<()> {
         if let Some(ref options) = session.transaction.options {
             if let Some(ref read_concern) = options.read_concern {
-                self.body
-                    .insert("readConcern", bson::to_document(read_concern)?);
+                self.read_concern = Some(read_concern.clone());
             }
         }
         Ok(())
@@ -89,8 +115,7 @@ impl Command {
     pub(crate) fn set_snapshot_read_concern(&mut self, session: &ClientSession) -> Result<()> {
         let mut concern = ReadConcern::snapshot();
         concern.at_cluster_time = session.snapshot_time;
-        self.body
-            .insert("readConcern", bson::to_document(&concern)?);
+        self.read_concern = Some(concern);
         Ok(())
     }
 }

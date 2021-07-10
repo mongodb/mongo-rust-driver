@@ -1,3 +1,5 @@
+use bson::Document;
+
 use crate::{
     bson::doc,
     cmap::{Command, StreamDescription},
@@ -28,11 +30,12 @@ impl AbortTransaction {
 
 impl Operation for AbortTransaction {
     type O = ();
+    type Command = Document;
     type Response = CommandResponse<WriteConcernOnlyBody>;
 
     const NAME: &'static str = "abortTransaction";
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command<Self::Command>> {
         let mut body = doc! {
             Self::NAME: 1,
         };
