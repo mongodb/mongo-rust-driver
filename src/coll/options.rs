@@ -492,10 +492,10 @@ pub struct AggregateOptions {
     pub write_concern: Option<WriteConcern>,
 
     /// Any amount of parameter names, each followed by definitions of constants in the MQL
-    /// Aggregate Expression language.
+    /// Aggregate Expression language.  Each parameter name is then usable to access the value of
+    /// the corresponding MQL Expression with the "$$" syntax within Aggregate Expression contexts.
     ///
-    /// Each parameter name is then usable to access the value of the corresponding MQL Expression
-    /// with the "$$" syntax within Aggregate Expression contexts.
+    /// This feature is only available on server versions 5.0 and above.
     #[serde(rename = "let")]
     pub bindings: Option<Document>,
 }
