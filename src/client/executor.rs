@@ -295,7 +295,7 @@ impl Client {
                     {
                         let labels: Option<Vec<_>> = None;
                         return Err(Error::new(
-                            ErrorKind::ServerVersion {
+                            ErrorKind::IncompatibleServer {
                                 message: "Snapshot reads require MongoDB 5.0 or later".into(),
                             },
                             labels,
