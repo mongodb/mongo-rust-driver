@@ -227,15 +227,12 @@ impl Client {
                 drop(server);
 
                 if let Some(ref mut session) = session {
-                    if err.labels().get(TRANSIENT_TRANSACTION_ERROR).is_some() {
+                    if err.contains_label(TRANSIENT_TRANSACTION_ERROR) {
                         session.unpin_mongos();
                     }
 
                     if op.name() == CommitTransaction::NAME
-                        && err
-                            .labels()
-                            .get(UNKNOWN_TRANSACTION_COMMIT_RESULT)
-                            .is_some()
+                        && err.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT)
                     {
                         session.unpin_mongos();
                     }
