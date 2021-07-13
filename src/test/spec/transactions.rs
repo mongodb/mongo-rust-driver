@@ -28,7 +28,8 @@ async fn run() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn test_sharded_transactions() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-    // TODO RUST-97: Add RecoveryToken tests to this directory.
+
+    // TODO RUST-902: Reduce transactionLifetimeLimitSeconds.
     run_spec_test(&["sharded-transactions"], run_v2_test).await;
     run_spec_test(&["sharded-transactions-unified"], run_unified_format_test).await;
 }

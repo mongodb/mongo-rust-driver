@@ -2,15 +2,17 @@ pub mod operation;
 pub mod test_event;
 pub mod test_file;
 
-use std::{ops::Deref, time::Duration};
+use std::{ops::Deref, sync::Arc, time::Duration};
 
 use semver::VersionReq;
 
 use crate::{
     bson::{doc, from_bson},
-    coll::options::DropCollectionOptions,
+    coll::options::{DistinctOptions, DropCollectionOptions},
     concern::{Acknowledgment, WriteConcern},
     options::{ClientOptions, CreateCollectionOptions, InsertManyOptions},
+    sdam::ServerInfo,
+    selection_criteria::SelectionCriteria,
     test::{
         assert_matches,
         util::{get_default_name, FailPointGuard},
@@ -130,6 +132,18 @@ pub async fn run_v2_test(test_file: TestFile) {
         let client =
             EventClient::with_additional_options(options, None, test.use_multiple_mongoses, None)
                 .await;
+
+        // TODO RUST-900: Remove this extraneous call.
+        if test.operations.iter().any(|op| op.name == "distinct") {
+            for server_address in internal_client.options.hosts.clone() {
+                let options = DistinctOptions::builder()
+                    .selection_criteria(Some(SelectionCriteria::Predicate(Arc::new(
+                        move |server_info: &ServerInfo| *server_info.address() == server_address,
+                    ))))
+                    .build();
+                coll.distinct("_id", None, options).await.unwrap();
+            }
+        }
 
         let mut fail_point_guards: Vec<FailPointGuard> = Vec::new();
         if let Some(fail_point) = test.fail_point {
