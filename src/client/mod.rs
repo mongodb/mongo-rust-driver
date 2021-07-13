@@ -181,7 +181,8 @@ impl Client {
         self.list_databases_common(filter, options, None).await
     }
 
-    /// Gets information about each database present in the cluster the Client is connected to.
+    /// Gets information about each database present in the cluster the Client is connected to
+    /// using the provided `ClientSession`.
     pub async fn list_databases_with_session(
         &self,
         filter: impl Into<Option<Document>>,

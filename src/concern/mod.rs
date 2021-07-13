@@ -20,6 +20,7 @@ use crate::{
 ///
 /// See the documentation [here](https://docs.mongodb.com/manual/reference/read-concern/) for more
 /// information about read concerns.
+#[skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -28,7 +29,6 @@ pub struct ReadConcern {
     pub level: ReadConcernLevel,
 
     /// The snapshot read timestamp.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) at_cluster_time: Option<Timestamp>,
 }
 
