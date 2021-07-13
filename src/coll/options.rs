@@ -490,6 +490,15 @@ pub struct AggregateOptions {
     /// If none is specified, the write concern defined on the object executing this operation will
     /// be used.
     pub write_concern: Option<WriteConcern>,
+
+    /// A document with any amount of parameter names, each followed by definitions of constants in
+    /// the MQL Aggregate Expression language.  Each parameter name is then usable to access the
+    /// value of the corresponding MQL Expression with the "$$" syntax within Aggregate Expression
+    /// contexts.
+    ///
+    /// This feature is only available on server versions 5.0 and above.
+    #[serde(rename = "let")]
+    pub let_vars: Option<Document>,
 }
 
 /// Specifies the options to a
