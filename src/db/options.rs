@@ -86,11 +86,17 @@ pub struct CreateCollectionOptions {
     /// The default configuration for indexes created on this collection, including the _id index.
     pub index_option_defaults: Option<IndexOptionDefaults>,
 
-    /// Specifies options for creating a timeseries collection.  This feature is only available on
-    /// server versions 5.0 and above.
+    /// An object containing options for creating time series collections. See the [`create`
+    /// command documentation](https://docs.mongodb.com/manual/reference/command/create/) for
+    /// supported options, and the [Time Series Collections documentation](
+    /// https://docs.mongodb.com/manual/core/timeseries-collections/) for more information.
+    ///
+    /// This feature is only available on server versions 5.0 and above.
     pub timeseries: Option<TimeseriesOptions>,
 
-    /// Duration indicating after how long old time-series data should be deleted.
+    /// Used to automatically delete documents in time series collections. See the [`create`
+    /// command documentation](https://docs.mongodb.com/manual/reference/command/create/) for more
+    /// information.
     #[serde(
         default,
         deserialize_with = "bson_util::deserialize_duration_from_u64_seconds",
