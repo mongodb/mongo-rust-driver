@@ -11,6 +11,7 @@ use futures_core::{Future, Stream};
 use crate::{
     bson::Document,
     error::{Error, ErrorKind, Result},
+    operation,
     options::ServerAddress,
     results::GetMoreResult,
     Client,
@@ -152,22 +153,20 @@ pub(crate) struct CursorSpecification {
 
 impl CursorSpecification {
     pub(crate) fn new(
-        ns: Namespace,
+        info: operation::CursorInfo,
         address: ServerAddress,
-        id: i64,
         batch_size: impl Into<Option<u32>>,
         max_time: impl Into<Option<Duration>>,
-        initial_buffer: VecDeque<Document>,
     ) -> Self {
         Self {
             info: CursorInformation {
-                ns,
-                id,
+                ns: info.ns,
+                id: info.id,
                 address,
                 batch_size: batch_size.into(),
                 max_time: max_time.into(),
             },
-            initial_buffer,
+            initial_buffer: info.first_batch,
         }
     }
 

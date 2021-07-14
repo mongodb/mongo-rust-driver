@@ -273,6 +273,7 @@ impl TestOperation for DeleteMany {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct DeleteOne {
     filter: Document,
+    session: Option<String>,
     #[serde(flatten)]
     options: DeleteOptions,
 }
@@ -284,10 +285,20 @@ impl TestOperation for DeleteOne {
         id: &str,
         test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
-        let collection = test_runner.get_collection(id);
-        let result = collection
-            .delete_one(self.filter.clone(), self.options.clone())
-            .await?;
+        let collection = test_runner.get_collection(id).clone();
+        let result = match &self.session {
+            Some(session_id) => {
+                let session = test_runner.get_mut_session(session_id);
+                collection
+                    .delete_one_with_session(self.filter.clone(), self.options.clone(), session)
+                    .await?
+            }
+            None => {
+                collection
+                    .delete_one(self.filter.clone(), self.options.clone())
+                    .await?
+            }
+        };
         let result = to_bson(&result)?;
         Ok(Some(result.into()))
     }
@@ -301,6 +312,7 @@ impl TestOperation for DeleteOne {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Find {
     filter: Option<Document>,
+    session: Option<String>,
     #[serde(flatten)]
     options: FindOptions,
 }
@@ -312,11 +324,25 @@ impl TestOperation for Find {
         id: &str,
         test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
-        let collection = test_runner.get_collection(id);
-        let cursor = collection
-            .find(self.filter.clone(), self.options.clone())
-            .await?;
-        let result = cursor.try_collect::<Vec<Document>>().await?;
+        let collection = test_runner.get_collection(id).clone();
+        let result = match &self.session {
+            Some(session_id) => {
+                let session = test_runner.get_mut_session(session_id);
+                let mut cursor = collection
+                    .find_with_session(self.filter.clone(), self.options.clone(), session)
+                    .await?;
+                cursor
+                    .stream(session)
+                    .try_collect::<Vec<Document>>()
+                    .await?
+            }
+            None => {
+                let cursor = collection
+                    .find(self.filter.clone(), self.options.clone())
+                    .await?;
+                cursor.try_collect::<Vec<Document>>().await?
+            }
+        };
         Ok(Some(Bson::from(result).into()))
     }
 
@@ -333,6 +359,7 @@ impl TestOperation for Find {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct InsertMany {
     documents: Vec<Document>,
+    session: Option<String>,
     #[serde(flatten)]
     options: InsertManyOptions,
 }
@@ -344,10 +371,20 @@ impl TestOperation for InsertMany {
         id: &str,
         test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
-        let collection = test_runner.get_collection(id);
-        let result = collection
-            .insert_many(self.documents.clone(), self.options.clone())
-            .await?;
+        let collection = test_runner.get_collection(id).clone();
+        let result = match &self.session {
+            Some(session_id) => {
+                let session = test_runner.get_mut_session(session_id);
+                collection
+                    .insert_many_with_session(self.documents.clone(), self.options.clone(), session)
+                    .await?
+            }
+            None => {
+                collection
+                    .insert_many(self.documents.clone(), self.options.clone())
+                    .await?
+            }
+        };
         let ids: HashMap<String, Bson> = result
             .inserted_ids
             .into_iter()
@@ -489,6 +526,7 @@ impl TestOperation for UpdateOne {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Aggregate {
     pipeline: Vec<Document>,
+    session: Option<String>,
     #[serde(flatten)]
     options: AggregateOptions,
 }
@@ -500,19 +538,51 @@ impl TestOperation for Aggregate {
         id: &str,
         test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
-        let cursor = match test_runner.entities.get(id).unwrap() {
-            Entity::Collection(collection) => {
-                collection
-                    .aggregate(self.pipeline.clone(), self.options.clone())
+        let result = match &self.session {
+            Some(session_id) => {
+                let entity = test_runner.entities.get(id).unwrap().clone();
+                let session = test_runner.get_mut_session(session_id);
+                let mut cursor = match entity {
+                    Entity::Collection(collection) => {
+                        collection
+                            .aggregate_with_session(
+                                self.pipeline.clone(),
+                                self.options.clone(),
+                                session,
+                            )
+                            .await?
+                    }
+                    Entity::Database(db) => {
+                        db.aggregate_with_session(
+                            self.pipeline.clone(),
+                            self.options.clone(),
+                            session,
+                        )
+                        .await?
+                    }
+                    other => panic!("Cannot execute aggregate on {:?}", &other),
+                };
+                cursor
+                    .stream(session)
+                    .try_collect::<Vec<Document>>()
                     .await?
             }
-            Entity::Database(db) => {
-                db.aggregate(self.pipeline.clone(), self.options.clone())
-                    .await?
+            None => {
+                let cursor = match test_runner.entities.get(id).unwrap() {
+                    Entity::Collection(collection) => {
+                        collection
+                            .aggregate(self.pipeline.clone(), self.options.clone())
+                            .await?
+                    }
+                    Entity::Database(db) => {
+                        db.aggregate(self.pipeline.clone(), self.options.clone())
+                            .await?
+                    }
+                    other => panic!("Cannot execute aggregate on {:?}", &other),
+                };
+                cursor.try_collect::<Vec<Document>>().await?
             }
-            other => panic!("Cannot execute aggregate on {:?}", &other),
         };
-        let result = cursor.try_collect::<Vec<Document>>().await?;
         Ok(Some(Bson::from(result).into()))
     }
 
@@ -530,6 +600,7 @@ impl TestOperation for Aggregate {
 pub(super) struct Distinct {
     field_name: String,
     filter: Option<Document>,
+    session: Option<String>,
     #[serde(flatten)]
     options: DistinctOptions,
 }
@@ -541,10 +612,25 @@ impl TestOperation for Distinct {
         id: &str,
         test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
-        let collection = test_runner.get_collection(id);
-        let result = collection
-            .distinct(&self.field_name, self.filter.clone(), self.options.clone())
-            .await?;
+        let collection = test_runner.get_collection(id).clone();
+        let result = match &self.session {
+            Some(session_id) => {
+                let session = test_runner.get_mut_session(session_id);
+                collection
+                    .distinct_with_session(
+                        &self.field_name,
+                        self.filter.clone(),
+                        self.options.clone(),
+                        session,
+                    )
+                    .await?
+            }
+            None => {
+                collection
+                    .distinct(&self.field_name, self.filter.clone(), self.options.clone())
+                    .await?
+            }
+        };
         Ok(Some(Bson::Array(result).into()))
     }
 
@@ -557,6 +643,7 @@ impl TestOperation for Distinct {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct CountDocuments {
     filter: Document,
+    session: Option<String>,
     #[serde(flatten)]
     options: CountOptions,
 }
@@ -568,10 +655,24 @@ impl TestOperation for CountDocuments {
         id: &str,
         test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
-        let collection = test_runner.get_collection(id);
-        let result = collection
-            .count_documents(self.filter.clone(), self.options.clone())
-            .await?;
+        let collection = test_runner.get_collection(id).clone();
+        let result = match &self.session {
+            Some(session_id) => {
+                let session = test_runner.get_mut_session(session_id);
+                collection
+                    .count_documents_with_session(
+                        self.filter.clone(),
+                        self.options.clone(),
+                        session,
+                    )
+                    .await?
+            }
+            None => {
+                collection
+                    .count_documents(self.filter.clone(), self.options.clone())
+                    .await?
+            }
+        };
         Ok(Some(Bson::from(result).into()))
     }
 
@@ -640,6 +741,7 @@ impl TestOperation for FindOne {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ListDatabases {
     filter: Option<Document>,
+    session: Option<String>,
     #[serde(flatten)]
     options: ListDatabasesOptions,
 }
@@ -651,10 +753,20 @@ impl TestOperation for ListDatabases {
         id: &str,
         test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
-        let client = test_runner.get_client(id);
-        let result = client
-            .list_databases(self.filter.clone(), self.options.clone())
-            .await?;
+        let client = test_runner.get_client(id).clone();
+        let result = match &self.session {
+            Some(session_id) => {
+                let session = test_runner.get_mut_session(session_id);
+                client
+                    .list_databases_with_session(self.filter.clone(), self.options.clone(), session)
+                    .await?
+            }
+            None => {
+                client
+                    .list_databases(self.filter.clone(), self.options.clone())
+                    .await?
+            }
+        };
         Ok(Some(bson::to_bson(&result)?.into()))
     }
 
@@ -695,6 +807,7 @@ impl TestOperation for ListDatabaseNames {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct ListCollections {
     filter: Option<Document>,
+    session: Option<String>,
     #[serde(flatten)]
     options: ListCollectionsOptions,
 }
@@ -706,11 +819,26 @@ impl TestOperation for ListCollections {
         id: &str,
         test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
-        let db = test_runner.get_database(id);
-        let cursor = db
-            .list_collections(self.filter.clone(), self.options.clone())
-            .await?;
-        let result = cursor.try_collect::<Vec<_>>().await?;
+        let db = test_runner.get_database(id).clone();
+        let result = match &self.session {
+            Some(session_id) => {
+                let session = test_runner.get_mut_session(session_id);
+                let mut cursor = db
+                    .list_collections_with_session(
+                        self.filter.clone(),
+                        self.options.clone(),
+                        session,
+                    )
+                    .await?;
+                cursor.stream(session).try_collect::<Vec<_>>().await?
+            }
+            None => {
+                let cursor = db
+                    .list_collections(self.filter.clone(), self.options.clone())
+                    .await?;
+                cursor.try_collect::<Vec<_>>().await?
+            }
+        };
         Ok(Some(bson::to_bson(&result)?.into()))
     }
 
@@ -785,6 +913,7 @@ impl TestOperation for ReplaceOne {
 pub(super) struct FindOneAndUpdate {
     filter: Document,
     update: UpdateModifications,
+    session: Option<String>,
     #[serde(flatten)]
     options: FindOneAndUpdateOptions,
 }
@@ -796,14 +925,29 @@ impl TestOperation for FindOneAndUpdate {
         id: &str,
         test_runner: &mut TestRunner,
     ) -> Result<Option<Entity>> {
-        let collection = test_runner.get_collection(id);
-        let result = collection
-            .find_one_and_update(
-                self.filter.clone(),
-                self.update.clone(),
-                self.options.clone(),
-            )
-            .await?;
+        let collection = test_runner.get_collection(id).clone();
+        let result = match &self.session {
+            Some(session_id) => {
+                let session = test_runner.get_mut_session(session_id);
+                collection
+                    .find_one_and_update_with_session(
+                        self.filter.clone(),
+                        self.update.clone(),
+                        self.options.clone(),
+                        session,
+                    )
+                    .await?
+            }
+            None => {
+                collection
+                    .find_one_and_update(
+                        self.filter.clone(),
+                        self.update.clone(),
+                        self.options.clone(),
+                    )
+                    .await?
+            }
+        };
         let result = to_bson(&result)?;
         Ok(Some(result.into()))
     }
@@ -1053,10 +1197,18 @@ impl TestOperation for RunCommand {
             command.insert("writeConcern", write_concern.clone());
         }
 
-        let db = test_runner.get_database(id);
-        let result = db
-            .run_command(command, self.read_preference.clone())
-            .await?;
+        let db = test_runner.get_database(id).clone();
+        let result = match &self.session {
+            Some(session_id) => {
+                let session = test_runner.get_mut_session(session_id);
+                db.run_command_with_session(command, self.read_preference.clone(), session)
+                    .await?
+            }
+            None => {
+                db.run_command(command, self.read_preference.clone())
+                    .await?
+            }
+        };
         let result = to_bson(&result)?;
         Ok(Some(result.into()))
     }

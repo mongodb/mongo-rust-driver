@@ -12,7 +12,7 @@ use lazy_static::lazy_static;
 use uuid::Uuid;
 
 use crate::{
-    bson::{doc, spec::BinarySubtype, Binary, Bson, Document},
+    bson::{doc, spec::BinarySubtype, Binary, Bson, Document, Timestamp},
     error::{ErrorKind, Result},
     operation::{AbortTransaction, CommitTransaction, Operation},
     options::{SessionOptions, TransactionOptions},
@@ -106,6 +106,7 @@ pub struct ClientSession {
     is_implicit: bool,
     options: Option<SessionOptions>,
     pub(crate) transaction: Transaction,
+    pub(crate) snapshot_time: Option<Timestamp>,
 }
 
 #[derive(Clone, Debug)]
@@ -173,6 +174,7 @@ impl ClientSession {
             is_implicit,
             options,
             transaction: Default::default(),
+            snapshot_time: None,
         }
     }
 
@@ -278,6 +280,17 @@ impl ClientSession {
         &mut self,
         options: impl Into<Option<TransactionOptions>>,
     ) -> Result<()> {
+        if self
+            .options
+            .as_ref()
+            .and_then(|o| o.snapshot)
+            .unwrap_or(false)
+        {
+            return Err(ErrorKind::Transaction {
+                message: "Transactions are not supported in snapshot sessions".into(),
+            }
+            .into());
+        }
         match self.transaction.state {
             TransactionState::Starting | TransactionState::InProgress => {
                 return Err(ErrorKind::Transaction {
@@ -486,6 +499,7 @@ struct DroppedClientSession {
     is_implicit: bool,
     options: Option<SessionOptions>,
     transaction: Transaction,
+    snapshot_time: Option<Timestamp>,
 }
 
 impl From<DroppedClientSession> for ClientSession {
@@ -497,6 +511,7 @@ impl From<DroppedClientSession> for ClientSession {
             is_implicit: dropped_session.is_implicit,
             options: dropped_session.options,
             transaction: dropped_session.transaction,
+            snapshot_time: dropped_session.snapshot_time,
         }
     }
 }
@@ -511,6 +526,7 @@ impl Drop for ClientSession {
                 is_implicit: self.is_implicit,
                 options: self.options.clone(),
                 transaction: self.transaction.clone(),
+                snapshot_time: self.snapshot_time,
             };
             RUNTIME.execute(async move {
                 let mut session: ClientSession = dropped_session.into();

@@ -282,6 +282,27 @@ impl Client {
                 if let Some(txn_number) = txn_number {
                     cmd.set_txn_number(txn_number);
                 }
+                if session
+                    .options()
+                    .and_then(|opts| opts.snapshot)
+                    .unwrap_or(false)
+                {
+                    if connection
+                        .stream_description()?
+                        .max_wire_version
+                        .unwrap_or(0)
+                        < 13
+                    {
+                        let labels: Option<Vec<_>> = None;
+                        return Err(Error::new(
+                            ErrorKind::IncompatibleServer {
+                                message: "Snapshot reads require MongoDB 5.0 or later".into(),
+                            },
+                            labels,
+                        ));
+                    }
+                    cmd.set_snapshot_read_concern(session)?;
+                }
                 match session.transaction.state {
                     TransactionState::Starting => {
                         cmd.set_start_transaction();
@@ -360,6 +381,11 @@ impl Client {
                     if let Some(ref mut session) = session {
                         session.advance_cluster_time(cluster_time)
                     }
+                }
+                if let (Some(timestamp), Some(session)) =
+                    (response.snapshot_time(), session.as_mut())
+                {
+                    session.snapshot_time = Some(*timestamp);
                 }
                 response.validate().map(|_| response)
             }

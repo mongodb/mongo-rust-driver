@@ -251,6 +251,7 @@ impl Error {
                 Some(write_error.message.clone())
             }
             ErrorKind::Transaction { message } => Some(message.clone()),
+            ErrorKind::IncompatibleServer { message } => Some(message.clone()),
             _ => None,
         }
     }
@@ -411,6 +412,11 @@ pub enum ErrorKind {
     #[error("{message}")]
     #[non_exhaustive]
     Transaction { message: String },
+
+    /// The server does not support the operation.
+    #[error("The server does not support a database operation: {message}")]
+    #[non_exhaustive]
+    IncompatibleServer { message: String },
 }
 
 /// An error that occurred due to a database command failing.

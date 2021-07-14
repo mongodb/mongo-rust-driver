@@ -158,18 +158,39 @@ impl Client {
         Database::new(self.clone(), name, Some(options))
     }
 
+    async fn list_databases_common(
+        &self,
+        filter: impl Into<Option<Document>>,
+        options: impl Into<Option<ListDatabasesOptions>>,
+        session: Option<&mut ClientSession>,
+    ) -> Result<Vec<DatabaseSpecification>> {
+        let op = ListDatabases::new(filter.into(), false, options.into());
+        self.execute_operation(op, session).await.and_then(|dbs| {
+            dbs.into_iter()
+                .map(|db_spec| bson::from_document(db_spec).map_err(crate::error::Error::from))
+                .collect()
+        })
+    }
+
     /// Gets information about each database present in the cluster the Client is connected to.
     pub async fn list_databases(
         &self,
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<ListDatabasesOptions>>,
     ) -> Result<Vec<DatabaseSpecification>> {
-        let op = ListDatabases::new(filter.into(), false, options.into());
-        self.execute_operation(op, None).await.and_then(|dbs| {
-            dbs.into_iter()
-                .map(|db_spec| bson::from_document(db_spec).map_err(crate::error::Error::from))
-                .collect()
-        })
+        self.list_databases_common(filter, options, None).await
+    }
+
+    /// Gets information about each database present in the cluster the Client is connected to
+    /// using the provided `ClientSession`.
+    pub async fn list_databases_with_session(
+        &self,
+        filter: impl Into<Option<Document>>,
+        options: impl Into<Option<ListDatabasesOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<Vec<DatabaseSpecification>> {
+        self.list_databases_common(filter, options, Some(session))
+            .await
     }
 
     /// Gets the names of the databases present in the cluster the Client is connected to.

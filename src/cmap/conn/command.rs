@@ -2,9 +2,10 @@ use serde::{de::DeserializeOwned, Deserialize};
 
 use super::wire::Message;
 use crate::{
-    bson::{Bson, Document},
+    bson::{Bson, Document, Timestamp},
     bson_util,
     client::{options::ServerApi, ClusterTime},
+    concern::ReadConcern,
     error::{CommandError, Error, ErrorKind, Result},
     options::ServerAddress,
     selection_criteria::ReadPreference,
@@ -84,6 +85,14 @@ impl Command {
         }
         Ok(())
     }
+
+    pub(crate) fn set_snapshot_read_concern(&mut self, session: &ClientSession) -> Result<()> {
+        let mut concern = ReadConcern::snapshot();
+        concern.at_cluster_time = session.snapshot_time;
+        self.body
+            .insert("readConcern", bson::to_document(&concern)?);
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -91,6 +100,7 @@ pub(crate) struct CommandResponse {
     source: ServerAddress,
     pub(crate) raw_response: Document,
     cluster_time: Option<ClusterTime>,
+    snapshot_time: Option<Timestamp>,
 }
 
 impl CommandResponse {
@@ -100,6 +110,7 @@ impl CommandResponse {
             source,
             raw_response: doc,
             cluster_time: None,
+            snapshot_time: None,
         }
     }
 
@@ -120,11 +131,21 @@ impl CommandResponse {
         let cluster_time = raw_response
             .get("$clusterTime")
             .and_then(|subdoc| bson::from_bson(subdoc.clone()).ok());
+        let snapshot_time = raw_response
+            .get("atClusterTime")
+            .or_else(|| {
+                raw_response
+                    .get("cursor")
+                    .and_then(|b| b.as_document())
+                    .and_then(|subdoc| subdoc.get("atClusterTime"))
+            })
+            .and_then(|subdoc| bson::from_bson(subdoc.clone()).ok());
 
         Ok(Self {
             source,
             raw_response,
             cluster_time,
+            snapshot_time,
         })
     }
 
@@ -168,6 +189,11 @@ impl CommandResponse {
     /// Gets the cluster time from the response, if any.
     pub(crate) fn cluster_time(&self) -> Option<&ClusterTime> {
         self.cluster_time.as_ref()
+    }
+
+    /// Gets the snapshot time from the response, if any.
+    pub(crate) fn snapshot_time(&self) -> Option<&Timestamp> {
+        self.snapshot_time.as_ref()
     }
 
     /// The address of the server that sent this response.

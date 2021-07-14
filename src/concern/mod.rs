@@ -10,7 +10,7 @@ use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    bson::{doc, serde_helpers},
+    bson::{doc, serde_helpers, Timestamp},
     bson_util,
     error::{ErrorKind, Result},
 };
@@ -20,11 +20,16 @@ use crate::{
 ///
 /// See the documentation [here](https://docs.mongodb.com/manual/reference/read-concern/) for more
 /// information about read concerns.
+#[skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ReadConcern {
     /// The level of the read concern.
     pub level: ReadConcernLevel,
+
+    /// The snapshot read timestamp.
+    pub(crate) at_cluster_time: Option<Timestamp>,
 }
 
 impl ReadConcern {
@@ -87,7 +92,10 @@ impl ReadConcern {
 
 impl From<ReadConcernLevel> for ReadConcern {
     fn from(level: ReadConcernLevel) -> Self {
-        Self { level }
+        Self {
+            level,
+            at_cluster_time: None,
+        }
     }
 }
 

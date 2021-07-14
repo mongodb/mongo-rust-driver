@@ -216,11 +216,12 @@ struct CursorBody {
 }
 
 #[derive(Debug, Deserialize)]
-struct CursorInfo {
-    id: i64,
-    ns: Namespace,
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CursorInfo {
+    pub(crate) id: i64,
+    pub(crate) ns: Namespace,
     #[serde(rename = "firstBatch")]
-    first_batch: VecDeque<Document>,
+    pub(crate) first_batch: VecDeque<Document>,
 }
 
 #[derive(Debug, PartialEq)]
