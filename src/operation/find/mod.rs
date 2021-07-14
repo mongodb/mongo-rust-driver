@@ -15,7 +15,7 @@ use crate::{
     Namespace,
 };
 
-use super::CommandResponse;
+use super::CursorResponse;
 
 #[derive(Debug)]
 pub(crate) struct Find<T> {
@@ -54,7 +54,7 @@ impl<T> Find<T> {
 
 impl<T: DeserializeOwned> Operation for Find<T> {
     type O = CursorSpecification<T>;
-    type Response = CommandResponse<CursorBody<T>>;
+    type Response = CursorResponse<T>;
     const NAME: &'static str = "find";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -109,8 +109,6 @@ impl<T: DeserializeOwned> Operation for Find<T> {
         response: CursorBody<T>,
         description: &StreamDescription,
     ) -> Result<Self::O> {
-        response.cursor.ns = self.ns.clone();
-
         Ok(CursorSpecification::new(
             response.cursor,
             description.server_address.clone(),

@@ -22,6 +22,7 @@ mod test;
 
 use std::{collections::VecDeque, fmt::Debug, ops::Deref};
 
+use bson::Timestamp;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
@@ -149,6 +150,9 @@ pub(crate) trait Response: Sized {
     /// The `clusterTime` field of the response.
     fn cluster_time(&self) -> Option<&ClusterTime>;
 
+    /// The `atClusterTime` field of the response.
+    fn at_cluster_time(&self) -> Option<Timestamp>;
+
     /// Convert into the body of the response.
     fn into_body(self) -> Self::Body;
 }
@@ -161,6 +165,8 @@ pub(crate) struct CommandResponse<T> {
 
     #[serde(rename = "$clusterTime")]
     pub(crate) cluster_time: Option<ClusterTime>,
+
+    pub(crate) at_cluster_time: Option<Timestamp>,
 
     #[serde(flatten)]
     pub(crate) body: T,
@@ -187,8 +193,44 @@ impl<T: DeserializeOwned> Response for CommandResponse<T> {
         self.cluster_time.as_ref()
     }
 
+    fn at_cluster_time(&self) -> Option<Timestamp> {
+        self.at_cluster_time
+    }
+
     fn into_body(self) -> Self::Body {
         self.body
+    }
+}
+
+/// A response to commands that return cursors.
+#[derive(Debug)]
+pub(crate) struct CursorResponse<T> {
+    response: CommandResponse<CursorBody<T>>,
+}
+
+impl<T: DeserializeOwned> Response for CursorResponse<T> {
+    type Body = CursorBody<T>;
+
+    fn deserialize_response(raw: &RawCommandResponse) -> Result<Self> {
+        Ok(Self {
+            response: raw.body()?,
+        })
+    }
+
+    fn ok(&self) -> Option<&Bson> {
+        self.response.ok()
+    }
+
+    fn cluster_time(&self) -> Option<&ClusterTime> {
+        self.response.cluster_time()
+    }
+
+    fn at_cluster_time(&self) -> Option<Timestamp> {
+        self.response.body.cursor.at_cluster_time
+    }
+
+    fn into_body(self) -> Self::Body {
+        self.response.body
     }
 }
 
@@ -307,14 +349,22 @@ impl<T> Deref for WriteResponseBody<T> {
 #[derive(Debug, Deserialize)]
 pub(crate) struct CursorBody<T> {
     cursor: CursorInfo<T>,
+
+    #[serde(flatten)]
+    write_concern_info: WriteConcernOnlyBody,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub(crate) struct CursorInfo<T> {
-    id: i64,
-    ns: Namespace,
+    pub(crate) id: i64,
+
+    pub(crate) ns: Namespace,
+
     #[serde(rename = "firstBatch")]
-    first_batch: VecDeque<T>,
+    pub(crate) first_batch: VecDeque<T>,
+
+    #[serde(rename = "atClusterTime")]
+    pub(crate) at_cluster_time: Option<Timestamp>,
 }
 
 #[derive(Debug, PartialEq)]

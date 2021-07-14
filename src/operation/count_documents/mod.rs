@@ -3,7 +3,7 @@ mod test;
 
 use bson::{doc, Document};
 
-use super::{CommandResponse, CursorBody, Operation, Retryability};
+use super::{CursorBody, CursorResponse, Operation, Retryability};
 use crate::{
     bson_util,
     cmap::{Command, StreamDescription},
@@ -65,7 +65,7 @@ impl CountDocuments {
 
 impl Operation for CountDocuments {
     type O = u64;
-    type Response = CommandResponse<CursorBody<Document>>;
+    type Response = CursorResponse<Document>;
 
     const NAME: &'static str = Aggregate::NAME;
 

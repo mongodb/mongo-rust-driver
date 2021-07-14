@@ -14,7 +14,7 @@ use crate::{
     options::{ListCollectionsOptions, ReadPreference, SelectionCriteria},
 };
 
-use super::CommandResponse;
+use super::CursorResponse;
 
 #[derive(Debug)]
 pub(crate) struct ListCollections<T> {
@@ -52,7 +52,7 @@ where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
     type O = CursorSpecification<T>;
-    type Response = CommandResponse<CursorBody<T>>;
+    type Response = CursorResponse<T>;
 
     const NAME: &'static str = "listCollections";
 

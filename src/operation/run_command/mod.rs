@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test;
 
-use bson::Bson;
+use bson::{Bson, Timestamp};
 
 use super::Operation;
 use crate::{
@@ -118,6 +118,17 @@ impl super::Response for Response {
 
     fn cluster_time(&self) -> Option<&ClusterTime> {
         self.cluster_time.as_ref()
+    }
+
+    fn at_cluster_time(&self) -> Option<Timestamp> {
+        self.doc
+            .get_timestamp("atClusterTime")
+            .or_else(|_| {
+                self.doc
+                    .get_document("cursor")
+                    .and_then(|subdoc| subdoc.get_timestamp("atClusterTime"))
+            })
+            .ok()
     }
 
     fn into_body(self) -> Self::Body {

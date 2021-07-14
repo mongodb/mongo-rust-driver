@@ -440,12 +440,6 @@ impl Client {
                         }
                     }
                 }
-                // if let (Some(timestamp), Some(session)) =
-                //     (response.snapshot_time(), session.as_mut())
-                // {
-                //     session.snapshot_time = Some(*timestamp);
-                // }
-                // response.validate().map(|_| response)
             }
             Err(err) => Err(err),
         };
@@ -603,6 +597,12 @@ impl Client {
             self.inner.topology.advance_cluster_time(cluster_time).await;
             if let Some(ref mut session) = session {
                 session.advance_cluster_time(cluster_time)
+            }
+        }
+
+        if let Some(timestamp) = command_response.at_cluster_time() {
+            if let Some(ref mut session) = session {
+                session.snapshot_time = Some(timestamp);
             }
         }
     }

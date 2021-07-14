@@ -86,7 +86,7 @@ impl Operation for Count {
         description: &StreamDescription,
     ) -> Result<Self::O> {
         let response_body: ResponseBody = match (description.max_wire_version, response) {
-            (Some(v), Response::Aggregate(CursorBody { mut cursor }))
+            (Some(v), Response::Aggregate(CursorBody { mut cursor, .. }))
                 if v >= SERVER_4_9_0_WIRE_VERSION =>
             {
                 cursor

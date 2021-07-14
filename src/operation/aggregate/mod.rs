@@ -1,20 +1,18 @@
 #[cfg(test)]
 mod test;
 
-use serde::Deserialize;
-
 use crate::{
     bson::{doc, Bson, Document},
     bson_util,
     cmap::{Command, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
-    operation::{append_options, Operation, Retryability, WriteConcernOnlyBody},
+    operation::{append_options, Operation, Retryability},
     options::{AggregateOptions, SelectionCriteria, WriteConcern},
     Namespace,
 };
 
-use super::{CommandResponse, CursorInfo};
+use super::{CursorBody, CursorResponse};
 
 #[derive(Debug)]
 pub(crate) struct Aggregate {
@@ -44,7 +42,7 @@ impl Aggregate {
 
 impl Operation for Aggregate {
     type O = CursorSpecification<Document>;
-    type Response = CommandResponse<Response>;
+    type Response = CursorResponse<Document>;
     const NAME: &'static str = "aggregate";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -70,7 +68,7 @@ impl Operation for Aggregate {
 
     fn handle_response(
         &self,
-        response: Response,
+        response: CursorBody<Document>,
         description: &StreamDescription,
     ) -> Result<Self::O> {
         if self.is_out_or_merge() {
@@ -151,12 +149,4 @@ impl From<String> for AggregateTarget {
     fn from(db_name: String) -> Self {
         AggregateTarget::Database(db_name)
     }
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub(crate) struct Response {
-    cursor: CursorInfo<Document>,
-
-    #[serde(flatten)]
-    write_concern_info: WriteConcernOnlyBody,
 }

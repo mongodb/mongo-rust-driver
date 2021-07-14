@@ -8,10 +8,8 @@ use crate::{
     concern::{ReadConcern, ReadConcernLevel},
     error::{ErrorKind, WriteFailure},
     operation::{
-        aggregate::Response,
         test::{self, handle_response_test},
         Aggregate,
-        CursorInfo,
         Operation,
     },
     options::{AggregateOptions, Hint, ServerAddress},
@@ -233,23 +231,16 @@ async fn handle_success() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_max_await_time() {
-    let response = Response {
-        cursor: CursorInfo {
-            id: 123,
-            ns: Namespace {
-                db: "a".to_string(),
-                coll: "b".to_string(),
-            },
-            first_batch: VecDeque::new(),
-        },
-        write_concern_info: Default::default(),
+    let response = doc! {
+        "cursor": {
+            "id": 123,
+            "ns": "a.b",
+            "firstBatch": []
+        }
     };
 
     let aggregate = Aggregate::empty();
-
-    let spec = aggregate
-        .handle_response(response.clone(), &Default::default())
-        .expect("handle should succeed");
+    let spec = handle_response_test(&aggregate, response.clone()).unwrap();
     assert!(spec.max_time().is_none());
 
     let max_await = Duration::from_millis(123);
@@ -257,9 +248,7 @@ async fn handle_max_await_time() {
         .max_await_time(max_await)
         .build();
     let aggregate = Aggregate::new(Namespace::empty(), Vec::new(), Some(options));
-    let spec = aggregate
-        .handle_response(response, &Default::default())
-        .expect("handle_should_succeed");
+    let spec = handle_response_test(&aggregate, response).unwrap();
     assert_eq!(spec.max_time(), Some(max_await));
 }
 
