@@ -232,6 +232,7 @@ async fn handle_success() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_max_await_time() {
     let response = doc! {
+        "ok": 1,
         "cursor": {
             "id": 123,
             "ns": "a.b",
