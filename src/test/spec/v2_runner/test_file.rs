@@ -8,7 +8,7 @@ use serde::{Deserialize, Deserializer};
 use crate::{
     bson::Document,
     options::{FindOptions, ReadPreference, SelectionCriteria, SessionOptions},
-    test::{spec::deserialize_uri_options_to_uri_string, EventClient, FailPoint, Serverless, TestClient},
+    test::{spec::deserialize_uri_options_to_uri_string, EventClient, FailPoint, Serverless, TestClient, SERVERLESS},
 };
 
 use super::{operation::Operation, test_event::CommandStartedEvent};
@@ -52,6 +52,14 @@ impl RunOn {
         if let Some(ref topology) = self.topology {
             if !topology.contains(&client.topology_string()) {
                 return false;
+            }
+        }
+        if let Some(ref serverless) = self.serverless {
+            let is_serverless = SERVERLESS.as_ref().map_or(false, |s| s == "serverless");
+            match serverless {
+                Serverless::Forbid if is_serverless => return false,
+                Serverless::Require if !is_serverless => return false,
+                _ => (),
             }
         }
         true

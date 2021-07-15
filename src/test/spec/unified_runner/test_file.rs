@@ -20,7 +20,7 @@ use crate::{
         SelectionCriteria,
         WriteConcern,
     },
-    test::{spec::unified_runner::results_match, Serverless, TestClient, DEFAULT_URI},
+    test::{spec::unified_runner::results_match, Serverless, TestClient, DEFAULT_URI, SERVERLESS},
 };
 
 #[derive(Debug, Deserialize)]
@@ -101,6 +101,14 @@ impl RunOnRequirement {
                 None,
             ) {
                 return false;
+            }
+        }
+        if let Some(ref serverless) = self.serverless {
+            let is_serverless = SERVERLESS.as_ref().map_or(false, |s| s == "serverless");
+            match serverless {
+                Serverless::Forbid if is_serverless => return false,
+                Serverless::Require if !is_serverless => return false,
+                _ => (),
             }
         }
         true
