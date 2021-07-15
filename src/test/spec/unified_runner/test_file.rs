@@ -20,7 +20,7 @@ use crate::{
         SelectionCriteria,
         WriteConcern,
     },
-    test::{spec::unified_runner::results_match, TestClient, DEFAULT_URI},
+    test::{spec::unified_runner::results_match, Serverless, TestClient, DEFAULT_URI},
 };
 
 #[derive(Debug, Deserialize)]
@@ -72,14 +72,6 @@ pub enum Topology {
     Sharded,
     #[serde(rename = "sharded-replicaset")]
     ShardedReplicaSet,
-}
-
-#[derive(Debug, Deserialize, PartialEq)]
-#[serde(rename_all = "lowercase", deny_unknown_fields)]
-pub enum Serverless {
-    Require,
-    Forbid,
-    Allow,
 }
 
 impl RunOnRequirement {
