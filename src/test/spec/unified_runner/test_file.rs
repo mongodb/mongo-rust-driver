@@ -61,6 +61,7 @@ pub struct RunOnRequirement {
     max_server_version: Option<String>,
     topologies: Option<Vec<Topology>>,
     server_parameters: Option<Document>,
+    serverless: Option<Serverless>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -71,6 +72,14 @@ pub enum Topology {
     Sharded,
     #[serde(rename = "sharded-replicaset")]
     ShardedReplicaSet,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase", deny_unknown_fields)]
+pub enum Serverless {
+    Require,
+    Forbid,
+    Allow,
 }
 
 impl RunOnRequirement {
