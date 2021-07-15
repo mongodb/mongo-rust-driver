@@ -134,7 +134,10 @@ pub async fn run_v2_test(test_file: TestFile) {
                 .await;
 
         // TODO RUST-900: Remove this extraneous call.
-        if internal_client.is_sharded() && internal_client.server_version_lte(4, 2) && test.operations.iter().any(|op| op.name == "distinct") {
+        if internal_client.is_sharded()
+            && internal_client.server_version_lte(4, 2)
+            && test.operations.iter().any(|op| op.name == "distinct")
+        {
             for server_address in internal_client.options.hosts.clone() {
                 let options = DistinctOptions::builder()
                     .selection_criteria(Some(SelectionCriteria::Predicate(Arc::new(

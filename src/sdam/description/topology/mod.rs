@@ -331,12 +331,12 @@ impl TopologyDescription {
         if let Ok(Some(max_wire_version)) = server_description.max_wire_version() {
             // TODO RUST-734: Evaluate whether we should permanently support sharded transactions.
             //                If we leave the feature as unsupported, we should revert this code.
-            if max_wire_version < 7
+            self.transaction_support_status = if max_wire_version < 7
                 || (max_wire_version < 8 && self.topology_type == TopologyType::Sharded)
             {
-                self.transaction_support_status = TransactionSupportStatus::Unsupported;
+                TransactionSupportStatus::Unsupported
             } else {
-                self.transaction_support_status = TransactionSupportStatus::Supported;
+                TransactionSupportStatus::Supported
             }
         }
     }
