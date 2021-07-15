@@ -33,7 +33,7 @@ pub use self::{
     v2_runner::{operation::Operation, run_v2_test, test_file::RunOn},
 };
 
-use serde::{Deserialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::Value;
 
 use crate::bson::Bson;

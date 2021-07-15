@@ -8,7 +8,14 @@ use serde::{Deserialize, Deserializer};
 use crate::{
     bson::Document,
     options::{FindOptions, ReadPreference, SelectionCriteria, SessionOptions},
-    test::{spec::deserialize_uri_options_to_uri_string, EventClient, FailPoint, Serverless, TestClient, SERVERLESS},
+    test::{
+        spec::deserialize_uri_options_to_uri_string,
+        EventClient,
+        FailPoint,
+        Serverless,
+        TestClient,
+        SERVERLESS,
+    },
 };
 
 use super::{operation::Operation, test_event::CommandStartedEvent};
