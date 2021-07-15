@@ -561,7 +561,7 @@ impl<T> Collection<T> {
 
 impl<T> Collection<T>
 where
-    T: DeserializeOwned + Unpin,
+    T: DeserializeOwned + Unpin + Send + Sync,
 {
     /// Finds the documents in the collection matching `filter`.
     pub async fn find(
@@ -572,7 +572,7 @@ where
         let mut options = options.into();
         resolve_options!(self, options, [read_concern, selection_criteria]);
 
-        let find = Find::new(self.namespace(), filter.into(), options);
+        let find = Find::<T>::new(self.namespace(), filter.into(), options);
         let client = self.client();
 
         client
@@ -592,7 +592,7 @@ where
         resolve_read_concern_with_session!(self, options, Some(&mut *session))?;
         resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
 
-        let find = Find::new(self.namespace(), filter.into(), options);
+        let find = Find::<T>::new(self.namespace(), filter.into(), options);
         let client = self.client();
 
         client

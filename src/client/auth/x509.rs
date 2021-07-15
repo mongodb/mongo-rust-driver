@@ -1,7 +1,7 @@
 use crate::{
     bson::{doc, Document},
     client::options::ServerApi,
-    cmap::{Command, CommandResponse, Connection},
+    cmap::{Command, Connection, RawCommandResponse},
     error::{Error, Result},
     options::Credential,
 };
@@ -38,7 +38,7 @@ pub(crate) async fn send_client_first(
     conn: &mut Connection,
     credential: &Credential,
     server_api: Option<&ServerApi>,
-) -> Result<CommandResponse> {
+) -> Result<RawCommandResponse> {
     let command = build_client_first(credential, server_api);
 
     conn.send_command(command, None).await
@@ -53,11 +53,9 @@ pub(super) async fn authenticate_stream(
 ) -> Result<()> {
     let server_response = match server_first.into() {
         Some(server_first) => server_first,
-        None => {
-            send_client_first(conn, credential, server_api)
-                .await?
-                .raw_response
-        }
+        None => send_client_first(conn, credential, server_api)
+            .await?
+            .auth_response_body("MONGODB-X509")?,
     };
 
     if server_response.get_str("dbname") != Ok("$external") {

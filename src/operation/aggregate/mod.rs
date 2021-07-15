@@ -4,13 +4,15 @@ mod test;
 use crate::{
     bson::{doc, Bson, Document},
     bson_util,
-    cmap::{Command, CommandResponse, StreamDescription},
+    cmap::{Command, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
-    operation::{append_options, CursorBody, Operation, Retryability, WriteConcernOnlyBody},
+    operation::{append_options, Operation, Retryability},
     options::{AggregateOptions, SelectionCriteria, WriteConcern},
     Namespace,
 };
+
+use super::{CursorBody, CursorResponse};
 
 #[derive(Debug)]
 pub(crate) struct Aggregate {
@@ -39,7 +41,8 @@ impl Aggregate {
 }
 
 impl Operation for Aggregate {
-    type O = CursorSpecification;
+    type O = CursorSpecification<Document>;
+    type Response = CursorResponse<Document>;
     const NAME: &'static str = "aggregate";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -65,21 +68,16 @@ impl Operation for Aggregate {
 
     fn handle_response(
         &self,
-        response: CommandResponse,
-        _description: &StreamDescription,
+        response: CursorBody<Document>,
+        description: &StreamDescription,
     ) -> Result<Self::O> {
-        let source_address = response.source_address().clone();
-
         if self.is_out_or_merge() {
-            let error_body: WriteConcernOnlyBody = response.clone().body()?;
-            error_body.validate()?;
+            response.write_concern_info.validate()?;
         };
 
-        let body: CursorBody = response.body()?;
-
         Ok(CursorSpecification::new(
-            body.cursor,
-            source_address,
+            response.cursor,
+            description.server_address.clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),
         ))

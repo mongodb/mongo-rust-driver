@@ -1,9 +1,9 @@
 use crate::{
     bson::{doc, Bson, Document},
-    cmap::{CommandResponse, StreamDescription},
+    cmap::StreamDescription,
     concern::WriteConcern,
     error::{BulkWriteError, ErrorKind, WriteConcernError},
-    operation::{Insert, Operation},
+    operation::{test::handle_response_test, Insert, Operation},
     options::InsertManyOptions,
     Namespace,
 };
@@ -142,13 +142,7 @@ async fn handle_success() {
         .op
         .build(&StreamDescription::new_testing())
         .unwrap();
-    let ok_response = CommandResponse::with_document(doc! { "ok": 1.0, "n": 3 });
-    let ok_result = fixtures
-        .op
-        .handle_response(ok_response, &Default::default());
-    assert!(ok_result.is_ok());
-
-    let response = ok_result.unwrap();
+    let response = handle_response_test(&fixtures.op, doc! { "ok": 1.0, "n": 3 }).unwrap();
     let inserted_ids = response.inserted_ids;
     assert_eq!(inserted_ids.len(), 3);
     assert_eq!(
@@ -161,12 +155,7 @@ async fn handle_success() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_invalid_response() {
     let fixtures = fixtures();
-
-    let invalid_response = CommandResponse::with_document(doc! { "ok": 1.0, "asdfadsf": 123123 });
-    assert!(fixtures
-        .op
-        .handle_response(invalid_response, &Default::default())
-        .is_err());
+    handle_response_test(&fixtures.op, doc! { "ok": 1.0, "asdfadsf": 123123 }).unwrap_err();
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -180,7 +169,7 @@ async fn handle_write_failure() {
         .build(&StreamDescription::new_testing())
         .unwrap();
 
-    let write_error_response = CommandResponse::with_document(doc! {
+    let write_error_response = doc! {
         "ok": 1.0,
         "n": 1,
         "writeErrors": [
@@ -205,13 +194,10 @@ async fn handle_write_failure() {
                 }
             }
         }
-    });
+    };
 
-    let write_error_response = fixtures
-        .op
-        .handle_response(write_error_response, &Default::default())
-        .expect_err("result should be err");
-
+    let write_error_response =
+        handle_response_test(&fixtures.op, write_error_response).unwrap_err();
     match *write_error_response.kind {
         ErrorKind::BulkWrite(bwe) => {
             let write_errors = bwe.write_errors.expect("write errors should be present");

@@ -9,13 +9,15 @@ use serde::Serialize;
 use crate::{
     bson::{doc, Document},
     bson_util,
-    cmap::{Command, CommandResponse, StreamDescription},
+    cmap::{Command, StreamDescription},
     error::{BulkWriteFailure, Error, ErrorKind, Result},
     operation::{append_options, Operation, Retryability, WriteResponseBody},
     options::{InsertManyOptions, WriteConcern},
     results::InsertManyResult,
     Namespace,
 };
+
+use super::CommandResponse;
 
 #[derive(Debug)]
 pub(crate) struct Insert<T> {
@@ -49,6 +51,8 @@ impl<T> Insert<T> {
 
 impl<T: Serialize> Operation for Insert<T> {
     type O = InsertManyResult;
+    type Response = CommandResponse<WriteResponseBody>;
+
     const NAME: &'static str = "insert";
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
@@ -110,15 +114,18 @@ impl<T: Serialize> Operation for Insert<T> {
 
     fn handle_response(
         &self,
-        response: CommandResponse,
+        response: WriteResponseBody,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
-        let body: WriteResponseBody = response.body()?;
-
         let mut map = HashMap::new();
         if self.is_ordered() {
             // in ordered inserts, only the first n were attempted.
-            for (i, id) in self.inserted_ids.iter().enumerate().take(body.n as usize) {
+            for (i, id) in self
+                .inserted_ids
+                .iter()
+                .enumerate()
+                .take(response.n as usize)
+            {
                 map.insert(i, id.clone());
             }
         } else {
@@ -128,21 +135,21 @@ impl<T: Serialize> Operation for Insert<T> {
                 map.insert(i, id.clone());
             }
 
-            if let Some(write_errors) = body.write_errors.as_ref() {
+            if let Some(write_errors) = response.write_errors.as_ref() {
                 for err in write_errors {
                     map.remove(&err.index);
                 }
             }
         }
 
-        if body.write_errors.is_some() || body.write_concern_error.is_some() {
+        if response.write_errors.is_some() || response.write_concern_error.is_some() {
             return Err(Error::new(
                 ErrorKind::BulkWrite(BulkWriteFailure {
-                    write_errors: body.write_errors,
-                    write_concern_error: body.write_concern_error,
+                    write_errors: response.write_errors,
+                    write_concern_error: response.write_concern_error,
                     inserted_ids: map,
                 }),
-                body.labels,
+                response.labels,
             ));
         }
 

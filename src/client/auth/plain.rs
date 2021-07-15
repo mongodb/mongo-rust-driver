@@ -36,7 +36,7 @@ pub(crate) async fn authenticate_stream(
     .into_command();
 
     let response = conn.send_command(sasl_start, None).await?;
-    let sasl_response = SaslResponse::parse("PLAIN", response.raw_response)?;
+    let sasl_response = SaslResponse::parse("PLAIN", response.auth_response_body("PLAIN")?)?;
 
     if !sasl_response.done {
         return Err(Error::invalid_authentication_response("PLAIN"));

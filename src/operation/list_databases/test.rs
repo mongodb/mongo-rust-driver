@@ -1,9 +1,9 @@
 use crate::{
     bson::{doc, Bson, Document},
     bson_util,
-    cmap::{CommandResponse, StreamDescription},
+    cmap::StreamDescription,
     error::ErrorKind,
-    operation::{ListDatabases, Operation},
+    operation::{test::handle_response_test, ListDatabases, Operation},
     options::ListDatabasesOptions,
     selection_criteria::ReadPreference,
 };
@@ -90,7 +90,6 @@ async fn build_with_options() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success() {
-    let list_databases_op = ListDatabases::empty();
     let total_size = 251658240;
 
     let databases: Vec<Document> = vec![
@@ -111,31 +110,23 @@ async fn handle_success() {
         },
     ];
 
-    let expected_values: Vec<Document> = databases.clone();
+    let actual_values = handle_response_test(
+        &ListDatabases::empty(),
+        doc! {
+           "databases" : bson_util::to_bson_array(&databases),
+           "totalSize" : total_size,
+           "ok" : 1
+        },
+    )
+    .expect("should succeed");
 
-    let response = CommandResponse::with_document(doc! {
-       "databases" : bson_util::to_bson_array(&databases),
-       "totalSize" : total_size,
-       "ok" : 1
-    });
-
-    let actual_values = list_databases_op
-        .handle_response(response, &Default::default())
-        .expect("supposed to succeed");
-
-    assert_eq!(actual_values, expected_values);
+    assert_eq!(actual_values, databases);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_response_no_databases() {
-    let list_databases_op = ListDatabases::empty();
-
-    let response = CommandResponse::with_document(doc! {
-       "ok" : 1
-    });
-
-    let result = list_databases_op.handle_response(response, &Default::default());
+    let result = handle_response_test(&ListDatabases::empty(), doc! { "ok": 1 });
     match result.map_err(|e| *e.kind) {
         Err(ErrorKind::InvalidResponse { .. }) => {}
         other => panic!("expected response error, but got {:?}", other),

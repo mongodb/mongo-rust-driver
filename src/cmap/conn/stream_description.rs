@@ -1,10 +1,13 @@
 use std::time::Duration;
 
-use crate::{is_master::IsMasterReply, sdam::ServerType};
+use crate::{client::options::ServerAddress, is_master::IsMasterReply, sdam::ServerType};
 
 /// Contains information about a given server in a format digestible by a connection.
 #[derive(Debug, Default, Clone)]
 pub(crate) struct StreamDescription {
+    /// The address of the server.
+    pub(crate) server_address: ServerAddress,
+
     /// The type of the server when the handshake occurred.
     pub(crate) initial_server_type: ServerType,
 
@@ -34,6 +37,7 @@ impl StreamDescription {
     /// Constructs a new StreamDescription from an IsMasterReply.
     pub(crate) fn from_is_master(reply: IsMasterReply) -> Self {
         Self {
+            server_address: reply.server_address,
             initial_server_type: reply.command_response.server_type(),
             max_wire_version: reply.command_response.max_wire_version,
             min_wire_version: reply.command_response.min_wire_version,
@@ -58,10 +62,17 @@ impl StreamDescription {
     /// Gets a description of a stream for a 4.2 connection.
     #[cfg(test)]
     pub(crate) fn new_testing() -> Self {
+        Self::with_wire_version(8)
+    }
+
+    /// Gets a description of a stream for a 4.2 connection.
+    #[cfg(test)]
+    pub(crate) fn with_wire_version(max_wire_version: i32) -> Self {
         Self {
+            server_address: Default::default(),
             initial_server_type: Default::default(),
-            max_wire_version: Some(8),
-            min_wire_version: Some(8),
+            max_wire_version: Some(max_wire_version),
+            min_wire_version: Some(max_wire_version),
             sasl_supported_mechs: Default::default(),
             logical_session_timeout: Some(Duration::from_secs(30 * 60)),
             max_bson_object_size: 16 * 1024 * 1024,

@@ -43,7 +43,7 @@ pub struct Phase {
 #[derive(Debug, Deserialize)]
 pub struct Response(String, TestIsMasterCommandResponse);
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TestIsMasterCommandResponse {
     pub is_writable_primary: Option<bool>,
@@ -80,7 +80,6 @@ impl From<TestIsMasterCommandResponse> for IsMasterCommandResponse {
         IsMasterCommandResponse {
             is_writable_primary: test.is_writable_primary,
             is_master: test.is_master,
-            ok: test.ok,
             hosts: test.hosts,
             passives: test.passives,
             arbiters: test.arbiters,
@@ -104,12 +103,6 @@ impl From<TestIsMasterCommandResponse> for IsMasterCommandResponse {
             max_bson_object_size: test.max_bson_object_size.unwrap_or(1234),
             max_write_batch_size: test.max_write_batch_size.unwrap_or(1234),
         }
-    }
-}
-
-impl PartialEq for TestIsMasterCommandResponse {
-    fn eq(&self, other: &Self) -> bool {
-        IsMasterCommandResponse::from(self.clone()) == other.clone().into()
     }
 }
 
@@ -227,16 +220,6 @@ async fn run_test(test_file: TestFile) {
 
     for (i, phase) in test_file.phases.into_iter().enumerate() {
         for Response(address, command_response) in phase.responses {
-            let is_master_reply = if command_response == Default::default() {
-                Err("dummy error".to_string())
-            } else {
-                Ok(IsMasterReply {
-                    command_response: command_response.into(),
-                    round_trip_time: Some(Duration::from_millis(1234)), // Doesn't matter for tests.
-                    cluster_time: None,
-                })
-            };
-
             let address = ServerAddress::parse(&address).unwrap_or_else(|_| {
                 panic!(
                     "{}: couldn't parse address \"{:?}\"",
@@ -245,11 +228,37 @@ async fn run_test(test_file: TestFile) {
                 )
             });
 
+            let is_master_reply = if command_response.ok != Some(1.0) {
+                Err(Error::from(ErrorKind::Command(CommandError {
+                    code: 1234,
+                    code_name: "dummy error".to_string(),
+                    message: "dummy".to_string(),
+                })))
+            } else if command_response == Default::default() {
+                Err(Error::from(ErrorKind::Io(Arc::new(
+                    std::io::ErrorKind::BrokenPipe.into(),
+                ))))
+            } else {
+                Ok(IsMasterReply {
+                    server_address: address.clone(),
+                    command_response: command_response.into(),
+                    round_trip_time: Some(Duration::from_millis(1234)), // Doesn't matter for tests.
+                    cluster_time: None,
+                })
+            };
+
             // only update server if we have strong reference to it like the monitors do
             if let Some(server) = servers.get(&address).and_then(|s| s.upgrade()) {
-                let new_sd = ServerDescription::new(address.clone(), Some(is_master_reply));
-                if topology.update(&server, new_sd).await {
-                    servers = topology.get_servers().await
+                match is_master_reply {
+                    Ok(reply) => {
+                        let new_sd = ServerDescription::new(address.clone(), Some(Ok(reply)));
+                        if topology.update(&server, new_sd).await {
+                            servers = topology.get_servers().await
+                        }
+                    }
+                    Err(e) => {
+                        topology.handle_monitor_error(e, &server).await;
+                    }
                 }
             }
         }
@@ -528,6 +537,7 @@ async fn pool_cleared_error_does_not_mark_unknown() {
             ServerDescription::new(
                 address.clone(),
                 Some(Ok(IsMasterReply {
+                    server_address: address.clone(),
                     command_response: heartbeat_response,
                     round_trip_time: Some(Duration::from_secs(1)),
                     cluster_time: None,

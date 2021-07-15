@@ -1,9 +1,13 @@
 #[cfg(test)]
 mod test;
 
+use std::marker::PhantomData;
+
+use serde::de::DeserializeOwned;
+
 use crate::{
     bson::{doc, Document},
-    cmap::{Command, CommandResponse, StreamDescription},
+    cmap::{Command, StreamDescription},
     cursor::CursorSpecification,
     error::{ErrorKind, Result},
     operation::{append_options, CursorBody, Operation, Retryability},
@@ -11,14 +15,17 @@ use crate::{
     Namespace,
 };
 
+use super::CursorResponse;
+
 #[derive(Debug)]
-pub(crate) struct Find {
+pub(crate) struct Find<T> {
     ns: Namespace,
     filter: Option<Document>,
     options: Option<FindOptions>,
+    _phantom: PhantomData<T>,
 }
 
-impl Find {
+impl<T> Find<T> {
     #[cfg(test)]
     fn empty() -> Self {
         Self::new(
@@ -40,12 +47,14 @@ impl Find {
             ns,
             filter,
             options,
+            _phantom: Default::default(),
         }
     }
 }
 
-impl Operation for Find {
-    type O = CursorSpecification;
+impl<T: DeserializeOwned> Operation for Find<T> {
+    type O = CursorSpecification<T>;
+    type Response = CursorResponse<T>;
     const NAME: &'static str = "find";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -97,16 +106,12 @@ impl Operation for Find {
 
     fn handle_response(
         &self,
-        response: CommandResponse,
-        _description: &StreamDescription,
+        response: CursorBody<T>,
+        description: &StreamDescription,
     ) -> Result<Self::O> {
-        let source_address = response.source_address().clone();
-        let mut body: CursorBody = response.body()?;
-        body.cursor.ns = self.ns.clone();
-
         Ok(CursorSpecification::new(
-            body.cursor,
-            source_address,
+            response.cursor,
+            description.server_address.clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),
         ))

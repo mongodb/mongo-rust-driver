@@ -1,21 +1,19 @@
+use std::io::Read;
+
 use bitflags::bitflags;
-use futures_io::{AsyncRead, AsyncWrite};
+use futures_io::AsyncWrite;
 use futures_util::{
     io::{BufReader, BufWriter},
     AsyncReadExt,
     AsyncWriteExt,
 };
 
-use super::{
-    header::{Header, OpCode},
-    util::CountReader,
-};
+use super::header::{Header, OpCode};
 use crate::{
-    bson::Document,
-    bson_util::async_encoding,
-    cmap::conn::command::Command,
-    error::{ErrorKind, Result},
-    runtime::{AsyncLittleEndianRead, AsyncLittleEndianWrite, AsyncStream},
+    bson_util,
+    cmap::conn::{command::Command, wire::util::SyncCountReader},
+    error::{Error, ErrorKind, Result},
+    runtime::{AsyncLittleEndianWrite, AsyncStream, SyncLittleEndianRead},
 };
 
 /// Represents an OP_MSG wire protocol operation.
@@ -32,64 +30,60 @@ impl Message {
     /// Creates a `Message` from a given `Command`.
     ///
     /// Note that `response_to` will need to be set manually.
-    pub(crate) fn with_command(mut command: Command, request_id: Option<i32>) -> Self {
+    pub(crate) fn with_command(mut command: Command, request_id: Option<i32>) -> Result<Self> {
         command.body.insert("$db", command.target_db);
 
-        Self {
+        let mut bytes = Vec::new();
+        command.body.to_writer(&mut bytes)?;
+        Ok(Self {
             response_to: 0,
             flags: MessageFlags::empty(),
-            sections: vec![MessageSection::Document(command.body)],
+            sections: vec![MessageSection::Document(bytes)],
             checksum: None,
             request_id,
-        }
+        })
     }
 
     /// Gets the first document contained in this Message.
-    pub(crate) fn single_document_response(self) -> Result<Document> {
-        self.sections
-            .into_iter()
-            .next()
-            .and_then(|section| match section {
-                MessageSection::Document(doc) => Some(doc),
-                MessageSection::Sequence { documents, .. } => documents.into_iter().next(),
-            })
-            .ok_or_else(|| {
+    pub(crate) fn single_document_response(self) -> Result<Vec<u8>> {
+        let section = self.sections.into_iter().next().ok_or_else(|| {
+            Error::new(
                 ErrorKind::InvalidResponse {
                     message: "no response received from server".into(),
-                }
-                .into()
+                },
+                Option::<Vec<String>>::None,
+            )
+        })?;
+        match section {
+            MessageSection::Document(doc) => Some(doc),
+            MessageSection::Sequence { documents, .. } => documents.into_iter().next(),
+        }
+        .ok_or_else(|| {
+            Error::from(ErrorKind::InvalidResponse {
+                message: "no message received from the server".to_string(),
             })
-    }
-
-    /// Gets all documents contained in this Message flattened to a single Vec.
-    #[allow(dead_code)]
-    pub(crate) fn documents(self) -> Vec<Document> {
-        self.sections
-            .into_iter()
-            .flat_map(|section| match section {
-                MessageSection::Document(doc) => vec![doc],
-                MessageSection::Sequence { documents, .. } => documents,
-            })
-            .collect()
+        })
     }
 
     /// Reads bytes from `reader` and deserializes them into a Message.
     pub(crate) async fn read_from(reader: &mut AsyncStream) -> Result<Self> {
         let mut reader = BufReader::new(reader);
         let header = Header::read_from(&mut reader).await?;
+
+        // TODO: RUST-616 ensure length is < maxMessageSizeBytes
         let mut length_remaining = header.length - Header::LENGTH as i32;
         let mut buf = vec![0u8; length_remaining as usize];
         reader.read_exact(&mut buf).await?;
         let mut reader = buf.as_slice();
 
-        let flags = MessageFlags::from_bits_truncate(reader.read_u32().await?);
+        let flags = MessageFlags::from_bits_truncate(reader.read_u32()?);
         length_remaining -= std::mem::size_of::<u32>() as i32;
 
-        let mut count_reader = CountReader::new(&mut reader);
+        let mut count_reader = SyncCountReader::new(&mut reader);
         let mut sections = Vec::new();
 
         while length_remaining - count_reader.bytes_read() as i32 > 4 {
-            sections.push(MessageSection::read(&mut count_reader).await?);
+            sections.push(MessageSection::read(&mut count_reader)?);
         }
 
         length_remaining -= count_reader.bytes_read() as i32;
@@ -97,7 +91,7 @@ impl Message {
         let mut checksum = None;
 
         if length_remaining == 4 && flags.contains(MessageFlags::CHECKSUM_PRESENT) {
-            checksum = Some(reader.read_u32().await?);
+            checksum = Some(reader.read_u32()?);
         } else if length_remaining != 0 {
             return Err(ErrorKind::InvalidResponse {
                 message: format!(
@@ -170,36 +164,36 @@ bitflags! {
 /// Represents a section as defined by the OP_MSG spec.
 #[derive(Debug)]
 pub(crate) enum MessageSection {
-    Document(Document),
+    Document(Vec<u8>),
     Sequence {
         size: i32,
         identifier: String,
-        documents: Vec<Document>,
+        documents: Vec<Vec<u8>>,
     },
 }
 
 impl MessageSection {
     /// Reads bytes from `reader` and deserializes them into a MessageSection.
-    async fn read<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self> {
-        let payload_type = reader.read_u8().await?;
+    fn read<R: Read>(reader: &mut R) -> Result<Self> {
+        let payload_type = reader.read_u8()?;
 
         if payload_type == 0 {
-            return Ok(MessageSection::Document(
-                async_encoding::decode_document(reader).await?,
-            ));
+            return Ok(MessageSection::Document(bson_util::read_document_bytes(
+                reader,
+            )?));
         }
 
-        let size = reader.read_i32().await?;
+        let size = reader.read_i32()?;
         let mut length_remaining = size - std::mem::size_of::<i32>() as i32;
 
         let mut identifier = String::new();
-        length_remaining -= reader.read_to_string(&mut identifier).await? as i32;
+        length_remaining -= reader.read_to_string(&mut identifier)? as i32;
 
         let mut documents = Vec::new();
-        let mut count_reader = CountReader::new(reader);
+        let mut count_reader = SyncCountReader::new(reader);
 
         while length_remaining > count_reader.bytes_read() as i32 {
-            documents.push(async_encoding::decode_document(&mut count_reader).await?);
+            documents.push(bson_util::read_document_bytes(&mut count_reader)?);
         }
 
         if length_remaining != count_reader.bytes_read() as i32 {
@@ -227,7 +221,7 @@ impl MessageSection {
             Self::Document(doc) => {
                 // Write payload type.
                 writer.write_u8(0).await?;
-                async_encoding::encode_document(writer, doc).await?;
+                writer.write_all(doc.as_slice()).await?;
             }
             Self::Sequence {
                 size,
@@ -241,7 +235,7 @@ impl MessageSection {
                 super::util::write_cstring(writer, identifier).await?;
 
                 for doc in documents {
-                    async_encoding::encode_document(writer, doc).await?;
+                    writer.write_all(doc.as_slice()).await?;
                 }
             }
         }

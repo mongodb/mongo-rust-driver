@@ -76,8 +76,8 @@ pub struct DeleteResult {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct GetMoreResult {
-    pub(crate) batch: VecDeque<Document>,
+pub(crate) struct GetMoreResult<T> {
+    pub(crate) batch: VecDeque<T>,
     pub(crate) exhausted: bool,
 }
 

@@ -2,10 +2,14 @@ use std::time::Duration;
 
 use crate::{
     bson::{doc, Bson},
-    cmap::{CommandResponse, StreamDescription},
+    cmap::StreamDescription,
     coll::{options::DistinctOptions, Namespace},
     error::ErrorKind,
-    operation::{test, Distinct, Operation},
+    operation::{
+        test::{self, handle_response_test},
+        Distinct,
+        Operation,
+    },
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -100,15 +104,12 @@ async fn handle_success() {
     let expected_values: Vec<Bson> =
         vec![Bson::String("A".to_string()), Bson::String("B".to_string())];
 
-    let response = CommandResponse::with_document(doc! {
+    let response = doc! {
        "values" : expected_values.clone(),
        "ok" : 1
-    });
+    };
 
-    let actual_values = distinct_op
-        .handle_response(response, &Default::default())
-        .expect("supposed to succeed");
-
+    let actual_values = handle_response_test(&distinct_op, response).unwrap();
     assert_eq!(actual_values, expected_values);
 }
 
@@ -117,17 +118,13 @@ async fn handle_success() {
 async fn handle_response_with_empty_values() {
     let distinct_op = Distinct::empty();
 
-    let response = CommandResponse::with_document(doc! {
+    let response = doc! {
        "values" : [],
        "ok" : 1
-    });
+    };
 
     let expected_values: Vec<Bson> = Vec::new();
-
-    let actual_values = distinct_op
-        .handle_response(response, &Default::default())
-        .expect("supposed to succeed");
-
+    let actual_values = handle_response_test(&distinct_op, response).unwrap();
     assert_eq!(actual_values, expected_values);
 }
 
@@ -136,11 +133,11 @@ async fn handle_response_with_empty_values() {
 async fn handle_response_no_values() {
     let distinct_op = Distinct::empty();
 
-    let response = CommandResponse::with_document(doc! {
+    let response = doc! {
        "ok" : 1
-    });
+    };
 
-    let result = distinct_op.handle_response(response, &Default::default());
+    let result = handle_response_test(&distinct_op, response);
     match result.map_err(|e| *e.kind) {
         Err(ErrorKind::InvalidResponse { .. }) => {}
         other => panic!("expected response error, but got {:?}", other),

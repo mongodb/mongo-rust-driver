@@ -3,12 +3,14 @@ mod test;
 
 use crate::{
     bson::doc,
-    cmap::{Command, CommandResponse, StreamDescription},
+    cmap::{Command, StreamDescription},
     error::Result,
     operation::{append_options, Operation, WriteConcernOnlyBody},
     options::{CreateCollectionOptions, WriteConcern},
     Namespace,
 };
+
+use super::CommandResponse;
 
 #[derive(Debug)]
 pub(crate) struct Create {
@@ -35,6 +37,8 @@ impl Create {
 
 impl Operation for Create {
     type O = ();
+    type Response = CommandResponse<WriteConcernOnlyBody>;
+
     const NAME: &'static str = "create";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -52,10 +56,10 @@ impl Operation for Create {
 
     fn handle_response(
         &self,
-        response: CommandResponse,
+        response: WriteConcernOnlyBody,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
-        response.body::<WriteConcernOnlyBody>()?.validate()
+        response.validate()
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

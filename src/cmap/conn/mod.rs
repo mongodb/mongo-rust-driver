@@ -26,7 +26,7 @@ use crate::{
     options::{ServerAddress, TlsOptions},
     runtime::AsyncStream,
 };
-pub(crate) use command::{Command, CommandResponse};
+pub(crate) use command::{Command, RawCommandResponse};
 pub(crate) use stream_description::StreamDescription;
 pub(crate) use wire::next_request_id;
 
@@ -238,8 +238,8 @@ impl Connection {
         &mut self,
         command: Command,
         request_id: impl Into<Option<i32>>,
-    ) -> Result<CommandResponse> {
-        let message = Message::with_command(command, request_id.into());
+    ) -> Result<RawCommandResponse> {
+        let message = Message::with_command(command, request_id.into())?;
 
         self.command_executing = true;
         let write_result = message.write_to(&mut self.stream).await;
@@ -250,7 +250,7 @@ impl Connection {
         self.command_executing = false;
         self.error = response_message_result.is_err();
 
-        CommandResponse::new(self.address.clone(), response_message_result?)
+        RawCommandResponse::new(self.address.clone(), response_message_result?)
     }
 
     /// Gets the connection's StreamDescription.

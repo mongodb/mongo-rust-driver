@@ -1,24 +1,31 @@
 #[cfg(test)]
 mod test;
 
+use std::marker::PhantomData;
+
+use serde::de::DeserializeOwned;
+
 use crate::{
     bson::{doc, Document},
-    cmap::{Command, CommandResponse, StreamDescription},
+    cmap::{Command, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
     operation::{append_options, CursorBody, Operation, Retryability},
     options::{ListCollectionsOptions, ReadPreference, SelectionCriteria},
 };
 
+use super::CursorResponse;
+
 #[derive(Debug)]
-pub(crate) struct ListCollections {
+pub(crate) struct ListCollections<T> {
     db: String,
     filter: Option<Document>,
     name_only: bool,
     options: Option<ListCollectionsOptions>,
+    _phantom: PhantomData<T>,
 }
 
-impl ListCollections {
+impl<T> ListCollections<T> {
     #[cfg(test)]
     fn empty() -> Self {
         Self::new(String::new(), None, false, None)
@@ -35,12 +42,18 @@ impl ListCollections {
             filter,
             name_only,
             options,
+            _phantom: PhantomData::default(),
         }
     }
 }
 
-impl Operation for ListCollections {
-    type O = CursorSpecification;
+impl<T> Operation for ListCollections<T>
+where
+    T: DeserializeOwned + Unpin + Send + Sync,
+{
+    type O = CursorSpecification<T>;
+    type Response = CursorResponse<T>;
+
     const NAME: &'static str = "listCollections";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -65,15 +78,12 @@ impl Operation for ListCollections {
 
     fn handle_response(
         &self,
-        response: CommandResponse,
-        _description: &StreamDescription,
+        response: CursorBody<T>,
+        description: &StreamDescription,
     ) -> Result<Self::O> {
-        let source_address = response.source_address().clone();
-        let body: CursorBody = response.body()?;
-
         Ok(CursorSpecification::new(
-            body.cursor,
-            source_address,
+            response.cursor,
+            description.server_address.clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
             None,
         ))

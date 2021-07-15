@@ -4,7 +4,10 @@ use serde::Deserialize;
 
 use crate::{
     bson::{doc, oid::ObjectId, DateTime, Document, Timestamp},
-    client::{options::ServerApi, ClusterTime},
+    client::{
+        options::{ServerAddress, ServerApi},
+        ClusterTime,
+    },
     cmap::{Command, Connection},
     error::{ErrorKind, Result},
     sdam::ServerType,
@@ -43,11 +46,14 @@ pub(crate) async fn run_is_master(
     let response = conn.send_command(command, None).await?;
     let end_time = Instant::now();
 
-    response.validate()?;
-    let cluster_time = response.cluster_time().cloned();
-    let command_response: IsMasterCommandResponse = response.body()?;
+    let server_address = response.source_address().clone();
+    let basic_response = response.into_document_response()?;
+    basic_response.validate()?;
+    let cluster_time = basic_response.cluster_time().cloned();
+    let command_response: IsMasterCommandResponse = basic_response.body()?;
 
     Ok(IsMasterReply {
+        server_address,
         command_response,
         round_trip_time: Some(end_time.duration_since(start_time)),
         cluster_time,
@@ -56,6 +62,7 @@ pub(crate) async fn run_is_master(
 
 #[derive(Debug, Clone)]
 pub(crate) struct IsMasterReply {
+    pub server_address: ServerAddress,
     pub command_response: IsMasterCommandResponse,
     pub round_trip_time: Option<Duration>,
     pub cluster_time: Option<ClusterTime>,
@@ -67,7 +74,6 @@ pub(crate) struct IsMasterCommandResponse {
     pub is_writable_primary: Option<bool>,
     #[serde(rename = "ismaster")]
     pub is_master: Option<bool>,
-    pub ok: Option<f32>,
     pub hosts: Option<Vec<String>>,
     pub passives: Option<Vec<String>>,
     pub arbiters: Option<Vec<String>>,
@@ -115,9 +121,7 @@ impl PartialEq for IsMasterCommandResponse {
 
 impl IsMasterCommandResponse {
     pub(crate) fn server_type(&self) -> ServerType {
-        if self.ok != Some(1.0) {
-            ServerType::Unknown
-        } else if self.msg.as_deref() == Some("isdbgrid") {
+        if self.msg.as_deref() == Some("isdbgrid") {
             ServerType::Mongos
         } else if self.set_name.is_some() {
             if let Some(true) = self.hidden {

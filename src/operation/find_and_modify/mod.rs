@@ -10,7 +10,7 @@ use self::options::FindAndModifyOptions;
 use crate::{
     bson::{doc, from_document, Bson, Document},
     bson_util,
-    cmap::{Command, CommandResponse, StreamDescription},
+    cmap::{Command, StreamDescription},
     coll::{
         options::{
             FindOneAndDeleteOptions,
@@ -24,6 +24,8 @@ use crate::{
     operation::{append_options, Operation, Retryability},
     options::WriteConcern,
 };
+
+use super::CommandResponse;
 
 pub(crate) struct FindAndModify<T = Document>
 where
@@ -100,6 +102,7 @@ where
     T: DeserializeOwned,
 {
     type O = Option<T>;
+    type Response = CommandResponse<Response>;
     const NAME: &'static str = "findAndModify";
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
@@ -128,11 +131,10 @@ where
 
     fn handle_response(
         &self,
-        response: CommandResponse,
+        response: Response,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
-        let body: ResponseBody = response.body()?;
-        match body.value {
+        match response.value {
             Bson::Document(doc) => Ok(Some(from_document(doc)?)),
             Bson::Null => Ok(None),
             other => Err(ErrorKind::InvalidResponse {
@@ -156,6 +158,6 @@ where
 }
 
 #[derive(Debug, Deserialize)]
-struct ResponseBody {
+pub(crate) struct Response {
     value: Bson,
 }

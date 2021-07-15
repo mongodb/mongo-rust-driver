@@ -17,16 +17,23 @@ mod list_databases;
 mod run_command;
 mod update;
 
+#[cfg(test)]
+mod test;
+
 use std::{collections::VecDeque, fmt::Debug, ops::Deref};
 
-use serde::{Deserialize, Serialize};
+use bson::Timestamp;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     bson::{self, Bson, Document},
-    cmap::{Command, CommandResponse, StreamDescription},
+    bson_util,
+    client::ClusterTime,
+    cmap::{Command, RawCommandResponse, StreamDescription},
     error::{
         BulkWriteError,
         BulkWriteFailure,
+        CommandError,
         Error,
         ErrorKind,
         Result,
@@ -62,6 +69,9 @@ pub(crate) trait Operation {
     /// The output type of this operation.
     type O;
 
+    /// The format of the command response from the server.
+    type Response: Response;
+
     /// The name of the server side command associated with this operation.
     const NAME: &'static str;
 
@@ -72,7 +82,7 @@ pub(crate) trait Operation {
     /// Interprets the server response to the command.
     fn handle_response(
         &self,
-        response: CommandResponse,
+        response: <Self::Response as Response>::Body,
         description: &StreamDescription,
     ) -> Result<Self::O>;
 
@@ -109,11 +119,137 @@ pub(crate) trait Operation {
         Retryability::None
     }
 
-    // Updates this operation as needed for a retry.
+    /// Updates this operation as needed for a retry.
     fn update_for_retry(&mut self) {}
 
     fn name(&self) -> &str {
         Self::NAME
+    }
+}
+
+/// Trait modeling the behavior of a command response to a server operation.
+pub(crate) trait Response: Sized {
+    /// The command-specific portion of a command response.
+    /// This type will be passed to the associated operation's `handle_response` method.
+    type Body;
+
+    /// Deserialize a response from the given raw response.
+    fn deserialize_response(raw: &RawCommandResponse) -> Result<Self>;
+
+    /// The `ok` field of the response.
+    fn ok(&self) -> Option<&Bson>;
+
+    /// Whether the command succeeeded or not (i.e. if this response is ok: 1).
+    fn is_success(&self) -> bool {
+        match self.ok() {
+            Some(b) => bson_util::get_int(&b) == Some(1),
+            None => false,
+        }
+    }
+
+    /// The `clusterTime` field of the response.
+    fn cluster_time(&self) -> Option<&ClusterTime>;
+
+    /// The `atClusterTime` field of the response.
+    fn at_cluster_time(&self) -> Option<Timestamp>;
+
+    /// Convert into the body of the response.
+    fn into_body(self) -> Self::Body;
+}
+
+/// A response to a command with a body shaped deserialized to a `T`.
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CommandResponse<T> {
+    pub(crate) ok: Bson,
+
+    #[serde(rename = "$clusterTime")]
+    pub(crate) cluster_time: Option<ClusterTime>,
+
+    pub(crate) at_cluster_time: Option<Timestamp>,
+
+    #[serde(flatten)]
+    pub(crate) body: T,
+}
+
+impl<T: DeserializeOwned> CommandResponse<T> {
+    pub(crate) fn is_success(&self) -> bool {
+        <Self as Response>::is_success(self)
+    }
+}
+
+impl<T: DeserializeOwned> Response for CommandResponse<T> {
+    type Body = T;
+
+    fn deserialize_response(raw: &RawCommandResponse) -> Result<Self> {
+        raw.body()
+    }
+
+    fn ok(&self) -> Option<&Bson> {
+        Some(&self.ok)
+    }
+
+    fn cluster_time(&self) -> Option<&ClusterTime> {
+        self.cluster_time.as_ref()
+    }
+
+    fn at_cluster_time(&self) -> Option<Timestamp> {
+        self.at_cluster_time
+    }
+
+    fn into_body(self) -> Self::Body {
+        self.body
+    }
+}
+
+/// A response to commands that return cursors.
+#[derive(Debug)]
+pub(crate) struct CursorResponse<T> {
+    response: CommandResponse<CursorBody<T>>,
+}
+
+impl<T: DeserializeOwned> Response for CursorResponse<T> {
+    type Body = CursorBody<T>;
+
+    fn deserialize_response(raw: &RawCommandResponse) -> Result<Self> {
+        Ok(Self {
+            response: raw.body()?,
+        })
+    }
+
+    fn ok(&self) -> Option<&Bson> {
+        self.response.ok()
+    }
+
+    fn cluster_time(&self) -> Option<&ClusterTime> {
+        self.response.cluster_time()
+    }
+
+    fn at_cluster_time(&self) -> Option<Timestamp> {
+        self.response.body.cursor.at_cluster_time
+    }
+
+    fn into_body(self) -> Self::Body {
+        self.response.body
+    }
+}
+
+/// A response body useful for deserializing command errors.
+#[derive(Deserialize, Debug)]
+pub(crate) struct CommandErrorBody {
+    #[serde(rename = "errorLabels")]
+    pub(crate) error_labels: Option<Vec<String>>,
+
+    #[serde(flatten)]
+    pub(crate) command_error: CommandError,
+}
+
+impl From<CommandErrorBody> for Error {
+    fn from(command_error_response: CommandErrorBody) -> Error {
+        Error::new(
+            ErrorKind::Command(command_error_response.command_error),
+            command_error_response.error_labels,
+        )
     }
 }
 
@@ -142,11 +278,11 @@ pub(crate) fn append_options<T: Serialize + Debug>(
 }
 
 #[derive(Deserialize, Debug)]
-struct EmptyBody {}
+pub(crate) struct EmptyBody {}
 
 /// Body of a write response that could possibly have a write concern error but not write errors.
-#[derive(Deserialize)]
-struct WriteConcernOnlyBody {
+#[derive(Debug, Deserialize, Default, Clone)]
+pub(crate) struct WriteConcernOnlyBody {
     #[serde(rename = "writeConcernError")]
     write_concern_error: Option<WriteConcernError>,
 
@@ -167,7 +303,7 @@ impl WriteConcernOnlyBody {
 }
 
 #[derive(Deserialize, Debug)]
-struct WriteResponseBody<T = EmptyBody> {
+pub(crate) struct WriteResponseBody<T = EmptyBody> {
     #[serde(flatten)]
     body: T,
 
@@ -211,17 +347,24 @@ impl<T> Deref for WriteResponseBody<T> {
 }
 
 #[derive(Debug, Deserialize)]
-struct CursorBody {
-    cursor: CursorInfo,
+pub(crate) struct CursorBody<T> {
+    cursor: CursorInfo<T>,
+
+    #[serde(flatten)]
+    write_concern_info: WriteConcernOnlyBody,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct CursorInfo {
+#[derive(Debug, Deserialize, Clone)]
+pub(crate) struct CursorInfo<T> {
     pub(crate) id: i64,
+
     pub(crate) ns: Namespace,
+
     #[serde(rename = "firstBatch")]
-    pub(crate) first_batch: VecDeque<Document>,
+    pub(crate) first_batch: VecDeque<T>,
+
+    #[serde(rename = "atClusterTime")]
+    pub(crate) at_cluster_time: Option<Timestamp>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -229,29 +372,4 @@ pub(crate) enum Retryability {
     Write,
     Read,
     None,
-}
-
-#[cfg(test)]
-mod test {
-    use crate::{
-        operation::Operation,
-        options::{ReadPreference, SelectionCriteria},
-    };
-
-    pub(crate) fn op_selection_criteria<F, T>(constructor: F)
-    where
-        T: Operation,
-        F: Fn(Option<SelectionCriteria>) -> T,
-    {
-        let op = constructor(None);
-        assert_eq!(op.selection_criteria(), None);
-
-        let read_pref: SelectionCriteria = ReadPreference::Secondary {
-            options: Default::default(),
-        }
-        .into();
-
-        let op = constructor(Some(read_pref.clone()));
-        assert_eq!(op.selection_criteria(), Some(&read_pref));
-    }
 }

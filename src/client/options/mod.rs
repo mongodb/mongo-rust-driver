@@ -390,6 +390,8 @@ pub struct ClientOptions {
 
     /// The handler that should process all command-related events. See the CommandEventHandler
     /// type documentation for more details.
+    ///
+    /// Note that monitoring command events may incur a performance penalty.
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
     #[builder(default)]
     #[serde(skip)]

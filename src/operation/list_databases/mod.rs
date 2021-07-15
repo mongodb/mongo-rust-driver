@@ -5,12 +5,14 @@ use serde::Deserialize;
 
 use crate::{
     bson::{doc, Document},
-    cmap::{Command, CommandResponse, StreamDescription},
+    cmap::{Command, StreamDescription},
     error::Result,
     operation::{append_options, Operation, Retryability},
     options::ListDatabasesOptions,
     selection_criteria::{ReadPreference, SelectionCriteria},
 };
+
+use super::CommandResponse;
 
 #[derive(Debug)]
 pub(crate) struct ListDatabases {
@@ -44,6 +46,8 @@ impl ListDatabases {
 
 impl Operation for ListDatabases {
     type O = Vec<Document>;
+    type Response = CommandResponse<Response>;
+
     const NAME: &'static str = "listDatabases";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -67,10 +71,10 @@ impl Operation for ListDatabases {
 
     fn handle_response(
         &self,
-        response: CommandResponse,
+        response: Response,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
-        response.body::<ResponseBody>().map(|body| body.databases)
+        Ok(response.databases)
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
@@ -83,6 +87,6 @@ impl Operation for ListDatabases {
 }
 
 #[derive(Debug, Deserialize)]
-struct ResponseBody {
+pub(crate) struct Response {
     databases: Vec<Document>,
 }

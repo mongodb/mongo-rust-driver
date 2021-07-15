@@ -1,13 +1,12 @@
-use serde::{de::DeserializeOwned, Deserialize};
+pub(crate) use serde::de::DeserializeOwned;
 
 use super::wire::Message;
 use crate::{
-    bson::{Bson, Document, Timestamp},
-    bson_util,
+    bson::Document,
     client::{options::ServerApi, ClusterTime},
-    concern::ReadConcern,
-    error::{CommandError, Error, ErrorKind, Result},
-    options::ServerAddress,
+    error::{Error, ErrorKind, Result},
+    operation::{CommandErrorBody, CommandResponse},
+    options::{ReadConcern, ServerAddress},
     selection_criteria::ReadPreference,
     ClientSession,
 };
@@ -96,27 +95,22 @@ impl Command {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct CommandResponse {
-    source: ServerAddress,
-    pub(crate) raw_response: Document,
-    cluster_time: Option<ClusterTime>,
-    snapshot_time: Option<Timestamp>,
+pub(crate) struct RawCommandResponse {
+    pub(crate) source: ServerAddress,
+    raw: Vec<u8>,
 }
 
-impl CommandResponse {
+impl RawCommandResponse {
     #[cfg(test)]
-    pub(crate) fn with_document_and_address(source: ServerAddress, doc: Document) -> Self {
-        Self {
-            source,
-            raw_response: doc,
-            cluster_time: None,
-            snapshot_time: None,
-        }
+    pub(crate) fn with_document_and_address(source: ServerAddress, doc: Document) -> Result<Self> {
+        let mut raw = Vec::new();
+        doc.to_writer(&mut raw)?;
+        Ok(Self { source, raw })
     }
 
     /// Initialize a response from a document.
     #[cfg(test)]
-    pub(crate) fn with_document(doc: Document) -> Self {
+    pub(crate) fn with_document(doc: Document) -> Result<Self> {
         Self::with_document_and_address(
             ServerAddress::Tcp {
                 host: "localhost".to_string(),
@@ -127,44 +121,52 @@ impl CommandResponse {
     }
 
     pub(crate) fn new(source: ServerAddress, message: Message) -> Result<Self> {
-        let raw_response = message.single_document_response()?;
-        let cluster_time = raw_response
-            .get("$clusterTime")
-            .and_then(|subdoc| bson::from_bson(subdoc.clone()).ok());
-        let snapshot_time = raw_response
-            .get("atClusterTime")
-            .or_else(|| {
-                raw_response
-                    .get("cursor")
-                    .and_then(|b| b.as_document())
-                    .and_then(|subdoc| subdoc.get("atClusterTime"))
-            })
-            .and_then(|subdoc| bson::from_bson(subdoc.clone()).ok());
+        let raw = message.single_document_response()?;
+        Ok(Self { source, raw })
+    }
 
-        Ok(Self {
-            source,
-            raw_response,
-            cluster_time,
-            snapshot_time,
+    pub(crate) fn body<T: DeserializeOwned>(&self) -> Result<T> {
+        bson::from_slice(self.raw.as_slice()).map_err(|e| {
+            Error::from(ErrorKind::InvalidResponse {
+                message: format!("{}", e),
+            })
         })
     }
 
-    /// Returns whether this response indicates a success or not (i.e. if "ok: 1")
-    pub(crate) fn is_success(&self) -> bool {
-        match self.raw_response.get("ok") {
-            Some(b) => bson_util::get_int(b) == Some(1),
-            _ => false,
-        }
+    /// Deserialize the body of this response, returning an authentication error if it fails.
+    pub(crate) fn auth_response_body<T: DeserializeOwned>(
+        &self,
+        mechanism_name: &str,
+    ) -> Result<T> {
+        self.body()
+            .map_err(|_| Error::invalid_authentication_response(mechanism_name))
     }
 
+    /// Deserialize the raw bytes into a response backed by a `Document` for further processing.
+    pub(crate) fn into_document_response(self) -> Result<DocumentCommandResponse> {
+        let response: CommandResponse<Document> = self.body()?;
+        Ok(DocumentCommandResponse { response })
+    }
+
+    /// The address of the server that sent this response.
+    pub(crate) fn source_address(&self) -> &ServerAddress {
+        &self.source
+    }
+}
+
+/// A command response backed by a `Document` rather than raw bytes.
+/// Use this for simple command responses where deserialization performance is not a high priority.
+pub(crate) struct DocumentCommandResponse {
+    response: CommandResponse<Document>,
+}
+
+impl DocumentCommandResponse {
     /// Returns a result indicating whether this response corresponds to a command failure.
     pub(crate) fn validate(&self) -> Result<()> {
-        if !self.is_success() {
-            let error_response: CommandErrorResponse =
-                bson::from_bson(Bson::Document(self.raw_response.clone())).map_err(|_| {
-                    ErrorKind::InvalidResponse {
-                        message: "invalid server response".to_string(),
-                    }
+        if !self.response.is_success() {
+            let error_response: CommandErrorBody = bson::from_document(self.response.body.clone())
+                .map_err(|_| ErrorKind::InvalidResponse {
+                    message: "invalid server response".to_string(),
                 })?;
             Err(Error::new(
                 ErrorKind::Command(error_response.command_error),
@@ -177,7 +179,7 @@ impl CommandResponse {
 
     /// Deserialize the body of the response.
     pub(crate) fn body<T: DeserializeOwned>(self) -> Result<T> {
-        match bson::from_document(self.raw_response) {
+        match bson::from_document(self.response.body) {
             Ok(body) => Ok(body),
             Err(e) => Err(ErrorKind::InvalidResponse {
                 message: format!("{}", e),
@@ -186,27 +188,7 @@ impl CommandResponse {
         }
     }
 
-    /// Gets the cluster time from the response, if any.
     pub(crate) fn cluster_time(&self) -> Option<&ClusterTime> {
-        self.cluster_time.as_ref()
+        self.response.cluster_time.as_ref()
     }
-
-    /// Gets the snapshot time from the response, if any.
-    pub(crate) fn snapshot_time(&self) -> Option<&Timestamp> {
-        self.snapshot_time.as_ref()
-    }
-
-    /// The address of the server that sent this response.
-    pub(crate) fn source_address(&self) -> &ServerAddress {
-        &self.source
-    }
-}
-
-#[derive(Deserialize, Debug)]
-struct CommandErrorResponse {
-    #[serde(rename = "errorLabels")]
-    error_labels: Option<Vec<String>>,
-
-    #[serde(flatten)]
-    command_error: CommandError,
 }

@@ -3,10 +3,10 @@ use pretty_assertions::assert_eq;
 use crate::{
     bson::doc,
     bson_util,
-    cmap::{CommandResponse, StreamDescription},
+    cmap::StreamDescription,
     concern::{Acknowledgment, WriteConcern},
     error::{ErrorKind, WriteConcernError, WriteError, WriteFailure},
-    operation::{Delete, Operation},
+    operation::{test::handle_response_test, Delete, Operation},
     options::DeleteOptions,
     Namespace,
 };
@@ -102,15 +102,14 @@ async fn build_one() {
 async fn handle_success() {
     let op = Delete::empty();
 
-    let ok_response = CommandResponse::with_document(doc! {
-        "ok": 1.0,
-        "n": 3,
-    });
-
-    let ok_result = op.handle_response(ok_response, &Default::default());
-    assert!(ok_result.is_ok());
-
-    let delete_result = ok_result.unwrap();
+    let delete_result = handle_response_test(
+        &op,
+        doc! {
+            "ok": 1.0,
+            "n": 3
+        },
+    )
+    .expect("should succeed");
     assert_eq!(delete_result.deleted_count, 3);
 }
 
@@ -118,11 +117,14 @@ async fn handle_success() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_invalid_response() {
     let op = Delete::empty();
-
-    let invalid_response = CommandResponse::with_document(doc! { "ok": 1.0, "asdfadsf": 123123 });
-    assert!(op
-        .handle_response(invalid_response, &Default::default())
-        .is_err());
+    handle_response_test(
+        &op,
+        doc! {
+            "ok": 1.0,
+            "asffasdf": 123123
+        },
+    )
+    .expect_err("should fail");
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -130,7 +132,7 @@ async fn handle_invalid_response() {
 async fn handle_write_failure() {
     let op = Delete::empty();
 
-    let write_error_response = CommandResponse::with_document(doc! {
+    let write_error_response = doc! {
         "ok": 1.0,
         "n": 0,
         "writeErrors": [
@@ -140,10 +142,9 @@ async fn handle_write_failure() {
                 "errmsg": "my error string"
             }
         ]
-    });
-    let write_error_result = op.handle_response(write_error_response, &Default::default());
-    assert!(write_error_result.is_err());
-    match *write_error_result.unwrap_err().kind {
+    };
+    let write_error = handle_response_test(&op, write_error_response).unwrap_err();
+    match *write_error.kind {
         ErrorKind::Write(WriteFailure::WriteError(ref error)) => {
             let expected_err = WriteError {
                 code: 1234,
@@ -162,7 +163,7 @@ async fn handle_write_failure() {
 async fn handle_write_concern_failure() {
     let op = Delete::empty();
 
-    let wc_error_response = CommandResponse::with_document(doc! {
+    let wc_error_response = doc! {
         "ok": 1.0,
         "n": 0,
         "writeConcernError": {
@@ -177,12 +178,11 @@ async fn handle_write_concern_failure() {
                 }
             }
         }
-    });
+    };
 
-    let wc_error_result = op.handle_response(wc_error_response, &Default::default());
-    assert!(wc_error_result.is_err());
-
-    match *wc_error_result.unwrap_err().kind {
+    let wc_error = handle_response_test(&op, wc_error_response)
+        .expect_err("should fail with write concern error");
+    match *wc_error.kind {
         ErrorKind::Write(WriteFailure::WriteConcernError(ref wc_error)) => {
             let expected_wc_err = WriteConcernError {
                 code: 456,

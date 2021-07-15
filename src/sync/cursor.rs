@@ -71,14 +71,14 @@ use crate::{
 #[derive(Debug)]
 pub struct Cursor<T>
 where
-    T: DeserializeOwned + Unpin,
+    T: DeserializeOwned + Unpin + Send + Sync,
 {
     async_cursor: AsyncCursor<T>,
 }
 
 impl<T> Cursor<T>
 where
-    T: DeserializeOwned + Unpin,
+    T: DeserializeOwned + Unpin + Send + Sync,
 {
     pub(crate) fn new(async_cursor: AsyncCursor<T>) -> Self {
         Self { async_cursor }
@@ -87,7 +87,7 @@ where
 
 impl<T> Iterator for Cursor<T>
 where
-    T: DeserializeOwned + Unpin,
+    T: DeserializeOwned + Unpin + Send + Sync,
 {
     type Item = Result<T>;
 
@@ -125,7 +125,7 @@ where
 
 impl<T> SessionCursor<T>
 where
-    T: DeserializeOwned + Unpin,
+    T: DeserializeOwned + Unpin + Send + Sync,
 {
     pub(crate) fn new(async_cursor: AsyncSessionCursor<T>) -> Self {
         Self { async_cursor }
@@ -174,14 +174,14 @@ where
 /// This updates the buffer of the parent `SessionCursor` when dropped.
 pub struct SessionCursorIter<'cursor, 'session, T = Document>
 where
-    T: DeserializeOwned + Unpin,
+    T: DeserializeOwned + Unpin + Send + Sync,
 {
     async_stream: SessionCursorStream<'cursor, 'session, T>,
 }
 
 impl<T> Iterator for SessionCursorIter<'_, '_, T>
 where
-    T: DeserializeOwned + Unpin,
+    T: DeserializeOwned + Unpin + Send + Sync,
 {
     type Item = Result<T>;
 

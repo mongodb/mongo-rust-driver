@@ -1,12 +1,12 @@
 use crate::{
     bson::doc,
-    cmap::{Command, CommandResponse, StreamDescription},
+    cmap::{Command, StreamDescription},
     error::Result,
     operation::{Operation, Retryability},
     options::WriteConcern,
 };
 
-use super::WriteConcernOnlyBody;
+use super::{CommandResponse, Response, WriteConcernOnlyBody};
 
 pub(crate) struct AbortTransaction {
     write_concern: Option<WriteConcern>,
@@ -20,6 +20,8 @@ impl AbortTransaction {
 
 impl Operation for AbortTransaction {
     type O = ();
+    type Response = CommandResponse<WriteConcernOnlyBody>;
+
     const NAME: &'static str = "abortTransaction";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -39,10 +41,10 @@ impl Operation for AbortTransaction {
 
     fn handle_response(
         &self,
-        response: CommandResponse,
+        response: <Self::Response as Response>::Body,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
-        response.body::<WriteConcernOnlyBody>()?.validate()
+        response.validate()
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

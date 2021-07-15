@@ -2,11 +2,15 @@ use std::time::Duration;
 
 use crate::{
     bson::doc,
-    cmap::{CommandResponse, StreamDescription},
+    cmap::StreamDescription,
     coll::{options::EstimatedDocumentCountOptions, Namespace},
     concern::ReadConcern,
-    error::ErrorKind,
-    operation::{test, Count, Operation},
+    operation::{
+        count::SERVER_4_9_0_WIRE_VERSION,
+        test::{self, handle_response_test, handle_response_test_with_wire_version},
+        Count,
+        Operation,
+    },
     options::ReadConcernLevel,
 };
 
@@ -77,12 +81,30 @@ async fn handle_success() {
     let count_op = Count::empty();
 
     let n = 26;
-    let response = CommandResponse::with_document(doc! { "n" : n, "ok" : 1 });
+    let response = doc! { "ok": 1.0, "n": n };
 
-    let actual_values = count_op
-        .handle_response(response, &Default::default())
-        .expect("supposed to succeed");
+    let actual_values = handle_response_test(&count_op, response).unwrap();
+    assert_eq!(actual_values, n);
+}
 
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn handle_success_agg() {
+    let count_op = Count::empty();
+
+    let n = 26;
+    let response = doc! {
+        "ok": 1.0,
+        "cursor": {
+            "id": 0,
+            "ns": "a.b",
+            "firstBatch": [ { "n": n } ]
+        }
+    };
+
+    let actual_values =
+        handle_response_test_with_wire_version(&count_op, response, SERVER_4_9_0_WIRE_VERSION)
+            .unwrap();
     assert_eq!(actual_values, n);
 }
 
@@ -90,12 +112,5 @@ async fn handle_success() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_response_no_n() {
     let count_op = Count::empty();
-
-    let response = CommandResponse::with_document(doc! { "ok" : 1 });
-
-    let result = count_op.handle_response(response, &Default::default());
-    match result.map_err(|e| *e.kind) {
-        Err(ErrorKind::InvalidResponse { .. }) => {}
-        other => panic!("expected response error, but got {:?}", other),
-    }
+    handle_response_test(&count_op, doc! { "ok": 1.0 }).unwrap_err();
 }

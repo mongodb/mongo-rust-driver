@@ -1,10 +1,13 @@
 use crate::{
     bson::doc,
     bson_util,
-    cmap::{CommandResponse, StreamDescription},
+    cmap::StreamDescription,
     coll::Namespace,
     concern::ReadConcern,
-    operation::{test, Operation},
+    operation::{
+        test::{self, handle_response_test},
+        Operation,
+    },
     options::{CountOptions, Hint},
 };
 
@@ -100,23 +103,15 @@ async fn handle_success() {
     let count_op = CountDocuments::new(ns, None, None);
 
     let n = 26;
-    let response = CommandResponse::with_document(doc! {
-        "cursor" : {
-            "firstBatch" : [
-                {
-                    "_id" : 1,
-                    "n" : n
-                }
-            ],
-            "id" : 0,
-            "ns" : "test_db.test_coll"
-        },
-        "ok" : 1
-    });
+    let response = doc! {
+        "ok": 1.0,
+        "cursor": {
+            "id": 0,
+            "ns": "test_db.test_coll",
+            "firstBatch": [ { "_id": 1, "n": n } ],
+        }
+    };
 
-    let actual_values = count_op
-        .handle_response(response, &Default::default())
-        .expect("supposed to succeed");
-
+    let actual_values = handle_response_test(&count_op, response).unwrap();
     assert_eq!(actual_values, n);
 }

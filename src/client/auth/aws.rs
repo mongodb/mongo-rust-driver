@@ -61,7 +61,8 @@ pub(super) async fn authenticate_stream(
 
     let server_first_response = conn.send_command(client_first, None).await?;
 
-    let server_first = ServerFirst::parse(server_first_response.raw_response)?;
+    let server_first =
+        ServerFirst::parse(server_first_response.auth_response_body("MONGODB-AWS")?)?;
     server_first.validate(&nonce)?;
 
     let aws_credential = AwsCredential::get(credential, http_client).await?;
@@ -96,7 +97,10 @@ pub(super) async fn authenticate_stream(
     let client_second = sasl_continue.into_command();
 
     let server_second_response = conn.send_command(client_second, None).await?;
-    let server_second = SaslResponse::parse("MONGODB-AWS", server_second_response.raw_response)?;
+    let server_second = SaslResponse::parse(
+        "MONGODB-AWS",
+        server_second_response.auth_response_body("MONGODB-AWS")?,
+    )?;
 
     if server_second.conversation_id != server_first.conversation_id {
         return Err(Error::invalid_authentication_response("MONGODB-AWS"));
@@ -373,12 +377,10 @@ impl ServerFirst {
             done,
         } = SaslResponse::parse("MONGODB-AWS", response)?;
 
-        let payload_document = Document::from_reader(&mut payload.as_slice())?;
-
         let ServerFirstPayload {
             server_nonce,
             sts_host,
-        } = bson::from_bson(Bson::Document(payload_document))
+        } = bson::from_slice(payload.as_slice())
             .map_err(|_| Error::invalid_authentication_response("MONGODB-AWS"))?;
 
         Ok(Self {
