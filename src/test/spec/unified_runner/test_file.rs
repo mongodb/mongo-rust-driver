@@ -104,10 +104,9 @@ impl RunOnRequirement {
             }
         }
         if let Some(ref serverless) = self.serverless {
-            let is_serverless = SERVERLESS.as_ref().map_or(false, |s| s == "serverless");
             match serverless {
-                Serverless::Forbid if is_serverless => return false,
-                Serverless::Require if !is_serverless => return false,
+                Serverless::Forbid if *SERVERLESS => return false,
+                Serverless::Require if !*SERVERLESS => return false,
                 _ => (),
             }
         }

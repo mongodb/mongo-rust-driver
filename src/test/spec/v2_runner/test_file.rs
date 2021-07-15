@@ -33,8 +33,7 @@ pub struct TestFile {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RunOn {
     pub min_server_version: Option<String>,
     pub max_server_version: Option<String>,
@@ -62,10 +61,9 @@ impl RunOn {
             }
         }
         if let Some(ref serverless) = self.serverless {
-            let is_serverless = SERVERLESS.as_ref().map_or(false, |s| s == "serverless");
             match serverless {
-                Serverless::Forbid if is_serverless => return false,
-                Serverless::Require if !is_serverless => return false,
+                Serverless::Forbid if *SERVERLESS => return false,
+                Serverless::Require if !*SERVERLESS => return false,
                 _ => (),
             }
         }

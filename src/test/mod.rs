@@ -59,5 +59,6 @@ lazy_static! {
         }),
         _ => None,
     };
-    pub(crate) static ref SERVERLESS: Option<String> = std::env::var("SERVERLESS").ok();
+    pub(crate) static ref SERVERLESS: bool =
+        matches!(std::env::var("SERVERLESS"), Ok(s) if s == "serverless");
 }
