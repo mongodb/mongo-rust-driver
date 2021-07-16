@@ -1,11 +1,11 @@
-use std::{sync::Arc, time::Duration};
 #[cfg(test)]
 use std::cmp::Ordering;
+use std::{sync::Arc, time::Duration};
 
 use derivative::Derivative;
-use serde::{Deserialize};
 #[cfg(test)]
 use serde::de::{Deserializer, Error};
+use serde::Deserialize;
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -46,7 +46,11 @@ pub(crate) struct ConnectionPoolOptions {
 
     /// Interval between background thread maintenance runs (e.g. ensure minPoolSize).
     #[cfg(test)]
-    #[serde(default, rename = "backgroundThreadIntervalMS", deserialize_with = "BackgroundThreadInterval::deserialize_from_i64_millis")]
+    #[serde(
+        default,
+        rename = "backgroundThreadIntervalMS",
+        deserialize_with = "BackgroundThreadInterval::deserialize_from_i64_millis"
+    )]
     pub(crate) background_thread_interval: Option<BackgroundThreadInterval>,
 
     /// Connections that have been ready for usage in the pool for longer than `max_idle_time` will
@@ -136,11 +140,17 @@ impl BackgroundThreadInterval {
         D: Deserializer<'de>,
     {
         let millis = Option::<i64>::deserialize(deserializer)?;
-        let millis = if let Some(m) = millis { m } else { return Ok(None) };
+        let millis = if let Some(m) = millis {
+            m
+        } else {
+            return Ok(None);
+        };
         Ok(Some(match millis.cmp(&0) {
             Ordering::Less => BackgroundThreadInterval::Never,
             Ordering::Equal => return Err(D::Error::custom("zero is not allowed")),
-            Ordering::Greater => BackgroundThreadInterval::Every(Duration::from_millis(millis as u64)),
+            Ordering::Greater => {
+                BackgroundThreadInterval::Every(Duration::from_millis(millis as u64))
+            }
         }))
     }
 }

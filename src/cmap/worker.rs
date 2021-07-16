@@ -1,5 +1,7 @@
 use derivative::Derivative;
 
+#[cfg(test)]
+use super::options::BackgroundThreadInterval;
 use super::{
     conn::PendingConnection,
     connection_requester,
@@ -18,8 +20,6 @@ use super::{
     Connection,
     DEFAULT_MAX_POOL_SIZE,
 };
-#[cfg(test)]
-use super::options::BackgroundThreadInterval;
 use crate::{
     error::{Error, ErrorKind, Result},
     event::cmap::{
