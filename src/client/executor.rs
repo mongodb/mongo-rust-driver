@@ -133,15 +133,10 @@ impl Client {
             }
         }
 
-        let selection_criteria = if let Some(ref session) = session {
-            session
-                .transaction
-                .pinned_mongos
-                .as_ref()
-                .or_else(|| op.selection_criteria())
-        } else {
-            op.selection_criteria()
-        };
+        let selection_criteria = session
+            .as_ref()
+            .and_then(|s| s.transaction.pinned_mongos.as_ref())
+            .or_else(|| op.selection_criteria());
 
         let server = match self.select_server(selection_criteria).await {
             Ok(server) => server,
@@ -226,18 +221,6 @@ impl Client {
                 // release the selected server to decrement its operation count
                 drop(server);
 
-                if let Some(ref mut session) = session {
-                    if err.contains_label(TRANSIENT_TRANSACTION_ERROR) {
-                        session.unpin_mongos();
-                    }
-
-                    if op.name() == CommitTransaction::NAME
-                        && err.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT)
-                    {
-                        session.unpin_mongos();
-                    }
-                }
-
                 if retryability == Retryability::Read && err.is_read_retryable()
                     || retryability == Retryability::Write && err.is_write_retryable()
                 {
@@ -257,6 +240,8 @@ impl Client {
         txn_number: Option<u64>,
         first_error: Error,
     ) -> Result<T::O> {
+        op.update_for_retry();
+
         let server = match self.select_server(op.selection_criteria()).await {
             Ok(server) => server,
             Err(_) => {
@@ -273,8 +258,6 @@ impl Client {
         if retryability == Retryability::None {
             return Err(first_error);
         }
-
-        op.update_for_retry();
 
         match self
             .execute_operation_on_connection(op, &mut conn, session, txn_number, &retryability)
@@ -501,13 +484,21 @@ impl Client {
                     handler.handle_command_failed_event(command_failed_event);
                 });
 
-                if let Some(session) = session {
+                err.add_labels(Some(connection), session, Some(retryability))?;
+
+                if let Some(ref mut session) = session {
                     if err.is_network_error() {
                         session.mark_dirty();
                     }
+
+                    if err.contains_label(TRANSIENT_TRANSACTION_ERROR)
+                        || (op.name() == CommitTransaction::NAME
+                            && err.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT))
+                    {
+                        session.unpin_mongos();
+                    }
                 }
 
-                err.add_labels(Some(connection), session, Some(retryability))?;
                 op.handle_error(err)
             }
             Ok(response) => {

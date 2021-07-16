@@ -133,6 +133,7 @@ impl Transaction {
     pub(crate) fn abort(&mut self) {
         self.state = TransactionState::Aborted;
         self.options = None;
+        self.pinned_mongos = None;
     }
 
     pub(crate) fn reset(&mut self) {
@@ -493,7 +494,8 @@ impl ClientSession {
                     .as_ref()
                     .and_then(|options| options.write_concern.as_ref())
                     .cloned();
-                let abort_transaction = AbortTransaction::new(write_concern);
+                let selection_criteria = self.transaction.pinned_mongos.clone();
+                let abort_transaction = AbortTransaction::new(write_concern, selection_criteria);
                 self.transaction.abort();
                 // Errors returned from running an abortTransaction command should be ignored.
                 let _result = self
