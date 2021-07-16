@@ -8,7 +8,14 @@ use serde::{Deserialize, Deserializer};
 use crate::{
     bson::Document,
     options::{FindOptions, ReadPreference, SelectionCriteria, SessionOptions},
-    test::{spec::deserialize_uri_options_to_uri_string, EventClient, FailPoint, TestClient},
+    test::{
+        spec::deserialize_uri_options_to_uri_string,
+        EventClient,
+        FailPoint,
+        Serverless,
+        TestClient,
+        SERVERLESS,
+    },
 };
 
 use super::{operation::Operation, test_event::CommandStartedEvent};
@@ -26,11 +33,12 @@ pub struct TestFile {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RunOn {
     pub min_server_version: Option<String>,
     pub max_server_version: Option<String>,
     pub topology: Option<Vec<String>>,
+    pub(crate) serverless: Option<Serverless>,
 }
 
 impl RunOn {
@@ -50,6 +58,13 @@ impl RunOn {
         if let Some(ref topology) = self.topology {
             if !topology.contains(&client.topology_string()) {
                 return false;
+            }
+        }
+        if let Some(ref serverless) = self.serverless {
+            match serverless {
+                Serverless::Forbid if *SERVERLESS => return false,
+                Serverless::Require if !*SERVERLESS => return false,
+                _ => (),
             }
         }
         true

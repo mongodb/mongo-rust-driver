@@ -11,7 +11,7 @@ mod spec;
 mod util;
 
 pub(crate) use self::{
-    spec::{run_single_test, run_spec_test, RunOn, Topology},
+    spec::{run_single_test, run_spec_test, RunOn, Serverless, Topology},
     util::{
         assert_matches,
         CmapEvent,
@@ -59,4 +59,6 @@ lazy_static! {
         }),
         _ => None,
     };
+    pub(crate) static ref SERVERLESS: bool =
+        matches!(std::env::var("SERVERLESS"), Ok(s) if s == "serverless");
 }

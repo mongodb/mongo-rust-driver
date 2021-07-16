@@ -33,7 +33,7 @@ pub use self::{
     v2_runner::{operation::Operation, run_v2_test, test_file::RunOn},
 };
 
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::Value;
 
 use crate::bson::Bson;
@@ -84,4 +84,12 @@ where
         .unwrap_or_else(|e| panic!("{}: {}", path.display().to_string(), e)),
     )
     .await
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase", deny_unknown_fields)]
+pub(crate) enum Serverless {
+    Require,
+    Forbid,
+    Allow,
 }

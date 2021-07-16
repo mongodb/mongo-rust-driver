@@ -20,7 +20,7 @@ use crate::{
         SelectionCriteria,
         WriteConcern,
     },
-    test::{spec::unified_runner::results_match, TestClient, DEFAULT_URI},
+    test::{spec::unified_runner::results_match, Serverless, TestClient, DEFAULT_URI, SERVERLESS},
 };
 
 #[derive(Debug, Deserialize)]
@@ -61,6 +61,7 @@ pub struct RunOnRequirement {
     max_server_version: Option<String>,
     topologies: Option<Vec<Topology>>,
     server_parameters: Option<Document>,
+    serverless: Option<Serverless>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -100,6 +101,13 @@ impl RunOnRequirement {
                 None,
             ) {
                 return false;
+            }
+        }
+        if let Some(ref serverless) = self.serverless {
+            match serverless {
+                Serverless::Forbid if *SERVERLESS => return false,
+                Serverless::Require if !*SERVERLESS => return false,
+                _ => (),
             }
         }
         true
