@@ -181,7 +181,9 @@ impl ConnectionPoolWorker {
             .as_ref()
             .and_then(|opts| opts.background_thread_interval)
             .map(|i| match i {
-                BackgroundThreadInterval::Never => Duration::MAX,
+                // One year is long enough to count as never for tests, but not so long that it
+                // will overflow interval math.
+                BackgroundThreadInterval::Never => Duration::from_secs(31_556_952),
                 BackgroundThreadInterval::Every(d) => d,
             })
             .unwrap_or(MAINTENACE_FREQUENCY);
