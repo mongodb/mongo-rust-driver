@@ -46,11 +46,7 @@ pub(crate) struct ConnectionPoolOptions {
 
     /// Interval between background thread maintenance runs (e.g. ensure minPoolSize).
     #[cfg(test)]
-    #[serde(
-        default,
-        rename = "backgroundThreadIntervalMS",
-        deserialize_with = "BackgroundThreadInterval::deserialize_from_i64_millis"
-    )]
+    #[serde(rename = "backgroundThreadIntervalMS")]
     pub(crate) background_thread_interval: Option<BackgroundThreadInterval>,
 
     /// Connections that have been ready for usage in the pool for longer than `max_idle_time` will
@@ -132,26 +128,19 @@ pub(crate) enum BackgroundThreadInterval {
 }
 
 #[cfg(test)]
-impl BackgroundThreadInterval {
-    pub(crate) fn deserialize_from_i64_millis<'de, D>(
-        deserializer: D,
-    ) -> std::result::Result<Option<Self>, D::Error>
+impl<'de> Deserialize<'de> for BackgroundThreadInterval {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let millis = Option::<i64>::deserialize(deserializer)?;
-        let millis = if let Some(m) = millis {
-            m
-        } else {
-            return Ok(None);
-        };
-        Ok(Some(match millis.cmp(&0) {
+        let millis = i64::deserialize(deserializer)?;
+        Ok(match millis.cmp(&0) {
             Ordering::Less => BackgroundThreadInterval::Never,
             Ordering::Equal => return Err(D::Error::custom("zero is not allowed")),
             Ordering::Greater => {
                 BackgroundThreadInterval::Every(Duration::from_millis(millis as u64))
             }
-        }))
+        })
     }
 }
 
