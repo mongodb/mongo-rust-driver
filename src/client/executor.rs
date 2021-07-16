@@ -141,7 +141,7 @@ impl Client {
         let server = match self.select_server(selection_criteria).await {
             Ok(server) => server,
             Err(mut err) => {
-                err.add_labels(None, &session, None)?;
+                err.add_labels_and_update_pin(None, &mut session, None)?;
                 return Err(err);
             }
         };
@@ -149,7 +149,7 @@ impl Client {
         let mut conn = match server.pool.check_out().await {
             Ok(conn) => conn,
             Err(mut err) => {
-                err.add_labels(None, &session, None)?;
+                err.add_labels_and_update_pin(None, &mut session, None)?;
 
                 if err.is_pool_cleared() {
                     return self.execute_retry(&mut op, &mut session, None, err).await;
@@ -158,14 +158,6 @@ impl Client {
                 }
             }
         };
-
-        // If the transaction is being aborted, unpin session before retry and regardless of whether
-        // the command succeeds, fails, or is executed.
-        if let Some(ref mut session) = session {
-            if session.transaction.state == TransactionState::Aborted {
-                session.unpin_mongos();
-            }
-        }
 
         let retryability = self.get_retryability(&conn, &op, &session).await?;
 
@@ -484,21 +476,13 @@ impl Client {
                     handler.handle_command_failed_event(command_failed_event);
                 });
 
-                err.add_labels(Some(connection), session, Some(retryability))?;
-
                 if let Some(ref mut session) = session {
                     if err.is_network_error() {
                         session.mark_dirty();
                     }
-
-                    if err.contains_label(TRANSIENT_TRANSACTION_ERROR)
-                        || (op.name() == CommitTransaction::NAME
-                            && err.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT))
-                    {
-                        session.unpin_mongos();
-                    }
                 }
 
+                err.add_labels_and_update_pin(Some(connection), session, Some(retryability))?;
                 op.handle_error(err)
             }
             Ok(response) => {
@@ -527,7 +511,11 @@ impl Client {
                 match op.handle_response(response.deserialized, connection.stream_description()?) {
                     Ok(response) => Ok(response),
                     Err(mut err) => {
-                        err.add_labels(Some(connection), session, Some(retryability))?;
+                        err.add_labels_and_update_pin(
+                            Some(connection),
+                            session,
+                            Some(retryability),
+                        )?;
                         Err(err)
                     }
                 }
@@ -641,7 +629,7 @@ impl Client {
 }
 
 impl Error {
-    /// Adds the necessary labels to this Error.
+    /// Adds the necessary labels to this Error, and unpins the session if needed.
     ///
     /// A TransientTransactionError label should be added if a transaction is in progress and the
     /// error is a network or server selection error.
@@ -651,10 +639,13 @@ impl Error {
     /// server version, a label should only be added if the `retry_writes` client option is not set
     /// to `false`, the operation during which the error occured is write-retryable, and a
     /// TransientTransactionError label has not already been added.
-    fn add_labels(
+    ///
+    /// If the TransientTransactionError or UnknownTransactionCommitResult labels are added, the
+    /// ClientSession should be unpinned.
+    fn add_labels_and_update_pin(
         &mut self,
         conn: Option<&Connection>,
-        session: &Option<&mut ClientSession>,
+        session: &mut Option<&mut ClientSession>,
         retryability: Option<&Retryability>,
     ) -> Result<()> {
         let transaction_state = session.as_ref().map_or(&TransactionState::None, |session| {
@@ -698,6 +689,15 @@ impl Error {
                 }
             }
         }
+
+        if let Some(ref mut session) = session {
+            if self.contains_label(TRANSIENT_TRANSACTION_ERROR)
+                || self.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT)
+            {
+                session.unpin_mongos();
+            }
+        }
+
         Ok(())
     }
 }
