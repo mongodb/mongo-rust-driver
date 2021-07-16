@@ -1,7 +1,11 @@
 use std::{sync::Arc, time::Duration};
+#[cfg(test)]
+use std::cmp::Ordering;
 
 use derivative::Derivative;
-use serde::Deserialize;
+use serde::{Deserialize};
+#[cfg(test)]
+use serde::de::{Deserializer, Error};
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -40,10 +44,10 @@ pub(crate) struct ConnectionPoolOptions {
     #[serde(skip)]
     pub(crate) event_handler: Option<Arc<dyn CmapEventHandler>>,
 
-    /// How often the background thread performs its maintenance (e.g. ensure minPoolSize).
+    /// Interval between background thread maintenance runs (e.g. ensure minPoolSize).
     #[cfg(test)]
-    #[serde(skip)]
-    pub(crate) maintenance_frequency: Option<Duration>,
+    #[serde(default, rename = "backgroundThreadIntervalMS", deserialize_with = "BackgroundThreadInterval::deserialize_from_i64_millis")]
+    pub(crate) background_thread_interval: Option<BackgroundThreadInterval>,
 
     /// Connections that have been ready for usage in the pool for longer than `max_idle_time` will
     /// not be used.
@@ -101,7 +105,7 @@ impl ConnectionPoolOptions {
             credential: options.credential.clone(),
             event_handler: options.cmap_event_handler.clone(),
             #[cfg(test)]
-            maintenance_frequency: None,
+            background_thread_interval: None,
             #[cfg(test)]
             ready: None,
         }
@@ -113,6 +117,31 @@ impl ConnectionPoolOptions {
             min_pool_size: self.min_pool_size,
             max_pool_size: self.max_pool_size,
         }
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(crate) enum BackgroundThreadInterval {
+    Never,
+    Every(Duration),
+}
+
+#[cfg(test)]
+impl BackgroundThreadInterval {
+    pub(crate) fn deserialize_from_i64_millis<'de, D>(
+        deserializer: D,
+    ) -> std::result::Result<Option<Self>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let millis = Option::<i64>::deserialize(deserializer)?;
+        let millis = if let Some(m) = millis { m } else { return Ok(None) };
+        Ok(Some(match millis.cmp(&0) {
+            Ordering::Less => BackgroundThreadInterval::Never,
+            Ordering::Equal => return Err(D::Error::custom("zero is not allowed")),
+            Ordering::Greater => BackgroundThreadInterval::Every(Duration::from_millis(millis as u64)),
+        }))
     }
 }
 

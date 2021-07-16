@@ -18,6 +18,8 @@ use super::{
     Connection,
     DEFAULT_MAX_POOL_SIZE,
 };
+#[cfg(test)]
+use super::options::BackgroundThreadInterval;
 use crate::{
     error::{Error, ErrorKind, Result},
     event::cmap::{
@@ -177,7 +179,11 @@ impl ConnectionPoolWorker {
         #[cfg(test)]
         let maintenance_frequency = options
             .as_ref()
-            .and_then(|opts| opts.maintenance_frequency)
+            .and_then(|opts| opts.background_thread_interval)
+            .map(|i| match i {
+                BackgroundThreadInterval::Never => Duration::MAX,
+                BackgroundThreadInterval::Every(d) => d,
+            })
             .unwrap_or(MAINTENACE_FREQUENCY);
 
         #[cfg(not(test))]
