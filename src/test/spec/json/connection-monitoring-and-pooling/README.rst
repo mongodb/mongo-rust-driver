@@ -116,6 +116,8 @@ the addition of the following fields to each test:
 - ``failPoint``: optional, a document containing a ``configureFailPoint``
   command to run against the endpoint being used for the test.
 
+- ``poolOptions.appName`` (optional): appName attribute to be set in connections, which will be affected by the fail point.
+
 Spec Test Match Function
 ========================
 
@@ -213,3 +215,4 @@ The following tests have not yet been automated, but MUST still be tested
 #. A user MUST be able to subscribe to Connection Monitoring Events in a manner idiomatic to their language and driver
 #. When a check out attempt fails because connection set up throws an error,
    assert that a ConnectionCheckOutFailedEvent with reason="connectionError" is emitted.
+   
