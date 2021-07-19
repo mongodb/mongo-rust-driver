@@ -4,17 +4,25 @@ use crate::{
     error::Result,
     operation::{Operation, Retryability},
     options::WriteConcern,
+    selection_criteria::SelectionCriteria,
 };
 
 use super::{CommandResponse, Response, WriteConcernOnlyBody};
 
 pub(crate) struct AbortTransaction {
     write_concern: Option<WriteConcern>,
+    selection_criteria: Option<SelectionCriteria>,
 }
 
 impl AbortTransaction {
-    pub(crate) fn new(write_concern: Option<WriteConcern>) -> Self {
-        Self { write_concern }
+    pub(crate) fn new(
+        write_concern: Option<WriteConcern>,
+        selection_criteria: Option<SelectionCriteria>,
+    ) -> Self {
+        Self {
+            write_concern,
+            selection_criteria,
+        }
     }
 }
 
@@ -47,11 +55,20 @@ impl Operation for AbortTransaction {
         response.validate()
     }
 
+    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+        self.selection_criteria.as_ref()
+    }
+
     fn write_concern(&self) -> Option<&WriteConcern> {
         self.write_concern.as_ref()
     }
 
     fn retryability(&self) -> Retryability {
         Retryability::Write
+    }
+
+    fn update_for_retry(&mut self) {
+        // The session must be "unpinned" before server selection for a retry.
+        self.selection_criteria = None;
     }
 }

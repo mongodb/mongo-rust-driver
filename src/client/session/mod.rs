@@ -5,6 +5,7 @@ mod test;
 
 use std::{
     collections::HashSet,
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -16,12 +17,15 @@ use crate::{
     error::{ErrorKind, Result},
     operation::{AbortTransaction, CommitTransaction, Operation},
     options::{SessionOptions, TransactionOptions},
-    sdam::TransactionSupportStatus,
+    sdam::{ServerInfo, TransactionSupportStatus},
+    selection_criteria::SelectionCriteria,
     Client,
     RUNTIME,
 };
 pub(crate) use cluster_time::ClusterTime;
 pub(super) use pool::ServerSessionPool;
+
+use super::options::ServerAddress;
 
 lazy_static! {
     pub(crate) static ref SESSIONS_UNSUPPORTED_COMMANDS: HashSet<&'static str> = {
@@ -95,7 +99,7 @@ lazy_static! {
 ///     }
 /// }
 /// ```
-// TODO RUST-122 Remove this note and adjust the above description to indicate that sharded
+// TODO RUST-734 Remove this note and adjust the above description to indicate that sharded
 // transactions are supported on 4.2+
 /// Note: the driver does not currently support transactions on sharded clusters.
 #[derive(Clone, Debug)]
@@ -113,6 +117,7 @@ pub struct ClientSession {
 pub(crate) struct Transaction {
     pub(crate) state: TransactionState,
     pub(crate) options: Option<TransactionOptions>,
+    pub(crate) pinned_mongos: Option<SelectionCriteria>,
 }
 
 impl Transaction {
@@ -128,11 +133,13 @@ impl Transaction {
     pub(crate) fn abort(&mut self) {
         self.state = TransactionState::Aborted;
         self.options = None;
+        self.pinned_mongos = None;
     }
 
     pub(crate) fn reset(&mut self) {
         self.state = TransactionState::None;
         self.options = None;
+        self.pinned_mongos = None;
     }
 }
 
@@ -141,6 +148,7 @@ impl Default for Transaction {
         Self {
             state: TransactionState::None,
             options: None,
+            pinned_mongos: None,
         }
     }
 }
@@ -245,6 +253,17 @@ impl ClientSession {
         self.server_session.txn_number
     }
 
+    /// Pin mongos to session.
+    pub(crate) fn pin_mongos(&mut self, address: ServerAddress) {
+        self.transaction.pinned_mongos = Some(SelectionCriteria::Predicate(Arc::new(
+            move |server_info: &ServerInfo| *server_info.address() == address,
+        )));
+    }
+
+    pub(crate) fn unpin_mongos(&mut self) {
+        self.transaction.pinned_mongos = None;
+    }
+
     /// Whether this session is dirty.
     #[cfg(test)]
     pub(crate) fn is_dirty(&self) -> bool {
@@ -297,6 +316,9 @@ impl ClientSession {
                     message: "transaction already in progress".into(),
                 }
                 .into());
+            }
+            TransactionState::Committed { .. } => {
+                self.unpin_mongos(); // Unpin session if previous transaction is committed.
             }
             _ => {}
         }
@@ -472,7 +494,8 @@ impl ClientSession {
                     .as_ref()
                     .and_then(|options| options.write_concern.as_ref())
                     .cloned();
-                let abort_transaction = AbortTransaction::new(write_concern);
+                let selection_criteria = self.transaction.pinned_mongos.clone();
+                let abort_transaction = AbortTransaction::new(write_concern, selection_criteria);
                 self.transaction.abort();
                 // Errors returned from running an abortTransaction command should be ignored.
                 let _result = self

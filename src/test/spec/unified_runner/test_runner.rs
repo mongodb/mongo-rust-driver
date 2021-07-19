@@ -4,6 +4,7 @@ use crate::{
     bson::Document,
     client::options::ClientOptions,
     concern::{Acknowledgment, WriteConcern},
+    db::options::CreateCollectionOptions,
     options::CollectionOptions,
     test::{util::FailPointGuard, EventHandler, TestClient, SERVER_API},
     Client,
@@ -32,22 +33,33 @@ impl TestRunner {
 
     pub async fn insert_initial_data(&self, data: &CollectionData) {
         let write_concern = WriteConcern::builder().w(Acknowledgment::Majority).build();
-        let collection_options = CollectionOptions::builder()
-            .write_concern(write_concern)
-            .build();
-        let coll = self
-            .internal_client
-            .init_db_and_coll_with_options(
-                &data.database_name,
-                &data.collection_name,
-                collection_options,
-            )
-            .await;
 
         if !data.documents.is_empty() {
+            let collection_options = CollectionOptions::builder()
+                .write_concern(write_concern)
+                .build();
+            let coll = self
+                .internal_client
+                .init_db_and_coll_with_options(
+                    &data.database_name,
+                    &data.collection_name,
+                    collection_options,
+                )
+                .await;
             coll.insert_many(data.documents.clone(), None)
                 .await
                 .unwrap();
+        } else {
+            let collection_options = CreateCollectionOptions::builder()
+                .write_concern(write_concern)
+                .build();
+            self.internal_client
+                .create_fresh_collection(
+                    &data.database_name,
+                    &data.collection_name,
+                    collection_options,
+                )
+                .await;
         }
     }
 

@@ -164,6 +164,10 @@ impl<'de> Deserialize<'de> for Operation {
                 FailPointCommand::deserialize(BsonDeserializer::new(definition.arguments))
                     .map(|op| Box::new(op) as Box<dyn TestOperation>)
             }
+            "targetedFailPoint" => {
+                TargetedFailPoint::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
             "assertCollectionExists" => {
                 AssertCollectionExists::deserialize(BsonDeserializer::new(definition.arguments))
                     .map(|op| Box::new(op) as Box<dyn TestOperation>)
@@ -188,6 +192,14 @@ impl<'de> Deserialize<'de> for Operation {
                 BsonDeserializer::new(definition.arguments),
             )
             .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "assertSessionPinned" => {
+                AssertSessionPinned::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "assertSessionUnpinned" => {
+                AssertSessionUnpinned::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
             "assertDifferentLsidOnLastTwoCommands" => {
                 AssertDifferentLsidOnLastTwoCommands::deserialize(BsonDeserializer::new(
                     definition.arguments,
@@ -1049,6 +1061,39 @@ impl TestOperation for FailPointCommand {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct TargetedFailPoint {
+    fail_point: FailPoint,
+    session: String,
+}
+
+#[async_trait]
+impl TestOperation for TargetedFailPoint {
+    async fn execute_test_runner_operation(&self, test_runner: &mut TestRunner) {
+        let session = test_runner.get_session(&self.session);
+        let selection_criteria = session
+            .transaction
+            .pinned_mongos
+            .clone()
+            .unwrap_or_else(|| panic!("ClientSession not pinned"));
+        let fail_point_guard = test_runner
+            .internal_client
+            .enable_failpoint(self.fail_point.clone(), Some(selection_criteria))
+            .await
+            .unwrap();
+        test_runner.fail_point_guards.push(fail_point_guard);
+    }
+
+    async fn execute_entity_operation(
+        &self,
+        _id: &str,
+        _test_runner: &mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct AssertCollectionExists {
     collection_name: String,
     database_name: String,
@@ -1259,6 +1304,56 @@ impl TestOperation for AssertSessionTransactionState {
             TransactionState::Aborted => "aborted",
         };
         assert_eq!(session_state, self.state);
+    }
+
+    async fn execute_entity_operation(
+        &self,
+        _id: &str,
+        _test_runner: &mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct AssertSessionPinned {
+    session: String,
+}
+
+#[async_trait]
+impl TestOperation for AssertSessionPinned {
+    async fn execute_test_runner_operation(&self, test_runner: &mut TestRunner) {
+        assert!(test_runner
+            .get_session(&self.session)
+            .transaction
+            .pinned_mongos
+            .is_some());
+    }
+
+    async fn execute_entity_operation(
+        &self,
+        _id: &str,
+        _test_runner: &mut TestRunner,
+    ) -> Result<Option<Entity>> {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct AssertSessionUnpinned {
+    session: String,
+}
+
+#[async_trait]
+impl TestOperation for AssertSessionUnpinned {
+    async fn execute_test_runner_operation(&self, test_runner: &mut TestRunner) {
+        assert!(test_runner
+            .get_session(&self.session)
+            .transaction
+            .pinned_mongos
+            .is_none());
     }
 
     async fn execute_entity_operation(

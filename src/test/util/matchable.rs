@@ -67,6 +67,10 @@ impl Matchable for Document {
             if k == "afterClusterTime" {
                 continue;
             }
+            // TODO RUST-97: Remove this logic to bypass recoveryToken
+            if k == "recoveryToken" {
+                continue;
+            }
             if k == "readConcern" {
                 if let Some(doc) = v.as_document() {
                     if doc.len() == 1 && doc.get_i32("afterClusterTime") == Ok(42) {

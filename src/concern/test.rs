@@ -179,7 +179,7 @@ async fn snapshot_read_concern() {
         .database(function_name!())
         .collection::<Document>(function_name!());
 
-    // TODO RUST-122 run this test on sharded clusters
+    // TODO RUST-734: Run this test on sharded clusters when transactions are complete.
     if client.is_replica_set() && client.server_version_gte(4, 0) {
         let mut session = client.start_session(None).await.unwrap();
         let options = TransactionOptions::builder()

@@ -11,7 +11,7 @@ use crate::{
     RUNTIME,
 };
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FailPoint {
     #[serde(flatten)]
     command: Document,
