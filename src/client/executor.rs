@@ -26,7 +26,13 @@ use crate::{
         Retryability,
     },
     options::SelectionCriteria,
-    sdam::{HandshakePhase, SelectedServer, SessionSupportStatus, TransactionSupportStatus},
+    sdam::{
+        HandshakePhase,
+        SelectedServer,
+        ServerType,
+        SessionSupportStatus,
+        TransactionSupportStatus,
+    },
     selection_criteria::ReadPreference,
 };
 
@@ -91,6 +97,7 @@ impl Client {
                         .into());
                     }
                 }
+
                 self.execute_operation_with_retry(op, Some(session)).await
             }
             None => {
@@ -135,10 +142,15 @@ impl Client {
             }
         }
 
-        let server = match self.select_server(op.selection_criteria()).await {
+        let selection_criteria = session
+            .as_ref()
+            .and_then(|s| s.transaction.pinned_mongos.as_ref())
+            .or_else(|| op.selection_criteria());
+
+        let server = match self.select_server(selection_criteria).await {
             Ok(server) => server,
             Err(mut err) => {
-                err.add_labels(None, &session, None)?;
+                err.add_labels_and_update_pin(None, &mut session, None)?;
                 return Err(err);
             }
         };
@@ -146,7 +158,7 @@ impl Client {
         let mut conn = match server.pool.check_out().await {
             Ok(conn) => conn,
             Err(mut err) => {
-                err.add_labels(None, &session, None)?;
+                err.add_labels_and_update_pin(None, &mut session, None)?;
 
                 if err.is_pool_cleared() {
                     return self.execute_retry(&mut op, &mut session, None, err).await;
@@ -229,6 +241,8 @@ impl Client {
         txn_number: Option<i64>,
         first_error: Error,
     ) -> Result<T::O> {
+        op.update_for_retry();
+
         let server = match self.select_server(op.selection_criteria()).await {
             Ok(server) => server,
             Err(_) => {
@@ -245,8 +259,6 @@ impl Client {
         if retryability == Retryability::None {
             return Err(first_error);
         }
-
-        op.update_for_retry();
 
         match self
             .execute_operation_on_connection(op, &mut conn, session, txn_number, &retryability)
@@ -286,7 +298,8 @@ impl Client {
             wc.validate()?;
         }
 
-        let mut cmd = op.build(connection.stream_description()?)?;
+        let stream_description = connection.stream_description()?;
+        let mut cmd = op.build(stream_description)?;
         self.inner
             .topology
             .update_command_with_read_pref(connection.address(), &mut cmd, op.selection_criteria())
@@ -324,6 +337,9 @@ impl Client {
                         cmd.set_start_transaction();
                         cmd.set_autocommit();
                         cmd.set_txn_read_concern(*session)?;
+                        if stream_description.initial_server_type == ServerType::Mongos {
+                            session.pin_mongos(connection.address().clone());
+                        }
                         session.transaction.state = TransactionState::InProgress;
                     }
                     TransactionState::InProgress
@@ -471,13 +487,13 @@ impl Client {
                     handler.handle_command_failed_event(command_failed_event);
                 });
 
-                if let Some(session) = session {
+                if let Some(ref mut session) = session {
                     if err.is_network_error() {
                         session.mark_dirty();
                     }
                 }
 
-                err.add_labels(Some(connection), session, Some(retryability))?;
+                err.add_labels_and_update_pin(Some(connection), session, Some(retryability))?;
                 op.handle_error(err)
             }
             Ok(response) => {
@@ -504,7 +520,11 @@ impl Client {
                 match op.handle_response(response.deserialized, connection.stream_description()?) {
                     Ok(response) => Ok(response),
                     Err(mut err) => {
-                        err.add_labels(Some(connection), session, Some(retryability))?;
+                        err.add_labels_and_update_pin(
+                            Some(connection),
+                            session,
+                            Some(retryability),
+                        )?;
                         Err(err)
                     }
                 }
@@ -618,7 +638,7 @@ impl Client {
 }
 
 impl Error {
-    /// Adds the necessary labels to this Error.
+    /// Adds the necessary labels to this Error, and unpins the session if needed.
     ///
     /// A TransientTransactionError label should be added if a transaction is in progress and the
     /// error is a network or server selection error.
@@ -628,10 +648,13 @@ impl Error {
     /// server version, a label should only be added if the `retry_writes` client option is not set
     /// to `false`, the operation during which the error occured is write-retryable, and a
     /// TransientTransactionError label has not already been added.
-    fn add_labels(
+    ///
+    /// If the TransientTransactionError or UnknownTransactionCommitResult labels are added, the
+    /// ClientSession should be unpinned.
+    fn add_labels_and_update_pin(
         &mut self,
         conn: Option<&Connection>,
-        session: &Option<&mut ClientSession>,
+        session: &mut Option<&mut ClientSession>,
         retryability: Option<&Retryability>,
     ) -> Result<()> {
         let transaction_state = session.as_ref().map_or(&TransactionState::None, |session| {
@@ -675,6 +698,15 @@ impl Error {
                 }
             }
         }
+
+        if let Some(ref mut session) = session {
+            if self.contains_label(TRANSIENT_TRANSACTION_ERROR)
+                || self.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT)
+            {
+                session.unpin_mongos();
+            }
+        }
+
         Ok(())
     }
 }

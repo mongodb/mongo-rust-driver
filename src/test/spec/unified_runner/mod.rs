@@ -78,7 +78,7 @@ pub async fn run_unified_format_test(test_file: TestFile) {
     let mut test_runner = TestRunner::new().await;
 
     if let Some(requirements) = test_file.run_on_requirements {
-        // TODO RUST-122: Unskip this test on sharded clusters
+        // TODO RUST-734: Unskip this test on sharded clusters when transactions are complete.
         if test_runner.internal_client.is_sharded() && test_file.description == "poc-transactions" {
             println!(
                 "Skipping {}: sharded transactions not supported",

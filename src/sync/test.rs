@@ -202,7 +202,7 @@ fn transactions() {
 
     let should_skip = RUNTIME.block_on(async {
         let test_client = AsyncTestClient::new().await;
-        // TODO RUST-122: Unskip this test on sharded clusters
+        // TODO RUST-734: Unskip this test on sharded clusters when transactions are complete.
         !test_client.is_replica_set() || test_client.server_version_lt(4, 0)
     });
     if should_skip {
