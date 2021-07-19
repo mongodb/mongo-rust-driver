@@ -326,21 +326,15 @@ impl TopologyDescription {
             self.transaction_support_status = TransactionSupportStatus::Unsupported;
         }
         if let Ok(Some(max_wire_version)) = server_description.max_wire_version() {
-            match self.topology_type {
-                TopologyType::Sharded => {
-                    // TODO RUST-122: support transactions on sharded clusters
-                    self.transaction_support_status = TransactionSupportStatus::Unsupported;
-                }
-                _ => {
-                    if max_wire_version < 7 {
-                        self.transaction_support_status = TransactionSupportStatus::Unsupported;
-                    } else {
-                        self.transaction_support_status = TransactionSupportStatus::Supported;
-                    }
-                }
+            // TODO RUST-734: Evaluate whether we should permanently support sharded transactions.
+            //                If we leave the feature as unsupported, we should revert this code.
+            self.transaction_support_status = if max_wire_version < 7
+                || (max_wire_version < 8 && self.topology_type == TopologyType::Sharded)
+            {
+                TransactionSupportStatus::Unsupported
+            } else {
+                TransactionSupportStatus::Supported
             }
-        } else {
-            self.transaction_support_status = TransactionSupportStatus::Unsupported;
         }
     }
 
@@ -749,7 +743,7 @@ pub(crate) enum TransactionSupportStatus {
 
     /// Transactions are supported by this topology. A topology supports transactions if it
     /// supports sessions and its maxWireVersion >= 7. Transactions are not currently supported
-    /// on sharded clusters (TODO RUST-122).
+    /// on sharded clusters (TODO RUST-734).
     ///
     /// Note that meeting these conditions does not guarantee that a deployment
     /// supports transactions; any other missing qualification will be reported by the server.

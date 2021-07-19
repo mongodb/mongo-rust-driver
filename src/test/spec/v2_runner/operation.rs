@@ -5,7 +5,7 @@ use futures::stream::TryStreamExt;
 use serde::{de::Deserializer, Deserialize};
 
 use crate::{
-    bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
+    bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
     client::session::TransactionState,
     coll::options::CollectionOptions,
     db::options::DatabaseOptions,
@@ -34,7 +34,7 @@ use crate::{
         WriteConcern,
     },
     selection_criteria::{ReadPreference, SelectionCriteria},
-    test::TestClient,
+    test::{FailPoint, TestClient},
     ClientSession,
     Collection,
     Database,
@@ -99,6 +99,7 @@ pub enum OperationResult {
 pub struct OperationError {
     pub error_contains: Option<String>,
     pub error_code_name: Option<String>,
+    pub error_code: Option<i32>,
     pub error_labels_contain: Option<Vec<String>>,
     pub error_labels_omit: Option<Vec<String>>,
 }
@@ -220,6 +221,18 @@ impl<'de> Deserialize<'de> for Operation {
             "listDatabases" => ListDatabases::deserialize(BsonDeserializer::new(Bson::Document(
                 definition.arguments,
             )))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "targetedFailPoint" => TargetedFailPoint::deserialize(BsonDeserializer::new(
+                Bson::Document(definition.arguments),
+            ))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "assertSessionPinned" => AssertSessionPinned::deserialize(BsonDeserializer::new(
+                Bson::Document(definition.arguments),
+            ))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "assertSessionUnpinned" => AssertSessionUnpinned::deserialize(BsonDeserializer::new(
+                Bson::Document(definition.arguments),
+            ))
             .map(|op| Box::new(op) as Box<dyn TestOperation>),
             "listDatabaseNames" => ListDatabaseNames::deserialize(BsonDeserializer::new(
                 Bson::Document(definition.arguments),
@@ -1214,6 +1227,101 @@ impl TestOperation for FindOneAndDelete {
 
     async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
         unimplemented!()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct TargetedFailPoint {
+    fail_point: FailPoint,
+}
+
+#[async_trait]
+impl TestOperation for TargetedFailPoint {
+    async fn execute_on_collection(
+        &self,
+        _collection: &Collection<Document>,
+        _session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_database(
+        &self,
+        _database: &Database,
+        _session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
+        Ok(Some(to_bson(&self.fail_point)?))
+    }
+
+    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct AssertSessionPinned {}
+
+#[async_trait]
+impl TestOperation for AssertSessionPinned {
+    async fn execute_on_collection(
+        &self,
+        _collection: &Collection<Document>,
+        _session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_database(
+        &self,
+        _database: &Database,
+        _session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_session(&self, session: &mut ClientSession) -> Result<Option<Bson>> {
+        assert!(session.transaction.pinned_mongos.is_some());
+        Ok(None)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct AssertSessionUnpinned {}
+
+#[async_trait]
+impl TestOperation for AssertSessionUnpinned {
+    async fn execute_on_collection(
+        &self,
+        _collection: &Collection<Document>,
+        _session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_database(
+        &self,
+        _database: &Database,
+        _session: Option<&mut ClientSession>,
+    ) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
+        unimplemented!()
+    }
+
+    async fn execute_on_session(&self, session: &mut ClientSession) -> Result<Option<Bson>> {
+        assert!(session.transaction.pinned_mongos.is_none());
+        Ok(None)
     }
 }
 
