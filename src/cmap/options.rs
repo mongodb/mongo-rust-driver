@@ -1,6 +1,10 @@
+#[cfg(test)]
+use std::cmp::Ordering;
 use std::{sync::Arc, time::Duration};
 
 use derivative::Derivative;
+#[cfg(test)]
+use serde::de::{Deserializer, Error};
 use serde::Deserialize;
 use typed_builder::TypedBuilder;
 
@@ -40,10 +44,10 @@ pub(crate) struct ConnectionPoolOptions {
     #[serde(skip)]
     pub(crate) event_handler: Option<Arc<dyn CmapEventHandler>>,
 
-    /// How often the background thread performs its maintenance (e.g. ensure minPoolSize).
+    /// Interval between background thread maintenance runs (e.g. ensure minPoolSize).
     #[cfg(test)]
-    #[serde(skip)]
-    pub(crate) maintenance_frequency: Option<Duration>,
+    #[serde(rename = "backgroundThreadIntervalMS")]
+    pub(crate) background_thread_interval: Option<BackgroundThreadInterval>,
 
     /// Connections that have been ready for usage in the pool for longer than `max_idle_time` will
     /// not be used.
@@ -101,7 +105,7 @@ impl ConnectionPoolOptions {
             credential: options.credential.clone(),
             event_handler: options.cmap_event_handler.clone(),
             #[cfg(test)]
-            maintenance_frequency: None,
+            background_thread_interval: None,
             #[cfg(test)]
             ready: None,
         }
@@ -113,6 +117,30 @@ impl ConnectionPoolOptions {
             min_pool_size: self.min_pool_size,
             max_pool_size: self.max_pool_size,
         }
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(crate) enum BackgroundThreadInterval {
+    Never,
+    Every(Duration),
+}
+
+#[cfg(test)]
+impl<'de> Deserialize<'de> for BackgroundThreadInterval {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let millis = i64::deserialize(deserializer)?;
+        Ok(match millis.cmp(&0) {
+            Ordering::Less => BackgroundThreadInterval::Never,
+            Ordering::Equal => return Err(D::Error::custom("zero is not allowed")),
+            Ordering::Greater => {
+                BackgroundThreadInterval::Every(Duration::from_millis(millis as u64))
+            }
+        })
     }
 }
 

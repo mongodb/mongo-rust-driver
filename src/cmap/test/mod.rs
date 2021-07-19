@@ -150,17 +150,13 @@ impl Executor {
     async fn execute_test(self) {
         let mut subscriber = self.state.handler.subscribe();
 
-        // CMAP spec requires setting this to 50ms.
-        let mut options = self.pool_options;
-        options.maintenance_frequency = Some(Duration::from_millis(50));
-
         let (update_sender, mut update_receiver) = ServerUpdateSender::channel();
 
         let pool = ConnectionPool::new(
             CLIENT_OPTIONS.hosts[0].clone(),
             Default::default(),
             update_sender,
-            Some(options),
+            Some(self.pool_options),
         );
 
         // Mock a monitoring task responding to errors reported by the pool.

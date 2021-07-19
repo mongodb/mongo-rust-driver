@@ -1,5 +1,7 @@
 use derivative::Derivative;
 
+#[cfg(test)]
+use super::options::BackgroundThreadInterval;
 use super::{
     conn::PendingConnection,
     connection_requester,
@@ -177,7 +179,13 @@ impl ConnectionPoolWorker {
         #[cfg(test)]
         let maintenance_frequency = options
             .as_ref()
-            .and_then(|opts| opts.maintenance_frequency)
+            .and_then(|opts| opts.background_thread_interval)
+            .map(|i| match i {
+                // One year is long enough to count as never for tests, but not so long that it
+                // will overflow interval math.
+                BackgroundThreadInterval::Never => Duration::from_secs(31_556_952),
+                BackgroundThreadInterval::Every(d) => d,
+            })
             .unwrap_or(MAINTENACE_FREQUENCY);
 
         #[cfg(not(test))]
