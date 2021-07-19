@@ -44,6 +44,15 @@ where
     G: Future<Output = ()>,
     T: DeserializeOwned,
 {
+    run_spec_test_with_path(spec, |_, t| run_test_file(t)).await
+}
+
+pub(crate) async fn run_spec_test_with_path<T, F, G>(spec: &[&str], run_test_file: F)
+where
+    F: Fn(PathBuf, T) -> G,
+    G: Future<Output = ()>,
+    T: DeserializeOwned,
+{
     let base_path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "src", "test", "spec", "json"]
         .iter()
         .chain(spec.iter())
@@ -62,7 +71,7 @@ where
         }
 
         let test_file_full_path = base_path.join(&test_file_path);
-        run_single_test(test_file_full_path, &run_test_file).await;
+        run_single_test_with_path(test_file_full_path, &run_test_file).await;
     }
 }
 
@@ -72,12 +81,22 @@ where
     G: Future<Output = ()>,
     T: DeserializeOwned,
 {
+    run_single_test_with_path(path, &|_, t| run_test_file(t)).await
+}
+
+pub(crate) async fn run_single_test_with_path<T, F, G>(path: PathBuf, run_test_file: &F)
+where
+    F: Fn(PathBuf, T) -> G,
+    G: Future<Output = ()>,
+    T: DeserializeOwned,
+{
     let json: Value = serde_json::from_reader(File::open(path.as_path()).unwrap()).unwrap();
 
     // Printing the name of the test file makes it easier to debug deserialization errors.
     println!("Running tests from {}", path.display().to_string());
 
     run_test_file(
+        path.clone(),
         bson::from_bson(
             Bson::try_from(json).unwrap_or_else(|_| panic!("{}", path.display().to_string())),
         )
