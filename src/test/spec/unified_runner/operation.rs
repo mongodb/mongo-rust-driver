@@ -169,6 +169,10 @@ impl<'de> Deserialize<'de> for Operation {
                 FailPointCommand::deserialize(BsonDeserializer::new(definition.arguments))
                     .map(|op| Box::new(op) as Box<dyn TestOperation>)
             }
+            "targetedFailPoint" => {
+                TargetedFailPoint::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
             "assertCollectionExists" => {
                 AssertCollectionExists::deserialize(BsonDeserializer::new(definition.arguments))
                     .map(|op| Box::new(op) as Box<dyn TestOperation>)
@@ -193,6 +197,14 @@ impl<'de> Deserialize<'de> for Operation {
                 BsonDeserializer::new(definition.arguments),
             )
             .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "assertSessionPinned" => {
+                AssertSessionPinned::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "assertSessionUnpinned" => {
+                AssertSessionUnpinned::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
             "assertDifferentLsidOnLastTwoCommands" => {
                 AssertDifferentLsidOnLastTwoCommands::deserialize(BsonDeserializer::new(
                     definition.arguments,
@@ -1019,6 +1031,36 @@ impl TestOperation for FailPointCommand {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct TargetedFailPoint {
+    fail_point: FailPoint,
+    session: String,
+}
+
+impl TestOperation for TargetedFailPoint {
+    fn execute_test_runner_operation<'a>(
+        &'a self,
+        test_runner: &'a mut TestRunner,
+    ) -> BoxFuture<'a, ()> {
+        async move {
+            let session = test_runner.get_session(&self.session);
+            let selection_criteria = session
+                .transaction
+                .pinned_mongos
+                .clone()
+                .unwrap_or_else(|| panic!("ClientSession not pinned"));
+            let fail_point_guard = test_runner
+                .internal_client
+                .enable_failpoint(self.fail_point.clone(), Some(selection_criteria))
+                .await
+                .unwrap();
+            test_runner.fail_point_guards.push(fail_point_guard);
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct AssertCollectionExists {
     collection_name: String,
     database_name: String,
@@ -1218,6 +1260,50 @@ impl TestOperation for AssertSessionTransactionState {
                 TransactionState::Aborted => "aborted",
             };
             assert_eq!(session_state, self.state);
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct AssertSessionPinned {
+    session: String,
+}
+
+impl TestOperation for AssertSessionPinned {
+    fn execute_test_runner_operation<'a>(
+        &'a self,
+        test_runner: &'a mut TestRunner,
+    ) -> BoxFuture<'a, ()> {
+        async move {
+            assert!(test_runner
+                .get_session(&self.session)
+                .transaction
+                .pinned_mongos
+                .is_some());
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct AssertSessionUnpinned {
+    session: String,
+}
+
+impl TestOperation for AssertSessionUnpinned {
+    fn execute_test_runner_operation<'a>(
+        &'a self,
+        test_runner: &'a mut TestRunner,
+    ) -> BoxFuture<'a, ()> {
+        async move {
+            assert!(test_runner
+                .get_session(&self.session)
+                .transaction
+                .pinned_mongos
+                .is_none());
         }
         .boxed()
     }

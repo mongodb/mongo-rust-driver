@@ -4,7 +4,7 @@ use futures::{future::BoxFuture, stream::TryStreamExt, FutureExt};
 use serde::{de::Deserializer, Deserialize};
 
 use crate::{
-    bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
+    bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
     client::session::TransactionState,
     coll::options::CollectionOptions,
     db::options::DatabaseOptions,
@@ -33,7 +33,7 @@ use crate::{
         WriteConcern,
     },
     selection_criteria::{ReadPreference, SelectionCriteria},
-    test::TestClient,
+    test::{FailPoint, TestClient},
     ClientSession,
     Collection,
     Database,
@@ -108,6 +108,7 @@ pub enum OperationResult {
 pub struct OperationError {
     pub error_contains: Option<String>,
     pub error_code_name: Option<String>,
+    pub error_code: Option<i32>,
     pub error_labels_contain: Option<Vec<String>>,
     pub error_labels_omit: Option<Vec<String>>,
 }
@@ -229,6 +230,18 @@ impl<'de> Deserialize<'de> for Operation {
             "listDatabases" => ListDatabases::deserialize(BsonDeserializer::new(Bson::Document(
                 definition.arguments,
             )))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "targetedFailPoint" => TargetedFailPoint::deserialize(BsonDeserializer::new(
+                Bson::Document(definition.arguments),
+            ))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "assertSessionPinned" => AssertSessionPinned::deserialize(BsonDeserializer::new(
+                Bson::Document(definition.arguments),
+            ))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "assertSessionUnpinned" => AssertSessionUnpinned::deserialize(BsonDeserializer::new(
+                Bson::Document(definition.arguments),
+            ))
             .map(|op| Box::new(op) as Box<dyn TestOperation>),
             "listDatabaseNames" => ListDatabaseNames::deserialize(BsonDeserializer::new(
                 Bson::Document(definition.arguments),
@@ -989,6 +1002,50 @@ impl TestOperation for FindOneAndDelete {
             };
             let result = bson::to_bson(&result)?;
             Ok(Some(result))
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct TargetedFailPoint {
+    fail_point: FailPoint,
+}
+
+impl TestOperation for TargetedFailPoint {
+    fn execute_on_client<'a>(&'a self, _client: &'a TestClient) -> BoxFuture<Result<Option<Bson>>> {
+        async move { Ok(Some(to_bson(&self.fail_point)?)) }.boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct AssertSessionPinned {}
+
+impl TestOperation for AssertSessionPinned {
+    fn execute_on_session<'a>(
+        &'a self,
+        session: &'a mut ClientSession,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            assert!(session.transaction.pinned_mongos.is_some());
+            Ok(None)
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct AssertSessionUnpinned {}
+
+impl TestOperation for AssertSessionUnpinned {
+    fn execute_on_session<'a>(
+        &'a self,
+        session: &'a mut ClientSession,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            assert!(session.transaction.pinned_mongos.is_none());
+            Ok(None)
         }
         .boxed()
     }
