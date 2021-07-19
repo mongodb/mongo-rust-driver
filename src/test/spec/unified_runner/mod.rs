@@ -34,7 +34,7 @@ pub use self::{
     test_runner::{EntityMap, TestRunner},
 };
 
-static SPEC_VERSIONS: &[Version] = &[Version::new(1, 0, 0), Version::new(1, 1, 0)];
+static SPEC_VERSIONS: &[Version] = &[Version::new(1, 0, 0), Version::new(1, 1, 0), Version::new(1, 4, 0)];
 
 const SKIPPED_OPERATIONS: &[&str] = &[
     "assertIndexExists",

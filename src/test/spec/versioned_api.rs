@@ -3,7 +3,7 @@ use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 use crate::{
     bson::doc,
     options::{ServerApi, ServerApiVersion},
-    test::{run_spec_test, EventClient, TestClient, CLIENT_OPTIONS, LOCK},
+    test::{run_spec_test, EventClient, CLIENT_OPTIONS, LOCK},
 };
 
 use super::run_unified_format_test;

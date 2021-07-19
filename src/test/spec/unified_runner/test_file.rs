@@ -72,6 +72,8 @@ pub enum Topology {
     Sharded,
     #[serde(rename = "sharded-replicaset")]
     ShardedReplicaSet,
+    #[serde(rename = "load-balanced")]
+    LoadBalanced,
 }
 
 impl RunOnRequirement {
