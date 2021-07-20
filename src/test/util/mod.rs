@@ -303,6 +303,7 @@ impl TestClient {
     }
 
     pub async fn topology(&self) -> Topology {
+        // TODO RUST-653 Detect and report a `LoadBalanced` topology.
         if self.is_sharded() {
             let shard_info = self
                 .database("config")

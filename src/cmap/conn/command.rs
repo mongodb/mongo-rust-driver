@@ -46,10 +46,6 @@ impl Command {
     }
 
     pub(crate) fn set_server_api(&mut self, server_api: &ServerApi) {
-        if matches!(self.name.as_str(), "getMore") {
-            return;
-        }
-
         self.body
             .insert("apiVersion", format!("{}", server_api.version));
 

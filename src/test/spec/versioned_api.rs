@@ -1,9 +1,19 @@
+use std::path::PathBuf;
+
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
     bson::doc,
     options::{ServerApi, ServerApiVersion},
-    test::{run_spec_test, EventClient, TestClient, CLIENT_OPTIONS, LOCK},
+    test::{
+        run_single_test,
+        run_spec_test_with_path,
+        spec::unified_runner::TestFile,
+        EventClient,
+        TestClient,
+        CLIENT_OPTIONS,
+        LOCK,
+    },
 };
 
 use super::run_unified_format_test;
@@ -12,11 +22,36 @@ use super::run_unified_format_test;
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-    // TODO RUST-768 Unskip these tests on 5.0
-    if TestClient::new().await.server_version_gte(5, 0) {
+    run_spec_test_with_path(&["versioned-api"], run_non_transaction_handling_test).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn run_transaction_handling_spec_test() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+    if TestClient::new().await.is_sharded() {
+        // TODO RUST-734 Unskip these tests on sharded deployments.
         return;
     }
-    run_spec_test(&["versioned-api"], run_unified_format_test).await;
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "src",
+        "test",
+        "spec",
+        "json",
+        "versioned-api",
+        "transaction-handling.json",
+    ]
+    .iter()
+    .collect();
+    run_single_test(path, &run_unified_format_test).await;
+}
+
+async fn run_non_transaction_handling_test(path: PathBuf, file: TestFile) {
+    if path.ends_with("transaction-handling.json") {
+        return;
+    }
+    run_unified_format_test(file).await
 }
 
 // TODO RUST-817 Remove this test in favor of transaction-handling.json versioned API spec test when
