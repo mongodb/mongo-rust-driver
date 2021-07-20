@@ -1454,6 +1454,7 @@ buildvariants:
   matrix_spec:
     os:
       - ubuntu-18.04
+    async-runtime: "tokio"
     versioned-api: "*"
   display_name: "Versioned API ${versioned-api}"
   tasks:
