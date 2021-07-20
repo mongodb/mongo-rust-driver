@@ -337,6 +337,7 @@ functions:
             TOPOLOGY=${TOPOLOGY} \
             AUTH=${AUTH} \
             SSL=${SSL} \
+            REQUIRE_API_VERSION=${REQUIRE_API_VERSION} \
             sh ${DRIVERS_TOOLS}/.evergreen/run-orchestration.sh
     # run-orchestration generates expansion file with the MONGODB_URI for the cluster
     - command: expansions.update
@@ -355,7 +356,10 @@ functions:
           export SSL="${SSL}"
           . .evergreen/generate-uri.sh
 
-          SINGLE_THREAD=${SINGLE_THREAD} ASYNC_RUNTIME=${ASYNC_RUNTIME} .evergreen/run-tests.sh
+          SINGLE_THREAD=${SINGLE_THREAD} \
+            ASYNC_RUNTIME=${ASYNC_RUNTIME} \
+            MONGODB_API_VERSION=${MONGODB_API_VERSION} \
+            .evergreen/run-tests.sh
 
   "run atlas tests":
     - command: shell.exec
@@ -1298,6 +1302,15 @@ axes:
           PYTHON: "/cygdrive/c/python/Python36/python"
           VENV_BIN_DIR: "Scripts"
 
+  - id: "versioned-api"
+    display_name: "Versioned API"
+    values:
+      - id: require-api-v1
+        display_name: "Require API V1"
+        variables:
+          REQUIRE_API_VERSION: "1"
+          MONGODB_API_VERISON: "1"
+
 buildvariants:
 -
   matrix_name: "tests"
@@ -1436,6 +1449,16 @@ buildvariants:
   display_name: "! Compile on Rust ${extra-rust-versions} with ${async-runtime}"
   tasks:
     - "compile-only"
+
+- matrix_name: "versioned-api-tests"
+  matrix_spec:
+    os:
+      - ubuntu-18.04
+    versioned-api: "*"
+  display_name: "Versioned API ${versioned-api}"
+  tasks:
+    - ".latest-standalone"
+    - ".5.0-standalone"
 
 -
   name: "lint"
