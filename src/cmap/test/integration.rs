@@ -179,7 +179,11 @@ async fn connection_error_during_establishment() {
     }
 
     let options = FailCommandOptions::builder().error_code(1234).build();
-    let failpoint = FailPoint::fail_command(&["isMaster"], FailPointMode::Times(10), Some(options));
+    let failpoint = FailPoint::fail_command(
+        &["isMaster", "hello"],
+        FailPointMode::Times(10),
+        Some(options),
+    );
     let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
 
     let handler = Arc::new(EventHandler::new());
