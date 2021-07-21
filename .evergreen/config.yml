@@ -1309,7 +1309,7 @@ axes:
         display_name: "Require API V1"
         variables:
           REQUIRE_API_VERSION: "1"
-          MONGODB_API_VERISON: "1"
+          MONGODB_API_VERSION: "1"
 
 buildvariants:
 -
