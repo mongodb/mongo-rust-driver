@@ -52,7 +52,7 @@ lazy_static! {
         std::env::var("MONGODB_URI").unwrap_or_else(|_| "mongodb://localhost:27017".to_string());
     pub(crate) static ref SERVER_API: Option<ServerApi> = match std::env::var("MONGODB_API_VERSION")
     {
-        Ok(server_api_version) => Some(ServerApi {
+        Ok(server_api_version) if !server_api_version.is_empty() => Some(ServerApi {
             version: ServerApiVersion::from_str(server_api_version.as_str()).unwrap(),
             deprecation_errors: None,
             strict: None,
