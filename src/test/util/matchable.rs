@@ -67,8 +67,7 @@ impl Matchable for Document {
             if k == "afterClusterTime" {
                 continue;
             }
-            // TODO RUST-97: Remove this logic to bypass recoveryToken
-            if k == "recoveryToken" {
+            if k == "recoveryToken" && v.is_placeholder() && self.get_document(k).is_ok() {
                 continue;
             }
             if k == "readConcern" {

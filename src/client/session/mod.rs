@@ -118,12 +118,14 @@ pub(crate) struct Transaction {
     pub(crate) state: TransactionState,
     pub(crate) options: Option<TransactionOptions>,
     pub(crate) pinned_mongos: Option<SelectionCriteria>,
+    pub(crate) recovery_token: Option<Document>,
 }
 
 impl Transaction {
     pub(crate) fn start(&mut self, options: Option<TransactionOptions>) {
         self.state = TransactionState::Starting;
         self.options = options;
+        self.recovery_token = None;
     }
 
     pub(crate) fn commit(&mut self, data_committed: bool) {
@@ -140,6 +142,7 @@ impl Transaction {
         self.state = TransactionState::None;
         self.options = None;
         self.pinned_mongos = None;
+        self.recovery_token = None;
     }
 }
 
@@ -149,6 +152,7 @@ impl Default for Transaction {
             state: TransactionState::None,
             options: None,
             pinned_mongos: None,
+            recovery_token: None,
         }
     }
 }
