@@ -67,12 +67,8 @@ impl Matchable for Document {
             if k == "afterClusterTime" {
                 continue;
             }
-            if k == "recoveryToken" && v.is_placeholder() {
-                if let Some(actual_v) = self.get(k) {
-                    if actual_v.as_document().is_some() {
-                        continue;
-                    }
-                }
+            if k == "recoveryToken" && v.is_placeholder() && self.get_document(k).is_ok() {
+                continue;
             }
             if k == "readConcern" {
                 if let Some(doc) = v.as_document() {

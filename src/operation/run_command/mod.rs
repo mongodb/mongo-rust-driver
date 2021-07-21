@@ -110,10 +110,7 @@ impl super::Response for Response {
             .ok()
             .and_then(|doc| bson::from_document(doc.clone()).ok());
 
-        let recovery_token = doc
-            .get_document("recoveryToken")
-            .ok()
-            .and_then(|doc| bson::from_document(doc.clone()).ok());
+        let recovery_token = doc.get_document("recoveryToken").ok().cloned();
 
         Ok(Self {
             doc,

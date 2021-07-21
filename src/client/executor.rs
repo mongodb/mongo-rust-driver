@@ -88,7 +88,6 @@ impl Client {
                         .into());
                     }
                 }
-
                 self.execute_operation_with_retry(op, Some(session)).await
             }
             None => {
