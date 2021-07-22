@@ -295,7 +295,8 @@ impl fmt::Display for ServerAddress {
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum ServerApiVersion {
-    V1,
+    /// Use API version 1.
+    V1, 
 }
 
 impl FromStr for ServerApiVersion {
@@ -500,6 +501,9 @@ pub struct ClientOptions {
     /// supported and is considered undefined behaviour. To run any command with a different API
     /// version or without declaring one, create a separate client that declares the
     /// appropriate API version.
+    ///
+    /// For more information, see the [Versioned API](
+    /// https://docs.mongodb.com/v5.0/reference/versioned-api/) manual page.
     #[builder(default)]
     pub server_api: Option<ServerApi>,
 
