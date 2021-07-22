@@ -333,7 +333,8 @@ impl<'de> Deserialize<'de> for ServerApiVersion {
     }
 }
 
-/// Options used to declare a versioned server API.
+/// Options used to declare a versioned server API.  For more information, see the [Versioned API](
+/// https://docs.mongodb.com/v5.0/reference/versioned-api/) manual page.
 #[derive(Clone, Debug, Deserialize, PartialEq, TypedBuilder)]
 #[builder(field_defaults(setter(into)))]
 #[serde(rename_all = "camelCase")]
