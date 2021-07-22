@@ -1,5 +1,9 @@
 use super::Handshaker;
-use crate::{bson::doc, cmap::options::ConnectionPoolOptions, options::DriverInfo};
+use crate::{
+    bson::doc,
+    cmap::options::ConnectionPoolOptions,
+    options::{ClientOptions, DriverInfo},
+};
 
 #[test]
 fn metadata_no_options() {
@@ -24,15 +28,17 @@ fn metadata_with_options() {
     let name = "even better Rust driver";
     let version = "the best version, of course";
 
-    let options = ConnectionPoolOptions::builder()
-        .app_name(app_name.to_string())
-        .driver_info(
-            DriverInfo::builder()
-                .name(name.to_string())
-                .version(version.to_string())
-                .build(),
-        )
-        .build();
+    let options = ConnectionPoolOptions::from_client_options(
+        &ClientOptions::builder()
+            .app_name(app_name.to_string())
+            .driver_info(
+                DriverInfo::builder()
+                    .name(name.to_string())
+                    .version(version.to_string())
+                    .build(),
+            )
+            .build(),
+    );
 
     let handshaker = Handshaker::new(Some(options.into()));
 

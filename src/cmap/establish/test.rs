@@ -3,7 +3,7 @@ use tokio::sync::RwLockWriteGuard;
 use crate::{
     bson::{doc, Bson},
     cmap::{establish::Handshaker, Command, Connection, ConnectionPoolOptions},
-    options::{AuthMechanism, Credential, ReadPreference},
+    options::{AuthMechanism, ClientOptions, Credential, ReadPreference},
     test::{TestClient, CLIENT_OPTIONS, LOCK},
 };
 
@@ -34,9 +34,11 @@ async fn speculative_auth_test(
         .await
         .unwrap();
 
-    let mut pool_options = ConnectionPoolOptions::builder()
-        .credential(credential.clone())
-        .build();
+    let mut pool_options = ConnectionPoolOptions::from_client_options(
+        &ClientOptions::builder()
+            .credential(credential.clone())
+            .build(),
+    );
     pool_options.tls_options = CLIENT_OPTIONS.tls_options();
 
     let handshaker = Handshaker::new(Some(pool_options.clone().into()));
