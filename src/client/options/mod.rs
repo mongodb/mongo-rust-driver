@@ -294,7 +294,7 @@ impl fmt::Display for ServerAddress {
 /// Specifies the server API version to declare
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
-pub(crate) enum ServerApiVersion {
+pub enum ServerApiVersion {
     V1,
 }
 
@@ -337,7 +337,7 @@ impl<'de> Deserialize<'de> for ServerApiVersion {
 #[builder(field_defaults(setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-pub(crate) struct ServerApi {
+pub struct ServerApi {
     /// The declared API version.
     pub version: ServerApiVersion,
 
@@ -500,8 +500,8 @@ pub struct ClientOptions {
     /// supported and is considered undefined behaviour. To run any command with a different API
     /// version or without declaring one, create a separate client that declares the
     /// appropriate API version.
-    #[builder(default, setter(skip))]
-    pub(crate) server_api: Option<ServerApi>,
+    #[builder(default)]
+    pub server_api: Option<ServerApi>,
 
     /// The amount of time the Client should attempt to select a server for an operation before
     /// timing outs
