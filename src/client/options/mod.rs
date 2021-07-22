@@ -296,7 +296,7 @@ impl fmt::Display for ServerAddress {
 #[non_exhaustive]
 pub enum ServerApiVersion {
     /// Use API version 1.
-    V1, 
+    V1,
 }
 
 impl FromStr for ServerApiVersion {
