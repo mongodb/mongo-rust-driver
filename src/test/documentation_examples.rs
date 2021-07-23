@@ -5,7 +5,7 @@ use tokio::sync::RwLockReadGuard;
 use crate::{
     bson::{doc, Bson},
     error::Result,
-    options::{ClientOptions, CursorType, FindOptions, ServerApi, ServerApiVersion},
+    options::{ClientOptions, FindOptions, ServerApi, ServerApiVersion},
     test::{TestClient, DEFAULT_URI, LOCK},
     Client,
     Collection,
@@ -1377,19 +1377,14 @@ async fn versioned_api_examples() -> Result<()> {
     }
 
     let uri = DEFAULT_URI.clone();
-    // Start 1. Declare an API version on a client
+    // Start Versioned API Example 1
     let mut options = ClientOptions::parse(&uri).await?;
     let server_api = ServerApi::builder().version(ServerApiVersion::V1).build();
     options.server_api = Some(server_api);
     let client = Client::with_options(options)?;
-    let cursor = client
-        .database("versioned_api_example")
-        .collection::<Document>("example")
-        .find(None, None)
-        .await?;
-    // End 1.
+    // End Versioned API Example 1
 
-    // Start 2. Strict option
+    // Start Versioned API Example 2
     let mut options = ClientOptions::parse(&uri).await?;
     let server_api = ServerApi::builder()
         .version(ServerApiVersion::V1)
@@ -1397,19 +1392,19 @@ async fn versioned_api_examples() -> Result<()> {
         .build();
     options.server_api = Some(server_api);
     let client = Client::with_options(options)?;
+    // End Versioned API Example 2
 
-    let find_options = FindOptions::builder()
-        .cursor_type(CursorType::Tailable)
+    // Start Versioned API Example 3
+    let mut options = ClientOptions::parse(&uri).await?;
+    let server_api = ServerApi::builder()
+        .version(ServerApiVersion::V1)
+        .strict(false)
         .build();
-    let cursor = client
-        .database("versioned_api_example")
-        .collection::<Document>("example")
-        .find(None, find_options)
-        .await
-        .expect_err("should fail");
-    // End 2.
+    options.server_api = Some(server_api);
+    let client = Client::with_options(options)?;
+    // End Versioned API Example 3
 
-    // Start 3. deprecationErrors option
+    // Start Versioned API Example 4
     let mut options = ClientOptions::parse(&uri).await?;
     let server_api = ServerApi::builder()
         .version(ServerApiVersion::V1)
@@ -1417,7 +1412,7 @@ async fn versioned_api_examples() -> Result<()> {
         .build();
     options.server_api = Some(server_api);
     let client = Client::with_options(options)?;
-    // End 3.
+    // End Versioned API Example 4
 
     Ok(())
 }
