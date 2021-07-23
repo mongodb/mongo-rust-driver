@@ -269,7 +269,7 @@ impl<T> Collection<T> {
         resolve_read_concern_with_session!(self, options, session.as_ref())?;
         resolve_selection_criteria_with_session!(self, options, session.as_ref())?;
 
-        let op = CountDocuments::new(self.namespace(), filter.into(), options);
+        let op = CountDocuments::new(self.namespace(), filter.into(), options)?;
         self.client().execute_operation(op, session).await
     }
 

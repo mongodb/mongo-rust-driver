@@ -1,4 +1,5 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::convert::TryInto;
 
 use derivative::Derivative;
 use serde::{de::Error, Deserialize, Deserializer};
@@ -304,7 +305,7 @@ impl ReadPreference {
         let mut doc = doc! { "mode": mode };
 
         if let Some(max_stale) = max_staleness {
-            doc.insert("maxStalenessSeconds", max_stale.as_secs());
+            doc.insert("maxStalenessSeconds", max_stale.as_secs().try_into().unwrap_or(i64::MAX));
         }
 
         if let Some(tag_sets) = tag_sets {

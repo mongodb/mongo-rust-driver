@@ -41,7 +41,7 @@ impl Command {
         }
     }
 
-    pub(crate) fn set_txn_number(&mut self, txn_number: u64) {
+    pub(crate) fn set_txn_number(&mut self, txn_number: i64) {
         self.body.insert("txnNumber", txn_number);
     }
 
