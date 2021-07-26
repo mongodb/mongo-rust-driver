@@ -411,10 +411,8 @@ impl Client {
                         self.update_cluster_time(&r, session).await;
                         if r.is_success() {
                             // Retrieve recovery token from successful response.
-                            if let Some(ref mut session) = session {
-                                if session.in_transaction() && is_sharded {
-                                    session.transaction.recovery_token = r.recovery_token();
-                                }
+                            if is_sharded {
+                                Client::update_recovery_token(&r, session).await;
                             }
 
                             Ok(CommandResult {
@@ -461,7 +459,11 @@ impl Client {
                                         }))
                                     }
                                     // for ok: 1 just return the original deserialization error.
-                                    _ => Err(deserialize_error),
+                                    _ => {
+                                        Client::update_recovery_token(&error_response, session)
+                                            .await;
+                                        Err(deserialize_error)
+                                    }
                                 }
                             }
                             // We failed to deserialize even that, so just return the original
@@ -637,6 +639,17 @@ impl Client {
         if let Some(timestamp) = command_response.at_cluster_time() {
             if let Some(ref mut session) = session {
                 session.snapshot_time = Some(timestamp);
+            }
+        }
+    }
+
+    async fn update_recovery_token<T: Response>(
+        response: &T,
+        session: &mut Option<&mut ClientSession>,
+    ) {
+        if let Some(ref mut session) = session {
+            if session.in_transaction() {
+                session.transaction.recovery_token = response.recovery_token().cloned();
             }
         }
     }

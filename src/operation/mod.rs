@@ -154,7 +154,7 @@ pub(crate) trait Response: Sized {
     fn at_cluster_time(&self) -> Option<Timestamp>;
 
     /// The `recoveryToken` field of the response.
-    fn recovery_token(&self) -> Option<Document>;
+    fn recovery_token(&self) -> Option<&Document>;
 
     /// Convert into the body of the response.
     fn into_body(self) -> Self::Body;
@@ -202,8 +202,8 @@ impl<T: DeserializeOwned> Response for CommandResponse<T> {
         self.at_cluster_time
     }
 
-    fn recovery_token(&self) -> Option<Document> {
-        self.recovery_token.clone()
+    fn recovery_token(&self) -> Option<&Document> {
+        self.recovery_token.as_ref()
     }
 
     fn into_body(self) -> Self::Body {
@@ -238,7 +238,7 @@ impl<T: DeserializeOwned> Response for CursorResponse<T> {
         self.response.body.cursor.at_cluster_time
     }
 
-    fn recovery_token(&self) -> Option<Document> {
+    fn recovery_token(&self) -> Option<&Document> {
         self.response.recovery_token()
     }
 

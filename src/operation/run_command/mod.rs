@@ -138,8 +138,8 @@ impl super::Response for Response {
             .ok()
     }
 
-    fn recovery_token(&self) -> Option<Document> {
-        self.recovery_token.clone()
+    fn recovery_token(&self) -> Option<&Document> {
+        self.recovery_token.as_ref()
     }
 
     fn into_body(self) -> Self::Body {
