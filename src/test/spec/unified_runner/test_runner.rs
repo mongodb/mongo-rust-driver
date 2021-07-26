@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     bson::Document,
-    client::{REDACTED_COMMANDS, options::ClientOptions},
+    client::{options::ClientOptions, REDACTED_COMMANDS},
     concern::{Acknowledgment, WriteConcern},
     options::CollectionOptions,
     test::{util::FailPointGuard, EventHandler, TestClient, SERVER_API},
@@ -61,7 +61,9 @@ impl TestRunner {
                     let observe_events = client.observe_events.clone();
                     let mut ignore_command_names = client.ignore_command_monitoring_events.clone();
                     if !client.observe_sensitive_commands.unwrap_or(false) {
-                        ignore_command_names.get_or_insert_with(|| vec![]).extend(REDACTED_COMMANDS.iter().map(|s| String::from(*s)));
+                        ignore_command_names
+                            .get_or_insert_with(|| vec![])
+                            .extend(REDACTED_COMMANDS.iter().map(|s| String::from(*s)));
                     }
                     let server_api = client.server_api.clone().or_else(|| SERVER_API.clone());
                     let observer = Arc::new(EventHandler::new());

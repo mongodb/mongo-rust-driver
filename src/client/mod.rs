@@ -10,6 +10,8 @@ use derivative::Derivative;
 use std::time::Instant;
 
 #[cfg(test)]
+pub(crate) use self::executor::REDACTED_COMMANDS;
+#[cfg(test)]
 use crate::options::ServerAddress;
 use crate::{
     bson::Document,
@@ -30,8 +32,6 @@ use crate::{
     sdam::{SelectedServer, SessionSupportStatus, Topology},
     ClientSession,
 };
-#[cfg(test)]
-pub(crate) use self::executor::REDACTED_COMMANDS;
 pub(crate) use session::{ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS};
 use session::{ServerSession, ServerSessionPool};
 
