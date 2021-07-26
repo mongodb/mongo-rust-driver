@@ -16,9 +16,8 @@ use crate::{
 };
 
 /// Contains the options for creating a connection pool.
-#[derive(Clone, Default, Deserialize, TypedBuilder, Derivative)]
+#[derive(Clone, Default, Deserialize, Derivative)]
 #[derivative(Debug, PartialEq)]
-#[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ConnectionPoolOptions {
     /// The application name specified by the user. This is sent to the server as part of the
@@ -74,13 +73,11 @@ pub(crate) struct ConnectionPoolOptions {
     /// Whether to start the pool as "ready" or not.
     /// For tests only.
     #[cfg(test)]
-    #[builder(setter(skip), default)]
     pub(crate) ready: Option<bool>,
 
     /// The declared API version
     ///
     /// The default value is to have no declared API version
-    #[builder(setter(skip), default)]
     pub(crate) server_api: Option<ServerApi>,
 
     /// The options specifying how a TLS connection should be configured. If `tls_options` is

@@ -294,7 +294,8 @@ impl fmt::Display for ServerAddress {
 /// Specifies the server API version to declare
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
-pub(crate) enum ServerApiVersion {
+pub enum ServerApiVersion {
+    /// Use API version 1.
     V1,
 }
 
@@ -332,12 +333,13 @@ impl<'de> Deserialize<'de> for ServerApiVersion {
     }
 }
 
-/// Options used to declare a versioned server API.
+/// Options used to declare a versioned server API.  For more information, see the [Versioned API](
+/// https://docs.mongodb.com/v5.0/reference/versioned-api/) manual page.
 #[derive(Clone, Debug, Deserialize, PartialEq, TypedBuilder)]
 #[builder(field_defaults(setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-pub(crate) struct ServerApi {
+pub struct ServerApi {
     /// The declared API version.
     pub version: ServerApiVersion,
 
@@ -493,15 +495,17 @@ pub struct ClientOptions {
 
     /// The declared API version for this client.
     /// The declared API version is applied to all commands run through the client, including those
-    /// sent through any [crate::Database] or [crate::Collection] derived from the client.
+    /// sent through any handle derived from the client.
     ///
-    /// Specifying versioned API options in the command document passed to
-    /// [crate::Database::run_command] AND declaring an API version on the client is not
-    /// supported and is considered undefined behaviour. To run any command with a different API
-    /// version or without declaring one, create a separate client that declares the
-    /// appropriate API version.
-    #[builder(default, setter(skip))]
-    pub(crate) server_api: Option<ServerApi>,
+    /// Specifying versioned API options in the command document passed to `run_command` AND
+    /// declaring an API version on the client is not supported and is considered undefined
+    /// behaviour. To run any command with a different API version or without declaring one, create
+    /// a separate client that declares the appropriate API version.
+    ///
+    /// For more information, see the [Versioned API](
+    /// https://docs.mongodb.com/v5.0/reference/versioned-api/) manual page.
+    #[builder(default)]
+    pub server_api: Option<ServerApi>,
 
     /// The amount of time the Client should attempt to select a server for an operation before
     /// timing outs
