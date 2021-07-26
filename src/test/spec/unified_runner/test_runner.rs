@@ -62,7 +62,7 @@ impl TestRunner {
                     let mut ignore_command_names = client.ignore_command_monitoring_events.clone();
                     if !client.observe_sensitive_commands.unwrap_or(false) {
                         ignore_command_names
-                            .get_or_insert_with(|| vec![])
+                            .get_or_insert_with(Vec::new)
                             .extend(REDACTED_COMMANDS.iter().map(|s| String::from(*s)));
                     }
                     let server_api = client.server_api.clone().or_else(|| SERVER_API.clone());
