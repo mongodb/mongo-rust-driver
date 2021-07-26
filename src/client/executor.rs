@@ -281,7 +281,7 @@ impl Client {
         self.inner
             .topology
             .update_command_with_read_pref(connection.address(), &mut cmd, op.selection_criteria())
-            .await;
+            .await?;
 
         match session {
             Some(ref mut session) if op.supports_sessions() && op.is_acknowledged() => {

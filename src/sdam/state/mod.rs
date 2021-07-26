@@ -390,11 +390,11 @@ impl Topology {
         server_address: &ServerAddress,
         command: &mut Command,
         criteria: Option<&SelectionCriteria>,
-    ) {
+    ) -> Result<()> {
         self.state
             .read()
             .await
-            .update_command_with_read_pref(server_address, command, criteria);
+            .update_command_with_read_pref(server_address, command, criteria)
     }
 
     /// Gets the latest information on whether sessions are supported or not.
@@ -494,7 +494,7 @@ impl TopologyState {
         server_address: &ServerAddress,
         command: &mut Command,
         criteria: Option<&SelectionCriteria>,
-    ) {
+    ) -> Result<()> {
         let server_type = self
             .description
             .get_server_description(server_address)
