@@ -76,7 +76,7 @@ impl ClientEntity {
             if let Some(ignore_command_names) = ignore_command_names {
                 if ignore_command_names
                     .iter()
-                    .any(|name| event.command_name() == name)
+                    .any(|name| event.command_name().eq_ignore_ascii_case(name))
                 {
                     return false;
                 }

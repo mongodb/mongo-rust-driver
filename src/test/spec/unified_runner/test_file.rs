@@ -62,6 +62,7 @@ pub struct RunOnRequirement {
     topologies: Option<Vec<Topology>>,
     server_parameters: Option<Document>,
     serverless: Option<Serverless>,
+    auth: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -112,6 +113,11 @@ impl RunOnRequirement {
                 _ => (),
             }
         }
+        if let Some(ref auth) = self.auth {
+            if *auth != client.auth_enabled() {
+                return false;
+            }
+        }
         true
     }
 }
@@ -139,6 +145,7 @@ pub struct Client {
     pub use_multiple_mongoses: Option<bool>,
     pub observe_events: Option<Vec<String>>,
     pub ignore_command_monitoring_events: Option<Vec<String>>,
+    pub observe_sensitive_commands: Option<bool>,
     #[serde(default)]
     pub server_api: Option<ServerApi>,
 }
