@@ -230,7 +230,7 @@ impl ClientSession {
     }
 
     /// Gets the current txn_number.
-    pub(crate) fn txn_number(&self) -> u64 {
+    pub(crate) fn txn_number(&self) -> i64 {
         self.server_session.txn_number
     }
 
@@ -240,8 +240,8 @@ impl ClientSession {
     }
 
     /// Increments the txn_number and returns the new value.
-    pub(crate) fn get_and_increment_txn_number(&mut self) -> u64 {
-        self.server_session.txn_number += 1;
+    pub(crate) fn get_and_increment_txn_number(&mut self) -> i64 {
+        self.increment_txn_number();
         self.server_session.txn_number
     }
 
@@ -556,7 +556,7 @@ pub(crate) struct ServerSession {
     dirty: bool,
 
     /// A monotonically increasing transaction number for this session.
-    txn_number: u64,
+    txn_number: i64,
 }
 
 impl ServerSession {

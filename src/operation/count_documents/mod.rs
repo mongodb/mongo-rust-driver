@@ -1,13 +1,15 @@
 #[cfg(test)]
 mod test;
 
+use std::convert::TryInto;
+
 use bson::{doc, Document};
 
 use super::{CursorBody, CursorResponse, Operation, Retryability};
 use crate::{
     bson_util,
     cmap::{Command, StreamDescription},
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     operation::aggregate::Aggregate,
     options::{AggregateOptions, CountOptions},
     selection_criteria::SelectionCriteria,
@@ -23,20 +25,30 @@ impl CountDocuments {
         namespace: Namespace,
         filter: Option<Document>,
         options: Option<CountOptions>,
-    ) -> Self {
+    ) -> Result<Self> {
         let mut pipeline = vec![doc! {
             "$match": filter.unwrap_or_default(),
         }];
 
         if let Some(skip) = options.as_ref().and_then(|opts| opts.skip) {
+            let s: i64 = skip.try_into().map_err(|_| {
+                Error::from(ErrorKind::InvalidArgument {
+                    message: format!("skip exceeds range of i64: {}", skip),
+                })
+            })?;
             pipeline.push(doc! {
-                "$skip": skip
+                "$skip": s
             });
         }
 
         if let Some(limit) = options.as_ref().and_then(|opts| opts.limit) {
+            let l: i64 = limit.try_into().map_err(|_| {
+                Error::from(ErrorKind::InvalidArgument {
+                    message: format!("limit exceeds range of i64: {}", limit),
+                })
+            })?;
             pipeline.push(doc! {
-                "$limit": limit
+                "$limit": l
             });
         }
 
@@ -57,9 +69,9 @@ impl CountDocuments {
                 .build()
         });
 
-        Self {
+        Ok(Self {
             aggregate: Aggregate::new(namespace, pipeline, aggregate_options),
-        }
+        })
     }
 }
 

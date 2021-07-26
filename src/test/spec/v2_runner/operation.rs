@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug, ops::Deref};
+use std::{collections::HashMap, convert::TryInto, fmt::Debug, ops::Deref};
 
 use async_trait::async_trait;
 use futures::stream::TryStreamExt;
@@ -797,7 +797,7 @@ impl TestOperation for CountDocuments {
                     .await?
             }
         };
-        Ok(Some(Bson::from(result)))
+        Ok(Some(Bson::Int64(result.try_into().unwrap())))
     }
 
     async fn execute_on_database(
@@ -833,7 +833,7 @@ impl TestOperation for EstimatedDocumentCount {
         let result = collection
             .estimated_document_count(self.options.clone())
             .await?;
-        Ok(Some(Bson::from(result)))
+        Ok(Some(Bson::Int64(result.try_into().unwrap())))
     }
 
     async fn execute_on_database(

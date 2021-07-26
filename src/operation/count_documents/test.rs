@@ -20,7 +20,7 @@ async fn build() {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
     };
-    let mut count_op = CountDocuments::new(ns, Some(doc! { "x": 1 }), None);
+    let mut count_op = CountDocuments::new(ns, Some(doc! { "x": 1 }), None).unwrap();
     let mut count_command = count_op
         .build(&StreamDescription::new_testing())
         .expect("error on build");
@@ -56,7 +56,7 @@ async fn build_with_options() {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
     };
-    let mut count_op = CountDocuments::new(ns, None, Some(options));
+    let mut count_op = CountDocuments::new(ns, None, Some(options)).unwrap();
     let mut count_command = count_op
         .build(&StreamDescription::new_testing())
         .expect("error on build");
@@ -65,8 +65,8 @@ async fn build_with_options() {
         "aggregate": "test_coll",
         "pipeline": [
             { "$match": {} },
-            { "$skip": skip },
-            { "$limit": limit },
+            { "$skip": skip as i64 },
+            { "$limit": limit as i64 },
             { "$group": { "_id": 1, "n": { "$sum": 1 } } },
         ],
         "hint": "_id_1",
@@ -89,7 +89,7 @@ async fn op_selection_criteria() {
             selection_criteria,
             ..Default::default()
         };
-        CountDocuments::new(Namespace::empty(), None, Some(options))
+        CountDocuments::new(Namespace::empty(), None, Some(options)).unwrap()
     });
 }
 
@@ -100,7 +100,7 @@ async fn handle_success() {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
     };
-    let count_op = CountDocuments::new(ns, None, None);
+    let count_op = CountDocuments::new(ns, None, None).unwrap();
 
     let n = 26;
     let response = doc! {
@@ -108,7 +108,7 @@ async fn handle_success() {
         "cursor": {
             "id": 0,
             "ns": "test_db.test_coll",
-            "firstBatch": [ { "_id": 1, "n": n } ],
+            "firstBatch": [ { "_id": 1, "n": n as i32 } ],
         }
     };
 

@@ -217,7 +217,7 @@ impl Client {
         &self,
         op: &mut T,
         session: &mut Option<&mut ClientSession>,
-        txn_number: Option<u64>,
+        txn_number: Option<i64>,
         first_error: Error,
     ) -> Result<T::O> {
         let server = match self.select_server(op.selection_criteria()).await {
@@ -270,7 +270,7 @@ impl Client {
         op: &mut T,
         connection: &mut Connection,
         session: &mut Option<&mut ClientSession>,
-        txn_number: Option<u64>,
+        txn_number: Option<i64>,
         retryability: &Retryability,
     ) -> Result<T::O> {
         if let Some(wc) = op.write_concern() {
@@ -281,7 +281,7 @@ impl Client {
         self.inner
             .topology
             .update_command_with_read_pref(connection.address(), &mut cmd, op.selection_criteria())
-            .await;
+            .await?;
 
         match session {
             Some(ref mut session) if op.supports_sessions() && op.is_acknowledged() => {

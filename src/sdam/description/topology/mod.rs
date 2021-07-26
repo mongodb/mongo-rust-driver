@@ -158,13 +158,13 @@ impl TopologyDescription {
         server_type: ServerType,
         command: &mut Command,
         criteria: Option<&SelectionCriteria>,
-    ) {
+    ) -> crate::error::Result<()> {
         match (self.topology_type, server_type) {
             (TopologyType::Sharded, ServerType::Mongos)
             | (TopologyType::Single, ServerType::Mongos) => {
-                self.update_command_read_pref_for_mongos(command, criteria);
+                self.update_command_read_pref_for_mongos(command, criteria)
             }
-            (TopologyType::Single, ServerType::Standalone) => {}
+            (TopologyType::Single, ServerType::Standalone) => Ok(()),
             (TopologyType::Single, _) => {
                 let specified_read_pref = criteria
                     .and_then(SelectionCriteria::as_read_pref)
@@ -177,7 +177,7 @@ impl TopologyDescription {
                     Some(other) => other,
                 };
 
-                command.set_read_preference(resolved_read_pref);
+                command.set_read_preference(resolved_read_pref)
             }
             _ => {
                 let read_pref = match criteria {
@@ -187,7 +187,7 @@ impl TopologyDescription {
                     },
                     None => ReadPreference::Primary,
                 };
-                command.set_read_preference(read_pref);
+                command.set_read_preference(read_pref)
             }
         }
     }
@@ -196,33 +196,30 @@ impl TopologyDescription {
         &self,
         command: &mut Command,
         criteria: Option<&SelectionCriteria>,
-    ) {
+    ) -> crate::error::Result<()> {
         match criteria {
             Some(SelectionCriteria::ReadPreference(ReadPreference::Secondary { ref options })) => {
                 command.set_read_preference(ReadPreference::Secondary {
                     options: options.clone(),
-                });
+                })
             }
             Some(SelectionCriteria::ReadPreference(ReadPreference::PrimaryPreferred {
                 ref options,
-            })) => {
-                command.set_read_preference(ReadPreference::PrimaryPreferred {
-                    options: options.clone(),
-                });
-            }
+            })) => command.set_read_preference(ReadPreference::PrimaryPreferred {
+                options: options.clone(),
+            }),
             Some(SelectionCriteria::ReadPreference(ReadPreference::SecondaryPreferred {
                 ref options,
-            })) if options.max_staleness.is_some() || options.tag_sets.is_some() => {
-                command.set_read_preference(ReadPreference::SecondaryPreferred {
+            })) if options.max_staleness.is_some() || options.tag_sets.is_some() => command
+                .set_read_preference(ReadPreference::SecondaryPreferred {
                     options: options.clone(),
-                });
-            }
+                }),
             Some(SelectionCriteria::ReadPreference(ReadPreference::Nearest { ref options })) => {
                 command.set_read_preference(ReadPreference::Nearest {
                     options: options.clone(),
-                });
+                })
             }
-            _ => {}
+            _ => Ok(()),
         }
     }
 
@@ -777,7 +774,7 @@ fn verify_max_staleness(max_staleness: Option<Duration>) -> crate::error::Result
         .map_err(|s| crate::error::ErrorKind::InvalidArgument { message: s }.into())
 }
 
-fn verify_max_staleness_inner(max_staleness: Option<Duration>) -> Result<(), String> {
+fn verify_max_staleness_inner(max_staleness: Option<Duration>) -> std::result::Result<(), String> {
     if max_staleness
         .map(|staleness| staleness > Duration::from_secs(0) && staleness < Duration::from_secs(90))
         .unwrap_or(false)

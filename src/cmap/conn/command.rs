@@ -41,7 +41,7 @@ impl Command {
         }
     }
 
-    pub(crate) fn set_txn_number(&mut self, txn_number: u64) {
+    pub(crate) fn set_txn_number(&mut self, txn_number: i64) {
         self.body.insert("txnNumber", txn_number);
     }
 
@@ -58,9 +58,10 @@ impl Command {
         }
     }
 
-    pub(crate) fn set_read_preference(&mut self, read_preference: ReadPreference) {
+    pub(crate) fn set_read_preference(&mut self, read_preference: ReadPreference) -> Result<()> {
         self.body
-            .insert("$readPreference", read_preference.into_document());
+            .insert("$readPreference", read_preference.into_document()?);
+        Ok(())
     }
 
     pub(crate) fn set_start_transaction(&mut self) {

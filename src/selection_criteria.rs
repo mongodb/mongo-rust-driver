@@ -1,13 +1,14 @@
+use std::convert::TryInto;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use derivative::Derivative;
-use serde::{de::Error, Deserialize, Deserializer};
+use serde::{de::Error as SerdeError, Deserialize, Deserializer};
 use typed_builder::TypedBuilder;
 
 use crate::{
     bson::{doc, Bson, Document},
     bson_util::deserialize_duration_from_u64_seconds,
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     options::ServerAddress,
     sdam::public::ServerInfo,
 };
@@ -272,7 +273,7 @@ impl ReadPreference {
         Ok(self)
     }
 
-    pub(crate) fn into_document(self) -> Document {
+    pub(crate) fn into_document(self) -> Result<Document> {
         let (mode, tag_sets, max_staleness, hedge) = match self {
             ReadPreference::Primary => ("primary", None, None, None),
             ReadPreference::PrimaryPreferred { options } => (
@@ -304,7 +305,15 @@ impl ReadPreference {
         let mut doc = doc! { "mode": mode };
 
         if let Some(max_stale) = max_staleness {
-            doc.insert("maxStalenessSeconds", max_stale.as_secs());
+            let s: i64 = max_stale.as_secs().try_into().map_err(|_| {
+                Error::from(ErrorKind::InvalidArgument {
+                    message: format!(
+                        "provided maxStalenessSeconds {:?} exceeds the range of i64 seconds",
+                        max_stale
+                    ),
+                })
+            })?;
+            doc.insert("maxStalenessSeconds", s);
         }
 
         if let Some(tag_sets) = tag_sets {
@@ -321,7 +330,7 @@ impl ReadPreference {
             doc.insert("hedge", doc! { "enabled": hedge.enabled });
         }
 
-        doc
+        Ok(doc)
     }
 
     #[cfg(test)]
@@ -391,7 +400,7 @@ mod test {
             .build();
 
         let read_pref = ReadPreference::Secondary { options };
-        let doc = read_pref.into_document();
+        let doc = read_pref.into_document().unwrap();
 
         assert_eq!(
             doc,
