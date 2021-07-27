@@ -411,9 +411,7 @@ impl Client {
                         self.update_cluster_time(&r, session).await;
                         if r.is_success() {
                             // Retrieve recovery token from successful response.
-                            if is_sharded {
-                                Client::update_recovery_token(&r, session).await;
-                            }
+                            Client::update_recovery_token(is_sharded, &r, session).await;
 
                             Ok(CommandResult {
                                 raw: response,
@@ -460,8 +458,12 @@ impl Client {
                                     }
                                     // for ok: 1 just return the original deserialization error.
                                     _ => {
-                                        Client::update_recovery_token(&error_response, session)
-                                            .await;
+                                        Client::update_recovery_token(
+                                            is_sharded,
+                                            &error_response,
+                                            session,
+                                        )
+                                        .await;
                                         Err(deserialize_error)
                                     }
                                 }
@@ -644,11 +646,12 @@ impl Client {
     }
 
     async fn update_recovery_token<T: Response>(
+        is_sharded: bool,
         response: &T,
         session: &mut Option<&mut ClientSession>,
     ) {
         if let Some(ref mut session) = session {
-            if session.in_transaction() {
+            if is_sharded && session.in_transaction() {
                 session.transaction.recovery_token = response.recovery_token().cloned();
             }
         }

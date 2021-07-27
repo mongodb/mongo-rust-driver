@@ -97,6 +97,7 @@ async fn client_errors() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
+// This test checks that deserializing an operation correctly still retrieves the recovery token.
 async fn deserialize_recovery_token() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
