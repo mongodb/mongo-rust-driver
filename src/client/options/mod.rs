@@ -1098,6 +1098,10 @@ impl ClientOptions {
                     options.repl_set_name = Some(replica_set);
                 }
             }
+
+            if options.load_balanced.is_none() {
+                options.load_balanced = config.load_balanced;
+            }
         }
 
         options.validate()?;
@@ -1120,7 +1124,7 @@ impl ClientOptions {
         }
     }
 
-    /// Ensure the options set are valid, returning an error descirbing the problem if they are not.
+    /// Ensure the options set are valid, returning an error describing the problem if they are not.
     pub(crate) fn validate(&self) -> Result<()> {
         if let Some(true) = self.direct_connection {
             if self.hosts.len() > 1 {

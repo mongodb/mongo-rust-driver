@@ -19,6 +19,7 @@ pub(crate) struct ResolvedConfig {
     pub(crate) min_ttl: Duration,
     pub(crate) auth_source: Option<String>,
     pub(crate) replica_set: Option<String>,
+    pub(crate) load_balanced: Option<bool>,
 }
 
 pub(crate) struct LookupHosts {
@@ -52,6 +53,7 @@ impl SrvResolver {
             min_ttl: lookup_result.min_ttl,
             auth_source: None,
             replica_set: None,
+            load_balanced: None,
         };
 
         self.get_txt_options(hostname, &mut config).await?;
@@ -189,11 +191,28 @@ impl SrvResolver {
                 "replicaset" => {
                     config.replica_set = Some(parts[1].into());
                 }
+                "loadBalanced" => {
+                    let val = match parts[1] {
+                        "true" => true,
+                        "false" => false,
+                        _ => {
+                            return Err(ErrorKind::DnsResolve {
+                                message: format!(
+                                    "TXT record option 'loadBalanced={}' was returned, only \
+                                     'true' and 'false' are allowed values.",
+                                    parts[1]
+                                ),
+                            }
+                            .into())
+                        }
+                    };
+                    config.load_balanced = Some(val);
+                }
                 other => {
                     return Err(ErrorKind::DnsResolve {
                         message: format!(
-                            "TXT record option '{}' was returned, but only 'authSource' and \
-                             'replicaSet' are allowed",
+                            "TXT record option '{}' was returned, but only 'authSource', \
+                             'replicaSet', and 'loadBalanced' are allowed",
                             other
                         ),
                     }
