@@ -556,6 +556,11 @@ pub struct ClientOptions {
     #[builder(default)]
     #[cfg(test)]
     pub(crate) heartbeat_freq_test: Option<Duration>,
+
+    /// Allow connecting to a load balancer.
+    #[builder(default)]
+    #[serde(skip)]
+    pub(crate) allow_load_balancer: Option<bool>,
 }
 
 fn default_hosts() -> Vec<ServerAddress> {
@@ -921,6 +926,7 @@ impl From<ClientOptionsParser> for ClientOptions {
             server_api: None,
             #[cfg(test)]
             heartbeat_freq_test: None,
+            allow_load_balancer: None,
         }
     }
 }
