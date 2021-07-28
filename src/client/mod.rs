@@ -10,6 +10,8 @@ use derivative::Derivative;
 use std::time::Instant;
 
 #[cfg(test)]
+pub(crate) use self::executor::REDACTED_COMMANDS;
+#[cfg(test)]
 use crate::options::ServerAddress;
 use crate::{
     bson::Document,

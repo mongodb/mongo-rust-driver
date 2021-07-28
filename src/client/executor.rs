@@ -31,7 +31,7 @@ use crate::{
 };
 
 lazy_static! {
-    static ref REDACTED_COMMANDS: HashSet<&'static str> = {
+    pub(crate) static ref REDACTED_COMMANDS: HashSet<&'static str> = {
         let mut hash_set = HashSet::new();
         hash_set.insert("authenticate");
         hash_set.insert("saslstart");
@@ -356,12 +356,14 @@ impl Client {
             cmd.set_server_api(server_api);
         }
 
-        self.emit_command_event(|handler| {
+        let should_redact = {
             let name = cmd.name.to_lowercase();
-            let should_redact = REDACTED_COMMANDS.contains(name.as_str())
+            REDACTED_COMMANDS.contains(name.as_str())
                 || HELLO_COMMAND_NAMES.contains(name.as_str())
-                    && cmd.body.contains_key("speculativeAuthenticate");
+                    && cmd.body.contains_key("speculativeAuthenticate")
+        };
 
+        self.emit_command_event(|handler| {
             let command_body = if should_redact {
                 Document::new()
             } else {
@@ -471,8 +473,6 @@ impl Client {
             }
             Ok(response) => {
                 self.emit_command_event(|handler| {
-                    let should_redact =
-                        REDACTED_COMMANDS.contains(cmd_name.to_lowercase().as_str());
                     let reply = if should_redact {
                         Document::new()
                     } else {
