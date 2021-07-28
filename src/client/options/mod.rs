@@ -1146,6 +1146,24 @@ impl ClientOptions {
             .into());
         }
 
+        if self.load_balanced.unwrap_or(false) {
+            if self.hosts.len() > 1 {
+                return Err(ErrorKind::InvalidArgument {
+                    message: "cannot specify multiple seeds with loadBalanced=true".to_string(),
+                }.into());
+            }
+            if self.repl_set_name.is_some() {
+                return Err(ErrorKind::InvalidArgument {
+                    message: "cannot specify replicaSet with loadBalanced=true".to_string(),
+                }.into());
+            }
+            if self.direct_connection == Some(true) {
+                return Err(ErrorKind::InvalidArgument {
+                    message: "cannot specify directConnection=true with loadBalanced=true".to_string(),
+                }.into());
+            }
+        }
+
         Ok(())
     }
 
