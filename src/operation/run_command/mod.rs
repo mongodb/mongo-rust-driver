@@ -96,6 +96,7 @@ impl Operation for RunCommand {
 pub(crate) struct Response {
     doc: Document,
     cluster_time: Option<ClusterTime>,
+    recovery_token: Option<Document>,
 }
 
 impl super::Response for Response {
@@ -109,7 +110,13 @@ impl super::Response for Response {
             .ok()
             .and_then(|doc| bson::from_document(doc.clone()).ok());
 
-        Ok(Self { doc, cluster_time })
+        let recovery_token = doc.get_document("recoveryToken").ok().cloned();
+
+        Ok(Self {
+            doc,
+            cluster_time,
+            recovery_token,
+        })
     }
 
     fn ok(&self) -> Option<&Bson> {
@@ -129,6 +136,10 @@ impl super::Response for Response {
                     .and_then(|subdoc| subdoc.get_timestamp("atClusterTime"))
             })
             .ok()
+    }
+
+    fn recovery_token(&self) -> Option<&Document> {
+        self.recovery_token.as_ref()
     }
 
     fn into_body(self) -> Self::Body {

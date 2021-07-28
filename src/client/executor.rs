@@ -299,6 +299,7 @@ impl Client {
         }
 
         let stream_description = connection.stream_description()?;
+        let is_sharded = stream_description.initial_server_type == ServerType::Mongos;
         let mut cmd = op.build(stream_description)?;
         self.inner
             .topology
@@ -337,15 +338,22 @@ impl Client {
                         cmd.set_start_transaction();
                         cmd.set_autocommit();
                         cmd.set_txn_read_concern(*session)?;
-                        if stream_description.initial_server_type == ServerType::Mongos {
+                        if is_sharded {
                             session.pin_mongos(connection.address().clone());
                         }
                         session.transaction.state = TransactionState::InProgress;
                     }
-                    TransactionState::InProgress
-                    | TransactionState::Committed { .. }
-                    | TransactionState::Aborted => {
+                    TransactionState::InProgress => cmd.set_autocommit(),
+                    TransactionState::Committed { .. } | TransactionState::Aborted => {
                         cmd.set_autocommit();
+
+                        // Append the recovery token to the command if we are committing or aborting
+                        // on a sharded transaction.
+                        if is_sharded {
+                            if let Some(ref recovery_token) = session.transaction.recovery_token {
+                                cmd.set_recovery_token(recovery_token);
+                            }
+                        }
                     }
                     _ => {}
                 }
@@ -414,6 +422,9 @@ impl Client {
                     Ok(r) => {
                         self.update_cluster_time(&r, session).await;
                         if r.is_success() {
+                            // Retrieve recovery token from successful response.
+                            Client::update_recovery_token(is_sharded, &r, session).await;
+
                             Ok(CommandResult {
                                 raw: response,
                                 deserialized: r.into_body(),
@@ -458,7 +469,15 @@ impl Client {
                                         }))
                                     }
                                     // for ok: 1 just return the original deserialization error.
-                                    _ => Err(deserialize_error),
+                                    _ => {
+                                        Client::update_recovery_token(
+                                            is_sharded,
+                                            &error_response,
+                                            session,
+                                        )
+                                        .await;
+                                        Err(deserialize_error)
+                                    }
                                 }
                             }
                             // We failed to deserialize even that, so just return the original
@@ -632,6 +651,18 @@ impl Client {
         if let Some(timestamp) = command_response.at_cluster_time() {
             if let Some(ref mut session) = session {
                 session.snapshot_time = Some(timestamp);
+            }
+        }
+    }
+
+    async fn update_recovery_token<T: Response>(
+        is_sharded: bool,
+        response: &T,
+        session: &mut Option<&mut ClientSession>,
+    ) {
+        if let Some(ref mut session) = session {
+            if is_sharded && session.in_transaction() {
+                session.transaction.recovery_token = response.recovery_token().cloned();
             }
         }
     }
