@@ -181,7 +181,7 @@ fn is_master_response_from_server_type(server_type: ServerType) -> Option<IsMast
         ServerType::RsGhost => {
             response.is_replica_set = Some(true);
         }
-        ServerType::Standalone => {}
+        ServerType::Standalone | ServerType::LoadBalancer => {}
     };
 
     Some(response)

@@ -123,6 +123,7 @@ impl Topology {
     /// Creates a new Topology given the `options`.
     pub(crate) fn new(mut options: ClientOptions) -> Result<Self> {
         let description = TopologyDescription::new(options.clone())?;
+        let is_load_balanced = description.topology_type() == TopologyType::LoadBalanced;
 
         let hosts: Vec<_> = options.hosts.drain(..).collect();
 
@@ -159,7 +160,9 @@ impl Topology {
             topology_state.add_new_server(address, options.clone(), &topology.downgrade());
         }
 
-        SrvPollingMonitor::start(topology.downgrade());
+        if !is_load_balanced {
+            SrvPollingMonitor::start(topology.downgrade());
+        }
 
         drop(topology_state);
         Ok(topology)
@@ -440,7 +443,7 @@ impl Topology {
 }
 
 impl WeakTopology {
-    /// Attempts to convert the WeakTopology to a string reference.
+    /// Attempts to convert the WeakTopology to a strong reference.
     pub(crate) fn upgrade(&self) -> Option<Topology> {
         Some(Topology {
             state: self.state.upgrade()?,
@@ -480,12 +483,13 @@ impl TopologyState {
         self.servers.insert(address, server);
 
         #[cfg(test)]
-        if !self.mocked {
-            monitor.start()
+        if self.mocked {
+            return;
         }
 
-        #[cfg(not(test))]
-        monitor.start();
+        if topology.client_options().load_balanced != Some(true) {
+            monitor.start();
+        }
     }
 
     /// Updates the given `command` as needed based on the `criteria`.

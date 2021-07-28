@@ -138,7 +138,7 @@ impl TopologyDescription {
     ) -> Result<Vec<&'a ServerDescription>> {
         let servers = match self.topology_type {
             TopologyType::Unknown => Vec::new(),
-            TopologyType::Single => self.servers.values().collect(),
+            TopologyType::Single | TopologyType::LoadBalanced => self.servers.values().collect(),
             TopologyType::Sharded => self.servers_with_type(&[ServerType::Mongos]).collect(),
             TopologyType::ReplicaSetWithPrimary | TopologyType::ReplicaSetNoPrimary => {
                 self.suitable_servers_in_replica_set(read_preference)?

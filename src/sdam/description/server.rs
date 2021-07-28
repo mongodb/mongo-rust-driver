@@ -22,6 +22,7 @@ pub enum ServerType {
     RsArbiter,
     RsOther,
     RsGhost,
+    LoadBalancer,
     Unknown,
 }
 

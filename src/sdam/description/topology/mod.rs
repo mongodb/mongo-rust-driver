@@ -27,6 +27,7 @@ pub(crate) enum TopologyType {
     ReplicaSetNoPrimary,
     ReplicaSetWithPrimary,
     Sharded,
+    LoadBalanced,
     Unknown,
 }
 
@@ -103,6 +104,8 @@ impl TopologyDescription {
             TopologyType::Single
         } else if options.repl_set_name.is_some() {
             TopologyType::ReplicaSetNoPrimary
+        } else if options.load_balanced.unwrap_or(false) {
+            TopologyType::LoadBalanced
         } else {
             TopologyType::Unknown
         };
@@ -418,7 +421,7 @@ impl TopologyDescription {
 
         // Update the topology description based on the current topology type.
         match self.topology_type {
-            TopologyType::Single => {}
+            TopologyType::Single | TopologyType::LoadBalanced => {}
             TopologyType::Unknown => self.update_unknown_topology(server_description)?,
             TopologyType::Sharded => self.update_sharded_topology(server_description),
             TopologyType::ReplicaSetNoPrimary => {
@@ -454,6 +457,7 @@ impl TopologyDescription {
                 self.topology_type = TopologyType::ReplicaSetNoPrimary;
                 self.update_rs_without_primary_server(server_description)?;
             }
+            ServerType::LoadBalancer => return Err("cannot transition to a load balancer".to_string()),
         }
 
         Ok(())
@@ -486,6 +490,7 @@ impl TopologyDescription {
             ServerType::RsSecondary | ServerType::RsArbiter | ServerType::RsOther => {
                 self.update_rs_without_primary_server(server_description)?;
             }
+            ServerType::LoadBalancer => return Err("cannot transition to a load balancer".to_string()),
         }
 
         Ok(())
@@ -508,6 +513,7 @@ impl TopologyDescription {
             ServerType::RsSecondary | ServerType::RsArbiter | ServerType::RsOther => {
                 self.update_rs_with_primary_from_member(server_description)?;
             }
+            ServerType::LoadBalancer => return Err("cannot transition to a load balancer".to_string()),
         }
 
         Ok(())
