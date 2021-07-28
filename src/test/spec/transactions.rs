@@ -5,6 +5,7 @@ use crate::{
     bson::{doc, serde_helpers::serialize_u64_as_i32, Document},
     client::session::TransactionState,
     test::{run_spec_test, TestClient, LOCK},
+    Collection,
 };
 
 use super::{run_unified_format_test, run_v2_test};
@@ -91,4 +92,58 @@ async fn client_errors() {
     let result = coll.insert_one_with_session(a, None, &mut session).await;
     assert!(result.is_err());
     assert_eq!(session.transaction.state, TransactionState::InProgress);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+// This test checks that deserializing an operation correctly still retrieves the recovery token.
+async fn deserialize_recovery_token() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
+    #[derive(Debug, Serialize)]
+    struct A {
+        num: i32,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct B {
+        str: String,
+    }
+
+    let client = TestClient::new().await;
+    if !client.is_sharded() || client.server_version_lt(4, 2) {
+        return;
+    }
+
+    let mut session = client.start_session(None).await.unwrap();
+
+    // Insert a document with schema A.
+    client
+        .database(function_name!())
+        .collection::<Document>(function_name!())
+        .drop(None)
+        .await
+        .unwrap();
+    client
+        .database(function_name!())
+        .create_collection(function_name!(), None)
+        .await
+        .unwrap();
+    let coll = client
+        .database(function_name!())
+        .collection(function_name!());
+    coll.insert_one(A { num: 4 }, None).await.unwrap();
+
+    // Attempt to execute Find on a document with schema B.
+    let coll: Collection<B> = client
+        .database(function_name!())
+        .collection(function_name!());
+    session.start_transaction(None).await.unwrap();
+    assert!(session.transaction.recovery_token.is_none());
+    let result = coll.find_one_with_session(None, None, &mut session).await;
+    assert!(result.is_err()); // Assert that the deserialization failed.
+
+    // Nevertheless, the recovery token should have been retrieved from the ok: 1 response.
+    assert!(session.transaction.recovery_token.is_some());
 }

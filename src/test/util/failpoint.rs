@@ -1,4 +1,4 @@
-use bson::{doc, Document};
+use bson::{doc, Bson, Document};
 use serde::{Deserialize, Serialize, Serializer};
 use std::time::Duration;
 use typed_builder::TypedBuilder;
@@ -48,10 +48,20 @@ impl FailPoint {
         client: &Client,
         criteria: impl Into<Option<SelectionCriteria>>,
     ) -> Result<FailPointGuard> {
+        // TODO: DRIVERS-1385 remove this logic for moving errorLabels to the top level.
+        let mut command = self.command.clone();
+        if let Some(Bson::Document(data)) = command.get_mut("data") {
+            if let Some(Bson::Document(wc_error)) = data.get_mut("writeConcernError") {
+                if let Some(labels) = wc_error.remove("errorLabels") {
+                    data.insert("errorLabels", labels);
+                }
+            }
+        }
+
         let criteria = criteria.into();
         client
             .database("admin")
-            .run_command(self.command.clone(), criteria.clone())
+            .run_command(command, criteria.clone())
             .await?;
         Ok(FailPointGuard {
             failpoint_name: self.name().to_string(),

@@ -41,6 +41,10 @@ impl Command {
         }
     }
 
+    pub(crate) fn set_recovery_token(&mut self, recovery_token: &Document) {
+        self.body.insert("recoveryToken", recovery_token);
+    }
+
     pub(crate) fn set_txn_number(&mut self, txn_number: i64) {
         self.body.insert("txnNumber", txn_number);
     }
