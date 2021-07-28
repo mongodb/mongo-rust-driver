@@ -557,10 +557,14 @@ pub struct ClientOptions {
     #[cfg(test)]
     pub(crate) heartbeat_freq_test: Option<Duration>,
 
-    /// Allow connecting to a load balancer.
-    #[builder(default)]
+    /// Allow use of the `load_balanced` option.
+    #[builder(default, setter(skip))]
     #[serde(skip)]
-    pub(crate) allow_load_balancer: Option<bool>,
+    pub(crate) allow_load_balanced: bool,
+
+    /// Whether or not the client is connecting to a MongoDB cluster through a load balancer.
+    #[builder(default, setter(skip))]
+    pub(crate) load_balanced: Option<bool>,
 }
 
 fn default_hosts() -> Vec<ServerAddress> {
@@ -694,6 +698,7 @@ struct ClientOptionsParser {
     auth_mechanism_properties: Option<Document>,
     read_preference: Option<ReadPreference>,
     read_preference_tags: Option<Vec<TagSet>>,
+    load_balanced: Option<bool>,
     original_uri: String,
 }
 
@@ -926,7 +931,8 @@ impl From<ClientOptionsParser> for ClientOptions {
             server_api: None,
             #[cfg(test)]
             heartbeat_freq_test: None,
-            allow_load_balancer: None,
+            allow_load_balanced: false,
+            load_balanced: parser.load_balanced,
         }
     }
 }
@@ -1128,6 +1134,14 @@ impl ClientOptions {
         if let Some(ref write_concern) = self.write_concern {
             write_concern.validate()?;
         }
+
+        if !self.allow_load_balanced && self.load_balanced.is_some() {
+            return Err(ErrorKind::InvalidArgument {
+                message: "loadBalanced is not supported".to_string(),
+            }
+            .into());
+        }
+
         Ok(())
     }
 
@@ -1682,6 +1696,9 @@ impl ClientOptionsParser {
             k @ "journal" => {
                 let mut write_concern = self.write_concern.get_or_insert_with(Default::default);
                 write_concern.journal = Some(get_bool!(value, k));
+            }
+            k @ "loadBalanced" => {
+                self.load_balanced = Some(get_bool!(value, k));
             }
             k @ "localthresholdms" => {
                 self.local_threshold = Some(Duration::from_millis(get_duration!(value, k)))
