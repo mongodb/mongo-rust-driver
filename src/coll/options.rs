@@ -832,24 +832,26 @@ pub struct FindOneOptions {
     pub sort: Option<Document>,
 }
 
-/// Specifies indexes to create.
+/// These are the valid options for creating an [`Index`](../struct.Index.html) with
+/// [`Collection::create_indexes`](../struct.Collection.html#method.create_indexes) and its related
+/// methods.
 ///
-/// [See](https://docs.mongodb.com/manual/reference/command/createIndexes/) for more.
-#[skip_serializing_none]
+/// For more information, see [`createIndexes`](https://docs.mongodb.com/manual/reference/command/createIndexes/).
 #[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
+#[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
-#[serde(rename_all = "camelCase")]
 pub struct CreateIndexesOptions {
-    /// INDEXTODO: Add documentation
-    #[builder(default)]
+    /// Specify the commit quorum needed to mark an `index` as ready.
     pub commit_quorum: Option<CommitQuorum>,
 
-    /// INDEXTODO: Add documentation
-    #[builder(default)]
+    /// The maximum amount of time to allow the index to build.
+    #[serde(
+        serialize_with = "bson_util::serialize_duration_option_as_int_millis",
+        deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis"
+    )]
     pub max_time: Option<Duration>,
 
     /// The write concern for the operation.
-    #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 }
 
@@ -865,13 +867,24 @@ pub struct DropCollectionOptions {
     pub write_concern: Option<WriteConcern>,
 }
 
-/// INDEXTODO: Add documentation
+/// The minimum number of data-bearing voting replica set members (i.e. commit quorum), including
+/// the primary, that must report a successful index build before the primary marks the indexes as
+/// ready.
+///
+/// For more information, see the [documentation](https://docs.mongodb.com/manual/reference/command/createIndexes/#definition)
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub enum CommitQuorum {
+    /// A specific number of voting replica set members. When set to 0, disables quorum voting.
     Nodes(u32),
+
+    /// All data-bearing voting replica set members (default).
     VotingMembers,
+
+    /// A simple majority of voting members.
     Majority,
+
+    /// A replica set tag name.
     Custom(String),
 }
 
