@@ -25,7 +25,7 @@ pub(crate) struct Insert<'a, T> {
     ns: Namespace,
     documents: Vec<&'a T>,
     inserted_ids: Vec<Bson>,
-    options: InsertManyOptions,
+    options: Option<InsertManyOptions>,
 }
 
 impl<'a, T> Insert<'a, T> {
@@ -34,9 +34,6 @@ impl<'a, T> Insert<'a, T> {
         documents: Vec<&'a T>,
         options: Option<InsertManyOptions>,
     ) -> Self {
-        let mut options =
-            options.unwrap_or_else(|| InsertManyOptions::builder().ordered(true).build());
-        options.ordered = Some(options.ordered.unwrap_or(true));
         Self {
             ns,
             options,
@@ -46,7 +43,10 @@ impl<'a, T> Insert<'a, T> {
     }
 
     fn is_ordered(&self) -> bool {
-        self.options.ordered.unwrap_or(true)
+        self.options
+            .as_ref()
+            .and_then(|o| o.ordered)
+            .unwrap_or(true)
     }
 }
 
@@ -58,13 +58,6 @@ impl<'a, T: Serialize> Operation for Insert<'a, T> {
     const NAME: &'static str = "insert";
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command<InsertCommand>> {
-        if self.documents.is_empty() {
-            return Err(ErrorKind::InvalidArgument {
-                message: "must specify at least one document to insert".to_string(),
-            }
-            .into());
-        }
-
         let mut docs: Vec<Vec<u8>> = Vec::new();
         let mut size = 0;
 
@@ -79,14 +72,19 @@ impl<'a, T: Serialize> Operation for Insert<'a, T> {
                 Some(b) => b,
                 None => {
                     let oid = ObjectId::new();
-                    let new_len = doc.len() as i32 + 1 + 4 + 12;
-                    doc.splice(0..4, new_len.to_le_bytes().iter().cloned());
 
-                    let mut new_doc = Vec::new();
-                    new_doc.write_u8(ElementType::ObjectId as u8)?;
-                    new_doc.write_all(b"_id\0")?;
-                    new_doc.extend(oid.bytes().iter());
-                    doc.splice(4..4, new_doc.into_iter());
+                    // write element to temporary buffer
+                    let mut new_id = Vec::new();
+                    new_id.write_u8(ElementType::ObjectId as u8)?;
+                    new_id.write_all(b"_id\0")?;
+                    new_id.extend(oid.bytes().iter());
+
+                    // insert element to beginning of existing doc after length
+                    doc.splice(4..4, new_id.into_iter());
+
+                    // update length of doc
+                    let new_len = doc.len() as i32;
+                    doc.splice(0..4, new_len.to_le_bytes().iter().cloned());
 
                     Bson::ObjectId(oid)
                 }
@@ -112,13 +110,16 @@ impl<'a, T: Serialize> Operation for Insert<'a, T> {
             .into());
         }
 
+        let mut options = self.options.clone().unwrap_or_default();
+        options.ordered = Some(self.is_ordered());
+
         let body = InsertCommand {
             insert: self.ns.coll.clone(),
             documents: DocumentArraySpec {
                 documents: docs,
                 length: size as i32,
             },
-            options: self.options.clone(),
+            options,
         };
 
         Ok(Command::new("insert".to_string(), self.ns.db.clone(), body))
@@ -161,7 +162,7 @@ impl<'a, T: Serialize> Operation for Insert<'a, T> {
 
         // update length of original doc
         let final_length = serialized.len() as i32;
-        (&mut serialized[0..4]).write_all(&final_length.to_le_bytes())?;
+        serialized.splice(0..4, final_length.to_le_bytes().iter().cloned());
 
         Ok(serialized)
     }
@@ -211,7 +212,7 @@ impl<'a, T: Serialize> Operation for Insert<'a, T> {
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {
-        self.options.write_concern.as_ref()
+        self.options.as_ref().and_then(|o| o.write_concern.as_ref())
     }
 
     fn retryability(&self) -> Retryability {

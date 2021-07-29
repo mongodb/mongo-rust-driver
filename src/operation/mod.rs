@@ -69,6 +69,7 @@ pub(crate) trait Operation {
     /// The output type of this operation.
     type O;
 
+    /// The format of the command body constructed in `build`.
     type Command: CommandBody;
 
     /// The format of the command response from the server.
@@ -81,6 +82,8 @@ pub(crate) trait Operation {
     /// The operation may store some additional state that is required for handling the response.
     fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>>;
 
+    /// Perform custom serialization of the built command.
+    /// By default, this will just call through to the `Serialize` implementation of the command.
     fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
         Ok(bson::to_vec(&cmd)?)
     }
@@ -141,15 +144,19 @@ pub(crate) trait CommandBody: Serialize {
 
 impl CommandBody for Document {
     fn should_redact(&self) -> bool {
-        self.contains_key("speculativeAuthenticate")
+        if let Some(command_name) = bson_util::first_key(self) {
+            HELLO_COMMAND_NAMES.contains(command_name.to_lowercase().as_str())
+                && self.contains_key("speculativeAuthenticate")
+        } else {
+            false
+        }
     }
 }
 
 impl<T: CommandBody> Command<T> {
     pub(crate) fn should_redact(&self) -> bool {
         let name = self.name.to_lowercase();
-        REDACTED_COMMANDS.contains(name.as_str())
-            || HELLO_COMMAND_NAMES.contains(name.as_str()) && self.body.should_redact()
+        REDACTED_COMMANDS.contains(name.as_str()) || self.body.should_redact()
     }
 }
 

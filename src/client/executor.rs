@@ -400,7 +400,6 @@ impl Client {
             bytes: serialized,
         };
 
-        let start_time = Instant::now();
         self.emit_command_event(|handler| {
             let command_body = if should_redact {
                 Document::new()
@@ -419,6 +418,7 @@ impl Client {
             handler.handle_command_started_event(command_started_event);
         });
 
+        let start_time = Instant::now();
         let command_result = match connection.send_raw_command(raw_cmd, request_id).await {
             Ok(response) => {
                 match T::Response::deserialize_response(&response) {
