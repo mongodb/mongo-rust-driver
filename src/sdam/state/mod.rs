@@ -160,6 +160,7 @@ impl Topology {
             topology_state.add_new_server(address, options.clone(), &topology.downgrade());
         }
 
+        // When the client is in load balanced mode, it doesn't poll for changes in the SRV record.
         if !is_load_balanced {
             SrvPollingMonitor::start(topology.downgrade());
         }
@@ -480,6 +481,13 @@ impl TopologyState {
             topology.clone(),
             self.http_client.clone(),
         );
+        let is_load_balanced = matches!(topology.client_options().load_balanced, Some(true));
+        if is_load_balanced {
+            // Because load balancer servers don't have a monitoring connection, the associated
+            // connection pool needs to be directly marked as ready.
+            let server = Arc::clone(&server);
+            RUNTIME.execute(async move { server.pool.mark_as_ready().await; })
+        }
         self.servers.insert(address, server);
 
         #[cfg(test)]
@@ -487,7 +495,8 @@ impl TopologyState {
             return;
         }
 
-        if topology.client_options().load_balanced != Some(true) {
+        // Load balancer servers don't have a monitoring connection.
+        if !is_load_balanced {
             monitor.start();
         }
     }
