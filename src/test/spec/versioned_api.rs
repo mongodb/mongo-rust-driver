@@ -10,7 +10,6 @@ use crate::{
         run_spec_test_with_path,
         spec::unified_runner::TestFile,
         EventClient,
-        TestClient,
         CLIENT_OPTIONS,
         LOCK,
     },
@@ -29,10 +28,6 @@ async fn run() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_transaction_handling_spec_test() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-    if TestClient::new().await.is_sharded() {
-        // TODO RUST-734 Unskip these tests on sharded deployments.
-        return;
-    }
     let path: PathBuf = [
         env!("CARGO_MANIFEST_DIR"),
         "src",
