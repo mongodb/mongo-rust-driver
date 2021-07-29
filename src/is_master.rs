@@ -97,6 +97,7 @@ pub(crate) struct IsMasterCommandResponse {
     pub speculative_authenticate: Option<Document>,
     pub max_bson_object_size: i64,
     pub max_write_batch_size: i64,
+    pub service_id: Option<ObjectId>,
 }
 
 impl PartialEq for IsMasterCommandResponse {
@@ -116,6 +117,7 @@ impl PartialEq for IsMasterCommandResponse {
             && self.logical_session_timeout_minutes == other.logical_session_timeout_minutes
             && self.max_bson_object_size == other.max_bson_object_size
             && self.max_write_batch_size == other.max_write_batch_size
+            && self.service_id == other.service_id
     }
 }
 

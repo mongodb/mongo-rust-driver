@@ -86,6 +86,9 @@ pub(crate) struct ConnectionPoolOptions {
     /// The default is not to use TLS for connections.
     #[serde(skip)]
     pub(crate) tls_options: Option<TlsOptions>,
+
+    /// Whether or not the client is connecting to a MongoDB cluster through a load balancer.
+    pub(crate) load_balanced: Option<bool>,
 }
 
 impl ConnectionPoolOptions {
@@ -105,6 +108,7 @@ impl ConnectionPoolOptions {
             background_thread_interval: None,
             #[cfg(test)]
             ready: None,
+            load_balanced: options.load_balanced.clone(),
         }
     }
 

@@ -8,7 +8,7 @@ use crate::{
     bson::{doc, Bson, Document},
     client::auth::{ClientFirst, FirstRound},
     cmap::{options::ConnectionPoolOptions, Command, Connection, StreamDescription},
-    error::Result,
+    error::{ErrorKind, Result},
     is_master::{is_master_command, run_is_master, IsMasterReply},
     options::{AuthMechanism, ClientOptions, Credential, DriverInfo, ServerApi},
 };
@@ -177,6 +177,10 @@ impl Handshaker {
                 command.target_db = cred.resolved_source().to_string();
                 credential = Some(cred);
             }
+
+            if options.load_balanced {
+                command.body.insert("loadBalanced", true);
+            }
         }
 
         command.body.insert("client", metadata);
@@ -194,6 +198,11 @@ impl Handshaker {
         let client_first = set_speculative_auth_info(&mut command.body, self.credential.as_ref())?;
 
         let mut is_master_reply = run_is_master(command, conn).await?;
+        if self.command.body.contains_key("loadBalanced") && is_master_reply.command_response.service_id.is_none() {
+            return Err(ErrorKind::IncompatibleServer {
+                message: "Driver attempted to initialize in load balancing mode, but the server does not support this mode.".to_string(),
+            }.into())
+        }
         conn.stream_description = Some(StreamDescription::from_is_master(is_master_reply.clone()));
 
         // Record the client's message and the server's response from speculative authentication if
@@ -232,6 +241,7 @@ pub(crate) struct HandshakerOptions {
     credential: Option<Credential>,
     driver_info: Option<DriverInfo>,
     server_api: Option<ServerApi>,
+    load_balanced: bool,
 }
 
 impl From<ConnectionPoolOptions> for HandshakerOptions {
@@ -241,6 +251,7 @@ impl From<ConnectionPoolOptions> for HandshakerOptions {
             credential: options.credential,
             driver_info: options.driver_info,
             server_api: options.server_api,
+            load_balanced: options.load_balanced.unwrap_or(false),
         }
     }
 }
@@ -252,6 +263,7 @@ impl From<ClientOptions> for HandshakerOptions {
             credential: options.credential,
             driver_info: options.driver_info,
             server_api: options.server_api,
+            load_balanced: options.load_balanced.unwrap_or(false),
         }
     }
 }
