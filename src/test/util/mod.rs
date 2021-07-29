@@ -247,6 +247,11 @@ impl TestClient {
         version.matches(&self.server_version)
     }
 
+    pub fn supports_transactions(&self) -> bool {
+        self.is_replica_set() && self.server_version_gte(4, 0)
+            || self.is_sharded() && self.server_version_gte(4, 2)
+    }
+
     pub async fn enable_failpoint(
         &self,
         fp: FailPoint,

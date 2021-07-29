@@ -47,10 +47,10 @@ lazy_static! {
 /// collections atomically. For more information about when and how to use transactions in MongoDB,
 /// see the [manual](https://docs.mongodb.com/manual/core/transactions/).
 ///
-/// Replica set transactions are supported on MongoDB 4.0+. Transactions are associated with a
-/// `ClientSession`. To begin a transaction, call [`ClientSession::start_transaction`] on a
-/// `ClientSession`. The `ClientSession` must be passed to operations to be executed within the
-/// transaction.
+/// Replica set transactions are supported on MongoDB 4.0+. Sharded transactions are supported on
+/// MongoDDB 4.2+. Transactions are associated with a `ClientSession`. To begin a transaction, call
+/// [`ClientSession::start_transaction`] on a `ClientSession`. The `ClientSession` must be passed to
+/// operations to be executed within the transaction.
 ///
 /// ```rust
 /// use mongodb::{
@@ -99,9 +99,6 @@ lazy_static! {
 ///     }
 /// }
 /// ```
-// TODO RUST-734 Remove this note and adjust the above description to indicate that sharded
-// transactions are supported on 4.2+
-/// Note: the driver does not currently support transactions on sharded clusters.
 #[derive(Clone, Debug)]
 pub struct ClientSession {
     cluster_time: Option<ClusterTime>,
