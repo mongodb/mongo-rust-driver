@@ -73,6 +73,7 @@ pub(crate) struct TestIsMasterCommandResponse {
     pub speculative_authenticate: Option<Document>,
     pub max_bson_object_size: Option<i64>,
     pub max_write_batch_size: Option<i64>,
+    pub service_id: Option<ObjectId>,
 }
 
 impl From<TestIsMasterCommandResponse> for IsMasterCommandResponse {
@@ -102,6 +103,7 @@ impl From<TestIsMasterCommandResponse> for IsMasterCommandResponse {
             speculative_authenticate: test.speculative_authenticate,
             max_bson_object_size: test.max_bson_object_size.unwrap_or(1234),
             max_write_batch_size: test.max_write_batch_size.unwrap_or(1234),
+            service_id: test.service_id,
         }
     }
 }
