@@ -229,9 +229,9 @@ impl AuthMechanism {
 
                 Ok(Some(ClientFirst::Scram(ScramVersion::Sha256, client_first)))
             }
-            Self::MongoDbX509 => Ok(Some(ClientFirst::X509(
+            Self::MongoDbX509 => Ok(Some(ClientFirst::X509(Box::new(
                 x509::build_speculative_client_first(credential),
-            ))),
+            )))),
             Self::Plain => Ok(None),
             #[cfg(feature = "tokio-runtime")]
             AuthMechanism::MongoDbAws => Ok(None),
@@ -469,7 +469,7 @@ impl Debug for Credential {
 /// Contains the first client message sent as part of the authentication handshake.
 pub(crate) enum ClientFirst {
     Scram(ScramVersion, scram::ClientFirst),
-    X509(Command),
+    X509(Box<Command>),
 }
 
 impl ClientFirst {
