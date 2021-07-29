@@ -486,7 +486,9 @@ impl TopologyState {
             // Because load balancer servers don't have a monitoring connection, the associated
             // connection pool needs to be directly marked as ready.
             let server = Arc::clone(&server);
-            RUNTIME.execute(async move { server.pool.mark_as_ready().await; })
+            RUNTIME.execute(async move {
+                server.pool.mark_as_ready().await;
+            })
         }
         self.servers.insert(address, server);
 

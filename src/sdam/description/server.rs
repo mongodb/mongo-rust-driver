@@ -168,6 +168,20 @@ impl ServerDescription {
         description
     }
 
+    pub(crate) fn new_load_balancer(mut address: ServerAddress) -> Self {
+        address = ServerAddress::Tcp {
+            host: address.host().to_lowercase(),
+            port: address.port(),
+        };
+        Self {
+            address,
+            server_type: ServerType::LoadBalancer,
+            last_update_time: None,
+            reply: Ok(None),
+            average_round_trip_time: None,
+        }
+    }
+
     /// Whether this server is "available" as per the definition in the server selection spec.
     pub(crate) fn is_available(&self) -> bool {
         !matches!(self.server_type, ServerType::Unknown)

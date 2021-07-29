@@ -114,7 +114,11 @@ impl TopologyDescription {
             .hosts
             .into_iter()
             .map(|address| {
-                let description = ServerDescription::new(address.clone(), None);
+                let description = if topology_type == TopologyType::LoadBalanced {
+                    ServerDescription::new_load_balancer(address.clone())
+                } else {
+                    ServerDescription::new(address.clone(), None)
+                };
 
                 (address, description)
             })
@@ -457,7 +461,9 @@ impl TopologyDescription {
                 self.topology_type = TopologyType::ReplicaSetNoPrimary;
                 self.update_rs_without_primary_server(server_description)?;
             }
-            ServerType::LoadBalancer => return Err("cannot transition to a load balancer".to_string()),
+            ServerType::LoadBalancer => {
+                return Err("cannot transition to a load balancer".to_string())
+            }
         }
 
         Ok(())
@@ -490,7 +496,9 @@ impl TopologyDescription {
             ServerType::RsSecondary | ServerType::RsArbiter | ServerType::RsOther => {
                 self.update_rs_without_primary_server(server_description)?;
             }
-            ServerType::LoadBalancer => return Err("cannot transition to a load balancer".to_string()),
+            ServerType::LoadBalancer => {
+                return Err("cannot transition to a load balancer".to_string())
+            }
         }
 
         Ok(())
@@ -513,7 +521,9 @@ impl TopologyDescription {
             ServerType::RsSecondary | ServerType::RsArbiter | ServerType::RsOther => {
                 self.update_rs_with_primary_from_member(server_description)?;
             }
-            ServerType::LoadBalancer => return Err("cannot transition to a load balancer".to_string()),
+            ServerType::LoadBalancer => {
+                return Err("cannot transition to a load balancer".to_string())
+            }
         }
 
         Ok(())
