@@ -46,7 +46,7 @@ futures-io = "0.3.14"
 futures-util = { version = "0.3.14", features = ["io"] }
 futures-executor = "0.3.14"
 hex = "0.4.0"
-hmac = "0.10.1"
+hmac = "0.11"
 lazy_static = "1.4.0"
 md-5 = "0.9.1"
 os_info = { version = "3.0.1", default-features = false }
@@ -76,7 +76,7 @@ version = "0.20.1"
 optional = true
 
 [dependencies.pbkdf2]
-version = "0.7.4"
+version = "0.8.0"
 default-features = false
 
 [dependencies.reqwest]
