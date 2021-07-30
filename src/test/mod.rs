@@ -27,6 +27,7 @@ pub(crate) use self::{
     },
 };
 
+use home::home_dir;
 use lazy_static::lazy_static;
 
 use self::util::TestLock;
@@ -34,7 +35,7 @@ use crate::{
     client::options::{ServerApi, ServerApiVersion},
     options::ClientOptions,
 };
-use std::str::FromStr;
+use std::{fs::read_to_string, str::FromStr};
 
 const MAX_POOL_SIZE: u32 = 100;
 
@@ -48,8 +49,7 @@ lazy_static! {
         options
     };
     pub(crate) static ref LOCK: TestLock = TestLock::new();
-    pub(crate) static ref DEFAULT_URI: String =
-        std::env::var("MONGODB_URI").unwrap_or_else(|_| "mongodb://localhost:27017".to_string());
+    pub(crate) static ref DEFAULT_URI: String = get_default_uri();
     pub(crate) static ref SERVER_API: Option<ServerApi> = match std::env::var("MONGODB_API_VERSION")
     {
         Ok(server_api_version) if !server_api_version.is_empty() => Some(ServerApi {
@@ -61,4 +61,17 @@ lazy_static! {
     };
     pub(crate) static ref SERVERLESS: bool =
         matches!(std::env::var("SERVERLESS"), Ok(s) if s == "serverless");
+}
+
+fn get_default_uri() -> String {
+    if let Ok(uri) = std::env::var("MONGODB_URI") {
+        return uri;
+    }
+    if let Some(mut home) = home_dir() {
+        home.push(".mongodb_uri");
+        if let Ok(uri) = read_to_string(home) {
+            return uri;
+        }
+    }
+    return "mongodb://localhost:27017".to_string();
 }
