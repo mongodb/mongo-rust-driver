@@ -67,7 +67,7 @@ pub enum Operation {
     WaitForEvent {
         event: String,
         count: usize,
-        #[serde(deserialize_with = "bson_util::deserialize_duration_from_u64_millis")]
+        #[serde(deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis")]
         #[serde(default)]
         timeout: Option<Duration>,
     },

@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use serde::Deserialize;
 
-use crate::options::ServerAddress;
+use crate::{bson_util, options::ServerAddress};
 
 /// We implement `Deserialize` for all of the event types so that we can more easily parse the CMAP
 /// spec tests. However, we have no need to parse the address field from the JSON files (if it's
@@ -44,7 +44,7 @@ pub struct ConnectionPoolOptions {
     /// The default is that connections will not be closed due to being idle.
     #[serde(rename = "maxIdleTimeMS")]
     #[serde(default)]
-    #[serde(deserialize_with = "crate::bson_util::deserialize_duration_from_u64_millis")]
+    #[serde(deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis")]
     pub max_idle_time: Option<Duration>,
 
     /// The maximum number of connections that the pool can have at a given time. This includes

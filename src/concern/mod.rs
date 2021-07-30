@@ -187,8 +187,8 @@ pub struct WriteConcern {
     /// write would not have finished propagating if allowed more time to finish, and the
     /// server will not roll back the writes that occurred before the timeout was reached.
     #[serde(rename = "wtimeout")]
-    #[serde(serialize_with = "bson_util::serialize_duration_as_int_millis")]
-    #[serde(deserialize_with = "bson_util::deserialize_duration_from_u64_millis")]
+    #[serde(serialize_with = "bson_util::serialize_duration_option_as_int_millis")]
+    #[serde(deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis")]
     #[serde(default)]
     pub w_timeout: Option<Duration>,
 
@@ -302,7 +302,7 @@ impl WriteConcern {
         struct WriteConcernHelper<'a> {
             w: Option<&'a Acknowledgment>,
 
-            #[serde(serialize_with = "bson_util::serialize_duration_as_int_millis")]
+            #[serde(serialize_with = "bson_util::serialize_duration_option_as_int_millis")]
             wtimeoutms: Option<Duration>,
 
             journal: Option<bool>,

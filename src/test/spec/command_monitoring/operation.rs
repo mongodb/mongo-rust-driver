@@ -118,7 +118,7 @@ struct FindModifiers {
     hint: Option<Hint>,
     #[serde(
         rename = "$maxTimeMS",
-        deserialize_with = "bson_util::deserialize_duration_from_u64_millis",
+        deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis",
         default
     )]
     max_time: Option<Duration>,

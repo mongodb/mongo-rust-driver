@@ -68,7 +68,7 @@ pub(crate) fn update_document_check(update: &Document) -> Result<()> {
     }
 }
 
-pub(crate) fn serialize_duration_as_int_millis<S: Serializer>(
+pub(crate) fn serialize_duration_option_as_int_millis<S: Serializer>(
     val: &Option<Duration>,
     serializer: S,
 ) -> std::result::Result<S::Ok, S::Error> {
@@ -94,7 +94,7 @@ pub(crate) fn serialize_duration_option_as_int_secs<S: Serializer>(
     }
 }
 
-pub(crate) fn deserialize_duration_from_u64_millis<'de, D>(
+pub(crate) fn deserialize_duration_option_from_u64_millis<'de, D>(
     deserializer: D,
 ) -> std::result::Result<Option<Duration>, D::Error>
 where
@@ -104,7 +104,7 @@ where
     Ok(millis.map(Duration::from_millis))
 }
 
-pub(crate) fn deserialize_duration_from_u64_seconds<'de, D>(
+pub(crate) fn deserialize_duration_option_from_u64_seconds<'de, D>(
     deserializer: D,
 ) -> std::result::Result<Option<Duration>, D::Error>
 where
@@ -126,7 +126,7 @@ pub(crate) fn serialize_u32_option_as_i32<S: Serializer>(
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
-pub(crate) fn serialize_batch_size<S: Serializer>(
+pub(crate) fn serialize_u32_option_as_batch_size<S: Serializer>(
     val: &Option<u32>,
     serializer: S,
 ) -> std::result::Result<S::Ok, S::Error> {
