@@ -142,7 +142,7 @@ pub(crate) trait Response: Sized {
     /// Whether the command succeeeded or not (i.e. if this response is ok: 1).
     fn is_success(&self) -> bool {
         match self.ok() {
-            Some(b) => bson_util::get_int(&b) == Some(1),
+            Some(b) => bson_util::get_int(b) == Some(1),
             None => false,
         }
     }

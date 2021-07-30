@@ -73,5 +73,5 @@ fn get_default_uri() -> String {
             return uri;
         }
     }
-    return "mongodb://localhost:27017".to_string();
+    "mongodb://localhost:27017".to_string()
 }

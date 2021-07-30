@@ -45,7 +45,7 @@ async fn basic() {
         MessageSection::Document(doc) => doc,
         MessageSection::Sequence { documents, .. } => documents.into_iter().next().unwrap(),
     };
-    let response_doc: Document = bson::from_slice(&response_doc_bytes.as_slice()).unwrap();
+    let response_doc: Document = bson::from_slice(response_doc_bytes.as_slice()).unwrap();
 
     assert_eq!(response_doc.get("ok"), Some(&Bson::Double(1.0)));
 }
