@@ -1,5 +1,4 @@
-use std::convert::TryInto;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, convert::TryInto, sync::Arc, time::Duration};
 
 use derivative::Derivative;
 use serde::{de::Error as SerdeError, Deserialize, Deserializer};
