@@ -21,6 +21,7 @@ use super::{
     DEFAULT_MAX_POOL_SIZE,
 };
 use crate::{
+    bson::oid::ObjectId,
     error::{Error, ErrorKind, Result},
     event::cmap::{
         CmapEventHandler,
@@ -36,7 +37,7 @@ use crate::{
     RUNTIME,
 };
 
-use std::{collections::VecDeque, sync::Arc, time::Duration};
+use std::{collections::{HashMap, VecDeque}, sync::Arc, time::Duration};
 use tokio::sync::mpsc;
 
 const MAX_CONNECTING: u32 = 2;
@@ -67,6 +68,9 @@ pub(crate) struct ConnectionPoolWorker {
     /// cleared. Connections belonging to a previous generation are considered stale and will be
     /// closed when checked back in or when popped off of the set of available connections.
     generation: u32,
+
+    /// The current generation and connection count for each serviceId in load-balanced mode.
+    service_generations: HashMap<ObjectId, (u32, u32)>,
 
     /// The established connections that are currently checked into the pool and awaiting usage in
     /// future operations.
@@ -201,6 +205,7 @@ impl ConnectionPoolWorker {
             total_connection_count: 0,
             pending_connection_count: 0,
             generation: 0,
+            service_generations: HashMap::new(),
             connection_options,
             available_connections: VecDeque::new(),
             max_pool_size,
