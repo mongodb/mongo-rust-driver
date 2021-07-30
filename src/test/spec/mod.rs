@@ -3,9 +3,8 @@ mod auth;
 mod collection_management;
 mod command_monitoring;
 mod connection_stepdown;
-mod crud_unified;
+mod crud;
 mod crud_v1;
-mod crud_v2;
 #[cfg(not(feature = "sync"))]
 mod initial_dns_seedlist_discovery;
 mod ocsp;

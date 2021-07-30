@@ -71,16 +71,18 @@ impl TestRunner {
                     let mut options = ClientOptions::parse_uri(&client.uri, None).await.unwrap();
                     options.command_event_handler = Some(observer.clone());
                     options.server_api = server_api;
-                    match client.use_multiple_mongoses {
-                        Some(true) => {
-                            if options.hosts.len() <= 1 {
-                                panic!("Test requires multiple mongos hosts");
+                    if TestClient::new().await.is_sharded() {
+                        match client.use_multiple_mongoses {
+                            Some(true) => {
+                                if options.hosts.len() <= 1 {
+                                    panic!("Test requires multiple mongos hosts");
+                                }
                             }
+                            Some(false) => {
+                                options.hosts.drain(1..);
+                            }
+                            None => {}
                         }
-                        Some(false) => {
-                            options.hosts.drain(1..);
-                        }
-                        None => {}
                     }
                     let client = Client::with_options(options).unwrap();
 
