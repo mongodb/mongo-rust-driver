@@ -1,7 +1,6 @@
 use std::{ops::Deref, time::Duration};
 
-use async_trait::async_trait;
-use futures::stream::StreamExt;
+use futures::{future::BoxFuture, stream::StreamExt, FutureExt};
 use serde::{
     de::{self, Deserializer},
     Deserialize,
@@ -16,12 +15,11 @@ use crate::{
     Collection,
 };
 
-#[async_trait]
 pub(super) trait TestOperation {
     /// The command names to monitor as part of this test.
     fn command_names(&self) -> &[&str];
 
-    async fn execute(&self, collection: Collection<Document>) -> Result<()>;
+    fn execute(&self, collection: Collection<Document>) -> BoxFuture<Result<()>>;
 }
 
 pub(super) struct AnyTestOperation {
@@ -75,17 +73,19 @@ pub(super) struct DeleteMany {
     filter: Document,
 }
 
-#[async_trait]
 impl TestOperation for DeleteMany {
     fn command_names(&self) -> &[&str] {
         &["delete"]
     }
 
-    async fn execute(&self, collection: Collection<Document>) -> Result<()> {
-        collection
-            .delete_many(self.filter.clone(), None)
-            .await
-            .map(|_| ())
+    fn execute(&self, collection: Collection<Document>) -> BoxFuture<Result<()>> {
+        async move {
+            collection
+                .delete_many(self.filter.clone(), None)
+                .await
+                .map(|_| ())
+        }
+        .boxed()
     }
 }
 
@@ -94,17 +94,19 @@ pub(super) struct DeleteOne {
     filter: Document,
 }
 
-#[async_trait]
 impl TestOperation for DeleteOne {
     fn command_names(&self) -> &[&str] {
         &["delete"]
     }
 
-    async fn execute(&self, collection: Collection<Document>) -> Result<()> {
-        collection
-            .delete_one(self.filter.clone(), None)
-            .await
-            .map(|_| ())
+    fn execute(&self, collection: Collection<Document>) -> BoxFuture<Result<()>> {
+        async move {
+            collection
+                .delete_one(self.filter.clone(), None)
+                .await
+                .map(|_| ())
+        }
+        .boxed()
     }
 }
 
@@ -159,31 +161,33 @@ pub(super) struct Find {
     modifiers: Option<FindModifiers>,
 }
 
-#[async_trait]
 impl TestOperation for Find {
     fn command_names(&self) -> &[&str] {
         &["find", "getMore"]
     }
 
-    async fn execute(&self, collection: Collection<Document>) -> Result<()> {
-        let mut options = FindOptions {
-            sort: self.sort.clone(),
-            skip: self.skip,
-            batch_size: self.batch_size.map(|i| i as u32),
-            limit: self.limit,
-            ..Default::default()
-        };
+    fn execute(&self, collection: Collection<Document>) -> BoxFuture<Result<()>> {
+        async move {
+            let mut options = FindOptions {
+                sort: self.sort.clone(),
+                skip: self.skip,
+                batch_size: self.batch_size.map(|i| i as u32),
+                limit: self.limit,
+                ..Default::default()
+            };
 
-        if let Some(ref modifiers) = self.modifiers {
-            modifiers.update_options(&mut options);
+            if let Some(ref modifiers) = self.modifiers {
+                modifiers.update_options(&mut options);
+            }
+
+            let mut cursor = collection.find(self.filter.clone(), options).await?;
+
+            while let Some(result) = cursor.next().await {
+                result?;
+            }
+            Ok(())
         }
-
-        let mut cursor = collection.find(self.filter.clone(), options).await?;
-
-        while let Some(result) = cursor.next().await {
-            result?;
-        }
-        Ok(())
+        .boxed()
     }
 }
 
@@ -194,17 +198,19 @@ pub(super) struct InsertMany {
     options: Option<InsertManyOptions>,
 }
 
-#[async_trait]
 impl TestOperation for InsertMany {
     fn command_names(&self) -> &[&str] {
         &["insert"]
     }
 
-    async fn execute(&self, collection: Collection<Document>) -> Result<()> {
-        collection
-            .insert_many(self.documents.clone(), self.options.clone())
-            .await
-            .map(|_| ())
+    fn execute(&self, collection: Collection<Document>) -> BoxFuture<Result<()>> {
+        async move {
+            collection
+                .insert_many(self.documents.clone(), self.options.clone())
+                .await
+                .map(|_| ())
+        }
+        .boxed()
     }
 }
 
@@ -213,17 +219,19 @@ pub(super) struct InsertOne {
     document: Document,
 }
 
-#[async_trait]
 impl TestOperation for InsertOne {
     fn command_names(&self) -> &[&str] {
         &["insert"]
     }
 
-    async fn execute(&self, collection: Collection<Document>) -> Result<()> {
-        collection
-            .insert_one(self.document.clone(), None)
-            .await
-            .map(|_| ())
+    fn execute(&self, collection: Collection<Document>) -> BoxFuture<Result<()>> {
+        async move {
+            collection
+                .insert_one(self.document.clone(), None)
+                .await
+                .map(|_| ())
+        }
+        .boxed()
     }
 }
 
@@ -233,17 +241,19 @@ pub(super) struct UpdateMany {
     update: Document,
 }
 
-#[async_trait]
 impl TestOperation for UpdateMany {
     fn command_names(&self) -> &[&str] {
         &["update"]
     }
 
-    async fn execute(&self, collection: Collection<Document>) -> Result<()> {
-        collection
-            .update_many(self.filter.clone(), self.update.clone(), None)
-            .await
-            .map(|_| ())
+    fn execute(&self, collection: Collection<Document>) -> BoxFuture<Result<()>> {
+        async move {
+            collection
+                .update_many(self.filter.clone(), self.update.clone(), None)
+                .await
+                .map(|_| ())
+        }
+        .boxed()
     }
 }
 
@@ -255,21 +265,23 @@ pub(super) struct UpdateOne {
     upsert: Option<bool>,
 }
 
-#[async_trait]
 impl TestOperation for UpdateOne {
     fn command_names(&self) -> &[&str] {
         &["update"]
     }
 
-    async fn execute(&self, collection: Collection<Document>) -> Result<()> {
-        let options = self.upsert.map(|b| UpdateOptions {
-            upsert: Some(b),
-            ..Default::default()
-        });
-        collection
-            .update_one(self.filter.clone(), self.update.clone(), options)
-            .await
-            .map(|_| ())
+    fn execute(&self, collection: Collection<Document>) -> BoxFuture<Result<()>> {
+        async move {
+            let options = self.upsert.map(|b| UpdateOptions {
+                upsert: Some(b),
+                ..Default::default()
+            });
+            collection
+                .update_one(self.filter.clone(), self.update.clone(), options)
+                .await
+                .map(|_| ())
+        }
+        .boxed()
     }
 }
 

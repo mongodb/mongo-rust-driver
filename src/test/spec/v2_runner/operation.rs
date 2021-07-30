@@ -1,7 +1,6 @@
 use std::{collections::HashMap, convert::TryInto, fmt::Debug, ops::Deref};
 
-use async_trait::async_trait;
-use futures::stream::TryStreamExt;
+use futures::{future::BoxFuture, stream::TryStreamExt, FutureExt};
 use serde::{de::Deserializer, Deserialize};
 
 use crate::{
@@ -40,26 +39,36 @@ use crate::{
     Database,
 };
 
-// The linked issue causes a warning that cannot be suppressed when providing a default
-// implementation for the async functions contained in this trait.
-// <https://github.com/rust-lang/rust/issues/51443>
-#[async_trait]
 pub trait TestOperation: Debug {
-    async fn execute_on_collection(
-        &self,
-        collection: &Collection<Document>,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>>;
+    fn execute_on_collection<'a>(
+        &'a self,
+        _collection: &'a Collection<Document>,
+        _session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        todo!()
+    }
 
-    async fn execute_on_database(
-        &self,
-        database: &Database,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>>;
+    fn execute_on_database<'a>(
+        &'a self,
+        _database: &'a Database,
+        _session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        todo!()
+    }
 
-    async fn execute_on_client(&self, client: &TestClient) -> Result<Option<Bson>>;
+    fn execute_on_client<'a>(
+        &'a self,
+        _client: &'a TestClient,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        todo!()
+    }
 
-    async fn execute_on_session(&self, session: &mut ClientSession) -> Result<Option<Bson>>;
+    fn execute_on_session<'a>(
+        &'a self,
+        _session: &'a mut ClientSession,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        todo!()
+    }
 }
 
 #[derive(Debug)]
@@ -293,43 +302,33 @@ pub(super) struct DeleteMany {
     options: Option<DeleteOptions>,
 }
 
-#[async_trait]
 impl TestOperation for DeleteMany {
-    async fn execute_on_collection(
-        &self,
-        collection: &Collection<Document>,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let result = match session {
-            Some(session) => {
-                collection
-                    .delete_many_with_session(self.filter.clone(), self.options.clone(), session)
-                    .await?
-            }
-            None => {
-                collection
-                    .delete_many(self.filter.clone(), self.options.clone())
-                    .await?
-            }
-        };
-        let result = bson::to_bson(&result)?;
-        Ok(Some(result))
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let result = match session {
+                Some(session) => {
+                    collection
+                        .delete_many_with_session(
+                            self.filter.clone(),
+                            self.options.clone(),
+                            session,
+                        )
+                        .await?
+                }
+                None => {
+                    collection
+                        .delete_many(self.filter.clone(), self.options.clone())
+                        .await?
+                }
+            };
+            let result = bson::to_bson(&result)?;
+            Ok(Some(result))
+        }
+        .boxed()
     }
 }
 
@@ -340,43 +339,29 @@ pub(super) struct DeleteOne {
     options: Option<DeleteOptions>,
 }
 
-#[async_trait]
 impl TestOperation for DeleteOne {
-    async fn execute_on_collection(
-        &self,
-        collection: &Collection<Document>,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let result = match session {
-            Some(session) => {
-                collection
-                    .delete_one_with_session(self.filter.clone(), self.options.clone(), session)
-                    .await?
-            }
-            None => {
-                collection
-                    .delete_one(self.filter.clone(), self.options.clone())
-                    .await?
-            }
-        };
-        let result = bson::to_bson(&result)?;
-        Ok(Some(result))
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let result = match session {
+                Some(session) => {
+                    collection
+                        .delete_one_with_session(self.filter.clone(), self.options.clone(), session)
+                        .await?
+                }
+                None => {
+                    collection
+                        .delete_one(self.filter.clone(), self.options.clone())
+                        .await?
+                }
+            };
+            let result = bson::to_bson(&result)?;
+            Ok(Some(result))
+        }
+        .boxed()
     }
 }
 
@@ -387,47 +372,33 @@ pub(super) struct Find {
     options: Option<FindOptions>,
 }
 
-#[async_trait]
 impl TestOperation for Find {
-    async fn execute_on_collection(
-        &self,
-        collection: &Collection<Document>,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let result = match session {
-            Some(session) => {
-                let mut cursor = collection
-                    .find_with_session(self.filter.clone(), self.options.clone(), session)
-                    .await?;
-                cursor
-                    .stream(session)
-                    .try_collect::<Vec<Document>>()
-                    .await?
-            }
-            None => {
-                let cursor = collection
-                    .find(self.filter.clone(), self.options.clone())
-                    .await?;
-                cursor.try_collect::<Vec<Document>>().await?
-            }
-        };
-        Ok(Some(Bson::from(result)))
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let result = match session {
+                Some(session) => {
+                    let mut cursor = collection
+                        .find_with_session(self.filter.clone(), self.options.clone(), session)
+                        .await?;
+                    cursor
+                        .stream(session)
+                        .try_collect::<Vec<Document>>()
+                        .await?
+                }
+                None => {
+                    let cursor = collection
+                        .find(self.filter.clone(), self.options.clone())
+                        .await?;
+                    cursor.try_collect::<Vec<Document>>().await?
+                }
+            };
+            Ok(Some(Bson::from(result)))
+        }
+        .boxed()
     }
 }
 
@@ -438,48 +409,33 @@ pub(super) struct InsertMany {
     options: Option<InsertManyOptions>,
 }
 
-#[async_trait]
 impl TestOperation for InsertMany {
-    async fn execute_on_collection(
-        &self,
-        collection: &Collection<Document>,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let result = match session {
-            Some(session) => {
-                collection
-                    .insert_many_with_session(self.documents.clone(), self.options.clone(), session)
-                    .await?
-            }
-            None => {
-                collection
-                    .insert_many(self.documents.clone(), self.options.clone())
-                    .await?
-            }
-        };
-        let ids: HashMap<String, Bson> = result
-            .inserted_ids
-            .into_iter()
-            .map(|(k, v)| (k.to_string(), v))
-            .collect();
-        let ids = bson::to_bson(&ids)?;
-        Ok(Some(Bson::from(doc! { "insertedIds": ids })))
-    }
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        let documents = self.documents.clone();
+        let options = self.options.clone();
 
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+        async move {
+            let result = match session {
+                Some(session) => {
+                    collection
+                        .insert_many_with_session(documents, options, session)
+                        .await?
+                }
+                None => collection.insert_many(documents, options).await?,
+            };
+            let ids: HashMap<String, Bson> = result
+                .inserted_ids
+                .into_iter()
+                .map(|(k, v)| (k.to_string(), v))
+                .collect();
+            let ids = bson::to_bson(&ids)?;
+            Ok(Some(Bson::from(doc! { "insertedIds": ids })))
+        }
+        .boxed()
     }
 }
 
@@ -490,43 +446,27 @@ pub(super) struct InsertOne {
     options: Option<InsertOneOptions>,
 }
 
-#[async_trait]
 impl TestOperation for InsertOne {
-    async fn execute_on_collection(
-        &self,
-        collection: &Collection<Document>,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let result = match session {
-            Some(session) => {
-                collection
-                    .insert_one_with_session(self.document.clone(), self.options.clone(), session)
-                    .await?
-            }
-            None => {
-                collection
-                    .insert_one(self.document.clone(), self.options.clone())
-                    .await?
-            }
-        };
-        let result = bson::to_bson(&result)?;
-        Ok(Some(result))
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        let document = self.document.clone();
+        let options = self.options.clone();
+        async move {
+            let result = match session {
+                Some(session) => {
+                    collection
+                        .insert_one_with_session(document, options, session)
+                        .await?
+                }
+                None => collection.insert_one(document, options).await?,
+            };
+            let result = bson::to_bson(&result)?;
+            Ok(Some(result))
+        }
+        .boxed()
     }
 }
 
@@ -538,52 +478,38 @@ pub(super) struct UpdateMany {
     options: Option<UpdateOptions>,
 }
 
-#[async_trait]
 impl TestOperation for UpdateMany {
-    async fn execute_on_collection(
-        &self,
-        collection: &Collection<Document>,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let result = match session {
-            Some(session) => {
-                collection
-                    .update_many_with_session(
-                        self.filter.clone(),
-                        self.update.clone(),
-                        self.options.clone(),
-                        session,
-                    )
-                    .await?
-            }
-            None => {
-                collection
-                    .update_many(
-                        self.filter.clone(),
-                        self.update.clone(),
-                        self.options.clone(),
-                    )
-                    .await?
-            }
-        };
-        let result = bson::to_bson(&result)?;
-        Ok(Some(result))
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let result = match session {
+                Some(session) => {
+                    collection
+                        .update_many_with_session(
+                            self.filter.clone(),
+                            self.update.clone(),
+                            self.options.clone(),
+                            session,
+                        )
+                        .await?
+                }
+                None => {
+                    collection
+                        .update_many(
+                            self.filter.clone(),
+                            self.update.clone(),
+                            self.options.clone(),
+                        )
+                        .await?
+                }
+            };
+            let result = bson::to_bson(&result)?;
+            Ok(Some(result))
+        }
+        .boxed()
     }
 }
 
@@ -595,52 +521,38 @@ pub(super) struct UpdateOne {
     options: Option<UpdateOptions>,
 }
 
-#[async_trait]
 impl TestOperation for UpdateOne {
-    async fn execute_on_collection(
-        &self,
-        collection: &Collection<Document>,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let result = match session {
-            Some(session) => {
-                collection
-                    .update_one_with_session(
-                        self.filter.clone(),
-                        self.update.clone(),
-                        self.options.clone(),
-                        session,
-                    )
-                    .await?
-            }
-            None => {
-                collection
-                    .update_one(
-                        self.filter.clone(),
-                        self.update.clone(),
-                        self.options.clone(),
-                    )
-                    .await?
-            }
-        };
-        let result = bson::to_bson(&result)?;
-        Ok(Some(result))
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let result = match session {
+                Some(session) => {
+                    collection
+                        .update_one_with_session(
+                            self.filter.clone(),
+                            self.update.clone(),
+                            self.options.clone(),
+                            session,
+                        )
+                        .await?
+                }
+                None => {
+                    collection
+                        .update_one(
+                            self.filter.clone(),
+                            self.update.clone(),
+                            self.options.clone(),
+                        )
+                        .await?
+                }
+            };
+            let result = bson::to_bson(&result)?;
+            Ok(Some(result))
+        }
+        .boxed()
     }
 }
 
@@ -652,65 +564,70 @@ pub(super) struct Aggregate {
     options: Option<AggregateOptions>,
 }
 
-#[async_trait]
 impl TestOperation for Aggregate {
-    async fn execute_on_collection(
-        &self,
-        collection: &Collection<Document>,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let result = match session {
-            Some(session) => {
-                let mut cursor = collection
-                    .aggregate_with_session(self.pipeline.clone(), self.options.clone(), session)
-                    .await?;
-                cursor
-                    .stream(session)
-                    .try_collect::<Vec<Document>>()
-                    .await?
-            }
-            None => {
-                let cursor = collection
-                    .aggregate(self.pipeline.clone(), self.options.clone())
-                    .await?;
-                cursor.try_collect::<Vec<Document>>().await?
-            }
-        };
-        Ok(Some(Bson::from(result)))
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let result = match session {
+                Some(session) => {
+                    let mut cursor = collection
+                        .aggregate_with_session(
+                            self.pipeline.clone(),
+                            self.options.clone(),
+                            session,
+                        )
+                        .await?;
+                    cursor
+                        .stream(session)
+                        .try_collect::<Vec<Document>>()
+                        .await?
+                }
+                None => {
+                    let cursor = collection
+                        .aggregate(self.pipeline.clone(), self.options.clone())
+                        .await?;
+                    cursor.try_collect::<Vec<Document>>().await?
+                }
+            };
+            Ok(Some(Bson::from(result)))
+        }
+        .boxed()
     }
 
-    async fn execute_on_database(
-        &self,
-        database: &Database,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let result = match session {
-            Some(session) => {
-                let mut cursor = database
-                    .aggregate_with_session(self.pipeline.clone(), self.options.clone(), session)
-                    .await?;
-                cursor
-                    .stream(session)
-                    .try_collect::<Vec<Document>>()
-                    .await?
-            }
-            None => {
-                let cursor = database
-                    .aggregate(self.pipeline.clone(), self.options.clone())
-                    .await?;
-                cursor.try_collect::<Vec<Document>>().await?
-            }
-        };
+    fn execute_on_database<'a>(
+        &'a self,
+        database: &'a Database,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let result = match session {
+                Some(session) => {
+                    let mut cursor = database
+                        .aggregate_with_session(
+                            self.pipeline.clone(),
+                            self.options.clone(),
+                            session,
+                        )
+                        .await?;
+                    cursor
+                        .stream(session)
+                        .try_collect::<Vec<Document>>()
+                        .await?
+                }
+                None => {
+                    let cursor = database
+                        .aggregate(self.pipeline.clone(), self.options.clone())
+                        .await?;
+                    cursor.try_collect::<Vec<Document>>().await?
+                }
+            };
 
-        Ok(Some(Bson::from(result)))
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+            Ok(Some(Bson::from(result)))
+        }
+        .boxed()
     }
 }
 
@@ -723,47 +640,33 @@ pub(super) struct Distinct {
     options: Option<DistinctOptions>,
 }
 
-#[async_trait]
 impl TestOperation for Distinct {
-    async fn execute_on_collection(
-        &self,
-        collection: &Collection<Document>,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let result = match session {
-            Some(session) => {
-                collection
-                    .distinct_with_session(
-                        &self.field_name,
-                        self.filter.clone(),
-                        self.options.clone(),
-                        session,
-                    )
-                    .await?
-            }
-            None => {
-                collection
-                    .distinct(&self.field_name, self.filter.clone(), self.options.clone())
-                    .await?
-            }
-        };
-        Ok(Some(Bson::Array(result)))
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let result = match session {
+                Some(session) => {
+                    collection
+                        .distinct_with_session(
+                            &self.field_name,
+                            self.filter.clone(),
+                            self.options.clone(),
+                            session,
+                        )
+                        .await?
+                }
+                None => {
+                    collection
+                        .distinct(&self.field_name, self.filter.clone(), self.options.clone())
+                        .await?
+                }
+            };
+            Ok(Some(Bson::Array(result)))
+        }
+        .boxed()
     }
 }
 
@@ -774,46 +677,32 @@ pub(super) struct CountDocuments {
     options: Option<CountOptions>,
 }
 
-#[async_trait]
 impl TestOperation for CountDocuments {
-    async fn execute_on_collection(
-        &self,
-        collection: &Collection<Document>,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let result = match session {
-            Some(session) => {
-                collection
-                    .count_documents_with_session(
-                        self.filter.clone(),
-                        self.options.clone(),
-                        session,
-                    )
-                    .await?
-            }
-            None => {
-                collection
-                    .count_documents(self.filter.clone(), self.options.clone())
-                    .await?
-            }
-        };
-        Ok(Some(Bson::Int64(result.try_into().unwrap())))
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let result = match session {
+                Some(session) => {
+                    collection
+                        .count_documents_with_session(
+                            self.filter.clone(),
+                            self.options.clone(),
+                            session,
+                        )
+                        .await?
+                }
+                None => {
+                    collection
+                        .count_documents(self.filter.clone(), self.options.clone())
+                        .await?
+                }
+            };
+            Ok(Some(Bson::Int64(result.try_into().unwrap())))
+        }
+        .boxed()
     }
 }
 
@@ -823,33 +712,19 @@ pub(super) struct EstimatedDocumentCount {
     options: Option<EstimatedDocumentCountOptions>,
 }
 
-#[async_trait]
 impl TestOperation for EstimatedDocumentCount {
-    async fn execute_on_collection(
-        &self,
-        collection: &Collection<Document>,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let result = collection
-            .estimated_document_count(self.options.clone())
-            .await?;
-        Ok(Some(Bson::Int64(result.try_into().unwrap())))
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        _session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let result = collection
+                .estimated_document_count(self.options.clone())
+                .await?;
+            Ok(Some(Bson::Int64(result.try_into().unwrap())))
+        }
+        .boxed()
     }
 }
 
@@ -860,45 +735,31 @@ pub(super) struct FindOne {
     options: Option<FindOneOptions>,
 }
 
-#[async_trait]
 impl TestOperation for FindOne {
-    async fn execute_on_collection(
-        &self,
-        collection: &Collection<Document>,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let result = match session {
-            Some(session) => {
-                collection
-                    .find_one_with_session(self.filter.clone(), self.options.clone(), session)
-                    .await?
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let result = match session {
+                Some(session) => {
+                    collection
+                        .find_one_with_session(self.filter.clone(), self.options.clone(), session)
+                        .await?
+                }
+                None => {
+                    collection
+                        .find_one(self.filter.clone(), self.options.clone())
+                        .await?
+                }
+            };
+            match result {
+                Some(result) => Ok(Some(Bson::from(result))),
+                None => Ok(None),
             }
-            None => {
-                collection
-                    .find_one(self.filter.clone(), self.options.clone())
-                    .await?
-            }
-        };
-        match result {
-            Some(result) => Ok(Some(Bson::from(result))),
-            None => Ok(None),
         }
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+        .boxed()
     }
 }
 
@@ -909,48 +770,34 @@ pub(super) struct ListCollections {
     options: Option<ListCollectionsOptions>,
 }
 
-#[async_trait]
 impl TestOperation for ListCollections {
-    async fn execute_on_collection(
-        &self,
-        _collection: &Collection<Document>,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(
-        &self,
-        database: &Database,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let result = match session {
-            Some(session) => {
-                let mut cursor = database
-                    .list_collections_with_session(
-                        self.filter.clone(),
-                        self.options.clone(),
-                        session,
-                    )
-                    .await?;
-                cursor.stream(session).try_collect::<Vec<_>>().await?
-            }
-            None => {
-                let cursor = database
-                    .list_collections(self.filter.clone(), self.options.clone())
-                    .await?;
-                cursor.try_collect::<Vec<_>>().await?
-            }
-        };
-        Ok(Some(bson::to_bson(&result)?))
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_database<'a>(
+        &'a self,
+        database: &'a Database,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let result = match session {
+                Some(session) => {
+                    let mut cursor = database
+                        .list_collections_with_session(
+                            self.filter.clone(),
+                            self.options.clone(),
+                            session,
+                        )
+                        .await?;
+                    cursor.stream(session).try_collect::<Vec<_>>().await?
+                }
+                None => {
+                    let cursor = database
+                        .list_collections(self.filter.clone(), self.options.clone())
+                        .await?;
+                    cursor.try_collect::<Vec<_>>().await?
+                }
+            };
+            Ok(Some(bson::to_bson(&result)?))
+        }
+        .boxed()
     }
 }
 
@@ -959,39 +806,25 @@ pub(super) struct ListCollectionNames {
     filter: Option<Document>,
 }
 
-#[async_trait]
 impl TestOperation for ListCollectionNames {
-    async fn execute_on_collection(
-        &self,
-        _collection: &Collection<Document>,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(
-        &self,
-        database: &Database,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let result = match session {
-            Some(session) => {
-                database
-                    .list_collection_names_with_session(self.filter.clone(), session)
-                    .await?
-            }
-            None => database.list_collection_names(self.filter.clone()).await?,
-        };
-        let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
-        Ok(Some(Bson::from(result)))
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_database<'a>(
+        &'a self,
+        database: &'a Database,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let result = match session {
+                Some(session) => {
+                    database
+                        .list_collection_names_with_session(self.filter.clone(), session)
+                        .await?
+                }
+                None => database.list_collection_names(self.filter.clone()).await?,
+            };
+            let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
+            Ok(Some(Bson::from(result)))
+        }
+        .boxed()
     }
 }
 
@@ -1003,52 +836,38 @@ pub(super) struct ReplaceOne {
     options: Option<ReplaceOptions>,
 }
 
-#[async_trait]
 impl TestOperation for ReplaceOne {
-    async fn execute_on_collection(
-        &self,
-        collection: &Collection<Document>,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let result = match session {
-            Some(session) => {
-                collection
-                    .replace_one_with_session(
-                        self.filter.clone(),
-                        self.replacement.clone(),
-                        self.options.clone(),
-                        session,
-                    )
-                    .await?
-            }
-            None => {
-                collection
-                    .replace_one(
-                        self.filter.clone(),
-                        self.replacement.clone(),
-                        self.options.clone(),
-                    )
-                    .await?
-            }
-        };
-        let result = bson::to_bson(&result)?;
-        Ok(Some(result))
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let result = match session {
+                Some(session) => {
+                    collection
+                        .replace_one_with_session(
+                            self.filter.clone(),
+                            self.replacement.clone(),
+                            self.options.clone(),
+                            session,
+                        )
+                        .await?
+                }
+                None => {
+                    collection
+                        .replace_one(
+                            self.filter.clone(),
+                            self.replacement.clone(),
+                            self.options.clone(),
+                        )
+                        .await?
+                }
+            };
+            let result = bson::to_bson(&result)?;
+            Ok(Some(result))
+        }
+        .boxed()
     }
 }
 
@@ -1060,52 +879,38 @@ pub(super) struct FindOneAndUpdate {
     options: Option<FindOneAndUpdateOptions>,
 }
 
-#[async_trait]
 impl TestOperation for FindOneAndUpdate {
-    async fn execute_on_collection(
-        &self,
-        collection: &Collection<Document>,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let result = match session {
-            Some(session) => {
-                collection
-                    .find_one_and_update_with_session(
-                        self.filter.clone(),
-                        self.update.clone(),
-                        self.options.clone(),
-                        session,
-                    )
-                    .await?
-            }
-            None => {
-                collection
-                    .find_one_and_update(
-                        self.filter.clone(),
-                        self.update.clone(),
-                        self.options.clone(),
-                    )
-                    .await?
-            }
-        };
-        let result = bson::to_bson(&result)?;
-        Ok(Some(result))
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let result = match session {
+                Some(session) => {
+                    collection
+                        .find_one_and_update_with_session(
+                            self.filter.clone(),
+                            self.update.clone(),
+                            self.options.clone(),
+                            session,
+                        )
+                        .await?
+                }
+                None => {
+                    collection
+                        .find_one_and_update(
+                            self.filter.clone(),
+                            self.update.clone(),
+                            self.options.clone(),
+                        )
+                        .await?
+                }
+            };
+            let result = bson::to_bson(&result)?;
+            Ok(Some(result))
+        }
+        .boxed()
     }
 }
 
@@ -1117,52 +922,38 @@ pub(super) struct FindOneAndReplace {
     options: Option<FindOneAndReplaceOptions>,
 }
 
-#[async_trait]
 impl TestOperation for FindOneAndReplace {
-    async fn execute_on_collection(
-        &self,
-        collection: &Collection<Document>,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let result = match session {
-            Some(session) => {
-                collection
-                    .find_one_and_replace_with_session(
-                        self.filter.clone(),
-                        self.replacement.clone(),
-                        self.options.clone(),
-                        session,
-                    )
-                    .await?
-            }
-            None => {
-                collection
-                    .find_one_and_replace(
-                        self.filter.clone(),
-                        self.replacement.clone(),
-                        self.options.clone(),
-                    )
-                    .await?
-            }
-        };
-        let result = bson::to_bson(&result)?;
-        Ok(Some(result))
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let result = match session {
+                Some(session) => {
+                    collection
+                        .find_one_and_replace_with_session(
+                            self.filter.clone(),
+                            self.replacement.clone(),
+                            self.options.clone(),
+                            session,
+                        )
+                        .await?
+                }
+                None => {
+                    collection
+                        .find_one_and_replace(
+                            self.filter.clone(),
+                            self.replacement.clone(),
+                            self.options.clone(),
+                        )
+                        .await?
+                }
+            };
+            let result = bson::to_bson(&result)?;
+            Ok(Some(result))
+        }
+        .boxed()
     }
 }
 
@@ -1173,47 +964,33 @@ pub(super) struct FindOneAndDelete {
     options: Option<FindOneAndDeleteOptions>,
 }
 
-#[async_trait]
 impl TestOperation for FindOneAndDelete {
-    async fn execute_on_collection(
-        &self,
-        collection: &Collection<Document>,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let result = match session {
-            Some(session) => {
-                collection
-                    .find_one_and_delete_with_session(
-                        self.filter.clone(),
-                        self.options.clone(),
-                        session,
-                    )
-                    .await?
-            }
-            None => {
-                collection
-                    .find_one_and_delete(self.filter.clone(), self.options.clone())
-                    .await?
-            }
-        };
-        let result = bson::to_bson(&result)?;
-        Ok(Some(result))
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let result = match session {
+                Some(session) => {
+                    collection
+                        .find_one_and_delete_with_session(
+                            self.filter.clone(),
+                            self.options.clone(),
+                            session,
+                        )
+                        .await?
+                }
+                None => {
+                    collection
+                        .find_one_and_delete(self.filter.clone(), self.options.clone())
+                        .await?
+                }
+            };
+            let result = bson::to_bson(&result)?;
+            Ok(Some(result))
+        }
+        .boxed()
     }
 }
 
@@ -1224,33 +1001,18 @@ pub(super) struct ListDatabases {
     options: Option<ListDatabasesOptions>,
 }
 
-#[async_trait]
 impl TestOperation for ListDatabases {
-    async fn execute_on_collection(
-        &self,
-        _collection: &Collection<Document>,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, client: &TestClient) -> Result<Option<Bson>> {
-        let result = client
-            .list_databases(self.filter.clone(), self.options.clone())
-            .await?;
-        Ok(Some(bson::to_bson(&result)?))
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_client<'a>(
+        &'a self,
+        client: &'a TestClient,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let result = client
+                .list_databases(self.filter.clone(), self.options.clone())
+                .await?;
+            Ok(Some(bson::to_bson(&result)?))
+        }
+        .boxed()
     }
 }
 
@@ -1261,34 +1023,19 @@ pub(super) struct ListDatabaseNames {
     options: Option<ListDatabasesOptions>,
 }
 
-#[async_trait]
 impl TestOperation for ListDatabaseNames {
-    async fn execute_on_collection(
-        &self,
-        _collection: &Collection<Document>,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, client: &TestClient) -> Result<Option<Bson>> {
-        let result = client
-            .list_database_names(self.filter.clone(), self.options.clone())
-            .await?;
-        let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
-        Ok(Some(Bson::Array(result)))
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_client<'a>(
+        &'a self,
+        client: &'a TestClient,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let result = client
+                .list_database_names(self.filter.clone(), self.options.clone())
+                .await?;
+            let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
+            Ok(Some(Bson::Array(result)))
+        }
+        .boxed()
     }
 }
 
@@ -1297,50 +1044,35 @@ pub(super) struct AssertSessionTransactionState {
     state: String,
 }
 
-#[async_trait]
 impl TestOperation for AssertSessionTransactionState {
-    async fn execute_on_collection(
-        &self,
-        _collection: &Collection<Document>,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, session: &mut ClientSession) -> Result<Option<Bson>> {
-        match self.state.as_str() {
-            "none" => assert!(matches!(session.transaction.state, TransactionState::None)),
-            "starting" => assert!(matches!(
-                session.transaction.state,
-                TransactionState::Starting
-            )),
-            "in_progress" => assert!(matches!(
-                session.transaction.state,
-                TransactionState::InProgress
-            )),
-            "committed" => assert!(matches!(
-                session.transaction.state,
-                TransactionState::Committed { .. }
-            )),
-            "aborted" => assert!(matches!(
-                session.transaction.state,
-                TransactionState::Aborted
-            )),
-            other => panic!("Unknown transaction state: {}", other),
+    fn execute_on_session<'a>(
+        &'a self,
+        session: &'a mut ClientSession,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            match self.state.as_str() {
+                "none" => assert!(matches!(session.transaction.state, TransactionState::None)),
+                "starting" => assert!(matches!(
+                    session.transaction.state,
+                    TransactionState::Starting
+                )),
+                "in_progress" => assert!(matches!(
+                    session.transaction.state,
+                    TransactionState::InProgress
+                )),
+                "committed" => assert!(matches!(
+                    session.transaction.state,
+                    TransactionState::Committed { .. }
+                )),
+                "aborted" => assert!(matches!(
+                    session.transaction.state,
+                    TransactionState::Aborted
+                )),
+                other => panic!("Unknown transaction state: {}", other),
+            }
+            Ok(None)
         }
-        Ok(None)
+        .boxed()
     }
 }
 
@@ -1349,93 +1081,42 @@ pub(super) struct StartTransaction {
     options: Option<TransactionOptions>,
 }
 
-#[async_trait]
 impl TestOperation for StartTransaction {
-    async fn execute_on_collection(
-        &self,
-        _collection: &Collection<Document>,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, session: &mut ClientSession) -> Result<Option<Bson>> {
-        session
-            .start_transaction(self.options.clone())
-            .await
-            .map(|_| None)
+    fn execute_on_session<'a>(
+        &'a self,
+        session: &'a mut ClientSession,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            session
+                .start_transaction(self.options.clone())
+                .await
+                .map(|_| None)
+        }
+        .boxed()
     }
 }
 
 #[derive(Debug, Deserialize)]
 pub(super) struct CommitTransaction {}
 
-#[async_trait]
 impl TestOperation for CommitTransaction {
-    async fn execute_on_collection(
-        &self,
-        _collection: &Collection<Document>,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, session: &mut ClientSession) -> Result<Option<Bson>> {
-        session.commit_transaction().await.map(|_| None)
+    fn execute_on_session<'a>(
+        &'a self,
+        session: &'a mut ClientSession,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move { session.commit_transaction().await.map(|_| None) }.boxed()
     }
 }
 
 #[derive(Debug, Deserialize)]
 pub(super) struct AbortTransaction {}
 
-#[async_trait]
 impl TestOperation for AbortTransaction {
-    async fn execute_on_collection(
-        &self,
-        _collection: &Collection<Document>,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, session: &mut ClientSession) -> Result<Option<Bson>> {
-        session.abort_transaction().await.map(|_| None)
+    fn execute_on_session<'a>(
+        &'a self,
+        session: &'a mut ClientSession,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move { session.abort_transaction().await.map(|_| None) }.boxed()
     }
 }
 
@@ -1446,42 +1127,28 @@ pub(super) struct RunCommand {
     read_preference: Option<ReadPreference>,
 }
 
-#[async_trait]
 impl TestOperation for RunCommand {
-    async fn execute_on_collection(
-        &self,
-        _collection: &Collection<Document>,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(
-        &self,
-        database: &Database,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let selection_criteria = self
-            .read_preference
-            .as_ref()
-            .map(|read_preference| SelectionCriteria::ReadPreference(read_preference.clone()));
-        let result = match session {
-            Some(session) => {
-                database
-                    .run_command_with_session(self.command.clone(), selection_criteria, session)
-                    .await
-            }
-            None => database.run_command(self.command.clone(), None).await,
-        };
-        result.map(|doc| Some(Bson::Document(doc)))
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_database<'a>(
+        &'a self,
+        database: &'a Database,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let selection_criteria = self
+                .read_preference
+                .as_ref()
+                .map(|read_preference| SelectionCriteria::ReadPreference(read_preference.clone()));
+            let result = match session {
+                Some(session) => {
+                    database
+                        .run_command_with_session(self.command.clone(), selection_criteria, session)
+                        .await
+                }
+                None => database.run_command(self.command.clone(), None).await,
+            };
+            result.map(|doc| Some(Bson::Document(doc)))
+        }
+        .boxed()
     }
 }
 
@@ -1492,44 +1159,30 @@ pub(super) struct DropCollection {
     options: Option<DropCollectionOptions>,
 }
 
-#[async_trait]
 impl TestOperation for DropCollection {
-    async fn execute_on_collection(
-        &self,
-        _collection: &Collection<Document>,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(
-        &self,
-        database: &Database,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let result = match session {
-            Some(session) => {
-                database
-                    .collection::<Document>(&self.collection)
-                    .drop_with_session(self.options.clone(), session)
-                    .await
-            }
-            None => {
-                database
-                    .collection::<Document>(&self.collection)
-                    .drop(self.options.clone())
-                    .await
-            }
-        };
-        result.map(|_| None)
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_database<'a>(
+        &'a self,
+        database: &'a Database,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let result = match session {
+                Some(session) => {
+                    database
+                        .collection::<Document>(&self.collection)
+                        .drop_with_session(self.options.clone(), session)
+                        .await
+                }
+                None => {
+                    database
+                        .collection::<Document>(&self.collection)
+                        .drop(self.options.clone())
+                        .await
+                }
+            };
+            result.map(|_| None)
+        }
+        .boxed()
     }
 }
 
@@ -1540,42 +1193,32 @@ pub(super) struct CreateCollection {
     options: Option<CreateCollectionOptions>,
 }
 
-#[async_trait]
 impl TestOperation for CreateCollection {
-    async fn execute_on_collection(
-        &self,
-        _collection: &Collection<Document>,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(
-        &self,
-        database: &Database,
-        session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        let result = match session {
-            Some(session) => {
-                database
-                    .create_collection_with_session(&self.collection, self.options.clone(), session)
-                    .await
-            }
-            None => {
-                database
-                    .create_collection(&self.collection, self.options.clone())
-                    .await
-            }
-        };
-        result.map(|_| None)
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_database<'a>(
+        &'a self,
+        database: &'a Database,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let result = match session {
+                Some(session) => {
+                    database
+                        .create_collection_with_session(
+                            &self.collection,
+                            self.options.clone(),
+                            session,
+                        )
+                        .await
+                }
+                None => {
+                    database
+                        .create_collection(&self.collection, self.options.clone())
+                        .await
+                }
+            };
+            result.map(|_| None)
+        }
+        .boxed()
     }
 }
 
@@ -1585,36 +1228,21 @@ pub(super) struct AssertCollectionExists {
     collection: String,
 }
 
-#[async_trait]
 impl TestOperation for AssertCollectionExists {
-    async fn execute_on_collection(
-        &self,
-        _collection: &Collection<Document>,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, client: &TestClient) -> Result<Option<Bson>> {
-        let collections = client
-            .database(&self.database)
-            .list_collection_names(None)
-            .await
-            .unwrap();
-        assert!(collections.contains(&self.collection));
-        Ok(None)
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_client<'a>(
+        &'a self,
+        client: &'a TestClient,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let collections = client
+                .database(&self.database)
+                .list_collection_names(None)
+                .await
+                .unwrap();
+            assert!(collections.contains(&self.collection));
+            Ok(None)
+        }
+        .boxed()
     }
 }
 
@@ -1624,65 +1252,25 @@ pub(super) struct AssertCollectionNotExists {
     collection: String,
 }
 
-#[async_trait]
 impl TestOperation for AssertCollectionNotExists {
-    async fn execute_on_collection(
-        &self,
-        _collection: &Collection<Document>,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, client: &TestClient) -> Result<Option<Bson>> {
-        let collections = client
-            .database(&self.database)
-            .list_collection_names(None)
-            .await
-            .unwrap();
-        assert!(!collections.contains(&self.collection));
-        Ok(None)
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
+    fn execute_on_client<'a>(
+        &'a self,
+        client: &'a TestClient,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let collections = client
+                .database(&self.database)
+                .list_collection_names(None)
+                .await
+                .unwrap();
+            assert!(!collections.contains(&self.collection));
+            Ok(None)
+        }
+        .boxed()
     }
 }
 
 #[derive(Debug, Deserialize)]
 pub(super) struct UnimplementedOperation;
 
-#[async_trait]
-impl TestOperation for UnimplementedOperation {
-    async fn execute_on_collection(
-        &self,
-        _collection: &Collection<Document>,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_database(
-        &self,
-        _database: &Database,
-        _session: Option<&mut ClientSession>,
-    ) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_client(&self, _client: &TestClient) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-
-    async fn execute_on_session(&self, _session: &mut ClientSession) -> Result<Option<Bson>> {
-        unimplemented!()
-    }
-}
+impl TestOperation for UnimplementedOperation {}
