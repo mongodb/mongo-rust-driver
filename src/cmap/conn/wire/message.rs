@@ -33,31 +33,29 @@ impl Message {
     /// Creates a `Message` from a given `Command`.
     ///
     /// Note that `response_to` will need to be set manually.
-    pub(crate) fn with_command(mut command: Command, request_id: Option<i32>) -> Result<Self> {
-        command.body.insert("$db", command.target_db);
-
-        let mut bytes = Vec::new();
-        command.body.to_writer(&mut bytes)?;
-        Ok(Self {
-            response_to: 0,
-            flags: MessageFlags::empty(),
-            sections: vec![MessageSection::Document(bytes)],
-            checksum: None,
+    pub(crate) fn with_command(command: Command, request_id: Option<i32>) -> Result<Self> {
+        let bytes = bson::to_vec(&command)?;
+        Ok(Self::with_raw_command(
+            RawCommand {
+                bytes,
+                target_db: command.target_db,
+                name: command.name,
+            },
             request_id,
-        })
+        ))
     }
 
     /// Creates a `Message` from a given `Command`.
     ///
     /// Note that `response_to` will need to be set manually.
-    pub(crate) fn with_raw_command(command: RawCommand, request_id: Option<i32>) -> Result<Self> {
-        Ok(Self {
+    pub(crate) fn with_raw_command(command: RawCommand, request_id: Option<i32>) -> Self {
+        Self {
             response_to: 0,
             flags: MessageFlags::empty(),
             sections: vec![MessageSection::Document(command.bytes)],
             checksum: None,
             request_id,
-        })
+        }
     }
 
     /// Gets the first document contained in this Message.

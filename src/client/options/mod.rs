@@ -339,7 +339,6 @@ impl<'de> Deserialize<'de> for ServerApiVersion {
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, TypedBuilder)]
 #[builder(field_defaults(setter(into)))]
-#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ServerApi {
     /// The declared API version.
@@ -356,6 +355,7 @@ pub struct ServerApi {
     /// deprecated from the declared API version is used.
     /// Note that at the time of this writing, no deprecations in version 1 exist.
     #[builder(default)]
+    #[serde(rename = "apiDeprecationErrors")]
     pub deprecation_errors: Option<bool>,
 }
 

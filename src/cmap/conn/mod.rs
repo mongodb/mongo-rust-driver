@@ -267,7 +267,7 @@ impl Connection {
         command: RawCommand,
         request_id: impl Into<Option<i32>>,
     ) -> Result<RawCommandResponse> {
-        let message = Message::with_raw_command(command, request_id.into())?;
+        let message = Message::with_raw_command(command, request_id.into());
         self.send_message(message).await
     }
 
