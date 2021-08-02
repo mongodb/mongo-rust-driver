@@ -6,7 +6,7 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     bson::{doc, Bson, Document},
-    bson_util::deserialize_duration_from_u64_seconds,
+    bson_util,
     error::{Error, ErrorKind, Result},
     options::ServerAddress,
     sdam::public::ServerInfo,
@@ -188,7 +188,7 @@ pub struct ReadPreferenceOptions {
     #[serde(
         rename = "maxStalenessSeconds",
         default,
-        deserialize_with = "deserialize_duration_from_u64_seconds"
+        deserialize_with = "bson_util::deserialize_duration_option_from_u64_seconds"
     )]
     pub max_staleness: Option<Duration>,
 

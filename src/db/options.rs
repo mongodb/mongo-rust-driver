@@ -99,7 +99,7 @@ pub struct CreateCollectionOptions {
     /// information.
     #[serde(
         default,
-        deserialize_with = "bson_util::deserialize_duration_from_u64_seconds",
+        deserialize_with = "bson_util::deserialize_duration_option_from_u64_seconds",
         serialize_with = "bson_util::serialize_duration_option_as_int_secs"
     )]
     pub expire_after_seconds: Option<Duration>,
@@ -200,7 +200,7 @@ pub struct ListCollectionsOptions {
     /// number of round trips needed to return the entire set of documents returned by the
     /// query).
     #[serde(
-        serialize_with = "bson_util::serialize_batch_size",
+        serialize_with = "bson_util::serialize_u32_option_as_batch_size",
         rename(serialize = "cursor")
     )]
     pub batch_size: Option<u32>,

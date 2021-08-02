@@ -6,13 +6,7 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     bson::{doc, Bson, Document},
-    bson_util::{
-        deserialize_duration_from_u64_millis,
-        serialize_batch_size,
-        serialize_duration_as_int_millis,
-        serialize_u32_option_as_i32,
-        serialize_u64_option_as_i64,
-    },
+    bson_util,
     concern::{ReadConcern, WriteConcern},
     options::Collation,
     selection_criteria::SelectionCriteria,
@@ -427,7 +421,10 @@ pub struct AggregateOptions {
     /// only the number of documents kept in memory at a given time (and by extension, the
     /// number of round trips needed to return the entire set of documents returned by the
     /// query).
-    #[serde(serialize_with = "serialize_batch_size", rename(serialize = "cursor"))]
+    #[serde(
+        serialize_with = "bson_util::serialize_u32_option_as_batch_size",
+        rename(serialize = "cursor")
+    )]
     pub batch_size: Option<u32>,
 
     /// Opt out of document-level validation.
@@ -452,7 +449,7 @@ pub struct AggregateOptions {
     /// This option will have no effect on non-tailable cursors that result from this operation.
     #[serde(
         skip_serializing,
-        deserialize_with = "deserialize_duration_from_u64_millis",
+        deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis",
         default
     )]
     pub max_await_time: Option<Duration>,
@@ -462,9 +459,9 @@ pub struct AggregateOptions {
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
     #[serde(
-        serialize_with = "serialize_duration_as_int_millis",
+        serialize_with = "bson_util::serialize_duration_option_as_int_millis",
         rename = "maxTimeMS",
-        deserialize_with = "deserialize_duration_from_u64_millis",
+        deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis",
         default
     )]
     pub max_time: Option<Duration>,
@@ -518,7 +515,10 @@ pub struct CountOptions {
     ///
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
-    #[serde(default, deserialize_with = "deserialize_duration_from_u64_millis")]
+    #[serde(
+        default,
+        deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis"
+    )]
     pub max_time: Option<Duration>,
 
     /// The number of documents to skip before counting.
@@ -558,9 +558,9 @@ pub struct EstimatedDocumentCountOptions {
     /// across the wire as an integer number of milliseconds.
     #[serde(
         default,
-        serialize_with = "serialize_duration_as_int_millis",
+        serialize_with = "bson_util::serialize_duration_option_as_int_millis",
         rename = "maxTimeMS",
-        deserialize_with = "deserialize_duration_from_u64_millis"
+        deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis"
     )]
     pub max_time: Option<Duration>,
 
@@ -588,9 +588,9 @@ pub struct DistinctOptions {
     /// across the wire as an integer number of milliseconds.
     #[serde(
         default,
-        serialize_with = "serialize_duration_as_int_millis",
+        serialize_with = "bson_util::serialize_duration_option_as_int_millis",
         rename = "maxTimeMS",
-        deserialize_with = "deserialize_duration_from_u64_millis"
+        deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis"
     )]
     pub max_time: Option<Duration>,
 
@@ -633,7 +633,7 @@ pub struct FindOptions {
     /// only the number of documents kept in memory at a given time (and by extension, the
     /// number of round trips needed to return the entire set of documents returned by the
     /// query.
-    #[serde(serialize_with = "serialize_u32_option_as_i32")]
+    #[serde(serialize_with = "bson_util::serialize_u32_option_as_i32")]
     pub batch_size: Option<u32>,
 
     /// Tags the query with an arbitrary string to help trace the operation through the database
@@ -665,7 +665,7 @@ pub struct FindOptions {
     ///
     /// Note: this option is deprecated starting in MongoDB version 4.0 and removed in MongoDB 4.2.
     /// Use the maxTimeMS option instead.
-    #[serde(serialize_with = "serialize_u64_option_as_i64")]
+    #[serde(serialize_with = "bson_util::serialize_u64_option_as_i64")]
     pub max_scan: Option<u64>,
 
     /// The maximum amount of time to allow the query to run.
@@ -674,7 +674,7 @@ pub struct FindOptions {
     /// across the wire as an integer number of milliseconds.
     #[serde(
         rename = "maxTimeMS",
-        serialize_with = "serialize_duration_as_int_millis"
+        serialize_with = "bson_util::serialize_duration_option_as_int_millis"
     )]
     pub max_time: Option<Duration>,
 
@@ -705,7 +705,7 @@ pub struct FindOptions {
     pub show_record_id: Option<bool>,
 
     /// The number of documents to skip before counting.
-    #[serde(serialize_with = "serialize_u64_option_as_i64")]
+    #[serde(serialize_with = "bson_util::serialize_u64_option_as_i64")]
     pub skip: Option<u64>,
 
     /// The order of the documents for the purposes of the operation.
@@ -791,14 +791,14 @@ pub struct FindOneOptions {
     ///
     /// Note: this option is deprecated starting in MongoDB version 4.0 and removed in MongoDB 4.2.
     /// Use the maxTimeMS option instead.
-    #[serde(serialize_with = "serialize_u64_option_as_i64")]
+    #[serde(serialize_with = "bson_util::serialize_u64_option_as_i64")]
     pub max_scan: Option<u64>,
 
     /// The maximum amount of time to allow the query to run.
     ///
     /// This options maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
     /// across the wire as an integer number of milliseconds.
-    #[serde(deserialize_with = "deserialize_duration_from_u64_millis")]
+    #[serde(deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis")]
     pub max_time: Option<Duration>,
 
     /// The inclusive lower bound for a specific index.
@@ -824,7 +824,7 @@ pub struct FindOneOptions {
     pub show_record_id: Option<bool>,
 
     /// The number of documents to skip before counting.
-    #[serde(serialize_with = "serialize_u64_option_as_i64")]
+    #[serde(serialize_with = "bson_util::serialize_u64_option_as_i64")]
     pub skip: Option<u64>,
 
     /// The order of the documents for the purposes of the operation.

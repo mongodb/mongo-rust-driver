@@ -57,7 +57,7 @@ pub(super) struct FindAndModifyOptions {
     pub(crate) array_filters: Option<Vec<Document>>,
 
     #[serde(
-        serialize_with = "bson_util::serialize_duration_as_int_millis",
+        serialize_with = "bson_util::serialize_duration_option_as_int_millis",
         rename = "maxTimeMS"
     )]
     #[builder(default)]
