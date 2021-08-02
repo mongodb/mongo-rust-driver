@@ -72,6 +72,15 @@ impl Client {
         }
         match session.into() {
             Some(session) => {
+                if !Arc::ptr_eq(&self.inner, &session.client().inner) {
+                    return Err(ErrorKind::InvalidArgument {
+                        message: "the session provided to an operation must be created from the \
+                                  same client as the collection/database"
+                            .into(),
+                    }
+                    .into());
+                }
+
                 if let Some(SelectionCriteria::ReadPreference(read_preference)) =
                     op.selection_criteria()
                 {
