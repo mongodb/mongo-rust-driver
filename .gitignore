@@ -9,3 +9,4 @@ Cargo.lock
 *.iml
 .vscode
 .cargo
+**/.DS_Store
