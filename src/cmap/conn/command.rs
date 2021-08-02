@@ -51,6 +51,8 @@ pub(crate) struct Command<T = Document> {
     autocommit: Option<bool>,
 
     read_concern: Option<ReadConcern>,
+
+    recovery_token: Option<Document>,
 }
 
 impl<T> Command<T> {
@@ -67,6 +69,7 @@ impl<T> Command<T> {
             start_transaction: None,
             autocommit: None,
             read_concern: None,
+            recovery_token: None,
         }
     }
 
@@ -79,7 +82,7 @@ impl<T> Command<T> {
     }
 
     pub(crate) fn set_recovery_token(&mut self, recovery_token: &Document) {
-        self.body.insert("recoveryToken", recovery_token);
+        self.recovery_token = Some(recovery_token.clone());
     }
 
     pub(crate) fn set_txn_number(&mut self, txn_number: i64) {
