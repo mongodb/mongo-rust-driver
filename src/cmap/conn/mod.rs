@@ -3,6 +3,7 @@ mod stream_description;
 mod wire;
 
 use std::{
+    collections::HashMap,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -12,6 +13,7 @@ use derivative::Derivative;
 use self::wire::Message;
 use super::manager::PoolManager;
 use crate::{
+    bson::oid::ObjectId,
     cmap::options::{ConnectionOptions, StreamOptions},
     error::{ErrorKind, Result},
     event::cmap::{
@@ -47,6 +49,7 @@ pub(crate) struct Connection {
     pub(super) id: u32,
     pub(super) address: ServerAddress,
     pub(crate) generation: u32,
+    pub(crate) service_id: Option<ObjectId>,
 
     /// The cached StreamDescription from the connection's handshake.
     pub(super) stream_description: Option<StreamDescription>,
@@ -91,6 +94,7 @@ impl Connection {
         let conn = Self {
             id,
             generation,
+            service_id: None,
             pool_manager: None,
             command_executing: false,
             ready_and_available_time: None,
@@ -179,11 +183,6 @@ impl Connection {
                 })
             })
             .unwrap_or(false)
-    }
-
-    /// Checks if the connection is stale.
-    pub(super) fn is_stale(&self, current_generation: u32) -> bool {
-        self.generation != current_generation
     }
 
     /// Checks if the connection is currently executing an operation.
@@ -301,6 +300,7 @@ impl Connection {
             id: self.id,
             address: self.address.clone(),
             generation: self.generation,
+            service_id: self.service_id,
             stream: std::mem::replace(&mut self.stream, AsyncStream::Null),
             handler: self.handler.take(),
             stream_description: self.stream_description.take(),
@@ -345,6 +345,7 @@ pub(super) struct PendingConnection {
     pub(super) id: u32,
     pub(super) address: ServerAddress,
     pub(super) generation: u32,
+    pub(super) service_generations: HashMap<ObjectId, u32>,
     pub(super) options: Option<ConnectionOptions>,
 }
 

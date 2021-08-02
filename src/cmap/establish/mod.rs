@@ -39,13 +39,20 @@ impl ConnectionEstablisher {
         &self,
         pending_connection: PendingConnection,
     ) -> Result<Connection> {
+        let service_generations = pending_connection.service_generations.clone();
         let mut connection = Connection::connect(pending_connection).await?;
-
-        let first_round = self
+        
+        let handshake = self
             .handshaker
             .handshake(&mut connection)
-            .await?
-            .first_round;
+            .await?;
+
+        // If the handshake response had a `serviceId` field, this is a connection to a load
+        // balancer and must derive its generation from the service_generations map.
+        if let Some(service_id) = handshake.is_master_reply.command_response.service_id {
+            connection.generation = *service_generations.get(&service_id).unwrap_or(&0);
+            connection.service_id = Some(service_id);
+        }
 
         if let Some(ref credential) = self.credential {
             credential
@@ -53,7 +60,7 @@ impl ConnectionEstablisher {
                     &mut connection,
                     &self.http_client,
                     self.server_api.as_ref(),
-                    first_round,
+                    handshake.first_round,
                 )
                 .await?;
         }

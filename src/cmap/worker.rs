@@ -328,7 +328,7 @@ impl ConnectionPoolWorker {
         // first attempt to check out an available connection
         while let Some(mut conn) = self.available_connections.pop_back() {
             // Close the connection if it's stale.
-            if conn.is_stale(self.generation) {
+            if self.is_stale(&conn) {
                 self.close_connection(conn, ConnectionClosedReason::Stale);
                 continue;
             }
@@ -406,6 +406,10 @@ impl ConnectionPoolWorker {
             id: self.next_connection_id,
             address: self.address.clone(),
             generation: self.generation,
+            service_generations: self.service_generations
+                .iter()
+                .map(|(id, (generation, _))| (*id, *generation))
+                .collect::<HashMap<ObjectId, u32>>(),
             options: self.connection_options.clone(),
         };
         self.next_connection_id += 1;
@@ -443,7 +447,7 @@ impl ConnectionPoolWorker {
 
         if conn.has_errored() {
             self.close_connection(conn, ConnectionClosedReason::Error);
-        } else if conn.is_stale(self.generation) {
+        } else if self.is_stale(&conn) {
             self.close_connection(conn, ConnectionClosedReason::Stale);
         } else if conn.is_executing() {
             self.close_connection(conn, ConnectionClosedReason::Dropped)
@@ -518,7 +522,7 @@ impl ConnectionPoolWorker {
     /// Iterate over the connections and remove any that are stale or idle.
     fn remove_perished_connections(&mut self) {
         while let Some(connection) = self.available_connections.pop_front() {
-            if connection.is_stale(self.generation) {
+            if self.is_stale(&connection) {
                 // the following unwrap is okay becaue we asserted the pool was nonempty
                 self.close_connection(connection, ConnectionClosedReason::Stale);
             } else if connection.is_idle(self.max_idle_time) {
@@ -558,6 +562,17 @@ impl ConnectionPoolWorker {
                     }
                 });
             }
+        }
+    }
+
+    fn is_stale(&self, conn: &Connection) -> bool {
+        if let Some(service_id) = conn.service_id {
+            let service_gen = self.service_generations.get(&service_id)
+                .map(|(g, _)| g)
+                .unwrap_or(&0);
+            conn.generation != *service_gen
+        } else {
+            self.generation != conn.generation
         }
     }
 }
