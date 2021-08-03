@@ -41,11 +41,8 @@ impl ConnectionEstablisher {
     ) -> Result<Connection> {
         let service_generations = pending_connection.service_generations.clone();
         let mut connection = Connection::connect(pending_connection).await?;
-        
-        let handshake = self
-            .handshaker
-            .handshake(&mut connection)
-            .await?;
+
+        let handshake = self.handshaker.handshake(&mut connection).await?;
 
         // If the handshake response had a `serviceId` field, this is a connection to a load
         // balancer and must derive its generation from the service_generations map.

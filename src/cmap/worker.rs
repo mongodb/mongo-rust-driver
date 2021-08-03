@@ -37,7 +37,11 @@ use crate::{
     RUNTIME,
 };
 
-use std::{collections::{HashMap, VecDeque}, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+    time::Duration,
+};
 use tokio::sync::mpsc;
 
 const MAX_CONNECTING: u32 = 2;
@@ -372,7 +376,9 @@ impl ConnectionPoolWorker {
 
                 if let Ok(ref mut c) = establish_result {
                     c.mark_as_in_use(manager.clone());
-                    manager.handle_connection_succeeded(ConnectionSucceeded::Used { service_id: c.service_id });
+                    manager.handle_connection_succeeded(ConnectionSucceeded::Used {
+                        service_id: c.service_id,
+                    });
                 }
 
                 establish_result
@@ -407,7 +413,8 @@ impl ConnectionPoolWorker {
             id: self.next_connection_id,
             address: self.address.clone(),
             generation: self.generation,
-            service_generations: self.service_generations
+            service_generations: self
+                .service_generations
                 .iter()
                 .map(|(id, (generation, _))| (*id, *generation))
                 .collect::<HashMap<ObjectId, u32>>(),
@@ -578,7 +585,8 @@ impl ConnectionPoolWorker {
                     .await;
 
                     if let Ok(connection) = connection {
-                        manager.handle_connection_succeeded(ConnectionSucceeded::ForPool(connection))
+                        manager
+                            .handle_connection_succeeded(ConnectionSucceeded::ForPool(connection))
                     }
                 });
             }
@@ -587,7 +595,9 @@ impl ConnectionPoolWorker {
 
     fn is_stale(&self, conn: &Connection) -> bool {
         if let Some(service_id) = conn.service_id {
-            let service_gen = self.service_generations.get(&service_id)
+            let service_gen = self
+                .service_generations
+                .get(&service_id)
                 .map(|(g, _)| g)
                 .unwrap_or(&0);
             conn.generation != *service_gen

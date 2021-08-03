@@ -198,10 +198,15 @@ impl Handshaker {
         let client_first = set_speculative_auth_info(&mut command.body, self.credential.as_ref())?;
 
         let mut is_master_reply = run_is_master(command, conn).await?;
-        if self.command.body.contains_key("loadBalanced") && is_master_reply.command_response.service_id.is_none() {
+        if self.command.body.contains_key("loadBalanced")
+            && is_master_reply.command_response.service_id.is_none()
+        {
             return Err(ErrorKind::IncompatibleServer {
-                message: "Driver attempted to initialize in load balancing mode, but the server does not support this mode.".to_string(),
-            }.into())
+                message: "Driver attempted to initialize in load balancing mode, but the server \
+                          does not support this mode."
+                    .to_string(),
+            }
+            .into());
         }
         conn.stream_description = Some(StreamDescription::from_is_master(is_master_reply.clone()));
 

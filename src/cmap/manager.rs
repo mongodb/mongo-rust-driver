@@ -122,9 +122,7 @@ impl PoolManagementRequest {
 #[derive(Debug)]
 pub(super) enum ConnectionSucceeded {
     ForPool(Connection),
-    Used {
-        service_id: Option<ObjectId>,
-    }
+    Used { service_id: Option<ObjectId> },
 }
 
 impl ConnectionSucceeded {

@@ -259,13 +259,10 @@ impl Topology {
 
         let is_load_balanced = state_lock.description.topology_type() == TopologyType::LoadBalanced;
         if error.is_state_change_error() {
-            let updated = if is_load_balanced {
-                true
-            } else {
-                self
+            let updated = is_load_balanced
+                || self
                     .mark_server_as_unknown(error.to_string(), server, state_lock)
-                    .await
-            };
+                    .await;
 
             if updated && (error.is_shutting_down() || handshake.wire_version().unwrap_or(0) < 8) {
                 server.pool.clear(error, service_id).await;
@@ -279,13 +276,10 @@ impl Topology {
                     || error.is_network_timeout()
                     || error.is_command_error()))
         {
-            let updated = if is_load_balanced {
-                true
-            } else {
-                self
+            let updated = is_load_balanced
+                || self
                     .mark_server_as_unknown(error.to_string(), server, state_lock)
-                    .await
-            };
+                    .await;
             if updated {
                 server.pool.clear(error, service_id).await;
             }
