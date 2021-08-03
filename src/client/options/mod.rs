@@ -558,6 +558,7 @@ pub struct ClientOptions {
     pub(crate) heartbeat_freq_test: Option<Duration>,
 
     /// Allow use of the `load_balanced` option.
+    // TODO RUST-653 Remove this when load balancer work is ready for release.
     #[builder(default, setter(skip))]
     #[serde(skip)]
     pub(crate) allow_load_balanced: bool,

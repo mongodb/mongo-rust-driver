@@ -108,7 +108,7 @@ impl ConnectionPoolOptions {
             background_thread_interval: None,
             #[cfg(test)]
             ready: None,
-            load_balanced: options.load_balanced.clone(),
+            load_balanced: options.load_balanced,
         }
     }
 

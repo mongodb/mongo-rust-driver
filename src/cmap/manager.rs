@@ -27,7 +27,7 @@ impl PoolManager {
             .send(PoolManagementRequest::Clear {
                 completion_handler: message,
                 cause,
-                service_id: service_id,
+                service_id,
             })
             .is_ok()
         {
