@@ -390,7 +390,7 @@ impl Topology {
         server_address: &ServerAddress,
         command: &mut Command<T>,
         criteria: Option<&SelectionCriteria>,
-    ) -> Result<()> {
+    ) {
         self.state
             .read()
             .await
@@ -494,7 +494,7 @@ impl TopologyState {
         server_address: &ServerAddress,
         command: &mut Command<T>,
         criteria: Option<&SelectionCriteria>,
-    ) -> Result<()> {
+    ) {
         let server_type = self
             .description
             .get_server_description(server_address)

@@ -93,9 +93,8 @@ impl<T> Command<T> {
         self.server_api = Some(server_api.clone());
     }
 
-    pub(crate) fn set_read_preference(&mut self, read_preference: ReadPreference) -> Result<()> {
+    pub(crate) fn set_read_preference(&mut self, read_preference: ReadPreference) {
         self.read_preference = Some(read_preference);
-        Ok(())
     }
 
     pub(crate) fn set_start_transaction(&mut self) {
@@ -106,20 +105,18 @@ impl<T> Command<T> {
         self.autocommit = Some(false);
     }
 
-    pub(crate) fn set_txn_read_concern(&mut self, session: &ClientSession) -> Result<()> {
+    pub(crate) fn set_txn_read_concern(&mut self, session: &ClientSession) {
         if let Some(ref options) = session.transaction.options {
             if let Some(ref read_concern) = options.read_concern {
                 self.read_concern = Some(read_concern.clone());
             }
         }
-        Ok(())
     }
 
-    pub(crate) fn set_snapshot_read_concern(&mut self, session: &ClientSession) -> Result<()> {
+    pub(crate) fn set_snapshot_read_concern(&mut self, session: &ClientSession) {
         let mut concern = ReadConcern::snapshot();
         concern.at_cluster_time = session.snapshot_time;
         self.read_concern = Some(concern);
-        Ok(())
     }
 }
 

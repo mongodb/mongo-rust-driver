@@ -49,7 +49,7 @@ async fn acquire_connection_and_send_command() {
         options: Default::default(),
     };
     let mut cmd = Command::new("listDatabases".to_string(), "admin".to_string(), body);
-    cmd.set_read_preference(read_pref).unwrap();
+    cmd.set_read_preference(read_pref);
     if let Some(server_api) = client_options.server_api.as_ref() {
         cmd.set_server_api(server_api);
     }
