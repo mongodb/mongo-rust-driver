@@ -19,6 +19,7 @@ use super::{
     TopologyDescription,
 };
 use crate::{
+    bson::oid::ObjectId,
     client::ClusterTime,
     cmap::{Command, Connection},
     error::{Error, Result},
@@ -249,19 +250,25 @@ impl Topology {
         error: Error,
         handshake: HandshakePhase,
         server: &Server,
+        service_id: Option<ObjectId>,
     ) -> bool {
         let state_lock = self.state.write().await;
         if handshake.generation() < server.pool.generation() {
             return false;
         }
 
+        let is_load_balanced = state_lock.description.topology_type() == TopologyType::LoadBalanced;
         if error.is_state_change_error() {
-            let updated = self
-                .mark_server_as_unknown(error.to_string(), server, state_lock)
-                .await;
+            let updated = if is_load_balanced {
+                true
+            } else {
+                self
+                    .mark_server_as_unknown(error.to_string(), server, state_lock)
+                    .await
+            };
 
             if updated && (error.is_shutting_down() || handshake.wire_version().unwrap_or(0) < 8) {
-                server.pool.clear(error).await;
+                server.pool.clear(error, service_id).await;
             }
             self.request_topology_check();
 
@@ -272,11 +279,15 @@ impl Topology {
                     || error.is_network_timeout()
                     || error.is_command_error()))
         {
-            let updated = self
-                .mark_server_as_unknown(error.to_string(), server, state_lock)
-                .await;
+            let updated = if is_load_balanced {
+                true
+            } else {
+                self
+                    .mark_server_as_unknown(error.to_string(), server, state_lock)
+                    .await
+            };
             if updated {
-                server.pool.clear(error).await;
+                server.pool.clear(error, service_id).await;
             }
             updated
         } else {
@@ -290,7 +301,9 @@ impl Topology {
             .mark_server_as_unknown(error.to_string(), server, state_lock)
             .await;
         if updated {
-            server.pool.clear(error).await;
+            // The heartbeat monitor is disabled in load-balanced mode, so this will never have a
+            // service id.
+            server.pool.clear(error, None).await;
         }
         updated
     }

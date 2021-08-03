@@ -1,7 +1,7 @@
 use tokio::sync::mpsc;
 
 use super::Connection;
-use crate::{error::Error, runtime::AcknowledgedMessage};
+use crate::{bson::oid::ObjectId, error::Error, runtime::AcknowledgedMessage};
 
 pub(super) fn channel() -> (PoolManager, ManagementRequestReceiver) {
     let (sender, receiver) = mpsc::unbounded_channel();
@@ -20,13 +20,14 @@ pub(super) struct PoolManager {
 
 impl PoolManager {
     /// Lazily clear the pool.
-    pub(super) async fn clear(&self, cause: Error) {
+    pub(super) async fn clear(&self, cause: Error, service_id: Option<ObjectId>) {
         let (message, acknowledgment_receiver) = AcknowledgedMessage::package(());
         if self
             .sender
             .send(PoolManagementRequest::Clear {
                 completion_handler: message,
                 cause,
+                service_id: service_id,
             })
             .is_ok()
         {
@@ -66,10 +67,10 @@ impl PoolManager {
     }
 
     /// Notify the pool that establishing a connection succeeded.
-    pub(super) fn handle_connection_succeeded(&self, connection: Option<Connection>) {
+    pub(super) fn handle_connection_succeeded(&self, conn: ConnectionSucceeded) {
         let _ = self
             .sender
-            .send(PoolManagementRequest::HandleConnectionSucceeded(connection));
+            .send(PoolManagementRequest::HandleConnectionSucceeded(conn));
     }
 }
 
@@ -90,6 +91,7 @@ pub(super) enum PoolManagementRequest {
     Clear {
         completion_handler: AcknowledgedMessage<()>,
         cause: Error,
+        service_id: Option<ObjectId>,
     },
 
     /// Mark the pool as Ready, allowing connections to be created and checked out.
@@ -105,7 +107,7 @@ pub(super) enum PoolManagementRequest {
 
     /// Update the pool after a successful connection, optionally populating the pool
     /// with the successful connection.
-    HandleConnectionSucceeded(Option<Connection>),
+    HandleConnectionSucceeded(ConnectionSucceeded),
 }
 
 impl PoolManagementRequest {
@@ -113,6 +115,23 @@ impl PoolManagementRequest {
         match self {
             PoolManagementRequest::CheckIn(conn) => conn,
             _ => panic!("tried to unwrap checkin but got {:?}", self),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(super) enum ConnectionSucceeded {
+    ForPool(Connection),
+    Used {
+        service_id: Option<ObjectId>,
+    }
+}
+
+impl ConnectionSucceeded {
+    pub(super) fn service_id(&self) -> Option<ObjectId> {
+        match self {
+            ConnectionSucceeded::ForPool(conn) => conn.service_id,
+            ConnectionSucceeded::Used { service_id, .. } => *service_id,
         }
     }
 }

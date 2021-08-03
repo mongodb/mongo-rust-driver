@@ -249,6 +249,7 @@ impl UpdateMonitor {
                                 generation: error_generation,
                             },
                             &server,
+                            None,
                         )
                         .await;
                 }

@@ -13,7 +13,7 @@ use super::{
     },
     establish::ConnectionEstablisher,
     manager,
-    manager::{ManagementRequestReceiver, PoolManagementRequest, PoolManager},
+    manager::{ConnectionSucceeded, ManagementRequestReceiver, PoolManagementRequest, PoolManager},
     options::{ConnectionOptions, ConnectionPoolOptions},
     status,
     status::{PoolGenerationPublisher, PoolGenerationSubscriber},
@@ -276,8 +276,9 @@ impl ConnectionPoolWorker {
                 PoolTask::HandleManagementRequest(PoolManagementRequest::Clear {
                     completion_handler: _,
                     cause,
+                    service_id,
                 }) => {
-                    self.clear(cause);
+                    self.clear(cause, service_id);
                 }
                 PoolTask::HandleManagementRequest(PoolManagementRequest::MarkAsReady {
                     completion_handler: _handler,
@@ -285,8 +286,8 @@ impl ConnectionPoolWorker {
                     self.mark_as_ready();
                 }
                 PoolTask::HandleManagementRequest(
-                    PoolManagementRequest::HandleConnectionSucceeded(c),
-                ) => self.handle_connection_succeeded(c),
+                    PoolManagementRequest::HandleConnectionSucceeded(conn),
+                ) => self.handle_connection_succeeded(conn),
                 PoolTask::HandleManagementRequest(
                     PoolManagementRequest::HandleConnectionFailed,
                 ) => self.handle_connection_failed(),
@@ -371,7 +372,7 @@ impl ConnectionPoolWorker {
 
                 if let Ok(ref mut c) = establish_result {
                     c.mark_as_in_use(manager.clone());
-                    manager.handle_connection_succeeded(None);
+                    manager.handle_connection_succeeded(ConnectionSucceeded::Used { service_id: c.service_id });
                 }
 
                 establish_result
@@ -430,9 +431,13 @@ impl ConnectionPoolWorker {
 
     /// Process a successful connection establishment, optionally populating the pool with the
     /// resulting connection.
-    fn handle_connection_succeeded(&mut self, connection: Option<Connection>) {
+    fn handle_connection_succeeded(&mut self, connection: ConnectionSucceeded) {
         self.pending_connection_count -= 1;
-        if let Some(mut connection) = connection {
+        if let Some(sid) = connection.service_id() {
+            let (_, count) = self.service_generations.entry(sid).or_insert((0, 0));
+            *count += 1;
+        }
+        if let ConnectionSucceeded::ForPool(mut connection) = connection {
             connection.mark_as_available();
             self.available_connections.push_back(connection);
         }
@@ -456,10 +461,17 @@ impl ConnectionPoolWorker {
         }
     }
 
-    fn clear(&mut self, cause: Error) {
-        self.generation += 1;
-        let previous_state = std::mem::replace(&mut self.state, PoolState::Paused(cause.clone()));
-        self.generation_publisher.publish(self.generation);
+    fn clear(&mut self, cause: Error, service_id: Option<ObjectId>) {
+        let previous_state = if let Some(sid) = service_id {
+            let (generation, _) = self.service_generations.entry(sid).or_insert((0, 0));
+            *generation += 1;
+            PoolState::Ready
+        } else {
+            self.generation += 1;
+            let prev = std::mem::replace(&mut self.state, PoolState::Paused(cause.clone()));
+            self.generation_publisher.publish(self.generation);
+            prev
+        };
 
         if matches!(previous_state, PoolState::Ready) {
             self.emit_event(|handler| {
@@ -506,6 +518,14 @@ impl ConnectionPoolWorker {
     /// Close a connection, emit the event for it being closed, and decrement the
     /// total connection count.
     fn close_connection(&mut self, connection: Connection, reason: ConnectionClosedReason) {
+        if let Some(sid) = connection.service_id {
+            if let Some((_, count)) = self.service_generations.get_mut(&sid) {
+                *count -= 1;
+                if *count == 0 {
+                    self.service_generations.remove(&sid);
+                }
+            }
+        }
         connection.close_and_drop(reason);
         self.total_connection_count -= 1;
     }
@@ -558,7 +578,7 @@ impl ConnectionPoolWorker {
                     .await;
 
                     if let Ok(connection) = connection {
-                        manager.handle_connection_succeeded(Some(connection))
+                        manager.handle_connection_succeeded(ConnectionSucceeded::ForPool(connection))
                     }
                 });
             }

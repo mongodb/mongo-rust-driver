@@ -21,6 +21,7 @@ pub(crate) use self::{
 };
 use self::{connection_requester::ConnectionRequestResult, options::ConnectionPoolOptions};
 use crate::{
+    bson::oid::ObjectId,
     error::{Error, Result},
     event::cmap::{
         CmapEventHandler,
@@ -156,8 +157,8 @@ impl ConnectionPool {
 
     /// Increments the generation of the pool. Rather than eagerly removing stale connections from
     /// the pool, they are left for the background thread to clean up.
-    pub(crate) async fn clear(&self, cause: Error) {
-        self.manager.clear(cause).await
+    pub(crate) async fn clear(&self, cause: Error, service_id: Option<ObjectId>) {
+        self.manager.clear(cause, service_id).await
     }
 
     /// Mark the pool as "ready", allowing connections to be created and checked out.
