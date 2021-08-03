@@ -260,7 +260,7 @@ impl Connection {
     /// server.
     ///
     /// An `Ok(...)` result simply means the server received the command and that the driver
-    /// driver received the response; it does not imply anything about the success of the command
+    /// received the response; it does not imply anything about the success of the command
     /// itself.
     pub(crate) async fn send_raw_command(
         &mut self,
