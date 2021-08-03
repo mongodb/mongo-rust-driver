@@ -291,7 +291,7 @@ async fn run_test(test_file: TestFile) {
                 };
 
                 topology
-                    .handle_application_error(error, handshake_phase, &server)
+                    .handle_application_error(error, handshake_phase, &server, None)
                     .await;
             }
         }
@@ -566,7 +566,7 @@ async fn pool_cleared_error_does_not_mark_unknown() {
     };
     assert!(
         !topology
-            .handle_application_error(error, phase, &server)
+            .handle_application_error(error, phase, &server, None)
             .await
     );
     assert_eq!(
