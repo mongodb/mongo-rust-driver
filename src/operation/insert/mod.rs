@@ -71,6 +71,7 @@ impl<'a, T: Serialize> Operation for Insert<'a, T> {
             let id = match bson_util::raw_get(doc.as_slice(), "_id")? {
                 Some(b) => b,
                 None => {
+                    // TODO: RUST-924 Use raw document API here instead.
                     let oid = ObjectId::new();
 
                     // write element to temporary buffer
