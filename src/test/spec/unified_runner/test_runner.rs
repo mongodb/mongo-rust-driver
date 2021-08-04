@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     bson::Document,
-    client::{options::ClientOptions},
+    client::options::ClientOptions,
     concern::{Acknowledgment, WriteConcern},
     db::options::CreateCollectionOptions,
     options::CollectionOptions,
@@ -72,7 +72,8 @@ impl TestRunner {
                     let id = client.id.clone();
                     let observe_events = client.observe_events.clone();
                     let ignore_command_names = client.ignore_command_monitoring_events.clone();
-                    let observe_sensitive_commands = client.observe_sensitive_commands.unwrap_or(false);
+                    let observe_sensitive_commands =
+                        client.observe_sensitive_commands.unwrap_or(false);
                     let server_api = client.server_api.clone().or_else(|| SERVER_API.clone());
                     let observer = Arc::new(EventHandler::new());
 

@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     bson::{Bson, Document},
-    client::{REDACTED_COMMANDS, HELLO_COMMAND_NAMES},
+    client::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     event::command::CommandStartedEvent,
     test::{CommandEvent, EventHandler},
     Client,
@@ -83,12 +83,14 @@ impl ClientEntity {
             }
             if !self.observe_sensitive_commands {
                 let lower_name = event.command_name().to_ascii_lowercase();
-                // If a hello command has been redacted, it's sensitive and the event should be ignored.
-                let is_sensitive_hello = HELLO_COMMAND_NAMES.contains(lower_name.as_str()) && match event {
-                    CommandEvent::Started(ev) => ev.command.is_empty(),
-                    CommandEvent::Succeeded(ev) => ev.reply.is_empty(),
-                    CommandEvent::Failed(_) => false,
-                };
+                // If a hello command has been redacted, it's sensitive and the event should be
+                // ignored.
+                let is_sensitive_hello = HELLO_COMMAND_NAMES.contains(lower_name.as_str())
+                    && match event {
+                        CommandEvent::Started(ev) => ev.command.is_empty(),
+                        CommandEvent::Succeeded(ev) => ev.reply.is_empty(),
+                        CommandEvent::Failed(_) => false,
+                    };
                 if is_sensitive_hello || REDACTED_COMMANDS.contains(lower_name.as_str()) {
                     return false;
                 }
