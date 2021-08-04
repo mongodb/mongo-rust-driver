@@ -217,7 +217,7 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                 let client = entity.as_client();
 
                 let actual_events: Vec<TestEvent> = client
-                    .get_filtered_events(&client.observe_events, &client.ignore_command_names)
+                    .get_filtered_events()
                     .into_iter()
                     .map(Into::into)
                     .collect();
@@ -308,4 +308,15 @@ async fn valid_fail() {
             .await
             .expect_err(&format!("tests from {} should have failed", path_display));
     }
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn valid_pass() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+    run_spec_test(
+        &["unified-test-format", "valid-pass"],
+        run_unified_format_test,
+    )
+    .await;
 }
