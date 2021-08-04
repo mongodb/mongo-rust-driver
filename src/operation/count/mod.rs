@@ -46,7 +46,7 @@ impl Operation for Count {
 
     const NAME: &'static str = "count";
 
-    fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
+    fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         let mut body = match description.max_wire_version {
             Some(v) if v >= SERVER_4_9_0_WIRE_VERSION => {
                 doc! {

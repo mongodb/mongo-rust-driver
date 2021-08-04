@@ -44,7 +44,7 @@ impl Operation for Create {
 
     const NAME: &'static str = "create";
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command<Self::Command>> {
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = doc! {
             Self::NAME: self.ns.coll.clone(),
         };

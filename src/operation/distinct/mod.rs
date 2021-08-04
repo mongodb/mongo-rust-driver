@@ -57,7 +57,7 @@ impl Operation for Distinct {
 
     const NAME: &'static str = "distinct";
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command<Self::Command>> {
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body: Document = doc! {
             Self::NAME: self.ns.coll.clone(),
             "key": self.field_name.clone(),

@@ -37,7 +37,7 @@ impl Operation for DropDatabase {
 
     const NAME: &'static str = "dropDatabase";
 
-    fn build(&mut self, _description: &StreamDescription) -> Result<Command<Self::Command>> {
+    fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = doc! {
             Self::NAME: 1,
         };
