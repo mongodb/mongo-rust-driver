@@ -47,7 +47,6 @@ futures-util = { version = "0.3.14", features = ["io"] }
 futures-executor = "0.3.14"
 hex = "0.4.0"
 hmac = "0.10.1"
-hyper = { version = "0.14", default-features = false, features = ["client", "http1", "tcp"], optional = true }
 lazy_static = "1.4.0"
 md-5 = "0.9.1"
 os_info = { version = "3.0.1", default-features = false }
@@ -75,6 +74,12 @@ optional = true
 
 [dependencies.async-std-resolver]
 version = "0.20.1"
+optional = true
+
+[dependencies.hyper]
+version = "0.14"
+default-features = false
+features = ["client", "http1", "tcp"]
 optional = true
 
 [dependencies.pbkdf2]

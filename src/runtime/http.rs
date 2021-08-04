@@ -82,7 +82,7 @@ impl HttpClient {
     }
 
     #[allow(clippy::type_complexity)]
-    /// Executes an HTTP equest and returns the response.
+    /// Executes an HTTP request and returns the response.
     pub(crate) fn request<'a>(
         &'a self,
         method: Method,
