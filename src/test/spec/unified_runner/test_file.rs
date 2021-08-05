@@ -147,7 +147,7 @@ pub struct Client {
     pub ignore_command_monitoring_events: Option<Vec<String>>,
     #[serde(default)]
     pub observe_sensitive_commands: Option<bool>,
-    #[serde(default, deserialize_with = "deserialize_server_api")]
+    #[serde(default, deserialize_with = "deserialize_server_api_test_format")]
     pub server_api: Option<ServerApi>,
 }
 
@@ -155,7 +155,7 @@ fn default_uri() -> String {
     DEFAULT_URI.clone()
 }
 
-pub fn deserialize_server_api<'de, D>(
+pub fn deserialize_server_api_test_format<'de, D>(
     deserializer: D,
 ) -> std::result::Result<Option<ServerApi>, D::Error>
 where
