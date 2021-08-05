@@ -2,19 +2,12 @@ use std::time::Duration;
 
 use crate::{bson::Document, bson_util, collation::Collation};
 
-<<<<<<< HEAD
-use serde::{Deserialize, Serialize};
-<<<<<<< HEAD
-use serde_with::skip_serializing_none;
-=======
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
->>>>>>> a521ae6 (fix)
-=======
->>>>>>> 4a468a7 (Update documentation for Options)
 use typed_builder::TypedBuilder;
 
 /// These are the valid options for specifying an [`IndexModel`](../struct.IndexModel.html).
 /// For more information on these properties, see the [documentation](https://docs.mongodb.com/manual/reference/command/createIndexes/#definition).
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, Serialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -30,6 +23,7 @@ pub struct IndexOptions {
     /// See the [documentation](https://docs.mongodb.com/manual/core/index-ttl/)
     /// for more information on how to use this option.
     #[serde(
+        rename = "expireAfterSeconds",
         deserialize_with = "bson_util::deserialize_duration_option_from_u64_seconds",
         serialize_with = "bson_util::serialize_duration_option_as_int_secs"
     )]
@@ -52,16 +46,19 @@ pub struct IndexOptions {
     /// Forces the index to be unique. The default value is false.
     pub unique: Option<bool>,
 
-    /// Specify the version number of the index. Starting in MongoDB 3.2, this option is not
-    /// allowed.
+    /// Specify the version number of the index.
+    /// Starting in MongoDB 3.2, Version 0 indexes are not allowed.
+    #[serde(rename = "v")]
     pub version: Option<IndexVersion>,
 
     /// For text indexes, the language that determines the list of stop words and the
     /// rules for the stemmer and tokenizer.
+    #[serde(rename = "default_language")]
     pub default_language: Option<String>,
 
     /// For `text` indexes, the name of the field, in the collection’s documents, that
     /// contains the override language for the document.
+    #[serde(rename = "language_override")]
     pub language_override: Option<String>,
 
     /// The `text` index version number. Users can use this option to override the default
@@ -93,7 +90,7 @@ pub struct IndexOptions {
     /// For `geoHaystack` indexes, specify the number of units within which to group the location
     /// values.
     #[serde(serialize_with = "bson_util::serialize_u32_option_as_i32")]
-    bucket_size: Option<u32>,
+    pub bucket_size: Option<u32>,
 
     /// If specified, the index only references documents that match the filter
     /// expression. See Partial Indexes for more information.

@@ -837,8 +837,10 @@ pub struct FindOneOptions {
 /// methods.
 ///
 /// For more information, see [`createIndexes`](https://docs.mongodb.com/manual/reference/command/createIndexes/).
+#[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
 #[builder(field_defaults(default, setter(into)))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[non_exhaustive]
 pub struct CreateIndexesOptions {
     /// Specify the commit quorum needed to mark an `index` as ready.
@@ -846,6 +848,7 @@ pub struct CreateIndexesOptions {
 
     /// The maximum amount of time to allow the index to build.
     #[serde(
+        rename = "maxTimeMS",
         serialize_with = "bson_util::serialize_duration_option_as_int_millis",
         deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis"
     )]

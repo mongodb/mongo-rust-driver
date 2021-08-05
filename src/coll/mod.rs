@@ -30,12 +30,13 @@ use crate::{
         Insert,
         Update,
     },
-    results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult, CreateIndexesResult},
+    results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
     selection_criteria::SelectionCriteria,
     Client,
     ClientSession,
     Cursor,
     Database,
+    IndexModel,
     SessionCursor,
 };
 
@@ -314,26 +315,53 @@ impl<T> Collection<T> {
         self.client().execute_operation(delete, session).await
     }
 
-    /// Builds one or more indexes on a collection.
-    pub async fn create_indexes(
+    async fn create_indexes_common(
         &self,
-        indexes: impl IntoIterator<Item = Index>,
+        indexes: impl IntoIterator<Item = IndexModel>,
         options: impl Into<Option<CreateIndexesOptions>>,
-    ) -> Result<CreateIndexesResult> {
-        let mut options = options.into();
-        resolve_options!(self, options, [write_concern]);
-        let indexes: Vec<Index> = indexes.into_iter().collect();
+        session: impl Into<Option<&mut ClientSession>>,
+    ) -> Result<Vec<String>> {
+        let session = session.into();
 
-        if indexes.is_empty() {
-            return Err(ErrorKind::ArgumentError {
-                message: "No indexes provided to create_indexes".to_string(),
+        let mut options = options.into();
+        resolve_write_concern_with_session!(self, options, session.as_ref())?;
+
+        let indexes: Vec<IndexModel> = indexes.into_iter().collect();
+
+        let create_indexes = CreateIndexes::new(self.namespace(), indexes, options);
+        self.client()
+            .execute_operation(create_indexes, session)
+            .await
+    }
+
+    /// Convenience method for creating a single index.
+    pub async fn create_index(
+        &self,
+        index: IndexModel,
+        options: impl Into<Option<CreateIndexesOptions>>,
+    ) -> Result<String> {
+        let mut result = self
+            .create_indexes_common(vec![index], options, None)
+            .await?;
+        if result.len() != 1 {
+            return Err(ErrorKind::InvalidResponse {
+                message: format!(
+                    "Expected exactly one index to be created, received {:?}",
+                    result
+                ),
             }
             .into());
         }
+        Ok(result.pop().unwrap())
+    }
 
-
-        let create_indexes = CreateIndexes::new(self.namespace(), indexes, options);
-        self.client().execute_operation(create_indexes).await
+    /// Create several indexes.
+    pub async fn create_indexes(
+        &self,
+        indexes: impl IntoIterator<Item = IndexModel>,
+        options: impl Into<Option<CreateIndexesOptions>>,
+    ) -> Result<Vec<String>> {
+        self.create_indexes_common(indexes, options, None).await
     }
 
     /// Deletes all documents stored in the collection matching `query`.

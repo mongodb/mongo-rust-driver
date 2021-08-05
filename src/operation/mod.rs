@@ -421,3 +421,14 @@ pub(crate) enum Retryability {
     Read,
     None,
 }
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CreateIndexResponseBody {
+    created_collection_automatically: Option<bool>,
+    num_indexes_before: Option<u32>,
+    num_indexes_after: Option<u32>,
+    note: Option<String>,
+    #[serde(flatten)]
+    err: Option<CommandError>,
+}
