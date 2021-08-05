@@ -6,6 +6,7 @@ use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, oid::ObjectId},
+    cmap::{conn::ConnectionGeneration, PoolGeneration},
     client::Client,
     error::{BulkWriteFailure, CommandError, Error, ErrorKind},
     is_master::{IsMasterCommandResponse, IsMasterReply, LastWrite},
@@ -273,18 +274,24 @@ async fn run_test(test_file: TestFile) {
                 .and_then(|s| s.upgrade())
             {
                 let error = application_error.to_error();
-                let error_generation = application_error
+                let pool_generation = application_error
                     .generation
+                    .map(PoolGeneration::Normal)
                     .unwrap_or_else(|| server.pool.generation());
+                let conn_generation = application_error
+                    .generation
+                    .or_else(|| server.pool.generation().as_normal())
+                    .unwrap_or(0);
+                let conn_generation = ConnectionGeneration::Normal(conn_generation);
                 let handshake_phase = match application_error.when {
                     ErrorHandshakePhase::BeforeHandshakeCompletes => {
                         HandshakePhase::BeforeCompletion {
-                            generation: error_generation,
+                            generation: pool_generation,
                         }
                     }
                     ErrorHandshakePhase::AfterHandshakeCompletes => {
                         HandshakePhase::AfterCompletion {
-                            generation: error_generation,
+                            generation: conn_generation,
                             max_wire_version: application_error.max_wire_version,
                         }
                     }

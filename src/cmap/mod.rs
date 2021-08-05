@@ -18,6 +18,7 @@ pub(crate) use self::{
     conn::{Command, Connection, RawCommand, RawCommandResponse, StreamDescription},
     establish::handshake::Handshaker,
     status::PoolGenerationSubscriber,
+    worker::PoolGeneration,
 };
 use self::{connection_requester::ConnectionRequestResult, options::ConnectionPoolOptions};
 use crate::{
@@ -166,7 +167,7 @@ impl ConnectionPool {
         self.manager.mark_as_ready().await;
     }
 
-    pub(crate) fn generation(&self) -> u32 {
+    pub(crate) fn generation(&self) -> PoolGeneration {
         self.generation_subscriber.generation()
     }
 }

@@ -220,7 +220,7 @@ impl Client {
                         err.clone(),
                         HandshakePhase::after_completion(&conn),
                         &server,
-                        conn.service_id,
+                        conn.generation.service_id(),
                     )
                     .await;
                 // release the connection to be processed by the connection pool
@@ -278,7 +278,7 @@ impl Client {
                         err.clone(),
                         HandshakePhase::after_completion(&conn),
                         &server,
-                        conn.service_id,
+                        conn.generation.service_id(),
                     )
                     .await;
                 drop(server);

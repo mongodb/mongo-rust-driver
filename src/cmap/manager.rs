@@ -128,7 +128,7 @@ pub(super) enum ConnectionSucceeded {
 impl ConnectionSucceeded {
     pub(super) fn service_id(&self) -> Option<ObjectId> {
         match self {
-            ConnectionSucceeded::ForPool(conn) => conn.service_id,
+            ConnectionSucceeded::ForPool(conn) => conn.generation.service_id(),
             ConnectionSucceeded::Used { service_id, .. } => *service_id,
         }
     }

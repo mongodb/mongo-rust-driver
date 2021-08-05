@@ -5,7 +5,7 @@ use std::sync::{
 
 use super::WeakTopology;
 use crate::{
-    cmap::{options::ConnectionPoolOptions, ConnectionPool},
+    cmap::{options::ConnectionPoolOptions, ConnectionPool, PoolGeneration},
     error::Error,
     options::{ClientOptions, ServerAddress},
     runtime::{AcknowledgedMessage, HttpClient},
@@ -74,7 +74,7 @@ impl Server {
 /// TODO: add success cases from application handshakes.
 #[derive(Debug)]
 pub(crate) enum ServerUpdate {
-    Error { error: Error, error_generation: u32 },
+    Error { error: Error, error_generation: PoolGeneration },
 }
 
 #[derive(Debug)]
@@ -106,7 +106,7 @@ impl ServerUpdateSender {
 
     /// Update the server based on the given error.
     /// This will block until the topology has processed the error.
-    pub(crate) async fn handle_error(&mut self, error: Error, error_generation: u32) {
+    pub(crate) async fn handle_error(&mut self, error: Error, error_generation: PoolGeneration) {
         let reason = ServerUpdate::Error {
             error,
             error_generation,

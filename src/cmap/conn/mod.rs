@@ -3,7 +3,6 @@ mod stream_description;
 mod wire;
 
 use std::{
-    collections::HashMap,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -14,7 +13,7 @@ use self::wire::Message;
 use super::manager::PoolManager;
 use crate::{
     bson::oid::ObjectId,
-    cmap::options::{ConnectionOptions, StreamOptions},
+    cmap::{PoolGeneration, options::{ConnectionOptions, StreamOptions}},
     error::{ErrorKind, Result},
     event::cmap::{
         CmapEventHandler,
@@ -48,8 +47,7 @@ pub struct ConnectionInfo {
 pub(crate) struct Connection {
     pub(super) id: u32,
     pub(super) address: ServerAddress,
-    pub(crate) generation: u32,
-    pub(crate) service_id: Option<ObjectId>,
+    pub(crate) generation: ConnectionGeneration,
 
     /// The cached StreamDescription from the connection's handshake.
     pub(super) stream_description: Option<StreamDescription>,
@@ -93,8 +91,7 @@ impl Connection {
 
         let conn = Self {
             id,
-            generation,
-            service_id: None,
+            generation: ConnectionGeneration::Normal(generation),
             pool_manager: None,
             command_executing: false,
             ready_and_available_time: None,
@@ -110,10 +107,14 @@ impl Connection {
 
     /// Constructs and connects a new connection.
     pub(super) async fn connect(pending_connection: PendingConnection) -> Result<Self> {
+        let generation = match pending_connection.generation {
+            PoolGeneration::Normal(gen) => gen,
+            PoolGeneration::LoadBalanced(_) => 0,  // Placeholder; will be overwritten in `ConnectionEstablisher::establish_connection`.
+        };
         Self::new(
             pending_connection.id,
             pending_connection.address.clone(),
-            pending_connection.generation,
+            generation,
             pending_connection.options,
         )
         .await
@@ -299,8 +300,7 @@ impl Connection {
         Connection {
             id: self.id,
             address: self.address.clone(),
-            generation: self.generation,
-            service_id: self.service_id,
+            generation: self.generation.clone(),
             stream: std::mem::replace(&mut self.stream, AsyncStream::Null),
             handler: self.handler.take(),
             stream_description: self.stream_description.take(),
@@ -335,6 +335,33 @@ impl Drop for Connection {
     }
 }
 
+#[derive(Debug, Clone)]
+pub(crate) enum ConnectionGeneration {
+    Normal(u32),
+    LoadBalanced {
+        generation: u32,
+        service_id: ObjectId,
+    }
+}
+
+impl ConnectionGeneration {
+    pub(crate) fn service_id(&self) -> Option<ObjectId> {
+        match self {
+            ConnectionGeneration::Normal(_) => None,
+            ConnectionGeneration::LoadBalanced { service_id, .. } => Some(*service_id),
+        }
+    }
+
+    pub(crate) fn is_stale(&self, current_generation: &PoolGeneration) -> bool {
+        match (self, current_generation) {
+            (ConnectionGeneration::Normal(cgen), PoolGeneration::Normal(pgen)) => cgen != pgen,
+            (ConnectionGeneration::LoadBalanced { generation: cgen, service_id }, PoolGeneration::LoadBalanced(gen_map)) =>
+                cgen != gen_map.get(service_id).unwrap_or(&0),
+            _ => false,  // TODO RUST-230 Log an error for mode mismatch.
+        }
+    }
+}
+
 /// Struct encapsulating the information needed to establish a `Connection`.
 ///
 /// Creating a `PendingConnection` contributes towards the total connection count of a pool, despite
@@ -344,8 +371,7 @@ impl Drop for Connection {
 pub(super) struct PendingConnection {
     pub(super) id: u32,
     pub(super) address: ServerAddress,
-    pub(super) generation: u32,
-    pub(super) service_generations: HashMap<ObjectId, u32>,
+    pub(super) generation: PoolGeneration,
     pub(super) options: Option<ConnectionOptions>,
 }
 

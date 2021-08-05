@@ -1,13 +1,15 @@
+use crate::cmap::PoolGeneration;
+
 /// Struct used to track the latest status of the pool.
 #[derive(Clone, Debug)]
 struct PoolStatus {
     /// The current generation of the pool.
-    generation: u32,
+    generation: PoolGeneration,
 }
 
 impl Default for PoolStatus {
     fn default() -> Self {
-        PoolStatus { generation: 0 }
+        PoolStatus { generation: PoolGeneration::normal() }
     }
 }
 
@@ -28,7 +30,7 @@ pub(super) struct PoolGenerationPublisher {
 
 impl PoolGenerationPublisher {
     /// Publish a new generation.
-    pub(super) fn publish(&self, new_generation: u32) {
+    pub(super) fn publish(&self, new_generation: PoolGeneration) {
         let new_status = PoolStatus {
             generation: new_generation,
         };
@@ -46,7 +48,7 @@ pub(crate) struct PoolGenerationSubscriber {
 
 impl PoolGenerationSubscriber {
     /// Get a copy of the latest generation.
-    pub(crate) fn generation(&self) -> u32 {
-        self.receiver.borrow().generation
+    pub(crate) fn generation(&self) -> PoolGeneration {
+        self.receiver.borrow().generation.clone()
     }
 }

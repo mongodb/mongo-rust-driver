@@ -21,7 +21,7 @@ use super::{
 use crate::{
     bson::oid::ObjectId,
     client::ClusterTime,
-    cmap::{Command, Connection},
+    cmap::{Command, Connection, conn::ConnectionGeneration, PoolGeneration},
     error::{Error, Result},
     options::{ClientOptions, SelectionCriteria, ServerAddress},
     runtime::HttpClient,
@@ -253,8 +253,19 @@ impl Topology {
         service_id: Option<ObjectId>,
     ) -> bool {
         let state_lock = self.state.write().await;
-        if handshake.generation() < server.pool.generation() {
-            return false;
+        match &handshake {
+            HandshakePhase::BeforeCompletion { generation } => {
+                match (generation, server.pool.generation()) {
+                    (PoolGeneration::Normal(hgen), PoolGeneration::Normal(sgen)) => if *hgen < sgen { return false },
+                    (PoolGeneration::LoadBalanced(_), PoolGeneration::LoadBalanced(_)) => {},
+                    _ => {},  // TODO RUST-230 Log an error for mode mismatch.
+                }
+            }
+            HandshakePhase::AfterCompletion { generation, .. } => {
+                if generation.is_stale(&server.pool.generation()) {
+                    return false;
+                }
+            }
         }
 
         let is_load_balanced = state_lock.description.topology_type() == TopologyType::LoadBalanced;
@@ -582,12 +593,12 @@ impl TopologyState {
 pub(crate) enum HandshakePhase {
     /// Describes an point that occurred before the handshake completed (e.g. when opening the
     /// socket or while performing authentication)
-    BeforeCompletion { generation: u32 },
+    BeforeCompletion { generation: PoolGeneration },
 
     /// Describes a point in time after the handshake completed (e.g. when the command was sent to
     /// the server).
     AfterCompletion {
-        generation: u32,
+        generation: ConnectionGeneration,
         max_wire_version: i32,
     },
 }
@@ -595,7 +606,7 @@ pub(crate) enum HandshakePhase {
 impl HandshakePhase {
     pub(crate) fn after_completion(handshaked_connection: &Connection) -> Self {
         Self::AfterCompletion {
-            generation: handshaked_connection.generation,
+            generation: handshaked_connection.generation.clone(),
             // given that this is a handshaked connection, the stream description should
             // always be available, so 0 should never actually be returned here.
             max_wire_version: handshaked_connection
@@ -603,14 +614,6 @@ impl HandshakePhase {
                 .ok()
                 .and_then(|sd| sd.max_wire_version)
                 .unwrap_or(0),
-        }
-    }
-
-    /// The generation of the connection that was used in the handshake.
-    fn generation(&self) -> u32 {
-        match self {
-            HandshakePhase::BeforeCompletion { generation } => *generation,
-            HandshakePhase::AfterCompletion { generation, .. } => *generation,
         }
     }
 
