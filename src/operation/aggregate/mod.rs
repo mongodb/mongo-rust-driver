@@ -42,7 +42,9 @@ impl Aggregate {
 
 impl Operation for Aggregate {
     type O = CursorSpecification<Document>;
+    type Command = Document;
     type Response = CursorResponse<Document>;
+
     const NAME: &'static str = "aggregate";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {

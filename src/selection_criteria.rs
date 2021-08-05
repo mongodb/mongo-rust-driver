@@ -1,13 +1,13 @@
-use std::{collections::HashMap, convert::TryInto, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use derivative::Derivative;
-use serde::{de::Error as SerdeError, Deserialize, Deserializer};
+use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize};
 use typed_builder::TypedBuilder;
 
 use crate::{
-    bson::{doc, Bson, Document},
+    bson::{doc},
     bson_util,
-    error::{Error, ErrorKind, Result},
+    error::{ErrorKind, Result},
     options::ServerAddress,
     sdam::public::ServerInfo,
 };
@@ -133,12 +133,13 @@ pub enum ReadPreference {
     Nearest { options: ReadPreferenceOptions },
 }
 
+
 impl<'de> Deserialize<'de> for ReadPreference {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        #[derive(Deserialize)]
+        #[derive(Serialize, Deserialize)]
         #[serde(rename_all = "camelCase", deny_unknown_fields)]
         struct ReadPreferenceHelper {
             mode: String,
@@ -169,8 +170,50 @@ impl<'de> Deserialize<'de> for ReadPreference {
     }
 }
 
+impl Serialize for ReadPreference {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        #[serde_with::skip_serializing_none]
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase", deny_unknown_fields)]
+        struct ReadPreferenceHelper<'a> {
+            mode: &'static str,
+            #[serde(flatten)]
+            options: Option<&'a ReadPreferenceOptions>,
+        }
+
+        let helper = match self {
+            ReadPreference::Primary => ReadPreferenceHelper {
+                mode: "primary",
+                options: None,
+            },
+            ReadPreference::PrimaryPreferred { options } => ReadPreferenceHelper {
+                mode: "primaryPreferred",
+                options: Some(options),
+            },
+            ReadPreference::Secondary { options } => ReadPreferenceHelper {
+                mode: "secondary",
+                options: Some(options),
+            },
+            ReadPreference::SecondaryPreferred { options } => ReadPreferenceHelper {
+                mode: "secondaryPreferred",
+                options: Some(options),
+            },
+            ReadPreference::Nearest { options } => ReadPreferenceHelper {
+                mode: "nearest",
+                options: Some(options),
+            },
+        };
+
+        helper.serialize(serializer)
+    }
+}
+
 /// Specifies read preference options for non-primary read preferences.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, TypedBuilder)]
+#[serde_with::skip_serializing_none]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -188,7 +231,8 @@ pub struct ReadPreferenceOptions {
     #[serde(
         rename = "maxStalenessSeconds",
         default,
-        deserialize_with = "bson_util::deserialize_duration_option_from_u64_seconds"
+        deserialize_with = "bson_util::deserialize_duration_option_from_u64_seconds",
+        serialize_with = "bson_util::serialize_duration_option_as_int_secs",
     )]
     pub max_staleness: Option<Duration>,
 
@@ -203,7 +247,7 @@ pub struct ReadPreferenceOptions {
 /// Specifies hedging behavior for reads.
 ///
 /// See the [MongoDB docs](https://docs.mongodb.com/manual/core/read-preference-hedge-option/) for more details.
-#[derive(Clone, Debug, Deserialize, PartialEq, TypedBuilder)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypedBuilder)]
 #[non_exhaustive]
 pub struct HedgedReadOptions {
     /// Whether or not to allow reads from a sharded cluster to be "hedged" across two replica
@@ -270,66 +314,6 @@ impl ReadPreference {
         options.max_staleness = Some(max_staleness);
 
         Ok(self)
-    }
-
-    pub(crate) fn into_document(self) -> Result<Document> {
-        let (mode, tag_sets, max_staleness, hedge) = match self {
-            ReadPreference::Primary => ("primary", None, None, None),
-            ReadPreference::PrimaryPreferred { options } => (
-                "primaryPreferred",
-                options.tag_sets,
-                options.max_staleness,
-                options.hedge,
-            ),
-            ReadPreference::Secondary { options } => (
-                "secondary",
-                options.tag_sets,
-                options.max_staleness,
-                options.hedge,
-            ),
-            ReadPreference::SecondaryPreferred { options } => (
-                "secondaryPreferred",
-                options.tag_sets,
-                options.max_staleness,
-                options.hedge,
-            ),
-            ReadPreference::Nearest { options } => (
-                "nearest",
-                options.tag_sets,
-                options.max_staleness,
-                options.hedge,
-            ),
-        };
-
-        let mut doc = doc! { "mode": mode };
-
-        if let Some(max_stale) = max_staleness {
-            let s: i64 = max_stale.as_secs().try_into().map_err(|_| {
-                Error::from(ErrorKind::InvalidArgument {
-                    message: format!(
-                        "provided maxStalenessSeconds {:?} exceeds the range of i64 seconds",
-                        max_stale
-                    ),
-                })
-            })?;
-            doc.insert("maxStalenessSeconds", s);
-        }
-
-        if let Some(tag_sets) = tag_sets {
-            let tags: Vec<Bson> = tag_sets
-                .into_iter()
-                .map(|tag_set| {
-                    Bson::Document(tag_set.into_iter().map(|(k, v)| (k, v.into())).collect())
-                })
-                .collect();
-            doc.insert("tags", tags);
-        }
-
-        if let Some(hedge) = hedge {
-            doc.insert("hedge", doc! { "enabled": hedge.enabled });
-        }
-
-        Ok(doc)
     }
 
     #[cfg(test)]
@@ -399,7 +383,7 @@ mod test {
             .build();
 
         let read_pref = ReadPreference::Secondary { options };
-        let doc = read_pref.into_document().unwrap();
+        let doc = bson::to_document(&read_pref).unwrap();
 
         assert_eq!(
             doc,

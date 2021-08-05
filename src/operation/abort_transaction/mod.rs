@@ -1,3 +1,5 @@
+use bson::Document;
+
 use crate::{
     bson::doc,
     cmap::{Command, StreamDescription},
@@ -28,6 +30,7 @@ impl AbortTransaction {
 
 impl Operation for AbortTransaction {
     type O = ();
+    type Command = Document;
     type Response = CommandResponse<WriteConcernOnlyBody>;
 
     const NAME: &'static str = "abortTransaction";

@@ -77,6 +77,7 @@ impl CountDocuments {
 
 impl Operation for CountDocuments {
     type O = u64;
+    type Command = Document;
     type Response = CursorResponse<Document>;
 
     const NAME: &'static str = Aggregate::NAME;

@@ -3,6 +3,7 @@ mod test;
 
 use std::{collections::VecDeque, marker::PhantomData, time::Duration};
 
+use bson::Document;
 use serde::{de::DeserializeOwned, Deserialize};
 
 use crate::{
@@ -43,6 +44,7 @@ impl<T> GetMore<T> {
 
 impl<T: DeserializeOwned> Operation for GetMore<T> {
     type O = GetMoreResult<T>;
+    type Command = Document;
     type Response = CommandResponse<GetMoreResponseBody<T>>;
 
     const NAME: &'static str = "getMore";

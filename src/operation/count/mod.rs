@@ -41,6 +41,7 @@ impl Count {
 
 impl Operation for Count {
     type O = u64;
+    type Command = Document;
     type Response = CommandResponse<Response>;
 
     const NAME: &'static str = "count";

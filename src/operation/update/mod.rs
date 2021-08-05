@@ -59,6 +59,7 @@ impl Update {
 
 impl Operation for Update {
     type O = UpdateResult;
+    type Command = Document;
     type Response = CommandResponse<WriteResponseBody<UpdateBody>>;
 
     const NAME: &'static str = "update";

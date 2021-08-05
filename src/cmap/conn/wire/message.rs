@@ -11,7 +11,10 @@ use futures_util::{
 use super::header::{Header, OpCode};
 use crate::{
     bson_util,
-    cmap::conn::{command::Command, wire::util::SyncCountReader},
+    cmap::{
+        conn::{command::RawCommand, wire::util::SyncCountReader},
+        Command,
+    },
     error::{Error, ErrorKind, Result},
     runtime::{AsyncLittleEndianWrite, AsyncStream, SyncLittleEndianRead},
 };
@@ -30,18 +33,29 @@ impl Message {
     /// Creates a `Message` from a given `Command`.
     ///
     /// Note that `response_to` will need to be set manually.
-    pub(crate) fn with_command(mut command: Command, request_id: Option<i32>) -> Result<Self> {
-        command.body.insert("$db", command.target_db);
+    pub(crate) fn with_command(command: Command, request_id: Option<i32>) -> Result<Self> {
+        let bytes = bson::to_vec(&command)?;
+        Ok(Self::with_raw_command(
+            RawCommand {
+                bytes,
+                target_db: command.target_db,
+                name: command.name,
+            },
+            request_id,
+        ))
+    }
 
-        let mut bytes = Vec::new();
-        command.body.to_writer(&mut bytes)?;
-        Ok(Self {
+    /// Creates a `Message` from a given `Command`.
+    ///
+    /// Note that `response_to` will need to be set manually.
+    pub(crate) fn with_raw_command(command: RawCommand, request_id: Option<i32>) -> Self {
+        Self {
             response_to: 0,
             flags: MessageFlags::empty(),
-            sections: vec![MessageSection::Document(bytes)],
+            sections: vec![MessageSection::Document(command.bytes)],
             checksum: None,
             request_id,
-        })
+        }
     }
 
     /// Gets the first document contained in this Message.

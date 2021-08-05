@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod test;
 
+use bson::Document;
+
 use crate::{
     bson::doc,
     cmap::{Command, StreamDescription},
@@ -30,6 +32,7 @@ impl DropDatabase {
 
 impl Operation for DropDatabase {
     type O = ();
+    type Command = Document;
     type Response = CommandResponse<WriteConcernOnlyBody>;
 
     const NAME: &'static str = "dropDatabase";

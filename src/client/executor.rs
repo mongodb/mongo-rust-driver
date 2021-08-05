@@ -6,7 +6,7 @@ use std::{collections::HashSet, sync::Arc, time::Instant};
 use super::{session::TransactionState, Client, ClientSession};
 use crate::{
     bson::Document,
-    cmap::{Connection, RawCommandResponse},
+    cmap::{Connection, RawCommand, RawCommandResponse},
     error::{
         Error,
         ErrorKind,
@@ -50,7 +50,7 @@ lazy_static! {
         hash_set.insert("copydb");
         hash_set
     };
-    static ref HELLO_COMMAND_NAMES: HashSet<&'static str> = {
+    pub(crate) static ref HELLO_COMMAND_NAMES: HashSet<&'static str> = {
         let mut hash_set = HashSet::new();
         hash_set.insert("hello");
         hash_set.insert("ismaster");
@@ -303,7 +303,7 @@ impl Client {
         self.inner
             .topology
             .update_command_with_read_pref(connection.address(), &mut cmd, op.selection_criteria())
-            .await?;
+            .await;
 
         match session {
             Some(ref mut session) if op.supports_sessions() && op.is_acknowledged() => {
@@ -330,13 +330,13 @@ impl Client {
                             labels,
                         ));
                     }
-                    cmd.set_snapshot_read_concern(session)?;
+                    cmd.set_snapshot_read_concern(session);
                 }
                 match session.transaction.state {
                     TransactionState::Starting => {
                         cmd.set_start_transaction();
                         cmd.set_autocommit();
-                        cmd.set_txn_read_concern(*session)?;
+                        cmd.set_txn_read_concern(*session);
                         if is_sharded {
                             session.pin_mongos(connection.address().clone());
                         }
@@ -388,23 +388,29 @@ impl Client {
             cmd.set_server_api(server_api);
         }
 
-        let should_redact = {
-            let name = cmd.name.to_lowercase();
-            REDACTED_COMMANDS.contains(name.as_str())
-                || HELLO_COMMAND_NAMES.contains(name.as_str())
-                    && cmd.body.contains_key("speculativeAuthenticate")
+        let should_redact = cmd.should_redact();
+
+        let cmd_name = cmd.name.clone();
+        let target_db = cmd.target_db.clone();
+
+        let serialized = op.serialize_command(cmd)?;
+        let raw_cmd = RawCommand {
+            name: cmd_name.clone(),
+            target_db,
+            bytes: serialized,
         };
 
         self.emit_command_event(|handler| {
             let command_body = if should_redact {
                 Document::new()
             } else {
-                cmd.body.clone()
+                Document::from_reader(raw_cmd.bytes.as_slice())
+                    .unwrap_or_else(|e| doc! { "serialization error": e.to_string() })
             };
             let command_started_event = CommandStartedEvent {
                 command: command_body,
-                db: cmd.target_db.clone(),
-                command_name: cmd.name.clone(),
+                db: raw_cmd.target_db.clone(),
+                command_name: raw_cmd.name.clone(),
                 request_id,
                 connection: connection_info.clone(),
             };
@@ -413,9 +419,7 @@ impl Client {
         });
 
         let start_time = Instant::now();
-        let cmd_name = cmd.name.clone();
-
-        let command_result = match connection.send_command(cmd, request_id).await {
+        let command_result = match connection.send_raw_command(raw_cmd, request_id).await {
             Ok(response) => {
                 match T::Response::deserialize_response(&response) {
                     Ok(r) => {
@@ -522,7 +526,7 @@ impl Client {
                         response
                             .raw
                             .body()
-                            .unwrap_or_else(|_| doc! { "error": "failed to deserialize" })
+                            .unwrap_or_else(|e| doc! { "deserialization error": e.to_string() })
                     };
 
                     let command_succeeded_event = CommandSucceededEvent {

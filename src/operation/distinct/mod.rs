@@ -52,6 +52,7 @@ impl Distinct {
 
 impl Operation for Distinct {
     type O = Vec<Bson>;
+    type Command = Document;
     type Response = CommandResponse<Response>;
 
     const NAME: &'static str = "distinct";

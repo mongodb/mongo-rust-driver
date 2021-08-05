@@ -28,7 +28,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use crate::{
     bson::{self, Bson, Document},
     bson_util,
-    client::ClusterTime,
+    client::{ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{
         BulkWriteError,
@@ -69,6 +69,9 @@ pub(crate) trait Operation {
     /// The output type of this operation.
     type O;
 
+    /// The format of the command body constructed in `build`.
+    type Command: CommandBody;
+
     /// The format of the command response from the server.
     type Response: Response;
 
@@ -77,7 +80,13 @@ pub(crate) trait Operation {
 
     /// Returns the command that should be sent to the server as part of this operation.
     /// The operation may store some additional state that is required for handling the response.
-    fn build(&mut self, description: &StreamDescription) -> Result<Command>;
+    fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>>;
+
+    /// Perform custom serialization of the built command.
+    /// By default, this will just call through to the `Serialize` implementation of the command.
+    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
+        Ok(bson::to_vec(&cmd)?)
+    }
 
     /// Interprets the server response to the command.
     fn handle_response(
@@ -124,6 +133,30 @@ pub(crate) trait Operation {
 
     fn name(&self) -> &str {
         Self::NAME
+    }
+}
+
+pub(crate) trait CommandBody: Serialize {
+    fn should_redact(&self) -> bool {
+        false
+    }
+}
+
+impl CommandBody for Document {
+    fn should_redact(&self) -> bool {
+        if let Some(command_name) = bson_util::first_key(self) {
+            HELLO_COMMAND_NAMES.contains(command_name.to_lowercase().as_str())
+                && self.contains_key("speculativeAuthenticate")
+        } else {
+            false
+        }
+    }
+}
+
+impl<T: CommandBody> Command<T> {
+    pub(crate) fn should_redact(&self) -> bool {
+        let name = self.name.to_lowercase();
+        REDACTED_COMMANDS.contains(name.as_str()) || self.body.should_redact()
     }
 }
 

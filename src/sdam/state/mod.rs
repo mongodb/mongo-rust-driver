@@ -385,12 +385,12 @@ impl Topology {
     }
 
     /// Updates the given `command` as needed based on the `critiera`.
-    pub(crate) async fn update_command_with_read_pref(
+    pub(crate) async fn update_command_with_read_pref<T>(
         &self,
         server_address: &ServerAddress,
-        command: &mut Command,
+        command: &mut Command<T>,
         criteria: Option<&SelectionCriteria>,
-    ) -> Result<()> {
+    ) {
         self.state
             .read()
             .await
@@ -489,12 +489,12 @@ impl TopologyState {
     }
 
     /// Updates the given `command` as needed based on the `criteria`.
-    pub(crate) fn update_command_with_read_pref(
+    pub(crate) fn update_command_with_read_pref<T>(
         &self,
         server_address: &ServerAddress,
-        command: &mut Command,
+        command: &mut Command<T>,
         criteria: Option<&SelectionCriteria>,
-    ) -> Result<()> {
+    ) {
         let server_type = self
             .description
             .get_server_description(server_address)

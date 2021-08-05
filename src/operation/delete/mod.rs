@@ -57,6 +57,7 @@ impl Delete {
 
 impl Operation for Delete {
     type O = DeleteResult;
+    type Command = Document;
     type Response = CommandResponse<WriteResponseBody>;
 
     const NAME: &'static str = "delete";

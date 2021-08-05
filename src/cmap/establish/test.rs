@@ -65,11 +65,9 @@ async fn speculative_auth_test(
         authorized_db_name.into(),
         doc! { "find": "foo", "limit": 1  },
     );
-    command
-        .set_read_preference(ReadPreference::PrimaryPreferred {
-            options: Default::default(),
-        })
-        .unwrap();
+    command.set_read_preference(ReadPreference::PrimaryPreferred {
+        options: Default::default(),
+    });
 
     let response = conn.send_command(command, None).await.unwrap();
     let doc_response = response.into_document_response().unwrap();

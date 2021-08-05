@@ -292,10 +292,11 @@ impl fmt::Display for ServerAddress {
 }
 
 /// Specifies the server API version to declare
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 #[non_exhaustive]
 pub enum ServerApiVersion {
     /// Use API version 1.
+    #[serde(rename = "1")]
     V1,
 }
 
@@ -335,23 +336,26 @@ impl<'de> Deserialize<'de> for ServerApiVersion {
 
 /// Options used to declare a versioned server API.  For more information, see the [Versioned API](
 /// https://docs.mongodb.com/v5.0/reference/versioned-api/) manual page.
-#[derive(Clone, Debug, Deserialize, PartialEq, TypedBuilder)]
+#[serde_with::skip_serializing_none]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, TypedBuilder)]
 #[builder(field_defaults(setter(into)))]
-#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ServerApi {
     /// The declared API version.
+    #[serde(rename = "apiVersion")]
     pub version: ServerApiVersion,
 
     /// Whether the MongoDB server should reject all commands that are not part of the
     /// declared API version. This includes command options and aggregation pipeline stages.
     #[builder(default)]
+    #[serde(rename = "apiStrict")]
     pub strict: Option<bool>,
 
     /// Whether the MongoDB server should return command failures when functionality that is
     /// deprecated from the declared API version is used.
     /// Note that at the time of this writing, no deprecations in version 1 exist.
     #[builder(default)]
+    #[serde(rename = "apiDeprecationErrors")]
     pub deprecation_errors: Option<bool>,
 }
 

@@ -102,6 +102,7 @@ where
     T: DeserializeOwned,
 {
     type O = Option<T>;
+    type Command = Document;
     type Response = CommandResponse<Response>;
     const NAME: &'static str = "findAndModify";
 

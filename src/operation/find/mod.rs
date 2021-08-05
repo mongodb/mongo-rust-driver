@@ -54,6 +54,7 @@ impl<T> Find<T> {
 
 impl<T: DeserializeOwned> Operation for Find<T> {
     type O = CursorSpecification<T>;
+    type Command = Document;
     type Response = CursorResponse<T>;
     const NAME: &'static str = "find";
 

@@ -153,18 +153,18 @@ impl TopologyDescription {
         self.servers.get(address)
     }
 
-    pub(crate) fn update_command_with_read_pref(
+    pub(crate) fn update_command_with_read_pref<T>(
         &self,
         server_type: ServerType,
-        command: &mut Command,
+        command: &mut Command<T>,
         criteria: Option<&SelectionCriteria>,
-    ) -> crate::error::Result<()> {
+    ) {
         match (self.topology_type, server_type) {
             (TopologyType::Sharded, ServerType::Mongos)
             | (TopologyType::Single, ServerType::Mongos) => {
                 self.update_command_read_pref_for_mongos(command, criteria)
             }
-            (TopologyType::Single, ServerType::Standalone) => Ok(()),
+            (TopologyType::Single, ServerType::Standalone) => {}
             (TopologyType::Single, _) => {
                 let specified_read_pref = criteria
                     .and_then(SelectionCriteria::as_read_pref)
@@ -192,11 +192,11 @@ impl TopologyDescription {
         }
     }
 
-    fn update_command_read_pref_for_mongos(
+    fn update_command_read_pref_for_mongos<T>(
         &self,
-        command: &mut Command,
+        command: &mut Command<T>,
         criteria: Option<&SelectionCriteria>,
-    ) -> crate::error::Result<()> {
+    ) {
         match criteria {
             Some(SelectionCriteria::ReadPreference(ReadPreference::Secondary { ref options })) => {
                 command.set_read_preference(ReadPreference::Secondary {
@@ -219,7 +219,7 @@ impl TopologyDescription {
                     options: options.clone(),
                 })
             }
-            _ => Ok(()),
+            _ => {}
         }
     }
 
