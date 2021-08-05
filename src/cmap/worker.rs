@@ -556,12 +556,11 @@ impl ConnectionPoolWorker {
     ) -> Result<()> {
         match (&mut self.generation, connection.generation.service_id()) {
             (PoolGeneration::LoadBalanced(gen_map), Some(sid)) => {
-                let count = self
-                    .service_connection_count
-                    .get_mut(&sid)
-                    .ok_or(Error::from(ErrorKind::Internal {
+                let count = self.service_connection_count.get_mut(&sid).ok_or_else(|| {
+                    Error::from(ErrorKind::Internal {
                         message: "no connection count for load-balanced service".to_string(),
-                    }))?;
+                    })
+                })?;
                 *count -= 1;
                 if *count == 0 {
                     gen_map.remove(&sid);
