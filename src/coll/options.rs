@@ -870,6 +870,26 @@ pub struct DropCollectionOptions {
     pub write_concern: Option<WriteConcern>,
 }
 
+/// Specifies the options toa  `Collection::drop_index`](../struct.Collection.html#method.drop)
+/// operation.
+#[serde_with::skip_serializing_none]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct DropIndexOptions {
+    /// The maximum amount of time to allow the index to drop.
+    #[serde(
+        rename = "maxTimeMS",
+        serialize_with = "bson_util::serialize_duration_option_as_int_millis",
+        deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis"
+    )]
+    pub max_time: Option<Duration>,
+
+    /// The write concern for the operation.
+    pub write_concern: Option<WriteConcern>,
+}
+
 /// The minimum number of data-bearing voting replica set members (i.e. commit quorum), including
 /// the primary, that must report a successful index build before the primary marks the indexes as
 /// ready.

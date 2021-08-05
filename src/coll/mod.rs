@@ -11,34 +11,7 @@ use serde::{
 };
 
 use self::options::*;
-use crate::{
-    bson::{doc, to_document, Bson, Document},
-    bson_util,
-    client::session::TransactionState,
-    concern::{ReadConcern, WriteConcern},
-    error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
-    operation::{
-        Aggregate,
-        Count,
-        CountDocuments,
-        CreateIndexes,
-        Delete,
-        Distinct,
-        DropCollection,
-        Find,
-        FindAndModify,
-        Insert,
-        Update,
-    },
-    results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
-    selection_criteria::SelectionCriteria,
-    Client,
-    ClientSession,
-    Cursor,
-    Database,
-    IndexModel,
-    SessionCursor,
-};
+use crate::{Client, ClientSession, Cursor, Database, IndexModel, SessionCursor, bson::{doc, to_document, Bson, Document}, bson_util, client::session::TransactionState, concern::{ReadConcern, WriteConcern}, error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result}, operation::{Aggregate, Count, CountDocuments, CreateIndexes, Delete, Distinct, DropCollection, DropIndex, Find, FindAndModify, Insert, Update}, results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult}, selection_criteria::SelectionCriteria};
 
 /// `Collection` is the client-side abstraction of a MongoDB Collection. It can be used to
 /// perform collection-level operations such as CRUD operations. A `Collection` can be obtained
@@ -472,6 +445,35 @@ impl<T> Collection<T> {
     ) -> Result<Vec<Bson>> {
         self.distinct_common(field_name, filter, options, session)
             .await
+    }
+
+    async fn drop_index_common(
+        &self,
+        name: Option<&str>,
+        options: impl Into<Option<DropIndexOptions>>,
+        session: impl Into<Option<&mut ClientSession>>,
+    ) -> Result<()> {
+        let session = session.into();
+
+
+        let mut options = options.into();
+        resolve_write_concern_with_session!(self, options, session.as_ref())?;
+
+        // If there is no provided name, that means we should drop all indexes.
+        let index_name = name.unwrap_or("*").to_string();
+
+        let drop_index = DropIndex::new(self.namespace(), index_name, options);
+        self.client().execute_operation(drop_index, session).await
+    }
+
+    /// Drop the index specified by `name` from the collection.
+    pub async fn drop_index(&self, name: &str, options: impl Into<Option<DropIndexOptions>>) -> Result<()> {
+        self.drop_index_common(Some(name), options, None).await
+    }
+
+    /// Drop all indexes associated with the collection.
+    pub async fn drop_indexes(&self, options: impl Into<Option<DropIndexOptions>>) -> Result<()> {
+        self.drop_index_common(None, options, None).await
     }
 
     async fn update_many_common(

@@ -11,7 +11,7 @@ use crate::{
     Namespace,
 };
 
-use super::{CommandResponse, CreateIndexResponseBody};
+use super::{CommandResponse, CreateIndexResponseBody, EmptyBody};
 
 #[derive(Debug)]
 pub(crate) struct CreateIndexes {
@@ -37,7 +37,7 @@ impl CreateIndexes {
 impl Operation for CreateIndexes {
     type O = Vec<String>;
     type Command = Document;
-    type Response = CommandResponse<CreateIndexResponseBody>;
+    type Response = CommandResponse<EmptyBody>;
     const NAME: &'static str = "createIndexes";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -58,7 +58,7 @@ impl Operation for CreateIndexes {
 
     fn handle_response(
         &self,
-        _response: CreateIndexResponseBody,
+        _response: EmptyBody,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
         let index_names = self.indexes.iter().filter_map(|i| i.get_name()).collect();

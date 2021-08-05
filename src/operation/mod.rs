@@ -9,6 +9,7 @@ mod delete;
 mod distinct;
 mod drop_collection;
 mod drop_database;
+mod drop_indexes;
 mod find;
 mod find_and_modify;
 mod get_more;
@@ -57,6 +58,7 @@ pub(crate) use delete::Delete;
 pub(crate) use distinct::Distinct;
 pub(crate) use drop_collection::DropCollection;
 pub(crate) use drop_database::DropDatabase;
+pub(crate) use drop_indexes::DropIndex;
 pub(crate) use find::Find;
 pub(crate) use find_and_modify::FindAndModify;
 pub(crate) use get_more::GetMore;
@@ -429,6 +431,14 @@ pub(crate) struct CreateIndexResponseBody {
     num_indexes_before: Option<u32>,
     num_indexes_after: Option<u32>,
     note: Option<String>,
+    #[serde(flatten)]
+    err: Option<CommandError>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DropIndexResponseBody {
+    n_indexes_was: Option<u32>,
     #[serde(flatten)]
     err: Option<CommandError>,
 }
