@@ -74,7 +74,10 @@ impl Server {
 /// TODO: add success cases from application handshakes.
 #[derive(Debug)]
 pub(crate) enum ServerUpdate {
-    Error { error: Error, error_generation: PoolGeneration },
+    Error {
+        error: Error,
+        error_generation: PoolGeneration,
+    },
 }
 
 #[derive(Debug)]

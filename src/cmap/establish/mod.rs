@@ -3,7 +3,12 @@ pub(super) mod handshake;
 mod test;
 
 use self::handshake::Handshaker;
-use super::{conn::{PendingConnection, ConnectionGeneration}, options::ConnectionPoolOptions, Connection, PoolGeneration};
+use super::{
+    conn::{ConnectionGeneration, PendingConnection},
+    options::ConnectionPoolOptions,
+    Connection,
+    PoolGeneration,
+};
 use crate::{
     client::{auth::Credential, options::ServerApi},
     error::{ErrorKind, Result},
@@ -46,17 +51,23 @@ impl ConnectionEstablisher {
 
         // If the handshake response had a `serviceId` field, this is a connection to a load
         // balancer and must derive its generation from the service_generations map.
-        match (pool_gen, handshake.is_master_reply.command_response.service_id) {
-            (PoolGeneration::Normal(_), None) => {},
+        match (
+            pool_gen,
+            handshake.is_master_reply.command_response.service_id,
+        ) {
+            (PoolGeneration::Normal(_), None) => {}
             (PoolGeneration::LoadBalanced(gen_map), Some(service_id)) => {
                 connection.generation = ConnectionGeneration::LoadBalanced {
                     generation: *gen_map.get(&service_id).unwrap_or(&0),
                     service_id,
                 };
             }
-            _ => return Err(ErrorKind::Internal {
-                message: "load-balanced mode mismatch".to_string(),
-            }.into())
+            _ => {
+                return Err(ErrorKind::Internal {
+                    message: "load-balanced mode mismatch".to_string(),
+                }
+                .into())
+            }
         }
 
         if let Some(ref credential) = self.credential {

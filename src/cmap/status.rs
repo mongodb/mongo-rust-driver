@@ -9,7 +9,9 @@ struct PoolStatus {
 
 impl Default for PoolStatus {
     fn default() -> Self {
-        PoolStatus { generation: PoolGeneration::normal() }
+        PoolStatus {
+            generation: PoolGeneration::normal(),
+        }
     }
 }
 

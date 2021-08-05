@@ -13,7 +13,10 @@ use self::wire::Message;
 use super::manager::PoolManager;
 use crate::{
     bson::oid::ObjectId,
-    cmap::{PoolGeneration, options::{ConnectionOptions, StreamOptions}},
+    cmap::{
+        options::{ConnectionOptions, StreamOptions},
+        PoolGeneration,
+    },
     error::{ErrorKind, Result},
     event::cmap::{
         CmapEventHandler,
@@ -109,7 +112,9 @@ impl Connection {
     pub(super) async fn connect(pending_connection: PendingConnection) -> Result<Self> {
         let generation = match pending_connection.generation {
             PoolGeneration::Normal(gen) => gen,
-            PoolGeneration::LoadBalanced(_) => 0,  // Placeholder; will be overwritten in `ConnectionEstablisher::establish_connection`.
+            PoolGeneration::LoadBalanced(_) => 0, /* Placeholder; will be overwritten in
+                                                   * `ConnectionEstablisher::
+                                                   * establish_connection`. */
         };
         Self::new(
             pending_connection.id,
@@ -341,7 +346,7 @@ pub(crate) enum ConnectionGeneration {
     LoadBalanced {
         generation: u32,
         service_id: ObjectId,
-    }
+    },
 }
 
 impl ConnectionGeneration {
@@ -355,9 +360,14 @@ impl ConnectionGeneration {
     pub(crate) fn is_stale(&self, current_generation: &PoolGeneration) -> bool {
         match (self, current_generation) {
             (ConnectionGeneration::Normal(cgen), PoolGeneration::Normal(pgen)) => cgen != pgen,
-            (ConnectionGeneration::LoadBalanced { generation: cgen, service_id }, PoolGeneration::LoadBalanced(gen_map)) =>
-                cgen != gen_map.get(service_id).unwrap_or(&0),
-            _ => false,  // TODO RUST-230 Log an error for mode mismatch.
+            (
+                ConnectionGeneration::LoadBalanced {
+                    generation: cgen,
+                    service_id,
+                },
+                PoolGeneration::LoadBalanced(gen_map),
+            ) => cgen != gen_map.get(service_id).unwrap_or(&0),
+            _ => false, // TODO RUST-230 Log an error for mode mismatch.
         }
     }
 }

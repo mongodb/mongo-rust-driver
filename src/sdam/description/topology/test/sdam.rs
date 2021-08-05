@@ -6,8 +6,8 @@ use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, oid::ObjectId},
-    cmap::{conn::ConnectionGeneration, PoolGeneration},
     client::Client,
+    cmap::{conn::ConnectionGeneration, PoolGeneration},
     error::{BulkWriteFailure, CommandError, Error, ErrorKind},
     is_master::{IsMasterCommandResponse, IsMasterReply, LastWrite},
     options::{ClientOptions, ReadPreference, SelectionCriteria, ServerAddress},

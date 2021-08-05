@@ -174,8 +174,15 @@ impl ConnectionPoolWorker {
         let (manager, management_receiver) = manager::channel();
         let (generation_publisher, generation_subscriber) = status::channel();
 
-        let is_load_balanced = options.as_ref().and_then(|opts| opts.load_balanced).unwrap_or(false);
-        let generation = if is_load_balanced { PoolGeneration::load_balanced() } else { PoolGeneration::normal() };
+        let is_load_balanced = options
+            .as_ref()
+            .and_then(|opts| opts.load_balanced)
+            .unwrap_or(false);
+        let generation = if is_load_balanced {
+            PoolGeneration::load_balanced()
+        } else {
+            PoolGeneration::normal()
+        };
 
         #[cfg(test)]
         let state = if options
@@ -486,10 +493,11 @@ impl ConnectionPoolWorker {
                 *gen += 1;
                 true
             }
-            (_, _) => {
-                return Err(ErrorKind::Internal { 
+            (..) => {
+                return Err(ErrorKind::Internal {
                     message: "load-balanced mode mismatch".to_string(),
-                }.into())
+                }
+                .into())
             }
         };
         self.generation_publisher.publish(self.generation.clone());
@@ -541,10 +549,15 @@ impl ConnectionPoolWorker {
 
     /// Close a connection, emit the event for it being closed, and decrement the
     /// total connection count.
-    fn close_connection(&mut self, connection: Connection, reason: ConnectionClosedReason) -> Result<()> {
+    fn close_connection(
+        &mut self,
+        connection: Connection,
+        reason: ConnectionClosedReason,
+    ) -> Result<()> {
         match (&mut self.generation, connection.generation.service_id()) {
             (PoolGeneration::LoadBalanced(gen_map), Some(sid)) => {
-                let count = self.service_connection_count
+                let count = self
+                    .service_connection_count
                     .get_mut(&sid)
                     .ok_or(Error::from(ErrorKind::Internal {
                         message: "no connection count for load-balanced service".to_string(),
@@ -555,10 +568,13 @@ impl ConnectionPoolWorker {
                     self.service_connection_count.remove(&sid);
                 }
             }
-            (PoolGeneration::Normal(_), None) => {},
-            _ => return Err(ErrorKind::Internal {
-                message: "load-balanced mode mismatch".to_string(),
-            }.into())
+            (PoolGeneration::Normal(_), None) => {}
+            _ => {
+                return Err(ErrorKind::Internal {
+                    message: "load-balanced mode mismatch".to_string(),
+                }
+                .into())
+            }
         }
         connection.close_and_drop(reason);
         self.total_connection_count -= 1;

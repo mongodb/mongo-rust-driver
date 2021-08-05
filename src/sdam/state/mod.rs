@@ -21,7 +21,7 @@ use super::{
 use crate::{
     bson::oid::ObjectId,
     client::ClusterTime,
-    cmap::{Command, Connection, conn::ConnectionGeneration, PoolGeneration},
+    cmap::{conn::ConnectionGeneration, Command, Connection, PoolGeneration},
     error::{Error, Result},
     options::{ClientOptions, SelectionCriteria, ServerAddress},
     runtime::HttpClient,
@@ -256,9 +256,13 @@ impl Topology {
         match &handshake {
             HandshakePhase::BeforeCompletion { generation } => {
                 match (generation, server.pool.generation()) {
-                    (PoolGeneration::Normal(hgen), PoolGeneration::Normal(sgen)) => if *hgen < sgen { return false },
-                    (PoolGeneration::LoadBalanced(_), PoolGeneration::LoadBalanced(_)) => {},
-                    _ => {},  // TODO RUST-230 Log an error for mode mismatch.
+                    (PoolGeneration::Normal(hgen), PoolGeneration::Normal(sgen)) => {
+                        if *hgen < sgen {
+                            return false;
+                        }
+                    }
+                    (PoolGeneration::LoadBalanced(_), PoolGeneration::LoadBalanced(_)) => {}
+                    _ => {} // TODO RUST-230 Log an error for mode mismatch.
                 }
             }
             HandshakePhase::AfterCompletion { generation, .. } => {
