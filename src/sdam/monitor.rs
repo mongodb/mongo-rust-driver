@@ -5,7 +5,7 @@ use std::{
 
 use super::{
     description::server::ServerDescription,
-    state::{server::Server, HandshakePhase, Topology, WeakTopology},
+    state::{server::Server, Topology, WeakTopology},
     ServerUpdate,
     ServerUpdateReceiver,
 };
@@ -51,16 +51,19 @@ impl Monitor {
     /// Start the monitor tasks.
     /// A weak reference is used to ensure that the monitor doesn't keep the topology alive after
     /// it's been removed from the topology or the client has been dropped.
-    pub(super) fn start(self) {
-        let mut heartbeat_monitor = HeartbeatMonitor::new(
-            self.address,
-            Arc::downgrade(&self.server),
-            self.topology.clone(),
-            self.client_options,
-        );
-        RUNTIME.execute(async move {
-            heartbeat_monitor.execute().await;
-        });
+    pub(super) fn start(self, is_load_balanced: bool) {
+        // Load balancer servers can't have a monitoring connection.
+        if !is_load_balanced {
+            let mut heartbeat_monitor = HeartbeatMonitor::new(
+                self.address,
+                Arc::downgrade(&self.server),
+                self.topology.clone(),
+                self.client_options,
+            );
+            RUNTIME.execute(async move {
+                heartbeat_monitor.execute().await;
+            });
+        }
 
         let update_monitor = UpdateMonitor {
             server: Arc::downgrade(&self.server),
@@ -240,16 +243,12 @@ impl UpdateMonitor {
             match update.into_message() {
                 ServerUpdate::Error {
                     error,
-                    error_generation,
                 } => {
                     topology
                         .handle_application_error(
-                            error,
-                            HandshakePhase::BeforeCompletion {
-                                generation: error_generation,
-                            },
+                            error.cause,
+                            error.handshake_phase,
                             &server,
-                            None,
                         )
                         .await;
                 }

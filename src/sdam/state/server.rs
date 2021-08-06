@@ -5,11 +5,10 @@ use std::sync::{
 
 use super::WeakTopology;
 use crate::{
-    cmap::{options::ConnectionPoolOptions, ConnectionPool, PoolGeneration},
-    error::Error,
+    cmap::{options::ConnectionPoolOptions, ConnectionPool, EstablishError},
     options::{ClientOptions, ServerAddress},
     runtime::{AcknowledgedMessage, HttpClient},
-    sdam::monitor::Monitor,
+    sdam::{monitor::Monitor},
 };
 
 /// Contains the state for a given server in the topology.
@@ -75,8 +74,7 @@ impl Server {
 #[derive(Debug)]
 pub(crate) enum ServerUpdate {
     Error {
-        error: Error,
-        error_generation: PoolGeneration,
+        error: EstablishError,
     },
 }
 
@@ -109,10 +107,9 @@ impl ServerUpdateSender {
 
     /// Update the server based on the given error.
     /// This will block until the topology has processed the error.
-    pub(crate) async fn handle_error(&mut self, error: Error, error_generation: PoolGeneration) {
+    pub(crate) async fn handle_error(&mut self, error: EstablishError) {
         let reason = ServerUpdate::Error {
             error,
-            error_generation,
         };
 
         let (message, callback) = AcknowledgedMessage::package(reason);

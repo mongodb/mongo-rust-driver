@@ -250,21 +250,22 @@ impl Topology {
         error: Error,
         handshake: HandshakePhase,
         server: &Server,
-        service_id: Option<ObjectId>,
     ) -> bool {
         let state_lock = self.state.write().await;
         match &handshake {
-            HandshakePhase::BeforeCompletion { generation } => {
+            HandshakePhase::PreHello { generation } => {
                 match (generation, server.pool.generation()) {
                     (PoolGeneration::Normal(hgen), PoolGeneration::Normal(sgen)) => {
                         if *hgen < sgen {
                             return false;
                         }
                     }
-                    (PoolGeneration::LoadBalanced(_), PoolGeneration::LoadBalanced(_)) => {}
+                    // Pre-hello handshake errors are ignored in load-balanced mode.
+                    (PoolGeneration::LoadBalanced(_), PoolGeneration::LoadBalanced(_)) => return false,
                     _ => {} // TODO RUST-230 Log an error for mode mismatch.
                 }
             }
+            HandshakePhase::PostHello { generation } |
             HandshakePhase::AfterCompletion { generation, .. } => {
                 if generation.is_stale(&server.pool.generation()) {
                     return false;
@@ -280,7 +281,7 @@ impl Topology {
                     .await;
 
             if updated && (error.is_shutting_down() || handshake.wire_version().unwrap_or(0) < 8) {
-                server.pool.clear(error, service_id).await;
+                server.pool.clear(error, handshake.service_id()).await;
             }
             self.request_topology_check();
 
@@ -296,7 +297,7 @@ impl Topology {
                     .mark_server_as_unknown(error.to_string(), server, state_lock)
                     .await;
             if updated {
-                server.pool.clear(error, service_id).await;
+                server.pool.clear(error, handshake.service_id()).await;
             }
             updated
         } else {
@@ -519,10 +520,7 @@ impl TopologyState {
             return;
         }
 
-        // Load balancer servers don't have a monitoring connection.
-        if !is_load_balanced {
-            monitor.start();
-        }
+        monitor.start(is_load_balanced);
     }
 
     /// Updates the given `command` as needed based on the `criteria`.
@@ -594,10 +592,14 @@ impl TopologyState {
 /// handshake for the conection being used in that operation.
 ///
 /// This is used to determine the error handling semantics for certain error types.
+#[derive(Debug, Clone)]
 pub(crate) enum HandshakePhase {
-    /// Describes an point that occurred before the handshake completed (e.g. when opening the
-    /// socket or while performing authentication)
-    BeforeCompletion { generation: PoolGeneration },
+    /// Describes a point that occurred before the initial hello completed (e.g. when opening the
+    /// socket).
+    PreHello { generation: PoolGeneration },
+
+    /// Describes a point in time after the initial hello has completed, but before authentication.
+    PostHello { generation: ConnectionGeneration },
 
     /// Describes a point in time after the handshake completed (e.g. when the command was sent to
     /// the server).
@@ -621,9 +623,19 @@ impl HandshakePhase {
         }
     }
 
+    /// The `serviceId` reported by the server.  If the initial hello has not completed, returns
+    /// `None`.
+    pub(crate) fn service_id(&self) -> Option<ObjectId> {
+        match self {
+            HandshakePhase::PreHello { .. } => None,
+            HandshakePhase::PostHello { generation, .. } => generation.service_id(),
+            HandshakePhase::AfterCompletion { generation, .. } => generation.service_id(),
+        }
+    }
+
     /// Whether this phase is before the handshake completed or not.
     fn is_before_completion(&self) -> bool {
-        matches!(self, HandshakePhase::BeforeCompletion { .. })
+        matches!(self, HandshakePhase::PreHello { .. })
     }
 
     /// The wire version of the server as reported by the handshake. If the handshake did not
@@ -633,7 +645,7 @@ impl HandshakePhase {
             HandshakePhase::AfterCompletion {
                 max_wire_version, ..
             } => Some(*max_wire_version),
-            HandshakePhase::BeforeCompletion { .. } => None,
+            HandshakePhase::PreHello { .. } | HandshakePhase::PostHello { .. } => None,
         }
     }
 }

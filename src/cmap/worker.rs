@@ -650,7 +650,6 @@ async fn establish_connection(
     event_handler: Option<&Arc<dyn CmapEventHandler>>,
 ) -> Result<Connection> {
     let connection_id = pending_connection.id;
-    let generation = pending_connection.generation.clone();
     let address = pending_connection.address.clone();
 
     let mut establish_result = establisher.establish_connection(pending_connection).await;
@@ -665,7 +664,7 @@ async fn establish_connection(
                 };
                 handler.handle_connection_closed_event(event);
             }
-            server_updater.handle_error(e.clone(), generation).await;
+            server_updater.handle_error(e.clone()).await;
             manager.handle_connection_failed();
         }
         Ok(ref mut connection) => {
@@ -675,7 +674,7 @@ async fn establish_connection(
         }
     }
 
-    establish_result
+    establish_result.map_err(|e| e.cause)
 }
 
 /// Enum modeling the possible pool states as described in the CMAP spec.

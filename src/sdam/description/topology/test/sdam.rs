@@ -7,7 +7,7 @@ use tokio::sync::RwLockReadGuard;
 use crate::{
     bson::{doc, oid::ObjectId},
     client::Client,
-    cmap::{conn::ConnectionGeneration, PoolGeneration},
+    cmap::{conn::ConnectionGeneration},
     error::{BulkWriteFailure, CommandError, Error, ErrorKind},
     is_master::{IsMasterCommandResponse, IsMasterReply, LastWrite},
     options::{ClientOptions, ReadPreference, SelectionCriteria, ServerAddress},
@@ -274,31 +274,27 @@ async fn run_test(test_file: TestFile) {
                 .and_then(|s| s.upgrade())
             {
                 let error = application_error.to_error();
-                let pool_generation = application_error
-                    .generation
-                    .map(PoolGeneration::Normal)
-                    .unwrap_or_else(|| server.pool.generation());
-                let conn_generation = application_error
+                let generation = application_error
                     .generation
                     .or_else(|| server.pool.generation().as_normal())
                     .unwrap_or(0);
-                let conn_generation = ConnectionGeneration::Normal(conn_generation);
+                let generation = ConnectionGeneration::Normal(generation);
                 let handshake_phase = match application_error.when {
                     ErrorHandshakePhase::BeforeHandshakeCompletes => {
-                        HandshakePhase::BeforeCompletion {
-                            generation: pool_generation,
+                        HandshakePhase::PostHello {
+                            generation,
                         }
                     }
                     ErrorHandshakePhase::AfterHandshakeCompletes => {
                         HandshakePhase::AfterCompletion {
-                            generation: conn_generation,
+                            generation,
                             max_wire_version: application_error.max_wire_version,
                         }
                     }
                 };
 
                 topology
-                    .handle_application_error(error, handshake_phase, &server, None)
+                    .handle_application_error(error, handshake_phase, &server)
                     .await;
             }
         }
@@ -568,12 +564,12 @@ async fn pool_cleared_error_does_not_mark_unknown() {
         message: "foo".to_string(),
     }
     .into();
-    let phase = HandshakePhase::BeforeCompletion {
+    let phase = HandshakePhase::PreHello {
         generation: server.pool.generation(),
     };
     assert!(
         !topology
-            .handle_application_error(error, phase, &server, None)
+            .handle_application_error(error, phase, &server)
             .await
     );
     assert_eq!(
