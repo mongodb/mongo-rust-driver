@@ -241,15 +241,9 @@ impl UpdateMonitor {
             };
 
             match update.into_message() {
-                ServerUpdate::Error {
-                    error,
-                } => {
+                ServerUpdate::Error { error } => {
                     topology
-                        .handle_application_error(
-                            error.cause,
-                            error.handshake_phase,
-                            &server,
-                        )
+                        .handle_application_error(error.cause, error.handshake_phase, &server)
                         .await;
                 }
             }

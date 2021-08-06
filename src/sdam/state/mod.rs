@@ -261,12 +261,14 @@ impl Topology {
                         }
                     }
                     // Pre-hello handshake errors are ignored in load-balanced mode.
-                    (PoolGeneration::LoadBalanced(_), PoolGeneration::LoadBalanced(_)) => return false,
+                    (PoolGeneration::LoadBalanced(_), PoolGeneration::LoadBalanced(_)) => {
+                        return false
+                    }
                     _ => {} // TODO RUST-230 Log an error for mode mismatch.
                 }
             }
-            HandshakePhase::PostHello { generation } |
-            HandshakePhase::AfterCompletion { generation, .. } => {
+            HandshakePhase::PostHello { generation }
+            | HandshakePhase::AfterCompletion { generation, .. } => {
                 if generation.is_stale(&server.pool.generation()) {
                     return false;
                 }

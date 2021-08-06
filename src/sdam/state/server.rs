@@ -8,7 +8,7 @@ use crate::{
     cmap::{options::ConnectionPoolOptions, ConnectionPool, EstablishError},
     options::{ClientOptions, ServerAddress},
     runtime::{AcknowledgedMessage, HttpClient},
-    sdam::{monitor::Monitor},
+    sdam::monitor::Monitor,
 };
 
 /// Contains the state for a given server in the topology.
@@ -73,9 +73,7 @@ impl Server {
 /// TODO: add success cases from application handshakes.
 #[derive(Debug)]
 pub(crate) enum ServerUpdate {
-    Error {
-        error: EstablishError,
-    },
+    Error { error: EstablishError },
 }
 
 #[derive(Debug)]
@@ -108,9 +106,7 @@ impl ServerUpdateSender {
     /// Update the server based on the given error.
     /// This will block until the topology has processed the error.
     pub(crate) async fn handle_error(&mut self, error: EstablishError) {
-        let reason = ServerUpdate::Error {
-            error,
-        };
+        let reason = ServerUpdate::Error { error };
 
         let (message, callback) = AcknowledgedMessage::package(reason);
         // These only fails if the other ends hang up, which means the monitor is

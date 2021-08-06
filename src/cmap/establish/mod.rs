@@ -11,7 +11,7 @@ use super::{
 };
 use crate::{
     client::{auth::Credential, options::ServerApi},
-    error::{ErrorKind, Error as MongoError},
+    error::{Error as MongoError, ErrorKind},
     runtime::HttpClient,
     sdam::HandshakePhase,
 };
@@ -48,17 +48,20 @@ impl ConnectionEstablisher {
         pending_connection: PendingConnection,
     ) -> std::result::Result<Connection, EstablishError> {
         let pool_gen = pending_connection.generation.clone();
-        let mut connection = Connection::connect(pending_connection).await.map_err(|e| EstablishError::pre_hello(e, pool_gen.clone()))?;
+        let mut connection = Connection::connect(pending_connection)
+            .await
+            .map_err(|e| EstablishError::pre_hello(e, pool_gen.clone()))?;
 
-        let handshake = self.handshaker.handshake(&mut connection).await.map_err(|e| EstablishError::pre_hello(e, pool_gen.clone()))?;
+        let handshake = self
+            .handshaker
+            .handshake(&mut connection)
+            .await
+            .map_err(|e| EstablishError::pre_hello(e, pool_gen.clone()))?;
         let service_id = handshake.is_master_reply.command_response.service_id;
 
         // If the handshake response had a `serviceId` field, this is a connection to a load
         // balancer and must derive its generation from the service_generations map.
-        match (
-            pool_gen,
-            service_id,
-        ) {
+        match (pool_gen, service_id) {
             (PoolGeneration::Normal(_), _) => {}
             (PoolGeneration::LoadBalanced(gen_map), Some(service_id)) => {
                 connection.generation = ConnectionGeneration::LoadBalanced {
@@ -70,7 +73,8 @@ impl ConnectionEstablisher {
                 return Err(EstablishError::post_hello(
                     ErrorKind::Internal {
                         message: "load-balanced mode mismatch".to_string(),
-                    }.into(),
+                    }
+                    .into(),
                     connection.generation.clone(),
                 ));
             }

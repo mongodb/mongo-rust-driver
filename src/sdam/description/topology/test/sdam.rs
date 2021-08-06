@@ -284,11 +284,9 @@ async fn run_test(test_file: TestFile) {
                     .unwrap_or(0);
                 let conn_generation = ConnectionGeneration::Normal(conn_generation);
                 let handshake_phase = match application_error.when {
-                    ErrorHandshakePhase::BeforeHandshakeCompletes => {
-                        HandshakePhase::PreHello {
-                            generation: pool_generation,
-                        }
-                    }
+                    ErrorHandshakePhase::BeforeHandshakeCompletes => HandshakePhase::PreHello {
+                        generation: pool_generation,
+                    },
                     ErrorHandshakePhase::AfterHandshakeCompletes => {
                         HandshakePhase::AfterCompletion {
                             generation: conn_generation,
