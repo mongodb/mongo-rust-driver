@@ -21,7 +21,7 @@ use super::CursorResponse;
 pub(crate) struct Find<T> {
     ns: Namespace,
     filter: Option<Document>,
-    options: Option<FindOptions>,
+    options: Option<Box<FindOptions>>,
     _phantom: PhantomData<T>,
 }
 
@@ -46,7 +46,7 @@ impl<T> Find<T> {
         Self {
             ns,
             filter,
-            options,
+            options: options.map(Box::new),
             _phantom: Default::default(),
         }
     }

@@ -69,42 +69,45 @@ impl Client {
         op: T,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<T::O> {
-        // TODO RUST-9: allow unacknowledged write concerns
-        if !op.is_acknowledged() {
-            return Err(ErrorKind::InvalidArgument {
-                message: "Unacknowledged write concerns are not supported".to_string(),
-            }
-            .into());
-        }
-        match session.into() {
-            Some(session) => {
-                if !Arc::ptr_eq(&self.inner, &session.client().inner) {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: "the session provided to an operation must be created from the \
-                                  same client as the collection/database"
-                            .into(),
-                    }
-                    .into());
+        Box::pin(async {
+            // TODO RUST-9: allow unacknowledged write concerns
+            if !op.is_acknowledged() {
+                return Err(ErrorKind::InvalidArgument {
+                    message: "Unacknowledged write concerns are not supported".to_string(),
                 }
-
-                if let Some(SelectionCriteria::ReadPreference(read_preference)) =
-                    op.selection_criteria()
-                {
-                    if session.in_transaction() && read_preference != &ReadPreference::Primary {
-                        return Err(ErrorKind::Transaction {
-                            message: "read preference in a transaction must be primary".into(),
+                .into());
+            }
+            match session.into() {
+                Some(session) => {
+                    if !Arc::ptr_eq(&self.inner, &session.client().inner) {
+                        return Err(ErrorKind::InvalidArgument {
+                            message: "the session provided to an operation must be created from \
+                                      the same client as the collection/database"
+                                .into(),
                         }
                         .into());
                     }
+
+                    if let Some(SelectionCriteria::ReadPreference(read_preference)) =
+                        op.selection_criteria()
+                    {
+                        if session.in_transaction() && read_preference != &ReadPreference::Primary {
+                            return Err(ErrorKind::Transaction {
+                                message: "read preference in a transaction must be primary".into(),
+                            }
+                            .into());
+                        }
+                    }
+                    self.execute_operation_with_retry(op, Some(session)).await
                 }
-                self.execute_operation_with_retry(op, Some(session)).await
+                None => {
+                    let mut implicit_session = self.start_implicit_session(&op).await?;
+                    self.execute_operation_with_retry(op, implicit_session.as_mut())
+                        .await
+                }
             }
-            None => {
-                let mut implicit_session = self.start_implicit_session(&op).await?;
-                self.execute_operation_with_retry(op, implicit_session.as_mut())
-                    .await
-            }
-        }
+        })
+        .await
     }
 
     /// Execute the given operation, returning the implicit session created for it if one was.
@@ -114,10 +117,13 @@ impl Client {
         &self,
         op: T,
     ) -> Result<(T::O, Option<ClientSession>)> {
-        let mut implicit_session = self.start_implicit_session(&op).await?;
-        self.execute_operation_with_retry(op, implicit_session.as_mut())
-            .await
-            .map(|result| (result, implicit_session))
+        Box::pin(async {
+            let mut implicit_session = self.start_implicit_session(&op).await?;
+            self.execute_operation_with_retry(op, implicit_session.as_mut())
+                .await
+                .map(|result| (result, implicit_session))
+        })
+        .await
     }
 
     /// Selects a server and executes the given operation on it, optionally using a provided
