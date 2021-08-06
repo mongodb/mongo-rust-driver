@@ -1,6 +1,8 @@
 #[cfg(feature = "tokio-runtime")]
+use futures_util::future::BoxFuture;
+#[cfg(feature = "tokio-runtime")]
 use hyper::{
-    body::{self, Buf},
+    body,
     client::HttpConnector,
     header::LOCATION,
     Body,
@@ -13,7 +15,7 @@ use hyper::{
 #[cfg(feature = "tokio-runtime")]
 use serde::Deserialize;
 #[cfg(feature = "tokio-runtime")]
-use std::{error::Error, future::Future, pin::Pin, str::FromStr};
+use std::{error::Error, str::FromStr};
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct HttpClient {
@@ -36,9 +38,7 @@ impl HttpClient {
             .request(Method::GET, Uri::from_str(uri)?, headers)
             .await?;
 
-        let mut buf = body::aggregate(res.into_body()).await?;
-        let mut bytes = vec![0; buf.remaining()];
-        buf.copy_to_slice(&mut bytes);
+        let bytes = body::to_bytes(res.into_body()).await?;
 
         let result = serde_json::from_slice(&bytes)?;
         Ok(result)
@@ -73,22 +73,19 @@ impl HttpClient {
     ) -> Result<String, Box<dyn Error>> {
         let res = self.request(method, Uri::from_str(uri)?, headers).await?;
 
-        let mut buf = body::aggregate(res.into_body()).await?;
-        let mut bytes = vec![0; buf.remaining()];
-        buf.copy_to_slice(&mut bytes);
+        let bytes = body::to_bytes(res.into_body()).await?;
 
-        let text = String::from_utf8(bytes)?;
+        let text = String::from_utf8(bytes.to_vec())?;
         Ok(text)
     }
 
-    #[allow(clippy::type_complexity)]
     /// Executes an HTTP request and returns the response.
     pub(crate) fn request<'a>(
         &'a self,
         method: Method,
         uri: Uri,
         headers: &'a [(&'a str, &'a str)],
-    ) -> Pin<Box<dyn Future<Output = Result<Response<Body>, Box<dyn Error>>> + 'a + Send>> {
+    ) -> BoxFuture<'a, Result<Response<Body>, Box<dyn Error>>> {
         Box::pin(async move {
             let mut request = Request::builder().uri(&uri).method(&method);
 
