@@ -11,7 +11,7 @@ use crate::{
     Namespace,
 };
 
-use super::{CommandResponse, CreateIndexResponseBody, EmptyBody};
+use super::{CommandResponse, EmptyBody};
 
 #[derive(Debug)]
 pub(crate) struct CreateIndexes {

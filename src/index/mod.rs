@@ -13,6 +13,7 @@ use typed_builder::TypedBuilder;
 /// [documentation](https://docs.mongodb.com/manual/reference/method/db.collection.createIndex/#options-for-all-index-types)
 /// for more information on how to use this option.
 #[derive(Debug, Default, Deserialize, TypedBuilder, Serialize)]
+#[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct IndexModel {

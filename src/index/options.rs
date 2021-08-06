@@ -10,7 +10,7 @@ use typed_builder::TypedBuilder;
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, Serialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct IndexOptions {
     /// Tells the server to build the index in the background and not block other tasks. Starting
@@ -24,6 +24,7 @@ pub struct IndexOptions {
     /// for more information on how to use this option.
     #[serde(
         rename = "expireAfterSeconds",
+        default,
         deserialize_with = "bson_util::deserialize_duration_option_from_u64_seconds",
         serialize_with = "bson_util::serialize_duration_option_as_int_secs"
     )]

@@ -870,7 +870,7 @@ pub struct DropCollectionOptions {
     pub write_concern: Option<WriteConcern>,
 }
 
-/// Specifies the options toa  `Collection::drop_index`](../struct.Collection.html#method.drop)
+/// Specifies the options to a [`Collection::drop_index`](../struct.Collection.html#method.drop_index)
 /// operation.
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
@@ -888,6 +888,27 @@ pub struct DropIndexOptions {
 
     /// The write concern for the operation.
     pub write_concern: Option<WriteConcern>,
+}
+
+/// Specifies the options to a [`Collection::list_indexes`](../struct.Collection.html#method.list_indexes)
+/// operation.
+#[serde_with::skip_serializing_none]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct ListIndexOptions {
+    /// The maximum amount of time to allow the index to drop.
+    #[serde(
+        rename = "maxTimeMS",
+        serialize_with = "bson_util::serialize_duration_option_as_int_millis",
+        deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis"
+    )]
+    pub max_time: Option<Duration>,
+
+    /// The number of indexes the server should return per cursor batch.
+    #[serde(serialize_with = "bson_util::serialize_u32_option_as_i32")]
+    pub batch_size: Option<u32>,
 }
 
 /// The minimum number of data-bearing voting replica set members (i.e. commit quorum), including

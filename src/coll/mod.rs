@@ -2,7 +2,7 @@ pub mod options;
 
 use std::{borrow::Borrow, collections::HashSet, fmt, fmt::Debug, sync::Arc};
 
-use futures_util::stream::StreamExt;
+use futures_util::{future, stream::{StreamExt, TryStreamExt}};
 use serde::{
     de::{DeserializeOwned, Error as DeError},
     Deserialize,
@@ -11,7 +11,36 @@ use serde::{
 };
 
 use self::options::*;
-use crate::{Client, ClientSession, Cursor, Database, IndexModel, SessionCursor, bson::{doc, to_document, Bson, Document}, bson_util, client::session::TransactionState, concern::{ReadConcern, WriteConcern}, error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result}, operation::{Aggregate, Count, CountDocuments, CreateIndexes, Delete, Distinct, DropCollection, DropIndex, Find, FindAndModify, Insert, Update}, results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult}, selection_criteria::SelectionCriteria};
+use crate::{
+    bson::{doc, to_document, Bson, Document},
+    bson_util,
+    client::session::TransactionState,
+    concern::{ReadConcern, WriteConcern},
+    error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
+    operation::{
+        Aggregate,
+        Count,
+        CountDocuments,
+        CreateIndexes,
+        Delete,
+        Distinct,
+        DropCollection,
+        DropIndex,
+        Find,
+        FindAndModify,
+        Insert,
+        ListIndexes,
+        Update,
+    },
+    results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
+    selection_criteria::SelectionCriteria,
+    Client,
+    ClientSession,
+    Cursor,
+    Database,
+    IndexModel,
+    SessionCursor,
+};
 
 /// `Collection` is the client-side abstraction of a MongoDB Collection. It can be used to
 /// perform collection-level operations such as CRUD operations. A `Collection` can be obtained
@@ -455,7 +484,6 @@ impl<T> Collection<T> {
     ) -> Result<()> {
         let session = session.into();
 
-
         let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
@@ -467,13 +495,51 @@ impl<T> Collection<T> {
     }
 
     /// Drop the index specified by `name` from the collection.
-    pub async fn drop_index(&self, name: &str, options: impl Into<Option<DropIndexOptions>>) -> Result<()> {
+    pub async fn drop_index(
+        &self,
+        name: &str,
+        options: impl Into<Option<DropIndexOptions>>,
+    ) -> Result<()> {
         self.drop_index_common(Some(name), options, None).await
     }
 
     /// Drop all indexes associated with the collection.
     pub async fn drop_indexes(&self, options: impl Into<Option<DropIndexOptions>>) -> Result<()> {
         self.drop_index_common(None, options, None).await
+    }
+
+    /// List all indexes on the collection.
+    pub async fn list_indexes(
+        &self,
+        options: impl Into<Option<ListIndexOptions>>,
+    ) -> Result<Cursor<IndexModel>> {
+        let list_indexes = ListIndexes::new(self.namespace(), options.into());
+        let client = self.client();
+        client
+            .execute_cursor_operation(list_indexes)
+            .await
+            .map(|(spec, session)| Cursor::new(client.clone(), spec, session))
+    }
+
+    async fn list_index_names_common(
+        &self,
+        cursor: impl TryStreamExt<Ok = IndexModel, Error = Error>,
+    ) -> Result<Vec<String>> {
+        cursor
+            .try_filter_map(|index| future::ok(index.get_name()))
+            .try_collect()
+            .await
+    }
+
+    /// Gets the names of all indexes on the collection.
+    pub async fn list_index_names(&self) -> Result<Vec<String>> {
+        let list_indexes = ListIndexes::new(self.namespace(), None);
+        let client = self.client();
+        let cursor: Cursor<IndexModel> = client
+            .execute_cursor_operation(list_indexes)
+            .await
+            .map(|(spec, session)| Cursor::new(client.clone(), spec, session))?;
+        self.list_index_names_common(cursor).await
     }
 
     async fn update_many_common(
