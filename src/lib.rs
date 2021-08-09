@@ -100,6 +100,8 @@ macro_rules! define_if_single_runtime_enabled {
 // and warnings other than our custom ones.
 define_if_single_runtime_enabled! {
     #[macro_use]
+    pub mod error;
+    #[macro_use]
     pub mod options;
 
     pub use ::bson;
@@ -112,7 +114,6 @@ define_if_single_runtime_enabled! {
     mod concern;
     mod cursor;
     mod db;
-    pub mod error;
     pub mod event;
     mod is_master;
     mod operation;

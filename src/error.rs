@@ -584,3 +584,26 @@ pub(crate) fn convert_bulk_errors(error: Error) -> Error {
         _ => error,
     }
 }
+
+/// Flag a load balanced mode mismatch; in tests, it will panic, optionally including an argument
+/// in the panic message.  Outside of tests, it will evaluate to `()`.
+// TODO RUST-230 Log an error in the non-panic branch for mode mismatch.
+#[cfg(test)]
+macro_rules! load_balanced_mode_mismatch {
+    () => {
+        panic!("load-balanced mode mismatch")
+    };
+    ($e:expr) => {
+        panic!("load-balanced mode mismatch: {}", $e)
+    };
+}
+#[cfg(not(test))]
+macro_rules! load_balanced_mode_mismatch {
+    () => {
+        ()
+    };
+    ($e:expr) => {{
+        let _ = $e;  // Suppress unused warnings.
+        ()
+    }};
+}

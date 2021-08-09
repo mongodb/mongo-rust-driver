@@ -367,7 +367,10 @@ impl ConnectionGeneration {
                 },
                 PoolGeneration::LoadBalanced(gen_map),
             ) => cgen != gen_map.get(service_id).unwrap_or(&0),
-            _ => false, // TODO RUST-230 Log an error for mode mismatch.
+            _ => {
+                load_balanced_mode_mismatch!();
+                false
+            }
         }
     }
 }

@@ -264,7 +264,7 @@ impl Topology {
                     (PoolGeneration::LoadBalanced(_), PoolGeneration::LoadBalanced(_)) => {
                         return false
                     }
-                    _ => {} // TODO RUST-230 Log an error for mode mismatch.
+                    _ => load_balanced_mode_mismatch!(),
                 }
             }
             HandshakePhase::PostHello { generation }
