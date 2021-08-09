@@ -367,10 +367,7 @@ impl ConnectionGeneration {
                 },
                 PoolGeneration::LoadBalanced(gen_map),
             ) => cgen != gen_map.get(service_id).unwrap_or(&0),
-            _ => {
-                load_balanced_mode_mismatch!();
-                false
-            }
+            _ => load_balanced_mode_mismatch!(false),
         }
     }
 }

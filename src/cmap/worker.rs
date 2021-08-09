@@ -487,10 +487,7 @@ impl ConnectionPoolWorker {
                 *gen += 1;
                 true
             }
-            (..) => {
-                load_balanced_mode_mismatch!();
-                false
-            }
+            (..) => load_balanced_mode_mismatch!(false),
         };
         self.generation_publisher.publish(self.generation.clone());
 
@@ -555,7 +552,7 @@ impl ConnectionPoolWorker {
                             self.service_connection_count.remove(&sid);
                         }
                     }
-                    None => load_balanced_mode_mismatch!("no connection count for load-balanced service"),
+                    None => load_balanced_mode_mismatch!(),
                 }
             }
             (PoolGeneration::Normal(_), None) => {}
