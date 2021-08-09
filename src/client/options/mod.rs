@@ -1724,7 +1724,7 @@ impl ClientOptionsParser {
                 let mut write_concern = self.write_concern.get_or_insert_with(Default::default);
                 write_concern.journal = Some(get_bool!(value, k));
             }
-            k @ "loadBalanced" => {
+            k @ "loadbalanced" => {
                 self.load_balanced = Some(get_bool!(value, k));
             }
             k @ "localthresholdms" => {
