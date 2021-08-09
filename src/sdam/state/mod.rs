@@ -637,7 +637,7 @@ impl HandshakePhase {
 
     /// Whether this phase is before the handshake completed or not.
     fn is_before_completion(&self) -> bool {
-        matches!(self, HandshakePhase::PreHello { .. })
+        !matches!(self, HandshakePhase::AfterCompletion { .. })
     }
 
     /// The wire version of the server as reported by the handshake. If the handshake did not
@@ -647,7 +647,7 @@ impl HandshakePhase {
             HandshakePhase::AfterCompletion {
                 max_wire_version, ..
             } => Some(*max_wire_version),
-            HandshakePhase::PreHello { .. } | HandshakePhase::PostHello { .. } => None,
+            _ => None,
         }
     }
 }
