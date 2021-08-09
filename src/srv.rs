@@ -191,14 +191,14 @@ impl SrvResolver {
                 "replicaset" => {
                     config.replica_set = Some(parts[1].into());
                 }
-                "loadBalanced" => {
+                "loadbalanced" => {
                     let val = match parts[1] {
                         "true" => true,
                         "false" => false,
                         _ => {
                             return Err(ErrorKind::DnsResolve {
                                 message: format!(
-                                    "TXT record option 'loadBalanced={}' was returned, only \
+                                    "TXT record option 'loadbalanced={}' was returned, only \
                                      'true' and 'false' are allowed values.",
                                     parts[1]
                                 ),
