@@ -1,6 +1,10 @@
 use std::time::Duration;
 
-use crate::{bson::Document, bson_util, collation::Collation};
+use crate::{
+    bson::{serde_helpers, Document},
+    bson_util,
+    collation::Collation,
+};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use typed_builder::TypedBuilder;
@@ -127,11 +131,11 @@ impl Serialize for IndexVersion {
     where
         S: Serializer,
     {
-        match *self {
-            IndexVersion::V0 => serializer.serialize_u32(0),
-            IndexVersion::V1 => serializer.serialize_u32(1),
-            IndexVersion::V2 => serializer.serialize_u32(2),
-            IndexVersion::Custom(i) => serializer.serialize_u32(i),
+        match self {
+            IndexVersion::V0 => serializer.serialize_i32(0),
+            IndexVersion::V1 => serializer.serialize_i32(1),
+            IndexVersion::V2 => serializer.serialize_i32(2),
+            IndexVersion::Custom(i) => serde_helpers::serialize_u32_as_i32(i, serializer),
         }
     }
 }
@@ -142,11 +146,11 @@ impl<'de> Deserialize<'de> for IndexVersion {
     where
         D: Deserializer<'de>,
     {
-        match u32::deserialize(deserializer)? {
+        match i32::deserialize(deserializer)? {
             0 => Ok(IndexVersion::V0),
             1 => Ok(IndexVersion::V1),
             2 => Ok(IndexVersion::V2),
-            i => Ok(IndexVersion::Custom(i)),
+            i => Ok(IndexVersion::Custom(i as u32)),
         }
     }
 }
@@ -165,11 +169,11 @@ impl Serialize for TextIndexVersion {
     where
         S: Serializer,
     {
-        match *self {
-            TextIndexVersion::V1 => serializer.serialize_u32(1),
-            TextIndexVersion::V2 => serializer.serialize_u32(2),
-            TextIndexVersion::V3 => serializer.serialize_u32(3),
-            TextIndexVersion::Custom(i) => serializer.serialize_u32(i),
+        match self {
+            TextIndexVersion::V1 => serializer.serialize_i32(1),
+            TextIndexVersion::V2 => serializer.serialize_i32(2),
+            TextIndexVersion::V3 => serializer.serialize_i32(3),
+            TextIndexVersion::Custom(i) => serde_helpers::serialize_u32_as_i32(i, serializer),
         }
     }
 }
@@ -179,11 +183,11 @@ impl<'de> Deserialize<'de> for TextIndexVersion {
     where
         D: Deserializer<'de>,
     {
-        match u32::deserialize(deserializer)? {
+        match i32::deserialize(deserializer)? {
             1 => Ok(TextIndexVersion::V1),
             2 => Ok(TextIndexVersion::V2),
             3 => Ok(TextIndexVersion::V3),
-            i => Ok(TextIndexVersion::Custom(i)),
+            i => Ok(TextIndexVersion::Custom(i as u32)),
         }
     }
 }
@@ -201,10 +205,10 @@ impl Serialize for Sphere2DIndexVersion {
     where
         S: Serializer,
     {
-        match *self {
-            Sphere2DIndexVersion::V2 => serializer.serialize_u32(2),
-            Sphere2DIndexVersion::V3 => serializer.serialize_u32(3),
-            Sphere2DIndexVersion::Custom(i) => serializer.serialize_u32(i),
+        match self {
+            Sphere2DIndexVersion::V2 => serializer.serialize_i32(2),
+            Sphere2DIndexVersion::V3 => serializer.serialize_i32(3),
+            Sphere2DIndexVersion::Custom(i) => serde_helpers::serialize_u32_as_i32(i, serializer),
         }
     }
 }
@@ -214,10 +218,10 @@ impl<'de> Deserialize<'de> for Sphere2DIndexVersion {
     where
         D: Deserializer<'de>,
     {
-        match u32::deserialize(deserializer)? {
+        match i32::deserialize(deserializer)? {
             2 => Ok(Sphere2DIndexVersion::V2),
             3 => Ok(Sphere2DIndexVersion::V3),
-            i => Ok(Sphere2DIndexVersion::Custom(i)),
+            i => Ok(Sphere2DIndexVersion::Custom(i as u32)),
         }
     }
 }

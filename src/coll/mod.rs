@@ -2,7 +2,10 @@ pub mod options;
 
 use std::{borrow::Borrow, collections::HashSet, fmt, fmt::Debug, sync::Arc};
 
-use futures_util::{future, stream::{StreamExt, TryStreamExt}};
+use futures_util::{
+    future,
+    stream::{StreamExt, TryStreamExt},
+};
 use serde::{
     de::{DeserializeOwned, Error as DeError},
     Deserialize,
@@ -17,6 +20,7 @@ use crate::{
     client::session::TransactionState,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
+    index::IndexModel,
     operation::{
         Aggregate,
         Count,
@@ -38,7 +42,6 @@ use crate::{
     ClientSession,
     Cursor,
     Database,
-    IndexModel,
     SessionCursor,
 };
 
@@ -500,6 +503,14 @@ impl<T> Collection<T> {
         name: &str,
         options: impl Into<Option<DropIndexOptions>>,
     ) -> Result<()> {
+        if name == "*" {
+            return Err(ErrorKind::InvalidArgument {
+                message: "Cannot pass name \"*\" to drop_index since more than one index would be \
+                          dropped."
+                    .to_string(),
+            }
+            .into());
+        }
         self.drop_index_common(Some(name), options, None).await
     }
 

@@ -1,6 +1,9 @@
 use std::{fmt::Debug, time::Duration};
 
-use futures::stream::{StreamExt, TryStreamExt};
+use futures::{
+    future,
+    stream::{StreamExt, TryStreamExt},
+};
 use lazy_static::lazy_static;
 use semver::VersionReq;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -9,6 +12,7 @@ use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 use crate::{
     bson::{doc, to_document, Bson, Document},
     error::{ErrorKind, Result, WriteFailure},
+    index::{options::IndexOptions, IndexModel},
     options::{
         Acknowledgment,
         AggregateOptions,
@@ -1048,4 +1052,200 @@ async fn collection_generic_bounds() {
         .database(function_name!())
         .collection(function_name!());
     let _result = coll.insert_one(Bar {}, None).await;
+}
+
+// Test that creating indexes works as expected.
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn index_management_creates() {
+    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
+    let client = TestClient::new().await;
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
+
+    // Test creating a single index with driver-generated name.
+    let result = coll
+        .create_index(
+            IndexModel::builder()
+                .keys(bson::doc! { "a": 1, "b": -1 })
+                .build(),
+            None,
+        )
+        .await
+        .expect("Test failed to create index");
+    assert_eq!(result, "a_1_b_-1");
+
+    // Test creating several indexes, with both specified and unspecified names.
+    let result = coll
+        .create_indexes(
+            vec![
+                IndexModel::builder().keys(bson::doc! { "c": 1 }).build(),
+                IndexModel::builder()
+                    .keys(bson::doc! { "d": 1 })
+                    .options(
+                        IndexOptions::builder()
+                            .name("customname".to_string())
+                            .build(),
+                    )
+                    .build(),
+            ],
+            None,
+        )
+        .await
+        .expect("Test failed to create indexes");
+    assert_eq!(result, vec!["c_1", "customname"]);
+
+    // Pull all index names from db to verify the _id_ index.
+    let names = coll
+        .list_index_names()
+        .await
+        .expect("Test failed to list index names");
+    assert_eq!(names, vec!["_id_", "a_1_b_-1", "c_1", "customname"]);
+}
+
+// Test that listing indexes works as expected.
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn index_management_lists() {
+    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
+    let client = TestClient::new().await;
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
+
+    let insert_data = vec![
+        IndexModel::builder().keys(bson::doc! { "a": 1 }).build(),
+        IndexModel::builder().keys(bson::doc! { "b": 1 }).build(),
+    ];
+
+    coll.create_indexes(insert_data.clone(), None)
+        .await
+        .expect("Test failed to create indexes");
+
+    let expected_names = vec!["_id_".to_string(), "a_1".to_string(), "b_1".to_string()];
+
+    let cursor_names: Vec<String> = coll
+        .list_indexes(None)
+        .await
+        .expect("Test failed to list indexes")
+        .try_filter_map(|index| future::ok(index.get_name()))
+        .try_collect()
+        .await
+        .unwrap();
+
+    assert_eq!(cursor_names, expected_names);
+
+    let names = coll
+        .list_index_names()
+        .await
+        .expect("Test failed to list index names");
+
+    assert_eq!(names, expected_names);
+}
+
+// Test that dropping indexes works as expected.
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn index_management_drops() {
+    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
+    let client = TestClient::new().await;
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
+
+    let result = coll
+        .create_indexes(
+            vec![
+                IndexModel::builder().keys(bson::doc! { "a": 1 }).build(),
+                IndexModel::builder().keys(bson::doc! { "b": 1 }).build(),
+                IndexModel::builder().keys(bson::doc! { "c": 1 }).build(),
+            ],
+            None,
+        )
+        .await
+        .expect("Test failed to create multiple indexes");
+    assert_eq!(result, vec!["a_1", "b_1", "c_1"]);
+
+    // Test dropping single index.
+    coll.drop_index("a_1", None)
+        .await
+        .expect("Test failed to drop index");
+    let names = coll
+        .list_index_names()
+        .await
+        .expect("Test failed to list index names");
+    assert_eq!(names, vec!["_id_", "b_1", "c_1"]);
+
+    // Test dropping several indexes.
+    coll.drop_indexes(None)
+        .await
+        .expect("Test failed to drop indexes");
+    let names = coll
+        .list_index_names()
+        .await
+        .expect("Test failed to list index names");
+    assert_eq!(names, vec!["_id_"]);
+}
+
+// Test that index management commands execute the expected database commands.
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn index_management_executes_commands() {
+    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
+    let client = EventClient::new().await;
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
+
+    // Collection::create_index and Collection::create_indexes execute createIndexes.
+    assert_eq!(
+        client.get_command_started_events(&["createIndexes"]).len(),
+        0
+    );
+    coll.create_index(
+        IndexModel::builder().keys(bson::doc! { "a": 1 }).build(),
+        None,
+    )
+    .await
+    .expect("Create Index op failed");
+    assert_eq!(
+        client.get_command_started_events(&["createIndexes"]).len(),
+        1
+    );
+    coll.create_indexes(
+        vec![
+            IndexModel::builder().keys(bson::doc! { "b": 1 }).build(),
+            IndexModel::builder().keys(bson::doc! { "c": 1 }).build(),
+        ],
+        None,
+    )
+    .await
+    .expect("Create Indexes op failed");
+    assert_eq!(
+        client.get_command_started_events(&["createIndexes"]).len(),
+        2
+    );
+
+    // Collection::list_indexes and Collection::list_index_names execute listIndexes.
+    assert_eq!(client.get_command_started_events(&["listIndexes"]).len(), 0);
+    coll.list_indexes(None).await.expect("List index op failed");
+    assert_eq!(client.get_command_started_events(&["listIndexes"]).len(), 1);
+    coll.list_index_names().await.expect("List index op failed");
+    assert_eq!(client.get_command_started_events(&["listIndexes"]).len(), 2);
+
+    // Collection::drop_index and Collection::drop_indexes execute dropIndexes.
+    assert_eq!(client.get_command_started_events(&["dropIndexes"]).len(), 0);
+    coll.drop_index("a_1", None)
+        .await
+        .expect("Drop index op failed");
+    assert_eq!(client.get_command_started_events(&["dropIndexes"]).len(), 1);
+    coll.drop_indexes(None)
+        .await
+        .expect("Drop indexes op failed");
+    assert_eq!(client.get_command_started_events(&["dropIndexes"]).len(), 2);
 }

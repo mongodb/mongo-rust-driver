@@ -5,9 +5,9 @@ use crate::{
     bson::{doc, Document},
     cmap::{Command, StreamDescription},
     error::Result,
+    index::IndexModel,
     operation::{append_options, Operation},
     options::{CreateIndexesOptions, WriteConcern},
-    IndexModel,
     Namespace,
 };
 
@@ -30,6 +30,18 @@ impl CreateIndexes {
             ns,
             indexes,
             options,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_indexes(indexes: Vec<IndexModel>) -> Self {
+        Self {
+            ns: Namespace {
+                db: String::new(),
+                coll: String::new(),
+            },
+            indexes,
+            options: None,
         }
     }
 }

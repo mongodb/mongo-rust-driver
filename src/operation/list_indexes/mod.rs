@@ -3,9 +3,9 @@ use crate::{
     cmap::{Command, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
+    index::IndexModel,
     operation::{append_options, Operation},
     options::ListIndexOptions,
-    IndexModel,
     Namespace,
 };
 
@@ -20,8 +20,19 @@ pub(crate) struct ListIndexes {
 }
 
 impl ListIndexes {
-    pub fn new(ns: Namespace, options: Option<ListIndexOptions>) -> Self {
+    pub(crate) fn new(ns: Namespace, options: Option<ListIndexOptions>) -> Self {
         ListIndexes { ns, options }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn empty() -> Self {
+        Self {
+            ns: Namespace {
+                db: String::new(),
+                coll: String::new(),
+            },
+            options: None,
+        }
     }
 }
 

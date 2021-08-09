@@ -19,12 +19,20 @@ pub(crate) struct DropIndex {
 }
 
 impl DropIndex {
-    pub(crate) fn new(
-        ns: Namespace,
-        name: String,
-        options: Option<DropIndexOptions>,
-    ) -> Self {
+    pub(crate) fn new(ns: Namespace, name: String, options: Option<DropIndexOptions>) -> Self {
         Self { ns, name, options }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn empty() -> Self {
+        Self {
+            ns: Namespace {
+                db: String::new(),
+                coll: String::new(),
+            },
+            name: String::new(),
+            options: None,
+        }
     }
 }
 
@@ -48,7 +56,11 @@ impl Operation for DropIndex {
         ))
     }
 
-    fn handle_response(&self, _response: EmptyBody, _description: &StreamDescription) -> Result<Self::O> {
+    fn handle_response(
+        &self,
+        _response: EmptyBody,
+        _description: &StreamDescription,
+    ) -> Result<Self::O> {
         Ok(())
     }
 }
