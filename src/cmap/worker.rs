@@ -537,11 +537,8 @@ impl ConnectionPoolWorker {
 
     /// Close a connection, emit the event for it being closed, and decrement the
     /// total connection count.
-    fn close_connection(
-        &mut self,
-        connection: Connection,
-        reason: ConnectionClosedReason,
-    ) {
+    #[allow(clippy::single_match)]
+    fn close_connection(&mut self, connection: Connection, reason: ConnectionClosedReason) {
         match (&mut self.generation, connection.generation.service_id()) {
             (PoolGeneration::LoadBalanced(gen_map), Some(sid)) => {
                 match self.service_connection_count.get_mut(&sid) {

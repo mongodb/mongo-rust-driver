@@ -585,7 +585,7 @@ pub(crate) fn convert_bulk_errors(error: Error) -> Error {
     }
 }
 
-/// Flag a load balanced mode mismatch.  In tests, it will panic; outside of tests, it will
+/// Flag a load-balanced mode mismatch.  In tests, it will panic; outside of tests, it will
 /// evaluate to the argument, or `()` if none is given.
 // TODO RUST-230 Log an error in the non-panic branch for mode mismatch.
 #[cfg(test)]
