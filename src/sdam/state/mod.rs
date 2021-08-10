@@ -22,7 +22,7 @@ use crate::{
     bson::oid::ObjectId,
     client::ClusterTime,
     cmap::{conn::ConnectionGeneration, Command, Connection, PoolGeneration},
-    error::{Error, Result},
+    error::{load_balanced_mode_mismatch, Error, Result},
     options::{ClientOptions, SelectionCriteria, ServerAddress},
     runtime::HttpClient,
     sdam::{
@@ -264,7 +264,7 @@ impl Topology {
                     (PoolGeneration::LoadBalanced(_), PoolGeneration::LoadBalanced(_)) => {
                         return false
                     }
-                    _ => load_balanced_mode_mismatch!(),
+                    _ => load_balanced_mode_mismatch!(false),
                 }
             }
             HandshakePhase::PostHello { generation }
@@ -506,15 +506,6 @@ impl TopologyState {
             topology.clone(),
             self.http_client.clone(),
         );
-        let is_load_balanced = matches!(topology.client_options().load_balanced, Some(true));
-        if is_load_balanced {
-            // Because load balancer servers don't have a monitoring connection, the associated
-            // connection pool needs to be directly marked as ready.
-            let server = Arc::clone(&server);
-            RUNTIME.execute(async move {
-                server.pool.mark_as_ready().await;
-            })
-        }
         self.servers.insert(address, server);
 
         #[cfg(test)]
@@ -522,7 +513,7 @@ impl TopologyState {
             return;
         }
 
-        monitor.start(is_load_balanced);
+        monitor.start();
     }
 
     /// Updates the given `command` as needed based on the `criteria`.
@@ -600,7 +591,8 @@ pub(crate) enum HandshakePhase {
     /// socket).
     PreHello { generation: PoolGeneration },
 
-    /// Describes a point in time after the initial hello has completed, but before authentication.
+    /// Describes a point in time after the initial hello has completed, but before the entire
+    /// handshake (e.g. including authentication) completes.
     PostHello { generation: ConnectionGeneration },
 
     /// Describes a point in time after the handshake completed (e.g. when the command was sent to

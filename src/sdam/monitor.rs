@@ -51,7 +51,8 @@ impl Monitor {
     /// Start the monitor tasks.
     /// A weak reference is used to ensure that the monitor doesn't keep the topology alive after
     /// it's been removed from the topology or the client has been dropped.
-    pub(super) fn start(self, is_load_balanced: bool) {
+    pub(super) fn start(self) {
+        let is_load_balanced = matches!(self.client_options.load_balanced, Some(true));
         // Load balancer servers can't have a monitoring connection.
         if !is_load_balanced {
             let mut heartbeat_monitor = HeartbeatMonitor::new(

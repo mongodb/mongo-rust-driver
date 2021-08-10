@@ -585,25 +585,19 @@ pub(crate) fn convert_bulk_errors(error: Error) -> Error {
     }
 }
 
-/// Flag a load-balanced mode mismatch.  In tests, it will panic; outside of tests, it will
-/// evaluate to the argument, or `()` if none is given.
+/// Flag a load-balanced mode mismatch.  With debug assertions enabled, it will panic; otherwise,
+/// it will return the argument, or `()` if none is given.
 // TODO RUST-230 Log an error in the non-panic branch for mode mismatch.
-#[cfg(test)]
 macro_rules! load_balanced_mode_mismatch {
     ($e:expr) => {{
-        let _ = $e;
-        panic!("load-balanced mode mismatch")
+        if cfg!(debug_assertions) {
+            panic!("load-balanced mode mismatch")
+        }
+        return $e;
     }};
     () => {
         load_balanced_mode_mismatch!(())
     };
 }
-#[cfg(not(test))]
-macro_rules! load_balanced_mode_mismatch {
-    ($e:expr) => {
-        $e
-    };
-    () => {
-        load_balanced_mode_mismatch!(())
-    };
-}
+
+pub(crate) use load_balanced_mode_mismatch;

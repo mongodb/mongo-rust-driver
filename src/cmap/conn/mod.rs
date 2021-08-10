@@ -17,7 +17,7 @@ use crate::{
         options::{ConnectionOptions, StreamOptions},
         PoolGeneration,
     },
-    error::{ErrorKind, Result},
+    error::{load_balanced_mode_mismatch, ErrorKind, Result},
     event::cmap::{
         CmapEventHandler,
         ConnectionCheckedInEvent,

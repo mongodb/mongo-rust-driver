@@ -22,7 +22,7 @@ use super::{
 };
 use crate::{
     bson::oid::ObjectId,
-    error::{Error, ErrorKind, Result},
+    error::{load_balanced_mode_mismatch, Error, ErrorKind, Result},
     event::cmap::{
         CmapEventHandler,
         ConnectionClosedEvent,
@@ -185,7 +185,7 @@ impl ConnectionPoolWorker {
         };
 
         #[cfg(test)]
-        let state = if options
+        let mut state = if options
             .as_ref()
             .and_then(|opts| opts.ready)
             .unwrap_or(false)
@@ -207,7 +207,17 @@ impl ConnectionPoolWorker {
             .unwrap_or(MAINTENACE_FREQUENCY);
 
         #[cfg(not(test))]
-        let (state, maintenance_frequency) = (PoolState::New, MAINTENACE_FREQUENCY);
+        let (mut state, maintenance_frequency) = (PoolState::New, MAINTENACE_FREQUENCY);
+
+        if options
+            .as_ref()
+            .and_then(|opts| opts.load_balanced)
+            .unwrap_or(false)
+        {
+            // Because load balancer servers don't have a monitoring connection, the associated
+            // connection pool needs start in the ready state.
+            state = PoolState::Ready;
+        }
 
         let worker = ConnectionPoolWorker {
             address,
@@ -487,7 +497,7 @@ impl ConnectionPoolWorker {
                 *gen += 1;
                 true
             }
-            (..) => load_balanced_mode_mismatch!(false),
+            (..) => load_balanced_mode_mismatch!(),
         };
         self.generation_publisher.publish(self.generation.clone());
 

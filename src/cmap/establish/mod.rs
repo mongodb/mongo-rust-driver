@@ -16,8 +16,6 @@ use crate::{
     sdam::HandshakePhase,
 };
 
-use thiserror::Error;
-
 /// Contains the logic to establish a connection, including handshaking, authenticating, and
 /// potentially more.
 #[derive(Clone, Debug)]
@@ -96,8 +94,7 @@ impl ConnectionEstablisher {
     }
 }
 
-#[derive(Debug, Clone, Error)]
-#[error("{cause}")]
+#[derive(Debug, Clone)]
 pub(crate) struct EstablishError {
     pub(crate) cause: MongoError,
     pub(crate) handshake_phase: HandshakePhase,
