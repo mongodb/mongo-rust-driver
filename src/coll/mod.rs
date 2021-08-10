@@ -346,16 +346,35 @@ impl<T> Collection<T> {
             .await
     }
 
+    async fn create_index_common(
+        &self,
+        index: IndexModel,
+        options: impl Into<Option<CreateIndexOptions>>,
+        session: impl Into<Option<&mut ClientSession>>,
+    ) -> Result<CreateIndexResult> {
+        let response = self
+            .create_indexes_common(vec![index], options, session)
+            .await?;
+        Ok(response.into())
+    }
+
     /// Creates the given index on this collection.
     pub async fn create_index(
         &self,
         index: IndexModel,
         options: impl Into<Option<CreateIndexOptions>>,
     ) -> Result<CreateIndexResult> {
-        let response = self
-            .create_indexes_common(vec![index], options, None)
-            .await?;
-        Ok(response.into())
+        self.create_index_common(index, options, None).await
+    }
+
+    /// Convenience method for creating a single index on an explicit session.
+    pub async fn create_index_with_session(
+        &self,
+        index: IndexModel,
+        options: impl Into<Option<CreateIndexOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<CreateIndexResult> {
+        self.create_index_common(index, options, session).await
     }
 
     /// Creates the given indexes on this collection.
@@ -365,6 +384,16 @@ impl<T> Collection<T> {
         options: impl Into<Option<CreateIndexOptions>>,
     ) -> Result<CreateIndexesResult> {
         self.create_indexes_common(indexes, options, None).await
+    }
+
+    /// Create several indexes on an explicit session.
+    pub async fn create_indexes_with_session(
+        &self,
+        indexes: impl IntoIterator<Item = IndexModel>,
+        options: impl Into<Option<CreateIndexOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<CreateIndexesResult> {
+        self.create_indexes_common(indexes, options, session).await
     }
 
     /// Deletes all documents stored in the collection matching `query`.
@@ -477,7 +506,7 @@ impl<T> Collection<T> {
             .await
     }
 
-    async fn drop_index_common(
+    async fn drop_indexes_common(
         &self,
         name: impl Into<Option<&str>>,
         options: impl Into<Option<DropIndexOptions>>,
@@ -495,11 +524,11 @@ impl<T> Collection<T> {
         self.client().execute_operation(drop_index, session).await
     }
 
-    /// Drops the index specified by `name` from this collection.
-    pub async fn drop_index(
+    async fn drop_index_common(
         &self,
         name: impl AsRef<str>,
         options: impl Into<Option<DropIndexOptions>>,
+        session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<()> {
         let name = name.as_ref();
         if name == "*" {
@@ -510,12 +539,40 @@ impl<T> Collection<T> {
             }
             .into());
         }
+        self.drop_indexes_common(name, options, session).await
+    }
+
+    /// Drops the index specified by `name` from this collection.
+    pub async fn drop_index(
+        &self,
+        name: &str,
+        options: impl Into<Option<DropIndexOptions>>,
+    ) -> Result<()> {
         self.drop_index_common(name, options, None).await
+    }
+
+    /// Drop the index specified by `name` from the collection using an explicit session.
+    pub async fn drop_index_with_session(
+        &self,
+        name: &str,
+        options: impl Into<Option<DropIndexOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<()> {
+        self.drop_index_common(name, options, session).await
     }
 
     /// Drops all indexes associated with this collection.
     pub async fn drop_indexes(&self, options: impl Into<Option<DropIndexOptions>>) -> Result<()> {
-        self.drop_index_common(None, options, None).await
+        self.drop_indexes_common(None, options, None).await
+    }
+
+    /// Drop all indexes associated with the collection using an explicit session.
+    pub async fn drop_indexes_with_session(
+        &self,
+        options: impl Into<Option<DropIndexOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<()> {
+        self.drop_indexes_common(None, options, session).await
     }
 
     /// Lists all indexes on this collection.
@@ -531,6 +588,20 @@ impl<T> Collection<T> {
             .map(|(spec, session)| Cursor::new(client.clone(), spec, session))
     }
 
+    /// List all indexes on the collection using an explicit session.
+    pub async fn list_indexes_with_session(
+        &self,
+        options: impl Into<Option<ListIndexOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<SessionCursor<IndexModel>> {
+        let list_indexes = ListIndexes::new(self.namespace(), options.into());
+        let client = self.client();
+        client
+            .execute_operation(list_indexes, session)
+            .await
+            .map(|spec| SessionCursor::new(client.clone(), spec))
+    }
+
     async fn list_index_names_common(
         &self,
         cursor: impl TryStreamExt<Ok = IndexModel, Error = Error>,
@@ -543,13 +614,17 @@ impl<T> Collection<T> {
 
     /// Gets the names of all indexes on the collection.
     pub async fn list_index_names(&self) -> Result<Vec<String>> {
-        let list_indexes = ListIndexes::new(self.namespace(), None);
-        let client = self.client();
-        let cursor: Cursor<IndexModel> = client
-            .execute_cursor_operation(list_indexes)
-            .await
-            .map(|(spec, session)| Cursor::new(client.clone(), spec, session))?;
+        let cursor = self.list_indexes(None).await?;
         self.list_index_names_common(cursor).await
+    }
+
+    /// Gets the names of all indexes on the collection using the provided `ClientSession`.
+    pub async fn list_index_names_with_session(
+        &self,
+        session: &mut ClientSession,
+    ) -> Result<Vec<String>> {
+        let mut cursor = self.list_indexes_with_session(None, session).await?;
+        self.list_index_names_common(cursor.stream(session)).await
     }
 
     async fn update_many_common(
