@@ -20,7 +20,7 @@ macro_rules! client_op {
     ($client:ident, $body:expr) => {
         |$client| async move {
             $body.await.unwrap();
-        };
+        }
     };
 }
 
