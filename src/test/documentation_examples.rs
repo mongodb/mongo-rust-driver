@@ -1,5 +1,6 @@
 use bson::Document;
 use futures::TryStreamExt;
+use semver::Version;
 use tokio::sync::RwLockReadGuard;
 
 use crate::{
@@ -1373,6 +1374,13 @@ async fn versioned_api_examples() -> Result<()> {
     let setup_client = TestClient::new().await;
     if setup_client.server_version_lt(4, 9) {
         println!("skipping versioned API examples due to unsupported server version");
+        return Ok(());
+    }
+    if setup_client.is_sharded() && setup_client.server_version <= Version::new(5, 0, 2) {
+        // See SERVER-58794.
+        println!(
+            "skipping versioned API examples due to unsupported server version on sharded topology"
+        );
         return Ok(());
     }
 
