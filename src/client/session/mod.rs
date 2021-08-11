@@ -601,7 +601,10 @@ impl ServerSession {
 
     /// Determines if this server session is about to expire in a short amount of time (1 minute).
     fn is_about_to_expire(&self, logical_session_timeout: Option<Duration>) -> bool {
-        let timeout = if let Some(t) = logical_session_timeout { t } else { return false; };
+        let timeout = match logical_session_timeout {
+            Some(t) => t,
+            None => return false,
+        };
         let expiration_date = self.last_use + timeout;
         expiration_date < Instant::now() + Duration::from_secs(60)
     }
