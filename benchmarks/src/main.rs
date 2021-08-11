@@ -15,6 +15,22 @@ macro_rules! spawn_blocking_and_await {
     }};
 }
 
+fn spawn<T>(future: T) -> impl Future<Output = <T as Future>::Output>
+where
+    T: Future + Send + 'static,
+    T::Output: Send + 'static,
+{
+    #[cfg(feature = "tokio-runtime")]
+    {
+        tokio::task::spawn(future).map(|result| result.unwrap())
+    }
+
+    #[cfg(feature = "async-std-runtime")]
+    {
+        async_std::task::spawn(future)
+    }
+}
+
 mod bench;
 mod fs;
 
@@ -25,18 +41,14 @@ use std::{
 
 use anyhow::Result;
 use clap::{App, Arg, ArgMatches};
+use futures::{Future, FutureExt};
 use lazy_static::lazy_static;
 
 use crate::bench::{
-    bson_decode::BsonDecodeBenchmark,
-    bson_encode::BsonEncodeBenchmark,
-    find_many::FindManyBenchmark,
-    find_one::FindOneBenchmark,
-    insert_many::InsertManyBenchmark,
-    insert_one::InsertOneBenchmark,
-    json_multi_export::JsonMultiExportBenchmark,
-    json_multi_import::JsonMultiImportBenchmark,
-    run_command::RunCommandBenchmark,
+    bson_decode::BsonDecodeBenchmark, bson_encode::BsonEncodeBenchmark,
+    find_many::FindManyBenchmark, find_one::FindOneBenchmark, insert_many::InsertManyBenchmark,
+    insert_one::InsertOneBenchmark, json_multi_export::JsonMultiExportBenchmark,
+    json_multi_import::JsonMultiImportBenchmark, run_command::RunCommandBenchmark,
 };
 
 lazy_static! {
@@ -444,7 +456,7 @@ fn parse_ids(matches: ArgMatches) -> Vec<bool> {
     ids
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::main(flavor = "current_thread"))]
+#[cfg_attr(feature = "tokio-runtime", tokio::main)]
 #[cfg_attr(feature = "async-std-runtime", async_std::main)]
 async fn main() {
     let matches = App::new("RustDriverBenchmark")
@@ -509,11 +521,19 @@ Run benchmarks by id number (comma-separated):
                     ",
                 ),
         )
+        .arg(
+            Arg::with_name("output")
+                .short("o")
+                .long("output")
+                .takes_value(true)
+                .help("Produce JSON output for ingestion by Evergreen"),
+        )
         .get_matches();
 
     let uri = option_env!("MONGODB_URI").unwrap_or("mongodb://localhost:27017");
 
     let verbose = matches.is_present("verbose");
+    let output_file = matches.value_of("output");
 
     println!(
         "Running tests{}...\n",
