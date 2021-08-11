@@ -1432,18 +1432,23 @@ async fn versioned_api_examples() -> std::result::Result<(), Box<dyn std::error:
     let db = client.database("versioned-api-migration-examples");
     db.collection::<Document>("sales").drop(None).await?;
 
+    use std::{error::Error, result::Result};
     // Start Versioned API Example 5
-    // Note that using `chrono::DateTime` values directly in a `doc!` macro requires enabling the
-    // `bson-chrono-0_4` feature.
+    // With the `bson-chrono-0_4` feature enabled, this function can be dropped in favor of using
+    // `chrono::DateTime` values directly.
+    fn iso_date(text: &str) -> Result<bson::DateTime, Box<dyn Error>> {
+        let chrono_dt = chrono::DateTime::parse_from_rfc3339(text)?;
+        Ok(bson::DateTime::from_millis(chrono_dt.timestamp_millis()))
+    }
     db.collection("sales").insert_many(vec![
-        doc! { "_id" : 1, "item" : "abc", "price" : 10, "quantity" : 2, "date" : chrono::DateTime::parse_from_rfc3339("2021-01-01T08:00:00Z")? },
-        doc! { "_id" : 3, "item" : "xyz", "price" : 5, "quantity" : 5, "date" : chrono::DateTime::parse_from_rfc3339("2021-02-03T09:05:00Z")? },
-        doc! { "_id" : 2, "item" : "jkl", "price" : 20, "quantity" : 1, "date" : chrono::DateTime::parse_from_rfc3339("2021-02-03T09:00:00Z")? },
-        doc! { "_id" : 4, "item" : "abc", "price" : 10, "quantity" : 10, "date" : chrono::DateTime::parse_from_rfc3339("2021-02-15T08:00:00Z")? },
-        doc! { "_id" : 5, "item" : "xyz", "price" : 5, "quantity" : 10, "date" : chrono::DateTime::parse_from_rfc3339("2021-02-15T09:05:00Z")? },
-        doc! { "_id" : 6, "item" : "xyz", "price" : 5, "quantity" : 5, "date" : chrono::DateTime::parse_from_rfc3339("2021-02-15T12:05:10Z")? },
-        doc! { "_id" : 7, "item" : "xyz", "price" : 5, "quantity" : 10, "date" : chrono::DateTime::parse_from_rfc3339("2021-02-15T14:12:12Z")? },
-        doc! { "_id" : 8, "item" : "abc", "price" : 10, "quantity" : 5, "date" : chrono::DateTime::parse_from_rfc3339("2021-03-16T20:20:13Z")? }
+        doc! { "_id" : 1, "item" : "abc", "price" : 10, "quantity" : 2, "date" : iso_date("2021-01-01T08:00:00Z")? },
+        doc! { "_id" : 3, "item" : "xyz", "price" : 5, "quantity" : 5, "date" : iso_date("2021-02-03T09:05:00Z")? },
+        doc! { "_id" : 2, "item" : "jkl", "price" : 20, "quantity" : 1, "date" : iso_date("2021-02-03T09:00:00Z")? },
+        doc! { "_id" : 4, "item" : "abc", "price" : 10, "quantity" : 10, "date" : iso_date("2021-02-15T08:00:00Z")? },
+        doc! { "_id" : 5, "item" : "xyz", "price" : 5, "quantity" : 10, "date" : iso_date("2021-02-15T09:05:00Z")? },
+        doc! { "_id" : 6, "item" : "xyz", "price" : 5, "quantity" : 5, "date" : iso_date("2021-02-15T12:05:10Z")? },
+        doc! { "_id" : 7, "item" : "xyz", "price" : 5, "quantity" : 10, "date" : iso_date("2021-02-15T14:12:12Z")? },
+        doc! { "_id" : 8, "item" : "abc", "price" : 10, "quantity" : 5, "date" : iso_date("2021-03-16T20:20:13Z")? }
     ], None).await?;
     // End Versioned API Example 5
 

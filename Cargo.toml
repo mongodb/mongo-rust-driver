@@ -9,7 +9,6 @@ license = "Apache-2.0"
 readme = "README.md"
 name = "mongodb"
 version = "2.0.0-beta.3"
-resolver = "2"
 
 exclude = [
     "etc/**",
@@ -39,7 +38,7 @@ bson-uuid-0_8 = ["bson/uuid-0_8"]
 async-trait = "0.1.42"
 base64 = "0.13.0"
 bitflags = "1.1.0"
-bson = "2.0.0-beta.3"  # when updating this, also update in dev-dependencies
+bson = "2.0.0-beta.3"
 chrono = "0.4.7"
 derivative = "2.1.1"
 futures-core = "0.3.14"
@@ -116,7 +115,6 @@ features = ["v4"]
 
 [dev-dependencies]
 approx = "0.4.0"
-bson = { version = "2.0.0-beta.3", features = ["chrono-0_4"] }
 derive_more = "0.99.13"
 function_name = "0.2.0"
 futures = "0.3"
