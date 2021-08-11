@@ -420,7 +420,7 @@ pub enum ErrorKind {
 }
 
 /// An error that occurred due to a database command failing.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize)]
 #[non_exhaustive]
 pub struct CommandError {
     /// Identifies the type of error.
