@@ -45,22 +45,22 @@ lazy_static! {
 pub trait Benchmark: Sized {
     type Options;
 
-    // execute once before benchmarking
+    /// execute once before benchmarking
     async fn setup(options: Self::Options) -> Result<Self>;
 
-    // execute at the beginning of every iteration
+    /// execute at the beginning of every iteration
     async fn before_task(&mut self) -> Result<()> {
         Ok(())
     }
 
     async fn do_task(&self) -> Result<()>;
 
-    // execute at the end of every iteration
+    /// execute at the end of every iteration
     async fn after_task(&self) -> Result<()> {
         Ok(())
     }
 
-    // execute once after benchmarking
+    /// execute once after benchmarking
     async fn teardown(&self) -> Result<()> {
         Ok(())
     }

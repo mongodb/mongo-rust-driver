@@ -2,8 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
-use mongodb::{bson::Document, options::InsertManyOptions, Client, Collection, Database};
-use serde::{Deserialize, Serialize};
+use mongodb::{options::InsertManyOptions, Client, Collection, Database};
 
 use crate::{
     bench::{Benchmark, COLL_NAME, DATABASE_NAME},
