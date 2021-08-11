@@ -73,7 +73,7 @@ impl TestClient {
         // To avoid populating the session pool with leftover implicit sessions, we check out a
         // session here and immediately mark it as dirty, then use it with any operations we need.
         let mut session = client
-            .start_session_with_timeout(Duration::from_secs(60 * 60), None, true)
+            .start_session_with_timeout(Some(Duration::from_secs(60 * 60)), None, true)
             .await;
         session.mark_dirty();
 

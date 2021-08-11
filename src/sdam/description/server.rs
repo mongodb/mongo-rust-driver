@@ -44,6 +44,7 @@ impl ServerType {
                 | ServerType::RsPrimary
                 | ServerType::RsSecondary
                 | ServerType::Mongos
+                | ServerType::LoadBalancer
         )
     }
 }
