@@ -1,7 +1,12 @@
 use std::{convert::TryInto, path::PathBuf};
 
 use anyhow::{bail, Result};
-use mongodb::{Client, Collection, Database, bson::{Bson, Document, doc}};
+use mongodb::{
+    bson::{doc, Bson, Document},
+    Client,
+    Collection,
+    Database,
+};
 use serde_json::Value;
 
 use crate::{

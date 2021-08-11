@@ -2,7 +2,12 @@ use std::{convert::TryInto, path::PathBuf};
 
 use anyhow::{bail, Result};
 use futures::stream::StreamExt;
-use mongodb::{Client, Collection, Database, bson::{Bson, Document}};
+use mongodb::{
+    bson::{Bson, Document},
+    Client,
+    Collection,
+    Database,
+};
 use serde_json::Value;
 
 use crate::{

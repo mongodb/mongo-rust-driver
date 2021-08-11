@@ -85,7 +85,8 @@ pub(crate) async fn parse_json_file_to_documents(file: File) -> Result<Vec<Docum
 
 fn finished(duration: Duration, iter: usize) -> bool {
     let elapsed = duration.as_secs();
-    elapsed >= *MAX_EXECUTION_TIME || (iter >= *TARGET_ITERATION_COUNT && elapsed > *MIN_EXECUTION_TIME)
+    elapsed >= *MAX_EXECUTION_TIME
+        || (iter >= *TARGET_ITERATION_COUNT && elapsed > *MIN_EXECUTION_TIME)
 }
 
 pub async fn run_benchmark<B: Benchmark + Send + Sync>(

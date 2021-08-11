@@ -33,6 +33,7 @@ where
 
 mod bench;
 mod fs;
+mod models;
 
 use std::{
     path::{Path, PathBuf},

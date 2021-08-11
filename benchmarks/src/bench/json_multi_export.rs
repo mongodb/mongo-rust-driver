@@ -2,11 +2,17 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
-use mongodb::{Client, Collection, Database, bson::{Document, doc}};
+use mongodb::{
+    bson::{doc, Document},
+    Client,
+    Collection,
+    Database,
+};
 
 use crate::{
     bench::{parse_json_file_to_documents, Benchmark, COLL_NAME, DATABASE_NAME},
     fs::File,
+    models::json_multi::Tweet,
 };
 
 const TOTAL_FILES: usize = 100;
@@ -66,10 +72,10 @@ impl Benchmark for JsonMultiExportBenchmark {
         let mut tasks = FuturesUnordered::new();
 
         for i in 0..TOTAL_FILES {
-            let coll_ref = self.coll.clone();
+            let coll_ref = self.coll.clone_with_type::<Tweet>();
             let path = std::env::temp_dir();
 
-            tasks.push(async move {
+            tasks.push(crate::spawn(async move {
                 // Note that errors are unwrapped within threads instead of propagated with `?`.
                 // While we could set up a channel to send errors back to main thread, this is a
                 // lot of work for little gain since we `unwrap()` in
@@ -83,9 +89,11 @@ impl Benchmark for JsonMultiExportBenchmark {
                     .unwrap();
 
                 while let Some(doc) = cursor.try_next().await.unwrap() {
-                    file.write_line(&doc.to_string()).await.unwrap();
+                    file.write_line(serde_json::to_string(&doc).unwrap().as_str())
+                        .await
+                        .unwrap();
                 }
-            });
+            }));
         }
 
         while !tasks.is_empty() {
