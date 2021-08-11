@@ -124,6 +124,12 @@ impl TopologyDescription {
             })
             .collect();
 
+        let session_support_status = if topology_type == TopologyType::LoadBalanced {
+            SessionSupportStatus::Supported { logical_session_timeout: None }
+        } else {
+            SessionSupportStatus::Undetermined
+        };
+
         Ok(Self {
             single_seed: servers.len() == 1,
             topology_type,
@@ -131,7 +137,7 @@ impl TopologyDescription {
             max_set_version: None,
             max_election_id: None,
             compatibility_error: None,
-            session_support_status: SessionSupportStatus::Undetermined,
+            session_support_status,
             transaction_support_status: TransactionSupportStatus::Undetermined,
             cluster_time: None,
             local_threshold: options.local_threshold,
