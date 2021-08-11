@@ -1458,15 +1458,14 @@ async fn versioned_api_examples() -> std::result::Result<(), Box<dyn std::error:
         .await;
     if let Err(err) = &result {
         println!("{:#?}", err.kind);
-        /* Prints:
-        Command(
-            CommandError {
-                code: 323,
-                code_name: "APIStrictError",
-                message: "Provided apiStrict:true, but the command count is not in API Version 1. Information on supported commands and migrations in API Version 1 can be found at https://dochub.mongodb.org/core/manual-versioned-api",
-            },
-        )
-        */
+        // Prints:
+        // Command(
+        //     CommandError {
+        //         code: 323,
+        //         code_name: "APIStrictError",
+        //         message: "Provided apiStrict:true, but the command count is not in API Version 1. Information on supported commands and migrations in API Version 1 can be found at https://dochub.mongodb.org/core/manual-versioned-api",
+        //     },
+        // )
     }
     // End Versioned API Example 6
     if let ErrorKind::Command(ref err) = *result.as_ref().unwrap_err().kind {
