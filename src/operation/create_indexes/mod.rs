@@ -7,7 +7,7 @@ use crate::{
     error::Result,
     index::IndexModel,
     operation::{append_options, Operation},
-    options::{CreateIndexesOptions, WriteConcern},
+    options::{CreateIndexOptions, WriteConcern},
     Namespace,
 };
 
@@ -17,14 +17,14 @@ use super::{CommandResponse, EmptyBody};
 pub(crate) struct CreateIndexes {
     ns: Namespace,
     indexes: Vec<IndexModel>,
-    options: Option<CreateIndexesOptions>,
+    options: Option<CreateIndexOptions>,
 }
 
 impl CreateIndexes {
     pub(crate) fn new(
         ns: Namespace,
         indexes: Vec<IndexModel>,
-        options: Option<CreateIndexesOptions>,
+        options: Option<CreateIndexOptions>,
     ) -> Self {
         Self {
             ns,

@@ -29,7 +29,7 @@ use crate::{
         Delete,
         Distinct,
         DropCollection,
-        DropIndex,
+        DropIndexes,
         Find,
         FindAndModify,
         Insert,
@@ -323,7 +323,7 @@ impl<T> Collection<T> {
     async fn create_indexes_common(
         &self,
         indexes: impl IntoIterator<Item = IndexModel>,
-        options: impl Into<Option<CreateIndexesOptions>>,
+        options: impl Into<Option<CreateIndexOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<Vec<String>> {
         let session = session.into();
@@ -343,20 +343,11 @@ impl<T> Collection<T> {
     pub async fn create_index(
         &self,
         index: IndexModel,
-        options: impl Into<Option<CreateIndexesOptions>>,
+        options: impl Into<Option<CreateIndexOptions>>,
     ) -> Result<String> {
         let mut result = self
             .create_indexes_common(vec![index], options, None)
             .await?;
-        if result.len() != 1 {
-            return Err(ErrorKind::InvalidResponse {
-                message: format!(
-                    "Expected exactly one index to be created, received {:?}",
-                    result
-                ),
-            }
-            .into());
-        }
         Ok(result.pop().unwrap())
     }
 
@@ -364,7 +355,7 @@ impl<T> Collection<T> {
     pub async fn create_indexes(
         &self,
         indexes: impl IntoIterator<Item = IndexModel>,
-        options: impl Into<Option<CreateIndexesOptions>>,
+        options: impl Into<Option<CreateIndexOptions>>,
     ) -> Result<Vec<String>> {
         self.create_indexes_common(indexes, options, None).await
     }
@@ -481,7 +472,7 @@ impl<T> Collection<T> {
 
     async fn drop_index_common(
         &self,
-        name: Option<&str>,
+        name: impl Into<Option<&str>>,
         options: impl Into<Option<DropIndexOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<()> {
@@ -491,18 +482,19 @@ impl<T> Collection<T> {
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
         // If there is no provided name, that means we should drop all indexes.
-        let index_name = name.unwrap_or("*").to_string();
+        let index_name = name.into().unwrap_or("*").to_string();
 
-        let drop_index = DropIndex::new(self.namespace(), index_name, options);
+        let drop_index = DropIndexes::new(self.namespace(), index_name, options);
         self.client().execute_operation(drop_index, session).await
     }
 
     /// Drop the index specified by `name` from the collection.
     pub async fn drop_index(
         &self,
-        name: &str,
+        name: impl AsRef<str>,
         options: impl Into<Option<DropIndexOptions>>,
     ) -> Result<()> {
+        let name = name.as_ref();
         if name == "*" {
             return Err(ErrorKind::InvalidArgument {
                 message: "Cannot pass name \"*\" to drop_index since more than one index would be \
@@ -511,7 +503,7 @@ impl<T> Collection<T> {
             }
             .into());
         }
-        self.drop_index_common(Some(name), options, None).await
+        self.drop_index_common(name, options, None).await
     }
 
     /// Drop all indexes associated with the collection.

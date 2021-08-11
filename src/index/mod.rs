@@ -7,11 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use typed_builder::TypedBuilder;
 
-/// Specifies the options to a
-/// [`Collection::create_index`](../struct.Collection.html#method.create_index) operation.
-/// See the
-/// [documentation](https://docs.mongodb.com/manual/reference/method/db.collection.createIndex/#options-for-all-index-types)
-/// for more information on how to use this option.
+/// Specifies the fields and options for an index. For more information, see the [documentation](https://docs.mongodb.com/manual/indexes/).
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase")]
@@ -22,6 +18,7 @@ pub struct IndexModel {
     #[serde(rename = "key")]
     keys: Document,
 
+    /// The options for the index.
     #[serde(flatten)]
     options: Option<IndexOptions>,
 }

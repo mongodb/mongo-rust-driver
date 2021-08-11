@@ -832,9 +832,9 @@ pub struct FindOneOptions {
     pub sort: Option<Document>,
 }
 
-/// These are the valid options for creating an [`Index`](../struct.Index.html) with
-/// [`Collection::create_indexes`](../struct.Collection.html#method.create_indexes) and its related
-/// methods.
+/// Specifies the options to a
+/// [`Collection::create_index`](../struct.Collection.html#method.create_index) or [`Collection::
+/// create_indexes`](../struct.Collection.html#method.create_indexes) operation.
 ///
 /// For more information, see [`createIndexes`](https://docs.mongodb.com/manual/reference/command/createIndexes/).
 #[serde_with::skip_serializing_none]
@@ -842,11 +842,14 @@ pub struct FindOneOptions {
 #[builder(field_defaults(default, setter(into)))]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[non_exhaustive]
-pub struct CreateIndexesOptions {
+pub struct CreateIndexOptions {
     /// Specify the commit quorum needed to mark an `index` as ready.
     pub commit_quorum: Option<CommitQuorum>,
 
     /// The maximum amount of time to allow the index to build.
+    ///
+    /// This option maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
     #[serde(
         rename = "maxTimeMS",
         default,
@@ -872,7 +875,8 @@ pub struct DropCollectionOptions {
 }
 
 /// Specifies the options to a
-/// [`Collection::drop_index`](../struct.Collection.html#method.drop_index) operation.
+/// [`Collection::drop_index`](../struct.Collection.html#method.drop_index) or
+/// [`Collection::drop_indexes`](../struct.Collection.html#method.drop_indexes) operation.
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -880,6 +884,9 @@ pub struct DropCollectionOptions {
 #[non_exhaustive]
 pub struct DropIndexOptions {
     /// The maximum amount of time to allow the index to drop.
+    ///
+    /// This option maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
     #[serde(
         rename = "maxTimeMS",
         default,
@@ -900,7 +907,10 @@ pub struct DropIndexOptions {
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
 pub struct ListIndexOptions {
-    /// The maximum amount of time to allow the index to drop.
+    /// The maximum amount of time to search for the index.
+    ///
+    /// This option maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
     #[serde(
         rename = "maxTimeMS",
         default,

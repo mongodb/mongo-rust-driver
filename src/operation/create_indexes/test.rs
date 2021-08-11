@@ -4,7 +4,7 @@ use crate::{
     bson::doc,
     cmap::StreamDescription,
     coll::{
-        options::{CommitQuorum, CreateIndexesOptions},
+        options::{CommitQuorum, CreateIndexOptions},
         Namespace,
     },
     concern::WriteConcern,
@@ -27,7 +27,7 @@ async fn build() {
         .keys(doc! { "x": 1 })
         .options(Some(index_options))
         .build();
-    let create_options = CreateIndexesOptions::builder()
+    let create_options = CreateIndexOptions::builder()
         .commit_quorum(Some(CommitQuorum::Majority))
         .max_time(Some(Duration::from_millis(42)))
         .write_concern(Some(WriteConcern::builder().journal(Some(true)).build()))

@@ -5,7 +5,7 @@ use crate::{
     cmap::StreamDescription,
     coll::{options::DropIndexOptions, Namespace},
     concern::WriteConcern,
-    operation::{test::handle_response_test, DropIndex, Operation},
+    operation::{test::handle_response_test, DropIndexes, Operation},
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -21,7 +21,7 @@ async fn build() {
         .write_concern(Some(WriteConcern::builder().journal(Some(true)).build()))
         .build();
 
-    let mut drop_index = DropIndex::new(ns, "foo".to_string(), Some(options));
+    let mut drop_index = DropIndexes::new(ns, "foo".to_string(), Some(options));
     let cmd = drop_index
         .build(&StreamDescription::new_testing())
         .expect("DropIndex command failed to build when it should have succeeded.");
@@ -39,7 +39,7 @@ async fn build() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success() {
-    let op = DropIndex::empty();
+    let op = DropIndexes::empty();
     let response = doc! { "ok": 1 };
     handle_response_test(&op, response).unwrap();
 }

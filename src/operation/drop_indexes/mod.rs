@@ -12,13 +12,13 @@ use crate::{
 
 use super::{CommandResponse, EmptyBody};
 
-pub(crate) struct DropIndex {
+pub(crate) struct DropIndexes {
     ns: Namespace,
     name: String,
     options: Option<DropIndexOptions>,
 }
 
-impl DropIndex {
+impl DropIndexes {
     pub(crate) fn new(ns: Namespace, name: String, options: Option<DropIndexOptions>) -> Self {
         Self { ns, name, options }
     }
@@ -36,7 +36,7 @@ impl DropIndex {
     }
 }
 
-impl Operation for DropIndex {
+impl Operation for DropIndexes {
     type O = ();
     type Command = Document;
     type Response = CommandResponse<EmptyBody>;
