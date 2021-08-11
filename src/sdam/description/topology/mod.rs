@@ -281,13 +281,6 @@ impl TopologyDescription {
             return;
         }
 
-        if server_description.server_type == ServerType::LoadBalancer {
-            self.session_support_status = SessionSupportStatus::Supported {
-                logical_session_timeout: None,
-            };
-            return;
-        }
-
         match server_description.logical_session_timeout().ok().flatten() {
             Some(timeout) => match self.session_support_status {
                 SessionSupportStatus::Supported {
