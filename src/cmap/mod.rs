@@ -16,11 +16,13 @@ use derivative::Derivative;
 pub use self::conn::ConnectionInfo;
 pub(crate) use self::{
     conn::{Command, Connection, RawCommand, RawCommandResponse, StreamDescription},
-    establish::handshake::Handshaker,
+    establish::{handshake::Handshaker, EstablishError},
     status::PoolGenerationSubscriber,
+    worker::PoolGeneration,
 };
 use self::{connection_requester::ConnectionRequestResult, options::ConnectionPoolOptions};
 use crate::{
+    bson::oid::ObjectId,
     error::{Error, Result},
     event::cmap::{
         CmapEventHandler,
@@ -156,8 +158,8 @@ impl ConnectionPool {
 
     /// Increments the generation of the pool. Rather than eagerly removing stale connections from
     /// the pool, they are left for the background thread to clean up.
-    pub(crate) async fn clear(&self, cause: Error) {
-        self.manager.clear(cause).await
+    pub(crate) async fn clear(&self, cause: Error, service_id: Option<ObjectId>) {
+        self.manager.clear(cause, service_id).await
     }
 
     /// Mark the pool as "ready", allowing connections to be created and checked out.
@@ -165,7 +167,7 @@ impl ConnectionPool {
         self.manager.mark_as_ready().await;
     }
 
-    pub(crate) fn generation(&self) -> u32 {
+    pub(crate) fn generation(&self) -> PoolGeneration {
         self.generation_subscriber.generation()
     }
 }

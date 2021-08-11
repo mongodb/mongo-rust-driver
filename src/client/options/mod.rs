@@ -556,6 +556,16 @@ pub struct ClientOptions {
     #[builder(default)]
     #[cfg(test)]
     pub(crate) heartbeat_freq_test: Option<Duration>,
+
+    /// Allow use of the `load_balanced` option.
+    // TODO RUST-653 Remove this when load balancer work is ready for release.
+    #[builder(default, setter(skip))]
+    #[serde(skip)]
+    pub(crate) allow_load_balanced: bool,
+
+    /// Whether or not the client is connecting to a MongoDB cluster through a load balancer.
+    #[builder(default, setter(skip))]
+    pub(crate) load_balanced: Option<bool>,
 }
 
 fn default_hosts() -> Vec<ServerAddress> {
@@ -689,6 +699,7 @@ struct ClientOptionsParser {
     auth_mechanism_properties: Option<Document>,
     read_preference: Option<ReadPreference>,
     read_preference_tags: Option<Vec<TagSet>>,
+    load_balanced: Option<bool>,
     original_uri: String,
 }
 
@@ -921,6 +932,8 @@ impl From<ClientOptionsParser> for ClientOptions {
             server_api: None,
             #[cfg(test)]
             heartbeat_freq_test: None,
+            allow_load_balanced: false,
+            load_balanced: parser.load_balanced,
         }
     }
 }
@@ -1086,6 +1099,10 @@ impl ClientOptions {
                     options.repl_set_name = Some(replica_set);
                 }
             }
+
+            if options.load_balanced.is_none() {
+                options.load_balanced = config.load_balanced;
+            }
         }
 
         options.validate()?;
@@ -1108,7 +1125,7 @@ impl ClientOptions {
         }
     }
 
-    /// Ensure the options set are valid, returning an error descirbing the problem if they are not.
+    /// Ensure the options set are valid, returning an error describing the problem if they are not.
     pub(crate) fn validate(&self) -> Result<()> {
         if let Some(true) = self.direct_connection {
             if self.hosts.len() > 1 {
@@ -1122,6 +1139,36 @@ impl ClientOptions {
         if let Some(ref write_concern) = self.write_concern {
             write_concern.validate()?;
         }
+
+        if !self.allow_load_balanced && self.load_balanced.is_some() {
+            return Err(ErrorKind::InvalidArgument {
+                message: "loadBalanced is not supported".to_string(),
+            }
+            .into());
+        }
+
+        if self.load_balanced.unwrap_or(false) {
+            if self.hosts.len() > 1 {
+                return Err(ErrorKind::InvalidArgument {
+                    message: "cannot specify multiple seeds with loadBalanced=true".to_string(),
+                }
+                .into());
+            }
+            if self.repl_set_name.is_some() {
+                return Err(ErrorKind::InvalidArgument {
+                    message: "cannot specify replicaSet with loadBalanced=true".to_string(),
+                }
+                .into());
+            }
+            if self.direct_connection == Some(true) {
+                return Err(ErrorKind::InvalidArgument {
+                    message: "cannot specify directConnection=true with loadBalanced=true"
+                        .to_string(),
+                }
+                .into());
+            }
+        }
+
         Ok(())
     }
 
@@ -1676,6 +1723,9 @@ impl ClientOptionsParser {
             k @ "journal" => {
                 let mut write_concern = self.write_concern.get_or_insert_with(Default::default);
                 write_concern.journal = Some(get_bool!(value, k));
+            }
+            k @ "loadbalanced" => {
+                self.load_balanced = Some(get_bool!(value, k));
             }
             k @ "localthresholdms" => {
                 self.local_threshold = Some(Duration::from_millis(get_duration!(value, k)))

@@ -7,6 +7,7 @@ use tokio::sync::RwLockReadGuard;
 use crate::{
     bson::{doc, oid::ObjectId},
     client::Client,
+    cmap::{conn::ConnectionGeneration, PoolGeneration},
     error::{BulkWriteFailure, CommandError, Error, ErrorKind},
     is_master::{IsMasterCommandResponse, IsMasterReply, LastWrite},
     options::{ClientOptions, ReadPreference, SelectionCriteria, ServerAddress},
@@ -73,6 +74,7 @@ pub(crate) struct TestIsMasterCommandResponse {
     pub speculative_authenticate: Option<Document>,
     pub max_bson_object_size: Option<i64>,
     pub max_write_batch_size: Option<i64>,
+    pub service_id: Option<ObjectId>,
 }
 
 impl From<TestIsMasterCommandResponse> for IsMasterCommandResponse {
@@ -102,6 +104,7 @@ impl From<TestIsMasterCommandResponse> for IsMasterCommandResponse {
             speculative_authenticate: test.speculative_authenticate,
             max_bson_object_size: test.max_bson_object_size.unwrap_or(1234),
             max_write_batch_size: test.max_write_batch_size.unwrap_or(1234),
+            service_id: test.service_id,
         }
     }
 }
@@ -271,18 +274,22 @@ async fn run_test(test_file: TestFile) {
                 .and_then(|s| s.upgrade())
             {
                 let error = application_error.to_error();
-                let error_generation = application_error
+                let pool_generation = application_error
                     .generation
+                    .map(PoolGeneration::Normal)
                     .unwrap_or_else(|| server.pool.generation());
+                let conn_generation = application_error
+                    .generation
+                    .or_else(|| server.pool.generation().as_normal())
+                    .unwrap_or(0);
+                let conn_generation = ConnectionGeneration::Normal(conn_generation);
                 let handshake_phase = match application_error.when {
-                    ErrorHandshakePhase::BeforeHandshakeCompletes => {
-                        HandshakePhase::BeforeCompletion {
-                            generation: error_generation,
-                        }
-                    }
+                    ErrorHandshakePhase::BeforeHandshakeCompletes => HandshakePhase::PreHello {
+                        generation: pool_generation,
+                    },
                     ErrorHandshakePhase::AfterHandshakeCompletes => {
                         HandshakePhase::AfterCompletion {
-                            generation: error_generation,
+                            generation: conn_generation,
                             max_wire_version: application_error.max_wire_version,
                         }
                     }
@@ -559,7 +566,7 @@ async fn pool_cleared_error_does_not_mark_unknown() {
         message: "foo".to_string(),
     }
     .into();
-    let phase = HandshakePhase::BeforeCompletion {
+    let phase = HandshakePhase::PreHello {
         generation: server.pool.generation(),
     };
     assert!(

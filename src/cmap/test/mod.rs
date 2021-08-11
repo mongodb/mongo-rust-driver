@@ -164,7 +164,7 @@ impl Executor {
         RUNTIME.execute(async move {
             while let Some(update) = update_receiver.recv().await {
                 match update.into_message() {
-                    ServerUpdate::Error { error, .. } => manager.clear(error).await,
+                    ServerUpdate::Error { error, .. } => manager.clear(error.cause, None).await,
                 }
             }
         });
@@ -286,6 +286,7 @@ impl Operation {
                             message: "test error".to_string(),
                         }
                         .into(),
+                        None,
                     )
                     .await;
                 }

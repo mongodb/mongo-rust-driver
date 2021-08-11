@@ -13,7 +13,7 @@ use super::{
     },
     establish::ConnectionEstablisher,
     manager,
-    manager::{ManagementRequestReceiver, PoolManagementRequest, PoolManager},
+    manager::{ConnectionSucceeded, ManagementRequestReceiver, PoolManagementRequest, PoolManager},
     options::{ConnectionOptions, ConnectionPoolOptions},
     status,
     status::{PoolGenerationPublisher, PoolGenerationSubscriber},
@@ -21,7 +21,8 @@ use super::{
     DEFAULT_MAX_POOL_SIZE,
 };
 use crate::{
-    error::{Error, ErrorKind, Result},
+    bson::oid::ObjectId,
+    error::{load_balanced_mode_mismatch, Error, ErrorKind, Result},
     event::cmap::{
         CmapEventHandler,
         ConnectionClosedEvent,
@@ -36,7 +37,11 @@ use crate::{
     RUNTIME,
 };
 
-use std::{collections::VecDeque, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+    time::Duration,
+};
 use tokio::sync::mpsc;
 
 const MAX_CONNECTING: u32 = 2;
@@ -66,7 +71,10 @@ pub(crate) struct ConnectionPoolWorker {
     /// The current generation of the pool. The generation is incremented whenever the pool is
     /// cleared. Connections belonging to a previous generation are considered stale and will be
     /// closed when checked back in or when popped off of the set of available connections.
-    generation: u32,
+    generation: PoolGeneration,
+
+    /// The connection count for each serviceId in load-balanced mode.
+    service_connection_count: HashMap<ObjectId, u32>,
 
     /// The established connections that are currently checked into the pool and awaiting usage in
     /// future operations.
@@ -166,8 +174,18 @@ impl ConnectionPoolWorker {
         let (manager, management_receiver) = manager::channel();
         let (generation_publisher, generation_subscriber) = status::channel();
 
+        let is_load_balanced = options
+            .as_ref()
+            .and_then(|opts| opts.load_balanced)
+            .unwrap_or(false);
+        let generation = if is_load_balanced {
+            PoolGeneration::load_balanced()
+        } else {
+            PoolGeneration::normal()
+        };
+
         #[cfg(test)]
-        let state = if options
+        let mut state = if options
             .as_ref()
             .and_then(|opts| opts.ready)
             .unwrap_or(false)
@@ -189,7 +207,13 @@ impl ConnectionPoolWorker {
             .unwrap_or(MAINTENACE_FREQUENCY);
 
         #[cfg(not(test))]
-        let (state, maintenance_frequency) = (PoolState::New, MAINTENACE_FREQUENCY);
+        let (mut state, maintenance_frequency) = (PoolState::New, MAINTENACE_FREQUENCY);
+
+        if is_load_balanced {
+            // Because load balancer servers don't have a monitoring connection, the associated
+            // connection pool needs start in the ready state.
+            state = PoolState::Ready;
+        }
 
         let worker = ConnectionPoolWorker {
             address,
@@ -200,7 +224,8 @@ impl ConnectionPoolWorker {
             next_connection_id: 1,
             total_connection_count: 0,
             pending_connection_count: 0,
-            generation: 0,
+            generation,
+            service_connection_count: HashMap::new(),
             connection_options,
             available_connections: VecDeque::new(),
             max_pool_size,
@@ -266,13 +291,14 @@ impl ConnectionPoolWorker {
                     }
                 },
                 PoolTask::HandleManagementRequest(PoolManagementRequest::CheckIn(connection)) => {
-                    self.check_in(connection)
+                    self.check_in(connection);
                 }
                 PoolTask::HandleManagementRequest(PoolManagementRequest::Clear {
                     completion_handler: _,
                     cause,
+                    service_id,
                 }) => {
-                    self.clear(cause);
+                    self.clear(cause, service_id);
                 }
                 PoolTask::HandleManagementRequest(PoolManagementRequest::MarkAsReady {
                     completion_handler: _handler,
@@ -280,12 +306,14 @@ impl ConnectionPoolWorker {
                     self.mark_as_ready();
                 }
                 PoolTask::HandleManagementRequest(
-                    PoolManagementRequest::HandleConnectionSucceeded(c),
-                ) => self.handle_connection_succeeded(c),
+                    PoolManagementRequest::HandleConnectionSucceeded(conn),
+                ) => self.handle_connection_succeeded(conn),
                 PoolTask::HandleManagementRequest(
                     PoolManagementRequest::HandleConnectionFailed,
                 ) => self.handle_connection_failed(),
-                PoolTask::Maintenance => self.perform_maintenance(),
+                PoolTask::Maintenance => {
+                    self.perform_maintenance();
+                }
             }
 
             if self.can_service_connection_request() {
@@ -323,7 +351,7 @@ impl ConnectionPoolWorker {
         // first attempt to check out an available connection
         while let Some(mut conn) = self.available_connections.pop_back() {
             // Close the connection if it's stale.
-            if conn.is_stale(self.generation) {
+            if conn.generation.is_stale(&self.generation) {
                 self.close_connection(conn, ConnectionClosedReason::Stale);
                 continue;
             }
@@ -366,7 +394,9 @@ impl ConnectionPoolWorker {
 
                 if let Ok(ref mut c) = establish_result {
                     c.mark_as_in_use(manager.clone());
-                    manager.handle_connection_succeeded(None);
+                    manager.handle_connection_succeeded(ConnectionSucceeded::Used {
+                        service_id: c.generation.service_id(),
+                    });
                 }
 
                 establish_result
@@ -400,7 +430,7 @@ impl ConnectionPoolWorker {
         let pending_connection = PendingConnection {
             id: self.next_connection_id,
             address: self.address.clone(),
-            generation: self.generation,
+            generation: self.generation.clone(),
             options: self.connection_options.clone(),
         };
         self.next_connection_id += 1;
@@ -421,9 +451,13 @@ impl ConnectionPoolWorker {
 
     /// Process a successful connection establishment, optionally populating the pool with the
     /// resulting connection.
-    fn handle_connection_succeeded(&mut self, connection: Option<Connection>) {
+    fn handle_connection_succeeded(&mut self, connection: ConnectionSucceeded) {
         self.pending_connection_count -= 1;
-        if let Some(mut connection) = connection {
+        if let Some(sid) = connection.service_id() {
+            let count = self.service_connection_count.entry(sid).or_insert(0);
+            *count += 1;
+        }
+        if let ConnectionSucceeded::ForPool(mut connection) = connection {
             connection.mark_as_available();
             self.available_connections.push_back(connection);
         }
@@ -438,21 +472,32 @@ impl ConnectionPoolWorker {
 
         if conn.has_errored() {
             self.close_connection(conn, ConnectionClosedReason::Error);
-        } else if conn.is_stale(self.generation) {
+        } else if conn.generation.is_stale(&self.generation) {
             self.close_connection(conn, ConnectionClosedReason::Stale);
         } else if conn.is_executing() {
-            self.close_connection(conn, ConnectionClosedReason::Dropped)
+            self.close_connection(conn, ConnectionClosedReason::Dropped);
         } else {
             self.available_connections.push_back(conn);
         }
     }
 
-    fn clear(&mut self, cause: Error) {
-        self.generation += 1;
-        let previous_state = std::mem::replace(&mut self.state, PoolState::Paused(cause.clone()));
-        self.generation_publisher.publish(self.generation);
+    fn clear(&mut self, cause: Error, service_id: Option<ObjectId>) {
+        let was_ready = match (&mut self.generation, service_id) {
+            (PoolGeneration::Normal(gen), None) => {
+                *gen += 1;
+                let prev = std::mem::replace(&mut self.state, PoolState::Paused(cause.clone()));
+                matches!(prev, PoolState::Ready)
+            }
+            (PoolGeneration::LoadBalanced(gen_map), Some(sid)) => {
+                let gen = gen_map.entry(sid).or_insert(0);
+                *gen += 1;
+                true
+            }
+            (..) => load_balanced_mode_mismatch!(),
+        };
+        self.generation_publisher.publish(self.generation.clone());
 
-        if matches!(previous_state, PoolState::Ready) {
+        if was_ready {
             self.emit_event(|handler| {
                 let event = PoolClearedEvent {
                     address: self.address.clone(),
@@ -461,11 +506,13 @@ impl ConnectionPoolWorker {
                 handler.handle_pool_cleared_event(event);
             });
 
-            for request in self.wait_queue.drain(..) {
-                // an error means the other end hung up already, which is okay because we were
-                // returning an error anyways
-                let _: std::result::Result<_, _> =
-                    request.fulfill(ConnectionRequestResult::PoolCleared(cause.clone()));
+            if !self.generation.is_load_balanced() {
+                for request in self.wait_queue.drain(..) {
+                    // an error means the other end hung up already, which is okay because we were
+                    // returning an error anyways
+                    let _: std::result::Result<_, _> =
+                        request.fulfill(ConnectionRequestResult::PoolCleared(cause.clone()));
+                }
             }
         }
     }
@@ -496,7 +543,24 @@ impl ConnectionPoolWorker {
 
     /// Close a connection, emit the event for it being closed, and decrement the
     /// total connection count.
+    #[allow(clippy::single_match)]
     fn close_connection(&mut self, connection: Connection, reason: ConnectionClosedReason) {
+        match (&mut self.generation, connection.generation.service_id()) {
+            (PoolGeneration::LoadBalanced(gen_map), Some(sid)) => {
+                match self.service_connection_count.get_mut(&sid) {
+                    Some(count) => {
+                        *count -= 1;
+                        if *count == 0 {
+                            gen_map.remove(&sid);
+                            self.service_connection_count.remove(&sid);
+                        }
+                    }
+                    None => load_balanced_mode_mismatch!(),
+                }
+            }
+            (PoolGeneration::Normal(_), None) => {}
+            _ => load_balanced_mode_mismatch!(),
+        }
         connection.close_and_drop(reason);
         self.total_connection_count -= 1;
     }
@@ -513,7 +577,7 @@ impl ConnectionPoolWorker {
     /// Iterate over the connections and remove any that are stale or idle.
     fn remove_perished_connections(&mut self) {
         while let Some(connection) = self.available_connections.pop_front() {
-            if connection.is_stale(self.generation) {
+            if connection.generation.is_stale(&self.generation) {
                 // the following unwrap is okay becaue we asserted the pool was nonempty
                 self.close_connection(connection, ConnectionClosedReason::Stale);
             } else if connection.is_idle(self.max_idle_time) {
@@ -549,7 +613,8 @@ impl ConnectionPoolWorker {
                     .await;
 
                     if let Ok(connection) = connection {
-                        manager.handle_connection_succeeded(Some(connection))
+                        manager
+                            .handle_connection_succeeded(ConnectionSucceeded::ForPool(connection))
                     }
                 });
             }
@@ -568,7 +633,6 @@ async fn establish_connection(
     event_handler: Option<&Arc<dyn CmapEventHandler>>,
 ) -> Result<Connection> {
     let connection_id = pending_connection.id;
-    let generation = pending_connection.generation;
     let address = pending_connection.address.clone();
 
     let mut establish_result = establisher.establish_connection(pending_connection).await;
@@ -583,7 +647,7 @@ async fn establish_connection(
                 };
                 handler.handle_connection_closed_event(event);
             }
-            server_updater.handle_error(e.clone(), generation).await;
+            server_updater.handle_error(e.clone()).await;
             manager.handle_connection_failed();
         }
         Ok(ref mut connection) => {
@@ -593,7 +657,7 @@ async fn establish_connection(
         }
     }
 
-    establish_result
+    establish_result.map_err(|e| e.cause)
 }
 
 /// Enum modeling the possible pool states as described in the CMAP spec.
@@ -665,5 +729,33 @@ impl HandleListener {
     /// select or with a timeout.
     async fn wait_for_all_handle_drops(&mut self) {
         self.receiver.recv().await;
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum PoolGeneration {
+    Normal(u32),
+    LoadBalanced(HashMap<ObjectId, u32>),
+}
+
+impl PoolGeneration {
+    pub(crate) fn normal() -> Self {
+        Self::Normal(0)
+    }
+
+    fn load_balanced() -> Self {
+        Self::LoadBalanced(HashMap::new())
+    }
+
+    fn is_load_balanced(&self) -> bool {
+        matches!(self, Self::LoadBalanced(_))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn as_normal(&self) -> Option<u32> {
+        match self {
+            PoolGeneration::Normal(n) => Some(*n),
+            _ => None,
+        }
     }
 }
