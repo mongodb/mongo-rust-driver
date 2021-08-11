@@ -209,11 +209,7 @@ impl ConnectionPoolWorker {
         #[cfg(not(test))]
         let (mut state, maintenance_frequency) = (PoolState::New, MAINTENACE_FREQUENCY);
 
-        if options
-            .as_ref()
-            .and_then(|opts| opts.load_balanced)
-            .unwrap_or(false)
-        {
+        if is_load_balanced {
             // Because load balancer servers don't have a monitoring connection, the associated
             // connection pool needs start in the ready state.
             state = PoolState::Ready;
