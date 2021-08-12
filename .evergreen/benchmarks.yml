@@ -117,7 +117,7 @@ functions:
       working_dir: "src"
       script: |
         ${PREPARE_SHELL}
-        cd benchmarks && download-data.sh
+        cd benchmarks && ./download-data.sh
 
   "bootstrap mongo-orchestration":
     - command: shell.exec
