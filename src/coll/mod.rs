@@ -355,7 +355,7 @@ impl<T> Collection<T> {
         let response = self
             .create_indexes_common(vec![index], options, session)
             .await?;
-        Ok(response.into())
+        Ok(response.into_create_index_result())
     }
 
     /// Creates the given index on this collection.
@@ -367,7 +367,7 @@ impl<T> Collection<T> {
         self.create_index_common(index, options, None).await
     }
 
-    /// Convenience method for creating a single index on an explicit session.
+    /// Creates the given index on this collection using the provided `ClientSession`.
     pub async fn create_index_with_session(
         &self,
         index: IndexModel,
@@ -386,7 +386,7 @@ impl<T> Collection<T> {
         self.create_indexes_common(indexes, options, None).await
     }
 
-    /// Create several indexes on an explicit session.
+    /// Creates the given indexes on this collection using the provided `ClientSession`.
     pub async fn create_indexes_with_session(
         &self,
         indexes: impl IntoIterator<Item = IndexModel>,
@@ -545,16 +545,16 @@ impl<T> Collection<T> {
     /// Drops the index specified by `name` from this collection.
     pub async fn drop_index(
         &self,
-        name: &str,
+        name: impl AsRef<str>,
         options: impl Into<Option<DropIndexOptions>>,
     ) -> Result<()> {
         self.drop_index_common(name, options, None).await
     }
 
-    /// Drop the index specified by `name` from the collection using an explicit session.
+    /// Drops the index specified by `name` from this collection using the provided `ClientSession`.
     pub async fn drop_index_with_session(
         &self,
-        name: &str,
+        name: impl AsRef<str>,
         options: impl Into<Option<DropIndexOptions>>,
         session: &mut ClientSession,
     ) -> Result<()> {
@@ -566,7 +566,7 @@ impl<T> Collection<T> {
         self.drop_indexes_common(None, options, None).await
     }
 
-    /// Drop all indexes associated with the collection using an explicit session.
+    /// Drops all indexes associated with this collection using the provided `ClientSession`.
     pub async fn drop_indexes_with_session(
         &self,
         options: impl Into<Option<DropIndexOptions>>,
@@ -588,7 +588,7 @@ impl<T> Collection<T> {
             .map(|(spec, session)| Cursor::new(client.clone(), spec, session))
     }
 
-    /// List all indexes on the collection using an explicit session.
+    /// Lists all indexes on this collection using the provided `ClientSession`.
     pub async fn list_indexes_with_session(
         &self,
         options: impl Into<Option<ListIndexOptions>>,
