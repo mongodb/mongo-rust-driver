@@ -15,6 +15,9 @@ fi
 
 pushd benchmarks
 
+export MIN_EXECUTION_TIME=1
+export TARGET_ITERATION_COUNT=3
+
 cargo run \
       --release \
       --no-default-features \

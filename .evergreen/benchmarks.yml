@@ -448,7 +448,7 @@ buildvariants:
   matrix_spec:
     os:
       - ubuntu-18.04
-  display_name: "${os}"
+  display_name: "BSON Benchmarks"
   tasks:
      - ".bson"
 
