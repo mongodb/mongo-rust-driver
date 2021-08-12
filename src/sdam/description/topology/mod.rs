@@ -176,7 +176,8 @@ impl TopologyDescription {
     ) {
         match (self.topology_type, server_type) {
             (TopologyType::Sharded, ServerType::Mongos)
-            | (TopologyType::Single, ServerType::Mongos) => {
+            | (TopologyType::Single, ServerType::Mongos)
+            | (TopologyType::LoadBalanced, _) => {
                 self.update_command_read_pref_for_mongos(command, criteria)
             }
             (TopologyType::Single, ServerType::Standalone) => {}
@@ -212,27 +213,20 @@ impl TopologyDescription {
         command: &mut Command<T>,
         criteria: Option<&SelectionCriteria>,
     ) {
-        match criteria {
-            Some(SelectionCriteria::ReadPreference(ReadPreference::Secondary { ref options })) => {
-                command.set_read_preference(ReadPreference::Secondary {
-                    options: options.clone(),
-                })
+        let read_preference = match criteria {
+            Some(SelectionCriteria::ReadPreference(rp)) => rp,
+            _ => return,
+        };
+        match read_preference {
+            ReadPreference::Secondary { .. }
+            | ReadPreference::PrimaryPreferred { .. }
+            | ReadPreference::Nearest { .. } => {
+                command.set_read_preference(read_preference.clone())
             }
-            Some(SelectionCriteria::ReadPreference(ReadPreference::PrimaryPreferred {
-                ref options,
-            })) => command.set_read_preference(ReadPreference::PrimaryPreferred {
-                options: options.clone(),
-            }),
-            Some(SelectionCriteria::ReadPreference(ReadPreference::SecondaryPreferred {
-                ref options,
-            })) if options.max_staleness.is_some() || options.tag_sets.is_some() => command
-                .set_read_preference(ReadPreference::SecondaryPreferred {
-                    options: options.clone(),
-                }),
-            Some(SelectionCriteria::ReadPreference(ReadPreference::Nearest { ref options })) => {
-                command.set_read_preference(ReadPreference::Nearest {
-                    options: options.clone(),
-                })
+            ReadPreference::SecondaryPreferred { ref options }
+                if options.max_staleness.is_some() || options.tag_sets.is_some() =>
+            {
+                command.set_read_preference(read_preference.clone())
             }
             _ => {}
         }
