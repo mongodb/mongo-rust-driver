@@ -101,20 +101,6 @@ pub struct CreateIndexResult {
     pub commit_quorum: Option<CommitQuorum>,
 }
 
-impl From<CreateIndexesResult> for CreateIndexResult {
-    fn from(result: CreateIndexesResult) -> Self {
-        Self {
-            // Safe unwrap because a successful `createIndex` command will always have names.
-            index_name: result.index_names.into_iter().next().unwrap(),
-            created_collection_automatically: result.created_collection_automatically,
-            num_indexes_before: result.num_indexes_before,
-            num_indexes_after: result.num_indexes_after,
-            note: result.note,
-            commit_quorum: result.commit_quorum,
-        }
-    }
-}
-
 /// Information about the indexes created as a result of a
 /// [`Collection::create_indexes`](../struct.Collection.html#method.create_indexes).
 #[derive(Debug, Clone, PartialEq)]
@@ -137,6 +123,19 @@ pub struct CreateIndexesResult {
 
     /// The commit quorum for the operation.
     pub commit_quorum: Option<CommitQuorum>,
+}
+
+impl CreateIndexesResult {
+    pub(crate) fn into_create_index_result(self) -> CreateIndexResult {
+        CreateIndexResult {
+            index_name: self.index_names.into_iter().next().unwrap(),
+            created_collection_automatically: self.created_collection_automatically,
+            num_indexes_before: self.num_indexes_before,
+            num_indexes_after: self.num_indexes_after,
+            note: self.note,
+            commit_quorum: self.commit_quorum,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

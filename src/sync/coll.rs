@@ -6,12 +6,15 @@ use super::{ClientSession, Cursor, SessionCursor};
 use crate::{
     bson::{Bson, Document},
     error::Result,
+    index::IndexModel,
     options::{
         AggregateOptions,
         CountOptions,
+        CreateIndexOptions,
         DeleteOptions,
         DistinctOptions,
         DropCollectionOptions,
+        DropIndexOptions,
         EstimatedDocumentCountOptions,
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
@@ -20,6 +23,7 @@ use crate::{
         FindOptions,
         InsertManyOptions,
         InsertOneOptions,
+        ListIndexOptions,
         ReadConcern,
         ReplaceOptions,
         SelectionCriteria,
@@ -27,7 +31,14 @@ use crate::{
         UpdateOptions,
         WriteConcern,
     },
-    results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
+    results::{
+        CreateIndexResult,
+        CreateIndexesResult,
+        DeleteResult,
+        InsertManyResult,
+        InsertOneResult,
+        UpdateResult,
+    },
     Collection as AsyncCollection,
     Namespace,
     RUNTIME,
@@ -210,6 +221,52 @@ impl<T> Collection<T> {
         ))
     }
 
+    /// Creates the given index on this collection.
+    pub fn create_index(
+        &self,
+        index: IndexModel,
+        options: impl Into<Option<CreateIndexOptions>>,
+    ) -> Result<CreateIndexResult> {
+        RUNTIME.block_on(self.async_collection.create_index(index, options))
+    }
+
+    /// Creates the given index on this collection using the provided `ClientSession`.
+    pub fn create_index_with_session(
+        &self,
+        index: IndexModel,
+        options: impl Into<Option<CreateIndexOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<CreateIndexResult> {
+        RUNTIME.block_on(self.async_collection.create_index_with_session(
+            index,
+            options,
+            &mut session.async_client_session,
+        ))
+    }
+
+    /// Creates the given indexes on this collection.
+    pub fn create_indexes(
+        &self,
+        indexes: impl IntoIterator<Item = IndexModel>,
+        options: impl Into<Option<CreateIndexOptions>>,
+    ) -> Result<CreateIndexesResult> {
+        RUNTIME.block_on(self.async_collection.create_indexes(indexes, options))
+    }
+
+    /// Creates the given indexes on this collection using the provided `ClientSession`.
+    pub fn create_indexes_with_session(
+        &self,
+        indexes: impl IntoIterator<Item = IndexModel>,
+        options: impl Into<Option<CreateIndexOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<CreateIndexesResult> {
+        RUNTIME.block_on(self.async_collection.create_indexes_with_session(
+            indexes,
+            options,
+            &mut session.async_client_session,
+        ))
+    }
+
     /// Deletes all documents stored in the collection matching `query`.
     pub fn delete_many(
         &self,
@@ -313,6 +370,86 @@ impl<T> Collection<T> {
         RUNTIME.block_on(
             self.async_collection
                 .update_many(query, update.into(), options.into()),
+        )
+    }
+
+    /// Drops the index specified by `name` from this collection.
+    pub fn drop_index(
+        &self,
+        name: impl AsRef<str>,
+        options: impl Into<Option<DropIndexOptions>>,
+    ) -> Result<()> {
+        RUNTIME.block_on(self.async_collection.drop_index(name, options))
+    }
+
+    /// Drops the index specified by `name` from this collection using the provided `ClientSession`.
+    pub fn drop_index_with_session(
+        &self,
+        name: impl AsRef<str>,
+        options: impl Into<Option<DropIndexOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<()> {
+        RUNTIME.block_on(self.async_collection.drop_index_with_session(
+            name,
+            options,
+            &mut session.async_client_session,
+        ))
+    }
+
+    /// Drops all indexes associated with this collection.
+    pub fn drop_indexes(&self, options: impl Into<Option<DropIndexOptions>>) -> Result<()> {
+        RUNTIME.block_on(self.async_collection.drop_indexes(options))
+    }
+
+    /// Drops all indexes associated with this collection using the provided `ClientSession`.
+    pub fn drop_indexes_with_session(
+        &self,
+        options: impl Into<Option<DropIndexOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<()> {
+        RUNTIME.block_on(
+            self.async_collection
+                .drop_indexes_with_session(options, &mut session.async_client_session),
+        )
+    }
+
+    /// Lists all indexes on this collection.
+    pub fn list_indexes(
+        &self,
+        options: impl Into<Option<ListIndexOptions>>,
+    ) -> Result<Cursor<IndexModel>> {
+        RUNTIME
+            .block_on(self.async_collection.list_indexes(options))
+            .map(Cursor::new)
+    }
+
+    /// Lists all indexes on this collection using the provided `ClientSession`.
+    pub fn list_indexes_with_session(
+        &self,
+        options: impl Into<Option<ListIndexOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<SessionCursor<IndexModel>> {
+        RUNTIME
+            .block_on(
+                self.async_collection
+                    .list_indexes_with_session(options, &mut session.async_client_session),
+            )
+            .map(SessionCursor::new)
+    }
+
+    /// Gets the names of all indexes on the collection.
+    pub fn list_index_names(&self) -> Result<Vec<String>> {
+        RUNTIME.block_on(self.async_collection.list_index_names())
+    }
+
+    /// Gets the names of all indexes on the collection using the provided `ClientSession`.
+    pub fn list_index_names_with_session(
+        &self,
+        session: &mut ClientSession,
+    ) -> Result<Vec<String>> {
+        RUNTIME.block_on(
+            self.async_collection
+                .list_index_names_with_session(&mut session.async_client_session),
         )
     }
 
