@@ -348,6 +348,7 @@ impl<T> Collection<T> {
         let mut result = self
             .create_indexes_common(vec![index], options, None)
             .await?;
+        // The result will have exactly one element when calling createIndexes with one index.
         Ok(result.pop().unwrap())
     }
 
