@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use mongodb::bson::Document;
 use serde::Serialize;
 
 #[derive(Debug, Clone)]
@@ -19,6 +20,7 @@ impl From<BenchmarkScore> for BenchmarkResult {
         BenchmarkResult {
             info: BenchmarkInfo {
                 test_name: score.name,
+                args: Document::new(),
             },
             metrics: vec![
                 BenchmarkMetric {
@@ -101,6 +103,7 @@ impl CompositeScore {
         BenchmarkResult {
             info: BenchmarkInfo {
                 test_name: self.name,
+                args: Document::new(),
             },
             metrics: vec![BenchmarkMetric {
                 name: "score",
@@ -191,6 +194,7 @@ pub(crate) struct BenchmarkResult {
 #[derive(Debug, Serialize)]
 pub(crate) struct BenchmarkInfo {
     test_name: &'static str,
+    args: Document,
 }
 
 #[derive(Debug, Serialize)]
