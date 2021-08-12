@@ -272,6 +272,11 @@ impl TopologyDescription {
     /// Updates the topology's logical session timeout value based on the server's value for it.
     fn update_session_support_status(&mut self, server_description: &ServerDescription) {
         if !server_description.server_type.is_data_bearing() {
+            if let TopologyType::Single = self.topology_type {
+                self.session_support_status = SessionSupportStatus::Unsupported {
+                    logical_session_timeout: None,
+                };
+            }
             return;
         }
 

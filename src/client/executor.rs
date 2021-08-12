@@ -31,6 +31,7 @@ use crate::{
         SelectedServer,
         ServerType,
         SessionSupportStatus,
+        TopologyType,
         TransactionSupportStatus,
     },
     selection_criteria::ReadPreference,
@@ -583,8 +584,11 @@ impl Client {
         // sessions are supported or not.
         match initial_status {
             SessionSupportStatus::Undetermined => {
+                let topology_type = self.inner.topology.topology_type().await;
                 let criteria = SelectionCriteria::Predicate(Arc::new(move |server_info| {
-                    server_info.server_type().is_data_bearing()
+                    let server_type = server_info.server_type();
+                    (matches!(topology_type, TopologyType::Single) && server_type.is_available())
+                        || server_type.is_data_bearing()
                 }));
                 let _: SelectedServer = self.select_server(Some(&criteria)).await?;
                 Ok(self.inner.topology.session_support_status().await)

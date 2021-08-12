@@ -17,6 +17,7 @@ pub(crate) use self::{
         server_selection::SelectedServer,
         SessionSupportStatus,
         TopologyDescription,
+        TopologyType,
         TransactionSupportStatus,
     },
     message_manager::TopologyMessageManager,

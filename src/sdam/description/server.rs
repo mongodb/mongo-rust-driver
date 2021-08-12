@@ -47,6 +47,10 @@ impl ServerType {
                 | ServerType::LoadBalancer
         )
     }
+
+    pub(crate) fn is_available(self) -> bool {
+        !matches!(self, ServerType::Unknown)
+    }
 }
 
 impl Default for ServerType {
@@ -185,7 +189,7 @@ impl ServerDescription {
 
     /// Whether this server is "available" as per the definition in the server selection spec.
     pub(crate) fn is_available(&self) -> bool {
-        !matches!(self.server_type, ServerType::Unknown)
+        self.server_type.is_available()
     }
 
     pub(crate) fn compatibility_error_message(&self) -> Option<String> {
