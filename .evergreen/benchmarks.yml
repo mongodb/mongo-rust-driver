@@ -195,7 +195,7 @@ functions:
   "upload benchmark results":
     - command: perf.send
       params:
-        file: "benchmark-results.json"
+        file: "src/benchmark-results.json"
 
   "stop mongo orchestration":
     - command: shell.exec
