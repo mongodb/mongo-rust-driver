@@ -2,10 +2,7 @@
 
 set -o errexit
 
-pushd benchmarks
-
+cd benchmarks
 cargo run \
       --release \
       -- --output="../benchmark-results.json" --bson
-
-popd

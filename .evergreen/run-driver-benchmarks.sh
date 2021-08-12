@@ -13,15 +13,12 @@ else
     exit 1
 fi
 
-pushd benchmarks
-
 export MIN_EXECUTION_TIME=1
 export TARGET_ITERATION_COUNT=3
 
+cd benchmarks
 cargo run \
       --release \
       --no-default-features \
       --features ${FEATURES} \
       -- --output="../benchmark-results.json" --single --multi --parallel
-
-popd
