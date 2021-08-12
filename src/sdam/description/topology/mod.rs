@@ -124,6 +124,14 @@ impl TopologyDescription {
             })
             .collect();
 
+        let session_support_status = if topology_type == TopologyType::LoadBalanced {
+            SessionSupportStatus::Supported {
+                logical_session_timeout: None,
+            }
+        } else {
+            SessionSupportStatus::Undetermined
+        };
+
         Ok(Self {
             single_seed: servers.len() == 1,
             topology_type,
@@ -131,7 +139,7 @@ impl TopologyDescription {
             max_set_version: None,
             max_election_id: None,
             compatibility_error: None,
-            session_support_status: SessionSupportStatus::Undetermined,
+            session_support_status,
             transaction_support_status: TransactionSupportStatus::Undetermined,
             cluster_time: None,
             local_threshold: options.local_threshold,
@@ -279,12 +287,12 @@ impl TopologyDescription {
                     logical_session_timeout: topology_timeout,
                 } => {
                     self.session_support_status = SessionSupportStatus::Supported {
-                        logical_session_timeout: std::cmp::min(timeout, topology_timeout),
+                        logical_session_timeout: std::cmp::min(Some(timeout), topology_timeout),
                     };
                 }
                 SessionSupportStatus::Undetermined => {
                     self.session_support_status = SessionSupportStatus::Supported {
-                        logical_session_timeout: timeout,
+                        logical_session_timeout: Some(timeout),
                     }
                 }
                 SessionSupportStatus::Unsupported { .. } => {
@@ -301,7 +309,7 @@ impl TopologyDescription {
                     match min_timeout {
                         Some(timeout) => {
                             self.session_support_status = SessionSupportStatus::Supported {
-                                logical_session_timeout: timeout,
+                                logical_session_timeout: Some(timeout),
                             }
                         }
                         None => {
@@ -721,7 +729,9 @@ pub(crate) enum SessionSupportStatus {
 
     /// Sessions are supported by this topology. This is the minimum timeout of all data-bearing
     /// servers in the deployment.
-    Supported { logical_session_timeout: Duration },
+    Supported {
+        logical_session_timeout: Option<Duration>,
+    },
 }
 
 impl Default for SessionSupportStatus {
@@ -740,7 +750,7 @@ impl SessionSupportStatus {
             } => *logical_session_timeout,
             Self::Supported {
                 logical_session_timeout,
-            } => Some(*logical_session_timeout),
+            } => *logical_session_timeout,
         }
     }
 }

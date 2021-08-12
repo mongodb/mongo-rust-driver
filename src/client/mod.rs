@@ -255,7 +255,7 @@ impl Client {
     /// available, a new one will be created.
     pub(crate) async fn start_session_with_timeout(
         &self,
-        logical_session_timeout: Duration,
+        logical_session_timeout: Option<Duration>,
         options: Option<SessionOptions>,
         is_implicit: bool,
     ) -> ClientSession {
