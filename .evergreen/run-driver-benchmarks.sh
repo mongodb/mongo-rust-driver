@@ -2,6 +2,8 @@
 
 set -o errexit
 
+. ~/.cargo/env
+
 FEATURES=""
 
 if [ "$ASYNC_RUNTIME" = "tokio" ]; then

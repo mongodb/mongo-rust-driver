@@ -2,6 +2,8 @@
 
 set -o errexit
 
+. ~/.cargo/env
+
 cd benchmarks
 cargo run \
       --release \
