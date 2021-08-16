@@ -30,7 +30,7 @@ use crate::{
         UpdateOptions,
         WriteConcern,
     },
-    results::DeleteResult,
+    results::{CreateIndexResult, CreateIndexesResult, DeleteResult},
     test::{
         util::{drop_collection, EventClient, TestClient},
         CLIENT_OPTIONS,
@@ -1075,7 +1075,16 @@ async fn index_management_creates() {
         )
         .await
         .expect("Test failed to create index");
-    assert_eq!(result, "a_1_b_-1");
+
+    let expected_result = CreateIndexResult {
+        index_name: "a_1_b_-1".to_string(),
+        created_collection_automatically: Some(true),
+        num_indexes_before: 1,
+        num_indexes_after: 2,
+        note: None,
+    };
+
+    assert_eq!(result, expected_result);
 
     // Test creating several indexes, with both specified and unspecified names.
     let result = coll
@@ -1095,7 +1104,16 @@ async fn index_management_creates() {
         )
         .await
         .expect("Test failed to create indexes");
-    assert_eq!(result, vec!["c_1", "customname"]);
+
+    let expected_result = CreateIndexesResult {
+        index_names: vec!["c_1".to_string(), "customname".to_string()],
+        created_collection_automatically: Some(false),
+        num_indexes_before: 2,
+        num_indexes_after: 4,
+        note: None,
+    };
+
+    assert_eq!(result, expected_result);
 
     // Pull all index names from db to verify the _id_ index.
     let names = coll
@@ -1103,6 +1121,77 @@ async fn index_management_creates() {
         .await
         .expect("Test failed to list index names");
     assert_eq!(names, vec!["_id_", "a_1_b_-1", "c_1", "customname"]);
+}
+
+// Test that creating a duplicate index orks as expected.
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn index_management_handles_duplicates() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+    let client = TestClient::new().await;
+    let coll = client
+        .init_db_and_coll(function_name!(), function_name!())
+        .await;
+
+    let result = coll
+        .create_index(
+            IndexModel::builder().keys(bson::doc! { "a": 1 }).build(),
+            None,
+        )
+        .await
+        .expect("Test failed to create index");
+
+    let expected_result = CreateIndexResult {
+        index_name: "a_1".to_string(),
+        created_collection_automatically: Some(true),
+        num_indexes_before: 1,
+        num_indexes_after: 2,
+        note: None,
+    };
+
+    assert_eq!(result, expected_result);
+
+    // Insert duplicate.
+    let result = coll
+        .create_index(
+            IndexModel::builder().keys(bson::doc! { "a": 1 }).build(),
+            None,
+        )
+        .await
+        .expect("Test failed to create index");
+
+    let expected_result = CreateIndexResult {
+        index_name: "a_1".to_string(),
+        created_collection_automatically: None,
+        num_indexes_before: 2,
+        num_indexes_after: 2,
+        note: Some("all indexes already exist".to_string()),
+    };
+
+    assert_eq!(result, expected_result);
+
+    // Test partial duplication.
+    let result = coll
+        .create_indexes(
+            vec![
+                IndexModel::builder().keys(bson::doc! { "a": 1 }).build(), // Duplicate
+                IndexModel::builder().keys(bson::doc! { "b": 1 }).build(), // Not duplicate
+            ],
+            None,
+        )
+        .await
+        .expect("Test failed to create indexes");
+
+    let expected_result = CreateIndexesResult {
+        index_names: vec!["a_1".to_string(), "b_1".to_string()],
+        created_collection_automatically: Some(false),
+        num_indexes_before: 2,
+        num_indexes_after: 3,
+        note: Some("index already exists".to_string()),
+    };
+
+    assert_eq!(result, expected_result);
 }
 
 // Test that listing indexes works as expected.
@@ -1168,7 +1257,16 @@ async fn index_management_drops() {
         )
         .await
         .expect("Test failed to create multiple indexes");
-    assert_eq!(result, vec!["a_1", "b_1", "c_1"]);
+
+    let expected_result = CreateIndexesResult {
+        index_names: vec!["a_1".to_string(), "b_1".to_string(), "c_1".to_string()],
+        created_collection_automatically: Some(true),
+        num_indexes_before: 1,
+        num_indexes_after: 4,
+        note: None,
+    };
+
+    assert_eq!(result, expected_result);
 
     // Test dropping single index.
     coll.drop_index("a_1", None)

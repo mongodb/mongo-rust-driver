@@ -10,6 +10,7 @@ use crate::{
     concern::WriteConcern,
     index::{options::IndexOptions, IndexModel},
     operation::{test::handle_response_test, CreateIndexes, Operation},
+    results::CreateIndexesResult,
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -70,9 +71,20 @@ async fn handle_success() {
         .build();
     let op = CreateIndexes::with_indexes(vec![a, b]);
 
-    let response = doc! { "ok": 1 };
+    let response = doc! {
+        "ok": 1,
+        "createdCollectionAutomatically": false,
+        "numIndexesBefore": 1,
+        "numIndexesAfter": 3,
+    };
 
-    let expected_values = vec!["a".to_string(), "b".to_string()];
+    let expected_values = CreateIndexesResult {
+        index_names: vec!["a".to_string(), "b".to_string()],
+        created_collection_automatically: Some(false),
+        num_indexes_before: 1,
+        num_indexes_after: 3,
+        note: None,
+    };
     let actual_values = handle_response_test(&op, response).unwrap();
     assert_eq!(actual_values, expected_values);
 }

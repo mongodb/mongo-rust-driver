@@ -8,10 +8,16 @@ use crate::{
     index::IndexModel,
     operation::{append_options, Operation},
     options::{CreateIndexOptions, WriteConcern},
+    results::CreateIndexesResult,
     Namespace,
 };
 
-use super::{CommandResponse, EmptyBody};
+use super::CommandResponse;
+use serde::{
+    de::{Error, Unexpected},
+    Deserialize,
+    Deserializer,
+};
 
 #[derive(Debug)]
 pub(crate) struct CreateIndexes {
@@ -47,9 +53,9 @@ impl CreateIndexes {
 }
 
 impl Operation for CreateIndexes {
-    type O = Vec<String>;
+    type O = CreateIndexesResult;
     type Command = Document;
-    type Response = CommandResponse<EmptyBody>;
+    type Response = CommandResponse<Response>;
     const NAME: &'static str = "createIndexes";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -70,16 +76,85 @@ impl Operation for CreateIndexes {
 
     fn handle_response(
         &self,
-        _response: EmptyBody,
+        response: Response,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
+        println!("{:?}", response);
         let index_names = self.indexes.iter().filter_map(|i| i.get_name()).collect();
-        Ok(index_names)
+        Ok(CreateIndexesResult {
+            index_names,
+            created_collection_automatically: response.created_collection_automatically,
+            num_indexes_before: response.num_indexes_before,
+            num_indexes_after: response.num_indexes_after,
+            note: response.note,
+        })
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {
         self.options
             .as_ref()
             .and_then(|opts| opts.write_concern.as_ref())
+    }
+}
+#[derive(Debug)]
+pub(crate) struct Response {
+    pub(crate) created_collection_automatically: Option<bool>,
+    pub(crate) num_indexes_before: u32,
+    pub(crate) num_indexes_after: u32,
+    pub(crate) note: Option<String>,
+}
+
+impl<'de> Deserialize<'de> for Response {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct ResponseBody {
+            created_collection_automatically: Option<bool>,
+            num_indexes_before: u32,
+            num_indexes_after: u32,
+            note: Option<String>,
+        }
+
+        impl From<ResponseBody> for Response {
+            fn from(r: ResponseBody) -> Self {
+                Self {
+                    created_collection_automatically: r.created_collection_automatically,
+                    num_indexes_before: r.num_indexes_before,
+                    num_indexes_after: r.num_indexes_after,
+                    note: r.note,
+                }
+            }
+        }
+
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum ResponseHelper {
+            PlainResponse(ResponseBody),
+            ShardedResponse { raw: Document },
+        }
+
+        match ResponseHelper::deserialize(deserializer)? {
+            ResponseHelper::PlainResponse(body) => Ok(body.into()),
+            ResponseHelper::ShardedResponse { raw } => {
+                let len = raw.values().count();
+                if len != 1 {
+                    return Err(Error::invalid_length(len, &"a single result"));
+                }
+
+                let v = raw.values().last().unwrap(); // Safe unwrap because of length check above.
+                println!("{:?}", v);
+                bson::from_bson(v.clone())
+                    .map(|b: ResponseBody| b.into())
+                    .map_err(|_| {
+                        Error::invalid_type(
+                            Unexpected::Other("Unknown bson"),
+                            &"a createIndexes response",
+                        )
+                    })
+            }
+        }
     }
 }

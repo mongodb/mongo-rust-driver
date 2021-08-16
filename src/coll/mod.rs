@@ -36,7 +36,14 @@ use crate::{
         ListIndexes,
         Update,
     },
-    results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
+    results::{
+        CreateIndexResult,
+        CreateIndexesResult,
+        DeleteResult,
+        InsertManyResult,
+        InsertOneResult,
+        UpdateResult,
+    },
     selection_criteria::SelectionCriteria,
     Client,
     ClientSession,
@@ -325,7 +332,7 @@ impl<T> Collection<T> {
         indexes: impl IntoIterator<Item = IndexModel>,
         options: impl Into<Option<CreateIndexOptions>>,
         session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<Vec<String>> {
+    ) -> Result<CreateIndexesResult> {
         let session = session.into();
 
         let mut options = options.into();
@@ -344,12 +351,11 @@ impl<T> Collection<T> {
         &self,
         index: IndexModel,
         options: impl Into<Option<CreateIndexOptions>>,
-    ) -> Result<String> {
-        let mut result = self
+    ) -> Result<CreateIndexResult> {
+        let response = self
             .create_indexes_common(vec![index], options, None)
             .await?;
-        // The result will have exactly one element when calling createIndexes with one index.
-        Ok(result.pop().unwrap())
+        Ok(response.into())
     }
 
     /// Create several indexes.
@@ -357,7 +363,7 @@ impl<T> Collection<T> {
         &self,
         indexes: impl IntoIterator<Item = IndexModel>,
         options: impl Into<Option<CreateIndexOptions>>,
-    ) -> Result<Vec<String>> {
+    ) -> Result<CreateIndexesResult> {
         self.create_indexes_common(indexes, options, None).await
     }
 

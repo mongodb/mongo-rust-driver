@@ -929,7 +929,7 @@ pub struct ListIndexOptions {
 /// ready.
 ///
 /// For more information, see the [documentation](https://docs.mongodb.com/manual/reference/command/createIndexes/#definition)
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum CommitQuorum {
     /// A specific number of voting replica set members. When set to 0, disables quorum voting.
