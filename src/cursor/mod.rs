@@ -11,6 +11,7 @@ use serde::de::DeserializeOwned;
 
 use crate::{
     bson::Document,
+    cmap::conn::Connection,
     error::{Error, Result},
     operation::GetMore,
     results::GetMoreResult,
@@ -96,12 +97,13 @@ where
         client: Client,
         spec: CursorSpecification<T>,
         session: Option<ClientSession>,
+        pinned_connection: Option<Connection>,
     ) -> Self {
         let provider = ImplicitSessionGetMoreProvider::new(&spec, session);
 
         Self {
             client: client.clone(),
-            wrapped_cursor: ImplicitSessionCursor::new(client, spec, provider),
+            wrapped_cursor: ImplicitSessionCursor::new(client, spec, provider, pinned_connection),
             _phantom: Default::default(),
         }
     }

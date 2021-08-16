@@ -130,7 +130,13 @@ impl Client {
         Box::pin(async {
             let mut implicit_session = self.start_implicit_session(&op).await?;
             let (spec, conn) = self.execute_operation_inner(op, implicit_session.as_mut()).await?;
-            Ok(Cursor::new(self.clone(), spec, implicit_session))
+            let is_load_balanced = self.inner.options.load_balanced.unwrap_or(false);
+            let pinned_connection = if is_load_balanced {
+                Some(conn)
+            } else {
+                None
+            };
+            Ok(Cursor::new(self.clone(), spec, implicit_session, pinned_connection))
         })
         .await
     }

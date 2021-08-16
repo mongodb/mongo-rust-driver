@@ -36,7 +36,7 @@ where
     info: CursorInformation,
     buffer: VecDeque<T>,
     exhausted: bool,
-    //pinned_connection: PinnedConnection,
+    pinned_connection: Option<Connection>,
 }
 
 impl<P, T> GenericCursor<P, T>
@@ -44,7 +44,7 @@ where
     P: GetMoreProvider<DocumentType = T>,
     T: DeserializeOwned,
 {
-    pub(super) fn new(client: Client, spec: CursorSpecification<T>, get_more_provider: P) -> Self {
+    pub(super) fn new(client: Client, spec: CursorSpecification<T>, get_more_provider: P, pinned_connection: Option<Connection>) -> Self {
         let exhausted = spec.id() == 0;
         Self {
             exhausted,
@@ -52,6 +52,7 @@ where
             provider: get_more_provider,
             buffer: spec.initial_buffer,
             info: spec.info,
+            pinned_connection,
         }
     }
 
