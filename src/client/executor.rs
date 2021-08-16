@@ -125,9 +125,8 @@ impl Client {
     {
         Box::pin(async {
             let mut implicit_session = self.start_implicit_session(&op).await?;
-            self.execute_operation_with_retry(op, implicit_session.as_mut())
-                .await
-                .map(|result| Cursor::new(self.clone(), result, implicit_session))
+            let spec = self.execute_operation_with_retry(op, implicit_session.as_mut()).await?;
+            Ok(Cursor::new(self.clone(), spec, implicit_session))
         })
         .await
     }
