@@ -131,7 +131,7 @@ impl Client {
             let mut implicit_session = self.start_implicit_session(&op).await?;
             let (spec, conn) = self.execute_operation_inner(op, implicit_session.as_mut()).await?;
             let is_load_balanced = self.inner.options.load_balanced.unwrap_or(false);
-            let pinned_connection = if is_load_balanced {
+            let pinned_connection = if is_load_balanced && spec.info.id != 0 {
                 Some(conn)
             } else {
                 None
