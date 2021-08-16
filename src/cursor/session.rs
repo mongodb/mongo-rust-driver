@@ -11,7 +11,7 @@ use serde::de::DeserializeOwned;
 use super::common::{CursorInformation, GenericCursor, GetMoreProvider, GetMoreProviderResult};
 use crate::{
     bson::Document,
-    cursor::CursorSpecification,
+    cursor::{CursorSpecification, PinnedConnection},
     error::{Error, Result},
     operation::GetMore,
     results::GetMoreResult,
@@ -132,6 +132,7 @@ where
                 self.client.clone(),
                 spec,
                 get_more_provider,
+                None,  // TODO abr-egn
             ),
             session_cursor: self,
         }
@@ -263,7 +264,7 @@ impl<'session, T: Send + Sync + DeserializeOwned> GetMoreProvider
         *self = Self::Idle(MutableSessionReference { reference: session })
     }
 
-    fn start_execution(&mut self, info: CursorInformation, client: Client) {
+    fn start_execution(&mut self, info: CursorInformation, client: Client, pinned_connection: PinnedConnection) {
         take_mut::take(self, |self_| {
             if let ExplicitSessionGetMoreProvider::Idle(session) = self_ {
                 let future = Box::pin(async move {

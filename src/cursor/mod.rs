@@ -19,7 +19,7 @@ use crate::{
     ClientSession,
     RUNTIME,
 };
-pub(crate) use common::{CursorInformation, CursorSpecification};
+pub(crate) use common::{CursorInformation, CursorSpecification, PinnedConnection};
 use common::{GenericCursor, GetMoreProvider, GetMoreProviderResult};
 
 /// A [`Cursor`] streams the result of a query. When a query is made, the returned [`Cursor`] will
@@ -200,7 +200,7 @@ impl<T: Send + Sync + DeserializeOwned> GetMoreProvider for ImplicitSessionGetMo
         }
     }
 
-    fn start_execution(&mut self, info: CursorInformation, client: Client) {
+    fn start_execution(&mut self, info: CursorInformation, client: Client, pinned_connection: PinnedConnection) {
         take_mut::take(self, |self_| match self_ {
             Self::Idle(mut session) => {
                 let future = Box::pin(async move {
