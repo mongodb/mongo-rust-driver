@@ -5,7 +5,7 @@ use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize};
 use typed_builder::TypedBuilder;
 
 use crate::{
-    bson::{doc},
+    bson::doc,
     bson_util,
     error::{ErrorKind, Result},
     options::ServerAddress,
@@ -133,7 +133,6 @@ pub enum ReadPreference {
     Nearest { options: ReadPreferenceOptions },
 }
 
-
 impl<'de> Deserialize<'de> for ReadPreference {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
@@ -232,7 +231,7 @@ pub struct ReadPreferenceOptions {
         rename = "maxStalenessSeconds",
         default,
         deserialize_with = "bson_util::deserialize_duration_option_from_u64_seconds",
-        serialize_with = "bson_util::serialize_duration_option_as_int_secs",
+        serialize_with = "bson_util::serialize_duration_option_as_int_secs"
     )]
     pub max_staleness: Option<Duration>,
 
