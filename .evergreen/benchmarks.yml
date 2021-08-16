@@ -13,8 +13,10 @@ stepback: true
 command_type: system
 
 # Protect ourself against rogue test case, or curl gone wild, that runs forever
-# 12 minutes is the longest we'll ever run
-exec_timeout_secs: 3600 # 12 minutes is the longest we'll ever run
+# 60 minutes is the longest we'll ever run
+exec_timeout_secs: 3600
+
+pre_error_fails_task: true
 
 # What to do when evergreen hits the timeout (`post:` tasks are run automatically)
 timeout:
@@ -173,7 +175,7 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          ASYNC_RUNTIME=${ASYNC_RUNTIME} RUST_VERSION=${RUST_VERSION} .evergreen/compile-only.sh
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} .evergreen/run-compile-benchmarks.sh
 
   "upload-mo-artifacts":
     - command: shell.exec
@@ -273,8 +275,6 @@ pre:
 
 post:
   - func: "stop mongo orchestration"
-  - func: "upload-mo-artifacts"
-  - func: "upload benchmark results"
   - func: "cleanup"
 
 tasks:
@@ -286,6 +286,7 @@ tasks:
           MONGODB_VERSION: "4.0"
           TOPOLOGY: "server"
       - func: "run driver benchmarks"
+      - func: "upload benchmark results"
 
   - name: "benchmark-4.0-replica_set"
     tags: ["4.0", "replica_set"]
@@ -295,6 +296,7 @@ tasks:
           MONGODB_VERSION: "4.0"
           TOPOLOGY: "replica_set"
       - func: "run driver benchmarks"
+      - func: "upload benchmark results"
 
   - name: "benchmark-4.0-sharded_cluster"
     tags: ["4.0", "sharded_cluster"]
@@ -304,6 +306,7 @@ tasks:
           MONGODB_VERSION: "4.0"
           TOPOLOGY: "sharded_cluster"
       - func: "run driver benchmarks"
+      - func: "upload benchmark results"
 
   - name: "benchmark-5.0-standalone"
     tags: ["5.0", "standalone"]
@@ -313,6 +316,7 @@ tasks:
           MONGODB_VERSION: "5.0"
           TOPOLOGY: "server"
       - func: "run driver benchmarks"
+      - func: "upload benchmark results"
 
   - name: "benchmark-5.0-replica_set"
     tags: ["5.0", "replica_set"]
@@ -322,6 +326,7 @@ tasks:
           MONGODB_VERSION: "5.0"
           TOPOLOGY: "replica_set"
       - func: "run driver benchmarks"
+      - func: "upload benchmark results"
 
   - name: "benchmark-5.0-sharded_cluster"
     tags: ["5.0", "sharded_cluster"]
@@ -331,28 +336,20 @@ tasks:
           MONGODB_VERSION: "5.0"
           TOPOLOGY: "sharded_cluster"
       - func: "run driver benchmarks"
+      - func: "upload benchmark results"
 
   - name: "benchmark-bson"
     tags: ["bson"]
     commands:
       - func: "run bson benchmarks"
+      - func: "upload benchmark results"
 
-  - name: "compile-only"
+  - name: "benchmark-compile"
     commands:
       - func: "compile only"
+      - func: "upload benchmark results"
 
 axes:
-  - id: "extra-rust-versions"
-    values:
-      - id: "min"
-        display_name: "1.48 (minimum supported version)"
-        variables:
-          RUST_VERSION: "1.48.0"
-      - id: "nightly"
-        display_name: "nightly"
-        variables:
-          RUST_VERSION: "nightly"
-
   - id: "mongodb-version"
     display_name: MongoDB Version
     values:
@@ -457,8 +454,7 @@ buildvariants:
     os:
       - ubuntu-18.04
     async-runtime: "*"
-    extra-rust-versions: "*"
-  display_name: "Compile on Rust ${extra-rust-versions} with ${async-runtime}"
+  display_name: "Compile on ${os} with ${async-runtime}"
   tasks:
-    - "compile-only"
+    - "benchmark-compile"
 

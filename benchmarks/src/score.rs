@@ -24,11 +24,11 @@ impl From<BenchmarkScore> for BenchmarkResult {
             },
             metrics: vec![
                 BenchmarkMetric {
-                    name: "median_iteration_time",
+                    name: "Median Iteration Time (s)",
                     value: score.median_iteration_time.as_secs_f64(),
                 },
                 BenchmarkMetric {
-                    name: "score",
+                    name: "Score (MB/s)",
                     value: score.score,
                 },
             ],
