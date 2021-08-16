@@ -353,7 +353,8 @@ fn xor(lhs: &[u8], rhs: &[u8]) -> Vec<u8> {
 }
 
 fn mac_verify<M: Mac + NewMac>(key: &[u8], input: &[u8], signature: &[u8]) -> Result<()> {
-    let mut mac = M::new_varkey(key).map_err(|_| Error::unknown_authentication_error("SCRAM"))?;
+    let mut mac =
+        M::new_from_slice(key).map_err(|_| Error::unknown_authentication_error("SCRAM"))?;
     mac.update(input);
     match mac.verify(signature) {
         Ok(_) => Ok(()),
