@@ -205,7 +205,6 @@ impl Database {
         self.client()
             .execute_cursor_operation(list_collections)
             .await
-            .map(|(spec, session)| Cursor::new(self.client().clone(), spec, session))
     }
 
     /// Gets information about each of the collections in the database using the provided
@@ -258,8 +257,7 @@ impl Database {
         let cursor: Cursor<Document> = self
             .client()
             .execute_cursor_operation(list_collections)
-            .await
-            .map(|(spec, session)| Cursor::new(self.client().clone(), spec, session))?;
+            .await?;
 
         self.list_collection_names_common(cursor).await
     }
@@ -413,7 +411,6 @@ impl Database {
         client
             .execute_cursor_operation(aggregate)
             .await
-            .map(|(spec, session)| Cursor::new(client.clone(), spec, session))
     }
 
     /// Runs an aggregation operation with the provided `ClientSession`.

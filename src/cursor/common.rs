@@ -1,6 +1,7 @@
 use std::{
     collections::VecDeque,
     pin::Pin,
+    sync::Arc,
     task::{Context, Poll},
     time::Duration,
 };
@@ -8,8 +9,10 @@ use std::{
 use derivative::Derivative;
 use futures_core::{Future, Stream};
 use serde::de::DeserializeOwned;
+use tokio::sync::Mutex;
 
 use crate::{
+    cmap::conn::Connection,
     error::{Error, ErrorKind, Result},
     operation,
     options::ServerAddress,
@@ -17,6 +20,8 @@ use crate::{
     Client,
     Namespace,
 };
+
+pub(crate) type PinnedConnection = Arc<Mutex<Option<Connection>>>;
 
 /// An internal cursor that can be used in a variety of contexts depending on its `GetMoreProvider`.
 #[derive(Derivative)]
@@ -31,6 +36,7 @@ where
     info: CursorInformation,
     buffer: VecDeque<T>,
     exhausted: bool,
+    //pinned_connection: PinnedConnection,
 }
 
 impl<P, T> GenericCursor<P, T>
@@ -68,7 +74,7 @@ where
     fn start_get_more(&mut self) {
         let info = self.info.clone();
         let client = self.client.clone();
-        self.provider.start_execution(info, client);
+        self.provider.start_execution(info, client/*, self.pinned_connection.as_mut()*/);
     }
 }
 
@@ -136,7 +142,7 @@ pub(super) trait GetMoreProvider: Unpin {
     );
 
     /// Start executing a new getMore if one isn't already in flight.
-    fn start_execution(&mut self, spec: CursorInformation, client: Client);
+    fn start_execution(&mut self, spec: CursorInformation, client: Client/*, pinned_connection: Option<&mut Connection>*/);
 }
 
 /// Trait describing results returned from a `GetMoreProvider`.

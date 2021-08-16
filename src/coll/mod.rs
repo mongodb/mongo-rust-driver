@@ -263,7 +263,6 @@ impl<T> Collection<T> {
         client
             .execute_cursor_operation(aggregate)
             .await
-            .map(|(spec, session)| Cursor::new(client.clone(), spec, session))
     }
 
     /// Runs an aggregation operation using the provided `ClientSession`.
@@ -813,7 +812,6 @@ where
         client
             .execute_cursor_operation(find)
             .await
-            .map(|(result, session)| Cursor::new(client.clone(), result, session))
     }
 
     /// Finds the documents in the collection matching `filter` using the provided `ClientSession`.

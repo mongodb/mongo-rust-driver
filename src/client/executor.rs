@@ -1,5 +1,6 @@
 use bson::doc;
 use lazy_static::lazy_static;
+use serde::de::DeserializeOwned;
 
 use std::{collections::HashSet, sync::Arc, time::Instant};
 
@@ -7,6 +8,7 @@ use super::{session::TransactionState, Client, ClientSession};
 use crate::{
     bson::Document,
     cmap::{Connection, RawCommand, RawCommandResponse},
+    cursor::{Cursor, CursorSpecification},
     error::{
         Error,
         ErrorKind,
@@ -114,15 +116,18 @@ impl Client {
     /// Execute the given operation, returning the implicit session created for it if one was.
     ///
     /// Server selection be will performed using the criteria specified on the operation, if any.
-    pub(crate) async fn execute_cursor_operation<T: Operation>(
+    pub(crate) async fn execute_cursor_operation<Op, T>(
         &self,
-        op: T,
-    ) -> Result<(T::O, Option<ClientSession>)> {
+        op: Op,
+    ) -> Result<Cursor<T>>
+        where Op: Operation<O=CursorSpecification<T>>,
+        T: DeserializeOwned + Unpin + Send + Sync,
+    {
         Box::pin(async {
             let mut implicit_session = self.start_implicit_session(&op).await?;
             self.execute_operation_with_retry(op, implicit_session.as_mut())
                 .await
-                .map(|result| (result, implicit_session))
+                .map(|result| Cursor::new(self.clone(), result, implicit_session))
         })
         .await
     }
