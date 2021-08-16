@@ -40,7 +40,7 @@ derivative = "2.1.1"
 err-derive = "0.2.3"
 futures = "0.3.5"
 hex = "0.4.0"
-hmac = "0.10.1"
+hmac = "0.11"
 lazy_static = "1.4.0"
 md-5 = "0.9.1"
 os_info = { version = "3.0.1", default-features = false }
@@ -66,7 +66,7 @@ version = "1.6.2"
 optional = true
 
 [dependencies.pbkdf2]
-version = "0.6.0"
+version = "0.8"
 default-features = false
 
 [dependencies.reqwest]
