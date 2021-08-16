@@ -3,6 +3,8 @@ use std::time::Duration;
 use mongodb::bson::Document;
 use serde::Serialize;
 
+const SCORE_VALUE_NAME: &'static str = "score";
+
 #[derive(Debug, Clone)]
 pub(crate) struct BenchmarkScore {
     /// The name of the benchmark (e.g. "Large doc bulk insert")
@@ -24,11 +26,11 @@ impl From<BenchmarkScore> for BenchmarkResult {
             },
             metrics: vec![
                 BenchmarkMetric {
-                    name: "Median Iteration Time (s)",
+                    name: "median_iteration_time_seconds",
                     value: score.median_iteration_time.as_secs_f64(),
                 },
                 BenchmarkMetric {
-                    name: "Score (MB/s)",
+                    name: SCORE_VALUE_NAME,
                     value: score.score,
                 },
             ],
@@ -106,7 +108,7 @@ impl CompositeScore {
                 args: Document::new(),
             },
             metrics: vec![BenchmarkMetric {
-                name: "score",
+                name: SCORE_VALUE_NAME,
                 value: score,
             }],
         }
