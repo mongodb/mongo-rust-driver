@@ -80,7 +80,8 @@ impl Client {
                 }
                 .into());
             }
-            match session.into() {
+            let mut implicit_session;
+            let session = match session.into() {
                 Some(session) => {
                     if !Arc::ptr_eq(&self.inner, &session.client().inner) {
                         return Err(ErrorKind::InvalidArgument {
@@ -101,14 +102,17 @@ impl Client {
                             .into());
                         }
                     }
-                    self.execute_operation_with_retry(op, Some(session)).await
+                    Some(session)
                 }
                 None => {
-                    let mut implicit_session = self.start_implicit_session(&op).await?;
-                    self.execute_operation_with_retry(op, implicit_session.as_mut())
-                        .await
+                    implicit_session = self.start_implicit_session(&op).await?;
+                    implicit_session.as_mut()
                 }
-            }
+            };
+            self.execute_operation_inner(op, session)
+                .await
+                .map(|(o, _)| o)
+
         })
         .await
     }
@@ -125,7 +129,7 @@ impl Client {
     {
         Box::pin(async {
             let mut implicit_session = self.start_implicit_session(&op).await?;
-            let spec = self.execute_operation_with_retry(op, implicit_session.as_mut()).await?;
+            let (spec, conn) = self.execute_operation_inner(op, implicit_session.as_mut()).await?;
             Ok(Cursor::new(self.clone(), spec, implicit_session))
         })
         .await
@@ -133,11 +137,11 @@ impl Client {
 
     /// Selects a server and executes the given operation on it, optionally using a provided
     /// session. Retries the operation upon failure if retryability is supported.
-    async fn execute_operation_with_retry<T: Operation>(
+    async fn execute_operation_inner<T: Operation>(
         &self,
         mut op: T,
         mut session: Option<&mut ClientSession>,
-    ) -> Result<T::O> {
+    ) -> Result<(T::O, Connection)> {
         // If the current transaction has been committed/aborted and it is not being
         // re-committed/re-aborted, reset the transaction's state to TransactionState::None.
         if let Some(ref mut session) = session {
@@ -204,7 +208,7 @@ impl Client {
             )
             .await
         {
-            Ok(result) => Ok(result),
+            Ok(result) => Ok((result, conn)),
             Err(mut err) => {
                 // Retryable writes are only supported by storage engines with document-level
                 // locking, so users need to disable retryable writes if using mmapv1.
@@ -250,7 +254,7 @@ impl Client {
         session: &mut Option<&mut ClientSession>,
         txn_number: Option<i64>,
         first_error: Error,
-    ) -> Result<T::O> {
+    ) -> Result<(T::O, Connection)> {
         op.update_for_retry();
 
         let server = match self.select_server(op.selection_criteria()).await {
@@ -274,7 +278,7 @@ impl Client {
             .execute_operation_on_connection(op, &mut conn, session, txn_number, &retryability)
             .await
         {
-            Ok(result) => Ok(result),
+            Ok(result) => Ok((result, conn)),
             Err(err) => {
                 self.inner
                     .topology
