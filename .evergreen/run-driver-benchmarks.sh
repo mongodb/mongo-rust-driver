@@ -24,3 +24,5 @@ cargo run \
       --no-default-features \
       --features ${FEATURES} \
       -- --output="../benchmark-results.json" --single --multi --parallel
+
+cat ../benchmark-results.json
