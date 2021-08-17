@@ -118,10 +118,9 @@ impl Client {
                     implicit_session.as_mut()
                 }
             };
-            self.execute_operation_inner(op, session)
+            self.execute_operation_inner(op, session, connection.into())
                 .await
                 .map(|(o, _)| o)
-
         })
         .await
     }
@@ -138,10 +137,10 @@ impl Client {
     {
         Box::pin(async {
             let mut implicit_session = self.start_implicit_session(&op).await?;
-            let (spec, conn) = self.execute_operation_inner(op, implicit_session.as_mut()).await?;
+            let (spec, conn) = self.execute_operation_inner(op, implicit_session.as_mut(), None).await?;
             let is_load_balanced = self.inner.options.load_balanced.unwrap_or(false);
             let pinned_connection = if is_load_balanced && spec.info.id != 0 {
-                Some(conn)
+                conn
             } else {
                 None
             };
@@ -156,7 +155,8 @@ impl Client {
         &self,
         mut op: T,
         mut session: Option<&mut ClientSession>,
-    ) -> Result<(T::O, Connection)> {
+        conn: Option<&mut Connection>,
+    ) -> Result<(T::O, Option<Connection>)> {
         // If the current transaction has been committed/aborted and it is not being
         // re-committed/re-aborted, reset the transaction's state to TransactionState::None.
         if let Some(ref mut session) = session {
@@ -184,15 +184,22 @@ impl Client {
             }
         };
 
-        let mut conn = match server.pool.check_out().await {
-            Ok(conn) => conn,
-            Err(mut err) => {
-                err.add_labels_and_update_pin(None, &mut session, None)?;
-
-                if err.is_pool_cleared() {
-                    return self.execute_retry(&mut op, &mut session, None, err).await;
-                } else {
-                    return Err(err);
+        let mut owned_conn = None;
+        let mut conn = match conn {
+            Some(c) => c,
+            None => match server.pool.check_out().await {
+                Ok(c) => {
+                    owned_conn = Some(c);
+                    owned_conn.as_mut().unwrap()
+                }
+                Err(mut err) => {
+                    err.add_labels_and_update_pin(None, &mut session, None)?;
+    
+                    if err.is_pool_cleared() {
+                        return self.execute_retry(&mut op, &mut session, None, err).await;
+                    } else {
+                        return Err(err);
+                    }
                 }
             }
         };
@@ -223,7 +230,7 @@ impl Client {
             )
             .await
         {
-            Ok(result) => Ok((result, conn)),
+            Ok(result) => Ok((result, owned_conn)),
             Err(mut err) => {
                 // Retryable writes are only supported by storage engines with document-level
                 // locking, so users need to disable retryable writes if using mmapv1.
@@ -247,7 +254,7 @@ impl Client {
                     )
                     .await;
                 // release the connection to be processed by the connection pool
-                drop(conn);
+                drop(owned_conn);
                 // release the selected server to decrement its operation count
                 drop(server);
 
@@ -269,7 +276,7 @@ impl Client {
         session: &mut Option<&mut ClientSession>,
         txn_number: Option<i64>,
         first_error: Error,
-    ) -> Result<(T::O, Connection)> {
+    ) -> Result<(T::O, Option<Connection>)> {
         op.update_for_retry();
 
         let server = match self.select_server(op.selection_criteria()).await {
@@ -293,7 +300,7 @@ impl Client {
             .execute_operation_on_connection(op, &mut conn, session, txn_number, &retryability)
             .await
         {
-            Ok(result) => Ok((result, conn)),
+            Ok(result) => Ok((result, Some(conn))),
             Err(err) => {
                 self.inner
                     .topology
