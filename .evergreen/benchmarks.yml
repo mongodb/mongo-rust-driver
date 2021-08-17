@@ -275,7 +275,7 @@ pre:
 
 post:
   - func: "stop mongo orchestration"
-  - func: "upload mo artifacts"
+  - func: "upload-mo-artifacts"
   - func: "cleanup"
 
 tasks:
