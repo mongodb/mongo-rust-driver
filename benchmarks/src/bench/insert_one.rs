@@ -9,7 +9,7 @@ use mongodb::{
 };
 use serde_json::Value;
 
-use crate::bench::{Benchmark, COLL_NAME, DATABASE_NAME, drop_database};
+use crate::bench::{drop_database, Benchmark, COLL_NAME, DATABASE_NAME};
 
 pub struct InsertOneBenchmark {
     db: Database,
@@ -36,6 +36,7 @@ impl Benchmark for InsertOneBenchmark {
         drop_database(&options.uri, &DATABASE_NAME).await?;
 
         let num_iter = options.num_iter;
+        let uri = options.uri.clone();
 
         // This benchmark uses a file that's quite large, and unfortunately `serde_json` has no
         // async version of `from_reader`, so rather than read the whole file into memory at once,
@@ -56,7 +57,7 @@ impl Benchmark for InsertOneBenchmark {
                 Bson::Document(doc) => doc,
                 _ => bail!("invalid json test file"),
             },
-            uri: options.uri,
+            uri,
         })
     }
 

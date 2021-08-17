@@ -48,7 +48,7 @@ impl Benchmark for JsonMultiExportBenchmark {
             let path = options.path.clone();
             let coll = coll.clone();
 
-            tasks.push(async move {
+            tasks.push(crate::spawn(async move {
                 let json_file_name = path.join(format!("ldjson{:03}.txt", i));
                 let file = File::open_read(&json_file_name).await?;
 
@@ -61,14 +61,18 @@ impl Benchmark for JsonMultiExportBenchmark {
 
                 let ok: anyhow::Result<()> = Ok(());
                 ok
-            });
+            }));
         }
 
         while let Some(result) = tasks.next().await {
             result?;
         }
 
-        Ok(JsonMultiExportBenchmark { uri: options.uri, db, coll })
+        Ok(JsonMultiExportBenchmark {
+            uri: options.uri,
+            db,
+            coll,
+        })
     }
 
     async fn do_task(&self) -> Result<()> {

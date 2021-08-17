@@ -39,7 +39,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use clap::{App, Arg, ArgMatches};
-use futures::{Future, FutureExt};
+use futures::Future;
+#[cfg(feature = "tokio-runtime")]
+use futures::FutureExt;
 use lazy_static::lazy_static;
 
 use crate::{

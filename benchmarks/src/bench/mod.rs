@@ -8,13 +8,21 @@ pub mod json_multi_export;
 pub mod json_multi_import;
 pub mod run_command;
 
-use std::{convert::TryInto, sync::Arc, time::{Duration, Instant}};
+use std::{
+    convert::TryInto,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use anyhow::{bail, Result};
 use futures::stream::TryStreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use lazy_static::lazy_static;
-use mongodb::{Client, bson::{Bson, Document, doc}, options::{ClientOptions, SelectionCriteria}};
+use mongodb::{
+    bson::{doc, Bson, Document},
+    options::{ClientOptions, SelectionCriteria},
+    Client,
+};
 use serde_json::Value;
 
 use crate::fs::{BufReader, File};
@@ -144,9 +152,7 @@ pub async fn drop_database(uri: &str, database: &str) -> Result<()> {
                 .database("admin")
                 .run_command(
                     doc! { "flushRouterConfig": 1 },
-                    SelectionCriteria::Predicate(Arc::new(move |s| {
-                        s.address() == &host
-                    })),
+                    SelectionCriteria::Predicate(Arc::new(move |s| s.address() == &host)),
                 )
                 .await?;
         }

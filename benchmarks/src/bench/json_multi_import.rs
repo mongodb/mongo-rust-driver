@@ -10,12 +10,15 @@ use crate::{
     models::json_multi::Tweet,
 };
 
+use super::drop_database;
+
 const TOTAL_FILES: usize = 100;
 
 pub struct JsonMultiImportBenchmark {
     db: Database,
     coll: Collection<Tweet>,
     path: PathBuf,
+    uri: String,
 }
 
 // Specifies the options to a `JsonMultiImportBenchmark::setup` operation.
@@ -31,7 +34,7 @@ impl Benchmark for JsonMultiImportBenchmark {
     async fn setup(options: Self::Options) -> Result<Self> {
         let client = Client::with_uri_str(&options.uri).await?;
         let db = client.database(&DATABASE_NAME);
-        db.drop(None).await?;
+        drop_database(options.uri.as_str(), DATABASE_NAME.as_str()).await?;
 
         let coll = db.collection(&COLL_NAME);
 
@@ -39,6 +42,7 @@ impl Benchmark for JsonMultiImportBenchmark {
             db,
             coll,
             path: options.path,
+            uri: options.uri,
         })
     }
 
@@ -83,7 +87,7 @@ impl Benchmark for JsonMultiImportBenchmark {
     }
 
     async fn teardown(&self) -> Result<()> {
-        self.db.drop(None).await?;
+        drop_database(self.uri.as_str(), self.db.name()).await?;
 
         Ok(())
     }
