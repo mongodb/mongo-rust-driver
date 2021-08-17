@@ -9,16 +9,17 @@ use mongodb::{
 };
 use serde_json::Value;
 
-use crate::bench::{Benchmark, COLL_NAME, DATABASE_NAME};
+use crate::bench::{Benchmark, COLL_NAME, DATABASE_NAME, drop_database};
 
 pub struct InsertOneBenchmark {
     db: Database,
     num_iter: usize,
     coll: Collection<Document>,
     doc: Document,
+    uri: String,
 }
 
-// Specifies the options to a `InsertOneBenchmark::setup` operation.
+/// Specifies the options to a `InsertOneBenchmark::setup` operation.
 pub struct Options {
     pub num_iter: usize,
     pub path: PathBuf,
@@ -32,7 +33,7 @@ impl Benchmark for InsertOneBenchmark {
     async fn setup(options: Self::Options) -> Result<Self> {
         let client = Client::with_uri_str(&options.uri).await?;
         let db = client.database(&DATABASE_NAME);
-        db.drop(None).await?;
+        drop_database(&options.uri, &DATABASE_NAME).await?;
 
         let num_iter = options.num_iter;
 
@@ -55,6 +56,7 @@ impl Benchmark for InsertOneBenchmark {
                 Bson::Document(doc) => doc,
                 _ => bail!("invalid json test file"),
             },
+            uri: options.uri,
         })
     }
 
@@ -74,7 +76,7 @@ impl Benchmark for InsertOneBenchmark {
     }
 
     async fn teardown(&self) -> Result<()> {
-        self.db.drop(None).await?;
+        drop_database(&self.uri, &DATABASE_NAME).await?;
 
         Ok(())
     }

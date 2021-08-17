@@ -566,5 +566,6 @@ Run benchmarks by id number (comma-separated):
         file.write_line(serde_json::to_string_pretty(&results).unwrap().as_str())
             .await
             .unwrap();
+        file.flush().await.unwrap();
     }
 }

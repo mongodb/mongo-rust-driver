@@ -45,6 +45,11 @@ impl File {
     pub(crate) async fn write_line(&mut self, s: &str) -> Result<()> {
         Ok(self.inner.write_all(format!("{}\n", s).as_bytes()).await?)
     }
+
+    pub(crate) async fn flush(&mut self) -> Result<()> {
+        self.inner.flush().await?;
+        Ok(())
+    }
 }
 
 pub(crate) struct BufReader {

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use mongodb::{
     bson::{doc, Document},
     Client,
@@ -25,7 +25,7 @@ impl Benchmark for RunCommandBenchmark {
     async fn setup(options: Self::Options) -> Result<Self> {
         let client = Client::with_uri_str(&options.uri).await?;
         let db = client.database(&DATABASE_NAME);
-        db.drop(None).await?;
+        db.drop(None).await.context("drop database in setup")?;
 
         Ok(RunCommandBenchmark {
             db,
@@ -36,14 +36,14 @@ impl Benchmark for RunCommandBenchmark {
 
     async fn do_task(&self) -> Result<()> {
         for _ in 0..self.num_iter {
-            let _doc = self.db.run_command(self.cmd.clone(), None).await?;
+            let _doc = self.db.run_command(self.cmd.clone(), None).await.context("run command")?;
         }
 
         Ok(())
     }
 
     async fn teardown(&self) -> Result<()> {
-        self.db.drop(None).await?;
+        self.db.drop(None).await.context("drop in teardown")?;
 
         Ok(())
     }

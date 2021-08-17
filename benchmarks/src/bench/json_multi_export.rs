@@ -15,9 +15,12 @@ use crate::{
     models::json_multi::Tweet,
 };
 
+use super::drop_database;
+
 const TOTAL_FILES: usize = 100;
 
 pub struct JsonMultiExportBenchmark {
+    uri: String,
     db: Database,
     coll: Collection<Document>,
 }
@@ -35,7 +38,7 @@ impl Benchmark for JsonMultiExportBenchmark {
     async fn setup(options: Self::Options) -> Result<Self> {
         let client = Client::with_uri_str(&options.uri).await?;
         let db = client.database(&DATABASE_NAME);
-        db.drop(None).await?;
+        drop_database(&options.uri, &DATABASE_NAME).await?;
 
         let coll = db.collection(&COLL_NAME);
 
@@ -65,7 +68,7 @@ impl Benchmark for JsonMultiExportBenchmark {
             result?;
         }
 
-        Ok(JsonMultiExportBenchmark { db, coll })
+        Ok(JsonMultiExportBenchmark { uri: options.uri, db, coll })
     }
 
     async fn do_task(&self) -> Result<()> {
@@ -93,6 +96,8 @@ impl Benchmark for JsonMultiExportBenchmark {
                         .await
                         .unwrap();
                 }
+
+                file.flush().await.unwrap();
             }));
         }
 
@@ -104,7 +109,7 @@ impl Benchmark for JsonMultiExportBenchmark {
     }
 
     async fn teardown(&self) -> Result<()> {
-        self.db.drop(None).await?;
+        drop_database(self.uri.as_str(), self.db.name()).await?;
 
         Ok(())
     }

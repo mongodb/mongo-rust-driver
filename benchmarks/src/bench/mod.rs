@@ -8,16 +8,13 @@ pub mod json_multi_export;
 pub mod json_multi_import;
 pub mod run_command;
 
-use std::{
-    convert::TryInto,
-    time::{Duration, Instant},
-};
+use std::{convert::TryInto, sync::Arc, time::{Duration, Instant}};
 
 use anyhow::{bail, Result};
 use futures::stream::TryStreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use lazy_static::lazy_static;
-use mongodb::bson::{Bson, Document};
+use mongodb::{Client, bson::{Bson, Document, doc}, options::{ClientOptions, SelectionCriteria}};
 use serde_json::Value;
 
 use crate::fs::{BufReader, File};
@@ -124,4 +121,36 @@ pub async fn run_benchmark<B: Benchmark + Send + Sync>(
 
     test_durations.sort();
     Ok(test_durations)
+}
+
+pub async fn drop_database(uri: &str, database: &str) -> Result<()> {
+    let options = ClientOptions::parse(uri).await?;
+    let client = Client::with_options(options.clone())?;
+
+    let hello = client
+        .database("admin")
+        .run_command(doc! { "ismaster": true }, None)
+        .await?;
+
+    client.database(&database).drop(None).await?;
+
+    // in sharded clusters, take additional steps to ensure database is dropped completely.
+    // see: https://docs.mongodb.com/manual/reference/method/db.dropDatabase/#replica-set-and-sharded-clusters
+    let is_sharded = hello.get_str("msg")? == "isbdgrid";
+    if is_sharded {
+        client.database(&database).drop(None).await?;
+        for host in options.hosts {
+            client
+                .database("admin")
+                .run_command(
+                    doc! { "flushRouterConfig": 1 },
+                    SelectionCriteria::Predicate(Arc::new(move |s| {
+                        s.address() == &host
+                    })),
+                )
+                .await?;
+        }
+    }
+
+    Ok(())
 }
