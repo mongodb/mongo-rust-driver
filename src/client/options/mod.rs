@@ -370,7 +370,7 @@ pub struct ClientOptions {
     ///
     /// Note that by default, the driver will autodiscover other nodes in the cluster. To connect
     /// directly to a single server (rather than autodiscovering the rest of the cluster), set the
-    /// `direct` field to `true`.
+    /// `direct_connection` field to `true`.
     #[builder(default_code = "vec![ServerAddress::Tcp {
         host: \"localhost\".to_string(),
         port: Some(27017),

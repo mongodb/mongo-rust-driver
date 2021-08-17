@@ -440,7 +440,7 @@ impl Topology {
             .transaction_support_status()
     }
 
-    pub(super) async fn topology_type(&self) -> TopologyType {
+    pub(crate) async fn topology_type(&self) -> TopologyType {
         self.state.read().await.description.topology_type()
     }
 

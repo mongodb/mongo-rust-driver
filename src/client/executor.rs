@@ -31,6 +31,7 @@ use crate::{
         SelectedServer,
         ServerType,
         SessionSupportStatus,
+        TopologyType,
         TransactionSupportStatus,
     },
     selection_criteria::ReadPreference,
@@ -573,6 +574,17 @@ impl Client {
         }
     }
 
+    async fn select_data_bearing_server(&self) -> Result<()> {
+        let topology_type = self.inner.topology.topology_type().await;
+        let criteria = SelectionCriteria::Predicate(Arc::new(move |server_info| {
+            let server_type = server_info.server_type();
+            (matches!(topology_type, TopologyType::Single) && server_type.is_available())
+                || server_type.is_data_bearing()
+        }));
+        let _: SelectedServer = self.select_server(Some(&criteria)).await?;
+        Ok(())
+    }
+
     /// Gets whether the topology supports sessions, and if so, returns the topology's logical
     /// session timeout. If it has yet to be determined if the topology supports sessions, this
     /// method will perform a server selection that will force that determination to be made.
@@ -583,10 +595,7 @@ impl Client {
         // sessions are supported or not.
         match initial_status {
             SessionSupportStatus::Undetermined => {
-                let criteria = SelectionCriteria::Predicate(Arc::new(move |server_info| {
-                    server_info.server_type().is_data_bearing()
-                }));
-                let _: SelectedServer = self.select_server(Some(&criteria)).await?;
+                self.select_data_bearing_server().await?;
                 Ok(self.inner.topology.session_support_status().await)
             }
             _ => Ok(initial_status),
@@ -603,10 +612,7 @@ impl Client {
         // sessions are supported or not.
         match initial_status {
             TransactionSupportStatus::Undetermined => {
-                let criteria = SelectionCriteria::Predicate(Arc::new(move |server_info| {
-                    server_info.server_type().is_data_bearing()
-                }));
-                let _: SelectedServer = self.select_server(Some(&criteria)).await?;
+                self.select_data_bearing_server().await?;
                 Ok(self.inner.topology.transaction_support_status().await)
             }
             _ => Ok(initial_status),
