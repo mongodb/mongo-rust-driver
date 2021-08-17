@@ -144,7 +144,7 @@ pub async fn drop_database(uri: &str, database: &str) -> Result<()> {
 
     // in sharded clusters, take additional steps to ensure database is dropped completely.
     // see: https://docs.mongodb.com/manual/reference/method/db.dropDatabase/#replica-set-and-sharded-clusters
-    let is_sharded = hello.get_str("msg")? == "isbdgrid";
+    let is_sharded = hello.get_str("msg").ok() == Some("isbdgrid");
     if is_sharded {
         client.database(&database).drop(None).await?;
         for host in options.hosts {
