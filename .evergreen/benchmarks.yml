@@ -279,32 +279,32 @@ post:
   - func: "cleanup"
 
 tasks:
-  - name: "benchmark-4.0-standalone"
-    tags: ["4.0", "standalone"]
+  - name: "benchmark-4.2-standalone"
+    tags: ["4.2", "standalone"]
     commands:
       - func: "bootstrap mongo-orchestration"
         vars:
-          MONGODB_VERSION: "4.0"
+          MONGODB_VERSION: "4.2"
           TOPOLOGY: "server"
       - func: "run driver benchmarks"
       - func: "upload benchmark results"
 
-  - name: "benchmark-4.0-replica_set"
-    tags: ["4.0", "replica_set"]
+  - name: "benchmark-4.2-replica_set"
+    tags: ["4.2", "replica_set"]
     commands:
       - func: "bootstrap mongo-orchestration"
         vars:
-          MONGODB_VERSION: "4.0"
+          MONGODB_VERSION: "4.2"
           TOPOLOGY: "replica_set"
       - func: "run driver benchmarks"
       - func: "upload benchmark results"
 
-  - name: "benchmark-4.0-sharded_cluster"
-    tags: ["4.0", "sharded_cluster"]
+  - name: "benchmark-4.2-sharded_cluster"
+    tags: ["4.2", "sharded_cluster"]
     commands:
       - func: "bootstrap mongo-orchestration"
         vars:
-          MONGODB_VERSION: "4.0"
+          MONGODB_VERSION: "4.2"
           TOPOLOGY: "sharded_cluster"
       - func: "run driver benchmarks"
       - func: "upload benchmark results"
@@ -358,10 +358,10 @@ axes:
         display_name: "5.0"
         variables:
           MONGODB_VERSION: "5.0"
-      - id: "4.0"
-        display_name: "4.0"
+      - id: "4.2"
+        display_name: "4.2"
         variables:
-          MONGODB_VERSION: "4.0"
+          MONGODB_VERSION: "4.2"
 
   - id: "topology"
     display_name: Topology
@@ -440,7 +440,7 @@ buildvariants:
   display_name: "${os} ${auth-and-tls} with ${async-runtime}"
   tasks:
      - ".5.0"
-     - ".4.0"
+     - ".4.2"
 -
   matrix_name: "bson benchmarks"
   matrix_spec:
