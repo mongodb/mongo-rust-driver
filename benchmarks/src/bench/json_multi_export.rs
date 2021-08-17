@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
+use futures::stream::TryStreamExt;
 use mongodb::{
     bson::{doc, Document},
     Client,
@@ -42,7 +42,7 @@ impl Benchmark for JsonMultiExportBenchmark {
 
         let coll = db.collection(&COLL_NAME);
 
-        let mut tasks = FuturesUnordered::new();
+        let mut tasks = Vec::new();
 
         for i in 0..TOTAL_FILES {
             let path = options.path.clone();
@@ -64,8 +64,8 @@ impl Benchmark for JsonMultiExportBenchmark {
             }));
         }
 
-        while let Some(result) = tasks.next().await {
-            result?;
+        for task in tasks {
+            task.await?;
         }
 
         Ok(JsonMultiExportBenchmark {
@@ -76,7 +76,7 @@ impl Benchmark for JsonMultiExportBenchmark {
     }
 
     async fn do_task(&self) -> Result<()> {
-        let mut tasks = FuturesUnordered::new();
+        let mut tasks = Vec::new();
 
         for i in 0..TOTAL_FILES {
             let coll_ref = self.coll.clone_with_type::<Tweet>();
@@ -105,8 +105,8 @@ impl Benchmark for JsonMultiExportBenchmark {
             }));
         }
 
-        while !tasks.is_empty() {
-            tasks.next().await;
+        for task in tasks {
+            task.await;
         }
 
         Ok(())

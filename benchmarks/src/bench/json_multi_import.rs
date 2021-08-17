@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
+use futures::stream::TryStreamExt;
 use mongodb::{options::InsertManyOptions, Client, Collection, Database};
 
 use crate::{
@@ -54,7 +54,7 @@ impl Benchmark for JsonMultiImportBenchmark {
     }
 
     async fn do_task(&self) -> Result<()> {
-        let mut tasks = FuturesUnordered::new();
+        let mut tasks = Vec::new();
 
         for i in 0..TOTAL_FILES {
             let coll_ref = self.coll.clone();
@@ -79,8 +79,8 @@ impl Benchmark for JsonMultiImportBenchmark {
             }));
         }
 
-        while !tasks.is_empty() {
-            tasks.next().await;
+        for task in tasks {
+            task.await;
         }
 
         Ok(())
