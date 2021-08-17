@@ -72,6 +72,15 @@ impl Client {
         op: T,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<T::O> {
+        self.execute_operation_with_connection(op, session, None).await
+    }
+
+    pub(crate) async fn execute_operation_with_connection<T: Operation>(
+        &self,
+        op: T,
+        session: impl Into<Option<&mut ClientSession>>,
+        connection: impl Into<Option<&mut Connection>>,
+    ) -> Result<T::O> {
         Box::pin(async {
             // TODO RUST-9: allow unacknowledged write concerns
             if !op.is_acknowledged() {
