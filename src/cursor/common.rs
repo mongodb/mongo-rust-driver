@@ -21,7 +21,7 @@ use crate::{
     Namespace,
 };
 
-pub(crate) type PinnedConnection = Option<Arc<Mutex<Connection>>>;
+pub(crate) type PinnedConnection = Arc<Mutex<Connection>>;
 
 /// An internal cursor that can be used in a variety of contexts depending on its `GetMoreProvider`.
 #[derive(Derivative)]
@@ -36,7 +36,7 @@ where
     info: CursorInformation,
     buffer: VecDeque<T>,
     exhausted: bool,
-    pinned_connection: PinnedConnection,
+    pinned_connection: Option<PinnedConnection>,
 }
 
 impl<P, T> GenericCursor<P, T>
@@ -143,7 +143,7 @@ pub(super) trait GetMoreProvider: Unpin {
     );
 
     /// Start executing a new getMore if one isn't already in flight.
-    fn start_execution(&mut self, spec: CursorInformation, client: Client, pinned_connection: PinnedConnection);
+    fn start_execution(&mut self, spec: CursorInformation, client: Client, pinned_connection: Option<PinnedConnection>);
 }
 
 /// Trait describing results returned from a `GetMoreProvider`.

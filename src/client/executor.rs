@@ -8,7 +8,7 @@ use super::{session::TransactionState, Client, ClientSession};
 use crate::{
     bson::Document,
     cmap::{Connection, RawCommand, RawCommandResponse},
-    cursor::{Cursor, CursorSpecification},
+    cursor::{Cursor, CursorSpecification, PinnedConnection},
     error::{
         Error,
         ErrorKind,
@@ -72,15 +72,6 @@ impl Client {
         op: T,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<T::O> {
-        self.execute_operation_pinned(op, session, None).await
-    }
-
-    pub(crate) async fn execute_operation_pinned<T: Operation>(
-        &self,
-        op: T,
-        session: impl Into<Option<&mut ClientSession>>,
-        pinned_connection: Option<&mut Connection>,
-    ) -> Result<T::O> {
         Box::pin(async {
             // TODO RUST-9: allow unacknowledged write concerns
             if !op.is_acknowledged() {
@@ -118,7 +109,7 @@ impl Client {
                     implicit_session.as_mut()
                 }
             };
-            self.execute_operation_with_retry(op, session, pinned_connection)
+            self.execute_operation_with_retry(op, session)
                 .await
                 .map(|(o, _)| o)
         })
@@ -137,7 +128,7 @@ impl Client {
     {
         Box::pin(async {
             let mut implicit_session = self.start_implicit_session(&op).await?;
-            let (spec, conn) = self.execute_operation_with_retry(op, implicit_session.as_mut(), None).await?;
+            let (spec, conn) = self.execute_operation_with_retry(op, implicit_session.as_mut()).await?;
             let is_load_balanced = self.inner.options.load_balanced.unwrap_or(false);
             let pinned_connection = if is_load_balanced && spec.info.id != 0 {
                 conn
@@ -155,7 +146,6 @@ impl Client {
         &self,
         mut op: T,
         mut session: Option<&mut ClientSession>,
-        pinned_connection: Option<&mut Connection>,
     ) -> Result<(T::O, Option<Connection>)> {
         // If the current transaction has been committed/aborted and it is not being
         // re-committed/re-aborted, reset the transaction's state to TransactionState::None.
@@ -185,8 +175,13 @@ impl Client {
         };
 
         let mut owned_conn = None;
-        let mut conn = match pinned_connection {
-            Some(c) => c,
+        let pinned_conn = op.pinned_connection();
+        let mut conn_lock = match pinned_conn {
+            None => None,
+            Some(ref c) => Some(c.lock().await),
+        };
+        let mut conn = match conn_lock {
+            Some(ref mut l) => &mut **l,
             None => match server.pool.check_out().await {
                 Ok(c) => {
                     owned_conn = Some(c);
@@ -257,11 +252,13 @@ impl Client {
                 drop(owned_conn);
                 // release the selected server to decrement its operation count
                 drop(server);
+                // release the lock on the pinned connection
+                drop(conn_lock);
 
                 if retryability == Retryability::Read && err.is_read_retryable()
                     || retryability == Retryability::Write && err.is_write_retryable()
                 {
-                    self.execute_retry(&mut op, &mut session, txn_number, pinned_connection, err)
+                    self.execute_retry(&mut op, &mut session, txn_number, pinned_conn, err)
                         .await
                 } else {
                     Err(err)
@@ -275,7 +272,7 @@ impl Client {
         op: &mut T,
         session: &mut Option<&mut ClientSession>,
         txn_number: Option<i64>,
-        pinned_connection: Option<&mut Connection>,
+        pinned_connection: Option<PinnedConnection>,
         first_error: Error,
     ) -> Result<(T::O, Option<Connection>)> {
         op.update_for_retry();

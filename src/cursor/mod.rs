@@ -200,7 +200,7 @@ impl<T: Send + Sync + DeserializeOwned> GetMoreProvider for ImplicitSessionGetMo
         }
     }
 
-    fn start_execution(&mut self, info: CursorInformation, client: Client, pinned_connection: PinnedConnection) {
+    fn start_execution(&mut self, info: CursorInformation, client: Client, pinned_connection: Option<PinnedConnection>) {
         take_mut::take(self, |self_| match self_ {
             Self::Idle(mut session) => {
                 let future = Box::pin(async move {
