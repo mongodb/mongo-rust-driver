@@ -2,7 +2,12 @@
 
 use std::collections::{HashMap, VecDeque};
 
-use crate::{bson::{Bson, Document}, bson_util, db::options::CreateCollectionOptions};
+use crate::{
+    bson::{Bson, Document},
+    bson_util,
+    coll::options::CommitQuorum,
+    db::options::CreateCollectionOptions,
+};
 
 use bson::Binary;
 use serde::{Deserialize, Serialize};
@@ -76,7 +81,7 @@ pub struct DeleteResult {
 /// [`Collection::create_index`](../struct.Collection.html#method.create_index).
 #[derive(Debug, Clone, PartialEq)]
 pub struct CreateIndexResult {
-    /// The list containing names of all indexes created in the `createIndex` command.
+    /// The name of the index created in the `createIndex` command.
     pub index_name: String,
 
     /// Whether or not the collection was created implicitly by the command.
@@ -90,20 +95,21 @@ pub struct CreateIndexResult {
 
     /// Any information pertinent to the creation of the indexes. For more information, see the [documentation](https://docs.mongodb.com/manual/reference/command/createIndexes/#output).
     pub note: Option<String>,
+
+    /// The commit quorum for the operation.
+    pub commit_quorum: Option<CommitQuorum>,
 }
 
 impl From<CreateIndexesResult> for CreateIndexResult {
     fn from(result: CreateIndexesResult) -> Self {
         Self {
-            index_name: result
-                .index_names
-                .last()
-                .unwrap_or(&String::new())
-                .to_string(),
+            // Safe unwrap because a successful `createIndex` command will always have names.
+            index_name: result.index_names.into_iter().next().unwrap(),
             created_collection_automatically: result.created_collection_automatically,
             num_indexes_before: result.num_indexes_before,
             num_indexes_after: result.num_indexes_after,
             note: result.note,
+            commit_quorum: result.commit_quorum,
         }
     }
 }
@@ -112,7 +118,7 @@ impl From<CreateIndexesResult> for CreateIndexResult {
 /// [`Collection::create_indexes`](../struct.Collection.html#method.create_indexes).
 #[derive(Debug, Clone, PartialEq)]
 pub struct CreateIndexesResult {
-    /// The list containing names of all indexes created in the `createIndex` command.
+    /// The list containing the names of all indexes created in the `createIndexes` command.
     pub index_names: Vec<String>,
 
     /// Whether or not the collection was created implicitly by the command.
@@ -126,6 +132,9 @@ pub struct CreateIndexesResult {
 
     /// Any information pertinent to the creation of the indexes. For more information, see the [documentation](https://docs.mongodb.com/manual/reference/command/createIndexes/#output).
     pub note: Option<String>,
+
+    /// The commit quorum for the operation.
+    pub commit_quorum: Option<CommitQuorum>,
 }
 
 #[derive(Debug, Clone)]

@@ -76,6 +76,7 @@ async fn handle_success() {
         "createdCollectionAutomatically": false,
         "numIndexesBefore": 1,
         "numIndexesAfter": 3,
+        "commitQuorum": "votingMembers",
     };
 
     let expected_values = CreateIndexesResult {
@@ -84,6 +85,7 @@ async fn handle_success() {
         num_indexes_before: 1,
         num_indexes_after: 3,
         note: None,
+        commit_quorum: Some(CommitQuorum::VotingMembers),
     };
     let actual_values = handle_response_test(&op, response).unwrap();
     assert_eq!(actual_values, expected_values);

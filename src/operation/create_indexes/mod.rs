@@ -4,15 +4,17 @@ mod test;
 use crate::{
     bson::{doc, Document},
     cmap::{Command, StreamDescription},
+    coll::options::CommitQuorum,
     error::Result,
     index::IndexModel,
     operation::{append_options, Operation},
     options::{CreateIndexOptions, WriteConcern},
     results::CreateIndexesResult,
+    selection_criteria::{ReadPreference, SelectionCriteria},
     Namespace,
 };
 
-use super::CommandResponse;
+use super::{CommandResponse, Retryability};
 use serde::{
     de::{Error, Unexpected},
     Deserialize,
@@ -79,7 +81,6 @@ impl Operation for CreateIndexes {
         response: Response,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
-        println!("{:?}", response);
         let index_names = self.indexes.iter().filter_map(|i| i.get_name()).collect();
         Ok(CreateIndexesResult {
             index_names,
@@ -87,6 +88,7 @@ impl Operation for CreateIndexes {
             num_indexes_before: response.num_indexes_before,
             num_indexes_after: response.num_indexes_after,
             note: response.note,
+            commit_quorum: response.commit_quorum,
         })
     }
 
@@ -95,13 +97,22 @@ impl Operation for CreateIndexes {
             .as_ref()
             .and_then(|opts| opts.write_concern.as_ref())
     }
+
+    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+        Some(SelectionCriteria::ReadPreference(ReadPreference::Primary)).as_ref()
+    }
+
+    fn retryability(&self) -> Retryability {
+        Retryability::Read
+    }
 }
 #[derive(Debug)]
 pub(crate) struct Response {
-    pub(crate) created_collection_automatically: Option<bool>,
-    pub(crate) num_indexes_before: u32,
-    pub(crate) num_indexes_after: u32,
-    pub(crate) note: Option<String>,
+    created_collection_automatically: Option<bool>,
+    num_indexes_before: u32,
+    num_indexes_after: u32,
+    note: Option<String>,
+    commit_quorum: Option<CommitQuorum>,
 }
 
 impl<'de> Deserialize<'de> for Response {
@@ -116,6 +127,7 @@ impl<'de> Deserialize<'de> for Response {
             num_indexes_before: u32,
             num_indexes_after: u32,
             note: Option<String>,
+            commit_quorum: Option<CommitQuorum>,
         }
 
         impl From<ResponseBody> for Response {
@@ -125,6 +137,7 @@ impl<'de> Deserialize<'de> for Response {
                     num_indexes_before: r.num_indexes_before,
                     num_indexes_after: r.num_indexes_after,
                     note: r.note,
+                    commit_quorum: r.commit_quorum,
                 }
             }
         }
@@ -145,7 +158,6 @@ impl<'de> Deserialize<'de> for Response {
                 }
 
                 let v = raw.values().last().unwrap(); // Safe unwrap because of length check above.
-                println!("{:?}", v);
                 bson::from_bson(v.clone())
                     .map(|b: ResponseBody| b.into())
                     .map_err(|_| {

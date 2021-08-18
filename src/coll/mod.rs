@@ -346,7 +346,7 @@ impl<T> Collection<T> {
             .await
     }
 
-    /// Convenience method for creating a single index.
+    /// Creates the given index on this collection.
     pub async fn create_index(
         &self,
         index: IndexModel,
@@ -358,7 +358,7 @@ impl<T> Collection<T> {
         Ok(response.into())
     }
 
-    /// Create several indexes.
+    /// Creates the given indexes on this collection.
     pub async fn create_indexes(
         &self,
         indexes: impl IntoIterator<Item = IndexModel>,
@@ -495,7 +495,7 @@ impl<T> Collection<T> {
         self.client().execute_operation(drop_index, session).await
     }
 
-    /// Drop the index specified by `name` from the collection.
+    /// Drops the index specified by `name` from this collection.
     pub async fn drop_index(
         &self,
         name: impl AsRef<str>,
@@ -513,12 +513,12 @@ impl<T> Collection<T> {
         self.drop_index_common(name, options, None).await
     }
 
-    /// Drop all indexes associated with the collection.
+    /// Drops all indexes associated with this collection.
     pub async fn drop_indexes(&self, options: impl Into<Option<DropIndexOptions>>) -> Result<()> {
         self.drop_index_common(None, options, None).await
     }
 
-    /// List all indexes on the collection.
+    /// Lists all indexes on this collection.
     pub async fn list_indexes(
         &self,
         options: impl Into<Option<ListIndexOptions>>,
