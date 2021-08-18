@@ -95,7 +95,7 @@ functions:
     - command: expansions.update
       params:
         file: src/expansion.yml
-            
+
   "prepare resources":
     - command: shell.exec
       params:
@@ -201,7 +201,7 @@ functions:
       params:
         script: |
           ${PREPARE_SHELL}
-          
+
           cd "$MONGO_ORCHESTRATION_HOME"
           # source the mongo-orchestration virtualenv if it exists
           if [ -f venv/bin/activate ]; then
@@ -272,7 +272,6 @@ pre:
 
 post:
   - func: "stop mongo orchestration"
-  - func: "upload-mo-artifacts"
   - func: "cleanup"
 
 tasks:
