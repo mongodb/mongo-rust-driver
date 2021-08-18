@@ -20,7 +20,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use lazy_static::lazy_static;
 use mongodb::{
     bson::{doc, Bson, Document},
-    options::{ClientOptions, SelectionCriteria},
+    options::{Acknowledgment, ClientOptions, SelectionCriteria, WriteConcern},
     Client,
 };
 use serde_json::Value;
@@ -132,7 +132,8 @@ pub async fn run_benchmark<B: Benchmark + Send + Sync>(
 }
 
 pub async fn drop_database(uri: &str, database: &str) -> Result<()> {
-    let options = ClientOptions::parse(uri).await?;
+    let mut options = ClientOptions::parse(uri).await?;
+    options.write_concern = Some(WriteConcern::builder().w(Acknowledgment::Majority).build());
     let client = Client::with_options(options.clone())?;
 
     let hello = client
