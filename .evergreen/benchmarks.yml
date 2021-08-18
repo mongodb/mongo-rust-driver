@@ -161,9 +161,6 @@ functions:
         working_dir: "src"
         script: |
           ${PREPARE_SHELL}
-          export MONGODB_URI="${MONGODB_URI}"
-          export SSL="${SSL}"
-          . .evergreen/generate-uri.sh
 
           .evergreen/run-bson-benchmarks.sh
 
