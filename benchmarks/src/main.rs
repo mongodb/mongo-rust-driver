@@ -43,6 +43,7 @@ use futures::Future;
 #[cfg(feature = "tokio-runtime")]
 use futures::FutureExt;
 use lazy_static::lazy_static;
+use mongodb::options::ClientOptions;
 
 use crate::{
     bench::{
@@ -141,6 +142,8 @@ const WRITE_BENCHES: &[&'static str] = &[
 ];
 
 async fn run_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<CompositeScore> {
+    let options = ClientOptions::parse(uri).await?;
+
     let mut comp_score = CompositeScore::new("All Benchmarks");
 
     // Run command
@@ -270,7 +273,8 @@ async fn run_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<Comp
     }
 
     // LDJSON multi-file import
-    if ids[7] {
+    // can only run against standalones because otherwise the host machine will run out of memory
+    if ids[7] && options.hosts.len() == 1 {
         let json_multi_import_options = bench::json_multi_import::Options {
             path: DATA_PATH.join("parallel").join("ldjson_multi"),
             uri: uri.to_string(),
@@ -288,7 +292,8 @@ async fn run_benchmarks(uri: &str, more_info: bool, ids: &[bool]) -> Result<Comp
     }
 
     // LDJSON multi-file export
-    if ids[8] {
+    // can only run against standalones because otherwise the host machine will run out of memory
+    if ids[8] && options.hosts.len() == 1 {
         let json_multi_export_options = bench::json_multi_export::Options {
             path: DATA_PATH.join("parallel").join("ldjson_multi"),
             uri: uri.to_string(),

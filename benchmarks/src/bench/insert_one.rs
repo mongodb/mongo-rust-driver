@@ -1,6 +1,6 @@
 use std::{convert::TryInto, fs::File, path::PathBuf};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use mongodb::{
     bson::{Bson, Document},
     Client,
@@ -62,22 +62,29 @@ impl Benchmark for InsertOneBenchmark {
     }
 
     async fn before_task(&mut self) -> Result<()> {
-        self.coll.drop(None).await?;
-        self.db.create_collection(COLL_NAME.as_str(), None).await?;
+        self.db
+            .create_collection(COLL_NAME.as_str(), None)
+            .await
+            .context("create collection")?;
 
         Ok(())
     }
 
     async fn do_task(&self) -> Result<()> {
         for _ in 0..self.num_iter {
-            self.coll.insert_one(&self.doc, None).await?;
+            self.coll
+                .insert_one(&self.doc, None)
+                .await
+                .context("insert one")?;
         }
 
         Ok(())
     }
 
     async fn teardown(&self) -> Result<()> {
-        drop_database(&self.uri, &DATABASE_NAME).await?;
+        drop_database(&self.uri, &DATABASE_NAME)
+            .await
+            .context("drop database teardown")?;
 
         Ok(())
     }

@@ -1,6 +1,6 @@
 use std::{convert::TryInto, fs::File, path::PathBuf};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use mongodb::{
     bson::{Bson, Document},
     Client,
@@ -62,21 +62,28 @@ impl Benchmark for InsertManyBenchmark {
     }
 
     async fn before_task(&mut self) -> Result<()> {
-        self.coll.drop(None).await?;
-        self.db.create_collection(COLL_NAME.as_str(), None).await?;
+        self.db
+            .create_collection(COLL_NAME.as_str(), None)
+            .await
+            .context("create in before")?;
 
         Ok(())
     }
 
     async fn do_task(&self) -> Result<()> {
         let insertions = vec![&self.doc; self.num_copies];
-        self.coll.insert_many(insertions, None).await?;
+        self.coll
+            .insert_many(insertions, None)
+            .await
+            .context("insert many")?;
 
         Ok(())
     }
 
     async fn teardown(&self) -> Result<()> {
-        drop_database(self.uri.as_str(), self.db.name()).await?;
+        drop_database(self.uri.as_str(), self.db.name())
+            .await
+            .context("teardown")?;
 
         Ok(())
     }
