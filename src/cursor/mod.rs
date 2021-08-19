@@ -3,17 +3,14 @@ pub(crate) mod session;
 
 use std::{
     pin::Pin,
-    sync::Arc,
     task::{Context, Poll},
 };
 
 use futures_core::{future::BoxFuture, Stream};
 use serde::de::DeserializeOwned;
-use tokio::sync::Mutex;
 
 use crate::{
     bson::Document,
-    cmap::conn::Connection,
     error::{Error, Result},
     operation::GetMore,
     results::GetMoreResult,
@@ -99,7 +96,7 @@ where
         client: Client,
         spec: CursorSpecification<T>,
         session: Option<ClientSession>,
-        pinned_connection: Option<Connection>,
+        pinned_connection: Option<PinnedConnection>,
     ) -> Self {
         let provider = ImplicitSessionGetMoreProvider::new(&spec, session, pinned_connection);
 
@@ -175,13 +172,13 @@ enum ImplicitSessionGetMoreProvider<T> {
 }
 
 impl<T> ImplicitSessionGetMoreProvider<T> {
-    fn new(spec: &CursorSpecification<T>, session: Option<ClientSession>, pinned_connection: Option<Connection>) -> Self {
+    fn new(spec: &CursorSpecification<T>, session: Option<ClientSession>, pinned_connection: Option<PinnedConnection>) -> Self {
         if spec.id() == 0 {
             Self::Done
         } else {
             Self::Idle {
                 session: session.map(Box::new),
-                pinned_connection: pinned_connection.map(|c| Arc::new(Mutex::new(c))),
+                pinned_connection,
             }
         }
     }
@@ -213,9 +210,9 @@ impl<T: Send + Sync + DeserializeOwned> GetMoreProvider for ImplicitSessionGetMo
 
     fn start_execution(&mut self, info: CursorInformation, client: Client) {
         take_mut::take(self, |self_| match self_ {
-            Self::Idle { session, pinned_connection } => {
+            Self::Idle { mut session, pinned_connection } => {
                 let future = Box::pin(async move {
-                    let get_more = GetMore::new(info, pinned_connection);
+                    let get_more = GetMore::new(info, pinned_connection.clone());
                     let get_more_result = client
                         .execute_operation(get_more, session.as_mut().map(|b| b.as_mut()))
                         .await;

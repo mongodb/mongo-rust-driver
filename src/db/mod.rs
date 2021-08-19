@@ -223,9 +223,8 @@ impl Database {
             options.into(),
         );
         self.client()
-            .execute_operation(list_collections, session)
+            .execute_session_cursor_operation(list_collections, session)
             .await
-            .map(|spec| SessionCursor::new(self.client().clone(), spec))
     }
 
     async fn list_collection_names_common(
@@ -272,9 +271,8 @@ impl Database {
             ListCollections::new(self.name().to_string(), filter.into(), true, None);
         let mut cursor: SessionCursor<Document> = self
             .client()
-            .execute_operation(list_collections, Some(&mut *session))
-            .await
-            .map(|spec| SessionCursor::new(self.client().clone(), spec))?;
+            .execute_session_cursor_operation(list_collections, &mut *session)
+            .await?;
 
         self.list_collection_names_common(cursor.stream(session))
             .await
@@ -433,8 +431,7 @@ impl Database {
         let aggregate = Aggregate::new(self.name().to_string(), pipeline, options);
         let client = self.client();
         client
-            .execute_operation(aggregate, session)
+            .execute_session_cursor_operation(aggregate, session)
             .await
-            .map(|spec| SessionCursor::new(client.clone(), spec))
     }
 }

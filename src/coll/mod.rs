@@ -283,9 +283,8 @@ impl<T> Collection<T> {
         let aggregate = Aggregate::new(self.namespace(), pipeline, options);
         let client = self.client();
         client
-            .execute_operation(aggregate, session)
+            .execute_session_cursor_operation(aggregate, session)
             .await
-            .map(|result| SessionCursor::new(client.clone(), result))
     }
 
     /// Estimates the number of documents in the collection using collection metadata.
@@ -829,9 +828,8 @@ where
         let client = self.client();
 
         client
-            .execute_operation(find, session)
+            .execute_session_cursor_operation(find, session)
             .await
-            .map(|result| SessionCursor::new(client.clone(), result))
     }
 
     /// Finds a single document in the collection matching `filter`.

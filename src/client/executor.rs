@@ -1,6 +1,7 @@
 use bson::doc;
 use lazy_static::lazy_static;
 use serde::de::DeserializeOwned;
+use tokio::sync::Mutex;
 
 use std::{collections::HashSet, sync::Arc, time::Instant};
 
@@ -8,7 +9,7 @@ use super::{session::TransactionState, Client, ClientSession};
 use crate::{
     bson::Document,
     cmap::{Connection, RawCommand, RawCommandResponse},
-    cursor::{Cursor, CursorSpecification, PinnedConnection},
+    cursor::{Cursor, CursorSpecification, PinnedConnection, session::SessionCursor},
     error::{
         Error,
         ErrorKind,
@@ -72,6 +73,14 @@ impl Client {
         op: T,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<T::O> {
+        self.execute_operation_pinnable(op, session).await.map(|(o, _)| o)
+    }
+
+    async fn execute_operation_pinnable<T: Operation>(
+        &self,
+        op: T,
+        session: impl Into<Option<&mut ClientSession>>,
+    ) -> Result<(T::O, Option<Connection>)> {
         Box::pin(async {
             // TODO RUST-9: allow unacknowledged write concerns
             if !op.is_acknowledged() {
@@ -111,7 +120,6 @@ impl Client {
             };
             self.execute_operation_with_retry(op, session)
                 .await
-                .map(|(o, _)| o)
         })
         .await
     }
@@ -129,15 +137,32 @@ impl Client {
         Box::pin(async {
             let mut implicit_session = self.start_implicit_session(&op).await?;
             let (spec, conn) = self.execute_operation_with_retry(op, implicit_session.as_mut()).await?;
-            let is_load_balanced = self.inner.options.load_balanced.unwrap_or(false);
-            let pinned_connection = if is_load_balanced && spec.info.id != 0 {
-                conn
-            } else {
-                None
-            };
-            Ok(Cursor::new(self.clone(), spec, implicit_session, pinned_connection))
+            let pinned_conn = self.pin_connection_for_cursor(&spec, conn);
+            Ok(Cursor::new(self.clone(), spec, implicit_session, pinned_conn))
         })
         .await
+    }
+
+    pub(crate) async fn execute_session_cursor_operation<Op, T>(
+        &self,
+        op: Op,
+        session: &mut ClientSession,
+    ) -> Result<SessionCursor<T>>
+        where Op: Operation<O=CursorSpecification<T>>,
+        T: DeserializeOwned + Unpin + Send + Sync,
+    {
+        let (spec, conn) = self.execute_operation_pinnable(op, session).await?;
+        let pinned_conn = self.pin_connection_for_cursor(&spec, conn);
+        Ok(SessionCursor::new(self.clone(), spec, pinned_conn))
+    }
+
+    fn pin_connection_for_cursor<T>(&self, spec: &CursorSpecification<T>, conn: Option<Connection>) -> Option<PinnedConnection> {
+        let is_load_balanced = self.inner.options.load_balanced.unwrap_or(false);
+        if is_load_balanced && spec.info.id != 0 {
+            conn.map(|c| Arc::new(Mutex::new(c)))
+        } else {
+            None
+        }
     }
 
     /// Selects a server and executes the given operation on it, optionally using a provided

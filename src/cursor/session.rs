@@ -121,7 +121,7 @@ where
         &mut self,
         session: &'session mut ClientSession,
     ) -> SessionCursorStream<'_, 'session, T> {
-        let get_more_provider = ExplicitSessionGetMoreProvider::new(session, self.pinned_connection);
+        let get_more_provider = ExplicitSessionGetMoreProvider::new(session, self.pinned_connection.clone());
 
         // Pass the buffer into this cursor handle for iteration.
         // It will be returned in the handle's `Drop` implementation.
@@ -278,7 +278,7 @@ impl<'session, T: Send + Sync + DeserializeOwned> GetMoreProvider
         take_mut::take(self, |self_| {
             if let ExplicitSessionGetMoreProvider::Idle { session, pinned_connection } = self_ {
                 let future = Box::pin(async move {
-                    let get_more = GetMore::new(info, pinned_connection);
+                    let get_more = GetMore::new(info, pinned_connection.clone());
                     let get_more_result = client
                         .execute_operation(get_more, Some(&mut *session.reference))
                         .await;
