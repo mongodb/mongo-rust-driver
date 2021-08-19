@@ -9,7 +9,7 @@ use serde::{de::DeserializeOwned, Deserialize};
 use crate::{
     bson::doc,
     cmap::{Command, StreamDescription},
-    cursor::CursorInformation,
+    cursor::{CursorInformation, PinnedConnection},
     error::{ErrorKind, Result},
     operation::Operation,
     options::SelectionCriteria,
@@ -26,17 +26,19 @@ pub(crate) struct GetMore<T> {
     selection_criteria: SelectionCriteria,
     batch_size: Option<u32>,
     max_time: Option<Duration>,
+    pinned_connection: Option<PinnedConnection>,
     _phantom: PhantomData<T>,
 }
 
 impl<T> GetMore<T> {
-    pub(crate) fn new(info: CursorInformation) -> Self {
+    pub(crate) fn new(info: CursorInformation, pinned_connection: Option<PinnedConnection>) -> Self {
         Self {
             ns: info.ns,
             cursor_id: info.id,
             selection_criteria: SelectionCriteria::from_address(info.address),
             batch_size: info.batch_size,
             max_time: info.max_time,
+            pinned_connection,
             _phantom: Default::default(),
         }
     }
@@ -90,6 +92,10 @@ impl<T: DeserializeOwned> Operation for GetMore<T> {
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         Some(&self.selection_criteria)
+    }
+
+    fn pinned_connection(&self) -> Option<PinnedConnection> {
+        self.pinned_connection.clone()
     }
 }
 

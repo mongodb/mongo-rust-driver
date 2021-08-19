@@ -23,17 +23,17 @@ mod update;
 #[cfg(test)]
 mod test;
 
-use std::{collections::VecDeque, fmt::Debug, ops::Deref, sync::Arc};
+use std::{collections::VecDeque, fmt::Debug, ops::Deref};
 
 use bson::Timestamp;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use tokio::sync::Mutex;
 
 use crate::{
     bson::{self, Bson, Document},
     bson_util,
     client::{ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
-    cmap::{Command, Connection, RawCommandResponse, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
+    cursor::PinnedConnection,
     error::{
         BulkWriteError,
         BulkWriteFailure,
@@ -143,7 +143,7 @@ pub(crate) trait Operation {
     }
 
     // The connection this operation is pinned to, if any.
-    fn pinned_connection(&self) -> Option<Arc<Mutex<Connection>>> {
+    fn pinned_connection(&self) -> Option<PinnedConnection> {
         None
     }
 }

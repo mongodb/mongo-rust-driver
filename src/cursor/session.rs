@@ -11,7 +11,7 @@ use serde::de::DeserializeOwned;
 use super::common::{CursorInformation, GenericCursor, GetMoreProvider, GetMoreProviderResult};
 use crate::{
     bson::Document,
-    cursor::{CursorSpecification, PinnedConnection},
+    cursor::{CursorSpecification, GetMoreContext, PinnedConnection},
     error::{Error, Result},
     operation::GetMore,
     results::GetMoreResult,
@@ -56,13 +56,14 @@ where
     client: Client,
     info: CursorInformation,
     buffer: VecDeque<T>,
+    pinned_connection: Option<PinnedConnection>,
 }
 
 impl<T> SessionCursor<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
-    pub(crate) fn new(client: Client, spec: CursorSpecification<T>) -> Self {
+    pub(crate) fn new(client: Client, spec: CursorSpecification<T>, pinned_connection: Option<PinnedConnection>) -> Self {
         let exhausted = spec.id() == 0;
 
         Self {
@@ -70,6 +71,7 @@ where
             client,
             info: spec.info,
             buffer: spec.initial_buffer,
+            pinned_connection,
         }
     }
 
@@ -119,7 +121,7 @@ where
         &mut self,
         session: &'session mut ClientSession,
     ) -> SessionCursorStream<'_, 'session, T> {
-        let get_more_provider = ExplicitSessionGetMoreProvider::new(session);
+        let get_more_provider = ExplicitSessionGetMoreProvider::new(session, self.pinned_connection);
 
         // Pass the buffer into this cursor handle for iteration.
         // It will be returned in the handle's `Drop` implementation.
@@ -132,7 +134,6 @@ where
                 self.client.clone(),
                 spec,
                 get_more_provider,
-                None,  // TODO abr-egn
             ),
             session_cursor: self,
         }
@@ -237,12 +238,18 @@ enum ExplicitSessionGetMoreProvider<'session, T> {
     ///
     /// This variant needs a `MutableSessionReference` struct that can be moved in order to
     /// transition to `Executing` via `take_mut`.
-    Idle(MutableSessionReference<'session>),
+    Idle {
+        session: MutableSessionReference<'session>,
+        pinned_connection: Option<PinnedConnection>,
+    },
 }
 
 impl<'session, T> ExplicitSessionGetMoreProvider<'session, T> {
-    fn new(session: &'session mut ClientSession) -> Self {
-        Self::Idle(MutableSessionReference { reference: session })
+    fn new(session: &'session mut ClientSession, pinned_connection: Option<PinnedConnection>) -> Self {
+        Self::Idle {
+            session: MutableSessionReference { reference: session },
+            pinned_connection,
+        }
     }
 }
 
@@ -256,25 +263,28 @@ impl<'session, T: Send + Sync + DeserializeOwned> GetMoreProvider
     fn executing_future(&mut self) -> Option<&mut Self::GetMoreFuture> {
         match self {
             Self::Executing(future) => Some(future),
-            Self::Idle(_) => None,
+            Self::Idle { .. } => None,
         }
     }
 
-    fn clear_execution(&mut self, session: &'session mut ClientSession, _exhausted: bool) {
-        *self = Self::Idle(MutableSessionReference { reference: session })
+    fn clear_execution(&mut self, context: GetMoreContext<&'session mut ClientSession>, _exhausted: bool) {
+        *self = Self::Idle {
+            session: MutableSessionReference { reference: context.session },
+            pinned_connection: context.pinned_connection,
+        }
     }
 
-    fn start_execution(&mut self, info: CursorInformation, client: Client, pinned_connection: PinnedConnection) {
+    fn start_execution(&mut self, info: CursorInformation, client: Client) {
         take_mut::take(self, |self_| {
-            if let ExplicitSessionGetMoreProvider::Idle(session) = self_ {
+            if let ExplicitSessionGetMoreProvider::Idle { session, pinned_connection } = self_ {
                 let future = Box::pin(async move {
-                    let get_more = GetMore::new(info);
+                    let get_more = GetMore::new(info, pinned_connection);
                     let get_more_result = client
                         .execute_operation(get_more, Some(&mut *session.reference))
                         .await;
                     ExecutionResult {
                         get_more_result,
-                        session: session.reference,
+                        context: GetMoreContext::new(session.reference, pinned_connection),
                     }
                 });
                 return ExplicitSessionGetMoreProvider::Executing(future);
@@ -288,7 +298,7 @@ impl<'session, T: Send + Sync + DeserializeOwned> GetMoreProvider
 /// well as the reference to the `ClientSession` used for the getMore.
 struct ExecutionResult<'session, T> {
     get_more_result: Result<GetMoreResult<T>>,
-    session: &'session mut ClientSession,
+    context: GetMoreContext<&'session mut ClientSession>,
 }
 
 impl<'session, T> GetMoreProviderResult for ExecutionResult<'session, T> {
@@ -299,8 +309,8 @@ impl<'session, T> GetMoreProviderResult for ExecutionResult<'session, T> {
         self.get_more_result.as_ref()
     }
 
-    fn into_parts(self) -> (Result<GetMoreResult<T>>, Self::Session) {
-        (self.get_more_result, self.session)
+    fn into_parts(self) -> (Result<GetMoreResult<T>>, GetMoreContext<Self::Session>) {
+        (self.get_more_result, self.context)
     }
 }
 

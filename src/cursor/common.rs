@@ -36,7 +36,6 @@ where
     info: CursorInformation,
     buffer: VecDeque<T>,
     exhausted: bool,
-    pinned_connection: Option<PinnedConnection>,
 }
 
 impl<P, T> GenericCursor<P, T>
@@ -44,7 +43,7 @@ where
     P: GetMoreProvider<DocumentType = T>,
     T: DeserializeOwned,
 {
-    pub(super) fn new(client: Client, spec: CursorSpecification<T>, get_more_provider: P, pinned_connection: Option<Connection>) -> Self {
+    pub(super) fn new(client: Client, spec: CursorSpecification<T>, get_more_provider: P) -> Self {
         let exhausted = spec.id() == 0;
         Self {
             exhausted,
@@ -52,7 +51,6 @@ where
             provider: get_more_provider,
             buffer: spec.initial_buffer,
             info: spec.info,
-            pinned_connection: pinned_connection.map(|c| Arc::new(Mutex::new(c))),
         }
     }
 
@@ -75,7 +73,7 @@ where
     fn start_get_more(&mut self) {
         let info = self.info.clone();
         let client = self.client.clone();
-        self.provider.start_execution(info, client, self.pinned_connection.clone());
+        self.provider.start_execution(info, client);
     }
 }
 
@@ -138,12 +136,12 @@ pub(super) trait GetMoreProvider: Unpin {
     /// Clear out any state remaining from previous getMore executions.
     fn clear_execution(
         &mut self,
-        session: <Self::ResultType as GetMoreProviderResult>::Session,
+        context: GetMoreContext<<Self::ResultType as GetMoreProviderResult>::Session>,
         exhausted: bool,
     );
 
     /// Start executing a new getMore if one isn't already in flight.
-    fn start_execution(&mut self, spec: CursorInformation, client: Client, pinned_connection: Option<PinnedConnection>);
+    fn start_execution(&mut self, spec: CursorInformation, client: Client);
 }
 
 /// Trait describing results returned from a `GetMoreProvider`.
@@ -153,7 +151,7 @@ pub(super) trait GetMoreProviderResult {
 
     fn as_ref(&self) -> std::result::Result<&GetMoreResult<Self::DocumentType>, &Error>;
 
-    fn into_parts(self) -> (Result<GetMoreResult<Self::DocumentType>>, Self::Session);
+    fn into_parts(self) -> (Result<GetMoreResult<Self::DocumentType>>, GetMoreContext<Self::Session>);
 
     /// Whether the response from the server indicated the cursor was exhausted or not.
     fn exhausted(&self) -> bool {
@@ -163,6 +161,17 @@ pub(super) trait GetMoreProviderResult {
                 matches!(*e.kind, ErrorKind::Command(ref e) if e.code == 43 || e.code == 237)
             }
         }
+    }
+}
+
+pub(crate) struct GetMoreContext<Session> {
+    pub(crate) session: Session,
+    pub(crate) pinned_connection: Option<PinnedConnection>,
+}
+
+impl<Session> GetMoreContext<Session> {
+    pub(crate) fn new(session: Session, pinned_connection: Option<PinnedConnection>) -> Self {
+        Self { session, pinned_connection }
     }
 }
 

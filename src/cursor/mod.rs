@@ -3,11 +3,13 @@ pub(crate) mod session;
 
 use std::{
     pin::Pin,
+    sync::Arc,
     task::{Context, Poll},
 };
 
 use futures_core::{future::BoxFuture, Stream};
 use serde::de::DeserializeOwned;
+use tokio::sync::Mutex;
 
 use crate::{
     bson::Document,
@@ -19,7 +21,7 @@ use crate::{
     ClientSession,
     RUNTIME,
 };
-pub(crate) use common::{CursorInformation, CursorSpecification, PinnedConnection};
+pub(crate) use common::{CursorInformation, CursorSpecification, GetMoreContext, PinnedConnection};
 use common::{GenericCursor, GetMoreProvider, GetMoreProviderResult};
 
 /// A [`Cursor`] streams the result of a query. When a query is made, the returned [`Cursor`] will
@@ -99,11 +101,11 @@ where
         session: Option<ClientSession>,
         pinned_connection: Option<Connection>,
     ) -> Self {
-        let provider = ImplicitSessionGetMoreProvider::new(&spec, session);
+        let provider = ImplicitSessionGetMoreProvider::new(&spec, session, pinned_connection);
 
         Self {
             client: client.clone(),
-            wrapped_cursor: ImplicitSessionCursor::new(client, spec, provider, pinned_connection),
+            wrapped_cursor: ImplicitSessionCursor::new(client, spec, provider),
             _phantom: Default::default(),
         }
     }
@@ -145,7 +147,7 @@ type ImplicitSessionCursor<T> = GenericCursor<ImplicitSessionGetMoreProvider<T>,
 
 struct ImplicitSessionGetMoreResult<T> {
     get_more_result: Result<GetMoreResult<T>>,
-    session: Option<Box<ClientSession>>,
+    context: GetMoreContext<Option<Box<ClientSession>>>,
 }
 
 impl<T> GetMoreProviderResult for ImplicitSessionGetMoreResult<T> {
@@ -156,8 +158,8 @@ impl<T> GetMoreProviderResult for ImplicitSessionGetMoreResult<T> {
         self.get_more_result.as_ref()
     }
 
-    fn into_parts(self) -> (Result<GetMoreResult<T>>, Self::Session) {
-        (self.get_more_result, self.session)
+    fn into_parts(self) -> (Result<GetMoreResult<T>>, GetMoreContext<Self::Session>) {
+        (self.get_more_result, self.context)
     }
 }
 
@@ -165,16 +167,22 @@ impl<T> GetMoreProviderResult for ImplicitSessionGetMoreResult<T> {
 /// This is to be used with cursors associated with implicit sessions.
 enum ImplicitSessionGetMoreProvider<T> {
     Executing(BoxFuture<'static, ImplicitSessionGetMoreResult<T>>),
-    Idle(Option<Box<ClientSession>>),
+    Idle {
+        session: Option<Box<ClientSession>>,
+        pinned_connection: Option<PinnedConnection>,
+    },
     Done,
 }
 
 impl<T> ImplicitSessionGetMoreProvider<T> {
-    fn new(spec: &CursorSpecification<T>, session: Option<ClientSession>) -> Self {
+    fn new(spec: &CursorSpecification<T>, session: Option<ClientSession>, pinned_connection: Option<Connection>) -> Self {
         if spec.id() == 0 {
             Self::Done
         } else {
-            Self::Idle(session.map(Box::new))
+            Self::Idle {
+                session: session.map(Box::new),
+                pinned_connection: pinned_connection.map(|c| Arc::new(Mutex::new(c))),
+            }
         }
     }
 }
@@ -187,35 +195,33 @@ impl<T: Send + Sync + DeserializeOwned> GetMoreProvider for ImplicitSessionGetMo
     fn executing_future(&mut self) -> Option<&mut Self::GetMoreFuture> {
         match self {
             Self::Executing(ref mut future) => Some(future),
-            Self::Idle(_) | Self::Done => None,
+            Self::Idle { .. } | Self::Done => None,
         }
     }
 
-    fn clear_execution(&mut self, session: Option<Box<ClientSession>>, exhausted: bool) {
-        // If cursor is exhausted, immediately return implicit session to the pool.
+    fn clear_execution(&mut self, context: GetMoreContext<Option<Box<ClientSession>>>, exhausted: bool) {
+        // If cursor is exhausted, immediately return implicit session and pinned connection to the pool.
         if exhausted {
             *self = Self::Done;
         } else {
-            *self = Self::Idle(session)
+            *self = Self::Idle {
+                session: context.session,
+                pinned_connection: context.pinned_connection,
+            }
         }
     }
 
-    fn start_execution(&mut self, info: CursorInformation, client: Client, pinned_connection: Option<PinnedConnection>) {
+    fn start_execution(&mut self, info: CursorInformation, client: Client) {
         take_mut::take(self, |self_| match self_ {
-            Self::Idle(mut session) => {
+            Self::Idle { session, pinned_connection } => {
                 let future = Box::pin(async move {
-                    let mut conn_lock = match pinned_connection {
-                        None => None,
-                        Some(ref c) => Some(c.lock().await),
-                    };
-                    let conn = conn_lock.as_mut().map(|l| &mut **l);
-                    let get_more = GetMore::new(info);
+                    let get_more = GetMore::new(info, pinned_connection);
                     let get_more_result = client
-                        .execute_operation_pinned(get_more, session.as_mut().map(|b| b.as_mut()), conn)
+                        .execute_operation(get_more, session.as_mut().map(|b| b.as_mut()))
                         .await;
                     ImplicitSessionGetMoreResult {
                         get_more_result,
-                        session,
+                        context: GetMoreContext::new(session, pinned_connection),
                     }
                 });
                 Self::Executing(future)
