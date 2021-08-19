@@ -10,11 +10,10 @@ use crate::{
     operation::{append_options, Operation},
     options::{CreateIndexOptions, WriteConcern},
     results::CreateIndexesResult,
-    selection_criteria::{ReadPreference, SelectionCriteria},
     Namespace,
 };
 
-use super::{CommandResponse, Retryability};
+use super::CommandResponse;
 use serde::{
     de::{Error, Unexpected},
     Deserialize,
@@ -96,14 +95,6 @@ impl Operation for CreateIndexes {
         self.options
             .as_ref()
             .and_then(|opts| opts.write_concern.as_ref())
-    }
-
-    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        Some(SelectionCriteria::ReadPreference(ReadPreference::Primary)).as_ref()
-    }
-
-    fn retryability(&self) -> Retryability {
-        Retryability::Read
     }
 }
 #[derive(Debug)]

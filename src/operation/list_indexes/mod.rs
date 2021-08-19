@@ -1,15 +1,6 @@
-use crate::{
-    bson::{doc, Document},
-    cmap::{Command, StreamDescription},
-    cursor::CursorSpecification,
-    error::Result,
-    index::IndexModel,
-    operation::{append_options, Operation},
-    options::ListIndexOptions,
-    Namespace,
-};
+use crate::{Namespace, bson::{doc, Document}, cmap::{Command, StreamDescription}, cursor::CursorSpecification, error::Result, index::IndexModel, operation::{append_options, Operation}, options::ListIndexOptions, selection_criteria::{ReadPreference, SelectionCriteria}};
 
-use super::{CursorBody, CursorResponse};
+use super::{CursorBody, CursorResponse, Retryability};
 
 #[cfg(test)]
 mod test;
@@ -67,5 +58,13 @@ impl Operation for ListIndexes {
             self.options.as_ref().and_then(|o| o.batch_size),
             self.options.as_ref().and_then(|o| o.max_time),
         ))
+    }
+
+    fn selection_criteria(&self) -> Option<&SelectionCriteria> {
+        Some(SelectionCriteria::ReadPreference(ReadPreference::Primary)).as_ref()
+    }
+
+    fn retryability(&self) -> Retryability {
+        Retryability::Read
     }
 }
