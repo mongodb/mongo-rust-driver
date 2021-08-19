@@ -1,9 +1,6 @@
 use std::{fmt::Debug, time::Duration};
 
-use futures::{
-    future,
-    stream::{StreamExt, TryStreamExt},
-};
+use futures::stream::{StreamExt, TryStreamExt};
 use lazy_static::lazy_static;
 use semver::VersionReq;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -1173,25 +1170,49 @@ async fn index_management_lists() {
 
     let insert_data = vec![
         IndexModel::builder().keys(bson::doc! { "a": 1 }).build(),
-        IndexModel::builder().keys(bson::doc! { "b": 1 }).build(),
+        IndexModel::builder()
+            .keys(bson::doc! { "b": 1, "c": 1 })
+            .build(),
+        IndexModel::builder()
+            .keys(bson::doc! { "d": 1 })
+            .options(IndexOptions::builder().unique(Some(true)).build())
+            .build(),
     ];
 
     coll.create_indexes(insert_data.clone(), None)
         .await
         .expect("Test failed to create indexes");
 
-    let expected_names = vec!["_id_".to_string(), "a_1".to_string(), "b_1".to_string()];
+    let expected_names = vec![
+        "_id_".to_string(),
+        "a_1".to_string(),
+        "b_1_c_1".to_string(),
+        "d_1".to_string(),
+    ];
 
-    let cursor_names: Vec<String> = coll
+    let mut indexes = coll
         .list_indexes(None)
         .await
-        .expect("Test failed to list indexes")
-        .try_filter_map(|index| future::ok(index.get_name()))
-        .try_collect()
-        .await
-        .unwrap();
+        .expect("Test failed to list indexes");
 
-    assert_eq!(cursor_names, expected_names);
+    let id = indexes.try_next().await.unwrap().unwrap();
+    assert_eq!(id.get_name().unwrap(), expected_names[0]);
+    assert!(!id.is_unique());
+
+    let a = indexes.try_next().await.unwrap().unwrap();
+    assert_eq!(a.get_name().unwrap(), expected_names[1]);
+    assert!(!a.is_unique());
+
+    let b_c = indexes.try_next().await.unwrap().unwrap();
+    assert_eq!(b_c.get_name().unwrap(), expected_names[2]);
+    assert!(!b_c.is_unique());
+
+    // Unique index.
+    let d = indexes.try_next().await.unwrap().unwrap();
+    assert_eq!(d.get_name().unwrap(), expected_names[3]);
+    assert!(d.is_unique());
+
+    assert!(indexes.try_next().await.unwrap().is_none());
 
     let names = coll
         .list_index_names()

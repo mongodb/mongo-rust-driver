@@ -48,7 +48,8 @@ pub struct IndexOptions {
     /// an index.
     pub storage_engine: Option<Document>,
 
-    /// Forces the index to be unique. The default value is false.
+    /// Forces the index to be unique so the collection will not accept documents where the index
+    /// key value matches an existing value in the index. The default value is false.
     pub unique: Option<bool>,
 
     /// Specify the version number of the index.

@@ -44,4 +44,9 @@ impl IndexModel {
     pub(crate) fn get_name(&self) -> Option<String> {
         self.options.as_ref().and_then(|o| o.name.as_ref()).cloned()
     }
+
+    #[cfg(test)]
+    pub(crate) fn is_unique(&self) -> bool {
+        self.options.as_ref().and_then(|o| o.unique).unwrap_or(false)
+    }
 }
