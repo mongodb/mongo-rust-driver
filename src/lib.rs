@@ -114,6 +114,7 @@ define_if_single_runtime_enabled! {
     mod db;
     pub mod error;
     pub mod event;
+    mod index;
     mod is_master;
     mod operation;
     pub mod results;
@@ -137,6 +138,7 @@ define_if_single_runtime_enabled! {
         coll::Collection,
         cursor::{Cursor, session::{SessionCursor, SessionCursorStream}},
         db::Database,
+        index::IndexModel,
     };
 
     #[cfg(feature = "sync")]

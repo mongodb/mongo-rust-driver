@@ -4,6 +4,8 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::{
     bson::{Bson, Document},
+    bson_util,
+    coll::options::CommitQuorum,
     db::options::CreateCollectionOptions,
 };
 
@@ -73,6 +75,66 @@ pub struct DeleteResult {
     /// The number of documents deleted by the operation.
     #[serde(serialize_with = "crate::bson::serde_helpers::serialize_u64_as_i64")]
     pub deleted_count: u64,
+}
+
+/// Information about the index created as a result of a
+/// [`Collection::create_index`](../struct.Collection.html#method.create_index).
+#[derive(Debug, Clone, PartialEq)]
+pub struct CreateIndexResult {
+    /// The name of the index created in the `createIndex` command.
+    pub index_name: String,
+
+    /// Whether or not the collection was created implicitly by the command.
+    pub created_collection_automatically: Option<bool>,
+
+    /// The number of indexes on the collection prior to running the command.
+    pub num_indexes_before: u32,
+
+    /// The number of indexes on the collection after the command was run.
+    pub num_indexes_after: u32,
+
+    /// Any information pertinent to the creation of the indexes. For more information, see the [documentation](https://docs.mongodb.com/manual/reference/command/createIndexes/#output).
+    pub note: Option<String>,
+
+    /// The commit quorum for the operation.
+    pub commit_quorum: Option<CommitQuorum>,
+}
+
+impl From<CreateIndexesResult> for CreateIndexResult {
+    fn from(result: CreateIndexesResult) -> Self {
+        Self {
+            // Safe unwrap because a successful `createIndex` command will always have names.
+            index_name: result.index_names.into_iter().next().unwrap(),
+            created_collection_automatically: result.created_collection_automatically,
+            num_indexes_before: result.num_indexes_before,
+            num_indexes_after: result.num_indexes_after,
+            note: result.note,
+            commit_quorum: result.commit_quorum,
+        }
+    }
+}
+
+/// Information about the indexes created as a result of a
+/// [`Collection::create_indexes`](../struct.Collection.html#method.create_indexes).
+#[derive(Debug, Clone, PartialEq)]
+pub struct CreateIndexesResult {
+    /// The list containing the names of all indexes created in the `createIndexes` command.
+    pub index_names: Vec<String>,
+
+    /// Whether or not the collection was created implicitly by the command.
+    pub created_collection_automatically: Option<bool>,
+
+    /// The number of indexes on the collection prior to running the command.
+    pub num_indexes_before: u32,
+
+    /// The number of indexes on the collection after the command was run.
+    pub num_indexes_after: u32,
+
+    /// Any information pertinent to the creation of the indexes. For more information, see the [documentation](https://docs.mongodb.com/manual/reference/command/createIndexes/#output).
+    pub note: Option<String>,
+
+    /// The commit quorum for the operation.
+    pub commit_quorum: Option<CommitQuorum>,
 }
 
 #[derive(Debug, Clone)]
@@ -148,7 +210,7 @@ pub struct DatabaseSpecification {
 
     /// The amount of disk space in bytes that is consumed by the database.
     #[serde(
-        deserialize_with = "crate::bson_util::deserialize_u64_from_bson_number",
+        deserialize_with = "bson_util::deserialize_u64_from_bson_number",
         serialize_with = "crate::bson::serde_helpers::serialize_u64_as_i64"
     )]
     pub size_on_disk: u64,

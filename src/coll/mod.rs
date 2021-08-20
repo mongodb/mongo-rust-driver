@@ -2,7 +2,10 @@ pub mod options;
 
 use std::{borrow::Borrow, collections::HashSet, fmt, fmt::Debug, sync::Arc};
 
-use futures_util::stream::StreamExt;
+use futures_util::{
+    future,
+    stream::{StreamExt, TryStreamExt},
+};
 use serde::{
     de::{DeserializeOwned, Error as DeError},
     Deserialize,
@@ -17,19 +20,30 @@ use crate::{
     client::session::TransactionState,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
+    index::IndexModel,
     operation::{
         Aggregate,
         Count,
         CountDocuments,
+        CreateIndexes,
         Delete,
         Distinct,
         DropCollection,
+        DropIndexes,
         Find,
         FindAndModify,
         Insert,
+        ListIndexes,
         Update,
     },
-    results::{DeleteResult, InsertManyResult, InsertOneResult, UpdateResult},
+    results::{
+        CreateIndexResult,
+        CreateIndexesResult,
+        DeleteResult,
+        InsertManyResult,
+        InsertOneResult,
+        UpdateResult,
+    },
     selection_criteria::SelectionCriteria,
     Client,
     ClientSession,
@@ -313,6 +327,46 @@ impl<T> Collection<T> {
         self.client().execute_operation(delete, session).await
     }
 
+    async fn create_indexes_common(
+        &self,
+        indexes: impl IntoIterator<Item = IndexModel>,
+        options: impl Into<Option<CreateIndexOptions>>,
+        session: impl Into<Option<&mut ClientSession>>,
+    ) -> Result<CreateIndexesResult> {
+        let session = session.into();
+
+        let mut options = options.into();
+        resolve_write_concern_with_session!(self, options, session.as_ref())?;
+
+        let indexes: Vec<IndexModel> = indexes.into_iter().collect();
+
+        let create_indexes = CreateIndexes::new(self.namespace(), indexes, options);
+        self.client()
+            .execute_operation(create_indexes, session)
+            .await
+    }
+
+    /// Creates the given index on this collection.
+    pub async fn create_index(
+        &self,
+        index: IndexModel,
+        options: impl Into<Option<CreateIndexOptions>>,
+    ) -> Result<CreateIndexResult> {
+        let response = self
+            .create_indexes_common(vec![index], options, None)
+            .await?;
+        Ok(response.into())
+    }
+
+    /// Creates the given indexes on this collection.
+    pub async fn create_indexes(
+        &self,
+        indexes: impl IntoIterator<Item = IndexModel>,
+        options: impl Into<Option<CreateIndexOptions>>,
+    ) -> Result<CreateIndexesResult> {
+        self.create_indexes_common(indexes, options, None).await
+    }
+
     /// Deletes all documents stored in the collection matching `query`.
     pub async fn delete_many(
         &self,
@@ -421,6 +475,81 @@ impl<T> Collection<T> {
     ) -> Result<Vec<Bson>> {
         self.distinct_common(field_name, filter, options, session)
             .await
+    }
+
+    async fn drop_index_common(
+        &self,
+        name: impl Into<Option<&str>>,
+        options: impl Into<Option<DropIndexOptions>>,
+        session: impl Into<Option<&mut ClientSession>>,
+    ) -> Result<()> {
+        let session = session.into();
+
+        let mut options = options.into();
+        resolve_write_concern_with_session!(self, options, session.as_ref())?;
+
+        // If there is no provided name, that means we should drop all indexes.
+        let index_name = name.into().unwrap_or("*").to_string();
+
+        let drop_index = DropIndexes::new(self.namespace(), index_name, options);
+        self.client().execute_operation(drop_index, session).await
+    }
+
+    /// Drops the index specified by `name` from this collection.
+    pub async fn drop_index(
+        &self,
+        name: impl AsRef<str>,
+        options: impl Into<Option<DropIndexOptions>>,
+    ) -> Result<()> {
+        let name = name.as_ref();
+        if name == "*" {
+            return Err(ErrorKind::InvalidArgument {
+                message: "Cannot pass name \"*\" to drop_index since more than one index would be \
+                          dropped."
+                    .to_string(),
+            }
+            .into());
+        }
+        self.drop_index_common(name, options, None).await
+    }
+
+    /// Drops all indexes associated with this collection.
+    pub async fn drop_indexes(&self, options: impl Into<Option<DropIndexOptions>>) -> Result<()> {
+        self.drop_index_common(None, options, None).await
+    }
+
+    /// Lists all indexes on this collection.
+    pub async fn list_indexes(
+        &self,
+        options: impl Into<Option<ListIndexOptions>>,
+    ) -> Result<Cursor<IndexModel>> {
+        let list_indexes = ListIndexes::new(self.namespace(), options.into());
+        let client = self.client();
+        client
+            .execute_cursor_operation(list_indexes)
+            .await
+            .map(|(spec, session)| Cursor::new(client.clone(), spec, session))
+    }
+
+    async fn list_index_names_common(
+        &self,
+        cursor: impl TryStreamExt<Ok = IndexModel, Error = Error>,
+    ) -> Result<Vec<String>> {
+        cursor
+            .try_filter_map(|index| future::ok(index.get_name()))
+            .try_collect()
+            .await
+    }
+
+    /// Gets the names of all indexes on the collection.
+    pub async fn list_index_names(&self) -> Result<Vec<String>> {
+        let list_indexes = ListIndexes::new(self.namespace(), None);
+        let client = self.client();
+        let cursor: Cursor<IndexModel> = client
+            .execute_cursor_operation(list_indexes)
+            .await
+            .map(|(spec, session)| Cursor::new(client.clone(), spec, session))?;
+        self.list_index_names_common(cursor).await
     }
 
     async fn update_many_common(

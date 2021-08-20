@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use bson::serde_helpers;
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
@@ -831,6 +832,36 @@ pub struct FindOneOptions {
     pub sort: Option<Document>,
 }
 
+/// Specifies the options to a
+/// [`Collection::create_index`](../struct.Collection.html#method.create_index) or [`Collection::
+/// create_indexes`](../struct.Collection.html#method.create_indexes) operation.
+///
+/// For more information, see [`createIndexes`](https://docs.mongodb.com/manual/reference/command/createIndexes/).
+#[serde_with::skip_serializing_none]
+#[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
+#[builder(field_defaults(default, setter(into)))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[non_exhaustive]
+pub struct CreateIndexOptions {
+    /// Specify the commit quorum needed to mark an `index` as ready.
+    pub commit_quorum: Option<CommitQuorum>,
+
+    /// The maximum amount of time to allow the index to build.
+    ///
+    /// This option maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
+    #[serde(
+        rename = "maxTimeMS",
+        default,
+        serialize_with = "bson_util::serialize_duration_option_as_int_millis",
+        deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis"
+    )]
+    pub max_time: Option<Duration>,
+
+    /// The write concern for the operation.
+    pub write_concern: Option<WriteConcern>,
+}
+
 /// Specifies the options to a [`Collection::drop`](../struct.Collection.html#method.drop)
 /// operation.
 #[serde_with::skip_serializing_none]
@@ -841,4 +872,115 @@ pub struct FindOneOptions {
 pub struct DropCollectionOptions {
     /// The write concern for the operation.
     pub write_concern: Option<WriteConcern>,
+}
+
+/// Specifies the options to a
+/// [`Collection::drop_index`](../struct.Collection.html#method.drop_index) or
+/// [`Collection::drop_indexes`](../struct.Collection.html#method.drop_indexes) operation.
+#[serde_with::skip_serializing_none]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct DropIndexOptions {
+    /// The maximum amount of time to allow the index to drop.
+    ///
+    /// This option maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
+    #[serde(
+        rename = "maxTimeMS",
+        default,
+        serialize_with = "bson_util::serialize_duration_option_as_int_millis",
+        deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis"
+    )]
+    pub max_time: Option<Duration>,
+
+    /// The write concern for the operation.
+    pub write_concern: Option<WriteConcern>,
+}
+
+/// Specifies the options to a
+/// [`Collection::list_indexes`](../struct.Collection.html#method.list_indexes) operation.
+#[serde_with::skip_serializing_none]
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct ListIndexOptions {
+    /// The maximum amount of time to search for the index.
+    ///
+    /// This option maps to the `maxTimeMS` MongoDB query option, so the duration will be sent
+    /// across the wire as an integer number of milliseconds.
+    #[serde(
+        rename = "maxTimeMS",
+        default,
+        serialize_with = "bson_util::serialize_duration_option_as_int_millis",
+        deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis"
+    )]
+    pub max_time: Option<Duration>,
+
+    /// The number of indexes the server should return per cursor batch.
+    #[serde(default, serialize_with = "bson_util::serialize_u32_option_as_i32")]
+    pub batch_size: Option<u32>,
+}
+
+/// The minimum number of data-bearing voting replica set members (i.e. commit quorum), including
+/// the primary, that must report a successful index build before the primary marks the indexes as
+/// ready.
+///
+/// For more information, see the [documentation](https://docs.mongodb.com/manual/reference/command/createIndexes/#definition)
+#[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
+pub enum CommitQuorum {
+    /// A specific number of voting replica set members. When set to 0, disables quorum voting.
+    Nodes(u32),
+
+    /// All data-bearing voting replica set members (default).
+    VotingMembers,
+
+    /// A simple majority of voting members.
+    Majority,
+
+    /// A replica set tag name.
+    Custom(String),
+}
+
+impl Serialize for CommitQuorum {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            CommitQuorum::Nodes(n) => serde_helpers::serialize_u32_as_i32(n, serializer),
+            CommitQuorum::VotingMembers => serializer.serialize_str("votingMembers"),
+            CommitQuorum::Majority => serializer.serialize_str("majority"),
+            CommitQuorum::Custom(s) => serializer.serialize_str(s),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for CommitQuorum {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum IntOrString {
+            Int(u32),
+            String(String),
+        }
+        match IntOrString::deserialize(deserializer)? {
+            IntOrString::String(s) => {
+                if s == "votingMembers" {
+                    Ok(CommitQuorum::VotingMembers)
+                } else if s == "majority" {
+                    Ok(CommitQuorum::Majority)
+                } else {
+                    Ok(CommitQuorum::Custom(s))
+                }
+            }
+            IntOrString::Int(i) => Ok(CommitQuorum::Nodes(i)),
+        }
+    }
 }
