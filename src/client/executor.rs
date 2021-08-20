@@ -210,8 +210,8 @@ impl Client {
         };
 
         let mut owned_conn = None;
-        let mut conn = match pinned_connection {
-            Some(ref mut l) => &mut **l,
+        let mut conn = match &mut pinned_connection {
+            Some(l) => &mut **l,
             None => match server.pool.check_out().await {
                 Ok(c) => {
                     owned_conn = Some(c);
@@ -312,9 +312,16 @@ impl Client {
             }
         };
 
-        let mut conn = match server.pool.check_out().await {
-            Ok(c) => c,
-            Err(_) => return Err(first_error),
+        let mut owned_conn = None;
+        let conn = match pinned_connection {
+            Some(c) => c,
+            None => match server.pool.check_out().await {
+                Ok(c) => {
+                    owned_conn = Some(c);
+                    owned_conn.as_mut().unwrap()
+                },
+                Err(_) => return Err(first_error),
+            }
         };
 
         let retryability = self.get_retryability(&conn, op, session).await?;
@@ -323,10 +330,10 @@ impl Client {
         }
 
         match self
-            .execute_operation_on_connection(op, &mut conn, session, txn_number, &retryability)
+            .execute_operation_on_connection(op, conn, session, txn_number, &retryability)
             .await
         {
-            Ok(result) => Ok((result, Some(conn))),
+            Ok(result) => Ok((result, owned_conn)),
             Err(err) => {
                 self.inner
                     .topology
