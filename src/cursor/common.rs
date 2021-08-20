@@ -87,10 +87,14 @@ where
                     // If a result is ready, retrieve the buffer and update the exhausted status.
                     Poll::Ready(get_more_result) => {
                         let exhausted = get_more_result.exhausted();
-                        let (result, session) = get_more_result.into_parts();
+                        let (result, mut context) = get_more_result.into_parts();
+                        if exhausted {
+                            // If the cursor is exhausted, the driver must return the pinned connection to the pool.
+                            context.drop_pinned_connection();
+                        }
 
                         self.exhausted = exhausted;
-                        self.provider.clear_execution(session, exhausted);
+                        self.provider.clear_execution(context, exhausted);
                         self.buffer = result?.batch;
                     }
                     Poll::Pending => return Poll::Pending,
@@ -168,6 +172,10 @@ pub(crate) struct GetMoreContext<T: GetMoreProviderResult + ?Sized> {
 impl<T: GetMoreProviderResult> GetMoreContext<T> {
     pub(crate) fn new(session: T::Session, pinned_connection: Option<T::PinnedConnection>) -> Self {
         Self { session, pinned_connection }
+    }
+
+    pub(crate) fn drop_pinned_connection(&mut self) {
+        self.pinned_connection = None;
     }
 }
 
