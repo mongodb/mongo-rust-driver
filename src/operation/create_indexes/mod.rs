@@ -131,8 +131,8 @@ impl<'de> Deserialize<'de> for Response {
                     return Err(Error::invalid_length(len, &"a single result"));
                 }
 
-                let v = raw.values().last().unwrap(); // Safe unwrap because of length check above.
-                bson::from_bson(v.clone()).map(Response).map_err(|_| {
+                let (_, v) = raw.into_iter().next().unwrap(); // Safe unwrap because of length check above.
+                bson::from_bson(v).map(Response).map_err(|_| {
                     Error::invalid_type(
                         Unexpected::Other("Unknown bson"),
                         &"a createIndexes response",
