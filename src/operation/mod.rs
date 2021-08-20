@@ -33,7 +33,6 @@ use crate::{
     bson_util,
     client::{ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     cmap::{Command, RawCommandResponse, StreamDescription},
-    cursor::PinnedConnection,
     error::{
         BulkWriteError,
         BulkWriteFailure,
@@ -140,11 +139,6 @@ pub(crate) trait Operation {
 
     fn name(&self) -> &str {
         Self::NAME
-    }
-
-    // The connection this operation is pinned to, if any.
-    fn pinned_connection(&self) -> Option<PinnedConnection> {
-        None
     }
 }
 

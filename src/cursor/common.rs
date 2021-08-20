@@ -1,7 +1,6 @@
 use std::{
     collections::VecDeque,
     pin::Pin,
-    sync::Arc,
     task::{Context, Poll},
     time::Duration,
 };
@@ -9,10 +8,8 @@ use std::{
 use derivative::Derivative;
 use futures_core::{Future, Stream};
 use serde::de::DeserializeOwned;
-use tokio::sync::Mutex;
 
 use crate::{
-    cmap::conn::Connection,
     error::{Error, ErrorKind, Result},
     operation,
     options::ServerAddress,
@@ -20,8 +17,6 @@ use crate::{
     Client,
     Namespace,
 };
-
-pub(crate) type PinnedConnection = Arc<Mutex<Connection>>;
 
 /// An internal cursor that can be used in a variety of contexts depending on its `GetMoreProvider`.
 #[derive(Derivative)]
@@ -136,7 +131,7 @@ pub(super) trait GetMoreProvider: Unpin {
     /// Clear out any state remaining from previous getMore executions.
     fn clear_execution(
         &mut self,
-        context: GetMoreContext<<Self::ResultType as GetMoreProviderResult>::Session>,
+        context: GetMoreContext<Self::ResultType>,
         exhausted: bool,
     );
 
@@ -145,13 +140,14 @@ pub(super) trait GetMoreProvider: Unpin {
 }
 
 /// Trait describing results returned from a `GetMoreProvider`.
-pub(super) trait GetMoreProviderResult {
+pub(crate) trait GetMoreProviderResult {
     type Session;
+    type PinnedConnection;
     type DocumentType;
 
     fn as_ref(&self) -> std::result::Result<&GetMoreResult<Self::DocumentType>, &Error>;
 
-    fn into_parts(self) -> (Result<GetMoreResult<Self::DocumentType>>, GetMoreContext<Self::Session>);
+    fn into_parts(self) -> (Result<GetMoreResult<Self::DocumentType>>, GetMoreContext<Self>);
 
     /// Whether the response from the server indicated the cursor was exhausted or not.
     fn exhausted(&self) -> bool {
@@ -164,13 +160,13 @@ pub(super) trait GetMoreProviderResult {
     }
 }
 
-pub(crate) struct GetMoreContext<Session> {
-    pub(crate) session: Session,
-    pub(crate) pinned_connection: Option<PinnedConnection>,
+pub(crate) struct GetMoreContext<T: GetMoreProviderResult + ?Sized> {
+    pub(crate) session: T::Session,
+    pub(crate) pinned_connection: Option<T::PinnedConnection>,
 }
 
-impl<Session> GetMoreContext<Session> {
-    pub(crate) fn new(session: Session, pinned_connection: Option<PinnedConnection>) -> Self {
+impl<T: GetMoreProviderResult> GetMoreContext<T> {
+    pub(crate) fn new(session: T::Session, pinned_connection: Option<T::PinnedConnection>) -> Self {
         Self { session, pinned_connection }
     }
 }
