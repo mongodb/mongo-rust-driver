@@ -81,6 +81,7 @@ impl Operation for CreateIndexes {
         _description: &StreamDescription,
     ) -> Result<Self::O> {
         let index_names = self.indexes.iter().filter_map(|i| i.get_name()).collect();
+        let Response(response) = response;
         Ok(CreateIndexesResult {
             index_names,
             created_collection_automatically: response.created_collection_automatically,
@@ -97,8 +98,9 @@ impl Operation for CreateIndexes {
             .and_then(|opts| opts.write_concern.as_ref())
     }
 }
-#[derive(Debug)]
-pub(crate) struct Response {
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ResponseBody {
     created_collection_automatically: Option<bool>,
     num_indexes_before: u32,
     num_indexes_after: u32,
@@ -106,33 +108,14 @@ pub(crate) struct Response {
     commit_quorum: Option<CommitQuorum>,
 }
 
+#[derive(Debug)]
+pub(crate) struct Response(ResponseBody);
+
 impl<'de> Deserialize<'de> for Response {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        #[derive(Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct ResponseBody {
-            created_collection_automatically: Option<bool>,
-            num_indexes_before: u32,
-            num_indexes_after: u32,
-            note: Option<String>,
-            commit_quorum: Option<CommitQuorum>,
-        }
-
-        impl From<ResponseBody> for Response {
-            fn from(r: ResponseBody) -> Self {
-                Self {
-                    created_collection_automatically: r.created_collection_automatically,
-                    num_indexes_before: r.num_indexes_before,
-                    num_indexes_after: r.num_indexes_after,
-                    note: r.note,
-                    commit_quorum: r.commit_quorum,
-                }
-            }
-        }
-
         #[derive(Deserialize)]
         #[serde(untagged)]
         enum ResponseHelper {
@@ -141,7 +124,7 @@ impl<'de> Deserialize<'de> for Response {
         }
 
         match ResponseHelper::deserialize(deserializer)? {
-            ResponseHelper::PlainResponse(body) => Ok(body.into()),
+            ResponseHelper::PlainResponse(body) => Ok(Response(body)),
             ResponseHelper::ShardedResponse { raw } => {
                 let len = raw.values().count();
                 if len != 1 {
@@ -149,14 +132,12 @@ impl<'de> Deserialize<'de> for Response {
                 }
 
                 let v = raw.values().last().unwrap(); // Safe unwrap because of length check above.
-                bson::from_bson(v.clone())
-                    .map(|b: ResponseBody| b.into())
-                    .map_err(|_| {
-                        Error::invalid_type(
-                            Unexpected::Other("Unknown bson"),
-                            &"a createIndexes response",
-                        )
-                    })
+                bson::from_bson(v.clone()).map(Response).map_err(|_| {
+                    Error::invalid_type(
+                        Unexpected::Other("Unknown bson"),
+                        &"a createIndexes response",
+                    )
+                })
             }
         }
     }

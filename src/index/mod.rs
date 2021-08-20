@@ -47,6 +47,9 @@ impl IndexModel {
 
     #[cfg(test)]
     pub(crate) fn is_unique(&self) -> bool {
-        self.options.as_ref().and_then(|o| o.unique).unwrap_or(false)
+        self.options
+            .as_ref()
+            .and_then(|o| o.unique)
+            .unwrap_or(false)
     }
 }

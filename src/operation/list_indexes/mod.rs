@@ -1,4 +1,14 @@
-use crate::{Namespace, bson::{doc, Document}, cmap::{Command, StreamDescription}, cursor::CursorSpecification, error::Result, index::IndexModel, operation::{append_options, Operation}, options::ListIndexOptions, selection_criteria::{ReadPreference, SelectionCriteria}};
+use crate::{
+    bson::{doc, Document},
+    cmap::{Command, StreamDescription},
+    cursor::CursorSpecification,
+    error::Result,
+    index::IndexModel,
+    operation::{append_options, Operation},
+    options::ListIndexOptions,
+    selection_criteria::{ReadPreference, SelectionCriteria},
+    Namespace,
+};
 
 use super::{CursorBody, CursorResponse, Retryability};
 
