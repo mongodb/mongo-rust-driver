@@ -1,6 +1,9 @@
-use std::time::{Duration, Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     bson::{doc, oid::ObjectId, DateTime, Document, Timestamp},
@@ -9,8 +12,14 @@ use crate::{
         ClusterTime,
     },
     cmap::{Command, Connection},
-    error::{ErrorKind, Result},
-    sdam::ServerType,
+    error::Result,
+    event::sdam::{
+        SdamEventHandler,
+        ServerHeartbeatFailedEvent,
+        ServerHeartbeatStartedEvent,
+        ServerHeartbeatSucceededEvent,
+    },
+    sdam::{ServerType, WeakTopology},
     selection_criteria::TagSet,
 };
 
@@ -28,74 +37,163 @@ pub(crate) fn is_master_command(api: Option<&ServerApi>) -> Command {
     command
 }
 
-/// Run the given isMaster command.
-///
-/// If the given command is not an isMaster, this function will return an error.
 pub(crate) async fn run_is_master(
-    command: Command,
     conn: &mut Connection,
+    command: Command,
+    topology: Option<&WeakTopology>,
+    handler: &Option<Arc<dyn SdamEventHandler>>,
 ) -> Result<IsMasterReply> {
-    if !command.name.eq_ignore_ascii_case("ismaster") && !command.name.eq_ignore_ascii_case("hello")
-    {
-        return Err(ErrorKind::Internal {
-            message: format!("invalid ismaster command: {}", command.name),
-        }
-        .into());
-    }
+    emit_event(topology, handler, |handler| {
+        let event = ServerHeartbeatStartedEvent {
+            server_address: conn.address.clone(),
+        };
+        handler.handle_server_heartbeat_started_event(event);
+    });
+
     let start_time = Instant::now();
-    let response = conn.send_command(command, None).await?;
+    let response_result = conn.send_command(command, None).await;
     let end_time = Instant::now();
 
-    let server_address = response.source_address().clone();
-    let basic_response = response.into_document_response()?;
-    basic_response.validate()?;
-    let cluster_time = basic_response.cluster_time().cloned();
-    let command_response: IsMasterCommandResponse = basic_response.body()?;
+    let round_trip_time = end_time.duration_since(start_time);
 
-    Ok(IsMasterReply {
-        server_address,
-        command_response,
-        round_trip_time: Some(end_time.duration_since(start_time)),
-        cluster_time,
-    })
+    match response_result.and_then(|raw_response| {
+        let is_master_reply = raw_response.to_is_master_response(round_trip_time)?;
+        Ok((raw_response, is_master_reply))
+    }) {
+        Ok((raw_response, is_master_reply)) => {
+            emit_event(topology, handler, |handler| {
+                let mut reply = raw_response
+                    .body::<Document>()
+                    .unwrap_or_else(|e| doc! { "deserialization error": e.to_string() });
+                // if this isMaster call is part of a handshake, remove speculative authentication
+                // information before publishing an event
+                reply.remove("speculativeAuthenticate");
+                let event = ServerHeartbeatSucceededEvent {
+                    duration: round_trip_time,
+                    reply,
+                    server_address: conn.address.clone(),
+                };
+                handler.handle_server_heartbeat_succeeded_event(event);
+            });
+            Ok(is_master_reply)
+        }
+        Err(err) => {
+            emit_event(topology, handler, |handler| {
+                let event = ServerHeartbeatFailedEvent {
+                    duration: round_trip_time,
+                    failure: err.clone(),
+                    server_address: conn.address.clone(),
+                };
+                handler.handle_server_heartbeat_failed_event(event);
+            });
+            Err(err)
+        }
+    }
+}
+
+fn emit_event<F>(
+    topology: Option<&WeakTopology>,
+    handler: &Option<Arc<dyn SdamEventHandler>>,
+    emit: F,
+) where
+    F: FnOnce(&Arc<dyn SdamEventHandler>),
+{
+    if let Some(handler) = handler {
+        if let Some(topology) = topology {
+            if topology.is_alive() {
+                emit(handler);
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct IsMasterReply {
     pub server_address: ServerAddress,
     pub command_response: IsMasterCommandResponse,
-    pub round_trip_time: Option<Duration>,
+    pub round_trip_time: Duration,
     pub cluster_time: Option<ClusterTime>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+/// The response to a `hello` command.
+///
+/// See the documentation [here](https://docs.mongodb.com/manual/reference/command/hello/) for more details.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct IsMasterCommandResponse {
+    /// Whether the server is writable. If true, this instance is a primary in a replica set, a
+    /// mongos instance, or a standalone mongod.
     pub is_writable_primary: Option<bool>,
     #[serde(rename = "ismaster")]
+
+    /// Legacy name for `is_writable_primary` field.
     pub is_master: Option<bool>,
+
+    /// The list of all hosts.
     pub hosts: Option<Vec<String>>,
+
+    /// The list of all passives in a replica set.
     pub passives: Option<Vec<String>>,
+
+    /// The list of all arbiters in a replica set.
     pub arbiters: Option<Vec<String>>,
+
+    /// An optional message. This contains the value "isdbgrid" when returned from a mongos.
     pub msg: Option<String>,
+
+    /// The address of the server that returned this `IsMasterCommandResponse`.
     pub me: Option<String>,
+
+    /// The current replica set config version.
     pub set_version: Option<i32>,
+
+    /// The name of the current replica set.
     pub set_name: Option<String>,
+
+    /// Whether the server is hidden.
     pub hidden: Option<bool>,
+
+    /// Whether the server is a secondary.
     pub secondary: Option<bool>,
+
+    /// Whether the server is an arbiter.
     pub arbiter_only: Option<bool>,
     #[serde(rename = "isreplicaset")]
+
+    /// Whether the server is a replica set.
     pub is_replica_set: Option<bool>,
+
+    /// The time in minutes that a session remains active after its most recent use.
     pub logical_session_timeout_minutes: Option<i64>,
+
+    /// Optime and date information for the server's most recent write operation.
     pub last_write: Option<LastWrite>,
+
+    /// The minimum wire version that the server supports.
     pub min_wire_version: Option<i32>,
+
+    /// The maximum wire version that the server supports.
     pub max_wire_version: Option<i32>,
+
+    /// User-defined tags for a replica set member.
     pub tags: Option<TagSet>,
+
+    /// A unique identifier for each election.
     pub election_id: Option<ObjectId>,
+
+    /// The address of current primary member of the replica set.
     pub primary: Option<String>,
+
+    /// A list of SASL mechanisms used to create the user's credential(s).
     pub sasl_supported_mechs: Option<Vec<String>>,
+
+    /// The reply to speculative authentication done in the authentication handshake.
     pub speculative_authenticate: Option<Document>,
+
+    /// The maximum permitted size of a BSON object in bytes.
     pub max_bson_object_size: i64,
+
+    /// The maximum number of write operations permitted in a write batch.
     pub max_write_batch_size: i64,
     pub service_id: Option<ObjectId>,
 }
@@ -147,7 +245,7 @@ impl IsMasterCommandResponse {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct LastWrite {
     pub last_write_date: DateTime,

@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod test;
 
+use std::sync::Arc;
+
 use lazy_static::lazy_static;
 use os_info::{Type, Version};
 
@@ -9,8 +11,10 @@ use crate::{
     client::auth::{ClientFirst, FirstRound},
     cmap::{options::ConnectionPoolOptions, Command, Connection, StreamDescription},
     error::{ErrorKind, Result},
+    event::sdam::SdamEventHandler,
     is_master::{is_master_command, run_is_master, IsMasterReply},
     options::{AuthMechanism, ClientOptions, Credential, DriverInfo, ServerApi},
+    sdam::WeakTopology,
 };
 
 #[cfg(feature = "tokio-runtime")]
@@ -133,7 +137,7 @@ lazy_static! {
 }
 
 /// Contains the logic needed to handshake a connection.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct Handshaker {
     /// The `isMaster` command to send when handshaking. This will always be identical
     /// given the same pool options, so it can be created at the time the Handshaker is created.
@@ -192,12 +196,17 @@ impl Handshaker {
     }
 
     /// Handshakes a connection.
-    pub(crate) async fn handshake(&self, conn: &mut Connection) -> Result<HandshakeResult> {
+    pub(crate) async fn handshake(
+        &self,
+        conn: &mut Connection,
+        topology: Option<&WeakTopology>,
+        handler: &Option<Arc<dyn SdamEventHandler>>,
+    ) -> Result<HandshakeResult> {
         let mut command = self.command.clone();
 
         let client_first = set_speculative_auth_info(&mut command.body, self.credential.as_ref())?;
 
-        let mut is_master_reply = run_is_master(command, conn).await?;
+        let mut is_master_reply = run_is_master(conn, command, topology, handler).await?;
         if self.command.body.contains_key("loadBalanced")
             && is_master_reply.command_response.service_id.is_none()
         {

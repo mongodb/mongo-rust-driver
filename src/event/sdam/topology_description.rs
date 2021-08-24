@@ -1,0 +1,128 @@
+use std::{collections::HashMap, fmt};
+
+use crate::{
+    bson::oid::ObjectId,
+    client::options::ServerAddress,
+    sdam::{ServerInfo, TopologyType},
+    selection_criteria::{ReadPreference, SelectionCriteria},
+};
+
+/// A description of the most up-to-date information known about a topology. Further details can
+/// be found in the [Server Discovery and Monitoring specification](https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst).
+#[derive(Clone)]
+pub struct TopologyDescription {
+    pub(crate) description: crate::sdam::TopologyDescription,
+}
+
+impl From<crate::sdam::TopologyDescription> for TopologyDescription {
+    fn from(description: crate::sdam::TopologyDescription) -> Self {
+        Self { description }
+    }
+}
+
+impl TopologyDescription {
+    /// Whether this topology has a readable server available that satisfies the specified selection
+    /// criteria.
+    pub fn has_readable_server(&self, selection_criteria: Option<SelectionCriteria>) -> bool {
+        match self.description.suitable_servers_in_latency_window(
+            &selection_criteria
+                .unwrap_or(SelectionCriteria::ReadPreference(ReadPreference::Primary)),
+        ) {
+            Ok(servers) => !servers.is_empty(),
+            Err(_) => false,
+        }
+    }
+
+    /// Whether this topology has a writable server available.
+    pub fn has_writable_server(&self) -> bool {
+        match self.description.topology_type {
+            TopologyType::Unknown | TopologyType::ReplicaSetNoPrimary => false,
+            TopologyType::Single | TopologyType::Sharded => {
+                self.description.has_available_servers()
+            }
+            TopologyType::ReplicaSetWithPrimary | TopologyType::LoadBalanced => true,
+        }
+    }
+
+    /// Gets the type of the topology.
+    pub fn topology_type(&self) -> TopologyType {
+        self.description.topology_type
+    }
+
+    /// Gets the set name of the topology.
+    pub fn set_name(&self) -> Option<&String> {
+        self.description.set_name.as_ref()
+    }
+
+    /// Gets the max set version of the topology.
+    pub fn max_set_version(&self) -> Option<i32> {
+        self.description.max_set_version
+    }
+
+    /// Gets the max election ID of the topology.
+    pub fn max_election_id(&self) -> Option<ObjectId> {
+        self.description.max_election_id
+    }
+
+    /// Gets the compatibility error of the topology.
+    pub fn compatibility_error(&self) -> Option<&String> {
+        self.description.compatibility_error.as_ref()
+    }
+
+    /// Gets the servers in the topology.
+    pub fn servers(&self) -> HashMap<&ServerAddress, ServerInfo> {
+        self.description
+            .servers
+            .iter()
+            .map(|(address, description)| (address, ServerInfo::new_borrowed(description)))
+            .collect()
+    }
+}
+
+impl fmt::Debug for TopologyDescription {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::result::Result<(), fmt::Error> {
+        f.debug_struct("Topology Description")
+            .field("Type", &self.topology_type())
+            .field("Set Name", &self.set_name())
+            .field("Max Set Version", &self.max_set_version())
+            .field("Max Election ID", &self.max_election_id())
+            .field("Compatibility Error", &self.compatibility_error())
+            .field("Servers", &self.servers().values())
+            .finish()
+    }
+}
+
+impl fmt::Display for TopologyDescription {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::result::Result<(), fmt::Error> {
+        write!(f, "{{ Type: {:?}", self.description.topology_type)?;
+
+        if let Some(ref set_name) = self.description.set_name {
+            write!(f, ", Set Name: {}", set_name)?;
+        }
+
+        if let Some(max_set_version) = self.description.max_set_version {
+            write!(f, ", Max Set Version: {}", max_set_version)?;
+        }
+
+        if let Some(max_election_id) = self.description.max_election_id {
+            write!(f, ", Max Election ID: {}", max_election_id)?;
+        }
+
+        if let Some(ref compatibility_error) = self.description.compatibility_error {
+            write!(f, ", Compatibility Error: {}", compatibility_error)?;
+        }
+
+        if !self.description.servers.is_empty() {
+            write!(f, ", Servers: ")?;
+            let mut iter = self.description.servers.values();
+            if let Some(server) = iter.next() {
+                write!(f, "{}", ServerInfo::new_borrowed(server))?;
+            }
+            for server in iter {
+                write!(f, ", {}", ServerInfo::new_borrowed(server))?;
+            }
+        }
+
+        write!(f, " }}")
+    }
+}

@@ -125,7 +125,7 @@ impl Executor {
 
         let mut pool_options = test_file.pool_options.unwrap_or_else(Default::default);
         pool_options.tls_options = CLIENT_OPTIONS.tls_options();
-        pool_options.event_handler = Some(handler.clone());
+        pool_options.cmap_event_handler = Some(handler.clone());
         pool_options.server_api = SERVER_API.clone();
 
         let state = State {

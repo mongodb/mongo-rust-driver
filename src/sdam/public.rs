@@ -1,23 +1,32 @@
-use std::{fmt, time::Duration};
+use std::{borrow::Cow, fmt, time::Duration};
 
-pub use crate::sdam::description::server::ServerType;
+pub use crate::sdam::description::{server::ServerType, topology::TopologyType};
 use crate::{
     bson::DateTime,
     is_master::IsMasterCommandResponse,
     options::ServerAddress,
-    sdam::description::server::ServerDescription,
+    sdam::ServerDescription,
     selection_criteria::TagSet,
 };
 
-/// Provides information about a given server in the cluster that a client is connected to. This is
-/// used when providing a predicate as a `SelectionCriteria`.
+/// A description of the most up-to-date information known about a server. Further details can be
+/// found in the [Server Discovery and Monitoring specification](https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst).
+#[derive(Clone)]
 pub struct ServerInfo<'a> {
-    description: &'a ServerDescription,
+    pub(crate) description: Cow<'a, ServerDescription>,
 }
 
 impl<'a> ServerInfo<'a> {
-    pub(crate) fn new(description: &'a ServerDescription) -> Self {
-        Self { description }
+    pub(crate) fn new_borrowed(description: &'a ServerDescription) -> Self {
+        Self {
+            description: Cow::Borrowed(description),
+        }
+    }
+
+    pub(crate) fn new_owned(description: ServerDescription) -> Self {
+        Self {
+            description: Cow::Owned(description),
+        }
     }
 
     fn command_response_getter<T>(
@@ -79,6 +88,35 @@ impl<'a> ServerInfo<'a> {
     /// Gets the tags associated with the server.
     pub fn tags(&self) -> Option<&TagSet> {
         self.command_response_getter(|r| r.tags.as_ref())
+    }
+}
+
+impl<'a> fmt::Debug for ServerInfo<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::result::Result<(), fmt::Error> {
+        match self.description.reply {
+            Ok(_) => f
+                .debug_struct("Server Description")
+                .field("Address", self.address())
+                .field("Type", &self.server_type())
+                .field("Average RTT", &self.average_round_trip_time())
+                .field("Last Update Time", &self.last_update_time())
+                .field("Max Wire Version", &self.max_wire_version())
+                .field("Min Wire Version", &self.min_wire_version())
+                .field("Replica Set Name", &self.replica_set_name())
+                .field("Replica Set Version", &self.replica_set_version())
+                .field("Tags", &self.tags())
+                .field(
+                    "Compatibility Error",
+                    &self.description.compatibility_error_message(),
+                )
+                .finish(),
+            Err(ref e) => f
+                .debug_struct("Server Description")
+                .field("Address", self.address())
+                .field("Type", &self.server_type())
+                .field("Error", e)
+                .finish(),
+        }
     }
 }
 

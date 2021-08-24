@@ -14,8 +14,8 @@ use crate::{
             server::{ServerDescription, ServerType},
             topology::TopologyType,
         },
-        public::ServerInfo,
         Server,
+        ServerInfo,
     },
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
 };
@@ -119,7 +119,7 @@ impl TopologyDescription {
             SelectionCriteria::Predicate(ref filter) => self
                 .servers
                 .values()
-                .filter(|s| filter(&ServerInfo::new(s)))
+                .filter(|s| filter(&ServerInfo::new_borrowed(s)))
                 .collect(),
         };
 
@@ -128,7 +128,7 @@ impl TopologyDescription {
         Ok(suitable_servers)
     }
 
-    fn has_available_servers(&self) -> bool {
+    pub(crate) fn has_available_servers(&self) -> bool {
         self.servers.values().any(|server| server.is_available())
     }
 
@@ -360,7 +360,7 @@ impl TopologyDescription {
 impl fmt::Display for TopologyDescription {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{{ Type: {:?}, Servers: [ ", self.topology_type)?;
-        for server_info in self.servers.values().map(ServerInfo::new) {
+        for server_info in self.servers.values().map(ServerInfo::new_borrowed) {
             write!(f, "{}, ", server_info)?;
         }
         write!(f, "] }}")

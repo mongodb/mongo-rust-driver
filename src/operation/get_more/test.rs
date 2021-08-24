@@ -144,7 +144,7 @@ async fn op_selection_criteria() {
         last_update_time: None,
         average_round_trip_time: None,
     };
-    let server_info = ServerInfo::new(&server_description);
+    let server_info = ServerInfo::new_borrowed(&server_description);
 
     let predicate = get_more
         .selection_criteria()
@@ -157,7 +157,7 @@ async fn op_selection_criteria() {
         address: ServerAddress::default(),
         ..server_description
     };
-    let server_info = ServerInfo::new(&server_description);
+    let server_info = ServerInfo::new_borrowed(&server_description);
     assert!(!predicate(&server_info));
 }
 

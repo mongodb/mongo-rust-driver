@@ -90,7 +90,7 @@ struct ClientInner {
 
 impl Drop for ClientInner {
     fn drop(&mut self) {
-        self.topology.mark_closed()
+        self.topology.close()
     }
 }
 

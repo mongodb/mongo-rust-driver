@@ -52,6 +52,7 @@ impl Server {
             address: address.clone(),
             operation_count: AtomicU32::new(0),
         });
+
         let monitor = Monitor::new(address, &server, topology, options.clone(), update_receiver);
         (server, monitor)
     }

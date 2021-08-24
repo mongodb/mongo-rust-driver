@@ -52,7 +52,7 @@ impl ConnectionEstablisher {
 
         let handshake = self
             .handshaker
-            .handshake(&mut connection)
+            .handshake(&mut connection, None, &None)
             .await
             .map_err(|e| EstablishError::pre_hello(e, pool_gen.clone()))?;
         let service_id = handshake.is_master_reply.command_response.service_id;

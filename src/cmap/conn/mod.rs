@@ -49,7 +49,7 @@ pub struct ConnectionInfo {
 #[derivative(Debug)]
 pub(crate) struct Connection {
     pub(super) id: u32,
-    pub(super) address: ServerAddress,
+    pub(crate) address: ServerAddress,
     pub(crate) generation: ConnectionGeneration,
 
     /// The cached StreamDescription from the connection's handshake.

@@ -1,6 +1,6 @@
 {
-  "description": "Monitoring a standalone connection - suppress update events for equal server descriptions",
-  "uri": "mongodb://a:27017",
+  "description": "Monitoring a direct connection - suppress update events for equal server descriptions",
+  "uri": "mongodb://a:27017/?directConnection=true",
   "phases": [
     {
       "responses": [
@@ -8,18 +8,20 @@
           "a:27017",
           {
             "ok": 1,
-            "ismaster": true,
+            "helloOk": true,
+            "isWritablePrimary": true,
             "minWireVersion": 0,
-            "maxWireVersion": 4
+            "maxWireVersion": 6
           }
         ],
         [
           "a:27017",
           {
             "ok": 1,
-            "ismaster": true,
+            "helloOk": true,
+            "isWritablePrimary": true,
             "minWireVersion": 0,
-            "maxWireVersion": 4
+            "maxWireVersion": 6
           }
         ]
       ],

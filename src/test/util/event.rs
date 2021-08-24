@@ -33,6 +33,18 @@ use crate::{
             CommandStartedEvent,
             CommandSucceededEvent,
         },
+        sdam::{
+            SdamEventHandler,
+            ServerClosedEvent,
+            ServerDescriptionChangedEvent,
+            ServerHeartbeatFailedEvent,
+            ServerHeartbeatStartedEvent,
+            ServerHeartbeatSucceededEvent,
+            ServerOpeningEvent,
+            TopologyClosedEvent,
+            TopologyDescriptionChangedEvent,
+            TopologyOpeningEvent,
+        },
     },
     options::ClientOptions,
     test::{CLIENT_OPTIONS, LOCK},
@@ -45,8 +57,22 @@ pub type CmapEvent = crate::cmap::test::event::Event;
 #[derive(Clone, Debug, From)]
 #[allow(clippy::large_enum_variant)]
 pub enum Event {
-    CmapEvent(CmapEvent),
-    CommandEvent(CommandEvent),
+    Cmap(CmapEvent),
+    Command(CommandEvent),
+    Sdam(SdamEvent),
+}
+
+#[derive(Clone, Debug)]
+pub enum SdamEvent {
+    ServerDescriptionChanged(ServerDescriptionChangedEvent),
+    ServerOpening(ServerOpeningEvent),
+    ServerClosed(ServerClosedEvent),
+    TopologyDescriptionChanged(TopologyDescriptionChangedEvent),
+    TopologyOpening(TopologyOpeningEvent),
+    TopologyClosed(TopologyClosedEvent),
+    ServerHeartbeatStarted(ServerHeartbeatStartedEvent),
+    ServerHeartbeatSucceeded(ServerHeartbeatSucceededEvent),
+    ServerHeartbeatFailed(ServerHeartbeatFailedEvent),
 }
 
 #[derive(Clone, Debug)]
@@ -93,6 +119,7 @@ impl CommandEvent {
 pub struct EventHandler {
     command_events: EventQueue<CommandEvent>,
     pub pool_cleared_events: EventQueue<PoolClearedEvent>,
+    sdam_events: EventQueue<SdamEvent>,
     event_broadcaster: tokio::sync::broadcast::Sender<Event>,
 }
 
@@ -102,6 +129,7 @@ impl EventHandler {
         Self {
             command_events: Default::default(),
             pool_cleared_events: Default::default(),
+            sdam_events: Default::default(),
             event_broadcaster,
         }
     }
@@ -158,6 +186,10 @@ impl EventHandler {
         let events = self.command_events.read().unwrap();
         events.iter().filter(|e| filter(*e)).cloned().collect()
     }
+
+    pub fn get_all_sdam_events(&self) -> Vec<SdamEvent> {
+        self.sdam_events.write().unwrap().drain(..).collect()
+    }
 }
 
 impl CmapEventHandler for EventHandler {
@@ -207,6 +239,62 @@ impl CmapEventHandler for EventHandler {
     }
 }
 
+impl SdamEventHandler for EventHandler {
+    fn handle_server_description_changed_event(&self, event: ServerDescriptionChangedEvent) {
+        let event = SdamEvent::ServerDescriptionChanged(event);
+        self.handle(event.clone());
+        self.sdam_events.write().unwrap().push_back(event);
+    }
+
+    fn handle_server_opening_event(&self, event: ServerOpeningEvent) {
+        let event = SdamEvent::ServerOpening(event);
+        self.handle(event.clone());
+        self.sdam_events.write().unwrap().push_back(event);
+    }
+
+    fn handle_server_closed_event(&self, event: ServerClosedEvent) {
+        let event = SdamEvent::ServerClosed(event);
+        self.handle(event.clone());
+        self.sdam_events.write().unwrap().push_back(event);
+    }
+
+    fn handle_topology_description_changed_event(&self, event: TopologyDescriptionChangedEvent) {
+        let event = SdamEvent::TopologyDescriptionChanged(event);
+        self.handle(event.clone());
+        self.sdam_events.write().unwrap().push_back(event);
+    }
+
+    fn handle_topology_opening_event(&self, event: TopologyOpeningEvent) {
+        let event = SdamEvent::TopologyOpening(event);
+        self.handle(event.clone());
+        self.sdam_events.write().unwrap().push_back(event);
+    }
+
+    fn handle_topology_closed_event(&self, event: TopologyClosedEvent) {
+        let event = SdamEvent::TopologyClosed(event);
+        self.handle(event.clone());
+        self.sdam_events.write().unwrap().push_back(event);
+    }
+
+    fn handle_server_heartbeat_started_event(&self, event: ServerHeartbeatStartedEvent) {
+        let event = SdamEvent::ServerHeartbeatStarted(event);
+        self.handle(event.clone());
+        self.sdam_events.write().unwrap().push_back(event);
+    }
+
+    fn handle_server_heartbeat_succeeded_event(&self, event: ServerHeartbeatSucceededEvent) {
+        let event = SdamEvent::ServerHeartbeatSucceeded(event);
+        self.handle(event.clone());
+        self.sdam_events.write().unwrap().push_back(event);
+    }
+
+    fn handle_server_heartbeat_failed_event(&self, event: ServerHeartbeatFailedEvent) {
+        let event = SdamEvent::ServerHeartbeatFailed(event);
+        self.handle(event.clone());
+        self.sdam_events.write().unwrap().push_back(event);
+    }
+}
+
 impl CommandEventHandler for EventHandler {
     fn handle_command_started_event(&self, event: CommandStartedEvent) {
         self.handle(CommandEvent::Started(event.clone()));
@@ -252,7 +340,7 @@ impl EventSubscriber<'_> {
                 loop {
                     match self.receiver.recv().await {
                         Ok(event) if filter(&event) => return event.into(),
-                        // the channel hit capacity and the channnel will skip a few to catch up.
+                        // the channel hit capacity and the channel will skip a few to catch up.
                         Err(RecvError::Lagged(_)) => continue,
                         Err(_) => return None,
                         _ => continue,
@@ -268,7 +356,7 @@ impl EventSubscriber<'_> {
 #[derive(Clone, Debug)]
 pub struct EventClient {
     client: TestClient,
-    handler: EventHandler,
+    pub(crate) handler: Arc<EventHandler>,
 }
 
 impl std::ops::Deref for EventClient {
@@ -294,7 +382,7 @@ impl EventClient {
         options: impl Into<Option<ClientOptions>>,
         handler: impl Into<Option<EventHandler>>,
     ) -> Self {
-        let handler = handler.into().unwrap_or_else(EventHandler::new);
+        let handler = Arc::new(handler.into().unwrap_or_else(EventHandler::new));
         let client = TestClient::with_handler(Some(handler.clone()), options).await;
 
         // clear events from commands used to set up client.

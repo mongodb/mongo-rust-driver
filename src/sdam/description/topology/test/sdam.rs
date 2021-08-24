@@ -2,7 +2,9 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use bson::Document;
 use serde::Deserialize;
-use tokio::sync::RwLockReadGuard;
+use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
+
+use super::TestSdamEvent;
 
 use crate::{
     bson::{doc, oid::ObjectId},
@@ -18,9 +20,22 @@ use crate::{
         },
         HandshakePhase,
         Topology,
+        TopologyDescription,
     },
     selection_criteria::TagSet,
-    test::{run_spec_test, TestClient, CLIENT_OPTIONS, LOCK},
+    test::{
+        run_spec_test,
+        Event,
+        EventClient,
+        EventHandler,
+        FailCommandOptions,
+        FailPoint,
+        FailPointMode,
+        SdamEvent,
+        TestClient,
+        CLIENT_OPTIONS,
+        LOCK,
+    },
 };
 
 #[derive(Debug, Deserialize)]
@@ -167,13 +182,25 @@ impl From<ServerError> for Error {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum Outcome {
+    Description(DescriptionOutcome),
+    Events(EventsOutcome),
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Outcome {
+pub struct DescriptionOutcome {
     topology_type: TopologyType,
     set_name: Option<String>,
     servers: HashMap<String, Server>,
     logical_session_timeout_minutes: Option<i32>,
     compatible: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct EventsOutcome {
+    events: Vec<TestSdamEvent>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -206,10 +233,6 @@ fn server_type_from_str(s: &str) -> Option<ServerType> {
 }
 
 async fn run_test(test_file: TestFile) {
-    let options = ClientOptions::parse_uri(&test_file.uri, None)
-        .await
-        .expect(&test_file.description);
-
     let test_description = &test_file.description;
 
     // TODO: RUST-360 unskip tests that rely on topology version
@@ -217,6 +240,19 @@ async fn run_test(test_file: TestFile) {
         println!("Skipping {} (RUST-360)", test_description);
         return;
     }
+
+    // TODO RUST-653 unskip load balancer test
+    if test_description.contains("load balancer") {
+        println!("Skipping {} (RUST-653)", test_description);
+        return;
+    }
+
+    let mut options = ClientOptions::parse_uri(&test_file.uri, None)
+        .await
+        .expect(test_description);
+
+    let handler = Arc::new(EventHandler::new());
+    options.sdam_event_handler = Some(handler.clone());
 
     let topology = Topology::new_mocked(options.clone());
     let mut servers = topology.get_servers().await;
@@ -245,7 +281,7 @@ async fn run_test(test_file: TestFile) {
                 Ok(IsMasterReply {
                     server_address: address.clone(),
                     command_response: command_response.into(),
-                    round_trip_time: Some(Duration::from_millis(1234)), // Doesn't matter for tests.
+                    round_trip_time: Duration::from_millis(1234), // Doesn't matter for tests.
                     cluster_time: None,
                 })
             };
@@ -303,126 +339,155 @@ async fn run_test(test_file: TestFile) {
 
         let topology_description = topology.description().await;
         let phase_description = phase.description.unwrap_or_else(|| format!("{}", i));
+
+        match phase.outcome {
+            Outcome::Description(outcome) => {
+                verify_description_outcome(
+                    outcome,
+                    topology_description,
+                    test_description,
+                    phase_description,
+                );
+            }
+            Outcome::Events(EventsOutcome { events: expected }) => {
+                let actual = handler.get_all_sdam_events();
+                assert_eq!(actual.len(), expected.len());
+                for (actual, expected) in actual.iter().zip(expected.iter()) {
+                    assert_eq!(
+                        actual, expected,
+                        "SDAM events do not match:\n actual: {:#?}, expected: {:#?}",
+                        actual, expected
+                    );
+                }
+            }
+        }
+    }
+}
+
+fn verify_description_outcome(
+    outcome: DescriptionOutcome,
+    topology_description: TopologyDescription,
+    test_description: &str,
+    phase_description: String,
+) {
+    assert_eq!(
+        topology_description.topology_type, outcome.topology_type,
+        "{}: {}",
+        test_description, phase_description
+    );
+
+    assert_eq!(
+        topology_description.set_name, outcome.set_name,
+        "{}: {}",
+        test_description, phase_description,
+    );
+
+    let expected_timeout = outcome
+        .logical_session_timeout_minutes
+        .map(|mins| Duration::from_secs((mins as u64) * 60));
+    assert_eq!(
+        topology_description
+            .session_support_status
+            .logical_session_timeout(),
+        expected_timeout,
+        "{}: {}",
+        test_description,
+        phase_description
+    );
+
+    if let Some(compatible) = outcome.compatible {
         assert_eq!(
-            topology_description.topology_type, phase.outcome.topology_type,
+            topology_description.compatibility_error.is_none(),
+            compatible,
             "{}: {}",
-            &test_file.description, phase_description
+            test_description,
+            phase_description,
+        );
+    }
+
+    assert_eq!(
+        topology_description.servers.len(),
+        outcome.servers.len(),
+        "{}: {}",
+        test_description,
+        phase_description
+    );
+
+    for (address, server) in outcome.servers {
+        let address = ServerAddress::parse(&address).unwrap_or_else(|_| {
+            panic!(
+                "{}: couldn't parse address \"{:?}\"",
+                test_description, address
+            )
+        });
+        let actual_server = &topology_description
+            .servers
+            .get(&address)
+            .unwrap_or_else(|| panic!("{} (phase {})", test_description, phase_description));
+
+        let server_type = server_type_from_str(&server.server_type)
+            .unwrap_or_else(|| panic!("{} (phase {})", test_description, phase_description));
+
+        assert_eq!(
+            actual_server.server_type, server_type,
+            "{} (phase {}, address: {})",
+            test_description, phase_description, address,
         );
 
         assert_eq!(
-            topology_description.set_name, phase.outcome.set_name,
-            "{}: {}",
-            &test_file.description, phase_description,
-        );
-
-        let expected_timeout = phase
-            .outcome
-            .logical_session_timeout_minutes
-            .map(|mins| Duration::from_secs((mins as u64) * 60));
-        assert_eq!(
-            topology_description
-                .session_support_status
-                .logical_session_timeout(),
-            expected_timeout,
-            "{}: {}",
-            &test_file.description,
+            actual_server.set_name().unwrap_or(None),
+            server.set_name,
+            "{} (phase {})",
+            test_description,
             phase_description
         );
 
-        if let Some(compatible) = phase.outcome.compatible {
+        assert_eq!(
+            actual_server.set_version().unwrap_or(None),
+            server.set_version,
+            "{} (phase {})",
+            test_description,
+            phase_description
+        );
+
+        assert_eq!(
+            actual_server.election_id().unwrap_or(None),
+            server.election_id,
+            "{} (phase {})",
+            test_description,
+            phase_description
+        );
+
+        if let Some(logical_session_timeout_minutes) = server.logical_session_timeout_minutes {
             assert_eq!(
-                topology_description.compatibility_error.is_none(),
-                compatible,
-                "{}: {}",
-                &test_file.description,
-                phase_description,
+                actual_server.logical_session_timeout().unwrap(),
+                Some(Duration::from_secs(
+                    logical_session_timeout_minutes as u64 * 60
+                )),
+                "{} (phase {})",
+                test_description,
+                phase_description
             );
         }
 
-        assert_eq!(
-            topology_description.servers.len(),
-            phase.outcome.servers.len(),
-            "{}: {}",
-            &test_file.description,
-            phase_description
-        );
-
-        for (address, server) in phase.outcome.servers {
-            let address = ServerAddress::parse(&address).unwrap_or_else(|_| {
-                panic!(
-                    "{}: couldn't parse address \"{:?}\"",
-                    test_description, address
-                )
-            });
-            let actual_server = &topology_description
-                .servers
-                .get(&address)
-                .unwrap_or_else(|| panic!("{} (phase {})", test_description, phase_description));
-
-            let server_type = server_type_from_str(&server.server_type)
-                .unwrap_or_else(|| panic!("{} (phase {})", test_description, phase_description));
-
+        if let Some(min_wire_version) = server.min_wire_version {
             assert_eq!(
-                actual_server.server_type, server_type,
-                "{} (phase {}, address: {})",
-                &test_file.description, phase_description, address,
-            );
-
-            assert_eq!(
-                actual_server.set_name().unwrap_or(None),
-                server.set_name,
+                actual_server.min_wire_version().unwrap(),
+                Some(min_wire_version),
                 "{} (phase {})",
-                &test_file.description,
+                test_description,
                 phase_description
             );
+        }
 
+        if let Some(max_wire_version) = server.max_wire_version {
             assert_eq!(
-                actual_server.set_version().unwrap_or(None),
-                server.set_version,
+                actual_server.max_wire_version().unwrap(),
+                Some(max_wire_version),
                 "{} (phase {})",
-                &test_file.description,
+                test_description,
                 phase_description
             );
-
-            assert_eq!(
-                actual_server.election_id().unwrap_or(None),
-                server.election_id,
-                "{} (phase {})",
-                &test_file.description,
-                phase_description
-            );
-
-            if let Some(logical_session_timeout_minutes) = server.logical_session_timeout_minutes {
-                assert_eq!(
-                    actual_server.logical_session_timeout().unwrap(),
-                    Some(Duration::from_secs(
-                        logical_session_timeout_minutes as u64 * 60
-                    )),
-                    "{} (phase {})",
-                    &test_file.description,
-                    phase_description
-                );
-            }
-
-            if let Some(min_wire_version) = server.min_wire_version {
-                assert_eq!(
-                    actual_server.min_wire_version().unwrap(),
-                    Some(min_wire_version),
-                    "{} (phase {})",
-                    &test_file.description,
-                    phase_description
-                );
-            }
-
-            if let Some(max_wire_version) = server.max_wire_version {
-                assert_eq!(
-                    actual_server.max_wire_version().unwrap(),
-                    Some(max_wire_version),
-                    "{} (phase {})",
-                    &test_file.description,
-                    phase_description
-                );
-            }
         }
     }
 }
@@ -449,6 +514,106 @@ async fn sharded() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn errors() {
     run_spec_test(&["server-discovery-and-monitoring", "errors"], run_test).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn monitoring() {
+    run_spec_test(&["server-discovery-and-monitoring", "monitoring"], run_test).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn topology_closed_event_last() {
+    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
+
+    let event_handler = EventHandler::new();
+    let mut subscriber = event_handler.subscribe();
+    let client = EventClient::with_additional_options(
+        None,
+        Some(Duration::from_millis(50)),
+        None,
+        event_handler.clone(),
+    )
+    .await;
+
+    client
+        .database(function_name!())
+        .collection(function_name!())
+        .insert_one(doc! { "x": 1 }, None)
+        .await
+        .unwrap();
+    drop(client);
+
+    subscriber
+        .wait_for_event(Duration::from_millis(500), |event| {
+            matches!(event, Event::Sdam(SdamEvent::TopologyClosed(_)))
+        })
+        .await
+        .expect("should see topology closed event");
+
+    // no further SDAM events should be emitted after the TopologyClosedEvent
+    assert!(subscriber
+        .wait_for_event(Duration::from_millis(500), |event| {
+            matches!(event, Event::Sdam(_))
+        })
+        .await
+        .is_none());
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn heartbeat_events() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+
+    let mut options = CLIENT_OPTIONS.clone();
+    options.hosts.drain(1..);
+    options.heartbeat_freq = Some(Duration::from_millis(50));
+
+    let event_handler = EventHandler::new();
+    let mut subscriber = event_handler.subscribe();
+
+    let client = EventClient::with_additional_options(
+        Some(options),
+        Some(Duration::from_millis(50)),
+        None,
+        event_handler.clone(),
+    )
+    .await;
+
+    subscriber
+        .wait_for_event(Duration::from_millis(500), |event| {
+            matches!(event, Event::Sdam(SdamEvent::ServerHeartbeatStarted(_)))
+        })
+        .await
+        .expect("should see server heartbeat started event");
+
+    subscriber
+        .wait_for_event(Duration::from_millis(500), |event| {
+            matches!(event, Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(_)))
+        })
+        .await
+        .expect("should see server heartbeat succeeded event");
+
+    if !client.supports_fail_command().await {
+        return;
+    }
+
+    let options = FailCommandOptions::builder().error_code(1234).build();
+    let failpoint =
+        FailPoint::fail_command(&["isMaster", "hello"], FailPointMode::Times(1), options);
+    let _fp_guard = client
+        .enable_failpoint(failpoint, None)
+        .await
+        .expect("enabling failpoint should succeed");
+
+    subscriber
+        .wait_for_event(Duration::from_millis(500), |event| {
+            matches!(event, Event::Sdam(SdamEvent::ServerHeartbeatFailed(_)))
+        })
+        .await
+        .expect("should see server heartbeat failed event");
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -546,7 +711,7 @@ async fn pool_cleared_error_does_not_mark_unknown() {
                 Some(Ok(IsMasterReply {
                     server_address: address.clone(),
                     command_response: heartbeat_response,
-                    round_trip_time: Some(Duration::from_secs(1)),
+                    round_trip_time: Duration::from_secs(1),
                     cluster_time: None,
                 })),
             ),
