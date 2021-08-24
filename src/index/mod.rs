@@ -16,11 +16,11 @@ pub struct IndexModel {
     /// Specifies the index’s fields. For each field, specify a key-value pair in which the key is
     /// the name of the field to index and the value is index type.
     #[serde(rename = "key")]
-    keys: Document,
+    pub keys: Document,
 
     /// The options for the index.
     #[serde(flatten)]
-    options: Option<IndexOptions>,
+    pub options: Option<IndexOptions>,
 }
 
 impl IndexModel {
