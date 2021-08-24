@@ -409,13 +409,13 @@ axes:
         variables:
           PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
           VENV_BIN_DIR: "bin"
-      - id: macos-10.14
-        display_name: "MacOS 10.14"
-        run_on: macos-1014
-        variables:
-          SINGLE_THREAD: true
-          PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
-          VENV_BIN_DIR: "bin"
+      # TODO: RUST-990 re-enable macOS benchmarks
+      # - id: macos-10.14
+      #   display_name: "MacOS 10.14"
+      #   run_on: macos-1014
+      #   variables:
+      #     PYTHON: "/opt/mongodbtoolchain/v3/bin/python"
+      #     VENV_BIN_DIR: "bin"
       - id: windows-64-vs2017
         display_name: "Windows (VS 2017)"
         run_on: windows-64-vs2017-test
@@ -429,7 +429,6 @@ buildvariants:
   matrix_spec:
     os:
       - ubuntu-18.04
-      - macos-10.14
       - windows-64-vs2017
     auth-and-tls: "*"
     async-runtime: "*"
