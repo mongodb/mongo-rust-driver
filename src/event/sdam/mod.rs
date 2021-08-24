@@ -184,8 +184,7 @@ pub trait SdamEventHandler: Send + Sync {
     fn handle_server_closed_event(&self, _event: ServerClosedEvent) {}
 
     /// A [`Client`](../../struct.Client.html) will call this method on each registered handler when
-    /// its topology description changes. Note that this method will not be called until the
-    /// [`Client`](../../struct.Client.html) is dropped.
+    /// its topology description changes.
     fn handle_topology_description_changed_event(&self, _event: TopologyDescriptionChangedEvent) {}
 
     /// A [`Client`](../../struct.Client.html) will call this method on each registered handler when
@@ -193,7 +192,8 @@ pub trait SdamEventHandler: Send + Sync {
     fn handle_topology_opening_event(&self, _event: TopologyOpeningEvent) {}
 
     /// A [`Client`](../../struct.Client.html) will call this method on each registered handler when
-    /// its topology closes.
+    /// its topology closes.  Note that this method will not be called until the
+    /// [`Client`](../../struct.Client.html) is dropped.
     fn handle_topology_closed_event(&self, _event: TopologyClosedEvent) {}
 
     /// A [`Client`](../../struct.Client.html) will call this method on each registered handler when
