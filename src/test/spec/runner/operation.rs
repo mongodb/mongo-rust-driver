@@ -833,8 +833,8 @@ impl EventClient {
         collection_options: Option<CollectionOptions>,
     ) -> Result<Option<Bson>> {
         let coll = match collection_options {
-            Some(options) => self.get_coll_with_options(&db_name, &coll_name, options),
-            None => self.get_coll(&db_name, &coll_name),
+            Some(options) => self.get_coll_with_options(db_name, coll_name, options),
+            None => self.get_coll(db_name, coll_name),
         };
         operation.execute_on_collection(&coll).await
     }

@@ -118,7 +118,7 @@ async fn sdam_pool_management() {
 
     subscriber
         .wait_for_event(Duration::from_millis(500), |event| {
-            matches!(event, Event::CmapEvent(CmapEvent::ConnectionPoolReady(_)))
+            matches!(event, Event::CmapEvent(CmapEvent::PoolReady(_)))
         })
         .await
         .expect("should see pool ready event");
@@ -136,14 +136,14 @@ async fn sdam_pool_management() {
 
     subscriber
         .wait_for_event(Duration::from_millis(1000), |event| {
-            matches!(event, Event::CmapEvent(CmapEvent::ConnectionPoolCleared(_)))
+            matches!(event, Event::CmapEvent(CmapEvent::PoolCleared(_)))
         })
         .await
         .expect("should see pool cleared event");
 
     subscriber
         .wait_for_event(Duration::from_millis(1000), |event| {
-            matches!(event, Event::CmapEvent(CmapEvent::ConnectionPoolReady(_)))
+            matches!(event, Event::CmapEvent(CmapEvent::PoolReady(_)))
         })
         .await
         .expect("should see pool ready event");
@@ -196,7 +196,7 @@ async fn sdam_min_pool_size_error() {
 
     subscriber
         .wait_for_event(Duration::from_millis(2000), |event| {
-            matches!(event, Event::CmapEvent(CmapEvent::ConnectionPoolCleared(_)))
+            matches!(event, Event::CmapEvent(CmapEvent::PoolCleared(_)))
         })
         .await
         .expect("should see pool cleared event");
@@ -231,7 +231,7 @@ async fn sdam_min_pool_size_error() {
 
     subscriber
         .wait_for_event(Duration::from_millis(10), |event| {
-            matches!(event, Event::CmapEvent(CmapEvent::ConnectionPoolReady(_)))
+            matches!(event, Event::CmapEvent(CmapEvent::PoolReady(_)))
         })
         .await
         .expect("should see pool ready event");

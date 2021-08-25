@@ -83,7 +83,7 @@ async fn insert_err_details() {
                     let result = doc.get_document("writeConcern");
                     match result {
                         Ok(write_concern_doc) => {
-                            assert_eq!(write_concern_doc.contains_key("provenance"), true);
+                            assert!(write_concern_doc.contains_key("provenance"));
                         }
                         Err(e) => panic!("{:?}", e),
                     }
@@ -654,7 +654,7 @@ async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>,
     let client = EventClient::new().await;
 
     let req = VersionReq::parse(">= 4.2").unwrap();
-    if options.is_some() && !req.matches(&client.server_version.as_ref().unwrap()) {
+    if options.is_some() && !req.matches(client.server_version.as_ref().unwrap()) {
         return;
     }
 
@@ -712,13 +712,13 @@ async fn find_one_and_delete_hint_server_version() {
 
     let req1 = VersionReq::parse("< 4.2").unwrap();
     let req2 = VersionReq::parse("4.2.*").unwrap();
-    if req1.matches(&client.server_version.as_ref().unwrap()) {
+    if req1.matches(client.server_version.as_ref().unwrap()) {
         let error = res.expect_err("find one and delete should fail");
         assert!(matches!(
             error.kind.as_ref(),
             ErrorKind::OperationError { .. }
         ));
-    } else if req2.matches(&client.server_version.as_ref().unwrap()) {
+    } else if req2.matches(client.server_version.as_ref().unwrap()) {
         let error = res.expect_err("find one and delete should fail");
         assert!(matches!(
             error.kind.as_ref(),

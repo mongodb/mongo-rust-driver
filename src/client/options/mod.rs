@@ -1190,7 +1190,7 @@ impl ClientOptionsParser {
                     credential.mechanism_properties = Some(doc);
                 }
 
-                mechanism.validate_credential(&credential)?;
+                mechanism.validate_credential(credential)?;
                 credential.mechanism = options.auth_mechanism.take();
             }
             None => {

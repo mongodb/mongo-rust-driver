@@ -37,6 +37,7 @@ pub enum Event {
 }
 
 #[derive(Clone, Debug)]
+#[allow(clippy::enum_variant_names)]
 pub enum CommandEvent {
     CommandStartedEvent(CommandStartedEvent),
     CommandSucceededEvent(CommandSucceededEvent),
@@ -108,16 +109,16 @@ impl EventHandler {
 
 impl CmapEventHandler for EventHandler {
     fn handle_pool_created_event(&self, event: PoolCreatedEvent) {
-        self.handle(CmapEvent::ConnectionPoolCreated(event));
+        self.handle(CmapEvent::PoolCreated(event));
     }
 
     fn handle_pool_cleared_event(&self, event: PoolClearedEvent) {
-        self.handle(CmapEvent::ConnectionPoolCleared(event.clone()));
+        self.handle(CmapEvent::PoolCleared(event.clone()));
         self.pool_cleared_events.write().unwrap().push_back(event);
     }
 
     fn handle_pool_ready_event(&self, event: PoolReadyEvent) {
-        self.handle(CmapEvent::ConnectionPoolReady(event))
+        self.handle(CmapEvent::PoolReady(event))
     }
 }
 

@@ -73,12 +73,10 @@ async fn build() {
 
     for (original_doc, cmd_doc) in fixtures.documents.iter().zip(cmd_docs.iter_mut()) {
         assert!(cmd_doc.get("_id").is_some());
-        if original_doc.get("_id").is_some() {
-            assert_eq!(original_doc, cmd_doc);
-        } else {
+        if !original_doc.get("_id").is_some() {
             cmd_doc.remove("_id");
-            assert_eq!(original_doc, cmd_doc);
-        };
+        }
+        assert_eq!(original_doc, cmd_doc);
     }
 
     assert_eq!(

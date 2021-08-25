@@ -159,7 +159,7 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                             Entity::Bson(ref result) => {
                                 assert!(results_match(
                                     Some(result),
-                                    &expect_result,
+                                    expect_result,
                                     operation.returns_root_documents(),
                                     Some(&test_runner.entities),
                                 ));

@@ -56,7 +56,7 @@ async fn run_spec_tests() {
             let db_name = get_db_name(&test_case.description);
             let coll_name = "coll";
 
-            let coll = client.init_db_and_coll(&db_name, &coll_name).await;
+            let coll = client.init_db_and_coll(&db_name, coll_name).await;
 
             if !test_file.data.is_empty() {
                 coll.insert_many(test_file.data.clone(), None)
@@ -73,7 +73,7 @@ async fn run_spec_tests() {
             }
 
             let result = client
-                .run_collection_operation(&test_case.operation, &db_name, &coll_name, None)
+                .run_collection_operation(&test_case.operation, &db_name, coll_name, None)
                 .await;
 
             if let Some(error) = test_case.outcome.error {
@@ -201,7 +201,7 @@ async fn transaction_ids_excluded() {
     assert!(excludes_txn_number("aggregate"));
 
     let req = semver::VersionReq::parse(">=4.2").unwrap();
-    if req.matches(&client.server_version.as_ref().unwrap()) {
+    if req.matches(client.server_version.as_ref().unwrap()) {
         coll.aggregate(
             vec![
                 doc! { "$match": doc! { "x": 1 } },
@@ -285,7 +285,7 @@ async fn mmapv1_error_raised() {
     let client = TestClient::new().await;
 
     let req = semver::VersionReq::parse("<=4.0").unwrap();
-    if !req.matches(&client.server_version.as_ref().unwrap()) || !client.is_replica_set() {
+    if !req.matches(client.server_version.as_ref().unwrap()) || !client.is_replica_set() {
         return;
     }
 
@@ -340,8 +340,8 @@ async fn label_not_added(retry_reads: bool) {
     // Configuring a failpoint is only supported on 4.0+ replica sets and 4.1.5+ sharded clusters.
     let req = VersionReq::parse(">=4.0").unwrap();
     let sharded_req = VersionReq::parse(">=4.1.5").unwrap();
-    if client.is_sharded() && !sharded_req.matches(&client.server_version.as_ref().unwrap())
-        || !req.matches(&client.server_version.as_ref().unwrap())
+    if client.is_sharded() && !sharded_req.matches(client.server_version.as_ref().unwrap())
+        || !req.matches(client.server_version.as_ref().unwrap())
     {
         return;
     }

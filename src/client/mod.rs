@@ -285,7 +285,7 @@ impl Client {
                     message: self
                         .inner
                         .topology
-                        .server_selection_timeout_error_message(&criteria)
+                        .server_selection_timeout_error_message(criteria)
                         .await,
                 }
                 .into());

@@ -58,7 +58,7 @@ async fn run_command_monitoring_test(test_file: TestFile) {
 
         if let Some(ref max_version) = test_case.max_version {
             let req = VersionReq::parse(&format!("<= {}", &max_version)).unwrap();
-            if !req.matches(&client.server_version.as_ref().unwrap()) {
+            if !req.matches(client.server_version.as_ref().unwrap()) {
                 println!("Skipping {}", test_case.description);
                 continue;
             }
@@ -66,7 +66,7 @@ async fn run_command_monitoring_test(test_file: TestFile) {
 
         if let Some(ref min_version) = test_case.min_version {
             let req = VersionReq::parse(&format!(">= {}", &min_version)).unwrap();
-            if !req.matches(&client.server_version.as_ref().unwrap()) {
+            if !req.matches(client.server_version.as_ref().unwrap()) {
                 println!("Skipping {}", test_case.description);
                 continue;
             }

@@ -454,7 +454,7 @@ pub(crate) enum ClientFirst {
 impl ClientFirst {
     pub(crate) fn to_document(&self) -> Document {
         match self {
-            Self::Scram(version, client_first) => client_first.to_command(&version).body,
+            Self::Scram(version, client_first) => client_first.to_command(version).body,
             Self::X509(command) => command.body.clone(),
         }
     }
