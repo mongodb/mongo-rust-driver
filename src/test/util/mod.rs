@@ -252,7 +252,7 @@ impl TestClient {
         } else {
             VersionReq::parse(">= 4.0").unwrap()
         };
-        version.matches(&self.server_version.as_ref().unwrap())
+        version.matches(self.server_version.as_ref().unwrap())
     }
 
     pub async fn enable_failpoint(

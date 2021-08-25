@@ -67,7 +67,7 @@ impl Database {
 
     /// Gets the name of the `Database`.
     pub fn name(&self) -> &str {
-        &self.async_database.name()
+        self.async_database.name()
     }
 
     /// Gets the read preference of the `Database`.

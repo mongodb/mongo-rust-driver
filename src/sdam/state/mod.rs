@@ -233,9 +233,7 @@ impl Topology {
     /// an operation.
     pub(crate) async fn handle_pre_handshake_error(&self, error: Error, server: &Server) -> bool {
         let state_lock = self.state.write().await;
-        let changed = self
-            .mark_server_as_unknown(error, &server, state_lock)
-            .await;
+        let changed = self.mark_server_as_unknown(error, server, state_lock).await;
         if changed {
             server.pool.clear();
         }
@@ -495,9 +493,9 @@ impl TopologyState {
         topology: WeakTopology,
     ) -> Option<TopologyDescriptionDiff> {
         let old_description = self.description.clone();
-        self.description.sync_hosts(&hosts);
+        self.description.sync_hosts(hosts);
 
-        self.sync_hosts(&hosts, options, &topology);
+        self.sync_hosts(hosts, options, &topology);
 
         old_description.diff(&self.description)
     }

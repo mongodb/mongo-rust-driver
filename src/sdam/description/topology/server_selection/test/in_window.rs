@@ -119,7 +119,7 @@ async fn load_balancing_test() {
 
     let version = VersionReq::parse(">= 4.2.9").unwrap();
     // blockConnection failpoint option only supported in 4.2.9+.
-    if !version.matches(&setup_client.server_version.as_ref().unwrap()) {
+    if !version.matches(setup_client.server_version.as_ref().unwrap()) {
         println!(
             "skipping load_balancing_test test due to server not supporting blockConnection option"
         );

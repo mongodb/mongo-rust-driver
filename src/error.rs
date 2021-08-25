@@ -97,7 +97,7 @@ impl Error {
         }
         match &self.kind.code_and_message() {
             Some((code, message)) => {
-                if RETRYABLE_READ_CODES.contains(&code) {
+                if RETRYABLE_READ_CODES.contains(code) {
                     return true;
                 }
                 if is_not_master(*code, message) || is_recovering(*code, message) {
@@ -125,7 +125,7 @@ impl Error {
             return true;
         }
         match &self.kind.code_and_message() {
-            Some((code, _)) => RETRYABLE_WRITE_CODES.contains(&code),
+            Some((code, _)) => RETRYABLE_WRITE_CODES.contains(code),
             None => false,
         }
     }

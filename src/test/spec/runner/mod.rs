@@ -91,7 +91,7 @@ pub async fn run_v2_test(test_file: TestFile) {
             // does not attach to the server ping. When the driver is updated to send implicit
             // sessions to standalones, this test should be unskipped.
             let req = semver::VersionReq::parse("<= 3.6").unwrap();
-            if req.matches(&client.server_version.as_ref().unwrap()) && client.is_standalone() {
+            if req.matches(client.server_version.as_ref().unwrap()) && client.is_standalone() {
                 continue;
             }
             start_session(&client, &db_name).await;

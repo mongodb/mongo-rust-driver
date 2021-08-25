@@ -309,9 +309,7 @@ impl Operation {
 
                 // wait for event to be emitted to ensure drop has completed.
                 subscriber
-                    .wait_for_event(EVENT_TIMEOUT, |e| {
-                        matches!(e, Event::ConnectionPoolClosed(_))
-                    })
+                    .wait_for_event(EVENT_TIMEOUT, |e| matches!(e, Event::PoolClosed(_)))
                     .await
                     .expect("did not receive ConnectionPoolClosed event after closing pool");
             }
@@ -356,7 +354,7 @@ impl Matchable for ConnectionPoolOptions {
 impl Matchable for Event {
     fn content_matches(&self, expected: &Event) -> bool {
         match (self, expected) {
-            (Event::ConnectionPoolCreated(actual), Event::ConnectionPoolCreated(ref expected)) => {
+            (Event::PoolCreated(actual), Event::PoolCreated(ref expected)) => {
                 actual.options.matches(&expected.options)
             }
             (Event::ConnectionCreated(actual), Event::ConnectionCreated(ref expected)) => {
@@ -380,9 +378,9 @@ impl Matchable for Event {
                 Event::ConnectionCheckOutFailed(ref expected),
             ) => actual.reason == expected.reason,
             (Event::ConnectionCheckOutStarted(_), Event::ConnectionCheckOutStarted(_)) => true,
-            (Event::ConnectionPoolCleared(_), Event::ConnectionPoolCleared(_)) => true,
-            (Event::ConnectionPoolReady(_), Event::ConnectionPoolReady(_)) => true,
-            (Event::ConnectionPoolClosed(_), Event::ConnectionPoolClosed(_)) => true,
+            (Event::PoolCleared(_), Event::PoolCleared(_)) => true,
+            (Event::PoolReady(_), Event::PoolReady(_)) => true,
+            (Event::PoolClosed(_), Event::PoolClosed(_)) => true,
             _ => false,
         }
     }
@@ -464,7 +462,7 @@ async fn redact_credential() {
 
     subscriber
         .wait_for_event(EVENT_TIMEOUT, |e| {
-            if let crate::test::Event::CmapEvent(CmapEvent::ConnectionPoolCreated(event)) = e {
+            if let crate::test::Event::CmapEvent(CmapEvent::PoolCreated(event)) = e {
                 let event_debug = format!("{:?}", event);
                 if let Some(ref pass) = credential.password {
                     assert!(!event_debug.contains(pass))
