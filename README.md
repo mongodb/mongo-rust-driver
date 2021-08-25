@@ -9,6 +9,7 @@ This repository contains the officially supported MongoDB Rust driver, a client 
     - [Importing](#importing)
         - [Configuring the async runtime](#configuring-the-async-runtime)
         - [Enabling the sync API](#enabling-the-sync-api)
+        - [All feature flags](#all-feature-flags)
 - [Example Usage](#example-usage)
     - [Using the async API](#using-the-async-api)
         - [Connecting to a MongoDB deployment](#connecting-to-a-mongodb-deployment)
