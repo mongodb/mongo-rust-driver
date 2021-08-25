@@ -9,3 +9,4 @@ tokio = "1.0.2"
 
 [dependencies.mongodb]
 path = "../.."
+features = ["aws-auth"]
