@@ -80,6 +80,7 @@ pub struct DeleteResult {
 /// Information about the index created as a result of a
 /// [`Collection::create_index`](../struct.Collection.html#method.create_index).
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct CreateIndexResult {
     /// The name of the index created in the `createIndex` command.
     pub index_name: String,
@@ -117,6 +118,7 @@ impl From<CreateIndexesResult> for CreateIndexResult {
 /// Information about the indexes created as a result of a
 /// [`Collection::create_indexes`](../struct.Collection.html#method.create_indexes).
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct CreateIndexesResult {
     /// The list containing the names of all indexes created in the `createIndexes` command.
     pub index_names: Vec<String>,
