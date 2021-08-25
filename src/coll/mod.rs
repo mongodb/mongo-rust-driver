@@ -58,9 +58,19 @@ use crate::{
 /// [`Database::collection`](struct.Database.html#method.collection) or
 /// [`Database::collection_with_options`](struct.Database.html#method.collection_with_options).
 ///
-/// `Collection` uses [`std::sync::Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html) internally,
-/// so it can safely be shared across threads or async tasks. For example:
+/// A [`Collection`] can be parameterized with any type that implements the
+/// `Serialize` and `Deserialize` traits from the [`serde`](https://serde.rs/) crate. This includes but
+/// is not limited to just `Document`. The various methods that accept or return instances of the
+/// documents in the collection will accept/return instances of the generic parameter (e.g.
+/// [`Collection::insert_one`] accepts it as an argument, [`Collection::find_one`] returns an
+/// `Option` of it). It is recommended to define types that model your data which you can
+/// parameterize your [`Collection`]s with instead of `Document`, since doing so eliminates a lot of
+/// boilerplate deserialization code and is often more performant.
 ///
+/// `Collection` uses [`std::sync::Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html) internally,
+/// so it can safely be shared across threads or async tasks.
+///
+/// # Example
 /// ```rust
 /// # use mongodb::{
 /// #     bson::doc,
@@ -76,14 +86,24 @@ use crate::{
 /// # use mongodb::Client;
 /// #
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
-/// let coll = client.database("items").collection("in_stock");
+/// use serde::{Deserialize, Serialize};
+///
+/// /// Define a type that models our data.
+/// #[derive(Clone, Debug, Deserialize, Serialize)]
+/// struct Item {
+///     id: u32,
+/// }
+///
+/// // Parameterize our collection with the model.
+/// let coll = client.database("items").collection::<Item>("in_stock");
 ///
 /// for i in 0..5 {
 ///     let coll_ref = coll.clone();
 ///
+///     // Spawn several tasks that operate on the same collection concurrently.
 ///     task::spawn(async move {
-///         // Perform operations with `coll_ref`. For example:
-///         coll_ref.insert_one(doc! { "x": i }, None).await;
+///         // Perform operations with `coll_ref` that work with directly our model.
+///         coll_ref.insert_one(Item { id: i }, None).await;
 ///     });
 /// }
 /// #
