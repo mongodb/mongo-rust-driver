@@ -1,15 +1,15 @@
-#[cfg(feature = "tokio-runtime")]
+#[cfg(feature = "aws-auth")]
 use reqwest::{Method, Response};
-#[cfg(feature = "tokio-runtime")]
+#[cfg(feature = "aws-auth")]
 use serde::Deserialize;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct HttpClient {
-    #[cfg(feature = "tokio-runtime")]
+    #[cfg(feature = "aws-auth")]
     inner: reqwest::Client,
 }
 
-#[cfg(feature = "tokio-runtime")]
+#[cfg(feature = "aws-auth")]
 impl HttpClient {
     /// Executes an HTTP GET request and deserializes the JSON response.
     pub(crate) async fn get_and_deserialize_json<'a, T>(
