@@ -25,12 +25,6 @@ tokio-runtime = ["tokio/macros", "tokio/net", "tokio/rt", "tokio/time", "serde_b
 async-std-runtime = ["async-std", "async-std/attributes", "async-std-resolver", "tokio-util/compat"]
 sync = ["async-std-runtime"]
 
-# The bson/u2i feature enables automatic conversion from unsigned to signed types during
-# serialization. This feature is intended for use when serializing data types in third-party crates
-# whose implementation cannot be changed; otherwise, it is preferred to use the helper functions
-# provided in the bson::serde_helpers module.
-bson-u2i = ["bson/u2i"]
-
 # Enable support for v0.4 of the chrono crate in the public API of the BSON library.
 bson-chrono-0_4 = ["bson/chrono-0_4"]
 
