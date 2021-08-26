@@ -309,6 +309,17 @@ functions:
           ${PREPARE_SHELL}
 
           .evergreen/run-plain-tests.sh
+
+  "run connection string tests":
+    - command: shell.exec
+      type: test
+      params:
+        shell: bash
+        working_dir: "src"
+        script: |
+          ${PREPARE_SHELL}
+
+          .evergreen/run-connection-string-tests.sh
             
   "prepare resources":
     - command: shell.exec
@@ -822,6 +833,10 @@ tasks:
       - func: "run aws auth test with aws credentials and session token as environment variables"
       - func: "run aws auth test with aws EC2 credentials"
       - func: "run aws ECS auth test"
+
+  - name: "test-connection-string"
+    commands:
+      - func: "run connection string tests"
 
   - name: "test-atlas-connectivity"
     tags: ["atlas-connect"]
@@ -1390,6 +1405,7 @@ buildvariants:
   display_name: "Atlas Connectivity ${os} with ${async-runtime}"
   tasks:
     - ".atlas-connect"
+
 - matrix_name: "aws-auth"
   matrix_spec:
     os:
@@ -1398,6 +1414,7 @@ buildvariants:
   display_name: "${os} AWS Auth with ${async-runtime}"
   tasks:
     - ".aws-auth"
+    - "test-connection-string"
 # TODO: RUST-361 enable these tests once OCSP support is implemented
 # - matrix_name: "ocsp"
 #   matrix_spec:
