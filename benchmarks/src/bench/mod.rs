@@ -10,6 +10,7 @@ pub mod run_command;
 
 use std::{
     convert::TryInto,
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -17,7 +18,11 @@ use anyhow::{bail, Result};
 use futures::stream::TryStreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use lazy_static::lazy_static;
-use mongodb::bson::{Bson, Document};
+use mongodb::{
+    bson::{doc, Bson, Document},
+    options::{Acknowledgment, ClientOptions, SelectionCriteria, WriteConcern},
+    Client,
+};
 use serde_json::Value;
 
 use crate::fs::{BufReader, File};
@@ -45,22 +50,22 @@ lazy_static! {
 pub trait Benchmark: Sized {
     type Options;
 
-    // execute once before benchmarking
+    /// execute once before benchmarking
     async fn setup(options: Self::Options) -> Result<Self>;
 
-    // execute at the beginning of every iteration
+    /// execute at the beginning of every iteration
     async fn before_task(&mut self) -> Result<()> {
         Ok(())
     }
 
     async fn do_task(&self) -> Result<()>;
 
-    // execute at the end of every iteration
+    /// execute at the end of every iteration
     async fn after_task(&self) -> Result<()> {
         Ok(())
     }
 
-    // execute once after benchmarking
+    /// execute once after benchmarking
     async fn teardown(&self) -> Result<()> {
         Ok(())
     }
@@ -85,7 +90,8 @@ pub(crate) async fn parse_json_file_to_documents(file: File) -> Result<Vec<Docum
 
 fn finished(duration: Duration, iter: usize) -> bool {
     let elapsed = duration.as_secs();
-    elapsed >= *MAX_EXECUTION_TIME || (iter >= *TARGET_ITERATION_COUNT && elapsed > *MIN_EXECUTION_TIME)
+    elapsed >= *MAX_EXECUTION_TIME
+        || (iter >= *TARGET_ITERATION_COUNT && elapsed > *MIN_EXECUTION_TIME)
 }
 
 pub async fn run_benchmark<B: Benchmark + Send + Sync>(
@@ -123,4 +129,35 @@ pub async fn run_benchmark<B: Benchmark + Send + Sync>(
 
     test_durations.sort();
     Ok(test_durations)
+}
+
+pub async fn drop_database(uri: &str, database: &str) -> Result<()> {
+    let mut options = ClientOptions::parse(uri).await?;
+    options.write_concern = Some(WriteConcern::builder().w(Acknowledgment::Majority).build());
+    let client = Client::with_options(options.clone())?;
+
+    let hello = client
+        .database("admin")
+        .run_command(doc! { "ismaster": true }, None)
+        .await?;
+
+    client.database(&database).drop(None).await?;
+
+    // in sharded clusters, take additional steps to ensure database is dropped completely.
+    // see: https://docs.mongodb.com/manual/reference/method/db.dropDatabase/#replica-set-and-sharded-clusters
+    let is_sharded = hello.get_str("msg").ok() == Some("isdbgrid");
+    if is_sharded {
+        client.database(&database).drop(None).await?;
+        for host in options.hosts {
+            client
+                .database("admin")
+                .run_command(
+                    doc! { "flushRouterConfig": 1 },
+                    SelectionCriteria::Predicate(Arc::new(move |s| s.address() == &host)),
+                )
+                .await?;
+        }
+    }
+
+    Ok(())
 }

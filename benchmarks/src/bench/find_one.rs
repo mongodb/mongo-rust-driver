@@ -1,11 +1,16 @@
 use std::{convert::TryInto, path::PathBuf};
 
 use anyhow::{bail, Result};
-use mongodb::{Client, Collection, Database, bson::{Bson, Document, doc}};
+use mongodb::{
+    bson::{doc, Bson, Document},
+    Client,
+    Collection,
+    Database,
+};
 use serde_json::Value;
 
 use crate::{
-    bench::{Benchmark, COLL_NAME, DATABASE_NAME},
+    bench::{drop_database, Benchmark, COLL_NAME, DATABASE_NAME},
     fs::read_to_string,
 };
 
@@ -13,6 +18,7 @@ pub struct FindOneBenchmark {
     db: Database,
     num_iter: usize,
     coll: Collection<Document>,
+    uri: String,
 }
 
 // Specifies the options to a `FindOneBenchmark::setup` operation.
@@ -29,7 +35,7 @@ impl Benchmark for FindOneBenchmark {
     async fn setup(options: Self::Options) -> Result<Self> {
         let client = Client::with_uri_str(&options.uri).await?;
         let db = client.database(&DATABASE_NAME);
-        db.drop(None).await?;
+        drop_database(options.uri.as_str(), DATABASE_NAME.as_str()).await?;
 
         let num_iter = options.num_iter;
 
@@ -47,7 +53,12 @@ impl Benchmark for FindOneBenchmark {
             coll.insert_one(doc.clone(), None).await?;
         }
 
-        Ok(FindOneBenchmark { db, num_iter, coll })
+        Ok(FindOneBenchmark {
+            db,
+            num_iter,
+            coll,
+            uri: options.uri,
+        })
     }
 
     async fn do_task(&self) -> Result<()> {
@@ -61,7 +72,7 @@ impl Benchmark for FindOneBenchmark {
     }
 
     async fn teardown(&self) -> Result<()> {
-        self.db.drop(None).await?;
+        drop_database(self.uri.as_str(), self.db.name()).await?;
 
         Ok(())
     }

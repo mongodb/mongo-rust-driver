@@ -6,11 +6,18 @@ edition = "2018"
 
 [features]
 default = ["tokio-runtime"]
-tokio-runtime = ["tokio/fs", "tokio/macros", "tokio/rt", "tokio/rt-multi-thread", "tokio-stream"]
-async-std-runtime = ["async-std"]
+tokio-runtime = [
+  "tokio/fs",
+  "tokio/macros",
+  "tokio/rt",
+  "tokio/rt-multi-thread",
+  "tokio-stream",
+  "mongodb/tokio-runtime"
+]
+async-std-runtime = ["async-std", "mongodb/async-std-runtime"]
 
 [dependencies]
-mongodb = { path = ".." }
+mongodb = { path = "..", default-features = false }
 serde_json = "1.0.59"
 lazy_static = "1.4.0"
 clap = "2.33.3"
@@ -22,3 +29,4 @@ tokio-stream = { version = "0.1.6", features = ["io-util"], optional = true }
 async-std = { version = "1.9.0", optional = true, features = ["attributes", "unstable"] }
 futures = "0.3.8"
 anyhow = "1.0.34"
+serde = "1"
