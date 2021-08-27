@@ -22,6 +22,7 @@ use crate::{
         FindOneAndUpdateOptions,
         FindOneOptions,
         FindOptions,
+        IndexOptions,
         InsertManyOptions,
         InsertOneOptions,
         ListCollectionsOptions,
@@ -1332,6 +1333,41 @@ impl TestOperation for AssertCollectionNotExists {
                 .unwrap();
             assert!(!collections.contains(&self.collection));
             Ok(None)
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct CreateIndex {
+    keys: Document,
+    name: Option<String>,
+}
+
+impl TestOperation for CreateIndex {
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let options = IndexOptions::builder().name(self.name.clone()).build();
+            let index = IndexModel::builder()
+                .keys(self.keys.clone())
+                .options(options)
+                .build();
+
+            let name = match session {
+                Some(session) => {
+                    collection
+                        .create_index_with_session(index, None, session)
+                        .await?
+                        .index_name
+                }
+                None => collection.create_index(index, None).await?.index_name,
+            };
+            Ok(Some(name.into()))
         }
         .boxed()
     }
