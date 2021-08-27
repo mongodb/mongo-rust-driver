@@ -194,6 +194,9 @@ async fn load_balancing_test() {
 
     let mut client = EventClient::new().await;
 
+    // saturate pools
+    do_test(&mut client, 0.0, 0.50).await;
+
     // verify that normal conditions generally evenly distributes load
     do_test(&mut client, 0.40, 0.50).await;
 
