@@ -147,7 +147,7 @@ async fn load_balancing_test() {
 
     /// min_share is the lower bound for the % of times the the less selected server
     /// was selected. max_share is the upper bound.
-    async fn do_test(client: &mut EventClient, min_share: f64, max_share: f64) {
+    async fn do_test(client: &mut EventClient, min_share: f64, max_share: f64, iterations: usize) {
         client.clear_cached_events();
 
         let mut handles: Vec<AsyncJoinHandle<()>> = Vec::new();
@@ -158,7 +158,7 @@ async fn load_balancing_test() {
             handles.push(
                 RUNTIME
                     .spawn(async move {
-                        for _ in 0..10 {
+                        for _ in 0..iterations {
                             let _ = collection.find_one(None, None).await;
                         }
                     })
@@ -195,10 +195,7 @@ async fn load_balancing_test() {
     let mut client = EventClient::new().await;
 
     // saturate pools
-    do_test(&mut client, 0.0, 0.50).await;
-
-    // verify that normal conditions generally evenly distributes load
-    do_test(&mut client, 0.40, 0.50).await;
+    do_test(&mut client, 0.40, 0.50, 100).await;
 
     // enable a failpoint on one of the mongoses to slow it down
     let options = FailCommandOptions::builder()
@@ -212,9 +209,9 @@ async fn load_balancing_test() {
         .expect("enabling failpoint should succeed");
 
     // verify that the lesser picked server (slower one) was picked less than 25% of the time.
-    do_test(&mut client, 0.05, 0.25).await;
+    do_test(&mut client, 0.05, 0.25, 10).await;
 
     // disable failpoint and rerun, should be back to even split
     drop(fp_guard);
-    do_test(&mut client, 0.40, 0.50).await;
+    do_test(&mut client, 0.40, 0.50, 100).await;
 }
