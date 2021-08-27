@@ -84,13 +84,8 @@
 #![cfg_attr(test, type_length_limit = "80000000")]
 #![doc(html_root_url = "https://docs.rs/mongodb/2.0.0-beta.3")]
 
-#[cfg(all(
-    feature = "aws-auth",
-    feature = "async-std-runtime"
-))]
-compile_error!(
-    "The `aws-auth` feature flag is only supported on the tokio runtime."
-);
+#[cfg(all(feature = "aws-auth", feature = "async-std-runtime"))]
+compile_error!("The `aws-auth` feature flag is only supported on the tokio runtime.");
 
 macro_rules! define_if_single_runtime_enabled {
     ( $( $def:item )+ ) => {

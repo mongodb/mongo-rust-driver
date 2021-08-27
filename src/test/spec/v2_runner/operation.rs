@@ -283,6 +283,10 @@ impl<'de> Deserialize<'de> for Operation {
                 BsonDeserializer::new(Bson::Document(definition.arguments)),
             )
             .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "listIndexNames" => ListIndexNames::deserialize(BsonDeserializer::new(Bson::Document(
+                definition.arguments,
+            )))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -834,8 +838,8 @@ impl TestOperation for ListCollectionNames {
                 }
                 None => database.list_collection_names(self.filter.clone()).await?,
             };
-            let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
-            Ok(Some(Bson::from(result)))
+            let result: Vec<Bson> = result.into_iter().map(|s| s.into()).collect();
+            Ok(Some(result.into()))
         }
         .boxed()
     }
@@ -1089,8 +1093,8 @@ impl TestOperation for ListDatabaseNames {
             let result = client
                 .list_database_names(self.filter.clone(), self.options.clone())
                 .await?;
-            let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
-            Ok(Some(Bson::Array(result)))
+            let result: Vec<Bson> = result.into_iter().map(|s| s.into()).collect();
+            Ok(Some(result.into()))
         }
         .boxed()
     }
@@ -1322,6 +1326,27 @@ impl TestOperation for AssertCollectionNotExists {
                 .unwrap();
             assert!(!collections.contains(&self.collection));
             Ok(None)
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct ListIndexNames {}
+
+impl TestOperation for ListIndexNames {
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let names = match session {
+                Some(session) => collection.list_index_names_with_session(session).await?,
+                None => collection.list_index_names().await?,
+            };
+            let names: Vec<Bson> = names.into_iter().map(|name| name.into()).collect();
+            Ok(Some(names.into()))
         }
         .boxed()
     }

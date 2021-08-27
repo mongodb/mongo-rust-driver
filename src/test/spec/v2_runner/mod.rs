@@ -34,7 +34,6 @@ const SKIPPED_OPERATIONS: &[&str] = &[
     "download_by_name",
     "listCollectionObjects",
     "listDatabaseObjects",
-    "listIndexNames",
     "listIndexes",
     "mapReduce",
     "watch",
