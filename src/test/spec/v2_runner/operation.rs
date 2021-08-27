@@ -16,6 +16,7 @@ use crate::{
         DeleteOptions,
         DistinctOptions,
         DropCollectionOptions,
+        DropIndexOptions,
         EstimatedDocumentCountOptions,
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
@@ -285,6 +286,14 @@ impl<'de> Deserialize<'de> for Operation {
             "assertCollectionNotExists" => AssertCollectionNotExists::deserialize(
                 BsonDeserializer::new(Bson::Document(definition.arguments)),
             )
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "createIndex" => CreateIndex::deserialize(BsonDeserializer::new(Bson::Document(
+                definition.arguments,
+            )))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "dropIndex" => DropIndex::deserialize(BsonDeserializer::new(Bson::Document(
+                definition.arguments,
+            )))
             .map(|op| Box::new(op) as Box<dyn TestOperation>),
             "listIndexes" => ListIndexes::deserialize(BsonDeserializer::new(Bson::Document(
                 definition.arguments,
@@ -1368,6 +1377,30 @@ impl TestOperation for CreateIndex {
                 None => collection.create_index(index, None).await?.index_name,
             };
             Ok(Some(name.into()))
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct DropIndex {
+    name: String,
+    #[serde(flatten)]
+    options: DropIndexOptions,
+}
+
+impl TestOperation for DropIndex {
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            match session {
+                Some(session) => collection.drop_index_with_session(self.name.clone(), self.options.clone(), session).await?,
+                None => collection.drop_index(self.name.clone(), self.options.clone()).await?,
+            }
+            Ok(None)
         }
         .boxed()
     }

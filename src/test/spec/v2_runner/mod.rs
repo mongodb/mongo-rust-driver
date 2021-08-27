@@ -29,7 +29,6 @@ use test_file::{TestData, TestFile};
 const SKIPPED_OPERATIONS: &[&str] = &[
     "bulkWrite",
     "count",
-    "createIndex",
     "download",
     "download_by_name",
     "listCollectionObjects",
