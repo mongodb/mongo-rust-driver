@@ -256,8 +256,8 @@ details). As such, it is **_highly_** recommended to poll all futures returned f
 completion. In order to still use timeout mechanisms like `tokio::time::timeout` with the driver,
 one option is to spawn tasks and time out on their
 [`JoinHandle`](https://docs.rs/tokio/1.10.1/tokio/task/struct.JoinHandle.html) futures instead of on
-the driver's futures directly. This will ensure the driver's futures continue to be polled while
-also allowing the application to continue.
+the driver's futures directly. This will ensure the driver's futures will always be completely polled
+while also allowing the application to continue in the event of a timeout.
 
 e.g.
 ``` rust
