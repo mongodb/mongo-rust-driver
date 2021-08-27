@@ -141,7 +141,6 @@ define_if_single_runtime_enabled! {
         coll::Collection,
         cursor::{Cursor, session::{SessionCursor, SessionCursorStream}},
         db::Database,
-        index::IndexModel,
     };
 
     #[cfg(feature = "sync")]
@@ -152,7 +151,7 @@ define_if_single_runtime_enabled! {
         db::Database,
     };
 
-    pub use coll::Namespace;
+    pub use {coll::Namespace, index::IndexModel};
 }
 
 #[cfg(all(

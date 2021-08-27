@@ -23,7 +23,7 @@ use crate::{
         FindOptions,
         InsertManyOptions,
         InsertOneOptions,
-        ListIndexOptions,
+        ListIndexesOptions,
         ReadConcern,
         ReplaceOptions,
         SelectionCriteria,
@@ -416,7 +416,7 @@ impl<T> Collection<T> {
     /// Lists all indexes on this collection.
     pub fn list_indexes(
         &self,
-        options: impl Into<Option<ListIndexOptions>>,
+        options: impl Into<Option<ListIndexesOptions>>,
     ) -> Result<Cursor<IndexModel>> {
         RUNTIME
             .block_on(self.async_collection.list_indexes(options))
@@ -426,7 +426,7 @@ impl<T> Collection<T> {
     /// Lists all indexes on this collection using the provided `ClientSession`.
     pub fn list_indexes_with_session(
         &self,
-        options: impl Into<Option<ListIndexOptions>>,
+        options: impl Into<Option<ListIndexesOptions>>,
         session: &mut ClientSession,
     ) -> Result<SessionCursor<IndexModel>> {
         RUNTIME

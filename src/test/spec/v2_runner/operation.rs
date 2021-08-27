@@ -291,10 +291,10 @@ impl<'de> Deserialize<'de> for Operation {
                 definition.arguments,
             )))
             .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "dropIndex" => DropIndex::deserialize(BsonDeserializer::new(Bson::Document(
-                definition.arguments,
-            )))
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "dropIndex" => {
+                DropIndex::deserialize(BsonDeserializer::new(Bson::Document(definition.arguments)))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
             "listIndexes" => ListIndexes::deserialize(BsonDeserializer::new(Bson::Document(
                 definition.arguments,
             )))
@@ -1397,8 +1397,16 @@ impl TestOperation for DropIndex {
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
             match session {
-                Some(session) => collection.drop_index_with_session(self.name.clone(), self.options.clone(), session).await?,
-                None => collection.drop_index(self.name.clone(), self.options.clone()).await?,
+                Some(session) => {
+                    collection
+                        .drop_index_with_session(self.name.clone(), self.options.clone(), session)
+                        .await?
+                }
+                None => {
+                    collection
+                        .drop_index(self.name.clone(), self.options.clone())
+                        .await?
+                }
             }
             Ok(None)
         }
@@ -1454,7 +1462,6 @@ impl TestOperation for ListIndexNames {
                 Some(session) => collection.list_index_names_with_session(session).await?,
                 None => collection.list_index_names().await?,
             };
-            let names: Vec<Bson> = names.into_iter().map(|name| name.into()).collect();
             Ok(Some(names.into()))
         }
         .boxed()
