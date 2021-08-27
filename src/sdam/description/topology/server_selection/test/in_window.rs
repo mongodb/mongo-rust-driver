@@ -195,7 +195,7 @@ async fn load_balancing_test() {
     let mut client = EventClient::new().await;
 
     // saturate pools
-    do_test(&mut client, 0.40, 0.50, 100).await;
+    do_test(&mut client, 0.0, 0.50, 100).await;
 
     // enable a failpoint on one of the mongoses to slow it down
     let options = FailCommandOptions::builder()
