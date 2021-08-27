@@ -67,7 +67,6 @@ features = ["sync"]
 | `async-std-runtime` | Enable support for the `async-std` runtime                                                                                            | `async-std` 1.0                     | no      |
 | `sync`              | Expose the synchronous API (`mongodb::sync`). This flag cannot be used in conjunction with either of the async runtime feature flags. | `async-std` 1.0                     | no      |
 | `aws-auth`          | Enable support for the MONGODB-AWS authentication mechanism.                                                                          | `reqwest` 0.11                      | no      |
-| `bson-u2i`          | Enable the `u2i` feature flag of the re-exported `bson` crate.                                                                        | n/a                                 | no      |
 | `bson-uuid-0_8`     | Enable support for v0.8 of the [`uuid`](docs.rs/uuid/0.8) crate in the public API of the re-exported `bson` crate.                    | `uuid` 0.8                          | no      |
 | `bson-chrono-0_4`   | Enable support for v0.4 of the [`chrono`](docs.rs/chrono/0.4) crate in the public API of the re-exported `bson` crate.                | n/a                                 | no      |
 
