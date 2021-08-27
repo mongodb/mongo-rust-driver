@@ -5,7 +5,7 @@ use crate::{
     error::Result,
     index::IndexModel,
     operation::{append_options, Operation},
-    options::ListIndexOptions,
+    options::ListIndexesOptions,
     selection_criteria::{ReadPreference, SelectionCriteria},
     Namespace,
 };
@@ -17,11 +17,11 @@ mod test;
 
 pub(crate) struct ListIndexes {
     ns: Namespace,
-    options: Option<ListIndexOptions>,
+    options: Option<ListIndexesOptions>,
 }
 
 impl ListIndexes {
-    pub(crate) fn new(ns: Namespace, options: Option<ListIndexOptions>) -> Self {
+    pub(crate) fn new(ns: Namespace, options: Option<ListIndexesOptions>) -> Self {
         ListIndexes { ns, options }
     }
 

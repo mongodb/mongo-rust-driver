@@ -906,7 +906,7 @@ pub struct DropIndexOptions {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]
-pub struct ListIndexOptions {
+pub struct ListIndexesOptions {
     /// The maximum amount of time to search for the index.
     ///
     /// This option maps to the `maxTimeMS` MongoDB query option, so the duration will be sent

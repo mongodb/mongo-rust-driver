@@ -6,13 +6,13 @@ use serde::{de::Deserializer, Deserialize};
 use crate::{
     bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
     client::session::TransactionState,
-    coll::options::CollectionOptions,
-    db::options::DatabaseOptions,
     error::Result,
     options::{
         AggregateOptions,
+        CollectionOptions,
         CountOptions,
         CreateCollectionOptions,
+        DatabaseOptions,
         DeleteOptions,
         DistinctOptions,
         DropCollectionOptions,
@@ -26,6 +26,7 @@ use crate::{
         InsertOneOptions,
         ListCollectionsOptions,
         ListDatabasesOptions,
+        ListIndexesOptions,
         ReplaceOptions,
         TransactionOptions,
         UpdateModifications,
@@ -37,6 +38,7 @@ use crate::{
     ClientSession,
     Collection,
     Database,
+    IndexModel,
 };
 
 pub trait TestOperation: Debug {
@@ -282,6 +284,10 @@ impl<'de> Deserialize<'de> for Operation {
             "assertCollectionNotExists" => AssertCollectionNotExists::deserialize(
                 BsonDeserializer::new(Bson::Document(definition.arguments)),
             )
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "listIndexes" => ListIndexes::deserialize(BsonDeserializer::new(Bson::Document(
+                definition.arguments,
+            )))
             .map(|op| Box::new(op) as Box<dyn TestOperation>),
             "listIndexNames" => ListIndexNames::deserialize(BsonDeserializer::new(Bson::Document(
                 definition.arguments,
@@ -1326,6 +1332,40 @@ impl TestOperation for AssertCollectionNotExists {
                 .unwrap();
             assert!(!collections.contains(&self.collection));
             Ok(None)
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct ListIndexes {
+    #[serde(flatten)]
+    options: ListIndexesOptions,
+}
+
+impl TestOperation for ListIndexes {
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let indexes: Vec<IndexModel> = match session {
+                Some(session) => {
+                    collection
+                        .list_indexes_with_session(None, session)
+                        .await?
+                        .stream(session)
+                        .try_collect()
+                        .await?
+                }
+                None => collection.list_indexes(None).await?.try_collect().await?,
+            };
+            let indexes: Vec<Document> = indexes
+                .iter()
+                .map(|index| bson::to_document(index).unwrap())
+                .collect();
+            Ok(Some(indexes.into()))
         }
         .boxed()
     }
