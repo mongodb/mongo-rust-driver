@@ -183,8 +183,18 @@ async fn load_balancing_test() {
 
         // verify that the lesser picked server (slower one) was picked less than 25% of the time.
         let share_of_selections = (*counts[0] as f64) / ((*counts[0] + *counts[1]) as f64);
-        assert!(share_of_selections <= max_share);
-        assert!(share_of_selections >= min_share);
+        assert!(
+            share_of_selections <= max_share,
+            "expected no more than {}%, instead got {}%",
+            max_share,
+            share_of_selections
+        );
+        assert!(
+            share_of_selections >= min_share,
+            "expected at least {}%, instead got {}%",
+            min_share,
+            share_of_selections
+        );
     }
 
     do_test(&mut client, 0.05, 0.25).await;
