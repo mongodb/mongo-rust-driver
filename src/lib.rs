@@ -1,72 +1,242 @@
-//! This crate is a pure Rust MongoDB driver. It follows the
-//! [MongoDB driver API and feature specifications](https://github.com/mongodb/specifications).
+//! This crate contains the officially supported MongoDB Rust driver, a
+//! client side library that can be used to interact with MongoDB deployments
+//! in Rust applications. It uses the [`bson`](docs.rs/bson) crate for BSON support.
+//! The driver contains a fully async API that supports either [`tokio`](docs.rs/tokio) (default)
+//! or [`async-std`](docs.rs/async-std), depending on the feature flags set. The driver also has
+//! a sync API that may be enabled via the `"sync"` feature flag.
 //!
-//! To connect to a MongoDB database, pass a MongoDB connection string to
-//! [`Client::with_uri_str`](struct.Client.html#method.with_uri_str):
+//! # Installation
 //!
-//! ```rust
-//! # #[cfg(not(feature = "sync"))]
-//! # use mongodb::{Client, error::Result};
-//! #
-//! # #[cfg(not(feature = "sync"))]
-//! # async fn make_client() -> Result<Client> {
-//! let client = Client::with_uri_str("mongodb://localhost:27017/").await?;
-//! # Ok(client)
-//! # }
-//! ```
-//! Alternately, create an instance of [`ClientOptions`](options/struct.ClientOptions.html) and pass
-//! it to [`Client::with_options`](struct.Client.html#method.with_options):
+//! ## Requirements
+//! - Rust 1.48+
+//! - MongoDB 3.6+
 //!
-//! ```rust
-//! # use mongodb::{
-//! #     error::Result,
-//! #     options::{ServerAddress, ClientOptions},
-//! # };
-//! # #[cfg(feature = "sync")]
-//! # use mongodb::sync::Client;
-//! # #[cfg(not(feature = "sync"))]
-//! # use mongodb::Client;
-//! #
-//! # fn make_client() -> Result<Client> {
-//! let options = ClientOptions::builder()
-//!                   .hosts(vec![
-//!                       ServerAddress::Tcp {
-//!                           host: "localhost".into(),
-//!                           port: Some(27017),
-//!                       }
-//!                   ])
-//!                   .build();
-//!
-//! let client = Client::with_options(options)?;
-//! # Ok(client)
-//! # }
+//! ## Importing
+//! The driver is available on [crates.io](https://crates.io/crates/mongodb). To use the driver in
+//! your application, simply add it to your project's `Cargo.toml`.
+//! ```toml
+//! [dependencies]
+//! mongodb = "2.0.0-beta.3"
 //! ```
 //!
-//! Operations can be performed by obtaining a [`Database`](struct.Database.html) or
-//! [`Collection`](struct.Collection.html) from the [`Client`](struct.Client.html):
+//! ### Configuring the async runtime
+//! The driver supports both of the most popular async runtime crates, namely
+//! [`tokio`](https://crates.io/crates/tokio) and [`async-std`](https://crates.io/crates/async-std). By
+//! default, the driver will use [`tokio`](https://crates.io/crates/tokio), but you can explicitly choose
+//! a runtime by specifying one of `"tokio-runtime"` or `"async-std-runtime"` feature flags in your
+//! `Cargo.toml`.
 //!
-//! ```rust
-//! # use mongodb::{
-//! #   bson::doc,
-//! #   error::Result,
-//! # };
-//! # #[cfg(not(feature = "sync"))]
-//! # use mongodb::Client;
-//! #
-//! # #[cfg(not(feature = "sync"))]
-//! # async fn do_stuff() -> Result<()> {
-//! # let client = Client::with_uri_str("mongodb://example.com").await?;
-//! #
-//! let db = client.database("some_db");
-//! for coll_name in db.list_collection_names(None).await? {
-//!     println!("collection: {}", coll_name);
+//! For example, to instruct the driver to work with [`async-std`](https://crates.io/crates/async-std),
+//! add the following to your `Cargo.toml`:
+//! ```toml
+//! [dependencies.mongodb]
+//! version = "2.0.0-beta.3"
+//! default-features = false
+//! features = ["async-std-runtime"]
+//! ```
+//!
+//! ### Enabling the sync API
+//! The driver also provides a blocking sync API. To enable this, add the `"sync"` feature to your
+//! `Cargo.toml`:
+//! ```toml
+//! [dependencies.mongodb]
+//! version = "2.0.0-beta.3"
+//! default-features = false
+//! features = ["sync"]
+//! ```
+//! **Note:** if the sync API is enabled, the async-specific types will be privatized (e.g.
+//! `mongodb::Client`). The sync-specific types can be imported from `mongodb::sync` (e.g.
+//! `mongodb::sync::Client`).
+//!
+//! ### All Feature flags
+//!
+//! | Feature             | Description                                                                                                                           | Extra dependencies                  | Default |
+//! |:--------------------|:--------------------------------------------------------------------------------------------------------------------------------------|:------------------------------------|:--------|
+//! | `tokio-runtime`     | Enable support for the `tokio` async runtime                                                                                          | `tokio` 1.0 with the `full` feature | yes     |
+//! | `async-std-runtime` | Enable support for the `async-std` runtime                                                                                            | `async-std` 1.0                     | no      |
+//! | `sync`              | Expose the synchronous API (`mongodb::sync`). This flag cannot be used in conjunction with either of the async runtime feature flags. | `async-std` 1.0                     | no      |
+//! | `aws-auth`          | Enable support for the MONGODB-AWS authentication mechanism.                                                                          | `reqwest` 0.11                      | no      |
+//! | `bson-uuid-0_8`     | Enable support for v0.8 of the [`uuid`](docs.rs/uuid/0.8) crate in the public API of the re-exported `bson` crate.                    | `uuid` 0.8                          | no      |
+//! | `bson-chrono-0_4`   | Enable support for v0.4 of the [`chrono`](docs.rs/chrono/0.4) crate in the public API of the re-exported `bson` crate.                | n/a                                 | no      |
+//!
+//! # Example Usage
+//!
+//! ## Using the async API
+//! ### Connecting to a MongoDB deployment
+//! ```no_run
+//! # async fn foo() -> mongodb::error::Result<()> {
+//! use mongodb::{Client, options::ClientOptions};
+//!
+//! // Parse a connection string into an options struct.
+//! let mut client_options = ClientOptions::parse("mongodb://localhost:27017").await?;
+//!
+//! // Manually set an option.
+//! client_options.app_name = Some("My App".to_string());
+//!
+//! // Get a handle to the deployment.
+//! let client = Client::with_options(client_options)?;
+//!
+//! // List the names of the databases in that deployment.
+//! for db_name in client.list_database_names(None, None).await? {
+//!     println!("{}", db_name);
+//! }
+//! # Ok(()) }
+//! ```
+//! ### Getting a handle to a database
+//! ```no_run
+//! # async fn foo() -> mongodb::error::Result<()> {
+//! # let client = mongodb::Client::with_uri_str("").await?;
+//! // Get a handle to a database.
+//! let db = client.database("mydb");
+//!
+//! // List the names of the collections in that database.
+//! for collection_name in db.list_collection_names(None).await? {
+//!     println!("{}", collection_name);
+//! }
+//! # Ok(()) }
+//! ```
+//! ### Inserting documents into a collection
+//! ```no_run
+//! # async fn foo() -> mongodb::error::Result<()> {
+//! # let db = mongodb::Client::with_uri_str("").await?.database("");
+//! use mongodb::bson::{doc, Document};
+//!
+//! // Get a handle to a collection in the database.
+//! let collection = db.collection::<Document>("books");
+//!
+//! let docs = vec![
+//!     doc! { "title": "1984", "author": "George Orwell" },
+//!     doc! { "title": "Animal Farm", "author": "George Orwell" },
+//!     doc! { "title": "The Great Gatsby", "author": "F. Scott Fitzgerald" },
+//! ];
+//!
+//! // Insert some documents into the "mydb.books" collection.
+//! collection.insert_many(docs, None).await?;
+//! # Ok(()) }
+//! ```
+//!
+//! A [`Collection`] can be parameterized with any type that implements the
+//! `Serialize` and `Deserialize` traits from the [`serde`](https://serde.rs/) crate,
+//! not just `Document`:
+//!
+//! ```toml
+//! # In Cargo.toml, add the following dependency.
+//! serde = { version = "1.0", features = ["derive"] }
+//! ```
+//!
+//! ```no_run
+//! # async fn foo() -> mongodb::error::Result<()> {
+//! # let db = mongodb::Client::with_uri_str("").await?.database("");
+//! use serde::{Deserialize, Serialize};
+//!
+//! #[derive(Debug, Serialize, Deserialize)]
+//! struct Book {
+//!     title: String,
+//!     author: String,
 //! }
 //!
-//! let coll = db.collection("some-coll");
-//! let result = coll.insert_one(doc! { "x": 1 }, None).await?;
-//! println!("{:#?}", result);
+//! // Get a handle to a collection of `Book`.
+//! let typed_collection = db.collection::<Book>("books");
 //!
-//! # Ok(())
+//! let books = vec![
+//!     Book {
+//!         title: "The Grapes of Wrath".to_string(),
+//!         author: "John Steinbeck".to_string(),
+//!     },
+//!     Book {
+//!         title: "To Kill a Mockingbird".to_string(),
+//!         author: "Harper Lee".to_string(),
+//!     },
+//! ];
+//!
+//! // Insert the books into "mydb.books" collection, no manual conversion to BSON necessary.
+//! typed_collection.insert_many(books, None).await?;
+//! # Ok(()) }
+//! ```
+//!
+//! ### Finding documents in a collection
+//! Results from queries are generally returned via [`Cursor`], a struct which streams the results
+//! back from the server as requested. The [`Cursor`] type implements the
+//! [`Stream`](https://docs.rs/futures/latest/futures/stream/trait.Stream.html) trait from
+//! the [`futures`](https://crates.io/crates/futures) crate, and in order to access its streaming
+//! functionality you need to import at least one of the
+//! [`StreamExt`](https://docs.rs/futures/latest/futures/stream/trait.StreamExt.html) or
+//! [`TryStreamExt`](https://docs.rs/futures/latest/futures/stream/trait.TryStreamExt.html) traits.
+//!
+//! ```toml
+//! # In Cargo.toml, add the following dependency.
+//! futures = "0.3"
+//! ```
+//! ```no_run
+//! # use serde::Deserialize;
+//! # #[derive(Deserialize)]
+//! # struct Book { title: String }
+//! # async fn foo() -> mongodb::error::Result<()> {
+//! # let typed_collection = mongodb::Client::with_uri_str("").await?.database("").collection::<Book>("");
+//! // This trait is required to use `try_next()` on the cursor
+//! use futures::stream::TryStreamExt;
+//! use mongodb::{bson::doc, options::FindOptions};
+//!
+//! // Query the books in the collection with a filter and an option.
+//! let filter = doc! { "author": "George Orwell" };
+//! let find_options = FindOptions::builder().sort(doc! { "title": 1 }).build();
+//! let mut cursor = typed_collection.find(filter, find_options).await?;
+//!
+//! // Iterate over the results of the cursor.
+//! while let Some(book) = cursor.try_next().await? {
+//!     println!("title: {}", book.title);
+//! }
+//! # Ok(()) }
+//! ```
+//!
+//! ### Using the sync API
+//! The driver also provides a blocking sync API. See the [Installation](#enabling-the-sync-api)
+//! section for instructions on how to enable it.
+//!
+//! The various sync-specific types are found in the `mongodb::sync` submodule rather than in the
+//! crate's top level like in the async API. The sync API calls through to the async API internally
+//! though, so it looks and behaves similarly to it.
+//! ```no_run
+//! # #[cfg(feature = "sync")]
+//! # {
+//! use mongodb::{
+//!     bson::doc,
+//!     sync::Client,
+//! };
+//! use serde::{Deserialize, Serialize};
+//!
+//! #[derive(Debug, Serialize, Deserialize)]
+//! struct Book {
+//!     title: String,
+//!     author: String,
+//! }
+//!
+//! let client = Client::with_uri_str("mongodb://localhost:27017")?;
+//! let database = client.database("mydb");
+//! let collection = database.collection::<Book>("books");
+//!
+//! let docs = vec![
+//!     Book {
+//!         title: "1984".to_string(),
+//!         author: "George Orwell".to_string(),
+//!     },
+//!     Book {
+//!         title: "Animal Farm".to_string(),
+//!         author: "George Orwell".to_string(),
+//!     },
+//!     Book {
+//!         title: "The Great Gatsby".to_string(),
+//!         author: "F. Scott Fitzgerald".to_string(),
+//!     },
+//! ];
+//!
+//! // Insert some books into the "mydb.books" collection.
+//! collection.insert_many(docs, None)?;
+//!
+//! let cursor = collection.find(doc! { "author": "George Orwell" }, None)?;
+//! for result in cursor {
+//!     println!("title: {}", result?.title);
+//! }
 //! # }
 //! ```
 
