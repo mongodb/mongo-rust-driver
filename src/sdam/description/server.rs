@@ -36,13 +36,7 @@ pub enum ServerType {
 
 impl ServerType {
     pub(crate) fn can_auth(self) -> bool {
-        matches!(
-            self,
-            ServerType::Standalone
-                | ServerType::RsPrimary
-                | ServerType::RsSecondary
-                | ServerType::Mongos
-        )
+        !matches!(self, ServerType::RsArbiter)
     }
 
     pub(crate) fn is_data_bearing(self) -> bool {
