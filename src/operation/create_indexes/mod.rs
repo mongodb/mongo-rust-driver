@@ -75,9 +75,7 @@ impl Operation for CreateIndexes {
         _description: &StreamDescription,
     ) -> Result<Self::O> {
         let index_names = self.indexes.iter().filter_map(|i| i.get_name()).collect();
-        Ok(CreateIndexesResult {
-            index_names,
-        })
+        Ok(CreateIndexesResult { index_names })
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {
