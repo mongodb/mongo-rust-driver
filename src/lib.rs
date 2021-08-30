@@ -91,21 +91,17 @@
 //! #     Client,
 //! #     bson::doc,
 //! # };
-//! # #[cfg(feature = "async-std-runtime")]
-//! # use async_std::{task, time};
-//! # #[cfg(feature = "tokio-runtime")]
-//! # use tokio::{task, time};
 //! #
-//! # #[cfg(not(feature = "sync"))]
+//! # #[cfg(all(not(feature = "sync"), feature = "tokio-runtime"))]
 //! # async fn foo() -> std::result::Result<(), Box<dyn std::error::Error>> {
 //! #
 //! # let client = Client::with_uri_str("mongodb://example.com").await?;
 //! let collection = client.database("foo").collection("bar");
-//! let handle = task::spawn(async move {
+//! let handle = tokio::task::spawn(async move {
 //!     collection.insert_one(doc! { "x": 1 }, None).await
 //! });
 //!
-//! time::timeout(Duration::from_secs(5), handle).await???;
+//! tokio::time::timeout(Duration::from_secs(5), handle).await???;
 //! # Ok(())
 //! # }
 //! ```
