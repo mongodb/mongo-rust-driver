@@ -12,6 +12,7 @@ use serde::de::DeserializeOwned;
 use tokio::sync::{Mutex, MutexGuard};
 
 use crate::{
+    bson::Document,
     cmap::conn::Connection,
     error::{Error, ErrorKind, Result},
     operation,
@@ -19,6 +20,7 @@ use crate::{
     results::GetMoreResult,
     Client,
     Namespace,
+    RUNTIME,
 };
 
 /// An internal cursor that can be used in a variety of contexts depending on its `GetMoreProvider`.
@@ -101,6 +103,12 @@ where
                         if exhausted {
                             // If the cursor is exhausted, the driver must return the pinned connection to the pool.
                             self.pinned_connection = PinnedConnection::new(None);
+                        }
+                        if let Err(e) = &result {
+                            if e.is_network_error() {
+                                // Flag the connection as invalid, preventing a killCursors command, but leave the connection pinned.
+                                self.pinned_connection.is_valid = false;
+                            }
                         }
 
                         self.exhausted = exhausted;
@@ -230,17 +238,35 @@ pub(crate) struct CursorInformation {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct PinnedConnection(Option<Arc<Mutex<Connection>>>);
+pub(crate) struct PinnedConnection {
+    connection: Option<Arc<Mutex<Connection>>>,
+    is_valid: bool,
+}
 
 impl PinnedConnection {
     pub(super) fn new(conn: Option<Connection>) -> Self {
-        Self(conn.map(|c| Arc::new(Mutex::new(c))))
+        Self {
+            connection: conn.map(|c| Arc::new(Mutex::new(c))),
+            is_valid: true,
+        }
     }
 
     pub(super) async fn lock(&self) -> Option<MutexGuard<'_, Connection>> {
-        match &self.0 {
+        match &self.connection {
             Some(c) => Some(c.lock().await),
             None => None,
         }
     }
+}
+
+pub(super) fn kill_cursor(client: Client, ns: &Namespace, cursor_id: i64, pinned_conn: PinnedConnection) {
+    if !pinned_conn.is_valid { return }
+    let coll = client
+        .database(ns.db.as_str())
+        .collection::<Document>(ns.coll.as_str());
+    RUNTIME.execute(async move {
+        let mut lock = pinned_conn.lock().await;
+        let conn = lock.as_mut().map(|l| &mut **l);
+        let _ = coll.kill_cursor(cursor_id, conn).await;
+    });
 }

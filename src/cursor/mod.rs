@@ -10,17 +10,15 @@ use futures_core::{future::BoxFuture, Stream};
 use serde::de::DeserializeOwned;
 
 use crate::{
-    bson::Document,
     cmap::conn::Connection,
     error::{Error, Result},
     operation::GetMore,
     results::GetMoreResult,
     Client,
     ClientSession,
-    RUNTIME,
 };
 pub(crate) use common::{CursorInformation, CursorSpecification, PinnedConnection};
-use common::{GenericCursor, GetMoreProvider, GetMoreProviderResult};
+use common::{GenericCursor, GetMoreProvider, GetMoreProviderResult, kill_cursor};
 
 /// A [`Cursor`] streams the result of a query. When a query is made, the returned [`Cursor`] will
 /// contain the first batch of results from the server; the individual results will then be returned
@@ -129,18 +127,12 @@ where
             return;
         }
 
-        let ns = self.wrapped_cursor.namespace();
-        let coll = self
-            .client
-            .database(ns.db.as_str())
-            .collection::<Document>(ns.coll.as_str());
-        let cursor_id = self.wrapped_cursor.id();
-        let pinned_conn = self.wrapped_cursor.pinned_connection();
-        RUNTIME.execute(async move {
-            let mut lock = pinned_conn.lock().await;
-            let conn = lock.as_mut().map(|l| &mut **l);
-            let _ = coll.kill_cursor(cursor_id, conn).await;
-        });
+        kill_cursor(
+            self.client.clone(),
+            self.wrapped_cursor.namespace(),
+            self.wrapped_cursor.id(),
+            self.wrapped_cursor.pinned_connection(),
+        );
     }
 }
 

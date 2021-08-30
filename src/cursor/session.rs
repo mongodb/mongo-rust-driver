@@ -8,7 +8,7 @@ use futures_core::{future::BoxFuture, Stream};
 use futures_util::StreamExt;
 use serde::de::DeserializeOwned;
 
-use super::common::{CursorInformation, GenericCursor, GetMoreProvider, GetMoreProviderResult, PinnedConnection};
+use super::common::{CursorInformation, GenericCursor, GetMoreProvider, GetMoreProviderResult, PinnedConnection, kill_cursor};
 use crate::{
     bson::Document,
     cmap::conn::Connection,
@@ -18,7 +18,6 @@ use crate::{
     results::GetMoreResult,
     Client,
     ClientSession,
-    RUNTIME,
 };
 
 /// A [`SessionCursor`] is a cursor that was created with a [`ClientSession`] that must be iterated
@@ -178,18 +177,12 @@ where
             return;
         }
 
-        let ns = &self.info.ns;
-        let coll = self
-            .client
-            .database(ns.db.as_str())
-            .collection::<Document>(ns.coll.as_str());
-        let cursor_id = self.info.id;
-        let pinned_conn = self.pinned_connection.clone();
-        RUNTIME.execute(async move {
-            let mut lock = pinned_conn.lock().await;
-            let conn = lock.as_mut().map(|l| &mut **l);
-            let _ = coll.kill_cursor(cursor_id, conn).await;
-        });
+        kill_cursor(
+            self.client.clone(),
+            &self.info.ns,
+            self.info.id,
+            self.pinned_connection.clone(),
+        );
     }
 }
 
