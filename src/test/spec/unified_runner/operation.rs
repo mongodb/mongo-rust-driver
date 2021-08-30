@@ -22,10 +22,12 @@ use crate::{
         FindOneAndUpdateOptions,
         FindOneOptions,
         FindOptions,
+        IndexOptions,
         InsertManyOptions,
         InsertOneOptions,
         ListCollectionsOptions,
         ListDatabasesOptions,
+        ListIndexesOptions,
         ReplaceOptions,
         SelectionCriteria,
         UpdateModifications,
@@ -33,6 +35,7 @@ use crate::{
     },
     selection_criteria::ReadPreference,
     test::FailPoint,
+    IndexModel,
     RUNTIME,
 };
 
@@ -233,6 +236,22 @@ impl<'de> Deserialize<'de> for Operation {
             }
             "abortTransaction" => {
                 AbortTransaction::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "createIndex" => CreateIndex::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "listIndexes" => ListIndexes::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "listIndexNames" => {
+                ListIndexNames::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "assertIndexExists" => {
+                AssertIndexExists::deserialize(BsonDeserializer::new(definition.arguments))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "assertIndexNotExists" => {
+                AssertIndexNotExists::deserialize(BsonDeserializer::new(definition.arguments))
                     .map(|op| Box::new(op) as Box<dyn TestOperation>)
             }
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
@@ -1445,6 +1464,166 @@ impl TestOperation for AbortTransaction {
             let session: &mut ClientSession = test_runner.get_mut_session(id);
             session.abort_transaction().await?;
             Ok(None)
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct CreateIndex {
+    session: Option<String>,
+    keys: Document,
+    name: Option<String>,
+}
+
+impl TestOperation for CreateIndex {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a mut TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let options = IndexOptions::builder().name(self.name.clone()).build();
+            let index = IndexModel::builder()
+                .keys(self.keys.clone())
+                .options(options)
+                .build();
+
+            let collection = test_runner.get_collection(id).clone();
+            let name = match self.session {
+                Some(ref session) => {
+                    let session = test_runner.get_mut_session(session);
+                    collection
+                        .create_index_with_session(index, None, session)
+                        .await?
+                        .index_name
+                }
+                None => collection.create_index(index, None).await?.index_name,
+            };
+            Ok(Some(Bson::String(name).into()))
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct ListIndexes {
+    session: Option<String>,
+    #[serde(flatten)]
+    options: ListIndexesOptions,
+}
+
+impl TestOperation for ListIndexes {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a mut TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let collection = test_runner.get_collection(id).clone();
+            let indexes: Vec<IndexModel> = match self.session {
+                Some(ref session) => {
+                    let session = test_runner.get_mut_session(session);
+                    collection
+                        .list_indexes_with_session(self.options.clone(), session)
+                        .await?
+                        .stream(session)
+                        .try_collect()
+                        .await?
+                }
+                None => {
+                    collection
+                        .list_indexes(self.options.clone())
+                        .await?
+                        .try_collect()
+                        .await?
+                }
+            };
+            let indexes: Vec<Document> = indexes
+                .iter()
+                .map(|index| bson::to_document(index).unwrap())
+                .collect();
+            Ok(Some(Bson::from(indexes).into()))
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct ListIndexNames {
+    session: Option<String>,
+}
+
+impl TestOperation for ListIndexNames {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a mut TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let collection = test_runner.get_collection(id).clone();
+            let names = match self.session {
+                Some(ref session) => {
+                    let session = test_runner.get_mut_session(session);
+                    collection.list_index_names_with_session(session).await?
+                }
+                None => collection.list_index_names().await?,
+            };
+            Ok(Some(Bson::from(names).into()))
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct AssertIndexExists {
+    collection_name: String,
+    database_name: String,
+    index_name: String,
+}
+
+impl TestOperation for AssertIndexExists {
+    fn execute_test_runner_operation<'a>(
+        &'a self,
+        test_runner: &'a mut TestRunner,
+    ) -> BoxFuture<'a, ()> {
+        async move {
+            let coll = test_runner
+                .internal_client
+                .database(&self.database_name)
+                .collection::<Document>(&self.collection_name);
+            let names = coll.list_index_names().await.unwrap();
+            assert!(names.contains(&self.index_name));
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct AssertIndexNotExists {
+    collection_name: String,
+    database_name: String,
+    index_name: String,
+}
+
+impl TestOperation for AssertIndexNotExists {
+    fn execute_test_runner_operation<'a>(
+        &'a self,
+        test_runner: &'a mut TestRunner,
+    ) -> BoxFuture<'a, ()> {
+        async move {
+            let coll = test_runner
+                .internal_client
+                .database(&self.database_name)
+                .collection::<Document>(&self.collection_name);
+            match coll.list_index_names().await {
+                Ok(indexes) => assert!(!indexes.contains(&self.index_name)),
+                // a namespace not found error indicates that the index does not exist
+                Err(err) => assert_eq!(err.code(), Some(26)),
+            }
         }
         .boxed()
     }

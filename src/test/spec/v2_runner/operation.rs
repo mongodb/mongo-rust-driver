@@ -6,26 +6,29 @@ use serde::{de::Deserializer, Deserialize};
 use crate::{
     bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
     client::session::TransactionState,
-    coll::options::CollectionOptions,
-    db::options::DatabaseOptions,
     error::Result,
     options::{
         AggregateOptions,
+        CollectionOptions,
         CountOptions,
         CreateCollectionOptions,
+        DatabaseOptions,
         DeleteOptions,
         DistinctOptions,
         DropCollectionOptions,
+        DropIndexOptions,
         EstimatedDocumentCountOptions,
         FindOneAndDeleteOptions,
         FindOneAndReplaceOptions,
         FindOneAndUpdateOptions,
         FindOneOptions,
         FindOptions,
+        IndexOptions,
         InsertManyOptions,
         InsertOneOptions,
         ListCollectionsOptions,
         ListDatabasesOptions,
+        ListIndexesOptions,
         ReplaceOptions,
         TransactionOptions,
         UpdateModifications,
@@ -37,6 +40,7 @@ use crate::{
     ClientSession,
     Collection,
     Database,
+    IndexModel,
 };
 
 pub trait TestOperation: Debug {
@@ -282,6 +286,30 @@ impl<'de> Deserialize<'de> for Operation {
             "assertCollectionNotExists" => AssertCollectionNotExists::deserialize(
                 BsonDeserializer::new(Bson::Document(definition.arguments)),
             )
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "createIndex" => CreateIndex::deserialize(BsonDeserializer::new(Bson::Document(
+                definition.arguments,
+            )))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "dropIndex" => {
+                DropIndex::deserialize(BsonDeserializer::new(Bson::Document(definition.arguments)))
+                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            }
+            "listIndexes" => ListIndexes::deserialize(BsonDeserializer::new(Bson::Document(
+                definition.arguments,
+            )))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "listIndexNames" => ListIndexNames::deserialize(BsonDeserializer::new(Bson::Document(
+                definition.arguments,
+            )))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "assertIndexExists" => AssertIndexExists::deserialize(BsonDeserializer::new(
+                Bson::Document(definition.arguments),
+            ))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "assertIndexNotExists" => AssertIndexNotExists::deserialize(BsonDeserializer::new(
+                Bson::Document(definition.arguments),
+            ))
             .map(|op| Box::new(op) as Box<dyn TestOperation>),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
@@ -834,8 +862,8 @@ impl TestOperation for ListCollectionNames {
                 }
                 None => database.list_collection_names(self.filter.clone()).await?,
             };
-            let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
-            Ok(Some(Bson::from(result)))
+            let result: Vec<Bson> = result.into_iter().map(|s| s.into()).collect();
+            Ok(Some(result.into()))
         }
         .boxed()
     }
@@ -1089,8 +1117,8 @@ impl TestOperation for ListDatabaseNames {
             let result = client
                 .list_database_names(self.filter.clone(), self.options.clone())
                 .await?;
-            let result: Vec<Bson> = result.iter().map(|s| Bson::String(s.to_string())).collect();
-            Ok(Some(Bson::Array(result)))
+            let result: Vec<Bson> = result.into_iter().map(|s| s.into()).collect();
+            Ok(Some(result.into()))
         }
         .boxed()
     }
@@ -1321,6 +1349,178 @@ impl TestOperation for AssertCollectionNotExists {
                 .await
                 .unwrap();
             assert!(!collections.contains(&self.collection));
+            Ok(None)
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct CreateIndex {
+    keys: Document,
+    name: Option<String>,
+}
+
+impl TestOperation for CreateIndex {
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let options = IndexOptions::builder().name(self.name.clone()).build();
+            let index = IndexModel::builder()
+                .keys(self.keys.clone())
+                .options(options)
+                .build();
+
+            let name = match session {
+                Some(session) => {
+                    collection
+                        .create_index_with_session(index, None, session)
+                        .await?
+                        .index_name
+                }
+                None => collection.create_index(index, None).await?.index_name,
+            };
+            Ok(Some(name.into()))
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct DropIndex {
+    name: String,
+    #[serde(flatten)]
+    options: DropIndexOptions,
+}
+
+impl TestOperation for DropIndex {
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            match session {
+                Some(session) => {
+                    collection
+                        .drop_index_with_session(self.name.clone(), self.options.clone(), session)
+                        .await?
+                }
+                None => {
+                    collection
+                        .drop_index(self.name.clone(), self.options.clone())
+                        .await?
+                }
+            }
+            Ok(None)
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct ListIndexes {
+    #[serde(flatten)]
+    options: ListIndexesOptions,
+}
+
+impl TestOperation for ListIndexes {
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let indexes: Vec<IndexModel> = match session {
+                Some(session) => {
+                    collection
+                        .list_indexes_with_session(None, session)
+                        .await?
+                        .stream(session)
+                        .try_collect()
+                        .await?
+                }
+                None => collection.list_indexes(None).await?.try_collect().await?,
+            };
+            let indexes: Vec<Document> = indexes
+                .iter()
+                .map(|index| bson::to_document(index).unwrap())
+                .collect();
+            Ok(Some(indexes.into()))
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct ListIndexNames {}
+
+impl TestOperation for ListIndexNames {
+    fn execute_on_collection<'a>(
+        &'a self,
+        collection: &'a Collection<Document>,
+        session: Option<&'a mut ClientSession>,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let names = match session {
+                Some(session) => collection.list_index_names_with_session(session).await?,
+                None => collection.list_index_names().await?,
+            };
+            Ok(Some(names.into()))
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct AssertIndexExists {
+    database: String,
+    collection: String,
+    index: String,
+}
+
+impl TestOperation for AssertIndexExists {
+    fn execute_on_client<'a>(
+        &'a self,
+        client: &'a TestClient,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let coll = client
+                .database(&self.database)
+                .collection::<Document>(&self.collection);
+            let indexes = coll.list_index_names().await?;
+            assert!(indexes.contains(&self.index));
+            Ok(None)
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct AssertIndexNotExists {
+    database: String,
+    collection: String,
+    index: String,
+}
+
+impl TestOperation for AssertIndexNotExists {
+    fn execute_on_client<'a>(
+        &'a self,
+        client: &'a TestClient,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let coll = client
+                .database(&self.database)
+                .collection::<Document>(&self.collection);
+            match coll.list_index_names().await {
+                Ok(indexes) => assert!(!indexes.contains(&self.index)),
+                // a namespace not found error indicates that the index does not exist
+                Err(err) => assert_eq!(err.code(), Some(26)),
+            }
             Ok(None)
         }
         .boxed()

@@ -29,13 +29,10 @@ use test_file::{TestData, TestFile};
 const SKIPPED_OPERATIONS: &[&str] = &[
     "bulkWrite",
     "count",
-    "createIndex",
     "download",
     "download_by_name",
     "listCollectionObjects",
     "listDatabaseObjects",
-    "listIndexNames",
-    "listIndexes",
     "mapReduce",
     "watch",
 ];
@@ -247,10 +244,10 @@ pub async fn run_v2_test(test_file: TestFile) {
                                 .await
                                 .unwrap();
                         }
-                        "assertCollectionExists" => {
-                            operation.execute_on_client(&internal_client).await.unwrap();
-                        }
-                        "assertCollectionNotExists" => {
+                        "assertCollectionExists"
+                        | "assertCollectionNotExists"
+                        | "assertIndexExists"
+                        | "assertIndexNotExists" => {
                             operation.execute_on_client(&internal_client).await.unwrap();
                         }
                         "targetedFailPoint" => {

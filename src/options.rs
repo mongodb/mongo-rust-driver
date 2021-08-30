@@ -21,6 +21,7 @@ pub use crate::{
     collation::*,
     concern::*,
     db::options::*,
+    index::options::*,
     selection_criteria::*,
 };
 

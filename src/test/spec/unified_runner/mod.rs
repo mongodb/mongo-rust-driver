@@ -42,17 +42,12 @@ static SPEC_VERSIONS: &[Version] = &[
 ];
 
 const SKIPPED_OPERATIONS: &[&str] = &[
-    "assertIndexExists",
-    "assertIndexNotExists",
     "bulkWrite",
     "count",
-    "createIndex",
     "download",
     "download_by_name",
     "listCollectionObjects",
     "listDatabaseObjects",
-    "listIndexNames",
-    "listIndexes",
     "mapReduce",
     "watch",
 ];

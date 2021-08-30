@@ -120,9 +120,17 @@ pub struct IndexOptions {
 #[non_exhaustive]
 pub enum IndexVersion {
     #[deprecated]
+    /// Version 0.
     V0,
+
+    /// Version 1.
     V1,
+
+    /// Version 2.
     V2,
+
+    //// Specify a custom index version. This is present to provide forwards compatibility with
+    /// any future index versions which may be added to new versions of MongoDB.
     Custom(u32),
 }
 
@@ -159,9 +167,17 @@ impl<'de> Deserialize<'de> for IndexVersion {
 /// Specify the version for a `text` index. For more information, see [Versions](https://docs.mongodb.com/manual/core/index-text/#versions).
 #[derive(Clone, Debug)]
 pub enum TextIndexVersion {
+    /// Version 1.
     V1,
+
+    /// Version 2.
     V2,
+
+    /// Version 3.
     V3,
+
+    /// Specify a custom text index version. This is present to provide forwards compatibility with
+    /// any future text index versions which may be added to new versions of MongoDB.
     Custom(u32),
 }
 
@@ -196,8 +212,14 @@ impl<'de> Deserialize<'de> for TextIndexVersion {
 /// Specify the version for a `2dsphere` index. For more information, see [Versions](https://docs.mongodb.com/manual/core/2dsphere/#versions).
 #[derive(Clone, Debug)]
 pub enum Sphere2DIndexVersion {
+    /// Version 2.
     V2,
+
+    /// Version 3.
     V3,
+
+    /// Specify a custom sphere 2D index version. This is present to provide forwards compatibility
+    /// with any future sphere 2D index verions which may be added to new versions of MongoDB.
     Custom(u32),
 }
 

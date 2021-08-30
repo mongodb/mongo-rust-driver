@@ -598,7 +598,7 @@ impl<T> Collection<T> {
     /// Lists all indexes on this collection.
     pub async fn list_indexes(
         &self,
-        options: impl Into<Option<ListIndexOptions>>,
+        options: impl Into<Option<ListIndexesOptions>>,
     ) -> Result<Cursor<IndexModel>> {
         let list_indexes = ListIndexes::new(self.namespace(), options.into());
         let client = self.client();
@@ -611,7 +611,7 @@ impl<T> Collection<T> {
     /// Lists all indexes on this collection using the provided `ClientSession`.
     pub async fn list_indexes_with_session(
         &self,
-        options: impl Into<Option<ListIndexOptions>>,
+        options: impl Into<Option<ListIndexesOptions>>,
         session: &mut ClientSession,
     ) -> Result<SessionCursor<IndexModel>> {
         let list_indexes = ListIndexes::new(self.namespace(), options.into());

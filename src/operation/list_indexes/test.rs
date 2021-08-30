@@ -4,12 +4,10 @@ use crate::{
     bson::doc,
     client::options::ServerAddress,
     cmap::StreamDescription,
-    coll::{options::ListIndexOptions, Namespace},
-    index::{
-        options::{IndexOptions, IndexVersion, TextIndexVersion},
-        IndexModel,
-    },
     operation::{test::handle_response_test, ListIndexes, Operation},
+    options::{IndexOptions, IndexVersion, ListIndexesOptions, TextIndexVersion},
+    IndexModel,
+    Namespace,
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -20,7 +18,7 @@ async fn build() {
         coll: "test_coll".to_string(),
     };
 
-    let list_options = ListIndexOptions::builder()
+    let list_options = ListIndexesOptions::builder()
         .max_time(Some(Duration::from_millis(42)))
         .batch_size(Some(4))
         .build();
