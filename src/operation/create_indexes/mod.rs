@@ -4,7 +4,6 @@ mod test;
 use crate::{
     bson::{doc, Document},
     cmap::{Command, StreamDescription},
-    coll::options::CommitQuorum,
     error::Result,
     index::IndexModel,
     operation::{append_options, Operation},
@@ -14,9 +13,6 @@ use crate::{
 };
 
 use super::{CommandResponse, WriteConcernOnlyBody};
-use serde::{
-    Deserialize,
-};
 
 #[derive(Debug)]
 pub(crate) struct CreateIndexes {
@@ -89,13 +85,4 @@ impl Operation for CreateIndexes {
             .as_ref()
             .and_then(|opts| opts.write_concern.as_ref())
     }
-}
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ResponseBody {
-    created_collection_automatically: Option<bool>,
-    num_indexes_before: u32,
-    num_indexes_after: u32,
-    note: Option<String>,
-    commit_quorum: Option<CommitQuorum>,
 }
