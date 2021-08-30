@@ -7,6 +7,7 @@ use futures_util::stream::TryStreamExt;
 use crate::{
     bson::{Bson, Document},
     client::session::TransactionState,
+    cmap::conn::Connection,
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
@@ -323,14 +324,15 @@ impl Database {
         self.create_collection_common(name, options, session).await
     }
 
-    async fn run_command_common(
+    pub(crate) async fn run_command_common(
         &self,
         command: Document,
         selection_criteria: impl Into<Option<SelectionCriteria>>,
         session: impl Into<Option<&mut ClientSession>>,
+        pinned_connection: Option<&mut Connection>,
     ) -> Result<Document> {
         let operation = RunCommand::new(self.name().into(), command, selection_criteria.into())?;
-        self.client().execute_operation(operation, session).await
+        self.client().execute_operation_pinned(operation, session, pinned_connection).await
     }
 
     /// Runs a database-level command.
@@ -343,7 +345,7 @@ impl Database {
         command: Document,
         selection_criteria: impl Into<Option<SelectionCriteria>>,
     ) -> Result<Document> {
-        self.run_command_common(command, selection_criteria, None)
+        self.run_command_common(command, selection_criteria, None, None)
             .await
     }
 
@@ -384,7 +386,7 @@ impl Database {
             }
             _ => {}
         }
-        self.run_command_common(command, selection_criteria, session)
+        self.run_command_common(command, selection_criteria, session, None)
             .await
     }
 

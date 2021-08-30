@@ -18,6 +18,7 @@ use crate::{
     bson::{doc, to_document, Bson, Document},
     bson_util,
     client::session::TransactionState,
+    cmap::conn::Connection,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
     index::IndexModel,
@@ -775,17 +776,19 @@ impl<T> Collection<T> {
     }
 
     /// Kill the server side cursor that id corresponds to.
-    pub(super) async fn kill_cursor(&self, cursor_id: i64) -> Result<()> {
+    pub(super) async fn kill_cursor(&self, cursor_id: i64, pinned_connection: Option<&mut Connection>) -> Result<()> {
         let ns = self.namespace();
 
         self.client()
             .database(ns.db.as_str())
-            .run_command(
+            .run_command_common(
                 doc! {
                     "killCursors": ns.coll.as_str(),
                     "cursors": [cursor_id]
                 },
                 None,
+                None,
+                pinned_connection,
             )
             .await?;
         Ok(())

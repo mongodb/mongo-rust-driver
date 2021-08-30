@@ -3,13 +3,16 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
+    sync::Arc,
 };
 
 use derivative::Derivative;
 use futures_core::{Future, Stream};
 use serde::de::DeserializeOwned;
+use tokio::sync::{Mutex, MutexGuard};
 
 use crate::{
+    cmap::conn::Connection,
     error::{Error, ErrorKind, Result},
     operation,
     options::ServerAddress,
@@ -31,6 +34,7 @@ where
     info: CursorInformation,
     buffer: VecDeque<T>,
     exhausted: bool,
+    pinned_connection: PinnedConnection,
 }
 
 impl<P, T> GenericCursor<P, T>
@@ -38,7 +42,7 @@ where
     P: GetMoreProvider<DocumentType = T>,
     T: DeserializeOwned,
 {
-    pub(super) fn new(client: Client, spec: CursorSpecification<T>, get_more_provider: P) -> Self {
+    pub(super) fn new(client: Client, spec: CursorSpecification<T>, pinned_connection: PinnedConnection, get_more_provider: P) -> Self {
         let exhausted = spec.id() == 0;
         Self {
             exhausted,
@@ -46,6 +50,7 @@ where
             provider: get_more_provider,
             buffer: spec.initial_buffer,
             info: spec.info,
+            pinned_connection,
         }
     }
 
@@ -65,10 +70,15 @@ where
         &self.info.ns
     }
 
+    pub(super) fn pinned_connection(&self) -> PinnedConnection {
+        self.pinned_connection.clone()
+    }
+
     fn start_get_more(&mut self) {
         let info = self.info.clone();
         let client = self.client.clone();
-        self.provider.start_execution(info, client);
+        let pinned_connection = self.pinned_connection.clone();
+        self.provider.start_execution(info, client, pinned_connection);
     }
 }
 
@@ -87,14 +97,14 @@ where
                     // If a result is ready, retrieve the buffer and update the exhausted status.
                     Poll::Ready(get_more_result) => {
                         let exhausted = get_more_result.exhausted();
-                        let (result, mut context) = get_more_result.into_parts();
+                        let (result, session) = get_more_result.into_parts();
                         if exhausted {
                             // If the cursor is exhausted, the driver must return the pinned connection to the pool.
-                            context.drop_pinned_connection();
+                            self.pinned_connection = PinnedConnection::new(None);
                         }
 
                         self.exhausted = exhausted;
-                        self.provider.clear_execution(context, exhausted);
+                        self.provider.clear_execution(session, exhausted);
                         self.buffer = result?.batch;
                     }
                     Poll::Pending => return Poll::Pending,
@@ -135,23 +145,22 @@ pub(super) trait GetMoreProvider: Unpin {
     /// Clear out any state remaining from previous getMore executions.
     fn clear_execution(
         &mut self,
-        context: GetMoreContext<Self::ResultType>,
+        session: <Self::ResultType as GetMoreProviderResult>::Session,
         exhausted: bool,
     );
 
     /// Start executing a new getMore if one isn't already in flight.
-    fn start_execution(&mut self, spec: CursorInformation, client: Client);
+    fn start_execution(&mut self, spec: CursorInformation, client: Client, pinned_connection: PinnedConnection);
 }
 
 /// Trait describing results returned from a `GetMoreProvider`.
 pub(crate) trait GetMoreProviderResult {
     type Session;
-    type PinnedConnection;
     type DocumentType;
 
     fn as_ref(&self) -> std::result::Result<&GetMoreResult<Self::DocumentType>, &Error>;
 
-    fn into_parts(self) -> (Result<GetMoreResult<Self::DocumentType>>, GetMoreContext<Self>);
+    fn into_parts(self) -> (Result<GetMoreResult<Self::DocumentType>>, Self::Session);
 
     /// Whether the response from the server indicated the cursor was exhausted or not.
     fn exhausted(&self) -> bool {
@@ -161,21 +170,6 @@ pub(crate) trait GetMoreProviderResult {
                 matches!(*e.kind, ErrorKind::Command(ref e) if e.code == 43 || e.code == 237)
             }
         }
-    }
-}
-
-pub(crate) struct GetMoreContext<T: GetMoreProviderResult + ?Sized> {
-    pub(crate) session: T::Session,
-    pub(crate) pinned_connection: Option<T::PinnedConnection>,
-}
-
-impl<T: GetMoreProviderResult> GetMoreContext<T> {
-    pub(crate) fn new(session: T::Session, pinned_connection: Option<T::PinnedConnection>) -> Self {
-        Self { session, pinned_connection }
-    }
-
-    pub(crate) fn drop_pinned_connection(&mut self) {
-        self.pinned_connection = None;
     }
 }
 
@@ -233,4 +227,20 @@ pub(crate) struct CursorInformation {
     pub(crate) id: i64,
     pub(crate) batch_size: Option<u32>,
     pub(crate) max_time: Option<Duration>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct PinnedConnection(Option<Arc<Mutex<Connection>>>);
+
+impl PinnedConnection {
+    pub(super) fn new(conn: Option<Connection>) -> Self {
+        Self(conn.map(|c| Arc::new(Mutex::new(c))))
+    }
+
+    pub(super) async fn lock(&self) -> Option<MutexGuard<'_, Connection>> {
+        match &self.0 {
+            Some(c) => Some(c.lock().await),
+            None => None,
+        }
+    }
 }

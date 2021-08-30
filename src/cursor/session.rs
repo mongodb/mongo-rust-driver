@@ -1,20 +1,18 @@
 use std::{
     collections::VecDeque,
     pin::Pin,
-    sync::Arc,
     task::{Context, Poll},
 };
 
 use futures_core::{future::BoxFuture, Stream};
 use futures_util::StreamExt;
 use serde::de::DeserializeOwned;
-use tokio::sync::Mutex;
 
-use super::common::{CursorInformation, GenericCursor, GetMoreProvider, GetMoreProviderResult};
+use super::common::{CursorInformation, GenericCursor, GetMoreProvider, GetMoreProviderResult, PinnedConnection};
 use crate::{
     bson::Document,
     cmap::conn::Connection,
-    cursor::{CursorSpecification, GetMoreContext},
+    cursor::CursorSpecification,
     error::{Error, Result},
     operation::GetMore,
     results::GetMoreResult,
@@ -59,14 +57,14 @@ where
     client: Client,
     info: CursorInformation,
     buffer: VecDeque<T>,
-    pinned_connection: Option<Arc<Mutex<Connection>>>,
+    pinned_connection: PinnedConnection,
 }
 
 impl<T> SessionCursor<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
-    pub(crate) fn new(client: Client, spec: CursorSpecification<T>, pinned_connection: Option<Connection>) -> Self {
+    pub(crate) fn new(client: Client, spec: CursorSpecification<T>, connection: Option<Connection>) -> Self {
         let exhausted = spec.id() == 0;
 
         Self {
@@ -74,7 +72,7 @@ where
             client,
             info: spec.info,
             buffer: spec.initial_buffer,
-            pinned_connection: pinned_connection.map(|c| Arc::new(Mutex::new(c))),
+            pinned_connection: PinnedConnection::new(connection),
         }
     }
 
@@ -124,7 +122,7 @@ where
         &mut self,
         session: &'session mut ClientSession,
     ) -> SessionCursorStream<'_, 'session, T> {
-        let get_more_provider = ExplicitSessionGetMoreProvider::new(session, self.pinned_connection.clone());
+        let get_more_provider = ExplicitSessionGetMoreProvider::new(session);
 
         // Pass the buffer into this cursor handle for iteration.
         // It will be returned in the handle's `Drop` implementation.
@@ -136,6 +134,7 @@ where
             generic_cursor: ExplicitSessionCursor::new(
                 self.client.clone(),
                 spec,
+                self.pinned_connection.clone(),
                 get_more_provider,
             ),
             session_cursor: self,
@@ -185,7 +184,12 @@ where
             .database(ns.db.as_str())
             .collection::<Document>(ns.coll.as_str());
         let cursor_id = self.info.id;
-        RUNTIME.execute(async move { coll.kill_cursor(cursor_id).await });
+        let pinned_conn = self.pinned_connection.clone();
+        RUNTIME.execute(async move {
+            let mut lock = pinned_conn.lock().await;
+            let conn = lock.as_mut().map(|l| &mut **l);
+            let _ = coll.kill_cursor(cursor_id, conn).await;
+        });
     }
 }
 
@@ -241,18 +245,12 @@ enum ExplicitSessionGetMoreProvider<'session, T> {
     ///
     /// This variant needs a `MutableSessionReference` struct that can be moved in order to
     /// transition to `Executing` via `take_mut`.
-    Idle {
-        session: MutableSessionReference<'session>,
-        pinned_connection: Option<Arc<Mutex<Connection>>>,
-    },
+    Idle(MutableSessionReference<'session>),
 }
 
 impl<'session, T> ExplicitSessionGetMoreProvider<'session, T> {
-    fn new(session: &'session mut ClientSession, pinned_connection: Option<Arc<Mutex<Connection>>>) -> Self {
-        Self::Idle {
-            session: MutableSessionReference { reference: session },
-            pinned_connection,
-        }
+    fn new(session: &'session mut ClientSession) -> Self {
+        Self::Idle(MutableSessionReference { reference: session })
     }
 }
 
@@ -270,21 +268,15 @@ impl<'session, T: Send + Sync + DeserializeOwned> GetMoreProvider
         }
     }
 
-    fn clear_execution(&mut self, context: GetMoreContext<Self::ResultType>, _exhausted: bool) {
-        *self = Self::Idle {
-            session: MutableSessionReference { reference: context.session },
-            pinned_connection: context.pinned_connection,
-        }
+    fn clear_execution(&mut self, session: &'session mut ClientSession, _exhausted: bool) {
+        *self = Self::Idle(MutableSessionReference { reference: session })
     }
 
-    fn start_execution(&mut self, info: CursorInformation, client: Client) {
+    fn start_execution(&mut self, info: CursorInformation, client: Client, pinned_connection: PinnedConnection) {
         take_mut::take(self, |self_| {
-            if let ExplicitSessionGetMoreProvider::Idle { session, pinned_connection } = self_ {
+            if let ExplicitSessionGetMoreProvider::Idle(session) = self_ {
                 let future = Box::pin(async move {
-                    let mut conn_lock = match pinned_connection {
-                        Some(ref c) => Some(c.lock().await),
-                        None => None,
-                    };
+                    let mut conn_lock = pinned_connection.lock().await;
                     let conn = conn_lock.as_mut().map(|l| &mut **l);
                     let get_more = GetMore::new(info);
                     let get_more_result = client
@@ -293,7 +285,7 @@ impl<'session, T: Send + Sync + DeserializeOwned> GetMoreProvider
                     drop(conn_lock);
                     ExecutionResult {
                         get_more_result,
-                        context: GetMoreContext::new(session.reference, pinned_connection),
+                        session: session.reference,
                     }
                 });
                 return ExplicitSessionGetMoreProvider::Executing(future);
@@ -307,20 +299,19 @@ impl<'session, T: Send + Sync + DeserializeOwned> GetMoreProvider
 /// well as the reference to the `ClientSession` used for the getMore.
 struct ExecutionResult<'session, T> {
     get_more_result: Result<GetMoreResult<T>>,
-    context: GetMoreContext<Self>,
+    session: &'session mut ClientSession,
 }
 
 impl<'session, T> GetMoreProviderResult for ExecutionResult<'session, T> {
     type Session = &'session mut ClientSession;
-    type PinnedConnection = Arc<Mutex<Connection>>;
     type DocumentType = T;
 
     fn as_ref(&self) -> std::result::Result<&GetMoreResult<T>, &Error> {
         self.get_more_result.as_ref()
     }
 
-    fn into_parts(self) -> (Result<GetMoreResult<T>>, GetMoreContext<Self>) {
-        (self.get_more_result, self.context)
+    fn into_parts(self) -> (Result<GetMoreResult<T>>, Self::Session) {
+        (self.get_more_result, self.session)
     }
 }
 
