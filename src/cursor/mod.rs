@@ -212,13 +212,12 @@ impl<T: Send + Sync + DeserializeOwned> GetMoreProvider for ImplicitSessionGetMo
             Self::Idle(mut session) => {
                 let future = Box::pin(async move {
                     let mut conn_lock = pinned_connection.lock().await;
-                    let conn = conn_lock.as_mut().map(|l| &mut **l);
                     let get_more = GetMore::new(info);
                     let get_more_result = client
                         .execute_operation_pinned(
                             get_more,
                             session.as_mut().map(|b| b.as_mut()),
-                            conn,
+                            conn_lock.as_deref_mut(),
                         )
                         .await;
                     ImplicitSessionGetMoreResult {

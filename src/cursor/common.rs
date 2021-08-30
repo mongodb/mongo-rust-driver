@@ -286,7 +286,6 @@ pub(super) fn kill_cursor(
         .collection::<Document>(ns.coll.as_str());
     RUNTIME.execute(async move {
         let mut lock = pinned_conn.lock().await;
-        let conn = lock.as_mut().map(|l| &mut **l);
-        let _ = coll.kill_cursor(cursor_id, conn).await;
+        let _ = coll.kill_cursor(cursor_id, lock.as_deref_mut()).await;
     });
 }

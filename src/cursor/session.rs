@@ -286,10 +286,13 @@ impl<'session, T: Send + Sync + DeserializeOwned> GetMoreProvider
             if let ExplicitSessionGetMoreProvider::Idle(session) = self_ {
                 let future = Box::pin(async move {
                     let mut conn_lock = pinned_connection.lock().await;
-                    let conn = conn_lock.as_mut().map(|l| &mut **l);
                     let get_more = GetMore::new(info);
                     let get_more_result = client
-                        .execute_operation_pinned(get_more, Some(&mut *session.reference), conn)
+                        .execute_operation_pinned(
+                            get_more,
+                            Some(&mut *session.reference),
+                            conn_lock.as_deref_mut(),
+                        )
                         .await;
                     drop(conn_lock);
                     ExecutionResult {

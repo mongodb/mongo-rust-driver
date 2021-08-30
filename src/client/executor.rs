@@ -243,7 +243,7 @@ impl Client {
             },
         };
 
-        let retryability = self.get_retryability(&conn, &op, &session).await?;
+        let retryability = self.get_retryability(conn, &op, &session).await?;
 
         let txn_number = match session {
             Some(ref mut session) => {
@@ -288,7 +288,7 @@ impl Client {
                     .topology
                     .handle_application_error(
                         err.clone(),
-                        HandshakePhase::after_completion(&conn),
+                        HandshakePhase::after_completion(conn),
                         &server,
                     )
                     .await;
@@ -338,7 +338,7 @@ impl Client {
             },
         };
 
-        let retryability = self.get_retryability(&conn, op, session).await?;
+        let retryability = self.get_retryability(conn, op, session).await?;
         if retryability == Retryability::None {
             return Err(first_error);
         }
@@ -353,7 +353,7 @@ impl Client {
                     .topology
                     .handle_application_error(
                         err.clone(),
-                        HandshakePhase::after_completion(&conn),
+                        HandshakePhase::after_completion(conn),
                         &server,
                     )
                     .await;
