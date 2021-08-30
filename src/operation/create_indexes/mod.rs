@@ -55,7 +55,8 @@ impl Operation for CreateIndexes {
     const NAME: &'static str = "createIndexes";
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
-        if description.max_wire_version.unwrap_or(0) < 8
+        // commit quorum is not supported on < 4.4
+        if description.max_wire_version.unwrap_or(0) < 9
             && self
                 .options
                 .as_ref()

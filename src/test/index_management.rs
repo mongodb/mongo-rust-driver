@@ -297,6 +297,7 @@ async fn commit_quorum_error() {
 
     if client.server_version_lt(4, 4) {
         let err = result.unwrap_err();
+        dbg!("{}", &err);
         assert!(matches!(*err.kind, ErrorKind::InvalidArgument { .. }));
     } else {
         assert!(result.is_ok());
