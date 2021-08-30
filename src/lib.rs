@@ -278,7 +278,7 @@
 //!
 //! ## Minimum supported Rust version (MSRV)
 //!
-//! The MSRV for this crate is currently 1.48.0. This will be rarely be increased, and if it ever does,
+//! The MSRV for this crate is currently 1.48.0. This will be rarely be increased, and if it ever is,
 //! it will only happen in a minor or major version release.
 
 #![warn(missing_docs)]
