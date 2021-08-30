@@ -244,10 +244,10 @@ pub async fn run_v2_test(test_file: TestFile) {
                                 .await
                                 .unwrap();
                         }
-                        "assertCollectionExists" => {
-                            operation.execute_on_client(&internal_client).await.unwrap();
-                        }
-                        "assertCollectionNotExists" => {
+                        "assertCollectionExists"
+                        | "assertCollectionNotExists"
+                        | "assertIndexExists"
+                        | "assertIndexNotExists" => {
                             operation.execute_on_client(&internal_client).await.unwrap();
                         }
                         "targetedFailPoint" => {

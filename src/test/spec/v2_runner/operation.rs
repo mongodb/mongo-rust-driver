@@ -303,6 +303,14 @@ impl<'de> Deserialize<'de> for Operation {
                 definition.arguments,
             )))
             .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "assertIndexExists" => AssertIndexExists::deserialize(BsonDeserializer::new(
+                Bson::Document(definition.arguments),
+            ))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "assertIndexNotExists" => AssertIndexNotExists::deserialize(BsonDeserializer::new(
+                Bson::Document(definition.arguments),
+            ))
+            .map(|op| Box::new(op) as Box<dyn TestOperation>),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -1463,6 +1471,57 @@ impl TestOperation for ListIndexNames {
                 None => collection.list_index_names().await?,
             };
             Ok(Some(names.into()))
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct AssertIndexExists {
+    database: String,
+    collection: String,
+    index: String,
+}
+
+impl TestOperation for AssertIndexExists {
+    fn execute_on_client<'a>(
+        &'a self,
+        client: &'a TestClient,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let coll = client
+                .database(&self.database)
+                .collection::<Document>(&self.collection);
+            let indexes = coll.list_index_names().await?;
+            assert!(indexes.contains(&self.index));
+            Ok(None)
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct AssertIndexNotExists {
+    database: String,
+    collection: String,
+    index: String,
+}
+
+impl TestOperation for AssertIndexNotExists {
+    fn execute_on_client<'a>(
+        &'a self,
+        client: &'a TestClient,
+    ) -> BoxFuture<'a, Result<Option<Bson>>> {
+        async move {
+            let coll = client
+                .database(&self.database)
+                .collection::<Document>(&self.collection);
+            match coll.list_index_names().await {
+                Ok(indexes) => assert!(!indexes.contains(&self.index)),
+                // a namespace not found error indicates that the index does not exist
+                Err(err) => assert_eq!(err.code(), Some(26)),
+            }
+            Ok(None)
         }
         .boxed()
     }

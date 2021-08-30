@@ -1619,8 +1619,11 @@ impl TestOperation for AssertIndexNotExists {
                 .internal_client
                 .database(&self.database_name)
                 .collection::<Document>(&self.collection_name);
-            let names = coll.list_index_names().await.unwrap();
-            assert!(!names.contains(&self.index_name));
+            match coll.list_index_names().await {
+                Ok(indexes) => assert!(!indexes.contains(&self.index_name)),
+                // a namespace not found error indicates that the index does not exist
+                Err(err) => assert_eq!(err.code(), Some(26)),
+            }
         }
         .boxed()
     }
