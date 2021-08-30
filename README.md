@@ -351,6 +351,11 @@ bash .evergreen/check-all.sh
 ## Continuous Integration
 Commits to master are run automatically on [evergreen](https://evergreen.mongodb.com/waterfall/mongo-rust-driver-stable).
 
+## Minimum supported Rust version (MSRV)
+
+The MSRV for this crate is currently 1.48.0. This will be rarely be increased, and if it ever does,
+it will only happen in a minor or major version release.
+
 ## License
 
 This project is licensed under the [Apache License 2.0](https://github.com/10gen/mongo-rust-driver/blob/master/LICENSE).
