@@ -261,9 +261,7 @@ impl<T> Collection<T> {
 
         let aggregate = Aggregate::new(self.namespace(), pipeline, options);
         let client = self.client();
-        client
-            .execute_cursor_operation(aggregate)
-            .await
+        client.execute_cursor_operation(aggregate).await
     }
 
     /// Runs an aggregation operation using the provided `ClientSession`.
@@ -776,7 +774,11 @@ impl<T> Collection<T> {
     }
 
     /// Kill the server side cursor that id corresponds to.
-    pub(super) async fn kill_cursor(&self, cursor_id: i64, pinned_connection: Option<&mut Connection>) -> Result<()> {
+    pub(super) async fn kill_cursor(
+        &self,
+        cursor_id: i64,
+        pinned_connection: Option<&mut Connection>,
+    ) -> Result<()> {
         let ns = self.namespace();
 
         self.client()
@@ -811,9 +813,7 @@ where
         let find = Find::<T>::new(self.namespace(), filter.into(), options);
         let client = self.client();
 
-        client
-            .execute_cursor_operation(find)
-            .await
+        client.execute_cursor_operation(find).await
     }
 
     /// Finds the documents in the collection matching `filter` using the provided `ClientSession`.
@@ -830,9 +830,7 @@ where
         let find = Find::<T>::new(self.namespace(), filter.into(), options);
         let client = self.client();
 
-        client
-            .execute_session_cursor_operation(find, session)
-            .await
+        client.execute_session_cursor_operation(find, session).await
     }
 
     /// Finds a single document in the collection matching `filter`.

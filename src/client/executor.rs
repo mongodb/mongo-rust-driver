@@ -8,7 +8,7 @@ use super::{session::TransactionState, Client, ClientSession};
 use crate::{
     bson::Document,
     cmap::{Connection, RawCommand, RawCommandResponse},
-    cursor::{Cursor, CursorSpecification, session::SessionCursor},
+    cursor::{session::SessionCursor, Cursor, CursorSpecification},
     error::{
         Error,
         ErrorKind,
@@ -81,7 +81,9 @@ impl Client {
         session: impl Into<Option<&mut ClientSession>>,
         pinned_connection: Option<&mut Connection>,
     ) -> Result<T::O> {
-        self.execute_operation_pinnable(op, session, pinned_connection).await.map(|(o, _)| o)
+        self.execute_operation_pinnable(op, session, pinned_connection)
+            .await
+            .map(|(o, _)| o)
     }
 
     async fn execute_operation_pinnable<T: Operation>(
@@ -136,18 +138,23 @@ impl Client {
     /// Execute the given operation, returning the implicit session created for it if one was.
     ///
     /// Server selection be will performed using the criteria specified on the operation, if any.
-    pub(crate) async fn execute_cursor_operation<Op, T>(
-        &self,
-        op: Op,
-    ) -> Result<Cursor<T>>
-        where Op: Operation<O=CursorSpecification<T>>,
+    pub(crate) async fn execute_cursor_operation<Op, T>(&self, op: Op) -> Result<Cursor<T>>
+    where
+        Op: Operation<O = CursorSpecification<T>>,
         T: DeserializeOwned + Unpin + Send + Sync,
     {
         Box::pin(async {
             let mut implicit_session = self.start_implicit_session(&op).await?;
-            let (spec, conn) = self.execute_operation_with_retry(op, implicit_session.as_mut(), None).await?;
+            let (spec, conn) = self
+                .execute_operation_with_retry(op, implicit_session.as_mut(), None)
+                .await?;
             let pinned_conn = self.pin_connection_for_cursor(&spec, conn);
-            Ok(Cursor::new(self.clone(), spec, implicit_session, pinned_conn))
+            Ok(Cursor::new(
+                self.clone(),
+                spec,
+                implicit_session,
+                pinned_conn,
+            ))
         })
         .await
     }
@@ -157,7 +164,8 @@ impl Client {
         op: Op,
         session: &mut ClientSession,
     ) -> Result<SessionCursor<T>>
-        where Op: Operation<O=CursorSpecification<T>>,
+    where
+        Op: Operation<O = CursorSpecification<T>>,
         T: DeserializeOwned + Unpin + Send + Sync,
     {
         let (spec, conn) = self.execute_operation_pinnable(op, session, None).await?;
@@ -165,7 +173,11 @@ impl Client {
         Ok(SessionCursor::new(self.clone(), spec, pinned_conn))
     }
 
-    fn pin_connection_for_cursor<T>(&self, spec: &CursorSpecification<T>, conn: Option<Connection>) -> Option<Connection> {
+    fn pin_connection_for_cursor<T>(
+        &self,
+        spec: &CursorSpecification<T>,
+        conn: Option<Connection>,
+    ) -> Option<Connection> {
         let is_load_balanced = self.inner.options.load_balanced.unwrap_or(false);
         if is_load_balanced && spec.info.id != 0 {
             conn
@@ -219,14 +231,16 @@ impl Client {
                 }
                 Err(mut err) => {
                     err.add_labels_and_update_pin(None, &mut session, None)?;
-    
+
                     if err.is_pool_cleared() {
-                        return self.execute_retry(&mut op, &mut session, None, None, err).await;
+                        return self
+                            .execute_retry(&mut op, &mut session, None, None, err)
+                            .await;
                     } else {
                         return Err(err);
                     }
                 }
-            }
+            },
         };
 
         let retryability = self.get_retryability(&conn, &op, &session).await?;
@@ -319,9 +333,9 @@ impl Client {
                 Ok(c) => {
                     owned_conn = Some(c);
                     owned_conn.as_mut().unwrap()
-                },
+                }
                 Err(_) => return Err(first_error),
-            }
+            },
         };
 
         let retryability = self.get_retryability(&conn, op, session).await?;

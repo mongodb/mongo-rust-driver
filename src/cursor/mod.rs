@@ -17,8 +17,8 @@ use crate::{
     Client,
     ClientSession,
 };
+use common::{kill_cursor, GenericCursor, GetMoreProvider, GetMoreProviderResult};
 pub(crate) use common::{CursorInformation, CursorSpecification, PinnedConnection};
-use common::{GenericCursor, GetMoreProvider, GetMoreProviderResult, kill_cursor};
 
 /// A [`Cursor`] streams the result of a query. When a query is made, the returned [`Cursor`] will
 /// contain the first batch of results from the server; the individual results will then be returned
@@ -101,7 +101,12 @@ where
 
         Self {
             client: client.clone(),
-            wrapped_cursor: ImplicitSessionCursor::new(client, spec, PinnedConnection::new(connection), provider),
+            wrapped_cursor: ImplicitSessionCursor::new(
+                client,
+                spec,
+                PinnedConnection::new(connection),
+                provider,
+            ),
             _phantom: Default::default(),
         }
     }
@@ -189,7 +194,7 @@ impl<T: Send + Sync + DeserializeOwned> GetMoreProvider for ImplicitSessionGetMo
     }
 
     fn clear_execution(&mut self, session: Option<Box<ClientSession>>, exhausted: bool) {
-        // If cursor is exhausted, immediately return implicit session and pinned connection to the pool.
+        // If cursor is exhausted, immediately return implicit session to the pool.
         if exhausted {
             *self = Self::Done;
         } else {
@@ -197,7 +202,12 @@ impl<T: Send + Sync + DeserializeOwned> GetMoreProvider for ImplicitSessionGetMo
         }
     }
 
-    fn start_execution(&mut self, info: CursorInformation, client: Client, pinned_connection: PinnedConnection) {
+    fn start_execution(
+        &mut self,
+        info: CursorInformation,
+        client: Client,
+        pinned_connection: PinnedConnection,
+    ) {
         take_mut::take(self, |self_| match self_ {
             Self::Idle(mut session) => {
                 let future = Box::pin(async move {
@@ -205,7 +215,11 @@ impl<T: Send + Sync + DeserializeOwned> GetMoreProvider for ImplicitSessionGetMo
                     let conn = conn_lock.as_mut().map(|l| &mut **l);
                     let get_more = GetMore::new(info);
                     let get_more_result = client
-                        .execute_operation_pinned(get_more, session.as_mut().map(|b| b.as_mut()), conn)
+                        .execute_operation_pinned(
+                            get_more,
+                            session.as_mut().map(|b| b.as_mut()),
+                            conn,
+                        )
                         .await;
                     ImplicitSessionGetMoreResult {
                         get_more_result,

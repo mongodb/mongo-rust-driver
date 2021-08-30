@@ -1,9 +1,9 @@
 use std::{
     collections::VecDeque,
     pin::Pin,
+    sync::Arc,
     task::{Context, Poll},
     time::Duration,
-    sync::Arc,
 };
 
 use derivative::Derivative;
@@ -44,7 +44,12 @@ where
     P: GetMoreProvider<DocumentType = T>,
     T: DeserializeOwned,
 {
-    pub(super) fn new(client: Client, spec: CursorSpecification<T>, pinned_connection: PinnedConnection, get_more_provider: P) -> Self {
+    pub(super) fn new(
+        client: Client,
+        spec: CursorSpecification<T>,
+        pinned_connection: PinnedConnection,
+        get_more_provider: P,
+    ) -> Self {
         let exhausted = spec.id() == 0;
         Self {
             exhausted,
@@ -80,7 +85,8 @@ where
         let info = self.info.clone();
         let client = self.client.clone();
         let pinned_connection = self.pinned_connection.clone();
-        self.provider.start_execution(info, client, pinned_connection);
+        self.provider
+            .start_execution(info, client, pinned_connection);
     }
 }
 
@@ -101,12 +107,14 @@ where
                         let exhausted = get_more_result.exhausted();
                         let (result, session) = get_more_result.into_parts();
                         if exhausted {
-                            // If the cursor is exhausted, the driver must return the pinned connection to the pool.
+                            // If the cursor is exhausted, the driver must return the pinned
+                            // connection to the pool.
                             self.pinned_connection = PinnedConnection::new(None);
                         }
                         if let Err(e) = &result {
                             if e.is_network_error() {
-                                // Flag the connection as invalid, preventing a killCursors command, but leave the connection pinned.
+                                // Flag the connection as invalid, preventing a killCursors command,
+                                // but leave the connection pinned.
                                 self.pinned_connection.is_valid = false;
                             }
                         }
@@ -158,7 +166,12 @@ pub(super) trait GetMoreProvider: Unpin {
     );
 
     /// Start executing a new getMore if one isn't already in flight.
-    fn start_execution(&mut self, spec: CursorInformation, client: Client, pinned_connection: PinnedConnection);
+    fn start_execution(
+        &mut self,
+        spec: CursorInformation,
+        client: Client,
+        pinned_connection: PinnedConnection,
+    );
 }
 
 /// Trait describing results returned from a `GetMoreProvider`.
@@ -259,8 +272,15 @@ impl PinnedConnection {
     }
 }
 
-pub(super) fn kill_cursor(client: Client, ns: &Namespace, cursor_id: i64, pinned_conn: PinnedConnection) {
-    if !pinned_conn.is_valid { return }
+pub(super) fn kill_cursor(
+    client: Client,
+    ns: &Namespace,
+    cursor_id: i64,
+    pinned_conn: PinnedConnection,
+) {
+    if !pinned_conn.is_valid {
+        return;
+    }
     let coll = client
         .database(ns.db.as_str())
         .collection::<Document>(ns.coll.as_str());

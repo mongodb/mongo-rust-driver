@@ -9,7 +9,7 @@ use serde::{de::DeserializeOwned, Deserialize};
 use crate::{
     bson::doc,
     cmap::{Command, StreamDescription},
-    cursor::{CursorInformation},
+    cursor::CursorInformation,
     error::{ErrorKind, Result},
     operation::Operation,
     options::SelectionCriteria,

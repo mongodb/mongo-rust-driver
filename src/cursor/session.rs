@@ -8,7 +8,14 @@ use futures_core::{future::BoxFuture, Stream};
 use futures_util::StreamExt;
 use serde::de::DeserializeOwned;
 
-use super::common::{CursorInformation, GenericCursor, GetMoreProvider, GetMoreProviderResult, PinnedConnection, kill_cursor};
+use super::common::{
+    kill_cursor,
+    CursorInformation,
+    GenericCursor,
+    GetMoreProvider,
+    GetMoreProviderResult,
+    PinnedConnection,
+};
 use crate::{
     bson::Document,
     cmap::conn::Connection,
@@ -63,7 +70,11 @@ impl<T> SessionCursor<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
-    pub(crate) fn new(client: Client, spec: CursorSpecification<T>, connection: Option<Connection>) -> Self {
+    pub(crate) fn new(
+        client: Client,
+        spec: CursorSpecification<T>,
+        connection: Option<Connection>,
+    ) -> Self {
         let exhausted = spec.id() == 0;
 
         Self {
@@ -265,7 +276,12 @@ impl<'session, T: Send + Sync + DeserializeOwned> GetMoreProvider
         *self = Self::Idle(MutableSessionReference { reference: session })
     }
 
-    fn start_execution(&mut self, info: CursorInformation, client: Client, pinned_connection: PinnedConnection) {
+    fn start_execution(
+        &mut self,
+        info: CursorInformation,
+        client: Client,
+        pinned_connection: PinnedConnection,
+    ) {
         take_mut::take(self, |self_| {
             if let ExplicitSessionGetMoreProvider::Idle(session) = self_ {
                 let future = Box::pin(async move {

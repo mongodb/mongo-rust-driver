@@ -332,7 +332,9 @@ impl Database {
         pinned_connection: Option<&mut Connection>,
     ) -> Result<Document> {
         let operation = RunCommand::new(self.name().into(), command, selection_criteria.into())?;
-        self.client().execute_operation_pinned(operation, session, pinned_connection).await
+        self.client()
+            .execute_operation_pinned(operation, session, pinned_connection)
+            .await
     }
 
     /// Runs a database-level command.
@@ -408,9 +410,7 @@ impl Database {
 
         let aggregate = Aggregate::new(self.name().to_string(), pipeline, options);
         let client = self.client();
-        client
-            .execute_cursor_operation(aggregate)
-            .await
+        client.execute_cursor_operation(aggregate).await
     }
 
     /// Runs an aggregation operation with the provided `ClientSession`.
