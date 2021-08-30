@@ -71,9 +71,10 @@ impl Operation for CreateIndexes {
 
     fn handle_response(
         &self,
-        _response: WriteConcernOnlyBody,
+        response: WriteConcernOnlyBody,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
+        response.validate()?;
         let index_names = self.indexes.iter().filter_map(|i| i.get_name()).collect();
         Ok(CreateIndexesResult { index_names })
     }
