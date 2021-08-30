@@ -81,11 +81,6 @@ async fn handle_success() {
 
     let expected_values = CreateIndexesResult {
         index_names: vec!["a".to_string(), "b".to_string()],
-        created_collection_automatically: Some(false),
-        num_indexes_before: 1,
-        num_indexes_after: 3,
-        note: None,
-        commit_quorum: Some(CommitQuorum::VotingMembers),
     };
     let actual_values = handle_response_test(&op, response).unwrap();
     assert_eq!(actual_values, expected_values);

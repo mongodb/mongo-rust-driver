@@ -13,11 +13,9 @@ use crate::{
     Namespace,
 };
 
-use super::CommandResponse;
+use super::{CommandResponse, WriteConcernOnlyBody};
 use serde::{
-    de::{Error, Unexpected},
     Deserialize,
-    Deserializer,
 };
 
 #[derive(Debug)]
@@ -56,7 +54,7 @@ impl CreateIndexes {
 impl Operation for CreateIndexes {
     type O = CreateIndexesResult;
     type Command = Document;
-    type Response = CommandResponse<Response>;
+    type Response = CommandResponse<WriteConcernOnlyBody>;
     const NAME: &'static str = "createIndexes";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -77,18 +75,12 @@ impl Operation for CreateIndexes {
 
     fn handle_response(
         &self,
-        response: Response,
+        _response: WriteConcernOnlyBody,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
         let index_names = self.indexes.iter().filter_map(|i| i.get_name()).collect();
-        let Response(response) = response;
         Ok(CreateIndexesResult {
             index_names,
-            created_collection_automatically: response.created_collection_automatically,
-            num_indexes_before: response.num_indexes_before,
-            num_indexes_after: response.num_indexes_after,
-            note: response.note,
-            commit_quorum: response.commit_quorum,
         })
     }
 
@@ -106,39 +98,4 @@ struct ResponseBody {
     num_indexes_after: u32,
     note: Option<String>,
     commit_quorum: Option<CommitQuorum>,
-}
-
-#[derive(Debug)]
-pub(crate) struct Response(ResponseBody);
-
-impl<'de> Deserialize<'de> for Response {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum ResponseHelper {
-            PlainResponse(ResponseBody),
-            ShardedResponse { raw: Document },
-        }
-
-        match ResponseHelper::deserialize(deserializer)? {
-            ResponseHelper::PlainResponse(body) => Ok(Response(body)),
-            ResponseHelper::ShardedResponse { raw } => {
-                let len = raw.values().count();
-                if len != 1 {
-                    return Err(Error::invalid_length(len, &"a single result"));
-                }
-
-                let (_, v) = raw.into_iter().next().unwrap(); // Safe unwrap because of length check above.
-                bson::from_bson(v).map(Response).map_err(|_| {
-                    Error::invalid_type(
-                        Unexpected::Other("Unknown bson"),
-                        &"a createIndexes response",
-                    )
-                })
-            }
-        }
-    }
 }
