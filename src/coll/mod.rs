@@ -610,10 +610,7 @@ impl<T> Collection<T> {
     ) -> Result<Cursor<IndexModel>> {
         let list_indexes = ListIndexes::new(self.namespace(), options.into());
         let client = self.client();
-        client
-            .execute_cursor_operation(list_indexes)
-            .await
-            .map(|(spec, session)| Cursor::new(client.clone(), spec, session))
+        client.execute_cursor_operation(list_indexes).await
     }
 
     /// Lists all indexes on this collection using the provided `ClientSession`.
@@ -625,9 +622,8 @@ impl<T> Collection<T> {
         let list_indexes = ListIndexes::new(self.namespace(), options.into());
         let client = self.client();
         client
-            .execute_operation(list_indexes, session)
+            .execute_session_cursor_operation(list_indexes, session)
             .await
-            .map(|spec| SessionCursor::new(client.clone(), spec))
     }
 
     async fn list_index_names_common(
