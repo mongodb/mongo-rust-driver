@@ -285,6 +285,10 @@ async fn commit_quorum_error() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
+    if client.is_standalone() {
+        return;
+    }
+
     let coll = client
         .init_db_and_coll(function_name!(), function_name!())
         .await;
