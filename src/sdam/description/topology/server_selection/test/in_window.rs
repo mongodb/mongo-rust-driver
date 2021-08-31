@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use approx::abs_diff_eq;
-use bson::Document;
+use bson::{doc, Document};
 use semver::VersionReq;
 use serde::Deserialize;
 use tokio::sync::RwLockWriteGuard;
@@ -114,6 +114,13 @@ async fn load_balancing_test() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
 
     let mut setup_client_options = CLIENT_OPTIONS.clone();
+
+    // TODO: RUST-1004 unskip on auth variants
+    if setup_client_options.credential.is_some() {
+        println!("skipping load_balancing_test test due to auth being enabled");
+        return;
+    }
+
     setup_client_options.hosts.drain(1..);
     setup_client_options.direct_connection = Some(true);
     let setup_client = TestClient::with_options(Some(setup_client_options)).await;
@@ -137,21 +144,17 @@ async fn load_balancing_test() {
         return;
     }
 
-    let options = FailCommandOptions::builder()
-        .block_connection(Duration::from_millis(500))
-        .build();
-    let failpoint = FailPoint::fail_command(&["find"], FailPointMode::AlwaysOn, options);
-
-    let fp_guard = setup_client
-        .enable_failpoint(failpoint, None)
+    // seed the collection with a document so the find commands do some work
+    setup_client
+        .database("load_balancing_test")
+        .collection("load_balancing_test")
+        .insert_one(doc! {}, None)
         .await
-        .expect("enabling failpoint should succeed");
-
-    let mut client = EventClient::new().await;
+        .unwrap();
 
     /// min_share is the lower bound for the % of times the the less selected server
     /// was selected. max_share is the upper bound.
-    async fn do_test(client: &mut EventClient, min_share: f64, max_share: f64) {
+    async fn do_test(client: &mut EventClient, min_share: f64, max_share: f64, iterations: usize) {
         client.clear_cached_events();
 
         let mut handles: Vec<AsyncJoinHandle<()>> = Vec::new();
@@ -162,7 +165,7 @@ async fn load_balancing_test() {
             handles.push(
                 RUNTIME
                     .spawn(async move {
-                        for _ in 0..10 {
+                        for _ in 0..iterations {
                             let _ = collection.find_one(None, None).await;
                         }
                     })
@@ -181,15 +184,41 @@ async fn load_balancing_test() {
         let mut counts: Vec<_> = tallies.values().collect();
         counts.sort();
 
-        // verify that the lesser picked server (slower one) was picked less than 25% of the time.
         let share_of_selections = (*counts[0] as f64) / ((*counts[0] + *counts[1]) as f64);
-        assert!(share_of_selections <= max_share);
-        assert!(share_of_selections >= min_share);
+        assert!(
+            share_of_selections <= max_share,
+            "expected no more than {}% of selections, instead got {}%",
+            (max_share * 100.0) as u32,
+            (share_of_selections * 100.0) as u32
+        );
+        assert!(
+            share_of_selections >= min_share,
+            "expected at least {}% of selections, instead got {}%",
+            (min_share * 100.0) as u32,
+            (share_of_selections * 100.0) as u32
+        );
     }
 
-    do_test(&mut client, 0.05, 0.25).await;
+    let mut client = EventClient::new().await;
 
-    // disable failpoint and rerun, should be close to even split
+    // saturate pools
+    do_test(&mut client, 0.0, 0.50, 100).await;
+
+    // enable a failpoint on one of the mongoses to slow it down
+    let options = FailCommandOptions::builder()
+        .block_connection(Duration::from_millis(500))
+        .build();
+    let failpoint = FailPoint::fail_command(&["find"], FailPointMode::AlwaysOn, options);
+
+    let fp_guard = setup_client
+        .enable_failpoint(failpoint, None)
+        .await
+        .expect("enabling failpoint should succeed");
+
+    // verify that the lesser picked server (slower one) was picked less than 25% of the time.
+    do_test(&mut client, 0.05, 0.25, 10).await;
+
+    // disable failpoint and rerun, should be back to even split
     drop(fp_guard);
-    do_test(&mut client, 0.40, 0.50).await;
+    do_test(&mut client, 0.40, 0.50, 100).await;
 }
