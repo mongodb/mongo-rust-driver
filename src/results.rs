@@ -5,7 +5,6 @@ use std::collections::{HashMap, VecDeque};
 use crate::{
     bson::{Bson, Document},
     bson_util,
-    coll::options::CommitQuorum,
     db::options::CreateCollectionOptions,
 };
 
@@ -84,21 +83,6 @@ pub struct DeleteResult {
 pub struct CreateIndexResult {
     /// The name of the index created in the `createIndex` command.
     pub index_name: String,
-
-    /// Whether or not the collection was created implicitly by the command.
-    pub created_collection_automatically: Option<bool>,
-
-    /// The number of indexes on the collection prior to running the command.
-    pub num_indexes_before: u32,
-
-    /// The number of indexes on the collection after the command was run.
-    pub num_indexes_after: u32,
-
-    /// Any information pertinent to the creation of the indexes. For more information, see the [documentation](https://docs.mongodb.com/manual/reference/command/createIndexes/#output).
-    pub note: Option<String>,
-
-    /// The commit quorum for the operation.
-    pub commit_quorum: Option<CommitQuorum>,
 }
 
 /// Information about the indexes created as a result of a
@@ -108,32 +92,12 @@ pub struct CreateIndexResult {
 pub struct CreateIndexesResult {
     /// The list containing the names of all indexes created in the `createIndexes` command.
     pub index_names: Vec<String>,
-
-    /// Whether or not the collection was created implicitly by the command.
-    pub created_collection_automatically: Option<bool>,
-
-    /// The number of indexes on the collection prior to running the command.
-    pub num_indexes_before: u32,
-
-    /// The number of indexes on the collection after the command was run.
-    pub num_indexes_after: u32,
-
-    /// Any information pertinent to the creation of the indexes. For more information, see the [documentation](https://docs.mongodb.com/manual/reference/command/createIndexes/#output).
-    pub note: Option<String>,
-
-    /// The commit quorum for the operation.
-    pub commit_quorum: Option<CommitQuorum>,
 }
 
 impl CreateIndexesResult {
     pub(crate) fn into_create_index_result(self) -> CreateIndexResult {
         CreateIndexResult {
             index_name: self.index_names.into_iter().next().unwrap(),
-            created_collection_automatically: self.created_collection_automatically,
-            num_indexes_before: self.num_indexes_before,
-            num_indexes_after: self.num_indexes_after,
-            note: self.note,
-            commit_quorum: self.commit_quorum,
         }
     }
 }
