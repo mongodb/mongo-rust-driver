@@ -36,7 +36,7 @@ async fn build() {
     let mut create_indexes = CreateIndexes::new(ns, vec![index_model], Some(create_options));
 
     let cmd = create_indexes
-        .build(&StreamDescription::new_testing())
+        .build(&StreamDescription::with_wire_version(10))
         .expect("CreateIndexes command failed to build when it should have succeeded.");
 
     assert_eq!(
