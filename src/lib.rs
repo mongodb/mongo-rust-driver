@@ -50,14 +50,22 @@
 //!
 //! ### All Feature flags
 //!
-//! | Feature             | Description                                                                                                                           | Extra dependencies                  | Default |
-//! |:--------------------|:--------------------------------------------------------------------------------------------------------------------------------------|:------------------------------------|:--------|
-//! | `tokio-runtime`     | Enable support for the `tokio` async runtime                                                                                          | `tokio` 1.0 with the `full` feature | yes     |
-//! | `async-std-runtime` | Enable support for the `async-std` runtime                                                                                            | `async-std` 1.0                     | no      |
-//! | `sync`              | Expose the synchronous API (`mongodb::sync`). This flag cannot be used in conjunction with either of the async runtime feature flags. | `async-std` 1.0                     | no      |
-//! | `aws-auth`          | Enable support for the MONGODB-AWS authentication mechanism.                                                                          | `reqwest` 0.11                      | no      |
-//! | `bson-uuid-0_8`     | Enable support for v0.8 of the [`uuid`](docs.rs/uuid/0.8) crate in the public API of the re-exported `bson` crate.                    | `uuid` 0.8                          | no      |
-//! | `bson-chrono-0_4`   | Enable support for v0.4 of the [`chrono`](docs.rs/chrono/0.4) crate in the public API of the re-exported `bson` crate.                | n/a                                 | no      |
+//! | Feature             | Description
+//! | Extra dependencies                  | Default | |:--------------------|:
+//! --------------------------------------------------------------------------------------------------------------------------------------|:
+//! ------------------------------------|:--------| | `tokio-runtime`     | Enable support for the
+//! `tokio` async runtime
+//! | `tokio` 1.0 with the `full` feature | yes     | | `async-std-runtime` | Enable support for the
+//! `async-std` runtime
+//! | `async-std` 1.0                     | no      | | `sync`              | Expose the synchronous
+//! API (`mongodb::sync`). This flag cannot be used in conjunction with either of the async runtime
+//! feature flags. | `async-std` 1.0                     | no      | | `aws-auth`          | Enable
+//! support for the MONGODB-AWS authentication mechanism.
+//! | `reqwest` 0.11                      | no      | | `bson-uuid-0_8`     | Enable support for
+//! v0.8 of the [`uuid`](docs.rs/uuid/0.8) crate in the public API of the re-exported `bson` crate.
+//! | `uuid` 0.8                          | no      | | `bson-chrono-0_4`   | Enable support for
+//! v0.4 of the [`chrono`](docs.rs/chrono/0.4) crate in the public API of the re-exported `bson`
+//! crate.                | n/a                                 | no      |
 //!
 //! # Example Usage
 //!
@@ -245,14 +253,14 @@
 //! In async Rust, it is common to implement cancellation and timeouts by dropping a future after a
 //! certain period of time instead of polling it to completion. This is how
 //! [`tokio::time::timeout`](https://docs.rs/tokio/1.10.1/tokio/time/fn.timeout.html) works, for
-//! example. However, doing this with futures returned by the driver can leave the driver's internals in
-//! an inconsistent state, which may lead to unpredictable or incorrect behavior (see RUST-937 for more
-//! details). As such, it is **_highly_** recommended to poll all futures returned from the driver to
-//! completion. In order to still use timeout mechanisms like `tokio::time::timeout` with the driver,
-//! one option is to spawn tasks and time out on their
+//! example. However, doing this with futures returned by the driver can leave the driver's
+//! internals in an inconsistent state, which may lead to unpredictable or incorrect behavior (see
+//! RUST-937 for more details). As such, it is **_highly_** recommended to poll all futures returned
+//! from the driver to completion. In order to still use timeout mechanisms like
+//! `tokio::time::timeout` with the driver, one option is to spawn tasks and time out on their
 //! [`JoinHandle`](https://docs.rs/tokio/1.10.1/tokio/task/struct.JoinHandle.html) futures instead of on
-//! the driver's futures directly. This will ensure the driver's futures will always be completely polled
-//! while also allowing the application to continue in the event of a timeout.
+//! the driver's futures directly. This will ensure the driver's futures will always be completely
+//! polled while also allowing the application to continue in the event of a timeout.
 //!
 //! e.g.
 //! ``` rust
@@ -278,8 +286,8 @@
 //!
 //! ## Minimum supported Rust version (MSRV)
 //!
-//! The MSRV for this crate is currently 1.48.0. This will be rarely be increased, and if it ever is,
-//! it will only happen in a minor or major version release.
+//! The MSRV for this crate is currently 1.48.0. This will be rarely be increased, and if it ever
+//! is, it will only happen in a minor or major version release.
 
 #![warn(missing_docs)]
 #![warn(missing_crate_level_docs)]

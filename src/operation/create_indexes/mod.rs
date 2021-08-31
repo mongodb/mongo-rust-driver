@@ -4,7 +4,6 @@ mod test;
 use crate::{
     bson::{doc, Document},
     cmap::{Command, StreamDescription},
-    coll::options::CommitQuorum,
     error::{ErrorKind, Result},
     index::IndexModel,
     operation::{append_options, Operation},

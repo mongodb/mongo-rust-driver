@@ -4,12 +4,12 @@ use tokio::sync::RwLockReadGuard;
 use crate::{
     bson::doc,
     error::ErrorKind,
-    index::{options::IndexOptions, IndexModel},
-    options::{CommitQuorum, CreateIndexOptions},
+    options::{CommitQuorum, CreateIndexOptions, IndexOptions},
     test::{
         util::{EventClient, TestClient},
         LOCK,
     },
+    IndexModel,
 };
 
 // Test that creating indexes works as expected.
