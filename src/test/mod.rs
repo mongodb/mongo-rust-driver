@@ -7,6 +7,7 @@ mod cursor;
 mod db;
 #[cfg(not(feature = "sync"))]
 mod documentation_examples;
+mod index_management;
 mod spec;
 mod util;
 
