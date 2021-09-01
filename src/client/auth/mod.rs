@@ -82,7 +82,8 @@ pub enum AuthMechanism {
     ///
     /// Note: Only server versions 4.4+ support AWS authentication. Additionally, the driver only
     /// supports AWS authentication with the tokio runtime.
-    #[cfg(feature = "aws-auth")]
+    #[cfg(any(feature = "aws-auth", docsrs))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "aws-auth")))]
     MongoDbAws,
 }
 
