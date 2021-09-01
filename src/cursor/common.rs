@@ -115,7 +115,7 @@ where
                             if e.is_network_error() {
                                 // Flag the connection as invalid, preventing a killCursors command,
                                 // but leave the connection pinned.
-                                self.pinned_connection.is_valid = false;
+                                self.pinned_connection.invalidate();
                             }
                         }
 
@@ -251,23 +251,34 @@ pub(crate) struct CursorInformation {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct PinnedConnection {
-    connection: Option<Arc<Mutex<Connection>>>,
-    is_valid: bool,
+pub(crate) enum PinnedConnection {
+    Valid(Arc<Mutex<Connection>>),
+    Invalid(Arc<Mutex<Connection>>),
+    Unpinned,
 }
 
 impl PinnedConnection {
     pub(super) fn new(conn: Option<Connection>) -> Self {
-        Self {
-            connection: conn.map(|c| Arc::new(Mutex::new(c))),
-            is_valid: true,
+        match conn {
+            Some(c) => Self::Valid(Arc::new(Mutex::new(c))),
+            None => Self::Unpinned,
         }
     }
 
     pub(super) async fn lock(&self) -> Option<MutexGuard<'_, Connection>> {
-        match &self.connection {
-            Some(c) => Some(c.lock().await),
-            None => None,
+        match self {
+            Self::Valid(c) | Self::Invalid(c) => Some(c.lock().await),
+            Self::Unpinned => None,
+        }
+    }
+
+    fn is_valid(&self) -> bool {
+        !matches!(self, Self::Invalid(_))
+    }
+
+    fn invalidate(&mut self) {
+        if let Self::Valid(c) = self {
+            *self = Self::Invalid(Arc::clone(c));
         }
     }
 }
@@ -278,7 +289,7 @@ pub(super) fn kill_cursor(
     cursor_id: i64,
     pinned_conn: PinnedConnection,
 ) {
-    if !pinned_conn.is_valid {
+    if !pinned_conn.is_valid() {
         return;
     }
     let coll = client
