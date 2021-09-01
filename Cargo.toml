@@ -126,3 +126,4 @@ semver = "1.0.0"
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]
+features = ["aws-auth"]

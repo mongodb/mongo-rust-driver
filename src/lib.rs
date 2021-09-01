@@ -115,7 +115,7 @@
 //! # Ok(()) }
 //! ```
 //!
-//! A [`Collection`] can be parameterized with any type that implements the
+//! A [`Collection`](struct.Collection.html) can be parameterized with any type that implements the
 //! `Serialize` and `Deserialize` traits from the [`serde`](https://serde.rs/) crate,
 //! not just `Document`:
 //!
@@ -155,8 +155,8 @@
 //! ```
 //!
 //! ### Finding documents in a collection
-//! Results from queries are generally returned via [`Cursor`], a struct which streams the results
-//! back from the server as requested. The [`Cursor`] type implements the
+//! Results from queries are generally returned via [`Cursor`](struct.Cursor.html), a struct which streams
+//! the results back from the server as requested. The [`Cursor`](struct.Cursor.html) type implements the
 //! [`Stream`](https://docs.rs/futures/latest/futures/stream/trait.Stream.html) trait from
 //! the [`futures`](https://crates.io/crates/futures) crate, and in order to access its streaming
 //! functionality you need to import at least one of the
@@ -282,7 +282,7 @@
 //! it will only happen in a minor or major version release.
 
 #![warn(missing_docs)]
-#![warn(missing_crate_level_docs)]
+#![warn(rustdoc::missing_crate_level_docs)]
 #![cfg_attr(
     feature = "cargo-clippy",
     allow(
