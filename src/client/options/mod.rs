@@ -102,38 +102,6 @@ lazy_static! {
     };
 }
 
-/// A hostname:port address pair.
-#[derive(Clone, Debug, Eq)]
-#[deprecated = "This type has been renamed to `ServerAddress` and will be removed in the 2.0.0 \
-                stable release"]
-pub struct StreamAddress {
-    /// The hostname of the address.
-    pub hostname: String,
-
-    /// The port of the address.
-    ///
-    /// The default is 27017.
-    pub port: Option<u16>,
-}
-
-#[allow(deprecated)]
-impl PartialEq for StreamAddress {
-    fn eq(&self, other: &Self) -> bool {
-        self.hostname == other.hostname && self.port.unwrap_or(27017) == other.port.unwrap_or(27017)
-    }
-}
-
-#[allow(deprecated)]
-impl Hash for StreamAddress {
-    fn hash<H>(&self, state: &mut H)
-    where
-        H: Hasher,
-    {
-        self.hostname.hash(state);
-        self.port.unwrap_or(27017).hash(state);
-    }
-}
-
 /// An enum representing the address of a MongoDB server.
 ///
 /// Currently this just supports addresses that can be connected to over TCP, but alternative
@@ -196,16 +164,6 @@ impl Hash for ServerAddress {
                 host.hash(state);
                 port.unwrap_or(27017).hash(state);
             }
-        }
-    }
-}
-
-#[allow(deprecated)]
-impl From<StreamAddress> for ServerAddress {
-    fn from(sa: StreamAddress) -> Self {
-        Self::Tcp {
-            host: sa.hostname,
-            port: sa.port,
         }
     }
 }
