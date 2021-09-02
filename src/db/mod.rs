@@ -331,9 +331,9 @@ impl Database {
         session: impl Into<Option<&mut ClientSession>>,
         pinned_connection: Option<&PinHandle>,
     ) -> Result<Document> {
-        let operation = RunCommand::new(self.name().into(), command, selection_criteria.into())?;
+        let operation = RunCommand::new(self.name().into(), command, selection_criteria.into(), pinned_connection)?;
         self.client()
-            .execute_operation_pinned(operation, session, pinned_connection)
+            .execute_operation(operation, session)
             .await
     }
 

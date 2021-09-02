@@ -7,25 +7,27 @@ use super::Operation;
 use crate::{
     bson::Document,
     client::{ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS},
-    cmap::{Command, RawCommandResponse, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription, conn::PinHandle},
     error::{ErrorKind, Result},
     options::WriteConcern,
     selection_criteria::SelectionCriteria,
 };
 
 #[derive(Debug)]
-pub(crate) struct RunCommand {
+pub(crate) struct RunCommand<'conn> {
     db: String,
     command: Document,
     selection_criteria: Option<SelectionCriteria>,
     write_concern: Option<WriteConcern>,
+    pinned_connection: Option<&'conn PinHandle>,
 }
 
-impl RunCommand {
+impl<'conn> RunCommand<'conn> {
     pub(crate) fn new(
         db: String,
         command: Document,
         selection_criteria: Option<SelectionCriteria>,
+        pinned_connection: Option<&'conn PinHandle>,
     ) -> Result<Self> {
         let write_concern = command
             .get("writeConcern")
@@ -37,6 +39,7 @@ impl RunCommand {
             command,
             selection_criteria,
             write_concern,
+            pinned_connection,
         })
     }
 
@@ -45,7 +48,7 @@ impl RunCommand {
     }
 }
 
-impl Operation for RunCommand {
+impl<'conn> Operation for RunCommand<'conn> {
     type O = Document;
     type Command = Document;
     type Response = Response;
@@ -90,6 +93,10 @@ impl Operation for RunCommand {
                 !SESSIONS_UNSUPPORTED_COMMANDS.contains(command_name.to_lowercase().as_str())
             })
             .unwrap_or(false)
+    }
+
+    fn pinned_connection(&self) -> Option<&PinHandle> {
+        self.pinned_connection
     }
 }
 

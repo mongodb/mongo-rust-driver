@@ -282,16 +282,15 @@ impl<'session, T: Send + Sync + DeserializeOwned> GetMoreProvider
         client: Client,
         pinned_connection: Option<&PinHandle>,
     ) {
-        let pinned_connection = pinned_connection.cloned();
         take_mut::take(self, |self_| {
             if let ExplicitSessionGetMoreProvider::Idle(session) = self_ {
+                let pinned_connection = pinned_connection.cloned();
                 let future = Box::pin(async move {
-                    let get_more = GetMore::new(info);
+                    let get_more = GetMore::new(info, pinned_connection.as_ref());
                     let get_more_result = client
-                        .execute_operation_pinned(
+                        .execute_operation(
                             get_more,
                             Some(&mut *session.reference),
-                            pinned_connection.as_ref(),
                         )
                         .await;
                     ExecutionResult {

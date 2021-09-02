@@ -8,7 +8,7 @@ use serde::{de::DeserializeOwned, Deserialize};
 
 use crate::{
     bson::doc,
-    cmap::{Command, StreamDescription},
+    cmap::{Command, StreamDescription, conn::PinHandle},
     cursor::CursorInformation,
     error::{ErrorKind, Result},
     operation::Operation,
@@ -20,29 +20,31 @@ use crate::{
 use super::CommandResponse;
 
 #[derive(Debug)]
-pub(crate) struct GetMore<T> {
+pub(crate) struct GetMore<'conn, T> {
     ns: Namespace,
     cursor_id: i64,
     selection_criteria: SelectionCriteria,
     batch_size: Option<u32>,
     max_time: Option<Duration>,
+    pinned_connection: Option<&'conn PinHandle>,
     _phantom: PhantomData<T>,
 }
 
-impl<T> GetMore<T> {
-    pub(crate) fn new(info: CursorInformation) -> Self {
+impl<'conn, T> GetMore<'conn, T> {
+    pub(crate) fn new(info: CursorInformation, pinned: Option<&'conn PinHandle>) -> Self {
         Self {
             ns: info.ns,
             cursor_id: info.id,
             selection_criteria: SelectionCriteria::from_address(info.address),
             batch_size: info.batch_size,
             max_time: info.max_time,
+            pinned_connection: pinned,
             _phantom: Default::default(),
         }
     }
 }
 
-impl<T: DeserializeOwned> Operation for GetMore<T> {
+impl<'conn, T: DeserializeOwned> Operation for GetMore<'conn, T> {
     type O = GetMoreResult<T>;
     type Command = Document;
     type Response = CommandResponse<GetMoreResponseBody<T>>;
@@ -90,6 +92,10 @@ impl<T: DeserializeOwned> Operation for GetMore<T> {
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         Some(&self.selection_criteria)
+    }
+
+    fn pinned_connection(&self) -> Option<&PinHandle> {
+        self.pinned_connection
     }
 }
 

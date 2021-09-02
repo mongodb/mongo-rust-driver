@@ -77,7 +77,7 @@ impl TestClient {
             .await;
         session.mark_dirty();
 
-        let is_master = RunCommand::new("admin".into(), doc! { "isMaster":  1 }, None).unwrap();
+        let is_master = RunCommand::new("admin".into(), doc! { "isMaster":  1 }, None, None).unwrap();
 
         let server_info = bson::from_bson(Bson::Document(
             client
@@ -87,7 +87,7 @@ impl TestClient {
         ))
         .unwrap();
 
-        let build_info = RunCommand::new("test".into(), doc! { "buildInfo":  1 }, None).unwrap();
+        let build_info = RunCommand::new("test".into(), doc! { "buildInfo":  1 }, None, None).unwrap();
 
         let response = client
             .execute_operation(build_info, &mut session)
@@ -99,7 +99,7 @@ impl TestClient {
         let server_version = Version::parse(server_version_str).unwrap();
 
         let get_parameters =
-            RunCommand::new("admin".into(), doc! { "getParameter": "*" }, None).unwrap();
+            RunCommand::new("admin".into(), doc! { "getParameter": "*" }, None, None).unwrap();
         let server_parameters = client
             .execute_operation(get_parameters, &mut session)
             .await

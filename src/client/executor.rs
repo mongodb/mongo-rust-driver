@@ -72,16 +72,7 @@ impl Client {
         op: T,
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<T::O> {
-        self.execute_operation_pinned(op, session, None).await
-    }
-
-    pub(crate) async fn execute_operation_pinned<T: Operation>(
-        &self,
-        op: T,
-        session: impl Into<Option<&mut ClientSession>>,
-        pinned_connection: Option<&PinHandle>,
-    ) -> Result<T::O> {
-        self.execute_operation_with_details(op, session, pinned_connection)
+        self.execute_operation_with_details(op, session)
             .await
             .map(|details| details.output)
     }
@@ -90,7 +81,6 @@ impl Client {
         &self,
         op: T,
         session: impl Into<Option<&mut ClientSession>>,
-        pinned_connection: Option<&PinHandle>,
     ) -> Result<OperationDetails<T>> {
         Box::pin(async {
             // TODO RUST-9: allow unacknowledged write concerns
@@ -130,7 +120,7 @@ impl Client {
                 }
             };
             let mut details = self
-                .execute_operation_with_retry(op, session, pinned_connection)
+                .execute_operation_with_retry(op, session)
                 .await?;
             details.implicit_session = implicit_session;
             Ok(details)
@@ -147,7 +137,7 @@ impl Client {
         T: DeserializeOwned + Unpin + Send + Sync,
     {
         Box::pin(async {
-            let mut details = self.execute_operation_with_details(op, None, None).await?;
+            let mut details = self.execute_operation_with_details(op, None).await?;
             let pinned = self.pin_connection_for_cursor(&mut details)?;
             Ok(Cursor::new(
                 self.clone(),
@@ -169,7 +159,7 @@ impl Client {
         T: DeserializeOwned + Unpin + Send + Sync,
     {
         let mut details = self
-            .execute_operation_with_details(op, session, None)
+            .execute_operation_with_details(op, session)
             .await?;
         let pinned = self.pin_connection_for_cursor(&mut details)?;
         Ok(SessionCursor::new(
@@ -197,7 +187,6 @@ impl Client {
         &self,
         mut op: T,
         mut session: Option<&mut ClientSession>,
-        pinned_connection: Option<&PinHandle>,
     ) -> Result<OperationDetails<T>> {
         // If the current transaction has been committed/aborted and it is not being
         // re-committed/re-aborted, reset the transaction's state to TransactionState::None.
@@ -226,7 +215,7 @@ impl Client {
             }
         };
 
-        let mut conn = match pinned_connection {
+        let mut conn = match op.pinned_connection() {
             Some(l) => l.take_connection().await?,
             None => match server.pool.check_out().await {
                 Ok(c) => c,
@@ -235,7 +224,7 @@ impl Client {
 
                     if err.is_pool_cleared() {
                         return self
-                            .execute_retry(&mut op, &mut session, None, None, err)
+                            .execute_retry(&mut op, &mut session, None, err)
                             .await;
                     } else {
                         return Err(err);
@@ -305,7 +294,7 @@ impl Client {
                 if retryability == Retryability::Read && err.is_read_retryable()
                     || retryability == Retryability::Write && err.is_write_retryable()
                 {
-                    self.execute_retry(&mut op, &mut session, txn_number, pinned_connection, err)
+                    self.execute_retry(&mut op, &mut session, txn_number, err)
                         .await
                 } else {
                     Err(err)
@@ -319,7 +308,6 @@ impl Client {
         op: &mut T,
         session: &mut Option<&mut ClientSession>,
         txn_number: Option<i64>,
-        pinned_connection: Option<&PinHandle>,
         first_error: Error,
     ) -> Result<OperationDetails<T>> {
         op.update_for_retry();
@@ -331,7 +319,7 @@ impl Client {
             }
         };
 
-        let mut conn = match pinned_connection {
+        let mut conn = match op.pinned_connection() {
             Some(c) => c.take_connection().await?,
             None => match server.pool.check_out().await {
                 Ok(c) => c,
