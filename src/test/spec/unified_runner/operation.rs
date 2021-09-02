@@ -35,6 +35,8 @@ use crate::{
     },
     selection_criteria::ReadPreference,
     test::FailPoint,
+    Collection,
+    Database,
     IndexModel,
     RUNTIME,
 };
@@ -566,10 +568,19 @@ impl TestOperation for Aggregate {
         async move {
             let result = match &self.session {
                 Some(session_id) => {
-                    let entity = test_runner.entities.get(id).unwrap().clone();
+                    enum AggregateEntity {
+                        Collection(Collection<Document>),
+                        Database(Database),
+                        Other(String),
+                    }
+                    let entity = match test_runner.entities.get(id).unwrap() {
+                        Entity::Collection(c) => AggregateEntity::Collection(c.clone()),
+                        Entity::Database(d) => AggregateEntity::Database(d.clone()),
+                        other => AggregateEntity::Other(format!("{:?}", other)),
+                    };
                     let session = test_runner.get_mut_session(session_id);
                     let mut cursor = match entity {
-                        Entity::Collection(collection) => {
+                        AggregateEntity::Collection(collection) => {
                             collection
                                 .aggregate_with_session(
                                     self.pipeline.clone(),
@@ -578,7 +589,7 @@ impl TestOperation for Aggregate {
                                 )
                                 .await?
                         }
-                        Entity::Database(db) => {
+                        AggregateEntity::Database(db) => {
                             db.aggregate_with_session(
                                 self.pipeline.clone(),
                                 self.options.clone(),
@@ -586,7 +597,7 @@ impl TestOperation for Aggregate {
                             )
                             .await?
                         }
-                        other => panic!("Cannot execute aggregate on {:?}", &other),
+                        AggregateEntity::Other(debug) => panic!("Cannot execute aggregate on {}", &debug),
                     };
                     cursor
                         .stream(session)
