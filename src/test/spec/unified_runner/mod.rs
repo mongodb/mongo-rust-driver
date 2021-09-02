@@ -12,7 +12,7 @@ use semver::Version;
 use tokio::sync::RwLockWriteGuard;
 
 use crate::{
-    bson::{doc, Document},
+    bson::{doc, Bson, Document},
     options::{CollectionOptions, FindOptions, ReadConcern, ReadPreference, SelectionCriteria},
     test::{run_single_test, run_spec_test, LOCK},
     RUNTIME,
@@ -140,14 +140,26 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                         .execute_entity_operation(id, &mut test_runner)
                         .await;
 
+                    // Precache the BSON result, if any, so that other entities can be saved without
+                    // cloning.
+                    #[derive(Debug)]
+                    enum ResultEntity {
+                        Bson(Bson),
+                        Other,
+                        None,
+                    }
+
+                    let bson_result = match &result {
+                        Ok(Some(Entity::Bson(bson))) => Ok(ResultEntity::Bson(bson.clone())),
+                        Ok(Some(_)) => Ok(ResultEntity::Other),
+                        Ok(None) => Ok(ResultEntity::None),
+                        Err(e) => Err(e.clone()),
+                    };
+
                     if let Some(ref id) = operation.save_result_as_entity {
-                        match &result {
+                        match result {
                             Ok(Some(entity)) => {
-                                if test_runner
-                                    .entities
-                                    .insert(id.clone(), entity.clone())
-                                    .is_some()
-                                {
+                                if test_runner.entities.insert(id.clone(), entity).is_some() {
                                     panic!("Entity with id {} already present in entity map", id);
                                 }
                             }
@@ -157,22 +169,19 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                     }
 
                     if let Some(expect_error) = operation.expect_error {
-                        let error = result
+                        let error = bson_result
                             .expect_err(&format!("{} should return an error", operation.name));
                         expect_error.verify_result(error);
                     } else {
-                        let result = result.unwrap_or_else(|e| {
+                        let result = bson_result.unwrap_or_else(|e| {
                             panic!(
                                 "{} should succeed, but the following error: {}",
                                 operation.name, e
                             )
                         });
                         if let Some(ref expect_result) = operation.expect_result {
-                            let result = result.unwrap_or_else(|| {
-                                panic!("{} should return an entity", operation.name)
-                            });
                             match result {
-                                Entity::Bson(ref result) => {
+                                ResultEntity::Bson(ref result) => {
                                     assert!(
                                         results_match(
                                             Some(result),
@@ -185,10 +194,13 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                                         result
                                     );
                                 }
-                                _ => panic!(
+                                ResultEntity::Other => panic!(
                                     "Incorrect entity type returned from {}, expected BSON",
                                     operation.name
                                 ),
+                                ResultEntity::None => {
+                                    panic!("{} should return an entity", operation.name)
+                                }
                             }
                         }
                     }

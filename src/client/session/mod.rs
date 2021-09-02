@@ -99,7 +99,7 @@ lazy_static! {
 ///     }
 /// }
 /// ```
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ClientSession {
     cluster_time: Option<ClusterTime>,
     server_session: ServerSession,

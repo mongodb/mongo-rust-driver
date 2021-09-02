@@ -14,7 +14,7 @@ use crate::{
     Database,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum Entity {
     Client(ClientEntity),
     Database(Database),
@@ -33,7 +33,7 @@ pub struct ClientEntity {
     observe_sensitive_commands: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct SessionEntity {
     pub lsid: Document,
     pub client_session: Option<Box<ClientSession>>,
