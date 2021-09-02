@@ -7,7 +7,7 @@ use std::{collections::HashSet, sync::Arc, time::Instant};
 use super::{session::TransactionState, Client, ClientSession};
 use crate::{
     bson::Document,
-    cmap::{Connection, RawCommand, RawCommandResponse},
+    cmap::{Connection, conn::PinHandle, RawCommand, RawCommandResponse},
     cursor::{session::SessionCursor, Cursor, CursorSpecification},
     error::{
         Error,
@@ -79,7 +79,7 @@ impl Client {
         &self,
         op: T,
         session: impl Into<Option<&mut ClientSession>>,
-        pinned_connection: Option<&mut Connection>,
+        pinned_connection: Option<&PinHandle>,
     ) -> Result<T::O> {
         self.execute_operation_with_details(op, session, pinned_connection)
             .await
@@ -90,7 +90,7 @@ impl Client {
         &self,
         op: T,
         session: impl Into<Option<&mut ClientSession>>,
-        pinned_connection: Option<&mut Connection>,
+        pinned_connection: Option<&PinHandle>,
     ) -> Result<OperationDetails<T>> {
         Box::pin(async {
             // TODO RUST-9: allow unacknowledged write concerns
@@ -148,12 +148,12 @@ impl Client {
     {
         Box::pin(async {
             let mut details = self.execute_operation_with_details(op, None, None).await?;
-            self.pin_connection_for_cursor(&mut details);
+            let pinned = self.pin_connection_for_cursor(&mut details)?;
             Ok(Cursor::new(
                 self.clone(),
                 details.output,
                 details.implicit_session,
-                details.connection,
+                pinned,
             ))
         })
         .await
@@ -171,21 +171,23 @@ impl Client {
         let mut details = self
             .execute_operation_with_details(op, session, None)
             .await?;
-        self.pin_connection_for_cursor(&mut details);
+        let pinned = self.pin_connection_for_cursor(&mut details)?;
         Ok(SessionCursor::new(
             self.clone(),
             details.output,
-            details.connection,
+            pinned,
         ))
     }
 
-    fn pin_connection_for_cursor<Op, T>(&self, details: &mut OperationDetails<Op>)
+    fn pin_connection_for_cursor<Op, T>(&self, details: &mut OperationDetails<Op>) -> Result<Option<PinHandle>>
     where
         Op: Operation<O = CursorSpecification<T>>,
     {
         let is_load_balanced = self.inner.options.load_balanced.unwrap_or(false);
-        if !is_load_balanced || details.output.info.id == 0 {
-            details.connection = None;
+        if is_load_balanced && details.output.info.id != 0 {
+            Ok(Some(details.connection.pin()?))
+        } else {
+            Ok(None)
         }
     }
 
@@ -195,7 +197,7 @@ impl Client {
         &self,
         mut op: T,
         mut session: Option<&mut ClientSession>,
-        mut pinned_connection: Option<&mut Connection>,
+        pinned_connection: Option<&PinHandle>,
     ) -> Result<OperationDetails<T>> {
         // If the current transaction has been committed/aborted and it is not being
         // re-committed/re-aborted, reset the transaction's state to TransactionState::None.
@@ -224,14 +226,10 @@ impl Client {
             }
         };
 
-        let mut owned_conn = None;
-        let mut conn = match &mut pinned_connection {
-            Some(l) => l,
+        let mut conn = match pinned_connection {
+            Some(l) => l.take_connection().await?,
             None => match server.pool.check_out().await {
-                Ok(c) => {
-                    owned_conn = Some(c);
-                    owned_conn.as_mut().unwrap()
-                }
+                Ok(c) => c,
                 Err(mut err) => {
                     err.add_labels_and_update_pin(None, &mut session, None)?;
 
@@ -246,7 +244,7 @@ impl Client {
             },
         };
 
-        let retryability = self.get_retryability(conn, &op, &session).await?;
+        let retryability = self.get_retryability(&conn, &op, &session).await?;
 
         let txn_number = match session {
             Some(ref mut session) => {
@@ -274,7 +272,7 @@ impl Client {
         {
             Ok(output) => Ok(OperationDetails {
                 output,
-                connection: owned_conn,
+                connection: conn,
                 implicit_session: None, // populated in execute_operation_with_details
             }),
             Err(mut err) => {
@@ -295,12 +293,12 @@ impl Client {
                     .topology
                     .handle_application_error(
                         err.clone(),
-                        HandshakePhase::after_completion(conn),
+                        HandshakePhase::after_completion(&conn),
                         &server,
                     )
                     .await;
                 // release the connection to be processed by the connection pool
-                drop(owned_conn);
+                drop(conn);
                 // release the selected server to decrement its operation count
                 drop(server);
 
@@ -321,7 +319,7 @@ impl Client {
         op: &mut T,
         session: &mut Option<&mut ClientSession>,
         txn_number: Option<i64>,
-        pinned_connection: Option<&mut Connection>,
+        pinned_connection: Option<&PinHandle>,
         first_error: Error,
     ) -> Result<OperationDetails<T>> {
         op.update_for_retry();
@@ -333,30 +331,26 @@ impl Client {
             }
         };
 
-        let mut owned_conn = None;
-        let conn = match pinned_connection {
-            Some(c) => c,
+        let mut conn = match pinned_connection {
+            Some(c) => c.take_connection().await?,
             None => match server.pool.check_out().await {
-                Ok(c) => {
-                    owned_conn = Some(c);
-                    owned_conn.as_mut().unwrap()
-                }
+                Ok(c) => c,
                 Err(_) => return Err(first_error),
             },
         };
 
-        let retryability = self.get_retryability(conn, op, session).await?;
+        let retryability = self.get_retryability(&mut conn, op, session).await?;
         if retryability == Retryability::None {
             return Err(first_error);
         }
 
         match self
-            .execute_operation_on_connection(op, conn, session, txn_number, &retryability)
+            .execute_operation_on_connection(op, &mut conn, session, txn_number, &retryability)
             .await
         {
             Ok(output) => Ok(OperationDetails {
                 output,
-                connection: owned_conn,
+                connection: conn,
                 implicit_session: None, // populated in execute_operation_with_details
             }),
             Err(err) => {
@@ -364,7 +358,7 @@ impl Client {
                     .topology
                     .handle_application_error(
                         err.clone(),
-                        HandshakePhase::after_completion(conn),
+                        HandshakePhase::after_completion(&conn),
                         &server,
                     )
                     .await;
@@ -852,6 +846,6 @@ struct CommandResult<T> {
 
 struct OperationDetails<T: Operation> {
     output: T::O,
-    connection: Option<Connection>,
+    connection: Connection,
     implicit_session: Option<ClientSession>,
 }

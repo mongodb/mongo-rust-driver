@@ -7,7 +7,7 @@ use futures_util::stream::TryStreamExt;
 use crate::{
     bson::{Bson, Document},
     client::session::TransactionState,
-    cmap::conn::Connection,
+    cmap::conn::PinHandle,
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
@@ -329,7 +329,7 @@ impl Database {
         command: Document,
         selection_criteria: impl Into<Option<SelectionCriteria>>,
         session: impl Into<Option<&mut ClientSession>>,
-        pinned_connection: Option<&mut Connection>,
+        pinned_connection: Option<&PinHandle>,
     ) -> Result<Document> {
         let operation = RunCommand::new(self.name().into(), command, selection_criteria.into())?;
         self.client()

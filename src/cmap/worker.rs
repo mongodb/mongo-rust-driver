@@ -38,7 +38,7 @@ use crate::{
 };
 
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     sync::Arc,
     time::Duration,
 };
@@ -138,6 +138,9 @@ pub(crate) struct ConnectionPoolWorker {
 
     /// Checked-out connections that are pinned to a cursor or transaction but not currently in use.
     pinned_connections: HashMap<u32, Connection>,
+
+    /// Checked-out connections that need to be unpinned when stored.
+    pending_unpins: HashSet<u32>,
 }
 
 impl ConnectionPoolWorker {
@@ -244,6 +247,7 @@ impl ConnectionPoolWorker {
             maintenance_frequency,
             server_updater,
             pinned_connections: HashMap::new(),
+            pending_unpins: HashSet::new(),
         };
 
         RUNTIME.execute(async move {
@@ -306,6 +310,9 @@ impl ConnectionPoolWorker {
                     if let Err(Some(conn)) = sender.send(self.take_pinned(connection_id)) {
                         self.store_pinned(conn);
                     }
+                }
+                PoolTask::HandleManagementRequest(PoolManagementRequest::Unpin(connection_id)) => {
+                    self.unpin(connection_id);
                 }
                 PoolTask::HandleManagementRequest(PoolManagementRequest::Clear {
                     completion_handler: _,
@@ -495,12 +502,26 @@ impl ConnectionPoolWorker {
         }
     }
 
-    fn store_pinned(&mut self, conn: Connection) {
-        self.pinned_connections.insert(conn.id, conn);
+    fn store_pinned(&mut self, mut conn: Connection) {
+        if self.pending_unpins.remove(&conn.id) {
+            conn.unpin();
+            self.check_in(conn);
+        } else {
+            self.pinned_connections.insert(conn.id, conn);
+        }
     }
 
     fn take_pinned(&mut self, id: u32) -> Option<Connection> {
         self.pinned_connections.remove(&id)
+    }
+
+    fn unpin(&mut self, id: u32) {
+        if let Some(mut conn) = self.pinned_connections.remove(&id) {
+            conn.unpin();
+            self.check_in(conn);
+        } else {
+            self.pending_unpins.insert(id);
+        }
     }
 
     fn clear(&mut self, cause: Error, service_id: Option<ObjectId>) {

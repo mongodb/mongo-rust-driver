@@ -158,10 +158,6 @@ impl ConnectionPool {
         conn
     }
 
-    pub(crate) async fn take_pinned(&self, id: u32) -> Result<Connection> {
-        self.manager.take_pinned(id).await
-    }
-
     /// Increments the generation of the pool. Rather than eagerly removing stale connections from
     /// the pool, they are left for the background thread to clean up.
     pub(crate) async fn clear(&self, cause: Error, service_id: Option<ObjectId>) {

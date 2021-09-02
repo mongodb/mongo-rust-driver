@@ -18,7 +18,7 @@ use super::common::{
 };
 use crate::{
     bson::Document,
-    cmap::conn::Connection,
+    cmap::conn::PinHandle,
     cursor::CursorSpecification,
     error::{Error, Result},
     operation::GetMore,
@@ -73,7 +73,7 @@ where
     pub(crate) fn new(
         client: Client,
         spec: CursorSpecification<T>,
-        connection: Option<Connection>,
+        pinned: Option<PinHandle>,
     ) -> Self {
         let exhausted = spec.id() == 0;
 
@@ -82,7 +82,7 @@ where
             client,
             info: spec.info,
             buffer: spec.initial_buffer,
-            pinned_connection: PinnedConnection::new(connection),
+            pinned_connection: PinnedConnection::new(pinned),
         }
     }
 
@@ -280,21 +280,20 @@ impl<'session, T: Send + Sync + DeserializeOwned> GetMoreProvider
         &mut self,
         info: CursorInformation,
         client: Client,
-        pinned_connection: PinnedConnection,
+        pinned_connection: Option<&PinHandle>,
     ) {
+        let pinned_connection = pinned_connection.cloned();
         take_mut::take(self, |self_| {
             if let ExplicitSessionGetMoreProvider::Idle(session) = self_ {
                 let future = Box::pin(async move {
-                    let mut conn_lock = pinned_connection.lock().await;
                     let get_more = GetMore::new(info);
                     let get_more_result = client
                         .execute_operation_pinned(
                             get_more,
                             Some(&mut *session.reference),
-                            conn_lock.as_deref_mut(),
+                            pinned_connection.as_ref(),
                         )
                         .await;
-                    drop(conn_lock);
                     ExecutionResult {
                         get_more_result,
                         session: session.reference,

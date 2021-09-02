@@ -1,7 +1,6 @@
 use std::{
     collections::VecDeque,
     pin::Pin,
-    sync::Arc,
     task::{Context, Poll},
     time::Duration,
 };
@@ -9,11 +8,10 @@ use std::{
 use derivative::Derivative;
 use futures_core::{Future, Stream};
 use serde::de::DeserializeOwned;
-use tokio::sync::{Mutex, MutexGuard};
 
 use crate::{
     bson::Document,
-    cmap::conn::Connection,
+    cmap::conn::{PinHandle},
     error::{Error, ErrorKind, Result},
     operation,
     options::ServerAddress,
@@ -77,16 +75,15 @@ where
         &self.info.ns
     }
 
-    pub(super) fn pinned_connection(&self) -> PinnedConnection {
-        self.pinned_connection.clone()
+    pub(super) fn pinned_connection(&self) -> &PinnedConnection {
+        &self.pinned_connection
     }
 
     fn start_get_more(&mut self) {
         let info = self.info.clone();
         let client = self.client.clone();
-        let pinned_connection = self.pinned_connection.clone();
         self.provider
-            .start_execution(info, client, pinned_connection);
+            .start_execution(info, client, self.pinned_connection.handle());
     }
 }
 
@@ -170,7 +167,7 @@ pub(super) trait GetMoreProvider: Unpin {
         &mut self,
         spec: CursorInformation,
         client: Client,
-        pinned_connection: PinnedConnection,
+        pinned_connection: Option<&PinHandle>,
     );
 }
 
@@ -252,22 +249,22 @@ pub(crate) struct CursorInformation {
 
 #[derive(Clone, Debug)]
 pub(crate) enum PinnedConnection {
-    Valid(Arc<Mutex<Connection>>),
-    Invalid(Arc<Mutex<Connection>>),
+    Valid(PinHandle),
+    Invalid(PinHandle),
     Unpinned,
 }
 
 impl PinnedConnection {
-    pub(super) fn new(conn: Option<Connection>) -> Self {
-        match conn {
-            Some(c) => Self::Valid(Arc::new(Mutex::new(c))),
+    pub(super) fn new(handle: Option<PinHandle>) -> Self {
+        match handle {
+            Some(h) => Self::Valid(h),
             None => Self::Unpinned,
         }
     }
 
-    pub(super) async fn lock(&self) -> Option<MutexGuard<'_, Connection>> {
+    fn handle(&self) -> Option<&PinHandle> {
         match self {
-            Self::Valid(c) | Self::Invalid(c) => Some(c.lock().await),
+            Self::Valid(h) | Self::Invalid(h) => Some(h),
             Self::Unpinned => None,
         }
     }
@@ -276,10 +273,20 @@ impl PinnedConnection {
         !matches!(self, Self::Invalid(_))
     }
 
-    fn invalidate(&mut self) {
-        if let Self::Valid(c) = self {
-            *self = Self::Invalid(Arc::clone(c));
+    fn unpin(&self) {
+        if let Some(h) = self.handle() {
+            h.unpin();
         }
+    }
+
+    fn invalidate(&mut self) {
+        take_mut::take(self, |self_| {
+            if let Self::Valid(c) = self_ {
+                Self::Invalid(c)
+            } else {
+                self_
+            }
+        });
     }
 }
 
@@ -289,14 +296,13 @@ pub(super) fn kill_cursor(
     cursor_id: i64,
     pinned_conn: PinnedConnection,
 ) {
-    if !pinned_conn.is_valid() {
-        return;
-    }
     let coll = client
         .database(ns.db.as_str())
         .collection::<Document>(ns.coll.as_str());
     RUNTIME.execute(async move {
-        let mut lock = pinned_conn.lock().await;
-        let _ = coll.kill_cursor(cursor_id, lock.as_deref_mut()).await;
+        if pinned_conn.is_valid() {
+            let _ = coll.kill_cursor(cursor_id, pinned_conn.handle()).await;
+        }
+        pinned_conn.unpin();
     });
 }

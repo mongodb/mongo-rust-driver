@@ -17,7 +17,7 @@ use crate::{
         options::{ConnectionOptions, StreamOptions},
         PoolGeneration,
     },
-    error::{load_balanced_mode_mismatch, ErrorKind, Result},
+    error::{load_balanced_mode_mismatch, Error, ErrorKind, Result},
     event::cmap::{
         CmapEventHandler,
         ConnectionCheckedInEvent,
@@ -289,8 +289,24 @@ impl Connection {
         })
     }
 
-    pub(crate) fn set_pinned(&mut self, pinned: bool) {
-        self.pinned = pinned;
+    pub(crate) fn pin(&mut self) -> Result<PinHandle> {
+        if self.pinned {
+            return Err(Error::internal(format!("cannot pin an already-pinned connection (id = {})", self.id)));
+        }
+        match &self.pool_manager {
+            Some(pm) => {
+                self.pinned = true;
+                Ok(PinHandle {
+                    connection_id: self.id,
+                    pool_manager: pm.clone(),
+                })
+            },
+            None => Err(Error::internal(format!("cannot pin a checked-in connection (id = {})", self.id))),   
+        }
+    }
+
+    pub(super) fn unpin(&mut self) {
+        self.pinned = false;
     }
 
     /// Close this connection, emitting a `ConnectionClosedEvent` with the supplied reason.
@@ -352,6 +368,21 @@ impl Drop for Connection {
                 conn.close(ConnectionClosedReason::PoolClosed);
             }
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct PinHandle {
+    connection_id: u32,
+    pool_manager: PoolManager,
+}
+
+impl PinHandle {
+    pub(crate) async fn take_connection(&self) -> Result<Connection> {
+        self.pool_manager.take_pinned(self.connection_id).await
+    }
+    pub(crate) fn unpin(&self) {
+        self.pool_manager.unpin(self.connection_id);
     }
 }
 
