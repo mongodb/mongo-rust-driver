@@ -87,6 +87,10 @@ impl Error {
         Error::authentication_error(mechanism_name, "invalid server response")
     }
 
+    pub(crate) fn internal(message: impl Into<String>) -> Error {
+        ErrorKind::Internal { message: message.into() }.into()
+    }
+
     pub(crate) fn is_state_change_error(&self) -> bool {
         self.is_recovering() || self.is_not_master()
     }

@@ -75,6 +75,8 @@ pub(crate) struct Connection {
 
     stream: AsyncStream,
 
+    pinned: bool,
+
     #[derivative(Debug = "ignore")]
     handler: Option<Arc<dyn CmapEventHandler>>,
 }
@@ -103,6 +105,7 @@ impl Connection {
             handler: options.and_then(|options| options.event_handler),
             stream_description: None,
             error: false,
+            pinned: false,
         };
 
         Ok(conn)
@@ -286,6 +289,10 @@ impl Connection {
         })
     }
 
+    pub(crate) fn set_pinned(&mut self, pinned: bool) {
+        self.pinned = pinned;
+    }
+
     /// Close this connection, emitting a `ConnectionClosedEvent` with the supplied reason.
     pub(super) fn close_and_drop(mut self, reason: ConnectionClosedReason) {
         self.close(reason);
@@ -313,6 +320,7 @@ impl Connection {
             error: self.error,
             pool_manager: None,
             ready_and_available_time: None,
+            pinned: self.pinned,
         }
     }
 }
@@ -330,8 +338,15 @@ impl Drop for Connection {
         // the `close_and_drop` helper explicitly, so we don't add it back to the
         // pool or emit any events.
         if let Some(pool_manager) = self.pool_manager.take() {
-            let dropped_connection = self.take();
-            if let Err(mut conn) = pool_manager.check_in(dropped_connection) {
+            let mut dropped_connection = self.take();
+            let result = if self.pinned {
+                // Preserve the timestamp for pinned connections.
+                dropped_connection.ready_and_available_time = self.ready_and_available_time;
+                pool_manager.store_pinned(dropped_connection)
+            } else {
+                pool_manager.check_in(dropped_connection)
+            };
+            if let Err(mut conn) = result {
                 // the check in failed because the pool has been dropped, so we emit the event
                 // here and drop the connection.
                 conn.close(ConnectionClosedReason::PoolClosed);

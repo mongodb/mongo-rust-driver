@@ -135,6 +135,9 @@ pub(crate) struct ConnectionPoolWorker {
     /// A handle used to notify SDAM that a connection establishment error happened. This will
     /// allow the server to transition to Unknown and clear the pool as necessary.
     server_updater: ServerUpdateSender,
+
+    /// Checked-out connections that are pinned to a cursor or transaction but not currently in use.
+    pinned_connections: HashMap<u32, Connection>,
 }
 
 impl ConnectionPoolWorker {
@@ -240,6 +243,7 @@ impl ConnectionPoolWorker {
             generation_publisher,
             maintenance_frequency,
             server_updater,
+            pinned_connections: HashMap::new(),
         };
 
         RUNTIME.execute(async move {
@@ -294,6 +298,14 @@ impl ConnectionPoolWorker {
                 },
                 PoolTask::HandleManagementRequest(PoolManagementRequest::CheckIn(connection)) => {
                     self.check_in(connection);
+                }
+                PoolTask::HandleManagementRequest(PoolManagementRequest::StorePinned(connection)) => {
+                    self.store_pinned(connection);
+                }
+                PoolTask::HandleManagementRequest(PoolManagementRequest::TakePinned { connection_id, sender }) => {
+                    if let Err(Some(conn)) = sender.send(self.take_pinned(connection_id)) {
+                        self.store_pinned(conn);
+                    }
                 }
                 PoolTask::HandleManagementRequest(PoolManagementRequest::Clear {
                     completion_handler: _,
@@ -481,6 +493,14 @@ impl ConnectionPoolWorker {
         } else {
             self.available_connections.push_back(conn);
         }
+    }
+
+    fn store_pinned(&mut self, conn: Connection) {
+        self.pinned_connections.insert(conn.id, conn);
+    }
+
+    fn take_pinned(&mut self, id: u32) -> Option<Connection> {
+        self.pinned_connections.remove(&id)
     }
 
     fn clear(&mut self, cause: Error, service_id: Option<ObjectId>) {
