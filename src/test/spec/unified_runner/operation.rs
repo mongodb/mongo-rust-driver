@@ -597,7 +597,9 @@ impl TestOperation for Aggregate {
                             )
                             .await?
                         }
-                        AggregateEntity::Other(debug) => panic!("Cannot execute aggregate on {}", &debug),
+                        AggregateEntity::Other(debug) => {
+                            panic!("Cannot execute aggregate on {}", &debug)
+                        }
                     };
                     cursor
                         .stream(session)

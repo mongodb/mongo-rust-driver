@@ -140,7 +140,8 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                         .execute_entity_operation(id, &mut test_runner)
                         .await;
 
-                    // Precache the BSON result, if any, so that other entities can be saved without cloning.
+                    // Precache the BSON result, if any, so that other entities can be saved without
+                    // cloning.
                     #[derive(Debug)]
                     enum ResultEntity {
                         Bson(Bson),
@@ -158,11 +159,7 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                     if let Some(ref id) = operation.save_result_as_entity {
                         match result {
                             Ok(Some(entity)) => {
-                                if test_runner
-                                    .entities
-                                    .insert(id.clone(), entity)
-                                    .is_some()
-                                {
+                                if test_runner.entities.insert(id.clone(), entity).is_some() {
                                     panic!("Entity with id {} already present in entity map", id);
                                 }
                             }
@@ -201,7 +198,9 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                                     "Incorrect entity type returned from {}, expected BSON",
                                     operation.name
                                 ),
-                                ResultEntity::None => panic!("{} should return an entity", operation.name),
+                                ResultEntity::None => {
+                                    panic!("{} should return an entity", operation.name)
+                                }
                             }
                         }
                     }
