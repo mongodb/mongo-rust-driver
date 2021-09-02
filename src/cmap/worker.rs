@@ -136,7 +136,8 @@ pub(crate) struct ConnectionPoolWorker {
     /// allow the server to transition to Unknown and clear the pool as necessary.
     server_updater: ServerUpdateSender,
 
-    /// Checked-out connections that are pinned to a cursor or transaction but not currently in use.
+    /// Checked-out connections that are pinned to a cursor or transaction but not currently in
+    /// use.
     pinned_connections: HashMap<u32, Connection>,
 
     /// Checked-out connections that need to be unpinned when stored.
@@ -303,10 +304,15 @@ impl ConnectionPoolWorker {
                 PoolTask::HandleManagementRequest(PoolManagementRequest::CheckIn(connection)) => {
                     self.check_in(connection);
                 }
-                PoolTask::HandleManagementRequest(PoolManagementRequest::StorePinned(connection)) => {
+                PoolTask::HandleManagementRequest(PoolManagementRequest::StorePinned(
+                    connection,
+                )) => {
                     self.store_pinned(connection);
                 }
-                PoolTask::HandleManagementRequest(PoolManagementRequest::TakePinned { connection_id, sender }) => {
+                PoolTask::HandleManagementRequest(PoolManagementRequest::TakePinned {
+                    connection_id,
+                    sender,
+                }) => {
                     if let Err(Some(conn)) = sender.send(self.take_pinned(connection_id)) {
                         self.store_pinned(conn);
                     }

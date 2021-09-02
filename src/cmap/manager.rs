@@ -1,7 +1,11 @@
 use tokio::sync::{mpsc, oneshot};
 
 use super::Connection;
-use crate::{bson::oid::ObjectId, error::{Error, Result}, runtime::AcknowledgedMessage};
+use crate::{
+    bson::oid::ObjectId,
+    error::{Error, Result},
+    runtime::AcknowledgedMessage,
+};
 
 pub(super) fn channel() -> (PoolManager, ManagementRequestReceiver) {
     let (sender, receiver) = mpsc::unbounded_channel();
@@ -59,8 +63,14 @@ impl PoolManager {
         Ok(())
     }
 
-    pub(super) fn store_pinned(&self, connection: Connection) -> std::result::Result<(), Connection> {
-        if let Err(request) = self.sender.send(PoolManagementRequest::StorePinned(connection)) {
+    pub(super) fn store_pinned(
+        &self,
+        connection: Connection,
+    ) -> std::result::Result<(), Connection> {
+        if let Err(request) = self
+            .sender
+            .send(PoolManagementRequest::StorePinned(connection))
+        {
             let conn = request.0.unwrap_check_in();
             return Err(conn);
         }
@@ -69,12 +79,22 @@ impl PoolManager {
 
     pub(super) async fn take_pinned(&self, id: u32) -> Result<Connection> {
         let (tx, rx) = oneshot::channel();
-        if self.sender.send(PoolManagementRequest::TakePinned { connection_id: id, sender: tx }).is_err() {
+        if self
+            .sender
+            .send(PoolManagementRequest::TakePinned {
+                connection_id: id,
+                sender: tx,
+            })
+            .is_err()
+        {
             return Err(Error::internal("pool worker dropped"));
         }
         match rx.await {
             Ok(Some(conn)) => Ok(conn),
-            Ok(None) => Err(Error::internal(format!("no pinned connection with id = {}", id))),
+            Ok(None) => Err(Error::internal(format!(
+                "no pinned connection with id = {}",
+                id
+            ))),
             Err(_) => Err(Error::internal("pool sender dropped")),
         }
     }

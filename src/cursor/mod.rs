@@ -10,7 +10,7 @@ use futures_core::{future::BoxFuture, Stream};
 use serde::de::DeserializeOwned;
 
 use crate::{
-    cmap::conn::{PinHandle},
+    cmap::conn::PinHandle,
     error::{Error, Result},
     operation::GetMore,
     results::GetMoreResult,
@@ -214,10 +214,7 @@ impl<T: Send + Sync + DeserializeOwned> GetMoreProvider for ImplicitSessionGetMo
                 let future = Box::pin(async move {
                     let get_more = GetMore::new(info, pinned_connection.as_ref());
                     let get_more_result = client
-                        .execute_operation(
-                            get_more,
-                            session.as_mut().map(|b| b.as_mut()),
-                        )
+                        .execute_operation(get_more, session.as_mut().map(|b| b.as_mut()))
                         .await;
                     ImplicitSessionGetMoreResult {
                         get_more_result,

@@ -77,7 +77,8 @@ impl TestClient {
             .await;
         session.mark_dirty();
 
-        let is_master = RunCommand::new("admin".into(), doc! { "isMaster":  1 }, None, None).unwrap();
+        let is_master =
+            RunCommand::new("admin".into(), doc! { "isMaster":  1 }, None, None).unwrap();
 
         let server_info = bson::from_bson(Bson::Document(
             client
@@ -87,7 +88,8 @@ impl TestClient {
         ))
         .unwrap();
 
-        let build_info = RunCommand::new("test".into(), doc! { "buildInfo":  1 }, None, None).unwrap();
+        let build_info =
+            RunCommand::new("test".into(), doc! { "buildInfo":  1 }, None, None).unwrap();
 
         let response = client
             .execute_operation(build_info, &mut session)

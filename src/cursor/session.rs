@@ -288,10 +288,7 @@ impl<'session, T: Send + Sync + DeserializeOwned> GetMoreProvider
                 let future = Box::pin(async move {
                     let get_more = GetMore::new(info, pinned_connection.as_ref());
                     let get_more_result = client
-                        .execute_operation(
-                            get_more,
-                            Some(&mut *session.reference),
-                        )
+                        .execute_operation(get_more, Some(&mut *session.reference))
                         .await;
                     ExecutionResult {
                         get_more_result,

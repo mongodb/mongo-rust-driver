@@ -88,7 +88,10 @@ impl Error {
     }
 
     pub(crate) fn internal(message: impl Into<String>) -> Error {
-        ErrorKind::Internal { message: message.into() }.into()
+        ErrorKind::Internal {
+            message: message.into(),
+        }
+        .into()
     }
 
     pub(crate) fn is_state_change_error(&self) -> bool {

@@ -291,7 +291,10 @@ impl Connection {
 
     pub(crate) fn pin(&mut self) -> Result<PinHandle> {
         if self.pinned {
-            return Err(Error::internal(format!("cannot pin an already-pinned connection (id = {})", self.id)));
+            return Err(Error::internal(format!(
+                "cannot pin an already-pinned connection (id = {})",
+                self.id
+            )));
         }
         match &self.pool_manager {
             Some(pm) => {
@@ -300,8 +303,11 @@ impl Connection {
                     connection_id: self.id,
                     pool_manager: pm.clone(),
                 })
-            },
-            None => Err(Error::internal(format!("cannot pin a checked-in connection (id = {})", self.id))),   
+            }
+            None => Err(Error::internal(format!(
+                "cannot pin a checked-in connection (id = {})",
+                self.id
+            ))),
         }
     }
 

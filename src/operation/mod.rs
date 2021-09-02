@@ -32,7 +32,7 @@ use crate::{
     bson::{self, Bson, Document},
     bson_util,
     client::{ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
-    cmap::{Command, RawCommandResponse, StreamDescription, conn::PinHandle},
+    cmap::{conn::PinHandle, Command, RawCommandResponse, StreamDescription},
     error::{
         BulkWriteError,
         BulkWriteFailure,

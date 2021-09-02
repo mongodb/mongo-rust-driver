@@ -11,7 +11,7 @@ use serde::de::DeserializeOwned;
 
 use crate::{
     bson::Document,
-    cmap::conn::{PinHandle},
+    cmap::conn::PinHandle,
     error::{Error, ErrorKind, Result},
     operation,
     options::ServerAddress,

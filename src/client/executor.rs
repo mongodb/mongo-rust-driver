@@ -7,7 +7,7 @@ use std::{collections::HashSet, sync::Arc, time::Instant};
 use super::{session::TransactionState, Client, ClientSession};
 use crate::{
     bson::Document,
-    cmap::{Connection, conn::PinHandle, RawCommand, RawCommandResponse},
+    cmap::{conn::PinHandle, Connection, RawCommand, RawCommandResponse},
     cursor::{session::SessionCursor, Cursor, CursorSpecification},
     error::{
         Error,
@@ -119,9 +119,7 @@ impl Client {
                     implicit_session.as_mut()
                 }
             };
-            let mut details = self
-                .execute_operation_with_retry(op, session)
-                .await?;
+            let mut details = self.execute_operation_with_retry(op, session).await?;
             details.implicit_session = implicit_session;
             Ok(details)
         })
@@ -158,18 +156,15 @@ impl Client {
         Op: Operation<O = CursorSpecification<T>>,
         T: DeserializeOwned + Unpin + Send + Sync,
     {
-        let mut details = self
-            .execute_operation_with_details(op, session)
-            .await?;
+        let mut details = self.execute_operation_with_details(op, session).await?;
         let pinned = self.pin_connection_for_cursor(&mut details)?;
-        Ok(SessionCursor::new(
-            self.clone(),
-            details.output,
-            pinned,
-        ))
+        Ok(SessionCursor::new(self.clone(), details.output, pinned))
     }
 
-    fn pin_connection_for_cursor<Op, T>(&self, details: &mut OperationDetails<Op>) -> Result<Option<PinHandle>>
+    fn pin_connection_for_cursor<Op, T>(
+        &self,
+        details: &mut OperationDetails<Op>,
+    ) -> Result<Option<PinHandle>>
     where
         Op: Operation<O = CursorSpecification<T>>,
     {
@@ -223,9 +218,7 @@ impl Client {
                     err.add_labels_and_update_pin(None, &mut session, None)?;
 
                     if err.is_pool_cleared() {
-                        return self
-                            .execute_retry(&mut op, &mut session, None, err)
-                            .await;
+                        return self.execute_retry(&mut op, &mut session, None, err).await;
                     } else {
                         return Err(err);
                     }
@@ -327,7 +320,7 @@ impl Client {
             },
         };
 
-        let retryability = self.get_retryability(&mut conn, op, session).await?;
+        let retryability = self.get_retryability(&conn, op, session).await?;
         if retryability == Retryability::None {
             return Err(first_error);
         }

@@ -7,7 +7,7 @@ use super::Operation;
 use crate::{
     bson::Document,
     client::{ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS},
-    cmap::{Command, RawCommandResponse, StreamDescription, conn::PinHandle},
+    cmap::{conn::PinHandle, Command, RawCommandResponse, StreamDescription},
     error::{ErrorKind, Result},
     options::WriteConcern,
     selection_criteria::SelectionCriteria,

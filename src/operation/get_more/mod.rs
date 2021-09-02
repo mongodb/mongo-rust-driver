@@ -8,7 +8,7 @@ use serde::{de::DeserializeOwned, Deserialize};
 
 use crate::{
     bson::doc,
-    cmap::{Command, StreamDescription, conn::PinHandle},
+    cmap::{conn::PinHandle, Command, StreamDescription},
     cursor::CursorInformation,
     error::{ErrorKind, Result},
     operation::Operation,
