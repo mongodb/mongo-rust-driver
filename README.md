@@ -1,7 +1,7 @@
 # MongoDB Rust Driver
 [![Crates.io](https://img.shields.io/crates/v/mongodb.svg)](https://crates.io/crates/mongodb) [![docs.rs](https://docs.rs/mongodb/badge.svg)](https://docs.rs/mongodb) [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-This repository contains the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the [`bson`](https://docs.rs/bson/2.0.0-beta.3) crate for BSON support. The driver contains a fully async API that supports either [`tokio`](https://crates.io/crates/tokio) (default) or [`async-std`](https://crates.io/crates/async-std), depending on the feature flags set. The driver also has a sync API that may be enabled via feature flag.
+This repository contains the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the [`bson`](https://docs.rs/bson/latest) crate for BSON support. The driver contains a fully async API that supports either [`tokio`](https://crates.io/crates/tokio) (default) or [`async-std`](https://crates.io/crates/async-std), depending on the feature flags set. The driver also has a sync API that may be enabled via feature flag.
 
 ## Index
 - [Installation](#installation)
@@ -36,7 +36,7 @@ This repository contains the officially supported MongoDB Rust driver, a client 
 The driver is available on [crates.io](https://crates.io/crates/mongodb). To use the driver in your application, simply add it to your project's `Cargo.toml`.
 ```toml
 [dependencies]
-mongodb = "2.0.0-beta.3"
+mongodb = "2.0.0"
 ```
 
 #### Configuring the async runtime
@@ -45,7 +45,7 @@ The driver supports both of the most popular async runtime crates, namely [`toki
 For example, to instruct the driver to work with [`async-std`](https://crates.io/crates/async-std), add the following to your `Cargo.toml`:
 ```toml
 [dependencies.mongodb]
-version = "2.0.0-beta.3"
+version = "2.0.0"
 default-features = false
 features = ["async-std-runtime"]
 ```
@@ -54,7 +54,7 @@ features = ["async-std-runtime"]
 The driver also provides a blocking sync API. To enable this, add the `"sync"` feature to your `Cargo.toml`:
 ```toml
 [dependencies.mongodb]
-version = "2.0.0-beta.3"
+version = "2.0.0"
 default-features = false
 features = ["sync"]
 ```
@@ -68,11 +68,11 @@ features = ["sync"]
 | `async-std-runtime` | Enable support for the `async-std` runtime                                                                                            | `async-std` 1.0                     | no      |
 | `sync`              | Expose the synchronous API (`mongodb::sync`). This flag cannot be used in conjunction with either of the async runtime feature flags. | `async-std` 1.0                     | no      |
 | `aws-auth`          | Enable support for the MONGODB-AWS authentication mechanism.                                                                          | `reqwest` 0.11                      | no      |
-| `bson-uuid-0_8`     | Enable support for v0.8 of the [`uuid`](docs.rs/uuid/0.8) crate in the public API of the re-exported `bson` crate.                    | `uuid` 0.8                          | no      |
+| `bson-uuid-0_8`     | Enable support for v0.8 of the [`uuid`](docs.rs/uuid/0.8) crate in the public API of the re-exported `bson` crate.                    | n/a                                 | no      |
 | `bson-chrono-0_4`   | Enable support for v0.4 of the [`chrono`](docs.rs/chrono/0.4) crate in the public API of the re-exported `bson` crate.                | n/a                                 | no      |
 
 ## Example Usage
-Below are simple examples of using the driver. For more specific examples and the API reference, see the driver's [docs.rs page](https://docs.rs/mongodb/2.0.0-beta.3).
+Below are simple examples of using the driver. For more specific examples and the API reference, see the driver's [docs.rs page](https://docs.rs/mongodb/latest).
 
 ### Using the async API
 #### Connecting to a MongoDB deployment
@@ -122,7 +122,7 @@ let docs = vec![
 collection.insert_many(docs, None).await?;
 ```
 
-A [`Collection`](https://docs.rs/mongodb/2.0.0-beta.3/mongodb/struct.Collection.html) can be parameterized with any type that implements the `Serialize` and `Deserialize` traits from the [`serde`](https://serde.rs/) crate, not just `Document`:
+A [`Collection`](https://docs.rs/mongodb/latest/mongodb/struct.Collection.html) can be parameterized with any type that implements the `Serialize` and `Deserialize` traits from the [`serde`](https://serde.rs/) crate, not just `Document`:
 
 ``` toml
 # In Cargo.toml, add the following dependency.
@@ -159,7 +159,7 @@ typed_collection.insert_many(books, None).await?;
 ```
 
 #### Finding documents in a collection
-Results from queries are generally returned via [`Cursor`](https://docs.rs/mongodb/2.0.0-beta.3/mongodb/struct.Cursor.html), a struct which streams the results back from the server as requested. The [`Cursor`](https://docs.rs/mongodb/2.0.0-beta.3/mongodb/struct.Cursor.html) type implements the [`Stream`](https://docs.rs/futures/latest/futures/stream/index.html) trait from the [`futures`](https://crates.io/crates/futures) crate, and in order to access its streaming functionality you need to import at least one of the [`StreamExt`](https://docs.rs/futures/latest/futures/stream/trait.StreamExt.html) or [`TryStreamExt`](https://docs.rs/futures/latest/futures/stream/trait.TryStreamExt.html) traits. 
+Results from queries are generally returned via [`Cursor`](https://docs.rs/mongodb/latest/mongodb/struct.Cursor.html), a struct which streams the results back from the server as requested. The [`Cursor`](https://docs.rs/mongodb/latest/mongodb/struct.Cursor.html) type implements the [`Stream`](https://docs.rs/futures/latest/futures/stream/index.html) trait from the [`futures`](https://crates.io/crates/futures) crate, and in order to access its streaming functionality you need to import at least one of the [`StreamExt`](https://docs.rs/futures/latest/futures/stream/trait.StreamExt.html) or [`TryStreamExt`](https://docs.rs/futures/latest/futures/stream/trait.TryStreamExt.html) traits. 
 
 ``` toml
 # In Cargo.toml, add the following dependency.
