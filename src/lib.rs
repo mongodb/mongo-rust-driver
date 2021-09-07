@@ -16,7 +16,7 @@
 //! your application, simply add it to your project's `Cargo.toml`.
 //! ```toml
 //! [dependencies]
-//! mongodb = "2.0.0-beta.3"
+//! mongodb = "2.0.0"
 //! ```
 //!
 //! ### Configuring the async runtime
@@ -30,7 +30,7 @@
 //! add the following to your `Cargo.toml`:
 //! ```toml
 //! [dependencies.mongodb]
-//! version = "2.0.0-beta.3"
+//! version = "2.0.0"
 //! default-features = false
 //! features = ["async-std-runtime"]
 //! ```
@@ -40,7 +40,7 @@
 //! `Cargo.toml`:
 //! ```toml
 //! [dependencies.mongodb]
-//! version = "2.0.0-beta.3"
+//! version = "2.0.0"
 //! default-features = false
 //! features = ["sync"]
 //! ```
@@ -56,7 +56,7 @@
 //! | `async-std-runtime` | Enable support for the `async-std` runtime                                                                                            | `async-std` 1.0                     | no      |
 //! | `sync`              | Expose the synchronous API (`mongodb::sync`). This flag cannot be used in conjunction with either of the async runtime feature flags. | `async-std` 1.0                     | no      |
 //! | `aws-auth`          | Enable support for the MONGODB-AWS authentication mechanism.                                                                          | `reqwest` 0.11                      | no      |
-//! | `bson-uuid-0_8`     | Enable support for v0.8 of the [`uuid`](docs.rs/uuid/0.8) crate in the public API of the re-exported `bson` crate.                    | `uuid` 0.8                          | no      |
+//! | `bson-uuid-0_8`     | Enable support for v0.8 of the [`uuid`](docs.rs/uuid/0.8) crate in the public API of the re-exported `bson` crate.                    | n/a                                 | no      |
 //! | `bson-chrono-0_4`   | Enable support for v0.4 of the [`chrono`](docs.rs/chrono/0.4) crate in the public API of the re-exported `bson` crate.                | n/a                                 | no      |
 //!
 //! # Example Usage
@@ -293,7 +293,7 @@
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(test, type_length_limit = "80000000")]
-#![doc(html_root_url = "https://docs.rs/mongodb/2.0.0-beta.3")]
+#![doc(html_root_url = "https://docs.rs/mongodb/2.0.0")]
 
 #[cfg(all(feature = "aws-auth", feature = "async-std-runtime"))]
 compile_error!("The `aws-auth` feature flag is only supported on the tokio runtime.");
