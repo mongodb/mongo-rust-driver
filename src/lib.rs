@@ -362,7 +362,7 @@ define_if_single_runtime_enabled! {
         db::Database,
     };
 
-    pub use {coll::Namespace, index::IndexModel};
+    pub use {coll::Namespace, index::IndexModel, client::session::ClusterTime};
 }
 
 #[cfg(all(

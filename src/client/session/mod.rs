@@ -22,7 +22,7 @@ use crate::{
     Client,
     RUNTIME,
 };
-pub(crate) use cluster_time::ClusterTime;
+pub use cluster_time::ClusterTime;
 pub(super) use pool::ServerSessionPool;
 
 use super::options::ServerAddress;
