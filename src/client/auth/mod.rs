@@ -205,7 +205,7 @@ impl AuthMechanism {
                 uri_db.unwrap_or("admin")
             }
             AuthMechanism::MongoDbX509 => "$external",
-            AuthMechanism::Plain => "$external",
+            AuthMechanism::Plain => uri_db.unwrap_or("$external"),
             #[cfg(feature = "aws-auth")]
             AuthMechanism::MongoDbAws => "$external",
             _ => "",
@@ -336,7 +336,8 @@ pub struct Credential {
     pub username: Option<String>,
 
     /// The database used to authenticate. This applies to all mechanisms and defaults to "admin"
-    /// in SCRAM authentication mechanisms and "$external" for GSSAPI, MONGODB-X509 and PLAIN.
+    /// in SCRAM authentication mechanisms, "$external" for GSSAPI and MONGODB-X509, and the
+    /// database name or "$external" for PLAIN.
     pub source: Option<String>,
 
     /// The password to authenticate with. This does not apply to all mechanisms.
