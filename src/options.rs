@@ -7,12 +7,12 @@
 //! API can be used as follows:
 //!
 //! ```rust
-//! # use mongodb::options::FindOptions;
-//! #
-//! # let options = FindOptions::builder()
-//! #                   .limit(20)
-//! #                   .batch_size(5)
-//! #                   .build();
+//! use mongodb::options::FindOptions;
+//!
+//! let options = FindOptions::builder()
+//!                   .limit(20)
+//!                   .batch_size(5)
+//!                   .build();
 //! ```
 
 pub use crate::{
