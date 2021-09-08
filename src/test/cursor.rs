@@ -1,12 +1,12 @@
 use std::time::Duration;
 
-use futures::{future::Either, StreamExt};
+use futures::{future::Either, StreamExt, TryStreamExt};
 use tokio::sync::RwLockReadGuard;
 
 use crate::{
-    bson::doc,
+    bson::{doc, Document},
     options::{CreateCollectionOptions, CursorType, FindOptions},
-    test::{TestClient, LOCK},
+    test::{TestClient, util::EventClient, LOCK},
     RUNTIME,
 };
 
@@ -108,4 +108,35 @@ async fn session_cursor_next() {
             Some(doc! { "_id": i })
         );
     }
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn batch_exhaustion() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+    let client = EventClient::new().await;
+
+    let coll = client.create_fresh_collection("cursor_batch_exhaustion_db", "cursor_batch_exhaustion_coll", None).await;
+    coll.insert_many(vec![
+        doc! { "foo": 1 },
+        doc! { "foo": 2 },
+        doc! { "foo": 3 },
+        doc! { "foo": 4 },
+        doc! { "foo": 5 },
+        doc! { "foo": 6 },
+    ], None).await.unwrap();
+    let cursor = coll.find(None,
+        FindOptions::builder()
+            .batch_size(2)
+            .limit(6)
+            .build()
+        ).await.unwrap();
+    let v: Vec<_> = cursor.try_collect().await.unwrap();
+    assert_eq!(4, v.len());
+
+    let commands: Vec<_> = client.get_command_events(&["find", "getMore", "killCursor"])
+        .into_iter()
+        .map(|e| (e.command_name().to_string(), e.body().cloned()))
+        .collect();
+    println!("{:#?}", commands);
 }

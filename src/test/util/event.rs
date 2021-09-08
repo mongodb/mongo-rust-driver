@@ -11,7 +11,7 @@ use tokio::sync::{
 
 use super::TestClient;
 use crate::{
-    bson::doc,
+    bson::{doc, Document},
     event::{
         cmap::{
             CmapEventHandler,
@@ -89,6 +89,14 @@ impl CommandEvent {
             CommandEvent::Started(event) => event.command_name.as_str(),
             CommandEvent::Failed(event) => event.command_name.as_str(),
             CommandEvent::Succeeded(event) => event.command_name.as_str(),
+        }
+    }
+
+    pub fn body(&self) -> Option<&Document> {
+        match self {
+            CommandEvent::Started(event) => Some(&event.command),
+            CommandEvent::Failed(_) => None,
+            CommandEvent::Succeeded(event) => Some(&event.reply),
         }
     }
 
