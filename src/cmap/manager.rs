@@ -63,6 +63,7 @@ impl PoolManager {
         Ok(())
     }
 
+    /// Store a pinned connection for later retrieval via id.  This connection is removed from the normal connection pool until unpinned.
     pub(super) fn store_pinned(
         &self,
         connection: Connection,
@@ -77,6 +78,7 @@ impl PoolManager {
         Ok(())
     }
 
+    /// Retrieve a previously-stored pinned connection by id.  This returns an error if the connection is already in use.
     pub(super) async fn take_pinned(&self, id: u32) -> Result<Connection> {
         let (tx, rx) = oneshot::channel();
         if self
@@ -99,6 +101,7 @@ impl PoolManager {
         }
     }
 
+    /// Remove a connection from pinned storage.
     pub(super) fn unpin(&self, id: u32) {
         let _ = self.sender.send(PoolManagementRequest::Unpin(id));
     }

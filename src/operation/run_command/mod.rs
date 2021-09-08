@@ -7,7 +7,7 @@ use super::Operation;
 use crate::{
     bson::Document,
     client::{ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS},
-    cmap::{conn::PinHandle, Command, RawCommandResponse, StreamDescription},
+    cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::{ErrorKind, Result},
     options::WriteConcern,
     selection_criteria::SelectionCriteria,
@@ -19,7 +19,7 @@ pub(crate) struct RunCommand<'conn> {
     command: Document,
     selection_criteria: Option<SelectionCriteria>,
     write_concern: Option<WriteConcern>,
-    pinned_connection: Option<&'conn PinHandle>,
+    pinned_connection: Option<&'conn PinnedConnectionHandle>,
 }
 
 impl<'conn> RunCommand<'conn> {
@@ -27,7 +27,7 @@ impl<'conn> RunCommand<'conn> {
         db: String,
         command: Document,
         selection_criteria: Option<SelectionCriteria>,
-        pinned_connection: Option<&'conn PinHandle>,
+        pinned_connection: Option<&'conn PinnedConnectionHandle>,
     ) -> Result<Self> {
         let write_concern = command
             .get("writeConcern")
@@ -95,7 +95,7 @@ impl<'conn> Operation for RunCommand<'conn> {
             .unwrap_or(false)
     }
 
-    fn pinned_connection(&self) -> Option<&PinHandle> {
+    fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
         self.pinned_connection
     }
 }

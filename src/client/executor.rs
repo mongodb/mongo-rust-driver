@@ -7,7 +7,7 @@ use std::{collections::HashSet, sync::Arc, time::Instant};
 use super::{session::TransactionState, Client, ClientSession};
 use crate::{
     bson::Document,
-    cmap::{conn::PinHandle, Connection, RawCommand, RawCommandResponse},
+    cmap::{conn::PinnedConnectionHandle, Connection, RawCommand, RawCommandResponse},
     cursor::{session::SessionCursor, Cursor, CursorSpecification},
     error::{
         Error,
@@ -74,14 +74,14 @@ impl Client {
     ) -> Result<T::O> {
         self.execute_operation_with_details(op, session)
             .await
-            .map(|details| details.output)
+            .map(|details| details.output.operation_output)
     }
 
     async fn execute_operation_with_details<T: Operation>(
         &self,
         op: T,
         session: impl Into<Option<&mut ClientSession>>,
-    ) -> Result<OperationDetails<T>> {
+    ) -> Result<ExecutionDetails<T>> {
         Box::pin(async {
             // TODO RUST-9: allow unacknowledged write concerns
             if !op.is_acknowledged() {
@@ -119,14 +119,13 @@ impl Client {
                     implicit_session.as_mut()
                 }
             };
-            let mut details = self.execute_operation_with_retry(op, session).await?;
-            details.implicit_session = implicit_session;
-            Ok(details)
+            let output = self.execute_operation_with_retry(op, session).await?;
+            Ok(ExecutionDetails { output, implicit_session })
         })
         .await
     }
 
-    /// Execute the given operation, returning cursor created by the operation.
+    /// Execute the given operation, returning the cursor created by the operation.
     ///
     /// Server selection be will performed using the criteria specified on the operation, if any.
     pub(crate) async fn execute_cursor_operation<Op, T>(&self, op: Op) -> Result<Cursor<T>>
@@ -136,10 +135,10 @@ impl Client {
     {
         Box::pin(async {
             let mut details = self.execute_operation_with_details(op, None).await?;
-            let pinned = self.pin_connection_for_cursor(&mut details)?;
+            let pinned = self.pin_connection_for_cursor(&mut details.output)?;
             Ok(Cursor::new(
                 self.clone(),
-                details.output,
+                details.output.operation_output,
                 details.implicit_session,
                 pinned,
             ))
@@ -157,19 +156,19 @@ impl Client {
         T: DeserializeOwned + Unpin + Send + Sync,
     {
         let mut details = self.execute_operation_with_details(op, session).await?;
-        let pinned = self.pin_connection_for_cursor(&mut details)?;
-        Ok(SessionCursor::new(self.clone(), details.output, pinned))
+        let pinned = self.pin_connection_for_cursor(&mut details.output)?;
+        Ok(SessionCursor::new(self.clone(), details.output.operation_output, pinned))
     }
 
     fn pin_connection_for_cursor<Op, T>(
         &self,
-        details: &mut OperationDetails<Op>,
-    ) -> Result<Option<PinHandle>>
+        details: &mut ExecutionOutput<Op>,
+    ) -> Result<Option<PinnedConnectionHandle>>
     where
         Op: Operation<O = CursorSpecification<T>>,
     {
         let is_load_balanced = self.inner.options.load_balanced.unwrap_or(false);
-        if is_load_balanced && details.output.info.id != 0 {
+        if is_load_balanced && details.operation_output.info.id != 0 {
             Ok(Some(details.connection.pin()?))
         } else {
             Ok(None)
@@ -182,7 +181,7 @@ impl Client {
         &self,
         mut op: T,
         mut session: Option<&mut ClientSession>,
-    ) -> Result<OperationDetails<T>> {
+    ) -> Result<ExecutionOutput<T>> {
         // If the current transaction has been committed/aborted and it is not being
         // re-committed/re-aborted, reset the transaction's state to TransactionState::None.
         if let Some(ref mut session) = session {
@@ -252,10 +251,9 @@ impl Client {
             )
             .await
         {
-            Ok(output) => Ok(OperationDetails {
-                output,
+            Ok(operation_output) => Ok(ExecutionOutput {
+                operation_output,
                 connection: conn,
-                implicit_session: None, // populated in execute_operation_with_details
             }),
             Err(mut err) => {
                 // Retryable writes are only supported by storage engines with document-level
@@ -302,7 +300,7 @@ impl Client {
         session: &mut Option<&mut ClientSession>,
         txn_number: Option<i64>,
         first_error: Error,
-    ) -> Result<OperationDetails<T>> {
+    ) -> Result<ExecutionOutput<T>> {
         op.update_for_retry();
 
         let server = match self.select_server(op.selection_criteria()).await {
@@ -329,10 +327,9 @@ impl Client {
             .execute_operation_on_connection(op, &mut conn, session, txn_number, &retryability)
             .await
         {
-            Ok(output) => Ok(OperationDetails {
-                output,
+            Ok(operation_output) => Ok(ExecutionOutput {
+                operation_output,
                 connection: conn,
-                implicit_session: None, // populated in execute_operation_with_details
             }),
             Err(err) => {
                 self.inner
@@ -825,8 +822,12 @@ struct CommandResult<T> {
     deserialized: T,
 }
 
-struct OperationDetails<T: Operation> {
-    output: T::O,
-    connection: Connection,
+struct ExecutionDetails<T: Operation> {
+    output: ExecutionOutput<T>,
     implicit_session: Option<ClientSession>,
+}
+
+struct ExecutionOutput<T: Operation> {
+    operation_output: T::O,
+    connection: Connection,
 }

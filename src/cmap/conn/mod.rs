@@ -75,6 +75,7 @@ pub(crate) struct Connection {
 
     stream: AsyncStream,
 
+    /// Whether or not the connection is pinned to a cursor or transaction.
     pinned: bool,
 
     #[derivative(Debug = "ignore")]
@@ -289,7 +290,8 @@ impl Connection {
         })
     }
 
-    pub(crate) fn pin(&mut self) -> Result<PinHandle> {
+    /// Pin the connection, removing it from the normal connection pool.
+    pub(crate) fn pin(&mut self) -> Result<PinnedConnectionHandle> {
         if self.pinned {
             return Err(Error::internal(format!(
                 "cannot pin an already-pinned connection (id = {})",
@@ -299,7 +301,7 @@ impl Connection {
         match &self.pool_manager {
             Some(pm) => {
                 self.pinned = true;
-                Ok(PinHandle {
+                Ok(PinnedConnectionHandle {
                     connection_id: self.id,
                     pool_manager: pm.clone(),
                 })
@@ -311,6 +313,7 @@ impl Connection {
         }
     }
 
+    /// Unpin the connection; this should only be used by the connection pool worker.  Other code should use `PinnedConnectionHandle::unpin_connection`.
     pub(super) fn unpin(&mut self) {
         self.pinned = false;
     }
@@ -377,17 +380,21 @@ impl Drop for Connection {
     }
 }
 
+/// A handle to a pinned connection - the connection itself can be retrieved or returned to the normal pool via this handle.
 #[derive(Clone, Debug)]
-pub(crate) struct PinHandle {
+pub(crate) struct PinnedConnectionHandle {
     connection_id: u32,
     pool_manager: PoolManager,
 }
 
-impl PinHandle {
+impl PinnedConnectionHandle {
+    /// Retrieve the pinned connection.  Will fail if the connection is already in use.
     pub(crate) async fn take_connection(&self) -> Result<Connection> {
         self.pool_manager.take_pinned(self.connection_id).await
     }
-    pub(crate) fn unpin(&self) {
+
+    /// Return the pinned connection to the normal connection pool.
+    pub(crate) fn unpin_connection(&self) {
         self.pool_manager.unpin(self.connection_id);
     }
 }

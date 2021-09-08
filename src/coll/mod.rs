@@ -18,7 +18,7 @@ use crate::{
     bson::{doc, to_document, Bson, Document},
     bson_util,
     client::session::TransactionState,
-    cmap::conn::PinHandle,
+    cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
     index::IndexModel,
@@ -773,7 +773,7 @@ impl<T> Collection<T> {
     pub(super) async fn kill_cursor(
         &self,
         cursor_id: i64,
-        pinned_connection: Option<&PinHandle>,
+        pinned_connection: Option<&PinnedConnectionHandle>,
     ) -> Result<()> {
         let ns = self.namespace();
 

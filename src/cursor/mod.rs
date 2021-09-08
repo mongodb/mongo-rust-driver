@@ -10,7 +10,7 @@ use futures_core::{future::BoxFuture, Stream};
 use serde::de::DeserializeOwned;
 
 use crate::{
-    cmap::conn::PinHandle,
+    cmap::conn::PinnedConnectionHandle,
     error::{Error, Result},
     operation::GetMore,
     results::GetMoreResult,
@@ -95,7 +95,7 @@ where
         client: Client,
         spec: CursorSpecification<T>,
         session: Option<ClientSession>,
-        pin: Option<PinHandle>,
+        pin: Option<PinnedConnectionHandle>,
     ) -> Self {
         let provider = ImplicitSessionGetMoreProvider::new(&spec, session);
 
@@ -206,7 +206,7 @@ impl<T: Send + Sync + DeserializeOwned> GetMoreProvider for ImplicitSessionGetMo
         &mut self,
         info: CursorInformation,
         client: Client,
-        pinned_connection: Option<&PinHandle>,
+        pinned_connection: Option<&PinnedConnectionHandle>,
     ) {
         take_mut::take(self, |self_| match self_ {
             Self::Idle(mut session) => {

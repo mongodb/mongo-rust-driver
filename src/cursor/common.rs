@@ -11,7 +11,7 @@ use serde::de::DeserializeOwned;
 
 use crate::{
     bson::Document,
-    cmap::conn::PinHandle,
+    cmap::conn::PinnedConnectionHandle,
     error::{Error, ErrorKind, Result},
     operation,
     options::ServerAddress,
@@ -106,7 +106,7 @@ where
                         if exhausted {
                             // If the cursor is exhausted, the driver must return the pinned
                             // connection to the pool.
-                            self.pinned_connection = PinnedConnection::new(None);
+                            self.pinned_connection = PinnedConnection::Unpinned;
                         }
                         if let Err(e) = &result {
                             if e.is_network_error() {
@@ -131,7 +131,7 @@ where
                     }
                     return Poll::Ready(Some(Ok(doc)));
                 }
-                None if !self.exhausted => {
+                None if !self.exhausted && !self.pinned_connection.is_invalid() => {
                     self.start_get_more();
                 }
                 None => return Poll::Ready(None),
@@ -167,7 +167,7 @@ pub(super) trait GetMoreProvider: Unpin {
         &mut self,
         spec: CursorInformation,
         client: Client,
-        pinned_connection: Option<&PinHandle>,
+        pinned_connection: Option<&PinnedConnectionHandle>,
     );
 }
 
@@ -249,33 +249,33 @@ pub(crate) struct CursorInformation {
 
 #[derive(Clone, Debug)]
 pub(crate) enum PinnedConnection {
-    Valid(PinHandle),
-    Invalid(PinHandle),
+    Valid(PinnedConnectionHandle),
+    Invalid(PinnedConnectionHandle),
     Unpinned,
 }
 
 impl PinnedConnection {
-    pub(super) fn new(handle: Option<PinHandle>) -> Self {
+    pub(super) fn new(handle: Option<PinnedConnectionHandle>) -> Self {
         match handle {
             Some(h) => Self::Valid(h),
             None => Self::Unpinned,
         }
     }
 
-    fn handle(&self) -> Option<&PinHandle> {
+    fn handle(&self) -> Option<&PinnedConnectionHandle> {
         match self {
             Self::Valid(h) | Self::Invalid(h) => Some(h),
             Self::Unpinned => None,
         }
     }
 
-    fn is_valid(&self) -> bool {
-        !matches!(self, Self::Invalid(_))
+    fn is_invalid(&self) -> bool {
+        matches!(self, Self::Invalid(_))
     }
 
     fn unpin(&self) {
         if let Some(h) = self.handle() {
-            h.unpin();
+            h.unpin_connection();
         }
     }
 
@@ -300,7 +300,7 @@ pub(super) fn kill_cursor(
         .database(ns.db.as_str())
         .collection::<Document>(ns.coll.as_str());
     RUNTIME.execute(async move {
-        if pinned_conn.is_valid() {
+        if !pinned_conn.is_invalid() {
             let _ = coll.kill_cursor(cursor_id, pinned_conn.handle()).await;
         }
         pinned_conn.unpin();
