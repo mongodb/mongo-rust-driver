@@ -111,10 +111,21 @@ use crate::{
 /// # }
 /// ```
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Collection<T> {
     inner: Arc<CollectionInner>,
     _phantom: std::marker::PhantomData<T>,
+}
+
+// Because derive is too conservative, derive only implements Clone if T is Clone.
+// Collection<T> does not actually store any value of type T (so T does not need to be clone).
+impl<T> Clone for Collection<T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            _phantom: Default::default(),
+        }
+    }
 }
 
 #[derive(Debug)]
