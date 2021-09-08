@@ -31,7 +31,10 @@ pub(crate) struct GetMore<'conn, T> {
 }
 
 impl<'conn, T> GetMore<'conn, T> {
-    pub(crate) fn new(info: CursorInformation, pinned: Option<&'conn PinnedConnectionHandle>) -> Self {
+    pub(crate) fn new(
+        info: CursorInformation,
+        pinned: Option<&'conn PinnedConnectionHandle>,
+    ) -> Self {
         Self {
             ns: info.ns,
             cursor_id: info.id,

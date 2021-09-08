@@ -313,7 +313,8 @@ impl Connection {
         }
     }
 
-    /// Unpin the connection; this should only be used by the connection pool worker.  Other code should use `PinnedConnectionHandle::unpin_connection`.
+    /// Unpin the connection; this should only be used by the connection pool worker.  Other code
+    /// should use `PinnedConnectionHandle::unpin_connection`.
     pub(super) fn unpin(&mut self) {
         self.pinned = false;
     }
@@ -380,7 +381,8 @@ impl Drop for Connection {
     }
 }
 
-/// A handle to a pinned connection - the connection itself can be retrieved or returned to the normal pool via this handle.
+/// A handle to a pinned connection - the connection itself can be retrieved or returned to the
+/// normal pool via this handle.
 #[derive(Clone, Debug)]
 pub(crate) struct PinnedConnectionHandle {
     connection_id: u32,

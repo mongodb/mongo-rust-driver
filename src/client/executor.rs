@@ -120,7 +120,10 @@ impl Client {
                 }
             };
             let output = self.execute_operation_with_retry(op, session).await?;
-            Ok(ExecutionDetails { output, implicit_session })
+            Ok(ExecutionDetails {
+                output,
+                implicit_session,
+            })
         })
         .await
     }
@@ -157,7 +160,11 @@ impl Client {
     {
         let mut details = self.execute_operation_with_details(op, session).await?;
         let pinned = self.pin_connection_for_cursor(&mut details.output)?;
-        Ok(SessionCursor::new(self.clone(), details.output.operation_output, pinned))
+        Ok(SessionCursor::new(
+            self.clone(),
+            details.output.operation_output,
+            pinned,
+        ))
     }
 
     fn pin_connection_for_cursor<Op, T>(
