@@ -47,7 +47,7 @@ async fn run_command_monitoring_test(test_file: TestFile) {
         "A successful mixed bulk write",
         "A successful unordered bulk write with an unacknowledged write concern",
         // We can't pass this test since it relies on old OP_QUERY behavior (SPEC-1519)
-        "A successful find event with a getmore and the server kills the cursor",
+        "A successful find event with a getmore and the server kills the cursor (<= 4.4)",
     ];
 
     for test_case in test_file.tests {
