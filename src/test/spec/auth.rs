@@ -52,14 +52,12 @@ async fn run_auth_test(test_file: TestFile) {
 
         let skipped_mechanisms = [
             "GSSAPI",
-            "PLAIN",
             "MONGODB-CR",
             #[cfg(not(feature = "aws-auth"))]
             "MONGODB-AWS",
         ];
 
         // TODO: GSSAPI (RUST-196)
-        // TODO: PLAIN (RUST-992)
         if skipped_mechanisms
             .iter()
             .any(|mech| test_case.description.contains(mech))
