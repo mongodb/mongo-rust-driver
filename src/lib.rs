@@ -315,7 +315,6 @@ macro_rules! define_if_single_runtime_enabled {
 // and warnings other than our custom ones.
 #[warn(renamed_and_removed_lints)]
 define_if_single_runtime_enabled! {
-
     #[macro_use]
     pub mod options;
 
