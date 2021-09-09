@@ -509,7 +509,7 @@ impl ConnectionPoolWorker {
     }
 
     fn store_pinned(&mut self, mut conn: Connection) {
-        if self.pending_unpins.remove(&conn.id) {
+        if self.pending_unpins.remove(&conn.id) || conn.is_executing() {
             conn.unpin();
             self.check_in(conn);
         } else {

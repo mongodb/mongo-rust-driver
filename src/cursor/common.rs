@@ -126,9 +126,6 @@ where
 
             match self.buffer.pop_front() {
                 Some(doc) => {
-                    if self.buffer.is_empty() && !self.exhausted {
-                        self.start_get_more();
-                    }
                     return Poll::Ready(Some(Ok(doc)));
                 }
                 None if !self.exhausted && !self.pinned_connection.is_invalid() => {
@@ -247,7 +244,7 @@ pub(crate) struct CursorInformation {
     pub(crate) max_time: Option<Duration>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) enum PinnedConnection {
     Valid(PinnedConnectionHandle),
     Invalid(PinnedConnectionHandle),
@@ -259,6 +256,17 @@ impl PinnedConnection {
         match handle {
             Some(h) => Self::Valid(h),
             None => Self::Unpinned,
+        }
+    }
+
+    /// Make a new `PinnedConnection` that refers to the same connection as this one.
+    /// Use with care and only when "lending" a handle in a way that can't be expressed as a
+    /// normal borrow.
+    pub(crate) fn replicate(&self) -> Self {
+        match self {
+            Self::Valid(h) => Self::Valid(h.replicate()),
+            Self::Invalid(h) => Self::Invalid(h.replicate()),
+            Self::Unpinned => Self::Unpinned,
         }
     }
 

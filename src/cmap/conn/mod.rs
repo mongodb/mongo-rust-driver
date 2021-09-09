@@ -383,13 +383,23 @@ impl Drop for Connection {
 
 /// A handle to a pinned connection - the connection itself can be retrieved or returned to the
 /// normal pool via this handle.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct PinnedConnectionHandle {
     connection_id: u32,
     pool_manager: PoolManager,
 }
 
 impl PinnedConnectionHandle {
+    /// Make a new `PinnedConnectionHandle` that refers to the same connection as this one.
+    /// Use with care and only when "lending" a handle in a way that can't be expressed as a
+    /// normal borrow.
+    pub(crate) fn replicate(&self) -> Self {
+        Self {
+            connection_id: self.connection_id,
+            pool_manager: self.pool_manager.clone(),
+        }
+    }
+
     /// Retrieve the pinned connection.  Will fail if the connection is already in use.
     pub(crate) async fn take_connection(&self) -> Result<Connection> {
         self.pool_manager.take_pinned(self.connection_id).await

@@ -144,7 +144,7 @@ where
             generic_cursor: ExplicitSessionCursor::new(
                 self.client.clone(),
                 spec,
-                self.pinned_connection.clone(),
+                self.pinned_connection.replicate(),
                 get_more_provider,
             ),
             session_cursor: self,
@@ -192,7 +192,7 @@ where
             self.client.clone(),
             &self.info.ns,
             self.info.id,
-            self.pinned_connection.clone(),
+            self.pinned_connection.replicate(),
         );
     }
 }
@@ -284,7 +284,7 @@ impl<'session, T: Send + Sync + DeserializeOwned> GetMoreProvider
     ) {
         take_mut::take(self, |self_| {
             if let ExplicitSessionGetMoreProvider::Idle(session) = self_ {
-                let pinned_connection = pinned_connection.cloned();
+                let pinned_connection = pinned_connection.map(|c| c.replicate());
                 let future = Box::pin(async move {
                     let get_more = GetMore::new(info, pinned_connection.as_ref());
                     let get_more_result = client

@@ -136,7 +136,7 @@ where
             self.client.clone(),
             self.wrapped_cursor.namespace(),
             self.wrapped_cursor.id(),
-            self.wrapped_cursor.pinned_connection().clone(),
+            self.wrapped_cursor.pinned_connection().replicate(),
         );
     }
 }
@@ -210,7 +210,7 @@ impl<T: Send + Sync + DeserializeOwned> GetMoreProvider for ImplicitSessionGetMo
     ) {
         take_mut::take(self, |self_| match self_ {
             Self::Idle(mut session) => {
-                let pinned_connection = pinned_connection.cloned();
+                let pinned_connection = pinned_connection.map(|c| c.replicate());
                 let future = Box::pin(async move {
                     let get_more = GetMore::new(info, pinned_connection.as_ref());
                     let get_more_result = client
