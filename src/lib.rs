@@ -282,7 +282,7 @@
 //! it will only happen in a minor or major version release.
 
 #![warn(missing_docs)]
-#![warn(missing_crate_level_docs)]
+#![warn(rustdoc::missing_crate_level_docs)]
 #![cfg_attr(
     feature = "cargo-clippy",
     allow(
