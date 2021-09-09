@@ -4,9 +4,9 @@ use futures::{future::Either, StreamExt, TryStreamExt};
 use tokio::sync::RwLockReadGuard;
 
 use crate::{
-    bson::{doc, Document},
+    bson::doc,
     options::{CreateCollectionOptions, CursorType, FindOptions},
-    test::{TestClient, util::EventClient, LOCK},
+    test::{util::EventClient, TestClient, LOCK},
     RUNTIME,
 };
 
@@ -116,28 +116,38 @@ async fn batch_exhaustion() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
 
-    let coll = client.create_fresh_collection("cursor_batch_exhaustion_db", "cursor_batch_exhaustion_coll", None).await;
-    coll.insert_many(vec![
-        doc! { "foo": 1 },
-        doc! { "foo": 2 },
-        doc! { "foo": 3 },
-        doc! { "foo": 4 },
-        doc! { "foo": 5 },
-        doc! { "foo": 6 },
-    ], None).await.unwrap();
+    let coll = client
+        .create_fresh_collection(
+            "cursor_batch_exhaustion_db",
+            "cursor_batch_exhaustion_coll",
+            None,
+        )
+        .await;
+    coll.insert_many(
+        vec![
+            doc! { "foo": 1 },
+            doc! { "foo": 2 },
+            doc! { "foo": 3 },
+            doc! { "foo": 4 },
+            doc! { "foo": 5 },
+            doc! { "foo": 6 },
+        ],
+        None,
+    )
+    .await
+    .unwrap();
 
     // Start a find where batch size will line up with limit.
-    let cursor = coll.find(None,
-        FindOptions::builder()
-            .batch_size(2)
-            .limit(4)
-            .build()
-        ).await.unwrap();
+    let cursor = coll
+        .find(None, FindOptions::builder().batch_size(2).limit(4).build())
+        .await
+        .unwrap();
     let v: Vec<_> = cursor.try_collect().await.unwrap();
     assert_eq!(4, v.len());
 
     // Assert that the last `getMore` response always has id 0, i.e. is exhausted.
-    let replies: Vec<_> = client.get_command_events(&["getMore"])
+    let replies: Vec<_> = client
+        .get_command_events(&["getMore"])
         .into_iter()
         .filter_map(|e| e.as_command_succeeded().map(|e| e.reply.clone()))
         .collect();

@@ -11,7 +11,7 @@ use tokio::sync::{
 
 use super::TestClient;
 use crate::{
-    bson::{doc, Document},
+    bson::doc,
     event::{
         cmap::{
             CmapEventHandler,
