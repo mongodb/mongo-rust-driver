@@ -282,7 +282,10 @@
 //! it will only happen in a minor or major version release.
 
 #![warn(missing_docs)]
-#![allow(renamed_and_removed_lints)]  // `missing_crate_level_docs` was renamed with a `rustdoc::` prefix
+// `missing_crate_level_docs` was renamed with a `rustdoc::` prefix in rustc 1.55, but isn't
+// supported in the MSRV.
+// TODO: remove this if/when the MSRV is 1.55+.
+#![allow(renamed_and_removed_lints)]  
 #![warn(missing_crate_level_docs)]
 #![cfg_attr(
     feature = "cargo-clippy",
