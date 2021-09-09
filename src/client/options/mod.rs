@@ -168,6 +168,13 @@ impl Hash for ServerAddress {
     }
 }
 
+impl FromStr for ServerAddress {
+    type Err = crate::error::Error;
+    fn from_str(address: &str) -> Result<Self> {
+        ServerAddress::parse(address)
+    }
+}
+
 impl ServerAddress {
     /// Parses an address string into a `StreamAddress`.
     pub fn parse(address: impl AsRef<str>) -> Result<Self> {
