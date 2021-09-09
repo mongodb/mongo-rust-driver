@@ -125,18 +125,24 @@ async fn batch_exhaustion() {
         doc! { "foo": 5 },
         doc! { "foo": 6 },
     ], None).await.unwrap();
+
+    // Start a find where batch size will line up with limit.
     let cursor = coll.find(None,
         FindOptions::builder()
             .batch_size(2)
-            .limit(6)
+            .limit(4)
             .build()
         ).await.unwrap();
     let v: Vec<_> = cursor.try_collect().await.unwrap();
     assert_eq!(4, v.len());
 
-    let commands: Vec<_> = client.get_command_events(&["find", "getMore", "killCursor"])
+    // Assert that the last `getMore` response always has id 0, i.e. is exhausted.
+    let replies: Vec<_> = client.get_command_events(&["getMore"])
         .into_iter()
-        .map(|e| (e.command_name().to_string(), e.body().cloned()))
+        .filter_map(|e| e.as_command_succeeded().map(|e| e.reply.clone()))
         .collect();
-    println!("{:#?}", commands);
+    let last = replies.last().unwrap();
+    let cursor = last.get_document("cursor").unwrap();
+    let id = cursor.get_i64("id").unwrap();
+    assert_eq!(0, id);
 }

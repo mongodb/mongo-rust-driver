@@ -92,14 +92,6 @@ impl CommandEvent {
         }
     }
 
-    pub fn body(&self) -> Option<&Document> {
-        match self {
-            CommandEvent::Started(event) => Some(&event.command),
-            CommandEvent::Failed(_) => None,
-            CommandEvent::Succeeded(event) => Some(&event.reply),
-        }
-    }
-
     fn request_id(&self) -> i32 {
         match self {
             CommandEvent::Started(event) => event.request_id,
@@ -108,14 +100,14 @@ impl CommandEvent {
         }
     }
 
-    fn as_command_started(&self) -> Option<&CommandStartedEvent> {
+    pub fn as_command_started(&self) -> Option<&CommandStartedEvent> {
         match self {
             CommandEvent::Started(e) => Some(e),
             _ => None,
         }
     }
 
-    fn as_command_succeeded(&self) -> Option<&CommandSucceededEvent> {
+    pub fn as_command_succeeded(&self) -> Option<&CommandSucceededEvent> {
         match self {
             CommandEvent::Succeeded(e) => Some(e),
             _ => None,
