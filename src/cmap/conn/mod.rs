@@ -411,7 +411,7 @@ impl PinnedConnectionHandle {
         }
     }
 
-    /// Retrieve the pinned connection.  Will fail if the connection is already in use.
+    /// Retrieve the pinned connection, blocking until it's available for use.  Will fail if the connection has been unpinned.
     pub(crate) async fn take_connection(&self) -> Result<Connection> {
         let mut receiver = self.receiver.lock().await;
         receiver.recv().await.ok_or_else(|| Error::internal("cannot take connection after unpin"))
