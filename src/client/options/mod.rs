@@ -2004,13 +2004,13 @@ mod tests {
     #[test]
     fn test_parse_address_with_from_str() {
         let x = "localhost:27017".parse::<ServerAddress>().unwrap();
-        let ServerAddress::Tcp{host, port} = x;
+        let ServerAddress::Tcp { host, port } = x;
         assert_eq!(host, "localhost");
         assert_eq!(port, Some(27017));
 
         // Port defaults to 27017 (so this doesn't fail)
         let x = "localhost".parse::<ServerAddress>().unwrap();
-        let ServerAddress::Tcp{host, port} = x;
+        let ServerAddress::Tcp { host, port } = x;
         assert_eq!(host, "localhost");
         assert_eq!(port, None);
 
