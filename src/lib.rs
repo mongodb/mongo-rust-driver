@@ -284,9 +284,8 @@
 #![warn(missing_docs)]
 // `missing_crate_level_docs` was renamed with a `rustdoc::` prefix in rustc 1.55, but isn't
 // supported in the MSRV.
-// TODO: remove this if/when the MSRV is 1.55+.
-#![allow(renamed_and_removed_lints)]  
-#![warn(missing_crate_level_docs)]
+// TODO: remove the wrapping cfg_attr if/when the MSRV is 1.55+.
+#![cfg_attr(docsrs, warn(rustdoc::missing_crate_level_docs))]
 #![cfg_attr(
     feature = "cargo-clippy",
     allow(
@@ -316,7 +315,6 @@ macro_rules! define_if_single_runtime_enabled {
 
 // In the case that neither tokio nor async-std is enabled, we want to disable all compiler errors
 // and warnings other than our custom ones.
-#[warn(renamed_and_removed_lints)]
 define_if_single_runtime_enabled! {
     #[macro_use]
     pub mod options;
