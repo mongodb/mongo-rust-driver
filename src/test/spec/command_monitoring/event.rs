@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 use crate::{
     bson::Document,
-    test::{CommandEvent, Matchable, MatchErrExt, eq_matches},
+    test::{eq_matches, CommandEvent, MatchErrExt, Matchable},
 };
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -38,7 +38,11 @@ impl Matchable for TestEvent {
                 },
             ) => {
                 eq_matches("command_name", actual_command_name, expected_command_name)?;
-                eq_matches("database_name", actual_database_name, expected_database_name)?;
+                eq_matches(
+                    "database_name",
+                    actual_database_name,
+                    expected_database_name,
+                )?;
                 actual_command.matches(expected_command).prefix("command")?;
                 Ok(())
             }

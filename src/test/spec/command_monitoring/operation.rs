@@ -159,7 +159,7 @@ impl TestOperation for Find {
                 min: self.min.clone(),
                 max: self.max.clone(),
                 return_key: self.return_key,
-                show_record_id :self.show_record_id,
+                show_record_id: self.show_record_id,
                 ..Default::default()
             };
 

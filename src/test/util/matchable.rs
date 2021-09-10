@@ -20,7 +20,11 @@ pub trait Matchable: Sized + 'static {
         if let Some(expected) = <dyn Any>::downcast_ref::<Self>(expected) {
             self.content_matches(expected)
         } else {
-            Err(format!("Couldn't down downcast expected ({:?}) to self ({:?})", expected.type_id(), self.type_id()))
+            Err(format!(
+                "Couldn't down downcast expected ({:?}) to self ({:?})",
+                expected.type_id(),
+                self.type_id()
+            ))
         }
     }
 }
@@ -35,9 +39,16 @@ impl MatchErrExt for Result<(), String> {
     }
 }
 
-pub fn eq_matches<T: PartialEq + Debug>(name: &str, actual: &T, expected: &T) -> Result<(), String> {
+pub fn eq_matches<T: PartialEq + Debug>(
+    name: &str,
+    actual: &T,
+    expected: &T,
+) -> Result<(), String> {
     if actual != expected {
-        return Err(format!("expected {} {:?}, got {:?}", name, expected, actual));
+        return Err(format!(
+            "expected {} {:?}, got {:?}",
+            name, expected, actual
+        ));
     }
     Ok(())
 }
@@ -58,7 +69,11 @@ impl Matchable for Bson {
             }
             (Bson::Array(actual_array), Bson::Array(expected_array)) => {
                 if actual_array.len() < expected_array.len() {
-                    return Err(format!("expected {} array elements, got {}", expected_array.len(), actual_array.len()));
+                    return Err(format!(
+                        "expected {} array elements, got {}",
+                        expected_array.len(),
+                        actual_array.len()
+                    ));
                 }
                 for (actual, expected) in actual_array.iter().zip(expected_array.iter()) {
                     actual.matches(expected)?;
@@ -67,8 +82,12 @@ impl Matchable for Bson {
             }
             _ => {
                 match (bson_util::get_int(self), get_int(expected)) {
-                    (Some(actual_int), Some(expected_int)) => eq_matches("int", &actual_int, &expected_int)?,
-                    (None, Some(expected_int)) => return Err(format!("expected int {}, got none", expected_int)),
+                    (Some(actual_int), Some(expected_int)) => {
+                        eq_matches("int", &actual_int, &expected_int)?
+                    }
+                    (None, Some(expected_int)) => {
+                        return Err(format!("expected int {}, got none", expected_int))
+                    }
                     _ => eq_matches("bson", self, expected)?,
                 }
                 Ok(())
@@ -113,11 +132,21 @@ impl Matchable for Document {
 
 impl Matchable for Credential {
     fn content_matches(&self, expected: &Credential) -> Result<(), String> {
-        self.username.content_matches(&expected.username).prefix("username")?;
-        self.source.content_matches(&expected.source).prefix("source")?;
-        self.password.content_matches(&expected.password).prefix("password")?;
-        self.mechanism.content_matches(&expected.mechanism).prefix("mechanism")?;
-        self.mechanism_properties.content_matches(&expected.mechanism_properties).prefix("mechanism_properties")?;
+        self.username
+            .content_matches(&expected.username)
+            .prefix("username")?;
+        self.source
+            .content_matches(&expected.source)
+            .prefix("source")?;
+        self.password
+            .content_matches(&expected.password)
+            .prefix("password")?;
+        self.mechanism
+            .content_matches(&expected.mechanism)
+            .prefix("mechanism")?;
+        self.mechanism_properties
+            .content_matches(&expected.mechanism_properties)
+            .prefix("mechanism_properties")?;
         Ok(())
     }
 }

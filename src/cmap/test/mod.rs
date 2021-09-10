@@ -23,8 +23,8 @@ use crate::{
         eq_matches,
         run_spec_test,
         EventClient,
-        Matchable,
         MatchErrExt,
+        Matchable,
         CLIENT_OPTIONS,
         LOCK,
         SERVER_API,
@@ -327,37 +327,41 @@ impl Matchable for TlsOptions {
         self.allow_invalid_certificates
             .matches(&expected.allow_invalid_certificates)
             .prefix("allow_invalid_certificates")?;
-        self
-                .ca_file_path
-                .as_ref()
-                .map(|pb| pb.display().to_string())
-                .matches(
-                    &expected
-                        .ca_file_path
-                        .as_ref()
-                        .map(|pb| pb.display().to_string()),
-                )
-                .prefix("ca_file_path")?;
-        self
-                .cert_key_file_path
-                .as_ref()
-                .map(|pb| pb.display().to_string())
-                .matches(
-                    &expected
-                        .cert_key_file_path
-                        .as_ref()
-                        .map(|pb| pb.display().to_string()),
-                )
-                .prefix("cert_key_file_path")?;
+        self.ca_file_path
+            .as_ref()
+            .map(|pb| pb.display().to_string())
+            .matches(
+                &expected
+                    .ca_file_path
+                    .as_ref()
+                    .map(|pb| pb.display().to_string()),
+            )
+            .prefix("ca_file_path")?;
+        self.cert_key_file_path
+            .as_ref()
+            .map(|pb| pb.display().to_string())
+            .matches(
+                &expected
+                    .cert_key_file_path
+                    .as_ref()
+                    .map(|pb| pb.display().to_string()),
+            )
+            .prefix("cert_key_file_path")?;
         Ok(())
     }
 }
 
 impl Matchable for EventOptions {
     fn content_matches(&self, expected: &EventOptions) -> std::result::Result<(), String> {
-        self.max_idle_time.matches(&expected.max_idle_time).prefix("max_idle_time")?;
-        self.max_pool_size.matches(&expected.max_pool_size).prefix("max_pool_size")?;
-        self.min_pool_size.matches(&expected.min_pool_size).prefix("min_pool_size")?;
+        self.max_idle_time
+            .matches(&expected.max_idle_time)
+            .prefix("max_idle_time")?;
+        self.max_pool_size
+            .matches(&expected.max_pool_size)
+            .prefix("max_pool_size")?;
+        self.min_pool_size
+            .matches(&expected.min_pool_size)
+            .prefix("min_pool_size")?;
         Ok(())
     }
 }
@@ -376,7 +380,10 @@ impl Matchable for Event {
             }
             (Event::ConnectionClosed(actual), Event::ConnectionClosed(ref expected)) => {
                 eq_matches("reason", &actual.reason, &expected.reason)?;
-                actual.connection_id.matches(&expected.connection_id).prefix("connection_id")?;
+                actual
+                    .connection_id
+                    .matches(&expected.connection_id)
+                    .prefix("connection_id")?;
                 Ok(())
             }
             (Event::ConnectionCheckedOut(actual), Event::ConnectionCheckedOut(ref expected)) => {
@@ -392,7 +399,10 @@ impl Matchable for Event {
                 if actual.reason == expected.reason {
                     Ok(())
                 } else {
-                    Err(format!("expected reason {:?}, got {:?}", expected.reason, actual.reason))
+                    Err(format!(
+                        "expected reason {:?}, got {:?}",
+                        expected.reason, actual.reason
+                    ))
                 }
             }
             (Event::ConnectionCheckOutStarted(_), Event::ConnectionCheckOutStarted(_)) => Ok(()),
