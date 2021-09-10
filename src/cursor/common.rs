@@ -281,9 +281,9 @@ impl PinnedConnection {
         matches!(self, Self::Invalid(_))
     }
 
-    fn unpin(&self) {
+    async fn unpin(&self) {
         if let Some(h) = self.handle() {
-            h.unpin_connection();
+            h.unpin_connection().await;
         }
     }
 
@@ -311,6 +311,6 @@ pub(super) fn kill_cursor(
         if !pinned_conn.is_invalid() {
             let _ = coll.kill_cursor(cursor_id, pinned_conn.handle()).await;
         }
-        pinned_conn.unpin();
+        pinned_conn.unpin().await;
     });
 }

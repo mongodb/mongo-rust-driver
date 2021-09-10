@@ -8,6 +8,7 @@ use std::{
 };
 
 use derivative::Derivative;
+use tokio::sync::{Mutex, mpsc};
 
 use self::wire::Message;
 use super::manager::PoolManager;
@@ -75,8 +76,9 @@ pub(crate) struct Connection {
 
     stream: AsyncStream,
 
-    /// Whether or not the connection is pinned to a cursor or transaction.
-    pinned: bool,
+    /// If the connection is pinned to a cursor or transaction, the channel sender to return this
+    /// connection to the pin holder.
+    pinned_sender: Option<mpsc::Sender<Connection>>,
 
     #[derivative(Debug = "ignore")]
     handler: Option<Arc<dyn CmapEventHandler>>,
@@ -106,7 +108,7 @@ impl Connection {
             handler: options.and_then(|options| options.event_handler),
             stream_description: None,
             error: false,
-            pinned: false,
+            pinned_sender: None,
         };
 
         Ok(conn)
@@ -292,31 +294,21 @@ impl Connection {
 
     /// Pin the connection, removing it from the normal connection pool.
     pub(crate) fn pin(&mut self) -> Result<PinnedConnectionHandle> {
-        if self.pinned {
+        if self.pinned_sender.is_some() {
             return Err(Error::internal(format!(
                 "cannot pin an already-pinned connection (id = {})",
                 self.id
             )));
         }
-        match &self.pool_manager {
-            Some(pm) => {
-                self.pinned = true;
-                Ok(PinnedConnectionHandle {
-                    connection_id: self.id,
-                    pool_manager: pm.clone(),
-                })
-            }
-            None => Err(Error::internal(format!(
+        if self.pool_manager.is_none() {
+            return Err(Error::internal(format!(
                 "cannot pin a checked-in connection (id = {})",
                 self.id
-            ))),
+            )));
         }
-    }
-
-    /// Unpin the connection; this should only be used by the connection pool worker.  Other code
-    /// should use `PinnedConnectionHandle::unpin_connection`.
-    pub(super) fn unpin(&mut self) {
-        self.pinned = false;
+        let (tx, rx) = mpsc::channel(1);
+        self.pinned_sender = Some(tx);
+        Ok(PinnedConnectionHandle { receiver: Arc::new(Mutex::new(rx)) })
     }
 
     /// Close this connection, emitting a `ConnectionClosedEvent` with the supplied reason.
@@ -346,7 +338,7 @@ impl Connection {
             error: self.error,
             pool_manager: None,
             ready_and_available_time: None,
-            pinned: self.pinned,
+            pinned_sender: self.pinned_sender.clone(),
         }
     }
 }
@@ -365,10 +357,31 @@ impl Drop for Connection {
         // pool or emit any events.
         if let Some(pool_manager) = self.pool_manager.take() {
             let mut dropped_connection = self.take();
-            let result = if self.pinned {
+            let result = if let Some(sender) = self.pinned_sender.as_mut() {
                 // Preserve the timestamp for pinned connections.
                 dropped_connection.ready_and_available_time = self.ready_and_available_time;
-                pool_manager.store_pinned(dropped_connection)
+                match sender.try_send(dropped_connection) {
+                    Ok(()) => Ok(()),
+                    // The connection has been unpinned and should be checked back in.
+                    Err(mpsc::error::TrySendError::Closed(mut conn)) => {
+                        conn.pinned_sender = None;
+                        conn.ready_and_available_time = None;
+                        pool_manager.check_in(conn)
+                    }
+                    // The connection is being returned to the pin holder while another connection
+                    // is in the pin buffer; this should never happen.  Only possible action is to
+                    // check the connection back in.
+                    Err(mpsc::error::TrySendError::Full(mut conn)) => {
+                        // Panic in debug mode
+                        if cfg!(debug_assertions) {
+                            panic!("buffer full when attempting to return a pinned connection")
+                        }
+                        // TODO RUST-230 log an error in non-debug mode.
+                        conn.pinned_sender = None;
+                        conn.ready_and_available_time = None;
+                        pool_manager.check_in(conn)
+                    }
+                }
             } else {
                 pool_manager.check_in(dropped_connection)
             };
@@ -385,8 +398,7 @@ impl Drop for Connection {
 /// normal pool via this handle.
 #[derive(Debug)]
 pub(crate) struct PinnedConnectionHandle {
-    connection_id: u32,
-    pool_manager: PoolManager,
+    receiver: Arc<Mutex<mpsc::Receiver<Connection>>>,
 }
 
 impl PinnedConnectionHandle {
@@ -395,19 +407,20 @@ impl PinnedConnectionHandle {
     /// normal borrow.
     pub(crate) fn replicate(&self) -> Self {
         Self {
-            connection_id: self.connection_id,
-            pool_manager: self.pool_manager.clone(),
+            receiver: self.receiver.clone(),
         }
     }
 
     /// Retrieve the pinned connection.  Will fail if the connection is already in use.
     pub(crate) async fn take_connection(&self) -> Result<Connection> {
-        self.pool_manager.take_pinned(self.connection_id).await
+        let mut receiver = self.receiver.lock().await;
+        receiver.recv().await.ok_or_else(|| Error::internal("cannot take connection after unpin"))
     }
 
     /// Return the pinned connection to the normal connection pool.
-    pub(crate) fn unpin_connection(&self) {
-        self.pool_manager.unpin(self.connection_id);
+    pub(crate) async fn unpin_connection(&self) {
+        let mut receiver = self.receiver.lock().await;
+        receiver.close();
     }
 }
 

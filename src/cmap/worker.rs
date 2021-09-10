@@ -304,22 +304,6 @@ impl ConnectionPoolWorker {
                 PoolTask::HandleManagementRequest(PoolManagementRequest::CheckIn(connection)) => {
                     self.check_in(connection);
                 }
-                PoolTask::HandleManagementRequest(PoolManagementRequest::StorePinned(
-                    connection,
-                )) => {
-                    self.store_pinned(connection);
-                }
-                PoolTask::HandleManagementRequest(PoolManagementRequest::TakePinned {
-                    connection_id,
-                    sender,
-                }) => {
-                    if let Err(Some(conn)) = sender.send(self.take_pinned(connection_id)) {
-                        self.store_pinned(conn);
-                    }
-                }
-                PoolTask::HandleManagementRequest(PoolManagementRequest::Unpin(connection_id)) => {
-                    self.unpin(connection_id);
-                }
                 PoolTask::HandleManagementRequest(PoolManagementRequest::Clear {
                     completion_handler: _,
                     cause,
@@ -505,28 +489,6 @@ impl ConnectionPoolWorker {
             self.close_connection(conn, ConnectionClosedReason::Dropped);
         } else {
             self.available_connections.push_back(conn);
-        }
-    }
-
-    fn store_pinned(&mut self, mut conn: Connection) {
-        if self.pending_unpins.remove(&conn.id) || conn.is_executing() {
-            conn.unpin();
-            self.check_in(conn);
-        } else {
-            self.pinned_connections.insert(conn.id, conn);
-        }
-    }
-
-    fn take_pinned(&mut self, id: u32) -> Option<Connection> {
-        self.pinned_connections.remove(&id)
-    }
-
-    fn unpin(&mut self, id: u32) {
-        if let Some(mut conn) = self.pinned_connections.remove(&id) {
-            conn.unpin();
-            self.check_in(conn);
-        } else {
-            self.pending_unpins.insert(id);
         }
     }
 

@@ -1,9 +1,9 @@
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc};
 
 use super::Connection;
 use crate::{
     bson::oid::ObjectId,
-    error::{Error, Result},
+    error::{Error},
     runtime::AcknowledgedMessage,
 };
 
@@ -63,51 +63,6 @@ impl PoolManager {
         Ok(())
     }
 
-    /// Store a pinned connection for later retrieval via id.  This connection is removed from the
-    /// normal connection pool until unpinned.
-    pub(super) fn store_pinned(
-        &self,
-        connection: Connection,
-    ) -> std::result::Result<(), Connection> {
-        if let Err(request) = self
-            .sender
-            .send(PoolManagementRequest::StorePinned(connection))
-        {
-            let conn = request.0.unwrap_check_in();
-            return Err(conn);
-        }
-        Ok(())
-    }
-
-    /// Retrieve a previously-stored pinned connection by id.  This returns an error if the
-    /// connection is already in use.
-    pub(super) async fn take_pinned(&self, id: u32) -> Result<Connection> {
-        let (tx, rx) = oneshot::channel();
-        if self
-            .sender
-            .send(PoolManagementRequest::TakePinned {
-                connection_id: id,
-                sender: tx,
-            })
-            .is_err()
-        {
-            return Err(Error::internal("pool worker dropped"));
-        }
-        match rx.await {
-            Ok(Some(conn)) => Ok(conn),
-            Ok(None) => Err(Error::internal(format!(
-                "no pinned connection with id = {}",
-                id
-            ))),
-            Err(_) => Err(Error::internal("pool sender dropped")),
-        }
-    }
-
-    /// Remove a connection from pinned storage.
-    pub(super) fn unpin(&self, id: u32) {
-        let _ = self.sender.send(PoolManagementRequest::Unpin(id));
-    }
-
     /// Notify the pool that establishing a connection failed.
     pub(super) fn handle_connection_failed(&self) {
         let _ = self
@@ -150,18 +105,6 @@ pub(super) enum PoolManagementRequest {
 
     /// Check in the given connection.
     CheckIn(Connection),
-
-    /// Store the given pinned connection.
-    StorePinned(Connection),
-
-    /// Take a previously-stored pinned connection.
-    TakePinned {
-        connection_id: u32,
-        sender: oneshot::Sender<Option<Connection>>,
-    },
-
-    /// Unpin a pinned connection and return it to the pool.
-    Unpin(u32),
 
     /// Update the pool based on the given establishment error.
     HandleConnectionFailed,
