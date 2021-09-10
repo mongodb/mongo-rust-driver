@@ -38,7 +38,7 @@ use crate::{
 };
 
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, VecDeque},
     sync::Arc,
     time::Duration,
 };
@@ -135,13 +135,6 @@ pub(crate) struct ConnectionPoolWorker {
     /// A handle used to notify SDAM that a connection establishment error happened. This will
     /// allow the server to transition to Unknown and clear the pool as necessary.
     server_updater: ServerUpdateSender,
-
-    /// Checked-out connections that are pinned to a cursor or transaction but not currently in
-    /// use.
-    pinned_connections: HashMap<u32, Connection>,
-
-    /// Checked-out connections that need to be unpinned when stored.
-    pending_unpins: HashSet<u32>,
 }
 
 impl ConnectionPoolWorker {
@@ -247,8 +240,6 @@ impl ConnectionPoolWorker {
             generation_publisher,
             maintenance_frequency,
             server_updater,
-            pinned_connections: HashMap::new(),
-            pending_unpins: HashSet::new(),
         };
 
         RUNTIME.execute(async move {
