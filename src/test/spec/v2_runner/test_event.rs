@@ -36,7 +36,7 @@ impl CommandStartedEvent {
             }
         }
 
-        self.command.content_matches(&expected)
+        self.command.content_matches(&expected).is_ok()
     }
 }
 

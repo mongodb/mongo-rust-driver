@@ -20,9 +20,11 @@ use crate::{
     sdam::{ServerUpdate, ServerUpdateSender},
     test::{
         assert_matches,
+        eq_matches,
         run_spec_test,
         EventClient,
         Matchable,
+        MatchErrExt,
         CLIENT_OPTIONS,
         LOCK,
         SERVER_API,
@@ -321,10 +323,11 @@ impl Operation {
 }
 
 impl Matchable for TlsOptions {
-    fn content_matches(&self, expected: &TlsOptions) -> bool {
+    fn content_matches(&self, expected: &TlsOptions) -> std::result::Result<(), String> {
         self.allow_invalid_certificates
             .matches(&expected.allow_invalid_certificates)
-            && self
+            .prefix("allow_invalid_certificates")?;
+        self
                 .ca_file_path
                 .as_ref()
                 .map(|pb| pb.display().to_string())
@@ -334,7 +337,8 @@ impl Matchable for TlsOptions {
                         .as_ref()
                         .map(|pb| pb.display().to_string()),
                 )
-            && self
+                .prefix("ca_file_path")?;
+        self
                 .cert_key_file_path
                 .as_ref()
                 .map(|pb| pb.display().to_string())
@@ -344,19 +348,22 @@ impl Matchable for TlsOptions {
                         .as_ref()
                         .map(|pb| pb.display().to_string()),
                 )
+                .prefix("cert_key_file_path")?;
+        Ok(())
     }
 }
 
 impl Matchable for EventOptions {
-    fn content_matches(&self, expected: &EventOptions) -> bool {
-        self.max_idle_time.matches(&expected.max_idle_time)
-            && self.max_pool_size.matches(&expected.max_pool_size)
-            && self.min_pool_size.matches(&expected.min_pool_size)
+    fn content_matches(&self, expected: &EventOptions) -> std::result::Result<(), String> {
+        self.max_idle_time.matches(&expected.max_idle_time).prefix("max_idle_time")?;
+        self.max_pool_size.matches(&expected.max_pool_size).prefix("max_pool_size")?;
+        self.min_pool_size.matches(&expected.min_pool_size).prefix("min_pool_size")?;
+        Ok(())
     }
 }
 
 impl Matchable for Event {
-    fn content_matches(&self, expected: &Event) -> bool {
+    fn content_matches(&self, expected: &Event) -> std::result::Result<(), String> {
         match (self, expected) {
             (Event::PoolCreated(actual), Event::PoolCreated(ref expected)) => {
                 actual.options.matches(&expected.options)
@@ -368,8 +375,9 @@ impl Matchable for Event {
                 actual.connection_id.matches(&expected.connection_id)
             }
             (Event::ConnectionClosed(actual), Event::ConnectionClosed(ref expected)) => {
-                actual.reason == expected.reason
-                    && actual.connection_id.matches(&expected.connection_id)
+                eq_matches("reason", &actual.reason, &expected.reason)?;
+                actual.connection_id.matches(&expected.connection_id).prefix("connection_id")?;
+                Ok(())
             }
             (Event::ConnectionCheckedOut(actual), Event::ConnectionCheckedOut(ref expected)) => {
                 actual.connection_id.matches(&expected.connection_id)
@@ -380,12 +388,18 @@ impl Matchable for Event {
             (
                 Event::ConnectionCheckOutFailed(actual),
                 Event::ConnectionCheckOutFailed(ref expected),
-            ) => actual.reason == expected.reason,
-            (Event::ConnectionCheckOutStarted(_), Event::ConnectionCheckOutStarted(_)) => true,
-            (Event::PoolCleared(_), Event::PoolCleared(_)) => true,
-            (Event::PoolReady(_), Event::PoolReady(_)) => true,
-            (Event::PoolClosed(_), Event::PoolClosed(_)) => true,
-            _ => false,
+            ) => {
+                if actual.reason == expected.reason {
+                    Ok(())
+                } else {
+                    Err(format!("expected reason {:?}, got {:?}", expected.reason, actual.reason))
+                }
+            }
+            (Event::ConnectionCheckOutStarted(_), Event::ConnectionCheckOutStarted(_)) => Ok(()),
+            (Event::PoolCleared(_), Event::PoolCleared(_)) => Ok(()),
+            (Event::PoolReady(_), Event::PoolReady(_)) => Ok(()),
+            (Event::PoolClosed(_), Event::PoolClosed(_)) => Ok(()),
+            (actual, expected) => Err(format!("expected event {:?}, got {:?}", actual, expected)),
         }
     }
 }

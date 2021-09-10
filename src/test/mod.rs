@@ -15,6 +15,7 @@ pub(crate) use self::{
     spec::{run_single_test, run_spec_test, run_spec_test_with_path, RunOn, Serverless, Topology},
     util::{
         assert_matches,
+        eq_matches,
         CmapEvent,
         CommandEvent,
         Event,
@@ -24,6 +25,7 @@ pub(crate) use self::{
         FailPoint,
         FailPointMode,
         Matchable,
+        MatchErrExt,
         SdamEvent,
         TestClient,
     },
