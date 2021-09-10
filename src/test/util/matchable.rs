@@ -202,7 +202,7 @@ impl<T: Matchable> Matchable for Option<T> {
         if let Some(expected_value) = expected {
             return match self {
                 Some(actual_value) => actual_value.content_matches(expected_value),
-                None => Err(format!("expected Some(_), got None")),
+                None => Err("expected Some(_), got None".to_string()),
             };
         }
         Ok(())
