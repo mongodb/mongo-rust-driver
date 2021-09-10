@@ -8,7 +8,7 @@ use std::{
 };
 
 use derivative::Derivative;
-use tokio::sync::{Mutex, mpsc};
+use tokio::sync::{mpsc, Mutex};
 
 use self::wire::Message;
 use super::manager::PoolManager;
@@ -308,7 +308,9 @@ impl Connection {
         }
         let (tx, rx) = mpsc::channel(1);
         self.pinned_sender = Some(tx);
-        Ok(PinnedConnectionHandle { receiver: Arc::new(Mutex::new(rx)) })
+        Ok(PinnedConnectionHandle {
+            receiver: Arc::new(Mutex::new(rx)),
+        })
     }
 
     /// Close this connection, emitting a `ConnectionClosedEvent` with the supplied reason.
@@ -411,10 +413,14 @@ impl PinnedConnectionHandle {
         }
     }
 
-    /// Retrieve the pinned connection, blocking until it's available for use.  Will fail if the connection has been unpinned.
+    /// Retrieve the pinned connection, blocking until it's available for use.  Will fail if the
+    /// connection has been unpinned.
     pub(crate) async fn take_connection(&self) -> Result<Connection> {
         let mut receiver = self.receiver.lock().await;
-        receiver.recv().await.ok_or_else(|| Error::internal("cannot take connection after unpin"))
+        receiver
+            .recv()
+            .await
+            .ok_or_else(|| Error::internal("cannot take connection after unpin"))
     }
 
     /// Return the pinned connection to the normal connection pool.
