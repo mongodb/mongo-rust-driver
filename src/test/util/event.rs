@@ -100,14 +100,14 @@ impl CommandEvent {
         }
     }
 
-    fn as_command_started(&self) -> Option<&CommandStartedEvent> {
+    pub fn as_command_started(&self) -> Option<&CommandStartedEvent> {
         match self {
             CommandEvent::Started(e) => Some(e),
             _ => None,
         }
     }
 
-    fn as_command_succeeded(&self) -> Option<&CommandSucceededEvent> {
+    pub fn as_command_succeeded(&self) -> Option<&CommandSucceededEvent> {
         match self {
             CommandEvent::Succeeded(e) => Some(e),
             _ => None,
