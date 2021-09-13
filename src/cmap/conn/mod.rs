@@ -427,6 +427,10 @@ impl PinnedConnectionHandle {
     pub(crate) async fn unpin_connection(&self) {
         let mut receiver = self.receiver.lock().await;
         receiver.close();
+        // Ensure any connections buffered in the channel are dropped, returning them to the pool.
+        while let Some(conn) = receiver.recv().await {
+            std::mem::drop(conn);
+        }
     }
 }
 
