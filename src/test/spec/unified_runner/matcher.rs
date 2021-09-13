@@ -36,17 +36,22 @@ fn command_events_match(
                 command_name: actual_command_name,
                 database_name: actual_database_name,
                 command: actual_command,
+                has_service_id: actual_has_service_id,
             },
             ExpectedCommandEvent::Started {
                 command_name: expected_command_name,
                 database_name: expected_database_name,
                 command: expected_command,
+                has_service_id: expected_has_service_id,
             },
         ) => {
             if expected_command_name.is_some() && actual_command_name != expected_command_name {
                 return false;
             }
             if expected_database_name.is_some() && actual_database_name != expected_database_name {
+                return false;
+            }
+            if expected_has_service_id.is_some() && actual_has_service_id != expected_has_service_id {
                 return false;
             }
             if let Some(expected_command) = expected_command {
@@ -67,13 +72,18 @@ fn command_events_match(
             ExpectedCommandEvent::Succeeded {
                 command_name: actual_command_name,
                 reply: actual_reply,
+                has_service_id: actual_has_service_id,
             },
             ExpectedCommandEvent::Succeeded {
                 command_name: expected_command_name,
                 reply: expected_reply,
+                has_service_id: expected_has_service_id,
             },
         ) => {
             if expected_command_name.is_some() && actual_command_name != expected_command_name {
+                return false;
+            }
+            if expected_has_service_id.is_some() && actual_has_service_id != expected_has_service_id {
                 return false;
             }
             if let Some(expected_reply) = expected_reply {
@@ -91,15 +101,22 @@ fn command_events_match(
         (
             ExpectedCommandEvent::Failed {
                 command_name: actual_command_name,
+                has_service_id: actual_has_service_id,
             },
             ExpectedCommandEvent::Failed {
                 command_name: expected_command_name,
+                has_service_id: expected_has_service_id,
             },
-        ) => match (expected_command_name, actual_command_name) {
-            (Some(expected), Some(actual)) => expected == actual,
-            (Some(_), None) => false,
-            _ => true,
-        },
+        ) => {
+            if expected_has_service_id.is_some() && actual_has_service_id != expected_has_service_id {
+                return false;
+            }
+            match (expected_command_name, actual_command_name) {
+                (Some(expected), Some(actual)) => expected == actual,
+                (Some(_), None) => false,
+                _ => true,
+            }
+        }
         _ => false,
     }
 }
