@@ -428,9 +428,7 @@ impl PinnedConnectionHandle {
         let mut receiver = self.receiver.lock().await;
         receiver.close();
         // Ensure any connections buffered in the channel are dropped, returning them to the pool.
-        while let Some(conn) = receiver.recv().await {
-            std::mem::drop(conn);
-        }
+        while receiver.recv().await.is_some() {}
     }
 }
 
