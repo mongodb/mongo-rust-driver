@@ -282,7 +282,10 @@
 //! it will only happen in a minor or major version release.
 
 #![warn(missing_docs)]
-#![warn(missing_crate_level_docs)]
+// `missing_crate_level_docs` was renamed with a `rustdoc::` prefix in rustc 1.55, but isn't
+// supported in the MSRV.
+// TODO: remove the wrapping cfg_attr if/when the MSRV is 1.55+.
+#![cfg_attr(docsrs, warn(rustdoc::missing_crate_level_docs))]
 #![cfg_attr(
     feature = "cargo-clippy",
     allow(
