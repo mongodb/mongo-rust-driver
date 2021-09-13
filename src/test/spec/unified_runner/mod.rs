@@ -22,7 +22,7 @@ pub use self::{
     entity::{ClientEntity, Entity, SessionEntity},
     matcher::{events_match, results_match},
     operation::{Operation, OperationObject},
-    test_event::TestEvent,
+    test_event::{TestEvent, ObserveEvent},
     test_file::{
         deserialize_uri_options_to_uri_string,
         CollectionData,

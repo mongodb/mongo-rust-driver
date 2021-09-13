@@ -36,3 +36,22 @@ impl From<CommandEvent> for TestEvent {
         }
     }
 }
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ObserveEvent {
+    CommandStartedEvent,
+    CommandSucceededEvent,
+    CommandFailedEvent,
+}
+
+impl ObserveEvent {
+    pub fn matches(&self, event: &CommandEvent) -> bool {
+        match (self, event) {
+            (Self::CommandStartedEvent, CommandEvent::Started(_)) => true,
+            (Self::CommandSucceededEvent, CommandEvent::Succeeded(_)) => true,
+            (Self::CommandFailedEvent, CommandEvent::Failed(_)) => true,
+            _ => false,
+        }
+    }
+}

@@ -7,7 +7,7 @@ use crate::{
     bson::{Bson, Document},
     client::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     event::command::CommandStartedEvent,
-    test::{CommandEvent, EventHandler},
+    test::{CommandEvent, EventHandler, spec::unified_runner::ObserveEvent},
     Client,
     ClientSession,
     Collection,
@@ -28,7 +28,7 @@ pub enum Entity {
 pub struct ClientEntity {
     client: Client,
     observer: Arc<EventHandler>,
-    observe_events: Option<Vec<String>>,
+    observe_events: Option<Vec<ObserveEvent>>,
     ignore_command_names: Option<Vec<String>>,
     observe_sensitive_commands: bool,
 }
@@ -43,7 +43,7 @@ impl ClientEntity {
     pub fn new(
         client: Client,
         observer: Arc<EventHandler>,
-        observe_events: Option<Vec<String>>,
+        observe_events: Option<Vec<ObserveEvent>>,
         ignore_command_names: Option<Vec<String>>,
         observe_sensitive_commands: bool,
     ) -> Self {
@@ -65,11 +65,7 @@ impl ClientEntity {
                 return false;
             }
             if let Some(observe_events) = self.observe_events.as_ref() {
-                if !observe_events.iter().any(|name| match event {
-                    CommandEvent::Started(_) => name.as_str() == "commandStartedEvent",
-                    CommandEvent::Succeeded(_) => name.as_str() == "commandSucceededEvent",
-                    CommandEvent::Failed(_) => name.as_str() == "commandFailedEvent",
-                }) {
+                if !observe_events.iter().any(|observe| observe.matches(event)) {
                     return false;
                 }
             }

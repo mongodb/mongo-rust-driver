@@ -3,7 +3,7 @@ use std::time::Duration;
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Deserializer};
 
-use super::{Operation, TestEvent};
+use super::{Operation, TestEvent, ObserveEvent, results_match};
 
 use crate::{
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
@@ -20,7 +20,7 @@ use crate::{
         SelectionCriteria,
         WriteConcern,
     },
-    test::{spec::unified_runner::results_match, Serverless, TestClient, DEFAULT_URI, SERVERLESS},
+    test::{Serverless, TestClient, DEFAULT_URI, SERVERLESS},
 };
 
 #[derive(Debug, Deserialize)]
@@ -143,7 +143,7 @@ pub struct Client {
     )]
     pub uri: String,
     pub use_multiple_mongoses: Option<bool>,
-    pub observe_events: Option<Vec<String>>,
+    pub observe_events: Option<Vec<ObserveEvent>>,
     pub ignore_command_monitoring_events: Option<Vec<String>>,
     #[serde(default)]
     pub observe_sensitive_commands: Option<bool>,
