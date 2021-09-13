@@ -7,7 +7,7 @@ use crate::{
     bson::{Bson, Document},
     client::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     event::command::CommandStartedEvent,
-    test::{CommandEvent, EventHandler, spec::unified_runner::ObserveEvent},
+    test::{CommandEvent, Event, EventHandler, spec::unified_runner::{ExpectedEventType, ObserveEvent}},
     Client,
     ClientSession,
     Collection,
@@ -59,40 +59,49 @@ impl ClientEntity {
     /// Gets a list of all of the events of the requested event types that occurred on this client.
     /// Ignores any event with a name in the ignore list. Also ignores all configureFailPoint
     /// events.
-    pub fn get_filtered_events(&self) -> Vec<CommandEvent> {
-        self.observer.get_filtered_command_events(|event| {
-            if event.command_name() == "configureFailPoint" {
-                return false;
+    pub fn get_filtered_events(&self, expected_type: ExpectedEventType) -> Vec<Event> {
+        self.observer.get_filtered_events(expected_type, |event| {
+            if let Event::Command(cev) = event {
+                if !self.allow_command_event(cev) {
+                    return false;
+                }
             }
             if let Some(observe_events) = self.observe_events.as_ref() {
                 if !observe_events.iter().any(|observe| observe.matches(event)) {
                     return false;
                 }
             }
-            if let Some(ignore_command_names) = self.ignore_command_names.as_ref() {
-                if ignore_command_names
-                    .iter()
-                    .any(|name| event.command_name().eq_ignore_ascii_case(name))
-                {
-                    return false;
-                }
-            }
-            if !self.observe_sensitive_commands {
-                let lower_name = event.command_name().to_ascii_lowercase();
-                // If a hello command has been redacted, it's sensitive and the event should be
-                // ignored.
-                let is_sensitive_hello = HELLO_COMMAND_NAMES.contains(lower_name.as_str())
-                    && match event {
-                        CommandEvent::Started(ev) => ev.command.is_empty(),
-                        CommandEvent::Succeeded(ev) => ev.reply.is_empty(),
-                        CommandEvent::Failed(_) => false,
-                    };
-                if is_sensitive_hello || REDACTED_COMMANDS.contains(lower_name.as_str()) {
-                    return false;
-                }
-            }
             true
         })
+    }
+
+    fn allow_command_event(&self, event: &CommandEvent) -> bool {
+        if event.command_name() == "configureFailPoint" {
+            return false;
+        }
+        if let Some(ignore_command_names) = self.ignore_command_names.as_ref() {
+            if ignore_command_names
+                .iter()
+                .any(|name| event.command_name().eq_ignore_ascii_case(name))
+            {
+                return false;
+            }
+        }
+        if !self.observe_sensitive_commands {
+            let lower_name = event.command_name().to_ascii_lowercase();
+            // If a hello command has been redacted, it's sensitive and the event should be
+            // ignored.
+            let is_sensitive_hello = HELLO_COMMAND_NAMES.contains(lower_name.as_str())
+                && match event {
+                    CommandEvent::Started(ev) => ev.command.is_empty(),
+                    CommandEvent::Succeeded(ev) => ev.reply.is_empty(),
+                    CommandEvent::Failed(_) => false,
+                };
+            if is_sensitive_hello || REDACTED_COMMANDS.contains(lower_name.as_str()) {
+                return false;
+            }
+        }
+        true
     }
 
     /// Gets all events of type commandStartedEvent, excluding configureFailPoint events.

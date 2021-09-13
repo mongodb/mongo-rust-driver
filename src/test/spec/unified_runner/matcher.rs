@@ -3,7 +3,7 @@ use crate::{
     bson_util::get_int,
 };
 
-use super::{EntityMap, TestEvent};
+use super::{EntityMap, ExpectedEvent, ExpectedCommandEvent};
 
 pub fn results_match(
     actual: Option<&Bson>,
@@ -15,18 +15,29 @@ pub fn results_match(
 }
 
 pub fn events_match(
-    actual: &TestEvent,
-    expected: &TestEvent,
+    actual: &ExpectedEvent,
+    expected: &ExpectedEvent,
+    entities: Option<&EntityMap>,
+) -> bool {
+    match (actual, expected) {
+        (ExpectedEvent::Command(act), ExpectedEvent::Command(exp)) => command_events_match(act, exp, entities),
+        _ => false,
+    }
+}
+
+fn command_events_match(
+    actual: &ExpectedCommandEvent,
+    expected: &ExpectedCommandEvent,
     entities: Option<&EntityMap>,
 ) -> bool {
     match (actual, expected) {
         (
-            TestEvent::Started {
+            ExpectedCommandEvent::Started {
                 command_name: actual_command_name,
                 database_name: actual_database_name,
                 command: actual_command,
             },
-            TestEvent::Started {
+            ExpectedCommandEvent::Started {
                 command_name: expected_command_name,
                 database_name: expected_database_name,
                 command: expected_command,
@@ -53,11 +64,11 @@ pub fn events_match(
             }
         }
         (
-            TestEvent::Succeeded {
+            ExpectedCommandEvent::Succeeded {
                 command_name: actual_command_name,
                 reply: actual_reply,
             },
-            TestEvent::Succeeded {
+            ExpectedCommandEvent::Succeeded {
                 command_name: expected_command_name,
                 reply: expected_reply,
             },
@@ -78,10 +89,10 @@ pub fn events_match(
             }
         }
         (
-            TestEvent::Failed {
+            ExpectedCommandEvent::Failed {
                 command_name: actual_command_name,
             },
-            TestEvent::Failed {
+            ExpectedCommandEvent::Failed {
                 command_name: expected_command_name,
             },
         ) => match (expected_command_name, actual_command_name) {

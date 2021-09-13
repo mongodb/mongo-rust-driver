@@ -1,8 +1,26 @@
-use crate::{bson::Document, test::CommandEvent};
+use crate::{bson::Document, test::{Event, CommandEvent}};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, PartialEq)]
-pub enum TestEvent {
+#[serde(untagged)]
+pub enum ExpectedEvent {
+    Cmap,
+    Command(ExpectedCommandEvent),
+    Sdam,
+}
+
+impl From<Event> for ExpectedEvent {
+    fn from(event: Event) -> Self {
+        match event {
+            Event::Command(sub) => ExpectedEvent::Command(sub.into()),
+            Event::Cmap(_) => ExpectedEvent::Cmap,
+            Event::Sdam(_) => ExpectedEvent::Sdam,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+pub enum ExpectedCommandEvent {
     #[serde(rename = "commandStartedEvent")]
     Started {
         command_name: Option<String>,
@@ -18,18 +36,18 @@ pub enum TestEvent {
     Failed { command_name: Option<String> },
 }
 
-impl From<CommandEvent> for TestEvent {
+impl From<CommandEvent> for ExpectedCommandEvent {
     fn from(event: CommandEvent) -> Self {
         match event {
-            CommandEvent::Started(event) => TestEvent::Started {
+            CommandEvent::Started(event) => ExpectedCommandEvent::Started {
                 command_name: Some(event.command_name),
                 database_name: Some(event.db),
                 command: Some(event.command),
             },
-            CommandEvent::Failed(event) => TestEvent::Failed {
+            CommandEvent::Failed(event) => ExpectedCommandEvent::Failed {
                 command_name: Some(event.command_name),
             },
-            CommandEvent::Succeeded(event) => TestEvent::Succeeded {
+            CommandEvent::Succeeded(event) => ExpectedCommandEvent::Succeeded {
                 command_name: Some(event.command_name),
                 reply: Some(event.reply),
             },
@@ -46,11 +64,11 @@ pub enum ObserveEvent {
 }
 
 impl ObserveEvent {
-    pub fn matches(&self, event: &CommandEvent) -> bool {
+    pub fn matches(&self, event: &Event) -> bool {
         match (self, event) {
-            (Self::CommandStartedEvent, CommandEvent::Started(_)) => true,
-            (Self::CommandSucceededEvent, CommandEvent::Succeeded(_)) => true,
-            (Self::CommandFailedEvent, CommandEvent::Failed(_)) => true,
+            (Self::CommandStartedEvent, Event::Command(CommandEvent::Started(_))) => true,
+            (Self::CommandSucceededEvent, Event::Command(CommandEvent::Succeeded(_))) => true,
+            (Self::CommandFailedEvent, Event::Command(CommandEvent::Failed(_))) => true,
             _ => false,
         }
     }

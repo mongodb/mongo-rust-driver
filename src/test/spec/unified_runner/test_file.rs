@@ -3,7 +3,7 @@ use std::time::Duration;
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Deserializer};
 
-use super::{Operation, TestEvent, ObserveEvent, results_match};
+use super::{Operation, ExpectedEvent, ObserveEvent, results_match};
 
 use crate::{
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
@@ -313,7 +313,15 @@ pub struct TestCase {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ExpectedEvents {
     pub client: String,
-    pub events: Vec<TestEvent>,
+    pub events: Vec<ExpectedEvent>,
+    pub event_type: Option<ExpectedEventType>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub enum ExpectedEventType {
+    Command,
+    Cmap,
 }
 
 #[derive(Debug, Deserialize)]

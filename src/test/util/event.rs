@@ -47,7 +47,7 @@ use crate::{
         },
     },
     options::ClientOptions,
-    test::{CLIENT_OPTIONS, LOCK},
+    test::{CLIENT_OPTIONS, LOCK, spec::ExpectedEventType},
     RUNTIME,
 };
 
@@ -179,12 +179,22 @@ impl EventHandler {
             .collect()
     }
 
-    pub fn get_filtered_command_events<F>(&self, filter: F) -> Vec<CommandEvent>
+    pub fn get_filtered_events<F>(&self, event_type: ExpectedEventType, filter: F) -> Vec<Event>
     where
-        F: Fn(&CommandEvent) -> bool,
+        F: Fn(&Event) -> bool,
     {
-        let events = self.command_events.read().unwrap();
-        events.iter().filter(|e| filter(*e)).cloned().collect()
+        match event_type {
+            ExpectedEventType::Command => {
+                let events = self.command_events.read().unwrap();
+                events
+                    .iter()
+                    .cloned()
+                    .map(|e| Event::Command(e))
+                    .filter(|e| filter(e))
+                    .collect()
+            }
+            _ => todo!(),
+        }
     }
 
     pub fn get_all_sdam_events(&self) -> Vec<SdamEvent> {

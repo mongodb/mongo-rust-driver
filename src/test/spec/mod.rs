@@ -28,7 +28,7 @@ use std::{
 };
 
 pub use self::{
-    unified_runner::{deserialize_uri_options_to_uri_string, run_unified_format_test, Topology},
+    unified_runner::{deserialize_uri_options_to_uri_string, run_unified_format_test, Topology, ExpectedEventType},
     v2_runner::{operation::Operation, run_v2_test, test_file::RunOn},
 };
 

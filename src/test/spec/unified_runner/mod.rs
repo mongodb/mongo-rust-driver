@@ -22,11 +22,12 @@ pub use self::{
     entity::{ClientEntity, Entity, SessionEntity},
     matcher::{events_match, results_match},
     operation::{Operation, OperationObject},
-    test_event::{TestEvent, ObserveEvent},
+    test_event::{ExpectedEvent, ExpectedCommandEvent, ObserveEvent},
     test_file::{
         deserialize_uri_options_to_uri_string,
         CollectionData,
         ExpectError,
+        ExpectedEventType,
         TestFile,
         TestFileEntity,
         Topology,
@@ -222,9 +223,10 @@ pub async fn run_unified_format_test(test_file: TestFile) {
             for expected in events {
                 let entity = test_runner.entities.get(&expected.client).unwrap();
                 let client = entity.as_client();
+                let event_type = expected.event_type.unwrap_or(test_file::ExpectedEventType::Command);
 
-                let actual_events: Vec<TestEvent> = client
-                    .get_filtered_events()
+                let actual_events: Vec<ExpectedEvent> = client
+                    .get_filtered_events(event_type)
                     .into_iter()
                     .map(Into::into)
                     .collect();
