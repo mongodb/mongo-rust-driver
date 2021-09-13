@@ -120,6 +120,7 @@ pub struct EventHandler {
     command_events: EventQueue<CommandEvent>,
     pub pool_cleared_events: EventQueue<PoolClearedEvent>,
     sdam_events: EventQueue<SdamEvent>,
+    cmap_events: EventQueue<CmapEvent>,
     event_broadcaster: tokio::sync::broadcast::Sender<Event>,
 }
 
@@ -130,6 +131,7 @@ impl EventHandler {
             command_events: Default::default(),
             pool_cleared_events: Default::default(),
             sdam_events: Default::default(),
+            cmap_events: Default::default(),
             event_broadcaster,
         }
     }
@@ -193,7 +195,15 @@ impl EventHandler {
                     .filter(|e| filter(e))
                     .collect()
             }
-            _ => todo!(),
+            ExpectedEventType::Cmap => {
+                let events = self.cmap_events.read().unwrap();
+                events
+                    .iter()
+                    .cloned()
+                    .map(|e| Event::Cmap(e))
+                    .filter(|e| filter(e))
+                    .collect()
+            }
         }
     }
 
@@ -204,48 +214,70 @@ impl EventHandler {
 
 impl CmapEventHandler for EventHandler {
     fn handle_connection_checked_out_event(&self, event: ConnectionCheckedOutEvent) {
-        self.handle(CmapEvent::ConnectionCheckedOut(event))
+        let event = CmapEvent::ConnectionCheckedOut(event);
+        self.handle(event.clone());
+        self.cmap_events.write().unwrap().push_back(event);
     }
 
     fn handle_connection_checkout_failed_event(&self, event: ConnectionCheckoutFailedEvent) {
-        self.handle(CmapEvent::ConnectionCheckOutFailed(event))
+        let event = CmapEvent::ConnectionCheckOutFailed(event);
+        self.handle(event.clone());
+        self.cmap_events.write().unwrap().push_back(event);
     }
 
-    fn handle_pool_cleared_event(&self, event: PoolClearedEvent) {
-        self.handle(CmapEvent::PoolCleared(event.clone()));
-        self.pool_cleared_events.write().unwrap().push_back(event);
+    fn handle_pool_cleared_event(&self, pool_cleared_event: PoolClearedEvent) {
+        let event = CmapEvent::PoolCleared(pool_cleared_event.clone());
+        self.handle(event.clone());
+        self.pool_cleared_events.write().unwrap().push_back(pool_cleared_event);
+        self.cmap_events.write().unwrap().push_back(event);
     }
 
     fn handle_pool_ready_event(&self, event: PoolReadyEvent) {
-        self.handle(CmapEvent::PoolReady(event))
+        let event = CmapEvent::PoolReady(event);
+        self.handle(event.clone());
+        self.cmap_events.write().unwrap().push_back(event);
     }
 
     fn handle_pool_created_event(&self, event: PoolCreatedEvent) {
-        self.handle(CmapEvent::PoolCreated(event));
+        let event = CmapEvent::PoolCreated(event);
+        self.handle(event.clone());
+        self.cmap_events.write().unwrap().push_back(event);
     }
 
     fn handle_pool_closed_event(&self, event: PoolClosedEvent) {
-        self.handle(CmapEvent::PoolClosed(event))
+        let event = CmapEvent::PoolClosed(event);
+        self.handle(event.clone());
+        self.cmap_events.write().unwrap().push_back(event);
     }
 
     fn handle_connection_created_event(&self, event: ConnectionCreatedEvent) {
-        self.handle(CmapEvent::ConnectionCreated(event))
+        let event = CmapEvent::ConnectionCreated(event);
+        self.handle(event.clone());
+        self.cmap_events.write().unwrap().push_back(event);
     }
 
     fn handle_connection_ready_event(&self, event: ConnectionReadyEvent) {
-        self.handle(CmapEvent::ConnectionReady(event))
+        let event = CmapEvent::ConnectionReady(event);
+        self.handle(event.clone());
+        self.cmap_events.write().unwrap().push_back(event);
     }
 
     fn handle_connection_closed_event(&self, event: ConnectionClosedEvent) {
-        self.handle(CmapEvent::ConnectionClosed(event))
+        let event = CmapEvent::ConnectionClosed(event);
+        self.handle(event.clone());
+        self.cmap_events.write().unwrap().push_back(event);
     }
 
     fn handle_connection_checkout_started_event(&self, event: ConnectionCheckoutStartedEvent) {
-        self.handle(CmapEvent::ConnectionCheckOutStarted(event))
+        let event = CmapEvent::ConnectionCheckOutStarted(event);
+        self.handle(event.clone());
+        self.cmap_events.write().unwrap().push_back(event);
     }
 
     fn handle_connection_checked_in_event(&self, event: ConnectionCheckedInEvent) {
-        self.handle(CmapEvent::ConnectionCheckedIn(event))
+        let event = CmapEvent::ConnectionCheckedIn(event);
+        self.handle(event.clone());
+        self.cmap_events.write().unwrap().push_back(event);
     }
 }
 
