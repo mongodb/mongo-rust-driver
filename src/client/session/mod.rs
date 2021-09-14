@@ -110,7 +110,7 @@ pub struct ClientSession {
     pub(crate) snapshot_time: Option<Timestamp>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct Transaction {
     pub(crate) state: TransactionState,
     pub(crate) options: Option<TransactionOptions>,
@@ -140,6 +140,15 @@ impl Transaction {
         self.options = None;
         self.pinned_mongos = None;
         self.recovery_token = None;
+    }
+
+    fn take(&mut self) -> Self {
+        Transaction {
+            state: self.state.clone(),
+            options: self.options.take(),
+            pinned_mongos: self.pinned_mongos.take(),
+            recovery_token: self.recovery_token.take(),
+        }
     }
 }
 
@@ -549,7 +558,7 @@ impl Drop for ClientSession {
                 client: self.client.clone(),
                 is_implicit: self.is_implicit,
                 options: self.options.clone(),
-                transaction: self.transaction.clone(),
+                transaction: self.transaction.take(),
                 snapshot_time: self.snapshot_time,
             };
             RUNTIME.execute(async move {
