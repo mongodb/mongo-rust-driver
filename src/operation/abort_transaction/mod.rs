@@ -3,7 +3,7 @@ use bson::Document;
 use crate::{
     bson::doc,
     client::session::TransactionPin,
-    cmap::{Command, StreamDescription},
+    cmap::{Command, conn::PinnedConnectionHandle, StreamDescription},
     error::Result,
     operation::{Operation, Retryability},
     options::WriteConcern,
@@ -62,6 +62,13 @@ impl Operation for AbortTransaction {
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
         match &self.pinned {
             Some(TransactionPin::Mongos(s)) => Some(s),
+            _ => None,
+        }
+    }
+
+    fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
+        match &self.pinned {
+            Some(TransactionPin::Connection(h)) => Some(h),
             _ => None,
         }
     }

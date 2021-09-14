@@ -14,6 +14,7 @@ use uuid::Uuid;
 
 use crate::{
     bson::{doc, spec::BinarySubtype, Binary, Bson, Document, Timestamp},
+    cmap::conn::PinnedConnectionHandle,
     error::{ErrorKind, Result},
     operation::{AbortTransaction, CommitTransaction, Operation},
     options::{SessionOptions, TransactionOptions},
@@ -149,6 +150,13 @@ impl Transaction {
         }
     }
 
+    pub(crate) fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
+        match &self.pinned {
+            Some(TransactionPin::Connection(c)) => Some(c),
+            _ => None,
+        }
+    }
+
     fn take(&mut self) -> Self {
         Transaction {
             state: self.state.clone(),
@@ -187,6 +195,7 @@ pub(crate) enum TransactionState {
 #[derive(Debug)]
 pub(crate) enum TransactionPin {
     Mongos(SelectionCriteria),
+    Connection(PinnedConnectionHandle),
 }
 
 impl ClientSession {
@@ -280,6 +289,11 @@ impl ClientSession {
         self.transaction.pinned = Some(TransactionPin::Mongos(SelectionCriteria::Predicate(Arc::new(
             move |server_info: &ServerInfo| *server_info.address() == address,
         ))));
+    }
+
+    /// Pin the connection to the session.
+    pub(crate) fn pin_connection(&mut self, handle: PinnedConnectionHandle) {
+        self.transaction.pinned = Some(TransactionPin::Connection(handle));
     }
 
     pub(crate) fn unpin(&mut self) {
