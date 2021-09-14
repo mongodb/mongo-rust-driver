@@ -1056,7 +1056,7 @@ impl TestOperation for AssertSessionPinned {
         session: &'a mut ClientSession,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            assert!(session.transaction.pinned_mongos.is_some());
+            assert!(session.transaction.pinned_mongos().is_some());
             Ok(None)
         }
         .boxed()
@@ -1072,7 +1072,7 @@ impl TestOperation for AssertSessionUnpinned {
         session: &'a mut ClientSession,
     ) -> BoxFuture<'a, Result<Option<Bson>>> {
         async move {
-            assert!(session.transaction.pinned_mongos.is_none());
+            assert!(session.transaction.pinned_mongos().is_none());
             Ok(None)
         }
         .boxed()

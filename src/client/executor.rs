@@ -205,7 +205,7 @@ impl Client {
 
         let selection_criteria = session
             .as_ref()
-            .and_then(|s| s.transaction.pinned_mongos.as_ref())
+            .and_then(|s| s.transaction.pinned_mongos())
             .or_else(|| op.selection_criteria());
 
         let server = match self.select_server(selection_criteria).await {
@@ -816,7 +816,7 @@ impl Error {
             if self.contains_label(TRANSIENT_TRANSACTION_ERROR)
                 || self.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT)
             {
-                session.unpin_mongos();
+                session.unpin();
             }
         }
 

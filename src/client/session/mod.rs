@@ -114,7 +114,7 @@ pub struct ClientSession {
 pub(crate) struct Transaction {
     pub(crate) state: TransactionState,
     pub(crate) options: Option<TransactionOptions>,
-    pub(crate) pinned_mongos: Option<SelectionCriteria>,
+    pub(crate) pinned: Option<TransactionPin>,
     pub(crate) recovery_token: Option<Document>,
 }
 
@@ -132,21 +132,28 @@ impl Transaction {
     pub(crate) fn abort(&mut self) {
         self.state = TransactionState::Aborted;
         self.options = None;
-        self.pinned_mongos = None;
+        self.pinned = None;
     }
 
     pub(crate) fn reset(&mut self) {
         self.state = TransactionState::None;
         self.options = None;
-        self.pinned_mongos = None;
+        self.pinned = None;
         self.recovery_token = None;
+    }
+
+    pub(crate) fn pinned_mongos(&self) -> Option<&SelectionCriteria> {
+        match &self.pinned {
+            Some(TransactionPin::Mongos(s)) => Some(s),
+            _ => None,
+        }
     }
 
     fn take(&mut self) -> Self {
         Transaction {
             state: self.state.clone(),
             options: self.options.take(),
-            pinned_mongos: self.pinned_mongos.take(),
+            pinned: self.pinned.take(),
             recovery_token: self.recovery_token.take(),
         }
     }
@@ -157,7 +164,7 @@ impl Default for Transaction {
         Self {
             state: TransactionState::None,
             options: None,
-            pinned_mongos: None,
+            pinned: None,
             recovery_token: None,
         }
     }
@@ -175,6 +182,11 @@ pub(crate) enum TransactionState {
         data_committed: bool,
     },
     Aborted,
+}
+
+#[derive(Debug)]
+pub(crate) enum TransactionPin {
+    Mongos(SelectionCriteria),
 }
 
 impl ClientSession {
@@ -265,13 +277,13 @@ impl ClientSession {
 
     /// Pin mongos to session.
     pub(crate) fn pin_mongos(&mut self, address: ServerAddress) {
-        self.transaction.pinned_mongos = Some(SelectionCriteria::Predicate(Arc::new(
+        self.transaction.pinned = Some(TransactionPin::Mongos(SelectionCriteria::Predicate(Arc::new(
             move |server_info: &ServerInfo| *server_info.address() == address,
-        )));
+        ))));
     }
 
-    pub(crate) fn unpin_mongos(&mut self) {
-        self.transaction.pinned_mongos = None;
+    pub(crate) fn unpin(&mut self) {
+        self.transaction.pinned = None;
     }
 
     /// Whether this session is dirty.
@@ -328,7 +340,7 @@ impl ClientSession {
                 .into());
             }
             TransactionState::Committed { .. } => {
-                self.unpin_mongos(); // Unpin session if previous transaction is committed.
+                self.unpin(); // Unpin session if previous transaction is committed.
             }
             _ => {}
         }
@@ -504,8 +516,7 @@ impl ClientSession {
                     .as_ref()
                     .and_then(|options| options.write_concern.as_ref())
                     .cloned();
-                let selection_criteria = self.transaction.pinned_mongos.clone();
-                let abort_transaction = AbortTransaction::new(write_concern, selection_criteria);
+                let abort_transaction = AbortTransaction::new(write_concern, self.transaction.pinned.take());
                 self.transaction.abort();
                 // Errors returned from running an abortTransaction command should be ignored.
                 let _result = self
