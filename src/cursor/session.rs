@@ -8,16 +8,23 @@ use futures_core::{future::BoxFuture, Stream};
 use futures_util::StreamExt;
 use serde::de::DeserializeOwned;
 
-use super::common::{CursorInformation, GenericCursor, GetMoreProvider, GetMoreProviderResult};
+use super::common::{
+    kill_cursor,
+    CursorInformation,
+    GenericCursor,
+    GetMoreProvider,
+    GetMoreProviderResult,
+    PinnedConnection,
+};
 use crate::{
     bson::Document,
+    cmap::conn::PinnedConnectionHandle,
     cursor::CursorSpecification,
     error::{Error, Result},
     operation::GetMore,
     results::GetMoreResult,
     Client,
     ClientSession,
-    RUNTIME,
 };
 
 /// A [`SessionCursor`] is a cursor that was created with a [`ClientSession`] that must be iterated
@@ -56,13 +63,18 @@ where
     client: Client,
     info: CursorInformation,
     buffer: VecDeque<T>,
+    pinned_connection: PinnedConnection,
 }
 
 impl<T> SessionCursor<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
-    pub(crate) fn new(client: Client, spec: CursorSpecification<T>) -> Self {
+    pub(crate) fn new(
+        client: Client,
+        spec: CursorSpecification<T>,
+        pinned: Option<PinnedConnectionHandle>,
+    ) -> Self {
         let exhausted = spec.id() == 0;
 
         Self {
@@ -70,6 +82,7 @@ where
             client,
             info: spec.info,
             buffer: spec.initial_buffer,
+            pinned_connection: PinnedConnection::new(pinned),
         }
     }
 
@@ -131,6 +144,7 @@ where
             generic_cursor: ExplicitSessionCursor::new(
                 self.client.clone(),
                 spec,
+                self.pinned_connection.replicate(),
                 get_more_provider,
             ),
             session_cursor: self,
@@ -174,13 +188,12 @@ where
             return;
         }
 
-        let ns = &self.info.ns;
-        let coll = self
-            .client
-            .database(ns.db.as_str())
-            .collection::<Document>(ns.coll.as_str());
-        let cursor_id = self.info.id;
-        RUNTIME.execute(async move { coll.kill_cursor(cursor_id).await });
+        kill_cursor(
+            self.client.clone(),
+            &self.info.ns,
+            self.info.id,
+            self.pinned_connection.replicate(),
+        );
     }
 }
 
@@ -255,7 +268,7 @@ impl<'session, T: Send + Sync + DeserializeOwned> GetMoreProvider
     fn executing_future(&mut self) -> Option<&mut Self::GetMoreFuture> {
         match self {
             Self::Executing(future) => Some(future),
-            Self::Idle(_) => None,
+            Self::Idle { .. } => None,
         }
     }
 
@@ -263,11 +276,17 @@ impl<'session, T: Send + Sync + DeserializeOwned> GetMoreProvider
         *self = Self::Idle(MutableSessionReference { reference: session })
     }
 
-    fn start_execution(&mut self, info: CursorInformation, client: Client) {
+    fn start_execution(
+        &mut self,
+        info: CursorInformation,
+        client: Client,
+        pinned_connection: Option<&PinnedConnectionHandle>,
+    ) {
         take_mut::take(self, |self_| {
             if let ExplicitSessionGetMoreProvider::Idle(session) = self_ {
+                let pinned_connection = pinned_connection.map(|c| c.replicate());
                 let future = Box::pin(async move {
-                    let get_more = GetMore::new(info);
+                    let get_more = GetMore::new(info, pinned_connection.as_ref());
                     let get_more_result = client
                         .execute_operation(get_more, Some(&mut *session.reference))
                         .await;

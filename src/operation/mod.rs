@@ -32,7 +32,7 @@ use crate::{
     bson::{self, Bson, Document},
     bson_util,
     client::{ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
-    cmap::{Command, RawCommandResponse, StreamDescription},
+    cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::{
         BulkWriteError,
         BulkWriteFailure,
@@ -136,6 +136,10 @@ pub(crate) trait Operation {
 
     /// Updates this operation as needed for a retry.
     fn update_for_retry(&mut self) {}
+
+    fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
+        None
+    }
 
     fn name(&self) -> &str {
         Self::NAME

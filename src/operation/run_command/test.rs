@@ -11,7 +11,7 @@ use crate::{
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build() {
-    let mut op = RunCommand::new("foo".into(), doc! { "isMaster": 1 }, None).unwrap();
+    let mut op = RunCommand::new("foo".into(), doc! { "isMaster": 1 }, None, None).unwrap();
     assert!(op.selection_criteria().is_none());
 
     let command = op.build(&StreamDescription::new_testing()).unwrap();
@@ -30,7 +30,7 @@ async fn build() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success() {
-    let op = RunCommand::new("foo".into(), doc! { "hello": 1 }, None).unwrap();
+    let op = RunCommand::new("foo".into(), doc! { "hello": 1 }, None, None).unwrap();
 
     let doc = doc! {
         "ok": 1,

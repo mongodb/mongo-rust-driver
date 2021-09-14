@@ -10,12 +10,15 @@ use futures_core::{Future, Stream};
 use serde::de::DeserializeOwned;
 
 use crate::{
+    bson::Document,
+    cmap::conn::PinnedConnectionHandle,
     error::{Error, ErrorKind, Result},
     operation,
     options::ServerAddress,
     results::GetMoreResult,
     Client,
     Namespace,
+    RUNTIME,
 };
 
 /// An internal cursor that can be used in a variety of contexts depending on its `GetMoreProvider`.
@@ -31,6 +34,7 @@ where
     info: CursorInformation,
     buffer: VecDeque<T>,
     exhausted: bool,
+    pinned_connection: PinnedConnection,
 }
 
 impl<P, T> GenericCursor<P, T>
@@ -38,7 +42,12 @@ where
     P: GetMoreProvider<DocumentType = T>,
     T: DeserializeOwned,
 {
-    pub(super) fn new(client: Client, spec: CursorSpecification<T>, get_more_provider: P) -> Self {
+    pub(super) fn new(
+        client: Client,
+        spec: CursorSpecification<T>,
+        pinned_connection: PinnedConnection,
+        get_more_provider: P,
+    ) -> Self {
         let exhausted = spec.id() == 0;
         Self {
             exhausted,
@@ -46,6 +55,7 @@ where
             provider: get_more_provider,
             buffer: spec.initial_buffer,
             info: spec.info,
+            pinned_connection,
         }
     }
 
@@ -65,10 +75,15 @@ where
         &self.info.ns
     }
 
+    pub(super) fn pinned_connection(&self) -> &PinnedConnection {
+        &self.pinned_connection
+    }
+
     fn start_get_more(&mut self) {
         let info = self.info.clone();
         let client = self.client.clone();
-        self.provider.start_execution(info, client);
+        self.provider
+            .start_execution(info, client, self.pinned_connection.handle());
     }
 }
 
@@ -88,6 +103,18 @@ where
                     Poll::Ready(get_more_result) => {
                         let exhausted = get_more_result.exhausted();
                         let (result, session) = get_more_result.into_parts();
+                        if exhausted {
+                            // If the cursor is exhausted, the driver must return the pinned
+                            // connection to the pool.
+                            self.pinned_connection = PinnedConnection::Unpinned;
+                        }
+                        if let Err(e) = &result {
+                            if e.is_network_error() {
+                                // Flag the connection as invalid, preventing a killCursors command,
+                                // but leave the connection pinned.
+                                self.pinned_connection.invalidate();
+                            }
+                        }
 
                         self.exhausted = exhausted;
                         self.provider.clear_execution(session, exhausted);
@@ -99,12 +126,9 @@ where
 
             match self.buffer.pop_front() {
                 Some(doc) => {
-                    if self.buffer.is_empty() && !self.exhausted {
-                        self.start_get_more();
-                    }
                     return Poll::Ready(Some(Ok(doc)));
                 }
-                None if !self.exhausted => {
+                None if !self.exhausted && !self.pinned_connection.is_invalid() => {
                     self.start_get_more();
                 }
                 None => return Poll::Ready(None),
@@ -136,11 +160,16 @@ pub(super) trait GetMoreProvider: Unpin {
     );
 
     /// Start executing a new getMore if one isn't already in flight.
-    fn start_execution(&mut self, spec: CursorInformation, client: Client);
+    fn start_execution(
+        &mut self,
+        spec: CursorInformation,
+        client: Client,
+        pinned_connection: Option<&PinnedConnectionHandle>,
+    );
 }
 
 /// Trait describing results returned from a `GetMoreProvider`.
-pub(super) trait GetMoreProviderResult {
+pub(crate) trait GetMoreProviderResult {
     type Session;
     type DocumentType;
 
@@ -213,4 +242,75 @@ pub(crate) struct CursorInformation {
     pub(crate) id: i64,
     pub(crate) batch_size: Option<u32>,
     pub(crate) max_time: Option<Duration>,
+}
+
+#[derive(Debug)]
+pub(crate) enum PinnedConnection {
+    Valid(PinnedConnectionHandle),
+    Invalid(PinnedConnectionHandle),
+    Unpinned,
+}
+
+impl PinnedConnection {
+    pub(super) fn new(handle: Option<PinnedConnectionHandle>) -> Self {
+        match handle {
+            Some(h) => Self::Valid(h),
+            None => Self::Unpinned,
+        }
+    }
+
+    /// Make a new `PinnedConnection` that refers to the same connection as this one.
+    /// Use with care and only when "lending" a handle in a way that can't be expressed as a
+    /// normal borrow.
+    pub(crate) fn replicate(&self) -> Self {
+        match self {
+            Self::Valid(h) => Self::Valid(h.replicate()),
+            Self::Invalid(h) => Self::Invalid(h.replicate()),
+            Self::Unpinned => Self::Unpinned,
+        }
+    }
+
+    fn handle(&self) -> Option<&PinnedConnectionHandle> {
+        match self {
+            Self::Valid(h) | Self::Invalid(h) => Some(h),
+            Self::Unpinned => None,
+        }
+    }
+
+    fn is_invalid(&self) -> bool {
+        matches!(self, Self::Invalid(_))
+    }
+
+    async fn unpin(&self) {
+        if let Some(h) = self.handle() {
+            h.unpin_connection().await;
+        }
+    }
+
+    fn invalidate(&mut self) {
+        take_mut::take(self, |self_| {
+            if let Self::Valid(c) = self_ {
+                Self::Invalid(c)
+            } else {
+                self_
+            }
+        });
+    }
+}
+
+pub(super) fn kill_cursor(
+    client: Client,
+    ns: &Namespace,
+    cursor_id: i64,
+    pinned_conn: PinnedConnection,
+) {
+    let coll = client
+        .database(ns.db.as_str())
+        .collection::<Document>(ns.coll.as_str());
+    RUNTIME.execute(async move {
+        if !pinned_conn.is_invalid() {
+            let _ = coll.kill_cursor(cursor_id, pinned_conn.handle()).await;
+        }
+        pinned_conn.unpin().await;
+    });
 }

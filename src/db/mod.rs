@@ -7,6 +7,7 @@ use futures_util::stream::TryStreamExt;
 use crate::{
     bson::{Bson, Document},
     client::session::TransactionState,
+    cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
@@ -205,7 +206,6 @@ impl Database {
         self.client()
             .execute_cursor_operation(list_collections)
             .await
-            .map(|(spec, session)| Cursor::new(self.client().clone(), spec, session))
     }
 
     /// Gets information about each of the collections in the database using the provided
@@ -224,9 +224,8 @@ impl Database {
             options.into(),
         );
         self.client()
-            .execute_operation(list_collections, session)
+            .execute_session_cursor_operation(list_collections, session)
             .await
-            .map(|spec| SessionCursor::new(self.client().clone(), spec))
     }
 
     async fn list_collection_names_common(
@@ -258,8 +257,7 @@ impl Database {
         let cursor: Cursor<Document> = self
             .client()
             .execute_cursor_operation(list_collections)
-            .await
-            .map(|(spec, session)| Cursor::new(self.client().clone(), spec, session))?;
+            .await?;
 
         self.list_collection_names_common(cursor).await
     }
@@ -274,9 +272,8 @@ impl Database {
             ListCollections::new(self.name().to_string(), filter.into(), true, None);
         let mut cursor: SessionCursor<Document> = self
             .client()
-            .execute_operation(list_collections, Some(&mut *session))
-            .await
-            .map(|spec| SessionCursor::new(self.client().clone(), spec))?;
+            .execute_session_cursor_operation(list_collections, &mut *session)
+            .await?;
 
         self.list_collection_names_common(cursor.stream(session))
             .await
@@ -327,13 +324,19 @@ impl Database {
         self.create_collection_common(name, options, session).await
     }
 
-    async fn run_command_common(
+    pub(crate) async fn run_command_common(
         &self,
         command: Document,
         selection_criteria: impl Into<Option<SelectionCriteria>>,
         session: impl Into<Option<&mut ClientSession>>,
+        pinned_connection: Option<&PinnedConnectionHandle>,
     ) -> Result<Document> {
-        let operation = RunCommand::new(self.name().into(), command, selection_criteria.into())?;
+        let operation = RunCommand::new(
+            self.name().into(),
+            command,
+            selection_criteria.into(),
+            pinned_connection,
+        )?;
         self.client().execute_operation(operation, session).await
     }
 
@@ -347,7 +350,7 @@ impl Database {
         command: Document,
         selection_criteria: impl Into<Option<SelectionCriteria>>,
     ) -> Result<Document> {
-        self.run_command_common(command, selection_criteria, None)
+        self.run_command_common(command, selection_criteria, None, None)
             .await
     }
 
@@ -388,7 +391,7 @@ impl Database {
             }
             _ => {}
         }
-        self.run_command_common(command, selection_criteria, session)
+        self.run_command_common(command, selection_criteria, session, None)
             .await
     }
 
@@ -410,10 +413,7 @@ impl Database {
 
         let aggregate = Aggregate::new(self.name().to_string(), pipeline, options);
         let client = self.client();
-        client
-            .execute_cursor_operation(aggregate)
-            .await
-            .map(|(spec, session)| Cursor::new(client.clone(), spec, session))
+        client.execute_cursor_operation(aggregate).await
     }
 
     /// Runs an aggregation operation with the provided `ClientSession`.
@@ -436,8 +436,7 @@ impl Database {
         let aggregate = Aggregate::new(self.name().to_string(), pipeline, options);
         let client = self.client();
         client
-            .execute_operation(aggregate, session)
+            .execute_session_cursor_operation(aggregate, session)
             .await
-            .map(|spec| SessionCursor::new(client.clone(), spec))
     }
 }

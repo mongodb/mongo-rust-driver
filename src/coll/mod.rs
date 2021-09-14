@@ -18,6 +18,7 @@ use crate::{
     bson::{doc, to_document, Bson, Document},
     bson_util,
     client::session::TransactionState,
+    cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
     index::IndexModel,
@@ -260,10 +261,7 @@ impl<T> Collection<T> {
 
         let aggregate = Aggregate::new(self.namespace(), pipeline, options);
         let client = self.client();
-        client
-            .execute_cursor_operation(aggregate)
-            .await
-            .map(|(spec, session)| Cursor::new(client.clone(), spec, session))
+        client.execute_cursor_operation(aggregate).await
     }
 
     /// Runs an aggregation operation using the provided `ClientSession`.
@@ -284,9 +282,8 @@ impl<T> Collection<T> {
         let aggregate = Aggregate::new(self.namespace(), pipeline, options);
         let client = self.client();
         client
-            .execute_operation(aggregate, session)
+            .execute_session_cursor_operation(aggregate, session)
             .await
-            .map(|result| SessionCursor::new(client.clone(), result))
     }
 
     /// Estimates the number of documents in the collection using collection metadata.
@@ -613,10 +610,7 @@ impl<T> Collection<T> {
     ) -> Result<Cursor<IndexModel>> {
         let list_indexes = ListIndexes::new(self.namespace(), options.into());
         let client = self.client();
-        client
-            .execute_cursor_operation(list_indexes)
-            .await
-            .map(|(spec, session)| Cursor::new(client.clone(), spec, session))
+        client.execute_cursor_operation(list_indexes).await
     }
 
     /// Lists all indexes on this collection using the provided `ClientSession`.
@@ -628,9 +622,8 @@ impl<T> Collection<T> {
         let list_indexes = ListIndexes::new(self.namespace(), options.into());
         let client = self.client();
         client
-            .execute_operation(list_indexes, session)
+            .execute_session_cursor_operation(list_indexes, session)
             .await
-            .map(|spec| SessionCursor::new(client.clone(), spec))
     }
 
     async fn list_index_names_common(
@@ -777,17 +770,23 @@ impl<T> Collection<T> {
     }
 
     /// Kill the server side cursor that id corresponds to.
-    pub(super) async fn kill_cursor(&self, cursor_id: i64) -> Result<()> {
+    pub(super) async fn kill_cursor(
+        &self,
+        cursor_id: i64,
+        pinned_connection: Option<&PinnedConnectionHandle>,
+    ) -> Result<()> {
         let ns = self.namespace();
 
         self.client()
             .database(ns.db.as_str())
-            .run_command(
+            .run_command_common(
                 doc! {
                     "killCursors": ns.coll.as_str(),
                     "cursors": [cursor_id]
                 },
                 None,
+                None,
+                pinned_connection,
             )
             .await?;
         Ok(())
@@ -810,10 +809,7 @@ where
         let find = Find::<T>::new(self.namespace(), filter.into(), options);
         let client = self.client();
 
-        client
-            .execute_cursor_operation(find)
-            .await
-            .map(|(result, session)| Cursor::new(client.clone(), result, session))
+        client.execute_cursor_operation(find).await
     }
 
     /// Finds the documents in the collection matching `filter` using the provided `ClientSession`.
@@ -830,10 +826,7 @@ where
         let find = Find::<T>::new(self.namespace(), filter.into(), options);
         let client = self.client();
 
-        client
-            .execute_operation(find, session)
-            .await
-            .map(|result| SessionCursor::new(client.clone(), result))
+        client.execute_session_cursor_operation(find, session).await
     }
 
     /// Finds a single document in the collection matching `filter`.
