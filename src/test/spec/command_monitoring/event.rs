@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 use crate::{
     bson::Document,
-    test::{CommandEvent, Matchable},
+    test::{eq_matches, CommandEvent, MatchErrExt, Matchable},
 };
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -23,7 +23,7 @@ pub enum TestEvent {
 }
 
 impl Matchable for TestEvent {
-    fn content_matches(&self, actual: &TestEvent) -> bool {
+    fn content_matches(&self, actual: &TestEvent) -> Result<(), String> {
         match (self, actual) {
             (
                 TestEvent::Started {
@@ -37,9 +37,14 @@ impl Matchable for TestEvent {
                     command: expected_command,
                 },
             ) => {
-                actual_command_name == expected_command_name
-                    && actual_database_name == expected_database_name
-                    && actual_command.matches(expected_command)
+                eq_matches("command_name", actual_command_name, expected_command_name)?;
+                eq_matches(
+                    "database_name",
+                    actual_database_name,
+                    expected_database_name,
+                )?;
+                actual_command.matches(expected_command).prefix("command")?;
+                Ok(())
             }
             (
                 TestEvent::Succeeded {
@@ -51,7 +56,9 @@ impl Matchable for TestEvent {
                     reply: expected_reply,
                 },
             ) => {
-                actual_command_name == expected_command_name && actual_reply.matches(expected_reply)
+                eq_matches("command_name", actual_command_name, expected_command_name)?;
+                actual_reply.matches(expected_reply).prefix("reply")?;
+                Ok(())
             }
             (
                 TestEvent::Failed {
@@ -60,8 +67,8 @@ impl Matchable for TestEvent {
                 TestEvent::Failed {
                     command_name: expected_command_name,
                 },
-            ) => actual_command_name == expected_command_name,
-            _ => false,
+            ) => eq_matches("command_name", actual_command_name, expected_command_name),
+            _ => Err(format!("expected event {:?}, got {:?}", self, actual)),
         }
     }
 }

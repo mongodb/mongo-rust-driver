@@ -110,43 +110,8 @@ impl TestOperation for DeleteOne {
     }
 }
 
-// This struct is necessary because the command monitoring tests specify the options in a very old
-// way (SPEC-1519).
-#[derive(Debug, Deserialize, Default)]
-struct FindModifiers {
-    #[serde(rename = "$comment", default)]
-    comment: Option<String>,
-    #[serde(rename = "$hint", default)]
-    hint: Option<Hint>,
-    #[serde(
-        rename = "$maxTimeMS",
-        deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis",
-        default
-    )]
-    max_time: Option<Duration>,
-    #[serde(rename = "$min", default)]
-    min: Option<Document>,
-    #[serde(rename = "$max", default)]
-    max: Option<Document>,
-    #[serde(rename = "$returnKey", default)]
-    return_key: Option<bool>,
-    #[serde(rename = "$showDiskLoc", default)]
-    show_disk_loc: Option<bool>,
-}
-
-impl FindModifiers {
-    fn update_options(&self, options: &mut FindOptions) {
-        options.comment = self.comment.clone();
-        options.hint = self.hint.clone();
-        options.max_time = self.max_time;
-        options.min = self.min.clone();
-        options.max = self.max.clone();
-        options.return_key = self.return_key;
-        options.show_record_id = self.show_disk_loc;
-    }
-}
-
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(super) struct Find {
     filter: Option<Document>,
     #[serde(default)]
@@ -158,7 +123,23 @@ pub(super) struct Find {
     #[serde(default)]
     limit: Option<i64>,
     #[serde(default)]
-    modifiers: Option<FindModifiers>,
+    comment: Option<String>,
+    #[serde(default)]
+    hint: Option<Hint>,
+    #[serde(
+        rename = "maxTimeMS",
+        deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis",
+        default
+    )]
+    max_time: Option<Duration>,
+    #[serde(default)]
+    min: Option<Document>,
+    #[serde(default)]
+    max: Option<Document>,
+    #[serde(rename = "returnKey", default)]
+    return_key: Option<bool>,
+    #[serde(rename = "showRecordId", default)]
+    show_record_id: Option<bool>,
 }
 
 impl TestOperation for Find {
@@ -168,17 +149,20 @@ impl TestOperation for Find {
 
     fn execute(&self, collection: Collection<Document>) -> BoxFuture<Result<()>> {
         async move {
-            let mut options = FindOptions {
+            let options = FindOptions {
                 sort: self.sort.clone(),
                 skip: self.skip,
                 batch_size: self.batch_size.map(|i| i as u32),
                 limit: self.limit,
+                comment: self.comment.clone(),
+                hint: self.hint.clone(),
+                max_time: self.max_time,
+                min: self.min.clone(),
+                max: self.max.clone(),
+                return_key: self.return_key,
+                show_record_id: self.show_record_id,
                 ..Default::default()
             };
-
-            if let Some(ref modifiers) = self.modifiers {
-                modifiers.update_options(&mut options);
-            }
 
             let mut cursor = collection.find(self.filter.clone(), options).await?;
 

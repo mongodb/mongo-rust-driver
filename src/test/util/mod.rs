@@ -7,7 +7,7 @@ pub use self::{
     event::{CmapEvent, CommandEvent, Event, EventClient, EventHandler, SdamEvent},
     failpoint::{FailCommandOptions, FailPoint, FailPointGuard, FailPointMode},
     lock::TestLock,
-    matchable::{assert_matches, Matchable},
+    matchable::{assert_matches, eq_matches, MatchErrExt, Matchable},
 };
 
 use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
