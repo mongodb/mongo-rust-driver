@@ -3,7 +3,7 @@ use bson::Document;
 use crate::{
     bson::doc,
     client::session::TransactionPin,
-    cmap::{Command, conn::PinnedConnectionHandle, StreamDescription},
+    cmap::{conn::PinnedConnectionHandle, Command, StreamDescription},
     error::Result,
     operation::{Operation, Retryability},
     options::WriteConcern,
@@ -18,10 +18,7 @@ pub(crate) struct AbortTransaction {
 }
 
 impl AbortTransaction {
-    pub(crate) fn new(
-        write_concern: Option<WriteConcern>,
-        pinned: Option<TransactionPin>,
-    ) -> Self {
+    pub(crate) fn new(write_concern: Option<WriteConcern>, pinned: Option<TransactionPin>) -> Self {
         Self {
             write_concern,
             pinned,

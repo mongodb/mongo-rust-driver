@@ -286,9 +286,9 @@ impl ClientSession {
 
     /// Pin mongos to session.
     pub(crate) fn pin_mongos(&mut self, address: ServerAddress) {
-        self.transaction.pinned = Some(TransactionPin::Mongos(SelectionCriteria::Predicate(Arc::new(
-            move |server_info: &ServerInfo| *server_info.address() == address,
-        ))));
+        self.transaction.pinned = Some(TransactionPin::Mongos(SelectionCriteria::Predicate(
+            Arc::new(move |server_info: &ServerInfo| *server_info.address() == address),
+        )));
     }
 
     /// Pin the connection to the session.
@@ -530,7 +530,8 @@ impl ClientSession {
                     .as_ref()
                     .and_then(|options| options.write_concern.as_ref())
                     .cloned();
-                let abort_transaction = AbortTransaction::new(write_concern, self.transaction.pinned.take());
+                let abort_transaction =
+                    AbortTransaction::new(write_concern, self.transaction.pinned.take());
                 self.transaction.abort();
                 // Errors returned from running an abortTransaction command should be ignored.
                 let _result = self

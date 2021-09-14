@@ -160,7 +160,8 @@ impl Client {
     {
         let mut details = self.execute_operation_with_details(op, session).await?;
         let pinned = if details.output.connection.is_pinned() {
-            // Cursor operations on load-balanced transactions will be pinned via the transaction pin.
+            // Cursor operations on load-balanced transactions will be pinned via the transaction
+            // pin.
             None
         } else {
             self.pin_connection_for_cursor(&mut details.output)?
@@ -325,17 +326,19 @@ impl Client {
             }
         };
 
-        let session_pinned = session.as_ref().and_then(|s| s.transaction.pinned_connection());
+        let session_pinned = session
+            .as_ref()
+            .and_then(|s| s.transaction.pinned_connection());
         let mut conn = match (session_pinned, op.pinned_connection()) {
             (Some(c), None) | (None, Some(c)) => c.take_connection().await?,
             (Some(c), Some(_)) => {
-                // An operation executing in a transaction should never have a pinned connection, but in case
-                // it does, prefer the transaction's pin.
+                // An operation executing in a transaction should never have a pinned connection,
+                // but in case it does, prefer the transaction's pin.
                 if cfg!(debug_assertions) {
                     panic!("pinned operation executing in pinned transaction");
                 }
                 c.take_connection().await?
-            },
+            }
             (None, None) => match server.pool.check_out().await {
                 Ok(c) => c,
                 Err(_) => return Err(first_error),
