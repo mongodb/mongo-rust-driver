@@ -4,7 +4,7 @@ use futures::{future::BoxFuture, stream::TryStreamExt, FutureExt};
 use serde::{de::Deserializer, Deserialize};
 use tokio::sync::Mutex;
 
-use super::{Entity, ExpectError, TestRunner, FindCursor};
+use super::{Entity, ExpectError, FindCursor, TestRunner};
 
 use crate::{
     bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
@@ -93,6 +93,12 @@ impl<'de> Deserialize<'de> for OperationObject {
     }
 }
 
+fn deserialize_op<'de, 'a, T: 'a + Deserialize<'de> + TestOperation>(
+    value: Bson,
+) -> std::result::Result<Box<dyn TestOperation + 'a>, bson::de::Error> {
+    T::deserialize(BsonDeserializer::new(value)).map(|op| Box::new(op) as Box<dyn TestOperation>)
+}
+
 impl<'de> Deserialize<'de> for Operation {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
         #[derive(Debug, Deserialize)]
@@ -113,152 +119,66 @@ impl<'de> Deserialize<'de> for Operation {
 
         let definition = OperationDefinition::deserialize(deserializer)?;
         let boxed_op = match definition.name.as_str() {
-            "insertOne" => InsertOne::deserialize(BsonDeserializer::new(definition.arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "insertMany" => InsertMany::deserialize(BsonDeserializer::new(definition.arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "updateOne" => UpdateOne::deserialize(BsonDeserializer::new(definition.arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "updateMany" => UpdateMany::deserialize(BsonDeserializer::new(definition.arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "deleteMany" => DeleteMany::deserialize(BsonDeserializer::new(definition.arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "deleteOne" => DeleteOne::deserialize(BsonDeserializer::new(definition.arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "find" => Find::deserialize(BsonDeserializer::new(definition.arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "createFindCursor" => CreateFindCursor::deserialize(BsonDeserializer::new(definition.arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "aggregate" => Aggregate::deserialize(BsonDeserializer::new(definition.arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "distinct" => Distinct::deserialize(BsonDeserializer::new(definition.arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "countDocuments" => {
-                CountDocuments::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
+            "insertOne" => deserialize_op::<InsertOne>(definition.arguments),
+            "insertMany" => deserialize_op::<InsertMany>(definition.arguments),
+            "updateOne" => deserialize_op::<UpdateOne>(definition.arguments),
+            "updateMany" => deserialize_op::<UpdateMany>(definition.arguments),
+            "deleteMany" => deserialize_op::<DeleteMany>(definition.arguments),
+            "deleteOne" => deserialize_op::<DeleteOne>(definition.arguments),
+            "find" => deserialize_op::<Find>(definition.arguments),
+            "createFindCursor" => deserialize_op::<CreateFindCursor>(definition.arguments),
+            "aggregate" => deserialize_op::<Aggregate>(definition.arguments),
+            "distinct" => deserialize_op::<Distinct>(definition.arguments),
+            "countDocuments" => deserialize_op::<CountDocuments>(definition.arguments),
             "estimatedDocumentCount" => {
-                EstimatedDocumentCount::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+                deserialize_op::<EstimatedDocumentCount>(definition.arguments)
             }
-            "findOne" => FindOne::deserialize(BsonDeserializer::new(definition.arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "listDatabases" => {
-                ListDatabases::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "listDatabaseNames" => {
-                ListDatabaseNames::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "listCollections" => {
-                ListCollections::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "listCollectionNames" => {
-                ListCollectionNames::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "replaceOne" => ReplaceOne::deserialize(BsonDeserializer::new(definition.arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "findOneAndUpdate" => {
-                FindOneAndUpdate::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "findOneAndReplace" => {
-                FindOneAndReplace::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "findOneAndDelete" => {
-                FindOneAndDelete::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "failPoint" => {
-                FailPointCommand::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "targetedFailPoint" => {
-                TargetedFailPoint::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
+            "findOne" => deserialize_op::<FindOne>(definition.arguments),
+            "listDatabases" => deserialize_op::<ListDatabases>(definition.arguments),
+            "listDatabaseNames" => deserialize_op::<ListDatabaseNames>(definition.arguments),
+            "listCollections" => deserialize_op::<ListCollections>(definition.arguments),
+            "listCollectionNames" => deserialize_op::<ListCollectionNames>(definition.arguments),
+            "replaceOne" => deserialize_op::<ReplaceOne>(definition.arguments),
+            "findOneAndUpdate" => deserialize_op::<FindOneAndUpdate>(definition.arguments),
+            "findOneAndReplace" => deserialize_op::<FindOneAndReplace>(definition.arguments),
+            "findOneAndDelete" => deserialize_op::<FindOneAndDelete>(definition.arguments),
+            "failPoint" => deserialize_op::<FailPointCommand>(definition.arguments),
+            "targetedFailPoint" => deserialize_op::<TargetedFailPoint>(definition.arguments),
             "assertCollectionExists" => {
-                AssertCollectionExists::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+                deserialize_op::<AssertCollectionExists>(definition.arguments)
             }
             "assertCollectionNotExists" => {
-                AssertCollectionNotExists::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+                deserialize_op::<AssertCollectionNotExists>(definition.arguments)
             }
-            "createCollection" => {
-                CreateCollection::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            "createCollection" => deserialize_op::<CreateCollection>(definition.arguments),
+            "dropCollection" => deserialize_op::<DropCollection>(definition.arguments),
+            "runCommand" => deserialize_op::<RunCommand>(definition.arguments),
+            "endSession" => deserialize_op::<EndSession>(definition.arguments),
+            "assertSessionTransactionState" => {
+                deserialize_op::<AssertSessionTransactionState>(definition.arguments)
             }
-            "dropCollection" => {
-                DropCollection::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "runCommand" => RunCommand::deserialize(BsonDeserializer::new(definition.arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "endSession" => EndSession::deserialize(BsonDeserializer::new(definition.arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "assertSessionTransactionState" => AssertSessionTransactionState::deserialize(
-                BsonDeserializer::new(definition.arguments),
-            )
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "assertSessionPinned" => {
-                AssertSessionPinned::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
+            "assertSessionPinned" => deserialize_op::<AssertSessionPinned>(definition.arguments),
             "assertSessionUnpinned" => {
-                AssertSessionUnpinned::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+                deserialize_op::<AssertSessionUnpinned>(definition.arguments)
             }
             "assertDifferentLsidOnLastTwoCommands" => {
-                AssertDifferentLsidOnLastTwoCommands::deserialize(BsonDeserializer::new(
-                    definition.arguments,
-                ))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>)
+                deserialize_op::<AssertDifferentLsidOnLastTwoCommands>(definition.arguments)
             }
-            "assertSameLsidOnLastTwoCommands" => AssertSameLsidOnLastTwoCommands::deserialize(
-                BsonDeserializer::new(definition.arguments),
-            )
-            .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "assertSessionDirty" => {
-                AssertSessionDirty::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+            "assertSameLsidOnLastTwoCommands" => {
+                deserialize_op::<AssertSameLsidOnLastTwoCommands>(definition.arguments)
             }
+            "assertSessionDirty" => deserialize_op::<AssertSessionDirty>(definition.arguments),
             "assertSessionNotDirty" => {
-                AssertSessionNotDirty::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
+                deserialize_op::<AssertSessionNotDirty>(definition.arguments)
             }
-            "startTransaction" => {
-                StartTransaction::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "commitTransaction" => {
-                CommitTransaction::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "abortTransaction" => {
-                AbortTransaction::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "createIndex" => CreateIndex::deserialize(BsonDeserializer::new(definition.arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "listIndexes" => ListIndexes::deserialize(BsonDeserializer::new(definition.arguments))
-                .map(|op| Box::new(op) as Box<dyn TestOperation>),
-            "listIndexNames" => {
-                ListIndexNames::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "assertIndexExists" => {
-                AssertIndexExists::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
-            "assertIndexNotExists" => {
-                AssertIndexNotExists::deserialize(BsonDeserializer::new(definition.arguments))
-                    .map(|op| Box::new(op) as Box<dyn TestOperation>)
-            }
+            "startTransaction" => deserialize_op::<StartTransaction>(definition.arguments),
+            "commitTransaction" => deserialize_op::<CommitTransaction>(definition.arguments),
+            "abortTransaction" => deserialize_op::<AbortTransaction>(definition.arguments),
+            "createIndex" => deserialize_op::<CreateIndex>(definition.arguments),
+            "listIndexes" => deserialize_op::<ListIndexes>(definition.arguments),
+            "listIndexNames" => deserialize_op::<ListIndexNames>(definition.arguments),
+            "assertIndexExists" => deserialize_op::<AssertIndexExists>(definition.arguments),
+            "assertIndexNotExists" => deserialize_op::<AssertIndexNotExists>(definition.arguments),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -355,7 +275,11 @@ pub(super) struct Find {
 }
 
 impl Find {
-    async fn get_cursor<'a>(&'a self, id: &'a str, test_runner: &'a mut TestRunner) -> Result<FindCursor> {
+    async fn get_cursor<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a mut TestRunner,
+    ) -> Result<FindCursor> {
         let collection = test_runner.get_collection(id).clone();
         match &self.session {
             Some(session_id) => {
@@ -421,7 +345,8 @@ impl TestOperation for CreateFindCursor {
         async move {
             let cursor = self.find.get_cursor(id, test_runner).await?;
             Ok(Some(Entity::FindCursor(cursor)))
-        }.boxed()
+        }
+        .boxed()
     }
 
     fn returns_root_documents(&self) -> bool {
