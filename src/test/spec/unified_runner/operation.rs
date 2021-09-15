@@ -180,6 +180,7 @@ impl<'de> Deserialize<'de> for Operation {
             "assertIndexExists" => deserialize_op::<AssertIndexExists>(definition.arguments),
             "assertIndexNotExists" => deserialize_op::<AssertIndexNotExists>(definition.arguments),
             "iterateUntilDocumentOrError" => deserialize_op::<IterateUntilDocumentOrError>(definition.arguments),
+            "close" => deserialize_op::<Close>(definition.arguments),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -322,6 +323,7 @@ impl TestOperation for Find {
                     let cursor = cursor.into_inner();
                     cursor.try_collect::<Vec<Document>>().await?
                 }
+                FindCursor::Closed => panic!("get_cursor returned a closed cursor"),
             };
             Ok(Some(Bson::from(result).into()))
         }
@@ -1636,10 +1638,29 @@ impl TestOperation for IterateUntilDocumentOrError {
                     let session = test_runner.get_mut_session(session_id);
                     cursor.next(session).await
                 },
+                FindCursor::Closed => None,
             };
             test_runner.entities.insert(id.to_string(), Entity::FindCursor(cursor));
             next.transpose()
                 .map(|opt| opt.map(|doc| Entity::Bson(Bson::Document(doc))))
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct Close { }
+
+impl TestOperation for Close {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a mut TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            test_runner.entities.insert(id.to_string(), Entity::FindCursor(FindCursor::Closed));
+            Ok(None)
         }
         .boxed()
     }

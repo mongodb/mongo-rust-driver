@@ -54,6 +54,7 @@ pub enum FindCursor {
         cursor: SessionCursor<Document>,
         session_id: String,
     },
+    Closed,
 }
 
 impl ClientEntity {
