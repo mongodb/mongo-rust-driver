@@ -50,7 +50,10 @@ pub enum FindCursor {
     // `Sync`; however, `Cursor` is `!Sync` due to internally storing a `BoxFuture`, which only has
     // a `Send` bound.  Wrapping it in `Mutex` works around this.
     Normal(Mutex<Cursor<Document>>),
-    Session(SessionCursor<Document>),
+    Session {
+        cursor: SessionCursor<Document>,
+        session_id: String,
+    },
 }
 
 impl ClientEntity {
@@ -217,6 +220,13 @@ impl Entity {
         match self {
             Self::Bson(bson) => bson,
             _ => panic!("Expected BSON entity, got {:?}", &self),
+        }
+    }
+
+    pub fn into_find_cursor(self) -> FindCursor {
+        match self {
+            Self::FindCursor(cursor) => cursor,
+            _ => panic!("Expected find cursor, got {:?}", &self),
         }
     }
 }

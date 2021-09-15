@@ -1,6 +1,6 @@
 use std::{collections::HashMap, convert::TryInto, fmt::Debug, ops::Deref, time::Duration};
 
-use futures::{future::BoxFuture, stream::TryStreamExt, FutureExt};
+use futures::{future::BoxFuture, stream::{StreamExt, TryStreamExt}, FutureExt};
 use serde::{de::Deserializer, Deserialize};
 use tokio::sync::Mutex;
 
@@ -179,6 +179,7 @@ impl<'de> Deserialize<'de> for Operation {
             "listIndexNames" => deserialize_op::<ListIndexNames>(definition.arguments),
             "assertIndexExists" => deserialize_op::<AssertIndexExists>(definition.arguments),
             "assertIndexNotExists" => deserialize_op::<AssertIndexNotExists>(definition.arguments),
+            "iterateUntilDocumentOrError" => deserialize_op::<IterateUntilDocumentOrError>(definition.arguments),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -287,7 +288,10 @@ impl Find {
                 let cursor = collection
                     .find_with_session(self.filter.clone(), self.options.clone(), session)
                     .await?;
-                Ok(FindCursor::Session(cursor))
+                Ok(FindCursor::Session {
+                    cursor,
+                    session_id: session_id.clone(),
+                })
             }
             None => {
                 let cursor = collection
@@ -307,8 +311,8 @@ impl TestOperation for Find {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let result = match self.get_cursor(id, test_runner).await? {
-                FindCursor::Session(mut cursor) => {
-                    let session = test_runner.get_mut_session(self.session.as_ref().unwrap());
+                FindCursor::Session { mut cursor, session_id } => {
+                    let session = test_runner.get_mut_session(&session_id);
                     cursor
                         .stream(session)
                         .try_collect::<Vec<Document>>()
@@ -1604,6 +1608,38 @@ impl TestOperation for AssertIndexNotExists {
                 // a namespace not found error indicates that the index does not exist
                 Err(err) => assert_eq!(err.code(), Some(26)),
             }
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct IterateUntilDocumentOrError { }
+
+impl TestOperation for IterateUntilDocumentOrError {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a mut TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            // A `SessionCursor` also requires a `&mut Session`, which would cause conflicting
+            // borrows, so take the cursor from the map and return it after execution instead.
+            let mut cursor = test_runner.entities.remove(id).unwrap().into_find_cursor();
+            let next = match &mut cursor {
+                FindCursor::Normal(cursor) => {
+                    let mut cursor = cursor.lock().await;
+                    cursor.next().await
+                }
+                FindCursor::Session { cursor, session_id } => {
+                    let session = test_runner.get_mut_session(session_id);
+                    cursor.next(session).await
+                },
+            };
+            test_runner.entities.insert(id.to_string(), Entity::FindCursor(cursor));
+            next.transpose()
+                .map(|opt| opt.map(|doc| Entity::Bson(Bson::Document(doc))))
         }
         .boxed()
     }
