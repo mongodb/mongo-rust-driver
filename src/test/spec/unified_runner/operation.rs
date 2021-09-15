@@ -2,8 +2,9 @@ use std::{collections::HashMap, convert::TryInto, fmt::Debug, ops::Deref, time::
 
 use futures::{future::BoxFuture, stream::TryStreamExt, FutureExt};
 use serde::{de::Deserializer, Deserialize};
+use tokio::sync::Mutex;
 
-use super::{Entity, ExpectError, TestRunner};
+use super::{Entity, ExpectError, TestRunner, FindCursor};
 
 use crate::{
     bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
@@ -125,6 +126,8 @@ impl<'de> Deserialize<'de> for Operation {
             "deleteOne" => DeleteOne::deserialize(BsonDeserializer::new(definition.arguments))
                 .map(|op| Box::new(op) as Box<dyn TestOperation>),
             "find" => Find::deserialize(BsonDeserializer::new(definition.arguments))
+                .map(|op| Box::new(op) as Box<dyn TestOperation>),
+            "createFindCursor" => CreateFindCursor::deserialize(BsonDeserializer::new(definition.arguments))
                 .map(|op| Box::new(op) as Box<dyn TestOperation>),
             "aggregate" => Aggregate::deserialize(BsonDeserializer::new(definition.arguments))
                 .map(|op| Box::new(op) as Box<dyn TestOperation>),
@@ -351,6 +354,27 @@ pub(super) struct Find {
     options: FindOptions,
 }
 
+impl Find {
+    async fn get_cursor<'a>(&'a self, id: &'a str, test_runner: &'a mut TestRunner) -> Result<FindCursor> {
+        let collection = test_runner.get_collection(id).clone();
+        match &self.session {
+            Some(session_id) => {
+                let session = test_runner.get_mut_session(session_id);
+                let cursor = collection
+                    .find_with_session(self.filter.clone(), self.options.clone(), session)
+                    .await?;
+                Ok(FindCursor::Session(cursor))
+            }
+            None => {
+                let cursor = collection
+                    .find(self.filter.clone(), self.options.clone())
+                    .await?;
+                Ok(FindCursor::Normal(Mutex::new(cursor)))
+            }
+        }
+    }
+}
+
 impl TestOperation for Find {
     fn execute_entity_operation<'a>(
         &'a self,
@@ -358,28 +382,46 @@ impl TestOperation for Find {
         test_runner: &'a mut TestRunner,
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
-            let collection = test_runner.get_collection(id).clone();
-            let result = match &self.session {
-                Some(session_id) => {
-                    let session = test_runner.get_mut_session(session_id);
-                    let mut cursor = collection
-                        .find_with_session(self.filter.clone(), self.options.clone(), session)
-                        .await?;
+            let result = match self.get_cursor(id, test_runner).await? {
+                FindCursor::Session(mut cursor) => {
+                    let session = test_runner.get_mut_session(self.session.as_ref().unwrap());
                     cursor
                         .stream(session)
                         .try_collect::<Vec<Document>>()
                         .await?
                 }
-                None => {
-                    let cursor = collection
-                        .find(self.filter.clone(), self.options.clone())
-                        .await?;
+                FindCursor::Normal(cursor) => {
+                    let cursor = cursor.into_inner();
                     cursor.try_collect::<Vec<Document>>().await?
                 }
             };
             Ok(Some(Bson::from(result).into()))
         }
         .boxed()
+    }
+
+    fn returns_root_documents(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct CreateFindCursor {
+    #[serde(flatten)]
+    find: Find,
+}
+
+impl TestOperation for CreateFindCursor {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a mut TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let cursor = self.find.get_cursor(id, test_runner).await?;
+            Ok(Some(Entity::FindCursor(cursor)))
+        }.boxed()
     }
 
     fn returns_root_documents(&self) -> bool {

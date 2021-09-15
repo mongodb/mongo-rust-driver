@@ -3,6 +3,8 @@ use std::{
     sync::Arc,
 };
 
+use tokio::sync::Mutex;
+
 use crate::{
     bson::{Bson, Document},
     client::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
@@ -11,7 +13,9 @@ use crate::{
     Client,
     ClientSession,
     Collection,
+    Cursor,
     Database,
+    SessionCursor,
 };
 
 #[derive(Debug)]
@@ -20,6 +24,7 @@ pub enum Entity {
     Database(Database),
     Collection(Collection<Document>),
     Session(SessionEntity),
+    FindCursor(FindCursor),
     Bson(Bson),
     None,
 }
@@ -37,6 +42,15 @@ pub struct ClientEntity {
 pub struct SessionEntity {
     pub lsid: Document,
     pub client_session: Option<Box<ClientSession>>,
+}
+
+#[derive(Debug)]
+pub enum FindCursor {
+    // Due to https://github.com/rust-lang/rust/issues/59245, the `Entity` type is required to be
+    // `Sync`; however, `Cursor` is `!Sync` due to internally storing a `BoxFuture`, which only has
+    // a `Send` bound.  Wrapping it in `Mutex` works around this.
+    Normal(Mutex<Cursor<Document>>),
+    Session(SessionCursor<Document>),
 }
 
 impl ClientEntity {
