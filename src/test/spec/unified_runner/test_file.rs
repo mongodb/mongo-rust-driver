@@ -136,12 +136,7 @@ pub enum TestFileEntity {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Client {
     pub id: String,
-    #[serde(
-        default = "default_uri",
-        deserialize_with = "deserialize_uri_options_to_uri_string",
-        rename = "uriOptions"
-    )]
-    pub uri: String,
+    pub uri_options: Option<Document>,
     pub use_multiple_mongoses: Option<bool>,
     pub observe_events: Option<Vec<ObserveEvent>>,
     pub ignore_command_monitoring_events: Option<Vec<String>>,
@@ -149,10 +144,6 @@ pub struct Client {
     pub observe_sensitive_commands: Option<bool>,
     #[serde(default, deserialize_with = "deserialize_server_api_test_format")]
     pub server_api: Option<ServerApi>,
-}
-
-fn default_uri() -> String {
-    DEFAULT_URI.clone()
 }
 
 pub fn deserialize_server_api_test_format<'de, D>(
@@ -177,17 +168,14 @@ where
     }))
 }
 
-pub fn deserialize_uri_options_to_uri_string<'de, D>(
-    deserializer: D,
-) -> std::result::Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let uri_options = Document::deserialize(deserializer)?;
+pub fn merge_uri_options(given_uri: &str, uri_options: Option<&Document>) -> String {
+    let uri_options = match uri_options {
+        Some(opts) => opts,
+        None => return given_uri.to_string(),
+    };
+    let mut given_uri_parts = given_uri.split('?');
 
-    let mut default_uri_parts = DEFAULT_URI.split('?');
-
-    let mut uri = String::from(default_uri_parts.next().unwrap());
+    let mut uri = String::from(given_uri_parts.next().unwrap());
     // A connection string has two slashes before the host list and one slash before the auth db
     // name. If an auth db name is not provided the latter slash might not be present, so it needs
     // to be added manually.
@@ -196,7 +184,7 @@ where
     }
     uri.push('?');
 
-    if let Some(options) = default_uri_parts.next() {
+    if let Some(options) = given_uri_parts.next() {
         let options = options.split('&');
         for option in options {
             let key = option.split('=').next().unwrap();
@@ -219,7 +207,7 @@ where
     // remove the trailing '&' from the URI (or '?' if no options are present)
     uri.pop();
 
-    Ok(uri)
+    uri
 }
 
 #[derive(Debug, Deserialize)]
@@ -378,14 +366,13 @@ impl ExpectError {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn deserialize_uri_options() {
+async fn merged_uri_options() {
     let options = doc! {
         "ssl": true,
         "w": 2,
         "readconcernlevel": "local",
     };
-    let d = BsonDeserializer::new(options.into());
-    let uri = deserialize_uri_options_to_uri_string(d).unwrap();
+    let uri = merge_uri_options(&DEFAULT_URI, Some(&options));
     let options = ClientOptions::parse_uri(&uri, None).await.unwrap();
 
     assert!(options.tls_options().is_some());

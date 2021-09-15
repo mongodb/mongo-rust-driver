@@ -24,7 +24,7 @@ pub use self::{
     operation::{Operation, OperationObject},
     test_event::{ExpectedEvent, ExpectedCommandEvent, ObserveEvent},
     test_file::{
-        deserialize_uri_options_to_uri_string,
+        merge_uri_options,
         CollectionData,
         ExpectError,
         ExpectedEventType,

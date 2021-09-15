@@ -66,6 +66,8 @@ lazy_static! {
     };
     pub(crate) static ref SERVERLESS: bool =
         matches!(std::env::var("SERVERLESS"), Ok(s) if s == "serverless");
+    pub(crate) static ref LOAD_BALANCED_SINGLE_URI: Option<String> = std::env::var("MONGODB_LOAD_BALANCED_SINGLE_URI").ok();
+    pub(crate) static ref LOAD_BALANCED_MULTIPLE_URI: Option<String> = std::env::var("MONGODB_LOAD_BALANCED_MULTIPLE_URI").ok();
 }
 
 fn get_default_uri() -> String {

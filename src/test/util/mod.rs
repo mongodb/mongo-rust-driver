@@ -278,6 +278,10 @@ impl TestClient {
         self.server_info.msg.as_deref() == Some("isdbgrid")
     }
 
+    pub fn is_load_balanced(&self) -> bool {
+        self.options.load_balanced.unwrap_or(false)
+    }
+
     pub fn server_version_eq(&self, major: u64, minor: u64) -> bool {
         self.server_version.major == major && self.server_version.minor == minor
     }
@@ -310,8 +314,9 @@ impl TestClient {
     }
 
     pub async fn topology(&self) -> Topology {
-        // TODO RUST-653 Detect and report a `LoadBalanced` topology.
-        if self.is_sharded() {
+        if self.is_load_balanced() {
+            Topology::LoadBalanced
+        } else if self.is_sharded() {
             let shard_info = self
                 .database("config")
                 .collection::<Document>("shards")
@@ -335,7 +340,9 @@ impl TestClient {
     }
 
     pub fn topology_string(&self) -> String {
-        if self.is_sharded() {
+        if self.is_load_balanced() {
+            "load-balanced".to_string()
+        } else if self.is_sharded() {
             "sharded".to_string()
         } else if self.is_replica_set() {
             "replicaset".to_string()
