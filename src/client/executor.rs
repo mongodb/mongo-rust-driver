@@ -159,12 +159,22 @@ impl Client {
         T: DeserializeOwned + Unpin + Send + Sync,
     {
         let mut details = self.execute_operation_with_details(op, session).await?;
-        let pinned = self.pin_connection_for_cursor(&mut details.output)?;
+        let pinned = if details.output.connection.is_pinned() {
+            // Cursor operations on load-balanced transactions will be pinned via the transaction
+            // pin.
+            None
+        } else {
+            self.pin_connection_for_cursor(&mut details.output)?
+        };
         Ok(SessionCursor::new(
             self.clone(),
             details.output.operation_output,
             pinned,
         ))
+    }
+
+    fn is_load_balanced(&self) -> bool {
+        self.inner.options.load_balanced.unwrap_or(false)
     }
 
     fn pin_connection_for_cursor<Op, T>(
@@ -174,8 +184,7 @@ impl Client {
     where
         Op: Operation<O = CursorSpecification<T>>,
     {
-        let is_load_balanced = self.inner.options.load_balanced.unwrap_or(false);
-        if is_load_balanced && details.operation_output.info.id != 0 {
+        if self.is_load_balanced() && details.operation_output.info.id != 0 {
             Ok(Some(details.connection.pin()?))
         } else {
             Ok(None)
@@ -205,7 +214,7 @@ impl Client {
 
         let selection_criteria = session
             .as_ref()
-            .and_then(|s| s.transaction.pinned_mongos.as_ref())
+            .and_then(|s| s.transaction.pinned_mongos())
             .or_else(|| op.selection_criteria());
 
         let server = match self.select_server(selection_criteria).await {
@@ -317,9 +326,20 @@ impl Client {
             }
         };
 
-        let mut conn = match op.pinned_connection() {
-            Some(c) => c.take_connection().await?,
-            None => match server.pool.check_out().await {
+        let session_pinned = session
+            .as_ref()
+            .and_then(|s| s.transaction.pinned_connection());
+        let mut conn = match (session_pinned, op.pinned_connection()) {
+            (Some(c), None) | (None, Some(c)) => c.take_connection().await?,
+            (Some(c), Some(_)) => {
+                // An operation executing in a transaction should never have a pinned connection,
+                // but in case it does, prefer the transaction's pin.
+                if cfg!(debug_assertions) {
+                    panic!("pinned operation executing in pinned transaction");
+                }
+                c.take_connection().await?
+            }
+            (None, None) => match server.pool.check_out().await {
                 Ok(c) => c,
                 Err(_) => return Err(first_error),
             },
@@ -411,7 +431,9 @@ impl Client {
                         cmd.set_start_transaction();
                         cmd.set_autocommit();
                         cmd.set_txn_read_concern(*session);
-                        if is_sharded {
+                        if self.is_load_balanced() {
+                            session.pin_connection(connection.pin()?);
+                        } else if is_sharded {
                             session.pin_mongos(connection.address().clone());
                         }
                         session.transaction.state = TransactionState::InProgress;
@@ -816,7 +838,7 @@ impl Error {
             if self.contains_label(TRANSIENT_TRANSACTION_ERROR)
                 || self.contains_label(UNKNOWN_TRANSACTION_COMMIT_RESULT)
             {
-                session.unpin_mongos();
+                session.unpin();
             }
         }
 

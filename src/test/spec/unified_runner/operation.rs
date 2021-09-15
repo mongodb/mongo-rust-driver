@@ -1077,8 +1077,8 @@ impl TestOperation for TargetedFailPoint {
             let session = test_runner.get_session(&self.session);
             let selection_criteria = session
                 .transaction
-                .pinned_mongos
-                .clone()
+                .pinned_mongos()
+                .cloned()
                 .unwrap_or_else(|| panic!("ClientSession not pinned"));
             let fail_point_guard = test_runner
                 .internal_client
@@ -1312,7 +1312,7 @@ impl TestOperation for AssertSessionPinned {
             assert!(test_runner
                 .get_session(&self.session)
                 .transaction
-                .pinned_mongos
+                .pinned_mongos()
                 .is_some());
         }
         .boxed()
@@ -1334,7 +1334,7 @@ impl TestOperation for AssertSessionUnpinned {
             assert!(test_runner
                 .get_session(&self.session)
                 .transaction
-                .pinned_mongos
+                .pinned_mongos()
                 .is_none());
         }
         .boxed()

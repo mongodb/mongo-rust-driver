@@ -2,7 +2,8 @@ use bson::Document;
 
 use crate::{
     bson::doc,
-    cmap::{Command, StreamDescription},
+    client::session::TransactionPin,
+    cmap::{conn::PinnedConnectionHandle, Command, StreamDescription},
     error::Result,
     operation::{Operation, Retryability},
     options::WriteConcern,
@@ -13,17 +14,14 @@ use super::{CommandResponse, Response, WriteConcernOnlyBody};
 
 pub(crate) struct AbortTransaction {
     write_concern: Option<WriteConcern>,
-    selection_criteria: Option<SelectionCriteria>,
+    pinned: Option<TransactionPin>,
 }
 
 impl AbortTransaction {
-    pub(crate) fn new(
-        write_concern: Option<WriteConcern>,
-        selection_criteria: Option<SelectionCriteria>,
-    ) -> Self {
+    pub(crate) fn new(write_concern: Option<WriteConcern>, pinned: Option<TransactionPin>) -> Self {
         Self {
             write_concern,
-            selection_criteria,
+            pinned,
         }
     }
 }
@@ -59,7 +57,17 @@ impl Operation for AbortTransaction {
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
-        self.selection_criteria.as_ref()
+        match &self.pinned {
+            Some(TransactionPin::Mongos(s)) => Some(s),
+            _ => None,
+        }
+    }
+
+    fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
+        match &self.pinned {
+            Some(TransactionPin::Connection(h)) => Some(h),
+            _ => None,
+        }
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {
@@ -72,6 +80,6 @@ impl Operation for AbortTransaction {
 
     fn update_for_retry(&mut self) {
         // The session must be "unpinned" before server selection for a retry.
-        self.selection_criteria = None;
+        self.pinned = None;
     }
 }
