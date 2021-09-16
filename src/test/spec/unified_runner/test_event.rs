@@ -130,6 +130,17 @@ pub enum ObserveEvent {
     CommandStartedEvent,
     CommandSucceededEvent,
     CommandFailedEvent,
+    PoolCreatedEvent,
+    PoolReadyEvent,
+    PoolClearedEvent,
+    PoolClosedEvent,
+    ConnectionCreatedEvent,
+    ConnectionReadyEvent,
+    ConnectionClosedEvent,
+    ConnectionCheckOutStartedEvent,
+    ConnectionCheckOutFailedEvent,
+    ConnectionCheckedOutEvent,
+    ConnectionCheckedInEvent,
 }
 
 impl ObserveEvent {
@@ -138,6 +149,17 @@ impl ObserveEvent {
             (Self::CommandStartedEvent, Event::Command(CommandEvent::Started(_))) => true,
             (Self::CommandSucceededEvent, Event::Command(CommandEvent::Succeeded(_))) => true,
             (Self::CommandFailedEvent, Event::Command(CommandEvent::Failed(_))) => true,
+            (Self::PoolCreatedEvent, Event::Cmap(CmapEvent::PoolCreated(_))) => true,
+            (Self::PoolReadyEvent, Event::Cmap(CmapEvent::PoolReady(_))) => true,
+            (Self::PoolClearedEvent, Event::Cmap(CmapEvent::PoolCleared(_))) => true,
+            (Self::PoolClosedEvent, Event::Cmap(CmapEvent::PoolClosed(_))) => true,
+            (Self::ConnectionCreatedEvent, Event::Cmap(CmapEvent::ConnectionCreated(_))) => true,
+            (Self::ConnectionReadyEvent, Event::Cmap(CmapEvent::ConnectionReady(_))) => true,
+            (Self::ConnectionClosedEvent, Event::Cmap(CmapEvent::ConnectionClosed(_))) => true,
+            (Self::ConnectionCheckOutStartedEvent, Event::Cmap(CmapEvent::ConnectionCheckOutStarted(_))) => true,
+            (Self::ConnectionCheckOutFailedEvent, Event::Cmap(CmapEvent::ConnectionCheckOutFailed(_))) => true,
+            (Self::ConnectionCheckedOutEvent, Event::Cmap(CmapEvent::ConnectionCheckedOut(_))) => true,
+            (Self::ConnectionCheckedInEvent, Event::Cmap(CmapEvent::ConnectionCheckedIn(_))) => true,
             _ => false,
         }
     }

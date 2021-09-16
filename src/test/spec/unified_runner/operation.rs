@@ -71,9 +71,7 @@ pub struct Operation {
     operation: Box<dyn TestOperation>,
     pub name: String,
     pub object: OperationObject,
-    pub expect_error: Option<ExpectError>,
-    pub expect_result: Option<Bson>,
-    pub save_result_as_entity: Option<String>,
+    pub expectation: Expectation,
 }
 
 #[derive(Debug)]
@@ -91,6 +89,16 @@ impl<'de> Deserialize<'de> for OperationObject {
             Ok(OperationObject::Entity(object))
         }
     }
+}
+
+#[derive(Debug)]
+pub enum Expectation {
+    Result {
+        value: Option<Bson>,
+        save_as_entity: Option<String>,
+    },
+    Error(ExpectError),
+    Ignore,
 }
 
 fn deserialize_op<'de, 'a, T: 'a + Deserialize<'de> + TestOperation>(
@@ -111,6 +119,7 @@ impl<'de> Deserialize<'de> for Operation {
             pub expect_error: Option<ExpectError>,
             pub expect_result: Option<Bson>,
             pub save_result_as_entity: Option<String>,
+            pub ignore_result_and_error: Option<bool>,
         }
 
         fn default_arguments() -> Bson {
@@ -185,13 +194,28 @@ impl<'de> Deserialize<'de> for Operation {
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
 
+        let expectation = if let Some(true) = definition.ignore_result_and_error {
+            if definition.expect_result.is_some() || definition.expect_error.is_some() || definition.save_result_as_entity.is_some() {
+                return Err(serde::de::Error::custom("ignoreResultAndError is mutually exclusive with expectResult, expectError, and saveResultAsEntity"));
+            }
+            Expectation::Ignore
+        } else if let Some(err) = definition.expect_error {
+            if definition.expect_result.is_some() || definition.save_result_as_entity.is_some() {
+                return Err(serde::de::Error::custom("expectError is mutually exclusive with expectResult and saveResultAsEntity"));
+            }
+            Expectation::Error(err)
+        } else {
+            Expectation::Result {
+                value: definition.expect_result,
+                save_as_entity: definition.save_result_as_entity,
+            }
+        };
+
         Ok(Operation {
             operation: boxed_op,
             name: definition.name,
             object: definition.object,
-            expect_error: definition.expect_error,
-            expect_result: definition.expect_result,
-            save_result_as_entity: definition.save_result_as_entity,
+            expectation,
         })
     }
 }

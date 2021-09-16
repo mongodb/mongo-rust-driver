@@ -326,13 +326,13 @@ pub struct ExpectError {
 }
 
 impl ExpectError {
-    pub fn verify_result(self, error: Error) {
+    pub fn verify_result(&self, error: Error) {
         if let Some(is_client_error) = self.is_client_error {
             assert_eq!(is_client_error, !error.is_server_error());
         }
-        if let Some(error_contains) = self.error_contains {
+        if let Some(error_contains) = &self.error_contains {
             match &error.message() {
-                Some(msg) => assert!(msg.contains(&error_contains)),
+                Some(msg) => assert!(msg.contains(error_contains)),
                 None => panic!("{} should include message field", error),
             }
         }
@@ -342,20 +342,20 @@ impl ExpectError {
                 None => panic!("{} should include code", error),
             }
         }
-        if let Some(error_code_name) = self.error_code_name {
+        if let Some(error_code_name) = &self.error_code_name {
             match &error.code_name() {
                 Some(name) => assert_eq!(&error_code_name, name),
                 None => panic!("{} should include code name", error),
             }
         }
-        if let Some(error_labels_contain) = self.error_labels_contain {
+        if let Some(error_labels_contain) = &self.error_labels_contain {
             for label in error_labels_contain {
-                assert!(error.labels().contains(&label));
+                assert!(error.labels().contains(label));
             }
         }
-        if let Some(error_labels_omit) = self.error_labels_omit {
+        if let Some(error_labels_omit) = &self.error_labels_omit {
             for label in error_labels_omit {
-                assert!(!error.labels().contains(&label));
+                assert!(!error.labels().contains(label));
             }
         }
         if self.expect_result.is_some() {
