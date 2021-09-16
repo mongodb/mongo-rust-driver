@@ -5,7 +5,7 @@ mod test_event;
 mod test_file;
 mod test_runner;
 
-use std::{fs::read_dir, path::PathBuf, time::Duration};
+use std::{fs::read_dir, path::PathBuf, time::Duration, convert::TryFrom};
 
 use futures::{future::FutureExt, stream::TryStreamExt};
 use semver::Version;
@@ -310,4 +310,41 @@ async fn valid_pass() {
         run_unified_format_test,
     )
     .await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn invalid() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "src",
+        "test",
+        "spec",
+        "json",
+        "unified-test-format",
+        "invalid",
+    ]
+    .iter()
+    .collect();
+
+    for entry in read_dir(&path).unwrap() {
+        let test_file = entry.unwrap();
+        if !test_file.file_type().unwrap().is_file() {
+            continue;
+        }
+        let test_file_path = PathBuf::from(test_file.file_name());
+        if test_file_path.extension().and_then(std::ffi::OsStr::to_str) != Some("json") {
+            continue;
+        }
+        let path = path.join(&test_file_path);
+        let path_display = path.display().to_string();
+
+        let json: serde_json::Value = serde_json::from_reader(std::fs::File::open(path.as_path()).unwrap()).unwrap();
+        let test_file: Result<TestFile, _> = bson::from_bson(
+            bson::Bson::try_from(json).unwrap_or_else(|_| panic!("{}", path_display)),
+        );
+        test_file.expect_err(&format!("{}: should be invalid", path_display));
+    }
 }
