@@ -6,7 +6,7 @@ use crate::{
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, PartialEq)]
-#[serde(untagged)]
+#[serde(untagged, deny_unknown_fields)]
 pub enum ExpectedEvent {
     Cmap(ExpectedCmapEvent),
     Command(ExpectedCommandEvent),
@@ -24,6 +24,7 @@ impl From<Event> for ExpectedEvent {
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub enum ExpectedCommandEvent {
     #[serde(rename = "commandStartedEvent")]
     Started {

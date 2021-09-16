@@ -342,9 +342,11 @@ async fn invalid() {
         let path_display = path.display().to_string();
 
         let json: serde_json::Value = serde_json::from_reader(std::fs::File::open(path.as_path()).unwrap()).unwrap();
-        let test_file: Result<TestFile, _> = bson::from_bson(
+        let result: Result<TestFile, _> = bson::from_bson(
             bson::Bson::try_from(json).unwrap_or_else(|_| panic!("{}", path_display)),
         );
-        test_file.expect_err(&format!("{}: should be invalid", path_display));
+        if let Ok(test_file) = result {
+            panic!("{}: should be invalid, parsed to:\n{:#?}", path_display, test_file);
+        }
     }
 }
