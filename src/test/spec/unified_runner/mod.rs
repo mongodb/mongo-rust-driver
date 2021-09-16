@@ -5,7 +5,7 @@ mod test_event;
 mod test_file;
 mod test_runner;
 
-use std::{fs::read_dir, path::PathBuf, time::Duration, convert::TryFrom};
+use std::{fs::read_dir, path::PathBuf, time::Duration, convert::TryFrom, ffi::OsStr};
 
 use futures::{future::FutureExt, stream::TryStreamExt};
 use semver::Version;
@@ -312,6 +312,11 @@ async fn valid_pass() {
     .await;
 }
 
+const SKIPPED_INVALID_TESTS: &[&str] = &[
+    // Event types are validated at test execution time, not parse time.
+    "expectedEventsForClient-events_conflicts_with_cmap_eventType.json",
+];
+
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn invalid() {
@@ -335,7 +340,12 @@ async fn invalid() {
             continue;
         }
         let test_file_path = PathBuf::from(test_file.file_name());
-        if test_file_path.extension().and_then(std::ffi::OsStr::to_str) != Some("json") {
+        if test_file_path.extension().and_then(OsStr::to_str) != Some("json") {
+            continue;
+        }
+        let test_file_str = test_file_path.as_os_str().to_str().unwrap();
+        if SKIPPED_INVALID_TESTS.iter().any(|skip| *skip == test_file_str) {
+            println!("Skipping {}", test_file_str);
             continue;
         }
         let path = path.join(&test_file_path);
