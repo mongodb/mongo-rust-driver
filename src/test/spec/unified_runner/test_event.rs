@@ -6,7 +6,7 @@ use crate::{
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, PartialEq)]
-#[serde(untagged, deny_unknown_fields)]
+#[serde(untagged, deny_unknown_fields, rename_all = "camelCase")]
 pub enum ExpectedEvent {
     Cmap(ExpectedCmapEvent),
     Command(ExpectedCommandEvent),
@@ -26,20 +26,20 @@ impl From<Event> for ExpectedEvent {
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub enum ExpectedCommandEvent {
-    #[serde(rename = "commandStartedEvent")]
+    #[serde(rename = "commandStartedEvent", rename_all = "camelCase")]
     Started {
         command_name: Option<String>,
         database_name: Option<String>,
         command: Option<Document>,
         has_service_id: Option<bool>,
     },
-    #[serde(rename = "commandSucceededEvent")]
+    #[serde(rename = "commandSucceededEvent", rename_all = "camelCase")]
     Succeeded {
         command_name: Option<String>,
         reply: Option<Document>,
         has_service_id: Option<bool>,
     },
-    #[serde(rename = "commandFailedEvent")]
+    #[serde(rename = "commandFailedEvent", rename_all = "camelCase")]
     Failed {
         command_name: Option<String>,
         has_service_id: Option<bool>,
