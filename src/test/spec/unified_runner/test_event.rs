@@ -1,10 +1,14 @@
-use crate::{bson::Document, test::{Event, CommandEvent}};
+use crate::{
+    bson::Document,
+    event::cmap::{ConnectionCheckoutFailedReason, ConnectionClosedReason},
+    test::{Event, CommandEvent, CmapEvent},
+};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum ExpectedEvent {
-    Cmap,
+    Cmap(ExpectedCmapEvent),
     Command(ExpectedCommandEvent),
     Sdam,
 }
@@ -13,7 +17,7 @@ impl From<Event> for ExpectedEvent {
     fn from(event: Event) -> Self {
         match event {
             Event::Command(sub) => ExpectedEvent::Command(sub.into()),
-            Event::Cmap(_) => ExpectedEvent::Cmap,
+            Event::Cmap(sub) => ExpectedEvent::Cmap(sub.into()),
             Event::Sdam(_) => ExpectedEvent::Sdam,
         }
     }
@@ -62,6 +66,60 @@ impl From<CommandEvent> for ExpectedCommandEvent {
                 // TODO RUST-956 Populate the `has_service_id` field once `service_id` is present.
                 has_service_id: None,
             },
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub enum ExpectedCmapEvent {
+    #[serde(rename = "poolCreatedEvent")]
+    PoolCreated,
+    #[serde(rename = "poolReadyEvent")]
+    PoolReady,
+    #[serde(rename = "poolClearedEvent")]
+    PoolCleared {
+        has_service_id: Option<bool>,
+    },
+    #[serde(rename = "poolClosedEvent")]
+    PoolClosed,
+    #[serde(rename = "connectionCreatedEvent")]
+    ConnectionCreated,
+    #[serde(rename = "connectionReadyEvent")]
+    ConnectionReady,
+    #[serde(rename = "connectionClosedEvent")]
+    ConnectionClosed {
+        reason: Option<ConnectionClosedReason>,
+    },
+    #[serde(rename = "connectionCheckOutStartedEvent")]
+    ConnectionCheckOutStarted,
+    #[serde(rename = "connectionCheckOutFaildEvent")]
+    ConnectionCheckOutFailed {
+        reason: Option<ConnectionCheckoutFailedReason>,
+    },
+    #[serde(rename = "connectionCheckedOutEvent")]
+    ConnectionCheckedOut,
+    #[serde(rename = "connectionCheckedInEvent")]
+    ConnectionCheckedIn,
+}
+
+impl From<CmapEvent> for ExpectedCmapEvent {
+    fn from(event: CmapEvent) -> Self {
+        match event {
+            CmapEvent::PoolCreated(_) => Self::PoolCreated,
+            CmapEvent::PoolClosed(_) => Self::PoolClosed,
+            CmapEvent::PoolReady(_) => Self::PoolReady,
+            CmapEvent::ConnectionCreated(_) => Self::ConnectionCreated,
+            CmapEvent::ConnectionReady(_) => Self::ConnectionReady,
+            CmapEvent::ConnectionClosed(ev) => Self::ConnectionClosed { reason: Some(ev.reason) },
+            CmapEvent::ConnectionCheckOutStarted(_) => Self::ConnectionCheckOutStarted,
+            CmapEvent::ConnectionCheckOutFailed(ev) => Self::ConnectionCheckOutFailed { reason: Some(ev.reason) },
+            CmapEvent::ConnectionCheckedOut(_) => Self::ConnectionCheckedOut,
+            CmapEvent::PoolCleared(_) => {
+                // TODO RUST-956 populate `has_service_id`
+                Self::PoolCleared { has_service_id: None }
+            },
+            CmapEvent::ConnectionCheckedIn(_) => Self::ConnectionCheckedIn,
         }
     }
 }
