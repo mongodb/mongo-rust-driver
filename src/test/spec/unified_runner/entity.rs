@@ -126,6 +126,11 @@ impl ClientEntity {
     pub fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
         self.observer.get_all_command_started_events()
     }
+
+    /// Gets the count of connections currently checked out.
+    pub fn connections_checked_out(&self) -> u32 {
+        self.observer.connections_checked_out()
+    }
 }
 
 impl From<Database> for Entity {

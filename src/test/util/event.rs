@@ -1,6 +1,6 @@
 use std::{
     collections::VecDeque,
-    sync::{Arc, RwLock},
+    sync::{Arc, RwLock, Mutex},
     time::Duration,
 };
 
@@ -122,6 +122,7 @@ pub struct EventHandler {
     sdam_events: EventQueue<SdamEvent>,
     cmap_events: EventQueue<CmapEvent>,
     event_broadcaster: tokio::sync::broadcast::Sender<Event>,
+    connections_checked_out: Arc<Mutex<u32>>,
 }
 
 impl EventHandler {
@@ -133,6 +134,7 @@ impl EventHandler {
             sdam_events: Default::default(),
             cmap_events: Default::default(),
             event_broadcaster,
+            connections_checked_out: Arc::new(Mutex::new(0)),
         }
     }
 
@@ -210,10 +212,15 @@ impl EventHandler {
     pub fn get_all_sdam_events(&self) -> Vec<SdamEvent> {
         self.sdam_events.write().unwrap().drain(..).collect()
     }
+
+    pub fn connections_checked_out(&self) -> u32 {
+        *self.connections_checked_out.lock().unwrap()
+    }
 }
 
 impl CmapEventHandler for EventHandler {
     fn handle_connection_checked_out_event(&self, event: ConnectionCheckedOutEvent) {
+        *self.connections_checked_out.lock().unwrap() += 1;
         let event = CmapEvent::ConnectionCheckedOut(event);
         self.handle(event.clone());
         self.cmap_events.write().unwrap().push_back(event);
@@ -275,6 +282,7 @@ impl CmapEventHandler for EventHandler {
     }
 
     fn handle_connection_checked_in_event(&self, event: ConnectionCheckedInEvent) {
+        *self.connections_checked_out.lock().unwrap() -= 1;
         let event = CmapEvent::ConnectionCheckedIn(event);
         self.handle(event.clone());
         self.cmap_events.write().unwrap().push_back(event);

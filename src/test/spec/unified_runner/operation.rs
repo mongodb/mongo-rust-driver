@@ -189,6 +189,7 @@ impl<'de> Deserialize<'de> for Operation {
             "assertIndexExists" => deserialize_op::<AssertIndexExists>(definition.arguments),
             "assertIndexNotExists" => deserialize_op::<AssertIndexNotExists>(definition.arguments),
             "iterateUntilDocumentOrError" => deserialize_op::<IterateUntilDocumentOrError>(definition.arguments),
+            "assertNumberConnectionsCheckedOut" => deserialize_op::<AssertNumberConnectionsCheckedOut>(definition.arguments),
             "close" => deserialize_op::<Close>(definition.arguments),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
@@ -1685,6 +1686,26 @@ impl TestOperation for Close {
         async move {
             test_runner.entities.insert(id.to_string(), Entity::FindCursor(FindCursor::Closed));
             Ok(None)
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct AssertNumberConnectionsCheckedOut {
+    client: String,
+    connections: u32,
+}
+
+impl TestOperation for AssertNumberConnectionsCheckedOut {
+    fn execute_test_runner_operation<'a>(
+        &'a self,
+        test_runner: &'a mut TestRunner,
+    ) -> BoxFuture<'a, ()> {
+        async move {
+            let client = test_runner.get_client(&self.client);
+            assert_eq!(client.connections_checked_out(), self.connections);
         }
         .boxed()
     }
