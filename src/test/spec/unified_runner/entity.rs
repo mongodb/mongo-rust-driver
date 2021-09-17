@@ -78,14 +78,12 @@ impl ClientEntity {
     /// Ignores any event with a name in the ignore list. Also ignores all configureFailPoint
     /// events.
     pub fn get_filtered_events(&self, expected_type: ExpectedEventType) -> Vec<Event> {
-        println!("==> get_filtered_events");
         self.observer.get_filtered_events(expected_type, |event| {
             if let Event::Command(cev) = event {
                 if !self.allow_command_event(cev) {
                     return false;
                 }
             }
-            println!("==> checking {:#?}", event);
             if let Some(observe_events) = self.observe_events.as_ref() {
                 if !observe_events.iter().any(|observe| observe.matches(event)) {
                     return false;
