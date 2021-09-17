@@ -199,6 +199,7 @@ impl EventHandler {
             }
             ExpectedEventType::Cmap => {
                 let events = self.cmap_events.read().unwrap();
+                println!("==> cmap events: {:?}", *events);
                 events
                     .iter()
                     .cloned()

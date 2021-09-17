@@ -90,6 +90,7 @@ impl TestRunner {
                     let uri = merge_uri_options(given_uri, client.uri_options.as_ref());
                     let mut options = ClientOptions::parse_uri(&uri, None).await.unwrap();
                     options.command_event_handler = Some(observer.clone());
+                    options.cmap_event_handler = Some(observer.clone());
                     options.server_api = server_api;
                     if TestClient::new().await.is_sharded() {
                         match client.use_multiple_mongoses {

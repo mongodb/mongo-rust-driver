@@ -22,7 +22,7 @@ pub use self::{
     entity::{ClientEntity, Entity, SessionEntity, FindCursor},
     matcher::{events_match, results_match},
     operation::{Operation, OperationObject},
-    test_event::{ExpectedEvent, ExpectedCommandEvent, ObserveEvent},
+    test_event::{ExpectedEvent, ExpectedCommandEvent, ExpectedCmapEvent, ObserveEvent},
     test_file::{
         merge_uri_options,
         CollectionData,
