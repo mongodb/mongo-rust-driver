@@ -215,7 +215,7 @@ pub async fn run_unified_format_test(test_file: TestFile) {
 
                 let expected_events = &expected.events;
 
-                assert_eq!(actual_events.len(), expected_events.len());
+                assert_eq!(actual_events.len(), expected_events.len(), "actual:\n{:#?}\nexpected:\n{:#?}", actual_events, expected_events);
 
                 for (actual, expected) in actual_events.iter().zip(expected_events) {
                     assert!(

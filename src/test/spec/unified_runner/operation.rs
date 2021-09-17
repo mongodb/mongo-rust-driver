@@ -293,7 +293,7 @@ impl TestOperation for DeleteOne {
 }
 
 #[derive(Debug, Default, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub(super) struct Find {
     filter: Option<Document>,
     session: Option<String>,
@@ -361,7 +361,7 @@ impl TestOperation for Find {
 }
 
 #[derive(Debug, Default, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub(super) struct CreateFindCursor {
     #[serde(flatten)]
     find: Find,

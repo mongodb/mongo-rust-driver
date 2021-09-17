@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use tokio::sync::Mutex;
+use tokio::sync::{oneshot, Mutex};
 
 use crate::{
     bson::{Bson, Document},
@@ -55,6 +55,21 @@ pub enum FindCursor {
         session_id: String,
     },
     Closed,
+}
+
+impl FindCursor {
+    async fn set_kill_watcher(&mut self) -> oneshot::Receiver<()> {
+        match self {
+            Self::Normal(cursor) => {
+                let mut cursor = cursor.lock().await;
+                let (tx, rx) = oneshot::channel();
+                cursor.kill_watcher = Some(tx);
+                rx
+            }
+            Self::Session { cursor, .. } => todo!(),
+            Closed => panic!("cannot set a kill_watcher on a closed cursor"),
+        }
+    }
 }
 
 impl ClientEntity {

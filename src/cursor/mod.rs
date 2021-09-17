@@ -8,6 +8,7 @@ use std::{
 
 use futures_core::{future::BoxFuture, Stream};
 use serde::de::DeserializeOwned;
+use tokio::sync::oneshot;
 
 use crate::{
     cmap::conn::PinnedConnectionHandle,
@@ -84,6 +85,7 @@ where
 {
     client: Client,
     wrapped_cursor: ImplicitSessionCursor<T>,
+    pub(crate) kill_watcher: Option<oneshot::Sender<()>>,
     _phantom: std::marker::PhantomData<T>,
 }
 
@@ -107,6 +109,7 @@ where
                 PinnedConnection::new(pin),
                 provider,
             ),
+            kill_watcher: None,
             _phantom: Default::default(),
         }
     }
@@ -128,6 +131,7 @@ where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
     fn drop(&mut self) {
+        println!("==> dropping cursor");
         if self.wrapped_cursor.is_exhausted() {
             return;
         }
@@ -137,6 +141,7 @@ where
             self.wrapped_cursor.namespace(),
             self.wrapped_cursor.id(),
             self.wrapped_cursor.pinned_connection().replicate(),
+            self.kill_watcher.take(),
         );
     }
 }
