@@ -315,6 +315,8 @@ async fn valid_pass() {
 const SKIPPED_INVALID_TESTS: &[&str] = &[
     // Event types are validated at test execution time, not parse time.
     "expectedEventsForClient-events_conflicts_with_cmap_eventType.json",
+    "expectedEventsForClient-events_conflicts_with_command_eventType.json",
+    "expectedEventsForClient-events_conflicts_with_default_eventType.json",
 ];
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
