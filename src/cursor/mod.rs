@@ -139,7 +139,6 @@ where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
     fn drop(&mut self) {
-        println!("==> dropping cursor");
         if self.wrapped_cursor.is_exhausted() {
             return;
         }
