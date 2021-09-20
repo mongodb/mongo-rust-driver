@@ -8,6 +8,7 @@ use std::{
 use derivative::Derivative;
 use futures_core::{Future, Stream};
 use serde::de::DeserializeOwned;
+#[cfg(test)]
 use tokio::sync::oneshot;
 
 use crate::{
@@ -304,7 +305,7 @@ pub(super) fn kill_cursor(
     ns: &Namespace,
     cursor_id: i64,
     pinned_conn: PinnedConnection,
-    kill_watcher: Option<oneshot::Sender<()>>,
+    #[cfg(test)] kill_watcher: Option<oneshot::Sender<()>>,
 ) {
     let coll = client
         .database(ns.db.as_str())
@@ -312,6 +313,7 @@ pub(super) fn kill_cursor(
     RUNTIME.execute(async move {
         if !pinned_conn.is_invalid() {
             let _ = coll.kill_cursor(cursor_id, pinned_conn.handle()).await;
+            #[cfg(test)]
             if let Some(tx) = kill_watcher {
                 let _ = tx.send(());
             }

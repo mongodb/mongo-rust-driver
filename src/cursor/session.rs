@@ -7,6 +7,7 @@ use std::{
 use futures_core::{future::BoxFuture, Stream};
 use futures_util::StreamExt;
 use serde::de::DeserializeOwned;
+#[cfg(test)]
 use tokio::sync::oneshot;
 
 use super::common::{
@@ -65,6 +66,7 @@ where
     info: CursorInformation,
     buffer: VecDeque<T>,
     pinned_connection: PinnedConnection,
+    #[cfg(test)]
     kill_watcher: Option<oneshot::Sender<()>>,
 }
 
@@ -85,6 +87,7 @@ where
             info: spec.info,
             buffer: spec.initial_buffer,
             pinned_connection: PinnedConnection::new(pinned),
+            #[cfg(test)]
             kill_watcher: None,
         }
     }
@@ -186,7 +189,7 @@ where
     /// the event is published.  To fix that, tests can set a "kill watcher" on cursors - a
     /// one-shot channel with a `()` value pushed after `killCommand` is run that the test can wait
     /// on.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) fn set_kill_watcher(&mut self, tx: oneshot::Sender<()>) {
         if self.kill_watcher.is_some() {
             panic!("cursor already has a kill_watcher");
@@ -209,6 +212,7 @@ where
             &self.info.ns,
             self.info.id,
             self.pinned_connection.replicate(),
+            #[cfg(test)]
             self.kill_watcher.take(),
         );
     }

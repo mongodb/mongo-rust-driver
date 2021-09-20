@@ -118,7 +118,6 @@ impl CommandEvent {
 #[derive(Clone, Debug)]
 pub struct EventHandler {
     command_events: EventQueue<CommandEvent>,
-    pub pool_cleared_events: EventQueue<PoolClearedEvent>,
     sdam_events: EventQueue<SdamEvent>,
     cmap_events: EventQueue<CmapEvent>,
     event_broadcaster: tokio::sync::broadcast::Sender<Event>,
@@ -130,7 +129,6 @@ impl EventHandler {
         let (event_broadcaster, _) = tokio::sync::broadcast::channel(500);
         Self {
             command_events: Default::default(),
-            pool_cleared_events: Default::default(),
             sdam_events: Default::default(),
             cmap_events: Default::default(),
             event_broadcaster,
@@ -233,12 +231,8 @@ impl CmapEventHandler for EventHandler {
     }
 
     fn handle_pool_cleared_event(&self, pool_cleared_event: PoolClearedEvent) {
-        let event = CmapEvent::PoolCleared(pool_cleared_event.clone());
+        let event = CmapEvent::PoolCleared(pool_cleared_event);
         self.handle(event.clone());
-        self.pool_cleared_events
-            .write()
-            .unwrap()
-            .push_back(pool_cleared_event);
         self.cmap_events.write().unwrap().push_back(event);
     }
 
@@ -528,13 +522,14 @@ impl EventClient {
             .collect()
     }
 
-    pub fn get_pool_cleared_events(&self) -> Vec<PoolClearedEvent> {
-        self.handler
-            .pool_cleared_events
-            .write()
-            .unwrap()
-            .drain(..)
-            .collect()
+    pub fn count_pool_cleared_events(&self) -> usize {
+        let mut out = 0;
+        for event in self.handler.cmap_events.read().unwrap().iter() {
+            if matches!(event, CmapEvent::PoolCleared(_)) {
+                out += 1;
+            }
+        }
+        out
     }
 
     #[allow(dead_code)]
@@ -544,7 +539,7 @@ impl EventClient {
 
     pub fn clear_cached_events(&self) {
         self.handler.command_events.write().unwrap().clear();
-        self.handler.pool_cleared_events.write().unwrap().clear();
+        self.handler.cmap_events.write().unwrap().clear();
     }
 }
 

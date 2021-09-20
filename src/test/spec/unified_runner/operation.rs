@@ -98,7 +98,7 @@ impl<'de> Deserialize<'de> for OperationObject {
 #[derive(Debug)]
 pub enum Expectation {
     Result {
-        value: Option<Bson>,
+        expected_value: Option<Bson>,
         save_as_entity: Option<String>,
     },
     Error(ExpectError),
@@ -223,7 +223,7 @@ impl<'de> Deserialize<'de> for Operation {
             Expectation::Error(err)
         } else {
             Expectation::Result {
-                value: definition.expect_result,
+                expected_value: definition.expect_result,
                 save_as_entity: definition.save_result_as_entity,
             }
         };

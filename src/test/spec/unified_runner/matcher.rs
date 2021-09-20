@@ -131,44 +131,30 @@ fn cmap_events_match(actual: &ExpectedCmapEvent, expected: &ExpectedCmapEvent) -
     match (actual, expected) {
         (
             ExpectedCmapEvent::PoolCleared {
-                has_service_id: expected_has_service_id,
-            },
-            ExpectedCmapEvent::PoolCleared {
                 has_service_id: actual_has_service_id,
             },
+            ExpectedCmapEvent::PoolCleared {
+                has_service_id: expected_has_service_id,
+            },
         ) => {
-            if expected_has_service_id.is_some() && actual_has_service_id != expected_has_service_id
-            {
-                return false;
-            }
-            true
+            expected_has_service_id.is_none() || (actual_has_service_id == expected_has_service_id)
         }
         (
             ExpectedCmapEvent::ConnectionClosed {
-                reason: expected_reason,
+                reason: actual_reason,
             },
             ExpectedCmapEvent::ConnectionClosed {
+                reason: expected_reason,
+            },
+        ) => expected_reason.is_none() || (actual_reason == expected_reason),
+        (
+            ExpectedCmapEvent::ConnectionCheckOutFailed {
                 reason: actual_reason,
             },
-        ) => {
-            if expected_reason.is_some() && actual_reason != expected_reason {
-                return false;
-            }
-            true
-        }
-        (
             ExpectedCmapEvent::ConnectionCheckOutFailed {
                 reason: expected_reason,
             },
-            ExpectedCmapEvent::ConnectionCheckOutFailed {
-                reason: actual_reason,
-            },
-        ) => {
-            if expected_reason.is_some() && actual_reason != expected_reason {
-                return false;
-            }
-            true
-        }
+        ) => expected_reason.is_none() || (actual_reason == expected_reason),
         _ => actual == expected,
     }
 }

@@ -145,7 +145,7 @@ pub async fn run_unified_format_test(test_file: TestFile) {
 
                     match &operation.expectation {
                         Expectation::Result {
-                            value,
+                            expected_value,
                             save_as_entity,
                         } => {
                             let opt_entity = result.unwrap_or_else(|e| {
@@ -154,21 +154,21 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                                     operation.name, e
                                 )
                             });
-                            if value.is_some() || save_as_entity.is_some() {
+                            if expected_value.is_some() || save_as_entity.is_some() {
                                 let entity = opt_entity.unwrap_or_else(|| {
                                     panic!("{} did not return an entity", operation.name)
                                 });
-                                if let Some(expect_result) = value {
+                                if let Some(expected_bson) = expected_value {
                                     if let Entity::Bson(actual) = &entity {
                                         assert!(
                                             results_match(
                                                 Some(actual),
-                                                expect_result,
+                                                expected_bson,
                                                 operation.returns_root_documents(),
                                                 Some(&test_runner.entities),
                                             ),
                                             "result mismatch, expected = {:#?}  actual = {:#?}",
-                                            expect_result,
+                                            expected_bson,
                                             actual,
                                         );
                                     } else {
