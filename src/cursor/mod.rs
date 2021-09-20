@@ -85,7 +85,7 @@ where
 {
     client: Client,
     wrapped_cursor: ImplicitSessionCursor<T>,
-    pub(crate) kill_watcher: Option<oneshot::Sender<()>>,
+    kill_watcher: Option<oneshot::Sender<()>>,
     _phantom: std::marker::PhantomData<T>,
 }
 
@@ -112,6 +112,14 @@ where
             kill_watcher: None,
             _phantom: Default::default(),
         }
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn set_kill_watcher(&mut self, tx: oneshot::Sender<()>) {
+        if self.kill_watcher.is_some() {
+            panic!("cursor already has a kill_watcher");
+        }
+        self.kill_watcher = Some(tx);
     }
 }
 

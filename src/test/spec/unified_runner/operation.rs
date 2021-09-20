@@ -1684,7 +1684,10 @@ impl TestOperation for Close {
         test_runner: &'a mut TestRunner,
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
-            test_runner.entities.insert(id.to_string(), Entity::FindCursor(FindCursor::Closed));
+            let cursor = test_runner.get_mut_find_cursor(id);
+            let rx = cursor.make_kill_watcher().await;
+            *cursor = FindCursor::Closed;
+            let _ = rx.await;
             Ok(None)
         }
         .boxed()

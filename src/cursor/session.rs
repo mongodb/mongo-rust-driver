@@ -7,6 +7,7 @@ use std::{
 use futures_core::{future::BoxFuture, Stream};
 use futures_util::StreamExt;
 use serde::de::DeserializeOwned;
+use tokio::sync::oneshot;
 
 use super::common::{
     kill_cursor,
@@ -64,6 +65,7 @@ where
     info: CursorInformation,
     buffer: VecDeque<T>,
     pinned_connection: PinnedConnection,
+    kill_watcher: Option<oneshot::Sender<()>>,
 }
 
 impl<T> SessionCursor<T>
@@ -83,6 +85,7 @@ where
             info: spec.info,
             buffer: spec.initial_buffer,
             pinned_connection: PinnedConnection::new(pinned),
+            kill_watcher: None,
         }
     }
 
@@ -177,6 +180,14 @@ where
     pub async fn next(&mut self, session: &mut ClientSession) -> Option<Result<T>> {
         self.stream(session).next().await
     }
+
+    #[allow(dead_code)]
+    pub(crate) fn set_kill_watcher(&mut self, tx: oneshot::Sender<()>) {
+        if self.kill_watcher.is_some() {
+            panic!("cursor already has a kill_watcher");
+        }
+        self.kill_watcher = Some(tx);
+    }
 }
 
 impl<T> Drop for SessionCursor<T>
@@ -193,6 +204,7 @@ where
             &self.info.ns,
             self.info.id,
             self.pinned_connection.replicate(),
+            self.kill_watcher.take(),
         );
     }
 }

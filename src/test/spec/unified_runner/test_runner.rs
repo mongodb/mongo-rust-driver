@@ -12,7 +12,7 @@ use crate::{
     Database,
 };
 
-use super::{merge_uri_options, ClientEntity, CollectionData, Entity, SessionEntity, TestFileEntity};
+use super::{merge_uri_options, ClientEntity, CollectionData, Entity, SessionEntity, TestFileEntity, FindCursor};
 
 pub type EntityMap = HashMap<String, Entity>;
 
@@ -181,5 +181,9 @@ impl TestRunner {
 
     pub fn get_mut_session(&mut self, id: &str) -> &mut SessionEntity {
         self.entities.get_mut(id).unwrap().as_mut_session_entity()
+    }
+
+    pub fn get_mut_find_cursor(&mut self, id: &str) -> &mut FindCursor {
+        self.entities.get_mut(id).unwrap().as_mut_find_cursor()
     }
 }

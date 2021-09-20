@@ -58,16 +58,19 @@ pub enum FindCursor {
 }
 
 impl FindCursor {
-    async fn set_kill_watcher(&mut self) -> oneshot::Receiver<()> {
+    pub async fn make_kill_watcher(&mut self) -> oneshot::Receiver<()> {
         match self {
             Self::Normal(cursor) => {
-                let mut cursor = cursor.lock().await;
                 let (tx, rx) = oneshot::channel();
-                cursor.kill_watcher = Some(tx);
+                cursor.lock().await.set_kill_watcher(tx);
                 rx
             }
-            Self::Session { cursor, .. } => todo!(),
-            Closed => panic!("cannot set a kill_watcher on a closed cursor"),
+            Self::Session { cursor, .. } => {
+                let (tx, rx) = oneshot::channel();
+                cursor.set_kill_watcher(tx);
+                rx
+            },
+            Self::Closed => panic!("cannot set a kill_watcher on a closed cursor"),
         }
     }
 }
@@ -241,6 +244,13 @@ impl Entity {
         match self {
             Self::Bson(bson) => bson,
             _ => panic!("Expected BSON entity, got {:?}", &self),
+        }
+    }
+
+    pub fn as_mut_find_cursor(&mut self) -> &mut FindCursor {
+        match self {
+            Self::FindCursor(cursor) => cursor,
+            _ => panic!("Expected find cursor, got {:?}", &self),
         }
     }
 
