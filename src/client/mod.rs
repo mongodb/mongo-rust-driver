@@ -69,6 +69,13 @@ const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 /// # Ok(())
 /// # }
 /// ```
+/// ## Notes on performance
+/// Spawning many asynchronous tasks that use the driver concurrently like this is often the best way to achieve maximum
+/// performance, as the driver is designed to work well in such situations.
+///
+/// Additionally, using a custom Rust type that implements `Serialize` and `Deserialize` as the generic parameter
+/// of [`Collection`] instead of [`bson::Document`] can reduce the amount of time the driver and your application
+/// spends serializing and deserializing BSON, which can also lead to increased performance.
 ///
 /// ## TCP Keepalive
 /// TCP keepalive is enabled by default with ``tcp_keepalive_time`` set to 120 seconds. The

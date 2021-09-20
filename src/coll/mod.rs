@@ -1135,6 +1135,9 @@ where
 
     /// Inserts the data in `docs` into the collection.
     ///
+    /// Note that this method accepts both owned and borrowed values, so the input documents
+    /// do not need to be cloned in order to be passed in.
+    ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
     /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
@@ -1148,6 +1151,9 @@ where
     }
 
     /// Inserts the data in `docs` into the collection using the provided `ClientSession`.
+    ///
+    /// Note that this method accepts both owned and borrowed values, so the input documents
+    /// do not need to be cloned in order to be passed in.
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
@@ -1187,6 +1193,9 @@ where
 
     /// Inserts `doc` into the collection.
     ///
+    /// Note that either an owned or borrowed value can be inserted here, so the input document
+    /// does not need to be cloned to be passed in.
+    ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
     /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
@@ -1200,6 +1209,9 @@ where
     }
 
     /// Inserts `doc` into the collection using the provided `ClientSession`.
+    ///
+    /// Note that either an owned or borrowed value can be inserted here, so the input document
+    /// does not need to be cloned to be passed in.
     ///
     /// This operation will retry once upon failure if the connection and encountered error support
     /// retryability. See the documentation
