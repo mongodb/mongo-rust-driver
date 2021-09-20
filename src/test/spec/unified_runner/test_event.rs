@@ -163,6 +163,7 @@ pub enum ObserveEvent {
 
 impl ObserveEvent {
     pub fn matches(&self, event: &Event) -> bool {
+        #[allow(clippy::match_like_matches_macro)]
         match (self, event) {
             (Self::CommandStarted, Event::Command(CommandEvent::Started(_))) => true,
             (Self::CommandSucceeded, Event::Command(CommandEvent::Succeeded(_))) => true,
