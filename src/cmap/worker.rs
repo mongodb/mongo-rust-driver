@@ -313,6 +313,10 @@ impl ConnectionPoolWorker {
                 PoolTask::HandleManagementRequest(
                     PoolManagementRequest::HandleConnectionFailed,
                 ) => self.handle_connection_failed(),
+                #[cfg(test)]
+                PoolTask::HandleManagementRequest(PoolManagementRequest::Sync(tx)) => {
+                    let _ = tx.send(());
+                }
                 PoolTask::Maintenance => {
                     self.perform_maintenance();
                 }

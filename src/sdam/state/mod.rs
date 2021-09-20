@@ -9,6 +9,8 @@ use std::{
     },
 };
 
+#[cfg(test)]
+use futures_util::stream::{FuturesUnordered, StreamExt};
 use tokio::sync::{RwLock, RwLockWriteGuard};
 
 use self::server::Server;
@@ -532,6 +534,11 @@ impl Topology {
             .map(|(addr, server)| (addr.clone(), Arc::downgrade(server)))
             .collect()
     }
+
+    #[cfg(test)]
+    pub(crate) async fn sync_workers(&self) {
+        self.state.read().await.sync_workers().await;
+    }
 }
 
 impl WeakTopology {
@@ -679,6 +686,16 @@ impl TopologyState {
         }
 
         self.servers.retain(|host, _| hosts.contains(host));
+    }
+
+    #[cfg(test)]
+    async fn sync_workers(&self) {
+        let rxen: FuturesUnordered<_> = self
+            .servers
+            .values()
+            .map(|v| v.pool.sync_worker())
+            .collect();
+        let _: Vec<_> = rxen.collect().await;
     }
 }
 

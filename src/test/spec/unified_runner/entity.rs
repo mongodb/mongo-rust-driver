@@ -155,6 +155,11 @@ impl ClientEntity {
     pub fn connections_checked_out(&self) -> u32 {
         self.observer.connections_checked_out()
     }
+
+    /// Synchronize all connection pool worker threads.
+    pub async fn sync_workers(&self) {
+        self.client.sync_workers().await;
+    }
 }
 
 impl From<Database> for Entity {

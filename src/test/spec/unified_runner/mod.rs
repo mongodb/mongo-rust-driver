@@ -213,6 +213,7 @@ pub async fn run_unified_format_test(test_file: TestFile) {
             for expected in events {
                 let entity = test_runner.entities.get(&expected.client).unwrap();
                 let client = entity.as_client();
+                client.sync_workers().await;
                 let event_type = expected
                     .event_type
                     .unwrap_or(test_file::ExpectedEventType::Command);
