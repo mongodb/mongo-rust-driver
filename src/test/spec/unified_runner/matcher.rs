@@ -1,6 +1,9 @@
-use crate::{bson::{doc, spec::ElementType, Bson}, bson_util::get_int};
+use crate::{
+    bson::{doc, spec::ElementType, Bson},
+    bson_util::get_int,
+};
 
-use super::{EntityMap, ExpectedEvent, ExpectedCommandEvent, ExpectedCmapEvent};
+use super::{EntityMap, ExpectedCmapEvent, ExpectedCommandEvent, ExpectedEvent};
 
 pub fn results_match(
     actual: Option<&Bson>,
@@ -17,7 +20,9 @@ pub fn events_match(
     entities: Option<&EntityMap>,
 ) -> bool {
     match (actual, expected) {
-        (ExpectedEvent::Command(act), ExpectedEvent::Command(exp)) => command_events_match(act, exp, entities),
+        (ExpectedEvent::Command(act), ExpectedEvent::Command(exp)) => {
+            command_events_match(act, exp, entities)
+        }
         (ExpectedEvent::Cmap(act), ExpectedEvent::Cmap(exp)) => cmap_events_match(act, exp),
         _ => false,
     }
@@ -49,7 +54,8 @@ fn command_events_match(
             if expected_database_name.is_some() && actual_database_name != expected_database_name {
                 return false;
             }
-            if expected_has_service_id.is_some() && actual_has_service_id != expected_has_service_id {
+            if expected_has_service_id.is_some() && actual_has_service_id != expected_has_service_id
+            {
                 return false;
             }
             if let Some(expected_command) = expected_command {
@@ -81,7 +87,8 @@ fn command_events_match(
             if expected_command_name.is_some() && actual_command_name != expected_command_name {
                 return false;
             }
-            if expected_has_service_id.is_some() && actual_has_service_id != expected_has_service_id {
+            if expected_has_service_id.is_some() && actual_has_service_id != expected_has_service_id
+            {
                 return false;
             }
             if let Some(expected_reply) = expected_reply {
@@ -106,7 +113,8 @@ fn command_events_match(
                 has_service_id: expected_has_service_id,
             },
         ) => {
-            if expected_has_service_id.is_some() && actual_has_service_id != expected_has_service_id {
+            if expected_has_service_id.is_some() && actual_has_service_id != expected_has_service_id
+            {
                 return false;
             }
             match (expected_command_name, actual_command_name) {
@@ -121,19 +129,41 @@ fn command_events_match(
 
 fn cmap_events_match(actual: &ExpectedCmapEvent, expected: &ExpectedCmapEvent) -> bool {
     match (actual, expected) {
-        (ExpectedCmapEvent::PoolCleared { has_service_id: expected_has_service_id }, ExpectedCmapEvent::PoolCleared { has_service_id: actual_has_service_id }) => {
-            if expected_has_service_id.is_some() && actual_has_service_id != expected_has_service_id {
+        (
+            ExpectedCmapEvent::PoolCleared {
+                has_service_id: expected_has_service_id,
+            },
+            ExpectedCmapEvent::PoolCleared {
+                has_service_id: actual_has_service_id,
+            },
+        ) => {
+            if expected_has_service_id.is_some() && actual_has_service_id != expected_has_service_id
+            {
                 return false;
             }
             true
         }
-        (ExpectedCmapEvent::ConnectionClosed { reason: expected_reason }, ExpectedCmapEvent::ConnectionClosed { reason: actual_reason }) => {
+        (
+            ExpectedCmapEvent::ConnectionClosed {
+                reason: expected_reason,
+            },
+            ExpectedCmapEvent::ConnectionClosed {
+                reason: actual_reason,
+            },
+        ) => {
             if expected_reason.is_some() && actual_reason != expected_reason {
                 return false;
             }
             true
         }
-        (ExpectedCmapEvent::ConnectionCheckOutFailed { reason: expected_reason }, ExpectedCmapEvent::ConnectionCheckOutFailed { reason: actual_reason }) => {
+        (
+            ExpectedCmapEvent::ConnectionCheckOutFailed {
+                reason: expected_reason,
+            },
+            ExpectedCmapEvent::ConnectionCheckOutFailed {
+                reason: actual_reason,
+            },
+        ) => {
             if expected_reason.is_some() && actual_reason != expected_reason {
                 return false;
             }

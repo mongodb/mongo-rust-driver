@@ -6,13 +6,29 @@ use crate::{
     concern::{Acknowledgment, WriteConcern},
     db::options::CreateCollectionOptions,
     options::CollectionOptions,
-    test::{util::FailPointGuard, EventHandler, TestClient, DEFAULT_URI, SERVER_API, LOAD_BALANCED_SINGLE_URI, LOAD_BALANCED_MULTIPLE_URI},
+    test::{
+        util::FailPointGuard,
+        EventHandler,
+        TestClient,
+        DEFAULT_URI,
+        LOAD_BALANCED_MULTIPLE_URI,
+        LOAD_BALANCED_SINGLE_URI,
+        SERVER_API,
+    },
     Client,
     Collection,
     Database,
 };
 
-use super::{merge_uri_options, ClientEntity, CollectionData, Entity, SessionEntity, TestFileEntity, FindCursor};
+use super::{
+    merge_uri_options,
+    ClientEntity,
+    CollectionData,
+    Entity,
+    FindCursor,
+    SessionEntity,
+    TestFileEntity,
+};
 
 pub type EntityMap = HashMap<String, Entity>;
 
@@ -77,12 +93,19 @@ impl TestRunner {
                     let server_api = client.server_api.clone().or_else(|| SERVER_API.clone());
                     let observer = Arc::new(EventHandler::new());
 
-                    let is_load_balanced = client.uri_options.as_ref().map_or(false, |opts| opts.get_bool("loadBalanced").unwrap_or(false));
+                    let is_load_balanced = client
+                        .uri_options
+                        .as_ref()
+                        .map_or(false, |opts| opts.get_bool("loadBalanced").unwrap_or(false));
                     let given_uri = if is_load_balanced {
                         if client.use_multiple_mongoses.unwrap_or(true) {
-                            LOAD_BALANCED_MULTIPLE_URI.as_ref().expect("Test requires URI for load balancer fronting multiple servers")
+                            LOAD_BALANCED_MULTIPLE_URI.as_ref().expect(
+                                "Test requires URI for load balancer fronting multiple servers",
+                            )
                         } else {
-                            LOAD_BALANCED_SINGLE_URI.as_ref().expect("Test requires URI for load balancer fronting single server")
+                            LOAD_BALANCED_SINGLE_URI.as_ref().expect(
+                                "Test requires URI for load balancer fronting single server",
+                            )
                         }
                     } else {
                         &DEFAULT_URI

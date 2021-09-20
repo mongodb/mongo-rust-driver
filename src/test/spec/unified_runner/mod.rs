@@ -5,7 +5,7 @@ mod test_event;
 mod test_file;
 mod test_runner;
 
-use std::{fs::read_dir, path::PathBuf, time::Duration, convert::TryFrom, ffi::OsStr};
+use std::{convert::TryFrom, ffi::OsStr, fs::read_dir, path::PathBuf, time::Duration};
 
 use futures::{future::FutureExt, stream::TryStreamExt};
 use semver::Version;
@@ -19,10 +19,10 @@ use crate::{
 };
 
 pub use self::{
-    entity::{ClientEntity, Entity, SessionEntity, FindCursor},
+    entity::{ClientEntity, Entity, FindCursor, SessionEntity},
     matcher::{events_match, results_match},
     operation::{Operation, OperationObject},
-    test_event::{ExpectedEvent, ExpectedCommandEvent, ExpectedCmapEvent, ObserveEvent},
+    test_event::{ExpectedCmapEvent, ExpectedCommandEvent, ExpectedEvent, ObserveEvent},
     test_file::{
         merge_uri_options,
         CollectionData,
@@ -144,7 +144,10 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                         .await;
 
                     match &operation.expectation {
-                        Expectation::Result { value, save_as_entity } => {
+                        Expectation::Result {
+                            value,
+                            save_as_entity,
+                        } => {
                             let opt_entity = result.unwrap_or_else(|e| {
                                 panic!(
                                     "{} should succeed, but failed with the following error: {}",
@@ -152,12 +155,14 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                                 )
                             });
                             if value.is_some() || save_as_entity.is_some() {
-                                let entity = opt_entity.expect(&format!("{} did not return an entity", operation.name));
+                                let entity = opt_entity.unwrap_or_else(|| {
+                                    panic!("{} did not return an entity", operation.name)
+                                });
                                 if let Some(expect_result) = value {
                                     if let Entity::Bson(actual) = &entity {
                                         assert!(
                                             results_match(
-                                                Some(&actual),
+                                                Some(actual),
                                                 expect_result,
                                                 operation.returns_root_documents(),
                                                 Some(&test_runner.entities),
@@ -175,7 +180,10 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                                 }
                                 if let Some(id) = save_as_entity {
                                     if test_runner.entities.insert(id.clone(), entity).is_some() {
-                                        panic!("Entity with id {} already present in entity map", id);
+                                        panic!(
+                                            "Entity with id {} already present in entity map",
+                                            id
+                                        );
                                     }
                                 }
                             }
@@ -205,7 +213,9 @@ pub async fn run_unified_format_test(test_file: TestFile) {
             for expected in events {
                 let entity = test_runner.entities.get(&expected.client).unwrap();
                 let client = entity.as_client();
-                let event_type = expected.event_type.unwrap_or(test_file::ExpectedEventType::Command);
+                let event_type = expected
+                    .event_type
+                    .unwrap_or(test_file::ExpectedEventType::Command);
 
                 let actual_events: Vec<ExpectedEvent> = client
                     .get_filtered_events(event_type)
@@ -215,7 +225,13 @@ pub async fn run_unified_format_test(test_file: TestFile) {
 
                 let expected_events = &expected.events;
 
-                assert_eq!(actual_events.len(), expected_events.len(), "actual:\n{:#?}\nexpected:\n{:#?}", actual_events, expected_events);
+                assert_eq!(
+                    actual_events.len(),
+                    expected_events.len(),
+                    "actual:\n{:#?}\nexpected:\n{:#?}",
+                    actual_events,
+                    expected_events
+                );
 
                 for (actual, expected) in actual_events.iter().zip(expected_events) {
                     assert!(
@@ -346,19 +362,26 @@ async fn invalid() {
             continue;
         }
         let test_file_str = test_file_path.as_os_str().to_str().unwrap();
-        if SKIPPED_INVALID_TESTS.iter().any(|skip| *skip == test_file_str) {
+        if SKIPPED_INVALID_TESTS
+            .iter()
+            .any(|skip| *skip == test_file_str)
+        {
             println!("Skipping {}", test_file_str);
             continue;
         }
         let path = path.join(&test_file_path);
         let path_display = path.display().to_string();
 
-        let json: serde_json::Value = serde_json::from_reader(std::fs::File::open(path.as_path()).unwrap()).unwrap();
+        let json: serde_json::Value =
+            serde_json::from_reader(std::fs::File::open(path.as_path()).unwrap()).unwrap();
         let result: Result<TestFile, _> = bson::from_bson(
             bson::Bson::try_from(json).unwrap_or_else(|_| panic!("{}", path_display)),
         );
         if let Ok(test_file) = result {
-            panic!("{}: should be invalid, parsed to:\n{:#?}", path_display, test_file);
+            panic!(
+                "{}: should be invalid, parsed to:\n{:#?}",
+                path_display, test_file
+            );
         }
     }
 }

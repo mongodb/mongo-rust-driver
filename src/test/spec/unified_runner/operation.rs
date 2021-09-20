@@ -1,6 +1,10 @@
 use std::{collections::HashMap, convert::TryInto, fmt::Debug, ops::Deref, time::Duration};
 
-use futures::{future::BoxFuture, stream::{StreamExt, TryStreamExt}, FutureExt};
+use futures::{
+    future::BoxFuture,
+    stream::{StreamExt, TryStreamExt},
+    FutureExt,
+};
 use serde::{de::Deserializer, Deserialize};
 use tokio::sync::Mutex;
 
@@ -188,21 +192,33 @@ impl<'de> Deserialize<'de> for Operation {
             "listIndexNames" => deserialize_op::<ListIndexNames>(definition.arguments),
             "assertIndexExists" => deserialize_op::<AssertIndexExists>(definition.arguments),
             "assertIndexNotExists" => deserialize_op::<AssertIndexNotExists>(definition.arguments),
-            "iterateUntilDocumentOrError" => deserialize_op::<IterateUntilDocumentOrError>(definition.arguments),
-            "assertNumberConnectionsCheckedOut" => deserialize_op::<AssertNumberConnectionsCheckedOut>(definition.arguments),
+            "iterateUntilDocumentOrError" => {
+                deserialize_op::<IterateUntilDocumentOrError>(definition.arguments)
+            }
+            "assertNumberConnectionsCheckedOut" => {
+                deserialize_op::<AssertNumberConnectionsCheckedOut>(definition.arguments)
+            }
             "close" => deserialize_op::<Close>(definition.arguments),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
 
         let expectation = if let Some(true) = definition.ignore_result_and_error {
-            if definition.expect_result.is_some() || definition.expect_error.is_some() || definition.save_result_as_entity.is_some() {
-                return Err(serde::de::Error::custom("ignoreResultAndError is mutually exclusive with expectResult, expectError, and saveResultAsEntity"));
+            if definition.expect_result.is_some()
+                || definition.expect_error.is_some()
+                || definition.save_result_as_entity.is_some()
+            {
+                return Err(serde::de::Error::custom(
+                    "ignoreResultAndError is mutually exclusive with expectResult, expectError, \
+                     and saveResultAsEntity",
+                ));
             }
             Expectation::Ignore
         } else if let Some(err) = definition.expect_error {
             if definition.expect_result.is_some() || definition.save_result_as_entity.is_some() {
-                return Err(serde::de::Error::custom("expectError is mutually exclusive with expectResult and saveResultAsEntity"));
+                return Err(serde::de::Error::custom(
+                    "expectError is mutually exclusive with expectResult and saveResultAsEntity",
+                ));
             }
             Expectation::Error(err)
         } else {
@@ -337,7 +353,10 @@ impl TestOperation for Find {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let result = match self.get_cursor(id, test_runner).await? {
-                FindCursor::Session { mut cursor, session_id } => {
+                FindCursor::Session {
+                    mut cursor,
+                    session_id,
+                } => {
                     let session = test_runner.get_mut_session(&session_id);
                     cursor
                         .stream(session)
@@ -1642,7 +1661,7 @@ impl TestOperation for AssertIndexNotExists {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(super) struct IterateUntilDocumentOrError { }
+pub(super) struct IterateUntilDocumentOrError {}
 
 impl TestOperation for IterateUntilDocumentOrError {
     fn execute_entity_operation<'a>(
@@ -1662,10 +1681,12 @@ impl TestOperation for IterateUntilDocumentOrError {
                 FindCursor::Session { cursor, session_id } => {
                     let session = test_runner.get_mut_session(session_id);
                     cursor.next(session).await
-                },
+                }
                 FindCursor::Closed => None,
             };
-            test_runner.entities.insert(id.to_string(), Entity::FindCursor(cursor));
+            test_runner
+                .entities
+                .insert(id.to_string(), Entity::FindCursor(cursor));
             next.transpose()
                 .map(|opt| opt.map(|doc| Entity::Bson(Bson::Document(doc))))
         }
@@ -1675,7 +1696,7 @@ impl TestOperation for IterateUntilDocumentOrError {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(super) struct Close { }
+pub(super) struct Close {}
 
 impl TestOperation for Close {
     fn execute_entity_operation<'a>(

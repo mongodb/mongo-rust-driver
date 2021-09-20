@@ -1,7 +1,7 @@
 use crate::{
     bson::Document,
     event::cmap::{ConnectionCheckoutFailedReason, ConnectionClosedReason},
-    test::{Event, CommandEvent, CmapEvent},
+    test::{CmapEvent, CommandEvent, Event},
 };
 use serde::Deserialize;
 
@@ -75,92 +75,115 @@ impl From<CommandEvent> for ExpectedCommandEvent {
 #[serde(deny_unknown_fields)]
 pub enum ExpectedCmapEvent {
     #[serde(rename = "poolCreatedEvent")]
-    PoolCreated { },
+    PoolCreated {},
     #[serde(rename = "poolReadyEvent")]
-    PoolReady { },
+    PoolReady {},
     #[serde(rename = "poolClearedEvent", rename_all = "camelCase")]
-    PoolCleared {
-        has_service_id: Option<bool>,
-    },
+    PoolCleared { has_service_id: Option<bool> },
     #[serde(rename = "poolClosedEvent")]
-    PoolClosed { },
+    PoolClosed {},
     #[serde(rename = "connectionCreatedEvent")]
-    ConnectionCreated { },
+    ConnectionCreated {},
     #[serde(rename = "connectionReadyEvent")]
-    ConnectionReady { },
+    ConnectionReady {},
     #[serde(rename = "connectionClosedEvent", rename_all = "camelCase")]
     ConnectionClosed {
         reason: Option<ConnectionClosedReason>,
     },
     #[serde(rename = "connectionCheckOutStartedEvent")]
-    ConnectionCheckOutStarted { },
+    ConnectionCheckOutStarted {},
     #[serde(rename = "connectionCheckOutFaildEvent", rename_all = "camelCase")]
     ConnectionCheckOutFailed {
         reason: Option<ConnectionCheckoutFailedReason>,
     },
     #[serde(rename = "connectionCheckedOutEvent")]
-    ConnectionCheckedOut { },
+    ConnectionCheckedOut {},
     #[serde(rename = "connectionCheckedInEvent")]
-    ConnectionCheckedIn { },
+    ConnectionCheckedIn {},
 }
 
 impl From<CmapEvent> for ExpectedCmapEvent {
     fn from(event: CmapEvent) -> Self {
         match event {
-            CmapEvent::PoolCreated(_) => Self::PoolCreated { },
-            CmapEvent::PoolClosed(_) => Self::PoolClosed { },
-            CmapEvent::PoolReady(_) => Self::PoolReady { },
-            CmapEvent::ConnectionCreated(_) => Self::ConnectionCreated { },
-            CmapEvent::ConnectionReady(_) => Self::ConnectionReady { },
-            CmapEvent::ConnectionClosed(ev) => Self::ConnectionClosed { reason: Some(ev.reason) },
-            CmapEvent::ConnectionCheckOutStarted(_) => Self::ConnectionCheckOutStarted { },
-            CmapEvent::ConnectionCheckOutFailed(ev) => Self::ConnectionCheckOutFailed { reason: Some(ev.reason) },
-            CmapEvent::ConnectionCheckedOut(_) => Self::ConnectionCheckedOut { },
+            CmapEvent::PoolCreated(_) => Self::PoolCreated {},
+            CmapEvent::PoolClosed(_) => Self::PoolClosed {},
+            CmapEvent::PoolReady(_) => Self::PoolReady {},
+            CmapEvent::ConnectionCreated(_) => Self::ConnectionCreated {},
+            CmapEvent::ConnectionReady(_) => Self::ConnectionReady {},
+            CmapEvent::ConnectionClosed(ev) => Self::ConnectionClosed {
+                reason: Some(ev.reason),
+            },
+            CmapEvent::ConnectionCheckOutStarted(_) => Self::ConnectionCheckOutStarted {},
+            CmapEvent::ConnectionCheckOutFailed(ev) => Self::ConnectionCheckOutFailed {
+                reason: Some(ev.reason),
+            },
+            CmapEvent::ConnectionCheckedOut(_) => Self::ConnectionCheckedOut {},
             CmapEvent::PoolCleared(_) => {
                 // TODO RUST-956 populate `has_service_id`
-                Self::PoolCleared { has_service_id: None }
-            },
-            CmapEvent::ConnectionCheckedIn(_) => Self::ConnectionCheckedIn { },
+                Self::PoolCleared {
+                    has_service_id: None,
+                }
+            }
+            CmapEvent::ConnectionCheckedIn(_) => Self::ConnectionCheckedIn {},
         }
     }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub enum ObserveEvent {
-    CommandStartedEvent,
-    CommandSucceededEvent,
-    CommandFailedEvent,
-    PoolCreatedEvent,
-    PoolReadyEvent,
-    PoolClearedEvent,
-    PoolClosedEvent,
-    ConnectionCreatedEvent,
-    ConnectionReadyEvent,
-    ConnectionClosedEvent,
-    ConnectionCheckOutStartedEvent,
-    ConnectionCheckOutFailedEvent,
-    ConnectionCheckedOutEvent,
-    ConnectionCheckedInEvent,
+    #[serde(rename = "commandStartedEvent")]
+    CommandStarted,
+    #[serde(rename = "commandSucceededEvent")]
+    CommandSucceeded,
+    #[serde(rename = "commandFailedEvent")]
+    CommandFailed,
+    #[serde(rename = "poolCreatedEvent")]
+    PoolCreated,
+    #[serde(rename = "poolReadyEvent")]
+    PoolReady,
+    #[serde(rename = "poolClearedEvent")]
+    PoolCleared,
+    #[serde(rename = "poolClosedEvent")]
+    PoolClosed,
+    #[serde(rename = "connectionCreatedEvent")]
+    ConnectionCreated,
+    #[serde(rename = "connectionReadyEvent")]
+    ConnectionReady,
+    #[serde(rename = "connectionClosedEvent")]
+    ConnectionClosed,
+    #[serde(rename = "connectionCheckOutStartedEvent")]
+    ConnectionCheckOutStarted,
+    #[serde(rename = "connectionCheckOutFailedEvent")]
+    ConnectionCheckOutFailed,
+    #[serde(rename = "connectionCheckedOutEvent")]
+    ConnectionCheckedOut,
+    #[serde(rename = "connectionCheckedInEvent")]
+    ConnectionCheckedIn,
 }
 
 impl ObserveEvent {
     pub fn matches(&self, event: &Event) -> bool {
         match (self, event) {
-            (Self::CommandStartedEvent, Event::Command(CommandEvent::Started(_))) => true,
-            (Self::CommandSucceededEvent, Event::Command(CommandEvent::Succeeded(_))) => true,
-            (Self::CommandFailedEvent, Event::Command(CommandEvent::Failed(_))) => true,
-            (Self::PoolCreatedEvent, Event::Cmap(CmapEvent::PoolCreated(_))) => true,
-            (Self::PoolReadyEvent, Event::Cmap(CmapEvent::PoolReady(_))) => true,
-            (Self::PoolClearedEvent, Event::Cmap(CmapEvent::PoolCleared(_))) => true,
-            (Self::PoolClosedEvent, Event::Cmap(CmapEvent::PoolClosed(_))) => true,
-            (Self::ConnectionCreatedEvent, Event::Cmap(CmapEvent::ConnectionCreated(_))) => true,
-            (Self::ConnectionReadyEvent, Event::Cmap(CmapEvent::ConnectionReady(_))) => true,
-            (Self::ConnectionClosedEvent, Event::Cmap(CmapEvent::ConnectionClosed(_))) => true,
-            (Self::ConnectionCheckOutStartedEvent, Event::Cmap(CmapEvent::ConnectionCheckOutStarted(_))) => true,
-            (Self::ConnectionCheckOutFailedEvent, Event::Cmap(CmapEvent::ConnectionCheckOutFailed(_))) => true,
-            (Self::ConnectionCheckedOutEvent, Event::Cmap(CmapEvent::ConnectionCheckedOut(_))) => true,
-            (Self::ConnectionCheckedInEvent, Event::Cmap(CmapEvent::ConnectionCheckedIn(_))) => true,
+            (Self::CommandStarted, Event::Command(CommandEvent::Started(_))) => true,
+            (Self::CommandSucceeded, Event::Command(CommandEvent::Succeeded(_))) => true,
+            (Self::CommandFailed, Event::Command(CommandEvent::Failed(_))) => true,
+            (Self::PoolCreated, Event::Cmap(CmapEvent::PoolCreated(_))) => true,
+            (Self::PoolReady, Event::Cmap(CmapEvent::PoolReady(_))) => true,
+            (Self::PoolCleared, Event::Cmap(CmapEvent::PoolCleared(_))) => true,
+            (Self::PoolClosed, Event::Cmap(CmapEvent::PoolClosed(_))) => true,
+            (Self::ConnectionCreated, Event::Cmap(CmapEvent::ConnectionCreated(_))) => true,
+            (Self::ConnectionReady, Event::Cmap(CmapEvent::ConnectionReady(_))) => true,
+            (Self::ConnectionClosed, Event::Cmap(CmapEvent::ConnectionClosed(_))) => true,
+            (
+                Self::ConnectionCheckOutStarted,
+                Event::Cmap(CmapEvent::ConnectionCheckOutStarted(_)),
+            ) => true,
+            (
+                Self::ConnectionCheckOutFailed,
+                Event::Cmap(CmapEvent::ConnectionCheckOutFailed(_)),
+            ) => true,
+            (Self::ConnectionCheckedOut, Event::Cmap(CmapEvent::ConnectionCheckedOut(_))) => true,
+            (Self::ConnectionCheckedIn, Event::Cmap(CmapEvent::ConnectionCheckedIn(_))) => true,
             _ => false,
         }
     }

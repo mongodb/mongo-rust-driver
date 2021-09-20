@@ -3,7 +3,7 @@ use std::time::Duration;
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Deserializer};
 
-use super::{Operation, ExpectedEvent, ObserveEvent, results_match};
+use super::{results_match, ExpectedEvent, ObserveEvent, Operation};
 
 use crate::{
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},

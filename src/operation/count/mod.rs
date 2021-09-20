@@ -76,11 +76,7 @@ impl Operation for Count {
 
         append_options(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(
-            name,
-            self.ns.db.clone(),
-            body,
-        ))
+        Ok(Command::new(name, self.ns.db.clone(), body))
     }
 
     fn handle_response(

@@ -28,7 +28,7 @@ use std::{
 };
 
 pub use self::{
-    unified_runner::{run_unified_format_test, merge_uri_options, Topology, ExpectedEventType},
+    unified_runner::{merge_uri_options, run_unified_format_test, ExpectedEventType, Topology},
     v2_runner::{operation::Operation, run_v2_test, test_file::RunOn},
 };
 

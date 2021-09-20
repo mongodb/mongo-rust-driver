@@ -9,7 +9,12 @@ use crate::{
     bson::{Bson, Document},
     client::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     event::command::CommandStartedEvent,
-    test::{CommandEvent, Event, EventHandler, spec::unified_runner::{ExpectedEventType, ObserveEvent}},
+    test::{
+        spec::unified_runner::{ExpectedEventType, ObserveEvent},
+        CommandEvent,
+        Event,
+        EventHandler,
+    },
     Client,
     ClientSession,
     Collection,
@@ -47,8 +52,8 @@ pub struct SessionEntity {
 #[derive(Debug)]
 pub enum FindCursor {
     // Due to https://github.com/rust-lang/rust/issues/59245, the `Entity` type is required to be
-    // `Sync`; however, `Cursor` is `!Sync` due to internally storing a `BoxFuture`, which only has
-    // a `Send` bound.  Wrapping it in `Mutex` works around this.
+    // `Sync`; however, `Cursor` is `!Sync` due to internally storing a `BoxFuture`, which only
+    // has a `Send` bound.  Wrapping it in `Mutex` works around this.
     Normal(Mutex<Cursor<Document>>),
     Session {
         cursor: SessionCursor<Document>,
@@ -69,7 +74,7 @@ impl FindCursor {
                 let (tx, rx) = oneshot::channel();
                 cursor.set_kill_watcher(tx);
                 rx
-            },
+            }
             Self::Closed => panic!("cannot set a kill_watcher on a closed cursor"),
         }
     }

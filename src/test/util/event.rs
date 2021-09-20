@@ -1,6 +1,6 @@
 use std::{
     collections::VecDeque,
-    sync::{Arc, RwLock, Mutex},
+    sync::{Arc, Mutex, RwLock},
     time::Duration,
 };
 
@@ -47,7 +47,7 @@ use crate::{
         },
     },
     options::ClientOptions,
-    test::{CLIENT_OPTIONS, LOCK, spec::ExpectedEventType},
+    test::{spec::ExpectedEventType, CLIENT_OPTIONS, LOCK},
     RUNTIME,
 };
 
@@ -193,7 +193,7 @@ impl EventHandler {
                 events
                     .iter()
                     .cloned()
-                    .map(|e| Event::Command(e))
+                    .map(Event::Command)
                     .filter(|e| filter(e))
                     .collect()
             }
@@ -202,7 +202,7 @@ impl EventHandler {
                 events
                     .iter()
                     .cloned()
-                    .map(|e| Event::Cmap(e))
+                    .map(Event::Cmap)
                     .filter(|e| filter(e))
                     .collect()
             }
@@ -235,7 +235,10 @@ impl CmapEventHandler for EventHandler {
     fn handle_pool_cleared_event(&self, pool_cleared_event: PoolClearedEvent) {
         let event = CmapEvent::PoolCleared(pool_cleared_event.clone());
         self.handle(event.clone());
-        self.pool_cleared_events.write().unwrap().push_back(pool_cleared_event);
+        self.pool_cleared_events
+            .write()
+            .unwrap()
+            .push_back(pool_cleared_event);
         self.cmap_events.write().unwrap().push_back(event);
     }
 
