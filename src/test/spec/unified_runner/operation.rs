@@ -311,7 +311,7 @@ impl TestOperation for DeleteOne {
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Find {
-    filter: Option<Document>,
+    filter: Document,
     session: Option<String>,
     #[serde(flatten)]
     options: FindOptions,
@@ -328,7 +328,7 @@ impl Find {
             Some(session_id) => {
                 let session = test_runner.get_mut_session(session_id);
                 let cursor = collection
-                    .find_with_session(self.filter.clone(), self.options.clone(), session)
+                    .find_with_session(Some(self.filter.clone()), self.options.clone(), session)
                     .await?;
                 Ok(FindCursor::Session {
                     cursor,
@@ -337,7 +337,7 @@ impl Find {
             }
             None => {
                 let cursor = collection
-                    .find(self.filter.clone(), self.options.clone())
+                    .find(Some(self.filter.clone()), self.options.clone())
                     .await?;
                 Ok(FindCursor::Normal(Mutex::new(cursor)))
             }
