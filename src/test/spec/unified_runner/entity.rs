@@ -116,6 +116,7 @@ impl ClientEntity {
         })
     }
 
+    /// Returns `true` if a given `CommandEvent` is allowed to be observed.
     fn allow_command_event(&self, event: &CommandEvent) -> bool {
         if event.command_name() == "configureFailPoint" {
             return false;
