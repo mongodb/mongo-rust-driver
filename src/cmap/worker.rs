@@ -503,6 +503,7 @@ impl ConnectionPoolWorker {
             self.emit_event(|handler| {
                 let event = PoolClearedEvent {
                     address: self.address.clone(),
+                    service_id,
                 };
 
                 handler.handle_pool_cleared_event(event);

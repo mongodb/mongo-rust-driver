@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use serde::Deserialize;
 
-use crate::{bson_util, options::ServerAddress};
+use crate::{bson::oid::ObjectId, bson_util, options::ServerAddress};
 
 /// We implement `Deserialize` for all of the event types so that we can more easily parse the CMAP
 /// spec tests. However, we have no need to parse the address field from the JSON files (if it's
@@ -79,6 +79,9 @@ pub struct PoolClearedEvent {
     #[serde(default = "self::empty_address")]
     #[serde(skip)]
     pub address: ServerAddress,
+
+    /// If the connection is to a load balancer, the id of the selected backend.
+    pub service_id: Option<ObjectId>,
 }
 
 /// Event emitted when a connection pool is cleared.
