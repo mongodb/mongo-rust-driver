@@ -218,22 +218,24 @@ impl Topology {
                     address: server_address.clone(),
                 };
                 handler.handle_server_opening_event(event);
-                if is_load_balanced {
-                    // Load-balanced clients don't have a heartbeat monitor, so we synthesize
-                    // updating the server to `ServerType::LoadBalancer`.
-                    let new_desc = ServerDescription {
-                        server_type: ServerType::LoadBalancer,
-                        ..ServerDescription::new(server_address.clone(), None)
-                    };
-                    topology_state
-                        .update(new_desc, &options, topology.downgrade())
-                        .map_err(Error::internal)?;
-                }
             }
         }
 
-        // When the client is in load balanced mode, it doesn't poll for changes in the SRV record.
-        if !is_load_balanced {
+        if is_load_balanced {
+            for server_address in &options.hosts {
+                // Load-balanced clients don't have a heartbeat monitor, so we synthesize
+                // updating the server to `ServerType::LoadBalancer`.
+                let new_desc = ServerDescription {
+                    server_type: ServerType::LoadBalancer,
+                    ..ServerDescription::new(server_address.clone(), None)
+                };
+                topology_state
+                    .update(new_desc, &options, topology.downgrade())
+                    .map_err(Error::internal)?;
+            }
+        } else {
+            // When the client is in load balanced mode, it doesn't poll for changes in the SRV
+            // record.
             SrvPollingMonitor::start(topology.downgrade());
         }
 
