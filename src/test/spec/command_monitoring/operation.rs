@@ -114,6 +114,8 @@ impl TestOperation for DeleteOne {
 #[serde(deny_unknown_fields)]
 pub(super) struct Find {
     filter: Option<Document>,
+    // `FindOptions` cannot be embedded directly because serde doesn't support combining `flatten`
+    // and `deny_unknown_fields`, so its fields are replicated here.
     #[serde(default)]
     sort: Option<Document>,
     #[serde(default)]
@@ -149,6 +151,8 @@ impl TestOperation for Find {
 
     fn execute(&self, collection: Collection<Document>) -> BoxFuture<Result<()>> {
         async move {
+            // `FindOptions` is constructed without the use of `..Default::default()` to enforce at
+            // compile-time that any new fields added there need to be considered here.
             let options = FindOptions {
                 sort: self.sort.clone(),
                 skip: self.skip,
@@ -161,7 +165,16 @@ impl TestOperation for Find {
                 max: self.max.clone(),
                 return_key: self.return_key,
                 show_record_id: self.show_record_id,
-                ..Default::default()
+                allow_disk_use: None,
+                allow_partial_results: None,
+                cursor_type: None,
+                max_await_time: None,
+                max_scan: None,
+                no_cursor_timeout: None,
+                projection: None,
+                read_concern: None,
+                selection_criteria: None,
+                collation: None,
             };
 
             let mut cursor = collection.find(self.filter.clone(), options).await?;

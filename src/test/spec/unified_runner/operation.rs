@@ -13,6 +13,8 @@ use super::{Entity, ExpectError, FindCursor, TestRunner};
 use crate::{
     bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
     client::session::{ClientSession, TransactionState},
+    coll::options::Hint,
+    collation::Collation,
     error::Result,
     options::{
         AggregateOptions,
@@ -33,6 +35,7 @@ use crate::{
         ListCollectionsOptions,
         ListDatabasesOptions,
         ListIndexesOptions,
+        ReadConcern,
         ReplaceOptions,
         SelectionCriteria,
         UpdateModifications,
@@ -309,12 +312,31 @@ impl TestOperation for DeleteOne {
 }
 
 #[derive(Debug, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Find {
     filter: Document,
     session: Option<String>,
-    #[serde(flatten)]
-    options: FindOptions,
+    // `FindOptions` cannot be embedded directly because serde doesn't support combining `flatten`
+    // and `deny_unknown_fields`, so its fields are replicated here.
+    allow_disk_use: Option<bool>,
+    allow_partial_results: Option<bool>,
+    batch_size: Option<u32>,
+    comment: Option<String>,
+    hint: Option<Hint>,
+    limit: Option<i64>,
+    max: Option<Document>,
+    max_scan: Option<u64>,
+    #[serde(rename = "maxTimeMS")]
+    max_time: Option<Duration>,
+    min: Option<Document>,
+    no_cursor_timeout: Option<bool>,
+    projection: Option<Document>,
+    read_concern: Option<ReadConcern>,
+    return_key: Option<bool>,
+    show_record_id: Option<bool>,
+    skip: Option<u64>,
+    sort: Option<Document>,
+    collation: Option<Collation>,
 }
 
 impl Find {
@@ -324,11 +346,36 @@ impl Find {
         test_runner: &'a mut TestRunner,
     ) -> Result<FindCursor> {
         let collection = test_runner.get_collection(id).clone();
+        // `FindOptions` is constructed without the use of `..Default::default()` to enforce at
+        // compile-time that any new fields added there need to be considered here.
+        let options = FindOptions {
+            allow_disk_use: self.allow_disk_use,
+            allow_partial_results: self.allow_partial_results,
+            batch_size: self.batch_size,
+            comment: self.comment.clone(),
+            hint: self.hint.clone(),
+            limit: self.limit,
+            max: self.max.clone(),
+            max_scan: self.max_scan,
+            max_time: self.max_time,
+            min: self.min.clone(),
+            no_cursor_timeout: self.no_cursor_timeout,
+            projection: self.projection.clone(),
+            read_concern: self.read_concern.clone(),
+            return_key: self.return_key,
+            show_record_id: self.show_record_id,
+            skip: self.skip,
+            sort: self.sort.clone(),
+            collation: self.collation.clone(),
+            cursor_type: None,
+            max_await_time: None,
+            selection_criteria: None,
+        };
         match &self.session {
             Some(session_id) => {
                 let session = test_runner.get_mut_session(session_id);
                 let cursor = collection
-                    .find_with_session(Some(self.filter.clone()), self.options.clone(), session)
+                    .find_with_session(self.filter.clone(), options, session)
                     .await?;
                 Ok(FindCursor::Session {
                     cursor,
@@ -336,9 +383,7 @@ impl Find {
                 })
             }
             None => {
-                let cursor = collection
-                    .find(Some(self.filter.clone()), self.options.clone())
-                    .await?;
+                let cursor = collection.find(self.filter.clone(), options).await?;
                 Ok(FindCursor::Normal(Mutex::new(cursor)))
             }
         }
@@ -380,10 +425,31 @@ impl TestOperation for Find {
 }
 
 #[derive(Debug, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct CreateFindCursor {
-    #[serde(flatten)]
-    find: Find,
+    // `Find` cannot be embedded directly because serde doesn't support combining `flatten`
+    // and `deny_unknown_fields`, so its fields are replicated here.
+    filter: Document,
+    session: Option<String>,
+    allow_disk_use: Option<bool>,
+    allow_partial_results: Option<bool>,
+    batch_size: Option<u32>,
+    comment: Option<String>,
+    hint: Option<Hint>,
+    limit: Option<i64>,
+    max: Option<Document>,
+    max_scan: Option<u64>,
+    #[serde(rename = "maxTimeMS")]
+    max_time: Option<Duration>,
+    min: Option<Document>,
+    no_cursor_timeout: Option<bool>,
+    projection: Option<Document>,
+    read_concern: Option<ReadConcern>,
+    return_key: Option<bool>,
+    show_record_id: Option<bool>,
+    skip: Option<u64>,
+    sort: Option<Document>,
+    collation: Option<Collation>,
 }
 
 impl TestOperation for CreateFindCursor {
@@ -393,7 +459,29 @@ impl TestOperation for CreateFindCursor {
         test_runner: &'a mut TestRunner,
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
-            let cursor = self.find.get_cursor(id, test_runner).await?;
+            let find = Find {
+                filter: self.filter.clone(),
+                session: self.session.clone(),
+                allow_disk_use: self.allow_disk_use,
+                allow_partial_results: self.allow_partial_results,
+                batch_size: self.batch_size,
+                comment: self.comment.clone(),
+                hint: self.hint.clone(),
+                limit: self.limit,
+                max: self.max.clone(),
+                max_scan: self.max_scan,
+                max_time: self.max_time,
+                min: self.min.clone(),
+                no_cursor_timeout: self.no_cursor_timeout,
+                projection: self.projection.clone(),
+                read_concern: self.read_concern.clone(),
+                return_key: self.return_key,
+                show_record_id: self.show_record_id,
+                skip: self.skip,
+                sort: self.sort.clone(),
+                collation: self.collation.clone(),
+            };
+            let cursor = find.get_cursor(id, test_runner).await?;
             Ok(Some(Entity::FindCursor(cursor)))
         }
         .boxed()
