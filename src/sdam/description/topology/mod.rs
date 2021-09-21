@@ -141,13 +141,7 @@ impl TopologyDescription {
             .hosts
             .into_iter()
             .map(|address| {
-                let description = if topology_type == TopologyType::LoadBalanced {
-                    ServerDescription::new_load_balancer(address.clone())
-                } else {
-                    ServerDescription::new(address.clone(), None)
-                };
-
-                (address, description)
+                (address.clone(), ServerDescription::new(address, None))
             })
             .collect();
 

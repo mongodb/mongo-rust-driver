@@ -204,11 +204,6 @@ impl Topology {
             topology_state.add_new_server(address, options.clone(), &topology.downgrade());
         }
 
-        // When the client is in load balanced mode, it doesn't poll for changes in the SRV record.
-        if !is_load_balanced {
-            SrvPollingMonitor::start(topology.downgrade());
-        }
-
         if let Some(ref handler) = options.sdam_event_handler {
             let event = TopologyDescriptionChangedEvent {
                 topology_id: id,
@@ -223,10 +218,21 @@ impl Topology {
                     address: server_address.clone(),
                 };
                 handler.handle_server_opening_event(event);
+                if is_load_balanced {
+                    // Load-balanced clients don't have a heartbeat monitor, so we synthesize updating the server to `ServerType::LoadBalancer`.
+                    let new_desc = ServerDescription {
+                        server_type: ServerType::LoadBalancer,
+                        ..ServerDescription::new(server_address.clone(), None)
+                    };
+                    topology_state.update(new_desc, &options, topology.downgrade()).map_err(Error::internal)?;
+                }
             }
         }
 
-        SrvPollingMonitor::start(topology.downgrade());
+        // When the client is in load balanced mode, it doesn't poll for changes in the SRV record.
+        if !is_load_balanced {
+            SrvPollingMonitor::start(topology.downgrade());
+        }
 
         drop(topology_state);
         Ok(topology)
@@ -235,6 +241,15 @@ impl Topology {
     pub(crate) fn close(&self) {
         self.common.is_alive.store(false, Ordering::SeqCst);
         if let Some(ref handler) = self.common.options.sdam_event_handler {
+            if self.common.options.load_balanced.unwrap_or(false) {
+                for host in &self.common.options.hosts {
+                    let event = ServerClosedEvent {
+                        address: host.clone(),
+                        topology_id: self.common.id,
+                    };
+                    handler.handle_server_closed_event(event);
+                }
+            }
             let event = TopologyClosedEvent {
                 topology_id: self.common.id,
             };
