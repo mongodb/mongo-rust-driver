@@ -184,9 +184,12 @@ impl ServerAddress {
             Some(part) => {
                 if part.is_empty() {
                     return Err(ErrorKind::InvalidArgument {
-                        message: format!("invalid server address: \"{}\"; hostname cannot be empty", address),
+                        message: format!(
+                            "invalid server address: \"{}\"; hostname cannot be empty",
+                            address
+                        ),
                     }
-                    .into())
+                    .into());
                 }
                 part
             }
