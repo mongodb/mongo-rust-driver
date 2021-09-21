@@ -478,6 +478,7 @@ impl Client {
         }
 
         let connection_info = connection.info();
+        let service_id = connection.service_id();
         let request_id = crate::cmap::conn::next_request_id();
 
         if let Some(ref server_api) = self.inner.options.server_api {
@@ -509,6 +510,7 @@ impl Client {
                 command_name: raw_cmd.name.clone(),
                 request_id,
                 connection: connection_info.clone(),
+                service_id,
             };
 
             handler.handle_command_started_event(command_started_event);
@@ -600,6 +602,7 @@ impl Client {
                         failure: err.clone(),
                         request_id,
                         connection: connection_info,
+                        service_id,
                     };
 
                     handler.handle_command_failed_event(command_failed_event);
@@ -631,6 +634,7 @@ impl Client {
                         command_name: cmd_name.clone(),
                         request_id,
                         connection: connection_info,
+                        service_id,
                     };
                     handler.handle_command_succeeded_event(command_succeeded_event);
                 });

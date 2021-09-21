@@ -167,6 +167,10 @@ impl Connection {
         }
     }
 
+    pub(crate) fn service_id(&self) -> Option<ObjectId> {
+        self.generation.service_id()
+    }
+
     pub(crate) fn address(&self) -> &ServerAddress {
         &self.address
     }

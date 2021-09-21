@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-use crate::{bson::Document, cmap::ConnectionInfo, error::Error};
+use crate::{bson::{Document, oid::ObjectId}, cmap::ConnectionInfo, error::Error};
 
 /// An event that triggers when a database command is initiated.
 #[derive(Clone, Debug)]
@@ -26,6 +26,9 @@ pub struct CommandStartedEvent {
 
     /// Information about the connect the command will be run on.
     pub connection: ConnectionInfo,
+
+    /// If the client connection is to a load balancer, the id of the selected backend.
+    pub service_id: Option<ObjectId>,
 }
 
 /// An event that triggers when a database command completes without an error.
@@ -48,6 +51,9 @@ pub struct CommandSucceededEvent {
 
     /// Information about the connect the command will be run on.
     pub connection: ConnectionInfo,
+
+    /// If the client connection is to a load balancer, the id of the selected backend.
+    pub service_id: Option<ObjectId>,
 }
 
 /// An event that triggers when a command failed to complete successfully.
@@ -70,6 +76,9 @@ pub struct CommandFailedEvent {
 
     /// Information about the connect the command will be run on.
     pub connection: ConnectionInfo,
+
+    /// If the client connection is to a load balancer, the id of the selected backend.
+    pub service_id: Option<ObjectId>,
 }
 
 /// Applications can implement this trait to specify custom logic to run on each command event sent
