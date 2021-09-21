@@ -140,9 +140,7 @@ impl TopologyDescription {
         let servers: HashMap<_, _> = options
             .hosts
             .into_iter()
-            .map(|address| {
-                (address.clone(), ServerDescription::new(address, None))
-            })
+            .map(|address| (address.clone(), ServerDescription::new(address, None)))
             .collect();
 
         let session_support_status = if topology_type == TopologyType::LoadBalanced {
