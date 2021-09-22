@@ -176,13 +176,23 @@ impl FromStr for ServerAddress {
 }
 
 impl ServerAddress {
-    /// Parses an address string into a `StreamAddress`.
+    /// Parses an address string into a `ServerAddress`.
     pub fn parse(address: impl AsRef<str>) -> Result<Self> {
         let address = address.as_ref();
         let mut parts = address.split(':');
-
         let hostname = match parts.next() {
-            Some(part) => part,
+            Some(part) => {
+                if part.is_empty() {
+                    return Err(ErrorKind::InvalidArgument {
+                        message: format!(
+                            "invalid server address: \"{}\"; hostname cannot be empty",
+                            address
+                        ),
+                    }
+                    .into());
+                }
+                part
+            }
             None => {
                 return Err(ErrorKind::InvalidArgument {
                     message: format!("invalid server address: \"{}\"", address),
@@ -200,6 +210,15 @@ impl ServerAddress {
                     ),
                 })?;
 
+                if port == 0 {
+                    return Err(ErrorKind::InvalidArgument {
+                        message: format!(
+                            "invalid server address: \"{}\"; port must be non-zero",
+                            address
+                        ),
+                    }
+                    .into());
+                }
                 if parts.next().is_some() {
                     return Err(ErrorKind::InvalidArgument {
                         message: format!(
@@ -216,7 +235,7 @@ impl ServerAddress {
         };
 
         Ok(ServerAddress::Tcp {
-            host: hostname.to_string(),
+            host: hostname.to_lowercase(),
             port,
         })
     }
@@ -1327,52 +1346,7 @@ impl ClientOptionsParser {
             None => (None, None),
         };
 
-        let hosts: Result<Vec<_>> = hosts_section
-            .split(',')
-            .map(|host| {
-                let (hostname, port) = match host.find(':') {
-                    Some(index) => host.split_at(index),
-                    None => (host, ""),
-                };
-
-                if hostname.is_empty() {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: "connection string contains no host".to_string(),
-                    }
-                    .into());
-                }
-                let port = if port.is_empty() {
-                    None
-                } else {
-                    let port_string_without_colon = &port[1..];
-                    let p: u16 = port_string_without_colon.parse().map_err(|_| {
-                        ErrorKind::InvalidArgument {
-                            message: format!(
-                                "invalid port specified in connection string: {}",
-                                port
-                            ),
-                        }
-                    })?;
-
-                    if p == 0 {
-                        return Err(ErrorKind::InvalidArgument {
-                            message: format!(
-                                "invalid port specified in connection string: {}",
-                                port
-                            ),
-                        }
-                        .into());
-                    }
-
-                    Some(p)
-                };
-
-                Ok(ServerAddress::Tcp {
-                    host: hostname.to_lowercase(),
-                    port,
-                })
-            })
-            .collect();
+        let hosts: Result<Vec<_>> = hosts_section.split(',').map(ServerAddress::parse).collect();
 
         let hosts = hosts?;
 
