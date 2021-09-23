@@ -43,6 +43,11 @@ pub(crate) struct ConnectionPoolOptions {
     #[serde(skip)]
     pub(crate) cmap_event_handler: Option<Arc<dyn CmapEventHandler>>,
 
+    /// The compressors that the Client is willing to use in the order they are specified
+    /// in the configuration.  The Client sends this list of compressors to the server.
+    /// The server responds with the intersection of its supported list of compressors.
+    pub(crate) compressors: Option<Vec<String>>,
+
     /// Interval between background thread maintenance runs (e.g. ensure minPoolSize).
     #[cfg(test)]
     #[serde(rename = "backgroundThreadIntervalMS")]
@@ -109,6 +114,7 @@ impl ConnectionPoolOptions {
             tls_options: options.tls_options(),
             credential: options.credential.clone(),
             cmap_event_handler: options.cmap_event_handler.clone(),
+            compressors: options.compressors.clone(),
             #[cfg(test)]
             background_thread_interval: None,
             #[cfg(test)]

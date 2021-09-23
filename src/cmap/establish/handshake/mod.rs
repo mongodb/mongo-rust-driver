@@ -145,6 +145,7 @@ pub(crate) struct Handshaker {
     credential: Option<Credential>,
     #[cfg(test)]
     mock_service_id: bool,
+    compressors: Option<Vec<String>>,
 }
 
 impl Handshaker {
@@ -152,6 +153,7 @@ impl Handshaker {
     pub(crate) fn new(options: Option<HandshakerOptions>) -> Self {
         let mut metadata = BASE_CLIENT_METADATA.clone();
         let mut credential = None;
+        let mut compressors = None;
 
         let mut command =
             is_master_command(options.as_ref().and_then(|opts| opts.server_api.as_ref()));
@@ -190,11 +192,16 @@ impl Handshaker {
             if options.load_balanced {
                 command.body.insert("loadBalanced", true);
             }
-
             #[cfg(test)]
             {
                 mock_service_id = options.mock_service_id;
             }
+            // Add compressors to handshake.
+            // See https://github.com/mongodb/specifications/blob/master/source/compression/OP_COMPRESSED.rst
+            if let Some(ref compressors) = options.compressors {
+                command.body.insert("compression", compressors);
+            }
+            compressors = options.compressors;
         }
 
         command.body.insert("client", metadata);
@@ -204,6 +211,7 @@ impl Handshaker {
             credential,
             #[cfg(test)]
             mock_service_id,
+            compressors,
         }
     }
 
@@ -259,6 +267,18 @@ impl Handshaker {
                 .map(|server_first| client_first.into_first_round(server_first))
         });
 
+        // Use the Client's first compressor choice that the server supports
+        if let Some(ref server_compressors) = is_master_reply.command_response.compressors {
+            if let Some(ref client_compressors) = self.compressors {
+                for client_compressor in client_compressors {
+                    if server_compressors.contains(client_compressor) {
+                        conn.compressor = Some(client_compressor.clone());
+                        break;
+                    }
+                }
+            }
+        }
+
         Ok(HandshakeResult {
             is_master_reply,
             first_round,
@@ -283,6 +303,7 @@ pub(crate) struct HandshakeResult {
 pub(crate) struct HandshakerOptions {
     app_name: Option<String>,
     credential: Option<Credential>,
+    compressors: Option<Vec<String>>,
     driver_info: Option<DriverInfo>,
     server_api: Option<ServerApi>,
     load_balanced: bool,
@@ -294,6 +315,7 @@ impl From<ConnectionPoolOptions> for HandshakerOptions {
     fn from(options: ConnectionPoolOptions) -> Self {
         Self {
             app_name: options.app_name,
+            compressors: options.compressors,
             credential: options.credential,
             driver_info: options.driver_info,
             server_api: options.server_api,
@@ -308,6 +330,7 @@ impl From<ClientOptions> for HandshakerOptions {
     fn from(options: ClientOptions) -> Self {
         Self {
             app_name: options.app_name,
+            compressors: options.compressors,
             credential: options.credential,
             driver_info: options.driver_info,
             server_api: options.server_api,

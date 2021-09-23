@@ -370,6 +370,9 @@ pub struct ClientOptions {
     #[builder(default)]
     pub app_name: Option<String>,
 
+    /// The compressors that the Client is willing to use in the order they are specified
+    /// in the configuration.  The Client sends this list of compressors to the server.
+    /// The server responds with the intersection of its supported list of compressors.
     #[builder(default, setter(skip))]
     pub(crate) compressors: Option<Vec<String>>,
 

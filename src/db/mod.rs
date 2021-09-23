@@ -39,7 +39,7 @@ use crate::{
 /// so it can safely be shared across threads or async tasks. For example:
 ///
 /// ```rust
-/// 
+///
 /// # #[cfg(not(feature = "sync"))]
 /// # use mongodb::{bson::Document, Client, error::Result};
 /// # #[cfg(feature = "async-std-runtime")]

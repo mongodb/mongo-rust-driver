@@ -76,6 +76,8 @@ pub(crate) struct Connection {
 
     stream: AsyncStream,
 
+    pub(super) compressor: Option<String>,
+
     /// If the connection is pinned to a cursor or transaction, the channel sender to return this
     /// connection to the pin holder.
     pinned_sender: Option<mpsc::Sender<Connection>>,
@@ -109,6 +111,7 @@ impl Connection {
             stream_description: None,
             error: false,
             pinned_sender: None,
+            compressor: None,
         };
 
         Ok(conn)
@@ -351,6 +354,7 @@ impl Connection {
             pool_manager: None,
             ready_and_available_time: None,
             pinned_sender: self.pinned_sender.clone(),
+            compressor: self.compressor.clone(),
         }
     }
 }
