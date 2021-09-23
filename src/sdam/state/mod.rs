@@ -84,9 +84,7 @@ struct TopologyState {
 
 impl Topology {
     /// Creates a new Topology given the `options`.
-    pub(crate) fn new(
-        options: ClientOptions,
-    ) -> Result<Self> {
+    pub(crate) fn new(options: ClientOptions) -> Result<Self> {
         let description = TopologyDescription::new(options.clone())?;
         let is_load_balanced = description.topology_type() == TopologyType::LoadBalanced;
 
@@ -153,7 +151,11 @@ impl Topology {
         }
 
         #[cfg(test)]
-        if !options.test_options.map(|to| to.disable_monitoring_threads).unwrap_or(false) {
+        if !options
+            .test_options
+            .map(|to| to.disable_monitoring_threads)
+            .unwrap_or(false)
+        {
             SrvPollingMonitor::start(topology.downgrade());
         }
         #[cfg(not(test))]
@@ -522,7 +524,11 @@ impl TopologyState {
         self.servers.insert(address, server);
 
         #[cfg(test)]
-        if options.test_options.map(|to| to.disable_monitoring_threads).unwrap_or(false) {
+        if options
+            .test_options
+            .map(|to| to.disable_monitoring_threads)
+            .unwrap_or(false)
+        {
             return;
         }
 

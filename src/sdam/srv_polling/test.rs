@@ -31,10 +31,7 @@ async fn run_test(new_hosts: Result<Vec<ServerAddress>>, expected_hosts: HashSet
     let topology = Topology::new(options).unwrap();
     let mut monitor = SrvPollingMonitor::new(topology.downgrade()).unwrap();
     monitor
-        .update_hosts(
-            new_hosts.and_then(make_lookup_hosts),
-            topology.clone(),
-        )
+        .update_hosts(new_hosts.and_then(make_lookup_hosts), topology.clone())
         .await;
 
     assert_eq!(expected_hosts, topology.servers().await);
@@ -121,6 +118,9 @@ async fn load_balanced_no_srv_polling() {
         localhost_test_build_10gen(27018),
     ]));
     let topology = Topology::new(options).unwrap();
-    RUNTIME.delay_for(rescan_interval*2).await;
-    assert_eq!(hosts.into_iter().collect::<HashSet<_>>(), topology.servers().await);
+    RUNTIME.delay_for(rescan_interval * 2).await;
+    assert_eq!(
+        hosts.into_iter().collect::<HashSet<_>>(),
+        topology.servers().await
+    );
 }

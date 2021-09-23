@@ -115,11 +115,9 @@ impl From<CmapEvent> for ExpectedCmapEvent {
                 reason: Some(ev.reason),
             },
             CmapEvent::ConnectionCheckedOut(_) => Self::ConnectionCheckedOut {},
-            CmapEvent::PoolCleared(ev) => {
-                Self::PoolCleared {
-                    has_service_id: Some(ev.service_id.is_some()),
-                }
-            }
+            CmapEvent::PoolCleared(ev) => Self::PoolCleared {
+                has_service_id: Some(ev.service_id.is_some()),
+            },
             CmapEvent::ConnectionCheckedIn(_) => Self::ConnectionCheckedIn {},
         }
     }

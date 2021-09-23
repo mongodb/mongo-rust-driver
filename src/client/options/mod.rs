@@ -37,6 +37,8 @@ use strsim::jaro_winkler;
 use typed_builder::TypedBuilder;
 use webpki_roots::TLS_SERVER_ROOTS;
 
+#[cfg(test)]
+use crate::srv::LookupHosts;
 use crate::{
     bson::{doc, Bson, Document},
     bson_util,
@@ -49,8 +51,6 @@ use crate::{
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
     srv::{OriginalSrvInfo, SrvResolver},
 };
-#[cfg(test)]
-use crate::srv::LookupHosts;
 
 pub use resolver_config::ResolverConfig;
 

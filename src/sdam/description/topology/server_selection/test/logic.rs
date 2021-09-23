@@ -150,12 +150,16 @@ async fn server_selection_unknown() {
     .await;
 }
 
-
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn server_selection_load_balanced() {
     run_spec_test(
-        &["server-selection", "server_selection", "LoadBalanced", "read"],
+        &[
+            "server-selection",
+            "server_selection",
+            "LoadBalanced",
+            "read",
+        ],
         run_test,
     )
     .await;

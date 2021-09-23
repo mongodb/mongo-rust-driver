@@ -113,7 +113,12 @@ impl SrvPollingMonitor {
 
     async fn lookup_hosts(&mut self) -> Result<LookupHosts> {
         #[cfg(test)]
-        if let Some(mock) = self.client_options.test_options.as_ref().and_then(|to| to.mock_lookup_hosts.as_ref()) {
+        if let Some(mock) = self
+            .client_options
+            .test_options
+            .as_ref()
+            .and_then(|to| to.mock_lookup_hosts.as_ref())
+        {
             return mock.clone();
         }
         let initial_hostname = self.initial_hostname.clone();

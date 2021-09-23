@@ -347,7 +347,13 @@ async fn run_test(test_file: TestFile) {
             }
             Outcome::Events(EventsOutcome { events: expected }) => {
                 let actual = handler.get_all_sdam_events();
-                assert_eq!(actual.len(), expected.len(), "event list length mismatch:\n actual: {:#?}, expected: {:#?}", actual, expected);
+                assert_eq!(
+                    actual.len(),
+                    expected.len(),
+                    "event list length mismatch:\n actual: {:#?}, expected: {:#?}",
+                    actual,
+                    expected
+                );
                 for (actual, expected) in actual.iter().zip(expected.iter()) {
                     assert_eq!(
                         actual, expected,
@@ -521,7 +527,11 @@ async fn monitoring() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn load_balanced() {
-    run_spec_test(&["server-discovery-and-monitoring", "load-balanced"], run_test).await;
+    run_spec_test(
+        &["server-discovery-and-monitoring", "load-balanced"],
+        run_test,
+    )
+    .await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

@@ -455,7 +455,8 @@ impl EventClient {
             }
             None => CLIENT_OPTIONS.clone(),
         };
-        options.test_options
+        options
+            .test_options
             .get_or_insert_with(Default::default)
             .heartbeat_freq = heartbeat_freq;
         if TestClient::new().await.is_sharded() && use_multiple_mongoses != Some(true) {

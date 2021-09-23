@@ -187,5 +187,9 @@ async fn replica_set() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn load_balanced() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-    run_spec_test(&["initial-dns-seedlist-discovery", "load-balanced"], run_test).await;
+    run_spec_test(
+        &["initial-dns-seedlist-discovery", "load-balanced"],
+        run_test,
+    )
+    .await;
 }
