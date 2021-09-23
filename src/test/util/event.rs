@@ -1,6 +1,6 @@
 use std::{
     collections::VecDeque,
-    sync::{Arc, RwLock},
+    sync::{Arc, Mutex, RwLock},
     time::Duration,
 };
 
@@ -47,7 +47,7 @@ use crate::{
         },
     },
     options::ClientOptions,
-    test::{CLIENT_OPTIONS, LOCK},
+    test::{spec::ExpectedEventType, CLIENT_OPTIONS, LOCK},
     RUNTIME,
 };
 
@@ -118,9 +118,10 @@ impl CommandEvent {
 #[derive(Clone, Debug)]
 pub struct EventHandler {
     command_events: EventQueue<CommandEvent>,
-    pub pool_cleared_events: EventQueue<PoolClearedEvent>,
     sdam_events: EventQueue<SdamEvent>,
+    cmap_events: EventQueue<CmapEvent>,
     event_broadcaster: tokio::sync::broadcast::Sender<Event>,
+    connections_checked_out: Arc<Mutex<u32>>,
 }
 
 impl EventHandler {
@@ -128,9 +129,10 @@ impl EventHandler {
         let (event_broadcaster, _) = tokio::sync::broadcast::channel(500);
         Self {
             command_events: Default::default(),
-            pool_cleared_events: Default::default(),
             sdam_events: Default::default(),
+            cmap_events: Default::default(),
             event_broadcaster,
+            connections_checked_out: Arc::new(Mutex::new(0)),
         }
     }
 
@@ -179,63 +181,108 @@ impl EventHandler {
             .collect()
     }
 
-    pub fn get_filtered_command_events<F>(&self, filter: F) -> Vec<CommandEvent>
+    pub fn get_filtered_events<F>(&self, event_type: ExpectedEventType, filter: F) -> Vec<Event>
     where
-        F: Fn(&CommandEvent) -> bool,
+        F: Fn(&Event) -> bool,
     {
-        let events = self.command_events.read().unwrap();
-        events.iter().filter(|e| filter(*e)).cloned().collect()
+        match event_type {
+            ExpectedEventType::Command => {
+                let events = self.command_events.read().unwrap();
+                events
+                    .iter()
+                    .cloned()
+                    .map(Event::Command)
+                    .filter(|e| filter(e))
+                    .collect()
+            }
+            ExpectedEventType::Cmap => {
+                let events = self.cmap_events.read().unwrap();
+                events
+                    .iter()
+                    .cloned()
+                    .map(Event::Cmap)
+                    .filter(|e| filter(e))
+                    .collect()
+            }
+        }
     }
 
     pub fn get_all_sdam_events(&self) -> Vec<SdamEvent> {
         self.sdam_events.write().unwrap().drain(..).collect()
     }
+
+    pub fn connections_checked_out(&self) -> u32 {
+        *self.connections_checked_out.lock().unwrap()
+    }
 }
 
 impl CmapEventHandler for EventHandler {
     fn handle_connection_checked_out_event(&self, event: ConnectionCheckedOutEvent) {
-        self.handle(CmapEvent::ConnectionCheckedOut(event))
+        *self.connections_checked_out.lock().unwrap() += 1;
+        let event = CmapEvent::ConnectionCheckedOut(event);
+        self.handle(event.clone());
+        self.cmap_events.write().unwrap().push_back(event);
     }
 
     fn handle_connection_checkout_failed_event(&self, event: ConnectionCheckoutFailedEvent) {
-        self.handle(CmapEvent::ConnectionCheckOutFailed(event))
+        let event = CmapEvent::ConnectionCheckOutFailed(event);
+        self.handle(event.clone());
+        self.cmap_events.write().unwrap().push_back(event);
     }
 
-    fn handle_pool_cleared_event(&self, event: PoolClearedEvent) {
-        self.handle(CmapEvent::PoolCleared(event.clone()));
-        self.pool_cleared_events.write().unwrap().push_back(event);
+    fn handle_pool_cleared_event(&self, pool_cleared_event: PoolClearedEvent) {
+        let event = CmapEvent::PoolCleared(pool_cleared_event);
+        self.handle(event.clone());
+        self.cmap_events.write().unwrap().push_back(event);
     }
 
     fn handle_pool_ready_event(&self, event: PoolReadyEvent) {
-        self.handle(CmapEvent::PoolReady(event))
+        let event = CmapEvent::PoolReady(event);
+        self.handle(event.clone());
+        self.cmap_events.write().unwrap().push_back(event);
     }
 
     fn handle_pool_created_event(&self, event: PoolCreatedEvent) {
-        self.handle(CmapEvent::PoolCreated(event));
+        let event = CmapEvent::PoolCreated(event);
+        self.handle(event.clone());
+        self.cmap_events.write().unwrap().push_back(event);
     }
 
     fn handle_pool_closed_event(&self, event: PoolClosedEvent) {
-        self.handle(CmapEvent::PoolClosed(event))
+        let event = CmapEvent::PoolClosed(event);
+        self.handle(event.clone());
+        self.cmap_events.write().unwrap().push_back(event);
     }
 
     fn handle_connection_created_event(&self, event: ConnectionCreatedEvent) {
-        self.handle(CmapEvent::ConnectionCreated(event))
+        let event = CmapEvent::ConnectionCreated(event);
+        self.handle(event.clone());
+        self.cmap_events.write().unwrap().push_back(event);
     }
 
     fn handle_connection_ready_event(&self, event: ConnectionReadyEvent) {
-        self.handle(CmapEvent::ConnectionReady(event))
+        let event = CmapEvent::ConnectionReady(event);
+        self.handle(event.clone());
+        self.cmap_events.write().unwrap().push_back(event);
     }
 
     fn handle_connection_closed_event(&self, event: ConnectionClosedEvent) {
-        self.handle(CmapEvent::ConnectionClosed(event))
+        let event = CmapEvent::ConnectionClosed(event);
+        self.handle(event.clone());
+        self.cmap_events.write().unwrap().push_back(event);
     }
 
     fn handle_connection_checkout_started_event(&self, event: ConnectionCheckoutStartedEvent) {
-        self.handle(CmapEvent::ConnectionCheckOutStarted(event))
+        let event = CmapEvent::ConnectionCheckOutStarted(event);
+        self.handle(event.clone());
+        self.cmap_events.write().unwrap().push_back(event);
     }
 
     fn handle_connection_checked_in_event(&self, event: ConnectionCheckedInEvent) {
-        self.handle(CmapEvent::ConnectionCheckedIn(event))
+        *self.connections_checked_out.lock().unwrap() -= 1;
+        let event = CmapEvent::ConnectionCheckedIn(event);
+        self.handle(event.clone());
+        self.cmap_events.write().unwrap().push_back(event);
     }
 }
 
@@ -475,13 +522,14 @@ impl EventClient {
             .collect()
     }
 
-    pub fn get_pool_cleared_events(&self) -> Vec<PoolClearedEvent> {
-        self.handler
-            .pool_cleared_events
-            .write()
-            .unwrap()
-            .drain(..)
-            .collect()
+    pub fn count_pool_cleared_events(&self) -> usize {
+        let mut out = 0;
+        for event in self.handler.cmap_events.read().unwrap().iter() {
+            if matches!(event, CmapEvent::PoolCleared(_)) {
+                out += 1;
+            }
+        }
+        out
     }
 
     #[allow(dead_code)]
@@ -491,7 +539,7 @@ impl EventClient {
 
     pub fn clear_cached_events(&self) {
         self.handler.command_events.write().unwrap().clear();
-        self.handler.pool_cleared_events.write().unwrap().clear();
+        self.handler.cmap_events.write().unwrap().clear();
     }
 }
 

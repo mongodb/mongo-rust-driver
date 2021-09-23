@@ -6,13 +6,29 @@ use crate::{
     concern::{Acknowledgment, WriteConcern},
     db::options::CreateCollectionOptions,
     options::CollectionOptions,
-    test::{util::FailPointGuard, EventHandler, TestClient, SERVER_API},
+    test::{
+        util::FailPointGuard,
+        EventHandler,
+        TestClient,
+        DEFAULT_URI,
+        LOAD_BALANCED_MULTIPLE_URI,
+        LOAD_BALANCED_SINGLE_URI,
+        SERVER_API,
+    },
     Client,
     Collection,
     Database,
 };
 
-use super::{ClientEntity, CollectionData, Entity, SessionEntity, TestFileEntity};
+use super::{
+    merge_uri_options,
+    ClientEntity,
+    CollectionData,
+    Entity,
+    FindCursor,
+    SessionEntity,
+    TestFileEntity,
+};
 
 pub type EntityMap = HashMap<String, Entity>;
 
@@ -77,8 +93,27 @@ impl TestRunner {
                     let server_api = client.server_api.clone().or_else(|| SERVER_API.clone());
                     let observer = Arc::new(EventHandler::new());
 
-                    let mut options = ClientOptions::parse_uri(&client.uri, None).await.unwrap();
+                    let is_load_balanced = client
+                        .uri_options
+                        .as_ref()
+                        .map_or(false, |opts| opts.get_bool("loadBalanced").unwrap_or(false));
+                    let given_uri = if is_load_balanced {
+                        if client.use_multiple_mongoses.unwrap_or(true) {
+                            LOAD_BALANCED_MULTIPLE_URI.as_ref().expect(
+                                "Test requires URI for load balancer fronting multiple servers",
+                            )
+                        } else {
+                            LOAD_BALANCED_SINGLE_URI.as_ref().expect(
+                                "Test requires URI for load balancer fronting single server",
+                            )
+                        }
+                    } else {
+                        &DEFAULT_URI
+                    };
+                    let uri = merge_uri_options(given_uri, client.uri_options.as_ref());
+                    let mut options = ClientOptions::parse_uri(&uri, None).await.unwrap();
                     options.command_event_handler = Some(observer.clone());
+                    options.cmap_event_handler = Some(observer.clone());
                     options.server_api = server_api;
                     if TestClient::new().await.is_sharded() {
                         match client.use_multiple_mongoses {
@@ -169,5 +204,9 @@ impl TestRunner {
 
     pub fn get_mut_session(&mut self, id: &str) -> &mut SessionEntity {
         self.entities.get_mut(id).unwrap().as_mut_session_entity()
+    }
+
+    pub fn get_mut_find_cursor(&mut self, id: &str) -> &mut FindCursor {
+        self.entities.get_mut(id).unwrap().as_mut_find_cursor()
     }
 }

@@ -12,6 +12,8 @@ mod worker;
 use std::sync::Arc;
 
 use derivative::Derivative;
+#[cfg(test)]
+use tokio::sync::oneshot;
 
 pub use self::conn::ConnectionInfo;
 pub(crate) use self::{
@@ -171,5 +173,10 @@ impl ConnectionPool {
 
     pub(crate) fn generation(&self) -> PoolGeneration {
         self.generation_subscriber.generation()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn sync_worker(&self) -> oneshot::Receiver<()> {
+        self.manager.sync_worker()
     }
 }

@@ -3,7 +3,7 @@ use crate::{
     bson_util::get_int,
 };
 
-use super::{EntityMap, TestEvent};
+use super::{EntityMap, ExpectedCmapEvent, ExpectedCommandEvent, ExpectedEvent};
 
 pub fn results_match(
     actual: Option<&Bson>,
@@ -15,27 +15,47 @@ pub fn results_match(
 }
 
 pub fn events_match(
-    actual: &TestEvent,
-    expected: &TestEvent,
+    actual: &ExpectedEvent,
+    expected: &ExpectedEvent,
+    entities: Option<&EntityMap>,
+) -> bool {
+    match (actual, expected) {
+        (ExpectedEvent::Command(act), ExpectedEvent::Command(exp)) => {
+            command_events_match(act, exp, entities)
+        }
+        (ExpectedEvent::Cmap(act), ExpectedEvent::Cmap(exp)) => cmap_events_match(act, exp),
+        _ => false,
+    }
+}
+
+fn command_events_match(
+    actual: &ExpectedCommandEvent,
+    expected: &ExpectedCommandEvent,
     entities: Option<&EntityMap>,
 ) -> bool {
     match (actual, expected) {
         (
-            TestEvent::Started {
+            ExpectedCommandEvent::Started {
                 command_name: actual_command_name,
                 database_name: actual_database_name,
                 command: actual_command,
+                has_service_id: actual_has_service_id,
             },
-            TestEvent::Started {
+            ExpectedCommandEvent::Started {
                 command_name: expected_command_name,
                 database_name: expected_database_name,
                 command: expected_command,
+                has_service_id: expected_has_service_id,
             },
         ) => {
             if expected_command_name.is_some() && actual_command_name != expected_command_name {
                 return false;
             }
             if expected_database_name.is_some() && actual_database_name != expected_database_name {
+                return false;
+            }
+            if expected_has_service_id.is_some() && actual_has_service_id != expected_has_service_id
+            {
                 return false;
             }
             if let Some(expected_command) = expected_command {
@@ -53,16 +73,22 @@ pub fn events_match(
             }
         }
         (
-            TestEvent::Succeeded {
+            ExpectedCommandEvent::Succeeded {
                 command_name: actual_command_name,
                 reply: actual_reply,
+                has_service_id: actual_has_service_id,
             },
-            TestEvent::Succeeded {
+            ExpectedCommandEvent::Succeeded {
                 command_name: expected_command_name,
                 reply: expected_reply,
+                has_service_id: expected_has_service_id,
             },
         ) => {
             if expected_command_name.is_some() && actual_command_name != expected_command_name {
+                return false;
+            }
+            if expected_has_service_id.is_some() && actual_has_service_id != expected_has_service_id
+            {
                 return false;
             }
             if let Some(expected_reply) = expected_reply {
@@ -78,18 +104,58 @@ pub fn events_match(
             }
         }
         (
-            TestEvent::Failed {
+            ExpectedCommandEvent::Failed {
                 command_name: actual_command_name,
+                has_service_id: actual_has_service_id,
             },
-            TestEvent::Failed {
+            ExpectedCommandEvent::Failed {
                 command_name: expected_command_name,
+                has_service_id: expected_has_service_id,
             },
-        ) => match (expected_command_name, actual_command_name) {
-            (Some(expected), Some(actual)) => expected == actual,
-            (Some(_), None) => false,
-            _ => true,
-        },
+        ) => {
+            if expected_has_service_id.is_some() && actual_has_service_id != expected_has_service_id
+            {
+                return false;
+            }
+            match (expected_command_name, actual_command_name) {
+                (Some(expected), Some(actual)) => expected == actual,
+                (Some(_), None) => false,
+                _ => true,
+            }
+        }
         _ => false,
+    }
+}
+
+fn cmap_events_match(actual: &ExpectedCmapEvent, expected: &ExpectedCmapEvent) -> bool {
+    match (actual, expected) {
+        (
+            ExpectedCmapEvent::PoolCleared {
+                has_service_id: actual_has_service_id,
+            },
+            ExpectedCmapEvent::PoolCleared {
+                has_service_id: expected_has_service_id,
+            },
+        ) => {
+            expected_has_service_id.is_none() || (actual_has_service_id == expected_has_service_id)
+        }
+        (
+            ExpectedCmapEvent::ConnectionClosed {
+                reason: actual_reason,
+            },
+            ExpectedCmapEvent::ConnectionClosed {
+                reason: expected_reason,
+            },
+        ) => expected_reason.is_none() || (actual_reason == expected_reason),
+        (
+            ExpectedCmapEvent::ConnectionCheckOutFailed {
+                reason: actual_reason,
+            },
+            ExpectedCmapEvent::ConnectionCheckOutFailed {
+                reason: expected_reason,
+            },
+        ) => expected_reason.is_none() || (actual_reason == expected_reason),
+        _ => actual == expected,
     }
 }
 

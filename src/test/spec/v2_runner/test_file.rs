@@ -9,11 +9,12 @@ use crate::{
     bson::Document,
     options::{FindOptions, ReadPreference, SelectionCriteria, SessionOptions},
     test::{
-        spec::deserialize_uri_options_to_uri_string,
+        spec::merge_uri_options,
         EventClient,
         FailPoint,
         Serverless,
         TestClient,
+        DEFAULT_URI,
         SERVERLESS,
     },
 };
@@ -104,7 +105,8 @@ fn deserialize_uri_options_to_uri_string_option<'de, D>(
 where
     D: Deserializer<'de>,
 {
-    Ok(Some(deserialize_uri_options_to_uri_string(deserializer)?))
+    let uri_options = Document::deserialize(deserializer)?;
+    Ok(Some(merge_uri_options(&DEFAULT_URI, Some(&uri_options))))
 }
 
 #[derive(Debug, Deserialize)]

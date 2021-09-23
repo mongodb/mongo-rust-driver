@@ -360,4 +360,9 @@ impl Client {
             .map(|stream_address| format!("{}", stream_address))
             .collect()
     }
+
+    #[cfg(test)]
+    pub(crate) async fn sync_workers(&self) {
+        self.inner.topology.sync_workers().await;
+    }
 }

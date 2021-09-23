@@ -47,8 +47,10 @@ impl Operation for Count {
     const NAME: &'static str = "count";
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
+        let mut name = Self::NAME.to_string();
         let mut body = match description.max_wire_version {
             Some(v) if v >= SERVER_4_9_0_WIRE_VERSION => {
+                name = "aggregate".to_string();
                 doc! {
                     "aggregate": self.ns.coll.clone(),
                     "pipeline": [
@@ -74,11 +76,7 @@ impl Operation for Count {
 
         append_options(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(
-            Self::NAME.to_string(),
-            self.ns.db.clone(),
-            body,
-        ))
+        Ok(Command::new(name, self.ns.db.clone(), body))
     }
 
     fn handle_response(

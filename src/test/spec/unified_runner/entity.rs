@@ -3,15 +3,24 @@ use std::{
     sync::Arc,
 };
 
+use tokio::sync::{oneshot, Mutex};
+
 use crate::{
     bson::{Bson, Document},
     client::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     event::command::CommandStartedEvent,
-    test::{CommandEvent, EventHandler},
+    test::{
+        spec::unified_runner::{ExpectedEventType, ObserveEvent},
+        CommandEvent,
+        Event,
+        EventHandler,
+    },
     Client,
     ClientSession,
     Collection,
+    Cursor,
     Database,
+    SessionCursor,
 };
 
 #[derive(Debug)]
@@ -20,6 +29,7 @@ pub enum Entity {
     Database(Database),
     Collection(Collection<Document>),
     Session(SessionEntity),
+    FindCursor(FindCursor),
     Bson(Bson),
     None,
 }
@@ -28,7 +38,7 @@ pub enum Entity {
 pub struct ClientEntity {
     client: Client,
     observer: Arc<EventHandler>,
-    observe_events: Option<Vec<String>>,
+    observe_events: Option<Vec<ObserveEvent>>,
     ignore_command_names: Option<Vec<String>>,
     observe_sensitive_commands: bool,
 }
@@ -39,11 +49,42 @@ pub struct SessionEntity {
     pub client_session: Option<Box<ClientSession>>,
 }
 
+#[derive(Debug)]
+pub enum FindCursor {
+    // Due to https://github.com/rust-lang/rust/issues/59245, the `Entity` type is required to be
+    // `Sync`; however, `Cursor` is `!Sync` due to internally storing a `BoxFuture`, which only
+    // has a `Send` bound.  Wrapping it in `Mutex` works around this.
+    Normal(Mutex<Cursor<Document>>),
+    Session {
+        cursor: SessionCursor<Document>,
+        session_id: String,
+    },
+    Closed,
+}
+
+impl FindCursor {
+    pub async fn make_kill_watcher(&mut self) -> oneshot::Receiver<()> {
+        match self {
+            Self::Normal(cursor) => {
+                let (tx, rx) = oneshot::channel();
+                cursor.lock().await.set_kill_watcher(tx);
+                rx
+            }
+            Self::Session { cursor, .. } => {
+                let (tx, rx) = oneshot::channel();
+                cursor.set_kill_watcher(tx);
+                rx
+            }
+            Self::Closed => panic!("cannot set a kill_watcher on a closed cursor"),
+        }
+    }
+}
+
 impl ClientEntity {
     pub fn new(
         client: Client,
         observer: Arc<EventHandler>,
-        observe_events: Option<Vec<String>>,
+        observe_events: Option<Vec<ObserveEvent>>,
         ignore_command_names: Option<Vec<String>>,
         observe_sensitive_commands: bool,
     ) -> Self {
@@ -59,39 +100,15 @@ impl ClientEntity {
     /// Gets a list of all of the events of the requested event types that occurred on this client.
     /// Ignores any event with a name in the ignore list. Also ignores all configureFailPoint
     /// events.
-    pub fn get_filtered_events(&self) -> Vec<CommandEvent> {
-        self.observer.get_filtered_command_events(|event| {
-            if event.command_name() == "configureFailPoint" {
-                return false;
+    pub fn get_filtered_events(&self, expected_type: ExpectedEventType) -> Vec<Event> {
+        self.observer.get_filtered_events(expected_type, |event| {
+            if let Event::Command(cev) = event {
+                if !self.allow_command_event(cev) {
+                    return false;
+                }
             }
             if let Some(observe_events) = self.observe_events.as_ref() {
-                if !observe_events.iter().any(|name| match event {
-                    CommandEvent::Started(_) => name.as_str() == "commandStartedEvent",
-                    CommandEvent::Succeeded(_) => name.as_str() == "commandSucceededEvent",
-                    CommandEvent::Failed(_) => name.as_str() == "commandFailedEvent",
-                }) {
-                    return false;
-                }
-            }
-            if let Some(ignore_command_names) = self.ignore_command_names.as_ref() {
-                if ignore_command_names
-                    .iter()
-                    .any(|name| event.command_name().eq_ignore_ascii_case(name))
-                {
-                    return false;
-                }
-            }
-            if !self.observe_sensitive_commands {
-                let lower_name = event.command_name().to_ascii_lowercase();
-                // If a hello command has been redacted, it's sensitive and the event should be
-                // ignored.
-                let is_sensitive_hello = HELLO_COMMAND_NAMES.contains(lower_name.as_str())
-                    && match event {
-                        CommandEvent::Started(ev) => ev.command.is_empty(),
-                        CommandEvent::Succeeded(ev) => ev.reply.is_empty(),
-                        CommandEvent::Failed(_) => false,
-                    };
-                if is_sensitive_hello || REDACTED_COMMANDS.contains(lower_name.as_str()) {
+                if !observe_events.iter().any(|observe| observe.matches(event)) {
                     return false;
                 }
             }
@@ -99,9 +116,49 @@ impl ClientEntity {
         })
     }
 
+    /// Returns `true` if a given `CommandEvent` is allowed to be observed.
+    fn allow_command_event(&self, event: &CommandEvent) -> bool {
+        if event.command_name() == "configureFailPoint" {
+            return false;
+        }
+        if let Some(ignore_command_names) = self.ignore_command_names.as_ref() {
+            if ignore_command_names
+                .iter()
+                .any(|name| event.command_name().eq_ignore_ascii_case(name))
+            {
+                return false;
+            }
+        }
+        if !self.observe_sensitive_commands {
+            let lower_name = event.command_name().to_ascii_lowercase();
+            // If a hello command has been redacted, it's sensitive and the event should be
+            // ignored.
+            let is_sensitive_hello = HELLO_COMMAND_NAMES.contains(lower_name.as_str())
+                && match event {
+                    CommandEvent::Started(ev) => ev.command.is_empty(),
+                    CommandEvent::Succeeded(ev) => ev.reply.is_empty(),
+                    CommandEvent::Failed(_) => false,
+                };
+            if is_sensitive_hello || REDACTED_COMMANDS.contains(lower_name.as_str()) {
+                return false;
+            }
+        }
+        true
+    }
+
     /// Gets all events of type commandStartedEvent, excluding configureFailPoint events.
     pub fn get_all_command_started_events(&self) -> Vec<CommandStartedEvent> {
         self.observer.get_all_command_started_events()
+    }
+
+    /// Gets the count of connections currently checked out.
+    pub fn connections_checked_out(&self) -> u32 {
+        self.observer.connections_checked_out()
+    }
+
+    /// Synchronize all connection pool worker threads.
+    pub async fn sync_workers(&self) {
+        self.client.sync_workers().await;
     }
 }
 
@@ -198,6 +255,20 @@ impl Entity {
         match self {
             Self::Bson(bson) => bson,
             _ => panic!("Expected BSON entity, got {:?}", &self),
+        }
+    }
+
+    pub fn as_mut_find_cursor(&mut self) -> &mut FindCursor {
+        match self {
+            Self::FindCursor(cursor) => cursor,
+            _ => panic!("Expected find cursor, got {:?}", &self),
+        }
+    }
+
+    pub fn into_find_cursor(self) -> FindCursor {
+        match self {
+            Self::FindCursor(cursor) => cursor,
+            _ => panic!("Expected find cursor, got {:?}", &self),
         }
     }
 }

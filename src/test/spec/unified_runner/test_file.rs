@@ -3,7 +3,7 @@ use std::time::Duration;
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Deserializer};
 
-use super::{Operation, TestEvent};
+use super::{results_match, ExpectedEvent, ObserveEvent, Operation};
 
 use crate::{
     bson::{doc, Bson, Deserializer as BsonDeserializer, Document},
@@ -20,7 +20,7 @@ use crate::{
         SelectionCriteria,
         WriteConcern,
     },
-    test::{spec::unified_runner::results_match, Serverless, TestClient, DEFAULT_URI, SERVERLESS},
+    test::{Serverless, TestClient, DEFAULT_URI, SERVERLESS},
 };
 
 #[derive(Debug, Deserialize)]
@@ -136,23 +136,14 @@ pub enum TestFileEntity {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Client {
     pub id: String,
-    #[serde(
-        default = "default_uri",
-        deserialize_with = "deserialize_uri_options_to_uri_string",
-        rename = "uriOptions"
-    )]
-    pub uri: String,
+    pub uri_options: Option<Document>,
     pub use_multiple_mongoses: Option<bool>,
-    pub observe_events: Option<Vec<String>>,
+    pub observe_events: Option<Vec<ObserveEvent>>,
     pub ignore_command_monitoring_events: Option<Vec<String>>,
     #[serde(default)]
     pub observe_sensitive_commands: Option<bool>,
     #[serde(default, deserialize_with = "deserialize_server_api_test_format")]
     pub server_api: Option<ServerApi>,
-}
-
-fn default_uri() -> String {
-    DEFAULT_URI.clone()
 }
 
 pub fn deserialize_server_api_test_format<'de, D>(
@@ -177,17 +168,14 @@ where
     }))
 }
 
-pub fn deserialize_uri_options_to_uri_string<'de, D>(
-    deserializer: D,
-) -> std::result::Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let uri_options = Document::deserialize(deserializer)?;
+pub fn merge_uri_options(given_uri: &str, uri_options: Option<&Document>) -> String {
+    let uri_options = match uri_options {
+        Some(opts) => opts,
+        None => return given_uri.to_string(),
+    };
+    let mut given_uri_parts = given_uri.split('?');
 
-    let mut default_uri_parts = DEFAULT_URI.split('?');
-
-    let mut uri = String::from(default_uri_parts.next().unwrap());
+    let mut uri = String::from(given_uri_parts.next().unwrap());
     // A connection string has two slashes before the host list and one slash before the auth db
     // name. If an auth db name is not provided the latter slash might not be present, so it needs
     // to be added manually.
@@ -196,7 +184,7 @@ where
     }
     uri.push('?');
 
-    if let Some(options) = default_uri_parts.next() {
+    if let Some(options) = given_uri_parts.next() {
         let options = options.split('&');
         for option in options {
             let key = option.split('=').next().unwrap();
@@ -219,7 +207,7 @@ where
     // remove the trailing '&' from the URI (or '?' if no options are present)
     uri.pop();
 
-    Ok(uri)
+    uri
 }
 
 #[derive(Debug, Deserialize)]
@@ -313,7 +301,15 @@ pub struct TestCase {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ExpectedEvents {
     pub client: String,
-    pub events: Vec<TestEvent>,
+    pub events: Vec<ExpectedEvent>,
+    pub event_type: Option<ExpectedEventType>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub enum ExpectedEventType {
+    Command,
+    Cmap,
 }
 
 #[derive(Debug, Deserialize)]
@@ -330,13 +326,13 @@ pub struct ExpectError {
 }
 
 impl ExpectError {
-    pub fn verify_result(self, error: Error) {
+    pub fn verify_result(&self, error: Error) {
         if let Some(is_client_error) = self.is_client_error {
             assert_eq!(is_client_error, !error.is_server_error());
         }
-        if let Some(error_contains) = self.error_contains {
+        if let Some(error_contains) = &self.error_contains {
             match &error.message() {
-                Some(msg) => assert!(msg.contains(&error_contains)),
+                Some(msg) => assert!(msg.contains(error_contains)),
                 None => panic!("{} should include message field", error),
             }
         }
@@ -346,20 +342,20 @@ impl ExpectError {
                 None => panic!("{} should include code", error),
             }
         }
-        if let Some(error_code_name) = self.error_code_name {
+        if let Some(error_code_name) = &self.error_code_name {
             match &error.code_name() {
                 Some(name) => assert_eq!(&error_code_name, name),
                 None => panic!("{} should include code name", error),
             }
         }
-        if let Some(error_labels_contain) = self.error_labels_contain {
+        if let Some(error_labels_contain) = &self.error_labels_contain {
             for label in error_labels_contain {
-                assert!(error.labels().contains(&label));
+                assert!(error.labels().contains(label));
             }
         }
-        if let Some(error_labels_omit) = self.error_labels_omit {
+        if let Some(error_labels_omit) = &self.error_labels_omit {
             for label in error_labels_omit {
-                assert!(!error.labels().contains(&label));
+                assert!(!error.labels().contains(label));
             }
         }
         if self.expect_result.is_some() {
@@ -370,14 +366,13 @@ impl ExpectError {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn deserialize_uri_options() {
+async fn merged_uri_options() {
     let options = doc! {
         "ssl": true,
         "w": 2,
         "readconcernlevel": "local",
     };
-    let d = BsonDeserializer::new(options.into());
-    let uri = deserialize_uri_options_to_uri_string(d).unwrap();
+    let uri = merge_uri_options(&DEFAULT_URI, Some(&options));
     let options = ClientOptions::parse_uri(&uri, None).await.unwrap();
 
     assert!(options.tls_options().is_some());

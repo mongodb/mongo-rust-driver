@@ -5,34 +5,37 @@ mod test_event;
 mod test_file;
 mod test_runner;
 
-use std::{fs::read_dir, path::PathBuf, time::Duration};
+use std::{convert::TryFrom, ffi::OsStr, fs::read_dir, path::PathBuf, time::Duration};
 
 use futures::{future::FutureExt, stream::TryStreamExt};
 use semver::Version;
 use tokio::sync::RwLockWriteGuard;
 
 use crate::{
-    bson::{doc, Bson, Document},
+    bson::{doc, Document},
     options::{CollectionOptions, FindOptions, ReadConcern, ReadPreference, SelectionCriteria},
     test::{run_single_test, run_spec_test, LOCK},
     RUNTIME,
 };
 
 pub use self::{
-    entity::{ClientEntity, Entity, SessionEntity},
+    entity::{ClientEntity, Entity, FindCursor, SessionEntity},
     matcher::{events_match, results_match},
     operation::{Operation, OperationObject},
-    test_event::TestEvent,
+    test_event::{ExpectedCmapEvent, ExpectedCommandEvent, ExpectedEvent, ObserveEvent},
     test_file::{
-        deserialize_uri_options_to_uri_string,
+        merge_uri_options,
         CollectionData,
         ExpectError,
+        ExpectedEventType,
         TestFile,
         TestFileEntity,
         Topology,
     },
     test_runner::{EntityMap, TestRunner},
 };
+
+use self::operation::Expectation;
 
 static SPEC_VERSIONS: &[Version] = &[
     Version::new(1, 0, 0),
@@ -140,69 +143,57 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                         .execute_entity_operation(id, &mut test_runner)
                         .await;
 
-                    // Precache the BSON result, if any, so that other entities can be saved without
-                    // cloning.
-                    #[derive(Debug)]
-                    enum ResultEntity {
-                        Bson(Bson),
-                        Other,
-                        None,
-                    }
-
-                    let bson_result = match &result {
-                        Ok(Some(Entity::Bson(bson))) => Ok(ResultEntity::Bson(bson.clone())),
-                        Ok(Some(_)) => Ok(ResultEntity::Other),
-                        Ok(None) => Ok(ResultEntity::None),
-                        Err(e) => Err(e.clone()),
-                    };
-
-                    if let Some(ref id) = operation.save_result_as_entity {
-                        match result {
-                            Ok(Some(entity)) => {
-                                if test_runner.entities.insert(id.clone(), entity).is_some() {
-                                    panic!("Entity with id {} already present in entity map", id);
+                    match &operation.expectation {
+                        Expectation::Result {
+                            expected_value,
+                            save_as_entity,
+                        } => {
+                            let opt_entity = result.unwrap_or_else(|e| {
+                                panic!(
+                                    "{} should succeed, but failed with the following error: {}",
+                                    operation.name, e
+                                )
+                            });
+                            if expected_value.is_some() || save_as_entity.is_some() {
+                                let entity = opt_entity.unwrap_or_else(|| {
+                                    panic!("{} did not return an entity", operation.name)
+                                });
+                                if let Some(expected_bson) = expected_value {
+                                    if let Entity::Bson(actual) = &entity {
+                                        assert!(
+                                            results_match(
+                                                Some(actual),
+                                                expected_bson,
+                                                operation.returns_root_documents(),
+                                                Some(&test_runner.entities),
+                                            ),
+                                            "result mismatch, expected = {:#?}  actual = {:#?}",
+                                            expected_bson,
+                                            actual,
+                                        );
+                                    } else {
+                                        panic!(
+                                            "Incorrect entity type returned from {}, expected BSON",
+                                            operation.name
+                                        );
+                                    }
                                 }
-                            }
-                            Ok(None) => panic!("{} did not return an entity", operation.name),
-                            Err(_) => panic!("{} should succeed", operation.name),
-                        }
-                    }
-
-                    if let Some(expect_error) = operation.expect_error {
-                        let error = bson_result
-                            .expect_err(&format!("{} should return an error", operation.name));
-                        expect_error.verify_result(error);
-                    } else {
-                        let result = bson_result.unwrap_or_else(|e| {
-                            panic!(
-                                "{} should succeed, but the following error: {}",
-                                operation.name, e
-                            )
-                        });
-                        if let Some(ref expect_result) = operation.expect_result {
-                            match result {
-                                ResultEntity::Bson(ref result) => {
-                                    assert!(
-                                        results_match(
-                                            Some(result),
-                                            expect_result,
-                                            operation.returns_root_documents(),
-                                            Some(&test_runner.entities),
-                                        ),
-                                        "result mismatch, expected = {:#?}  actual = {:#?}",
-                                        expect_result,
-                                        result
-                                    );
-                                }
-                                ResultEntity::Other => panic!(
-                                    "Incorrect entity type returned from {}, expected BSON",
-                                    operation.name
-                                ),
-                                ResultEntity::None => {
-                                    panic!("{} should return an entity", operation.name)
+                                if let Some(id) = save_as_entity {
+                                    if test_runner.entities.insert(id.clone(), entity).is_some() {
+                                        panic!(
+                                            "Entity with id {} already present in entity map",
+                                            id
+                                        );
+                                    }
                                 }
                             }
                         }
+                        Expectation::Error(expect_error) => {
+                            let error = result
+                                .expect_err(&format!("{} should return an error", operation.name));
+                            expect_error.verify_result(error);
+                        }
+                        Expectation::Ignore => (),
                     }
                 }
             }
@@ -222,16 +213,26 @@ pub async fn run_unified_format_test(test_file: TestFile) {
             for expected in events {
                 let entity = test_runner.entities.get(&expected.client).unwrap();
                 let client = entity.as_client();
+                client.sync_workers().await;
+                let event_type = expected
+                    .event_type
+                    .unwrap_or(test_file::ExpectedEventType::Command);
 
-                let actual_events: Vec<TestEvent> = client
-                    .get_filtered_events()
+                let actual_events: Vec<ExpectedEvent> = client
+                    .get_filtered_events(event_type)
                     .into_iter()
                     .map(Into::into)
                     .collect();
 
                 let expected_events = &expected.events;
 
-                assert_eq!(actual_events.len(), expected_events.len());
+                assert_eq!(
+                    actual_events.len(),
+                    expected_events.len(),
+                    "actual:\n{:#?}\nexpected:\n{:#?}",
+                    actual_events,
+                    expected_events
+                );
 
                 for (actual, expected) in actual_events.iter().zip(expected_events) {
                     assert!(
@@ -326,4 +327,62 @@ async fn valid_pass() {
         run_unified_format_test,
     )
     .await;
+}
+
+const SKIPPED_INVALID_TESTS: &[&str] = &[
+    // Event types are validated at test execution time, not parse time.
+    "expectedEventsForClient-events_conflicts_with_cmap_eventType.json",
+    "expectedEventsForClient-events_conflicts_with_command_eventType.json",
+    "expectedEventsForClient-events_conflicts_with_default_eventType.json",
+];
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn invalid() {
+    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
+
+    let path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "src",
+        "test",
+        "spec",
+        "json",
+        "unified-test-format",
+        "invalid",
+    ]
+    .iter()
+    .collect();
+
+    for entry in read_dir(&path).unwrap() {
+        let test_file = entry.unwrap();
+        if !test_file.file_type().unwrap().is_file() {
+            continue;
+        }
+        let test_file_path = PathBuf::from(test_file.file_name());
+        if test_file_path.extension().and_then(OsStr::to_str) != Some("json") {
+            continue;
+        }
+        let test_file_str = test_file_path.as_os_str().to_str().unwrap();
+        if SKIPPED_INVALID_TESTS
+            .iter()
+            .any(|skip| *skip == test_file_str)
+        {
+            println!("Skipping {}", test_file_str);
+            continue;
+        }
+        let path = path.join(&test_file_path);
+        let path_display = path.display().to_string();
+
+        let json: serde_json::Value =
+            serde_json::from_reader(std::fs::File::open(path.as_path()).unwrap()).unwrap();
+        let result: Result<TestFile, _> = bson::from_bson(
+            bson::Bson::try_from(json).unwrap_or_else(|_| panic!("{}", path_display)),
+        );
+        if let Ok(test_file) = result {
+            panic!(
+                "{}: should be invalid, parsed to:\n{:#?}",
+                path_display, test_file
+            );
+        }
+    }
 }
