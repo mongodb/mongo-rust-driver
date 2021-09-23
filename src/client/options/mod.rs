@@ -547,6 +547,7 @@ pub struct ClientOptions {
 
     /// Whether or not the client is connecting to a MongoDB cluster through a load balancer.
     #[builder(default, setter(skip))]
+    #[serde(rename = "loadbalanced")]
     pub(crate) load_balanced: Option<bool>,
 
     /// Control test behavior of the client.
@@ -640,6 +641,8 @@ impl Serialize for ClientOptions {
             writeconcern: &'a Option<WriteConcern>,
 
             zlibcompressionlevel: &'a Option<i32>,
+
+            loadbalanced: &'a Option<bool>,
         }
 
         let client_options = ClientOptionsHelper {
@@ -663,6 +666,7 @@ impl Serialize for ClientOptions {
             tls: &self.tls,
             writeconcern: &self.write_concern,
             zlibcompressionlevel: &self.zlib_compression,
+            loadbalanced: &self.load_balanced,
         };
 
         client_options.serialize(serializer)
