@@ -1132,6 +1132,7 @@ impl ClientOptions {
             write_concern.validate()?;
         }
 
+        #[cfg(not(test))]
         if !self.allow_load_balanced && self.load_balanced.is_some() {
             return Err(ErrorKind::InvalidArgument {
                 message: "loadBalanced is not supported".to_string(),

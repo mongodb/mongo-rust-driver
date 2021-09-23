@@ -68,7 +68,7 @@ async fn run() {
             return;
         }
 
-        assert!(matches!(result, Ok(_)));
+        assert!(matches!(result, Ok(_)), "non-Ok result: {:?}", result);
 
         let options = result.unwrap();
 
@@ -180,5 +180,5 @@ async fn run() {
     }
 
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-    run_spec_test(&["initial-dns-seedlist-discovery"], run_test).await;
+    run_spec_test(&["initial-dns-seedlist-discovery", "replica-set"], run_test).await;
 }
