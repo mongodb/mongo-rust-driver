@@ -242,12 +242,6 @@ async fn run_test(test_file: TestFile) {
         return;
     }
 
-    // TODO RUST-653 unskip load balancer test
-    if test_description.contains("load balancer") {
-        println!("Skipping {} (RUST-653)", test_description);
-        return;
-    }
-
     let mut options = ClientOptions::parse_uri(&test_file.uri, None)
         .await
         .expect(test_description);
@@ -257,7 +251,6 @@ async fn run_test(test_file: TestFile) {
     options.test_options_mut().disable_monitoring_threads = true;
 
     let topology = Topology::new(options.clone()).unwrap();
-    //let topology = Topology::new_mocked(options.clone());
     let mut servers = topology.get_servers().await;
 
     for (i, phase) in test_file.phases.into_iter().enumerate() {
