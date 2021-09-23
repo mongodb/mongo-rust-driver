@@ -26,7 +26,7 @@ lazy_static::lazy_static! {
 async fn run_test(new_hosts: Result<Vec<ServerAddress>>, expected_hosts: HashSet<ServerAddress>) {
     let mut options = ClientOptions::new_srv();
     options.hosts = DEFAULT_HOSTS.clone();
-    let topology = Topology::new_mocked(options);
+    let topology = Topology::new(options, true).unwrap();
     let mut monitor = SrvPollingMonitor::new(topology.downgrade()).unwrap();
 
     monitor

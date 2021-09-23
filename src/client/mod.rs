@@ -119,6 +119,9 @@ impl Client {
         options.validate()?;
 
         let inner = Arc::new(ClientInner {
+            #[cfg(test)]
+            topology: Topology::new(options.clone(), false)?,
+            #[cfg(not(test))]
             topology: Topology::new(options.clone())?,
             session_pool: ServerSessionPool::new(),
             options,

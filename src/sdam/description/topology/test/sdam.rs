@@ -254,7 +254,8 @@ async fn run_test(test_file: TestFile) {
     let handler = Arc::new(EventHandler::new());
     options.sdam_event_handler = Some(handler.clone());
 
-    let topology = Topology::new_mocked(options.clone());
+    let topology = Topology::new(options.clone(), true).unwrap();
+    //let topology = Topology::new_mocked(options.clone());
     let mut servers = topology.get_servers().await;
 
     for (i, phase) in test_file.phases.into_iter().enumerate() {
@@ -351,7 +352,7 @@ async fn run_test(test_file: TestFile) {
             }
             Outcome::Events(EventsOutcome { events: expected }) => {
                 let actual = handler.get_all_sdam_events();
-                assert_eq!(actual.len(), expected.len());
+                assert_eq!(actual.len(), expected.len(), "event list length mismatch:\n actual: {:#?}, expected: {:#?}", actual, expected);
                 for (actual, expected) in actual.iter().zip(expected.iter()) {
                     assert_eq!(
                         actual, expected,
@@ -679,7 +680,7 @@ async fn pool_cleared_error_does_not_mark_unknown() {
     let options = ClientOptions::builder()
         .hosts(vec![address.clone()])
         .build();
-    let topology = Topology::new_mocked(options);
+    let topology = Topology::new(options, true).unwrap();
 
     // get the one server in the topology
     let server = topology

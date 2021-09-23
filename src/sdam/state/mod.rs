@@ -85,80 +85,13 @@ struct TopologyState {
 }
 
 impl Topology {
-    /// Creates a new TopologyDescription with the set of servers initialized to the addresses
-    /// specified in `hosts` and each other field set to its default value. No monitoring threads
-    /// will be started for the servers in the topology that's returned.
-    #[cfg(test)]
-    pub(super) fn new_mocked(options: ClientOptions) -> Self {
-        let description = TopologyDescription::new(options.clone()).unwrap();
-
-        let id = ObjectId::new();
-        if let Some(ref handler) = options.sdam_event_handler {
-            let event = TopologyOpeningEvent { topology_id: id };
-            handler.handle_topology_opening_event(event);
-        }
-
-        let common = Common {
-            is_alive: Arc::new(AtomicBool::new(true)),
-            message_manager: TopologyMessageManager::new(),
-            options: options.clone(),
-            id,
-        };
-
-        let http_client = HttpClient::default();
-
-        let state = TopologyState {
-            description,
-            servers: Default::default(),
-            http_client: http_client.clone(),
-            mocked: true,
-        };
-
-        let topology = Self {
-            state: Arc::new(RwLock::new(state)),
-            common,
-        };
-
-        // we can block in place here because we're the only ones with access to the lock, so it
-        // should be acquired immediately.
-        let mut topology_state = RUNTIME.block_in_place(topology.state.write());
-
-        for address in &options.hosts {
-            topology_state.servers.insert(
-                address.clone(),
-                Server::create(
-                    address.clone(),
-                    &options,
-                    topology.downgrade(),
-                    http_client.clone(),
-                )
-                .0,
-            );
-        }
-
-        if let Some(ref handler) = options.sdam_event_handler {
-            let event = TopologyDescriptionChangedEvent {
-                topology_id: id,
-                previous_description: TopologyDescription::new_empty().into(),
-                new_description: topology_state.description.clone().into(),
-            };
-            handler.handle_topology_description_changed_event(event);
-
-            for server_address in &options.hosts {
-                let event = ServerOpeningEvent {
-                    topology_id: id,
-                    address: server_address.clone(),
-                };
-                handler.handle_server_opening_event(event);
-            }
-        }
-
-        drop(topology_state);
-        topology
-    }
-
-    /// Creates a new Topology given the `options`.
-    pub(crate) fn new(mut options: ClientOptions) -> Result<Self> {
+    /// Creates a new Topology given the `options`.  If `mocked` is true, no server monitoring
+    /// threads will be spawned.
+    pub(crate) fn new(
+        options: ClientOptions,
+        #[cfg(test)]
+        mocked: bool,
+    ) -> Result<Self> {
         let description = TopologyDescription::new(options.clone())?;
         let is_load_balanced = description.topology_type() == TopologyType::LoadBalanced;
 
@@ -168,8 +101,6 @@ impl Topology {
             handler.handle_topology_opening_event(event);
         }
 
-        let hosts: Vec<_> = options.hosts.drain(..).collect();
-
         let common = Common {
             is_alive: Arc::new(AtomicBool::new(true)),
             message_manager: TopologyMessageManager::new(),
@@ -179,19 +110,12 @@ impl Topology {
 
         let http_client = HttpClient::default();
 
-        #[cfg(test)]
         let topology_state = TopologyState {
             description,
             servers: Default::default(),
             http_client,
-            mocked: false,
-        };
-
-        #[cfg(not(test))]
-        let topology_state = TopologyState {
-            description,
-            servers: Default::default(),
-            http_client,
+            #[cfg(test)]
+            mocked,
         };
 
         let state = Arc::new(RwLock::new(topology_state));
@@ -200,8 +124,8 @@ impl Topology {
         // we can block in place here because we're the only ones with access to the lock, so it
         // should be acquired immediately.
         let mut topology_state = RUNTIME.block_in_place(topology.state.write());
-        for address in hosts {
-            topology_state.add_new_server(address, options.clone(), &topology.downgrade());
+        for address in &options.hosts {
+            topology_state.add_new_server(address.clone(), options.clone(), &topology.downgrade());
         }
 
         if let Some(ref handler) = options.sdam_event_handler {
