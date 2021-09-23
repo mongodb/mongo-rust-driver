@@ -80,17 +80,12 @@ struct TopologyState {
     http_client: HttpClient,
     description: TopologyDescription,
     servers: HashMap<ServerAddress, Arc<Server>>,
-    #[cfg(test)]
-    mocked: bool,
 }
 
 impl Topology {
-    /// Creates a new Topology given the `options`.  If `mocked` is true, no server monitoring
-    /// threads will be spawned.
+    /// Creates a new Topology given the `options`.
     pub(crate) fn new(
         options: ClientOptions,
-        #[cfg(test)]
-        mocked: bool,
     ) -> Result<Self> {
         let description = TopologyDescription::new(options.clone())?;
         let is_load_balanced = description.topology_type() == TopologyType::LoadBalanced;
@@ -114,8 +109,6 @@ impl Topology {
             description,
             servers: Default::default(),
             http_client,
-            #[cfg(test)]
-            mocked,
         };
 
         let state = Arc::new(RwLock::new(topology_state));
@@ -157,11 +150,14 @@ impl Topology {
                     .update(new_desc, &options, topology.downgrade())
                     .map_err(Error::internal)?;
             }
-        } else {
-            // When the client is in load balanced mode, it doesn't poll for changes in the SRV
-            // record.
+        }
+
+        #[cfg(test)]
+        if !options.test_options.map(|to| to.disable_monitoring_threads).unwrap_or(false) {
             SrvPollingMonitor::start(topology.downgrade());
         }
+        #[cfg(not(test))]
+        SrvPollingMonitor::start(topology.downgrade());
 
         drop(topology_state);
         Ok(topology)
@@ -526,7 +522,7 @@ impl TopologyState {
         self.servers.insert(address, server);
 
         #[cfg(test)]
-        if self.mocked {
+        if options.test_options.map(|to| to.disable_monitoring_threads).unwrap_or(false) {
             return;
         }
 

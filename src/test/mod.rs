@@ -49,7 +49,6 @@ lazy_static! {
         let mut options = ClientOptions::parse_without_srv_resolution(&uri).unwrap();
         options.max_pool_size = Some(MAX_POOL_SIZE);
         options.server_api = SERVER_API.clone();
-        options.allow_load_balanced = true;
 
         options
     };

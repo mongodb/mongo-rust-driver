@@ -49,6 +49,8 @@ use crate::{
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
     srv::{OriginalSrvInfo, SrvResolver},
 };
+#[cfg(test)]
+use crate::srv::LookupHosts;
 
 pub use resolver_config::ResolverConfig;
 
@@ -543,20 +545,29 @@ pub struct ClientOptions {
     #[serde(skip)]
     pub(crate) resolver_config: Option<ResolverConfig>,
 
-    /// Used by tests to override MIN_HEARTBEAT_FREQUENCY.
-    #[builder(default)]
-    #[cfg(test)]
-    pub(crate) heartbeat_freq_test: Option<Duration>,
-
-    /// Allow use of the `load_balanced` option.
-    // TODO RUST-653 Remove this when load balancer work is ready for release.
-    #[builder(default, setter(skip))]
-    #[serde(skip)]
-    pub(crate) allow_load_balanced: bool,
-
     /// Whether or not the client is connecting to a MongoDB cluster through a load balancer.
     #[builder(default, setter(skip))]
     pub(crate) load_balanced: Option<bool>,
+
+    /// Control test behavior of the client.
+    #[cfg(test)]
+    #[builder(default, setter(skip))]
+    #[serde(skip)]
+    #[derivative(PartialEq = "ignore")]
+    pub(crate) test_options: Option<TestOptions>,
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Default)]
+pub(crate) struct TestOptions {
+    /// Override MIN_HEARTBEAT_FREQUENCY.
+    pub(crate) heartbeat_freq: Option<Duration>,
+
+    /// Disable server and SRV-polling monitor threads.
+    pub(crate) disable_monitoring_threads: bool,
+
+    /// Mock response for `SrvPollingMonitor::lookup_hosts`.
+    pub(crate) mock_lookup_hosts: Option<Result<LookupHosts>>,
 }
 
 fn default_hosts() -> Vec<ServerAddress> {
@@ -921,11 +932,10 @@ impl From<ClientOptionsParser> for ClientOptions {
             original_uri: Some(parser.original_uri),
             resolver_config: None,
             server_api: None,
-            #[cfg(test)]
-            heartbeat_freq_test: None,
-            allow_load_balanced: false,
             load_balanced: parser.load_balanced,
             sdam_event_handler: None,
+            #[cfg(test)]
+            test_options: None,
         }
     }
 }
@@ -1132,8 +1142,9 @@ impl ClientOptions {
             write_concern.validate()?;
         }
 
-        #[cfg(not(test))]
-        if !self.allow_load_balanced && self.load_balanced.is_some() {
+        // Disallow use of load-balanced configurations in non-test code.
+        // TODO RUST-653 Remove this when load balancer work is ready for release.
+        if !cfg!(test) && self.load_balanced.is_some() {
             return Err(ErrorKind::InvalidArgument {
                 message: "loadBalanced is not supported".to_string(),
             }
@@ -1200,6 +1211,11 @@ impl ClientOptions {
                 original_uri
             ]
         );
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_options_mut(&mut self) -> &mut TestOptions {
+        self.test_options.get_or_insert_with(Default::default)
     }
 }
 

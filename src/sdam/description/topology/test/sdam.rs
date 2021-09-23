@@ -253,8 +253,9 @@ async fn run_test(test_file: TestFile) {
 
     let handler = Arc::new(EventHandler::new());
     options.sdam_event_handler = Some(handler.clone());
+    options.test_options_mut().disable_monitoring_threads = true;
 
-    let topology = Topology::new(options.clone(), true).unwrap();
+    let topology = Topology::new(options.clone()).unwrap();
     //let topology = Topology::new_mocked(options.clone());
     let mut servers = topology.get_servers().await;
 
@@ -677,10 +678,11 @@ async fn direct_connection() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn pool_cleared_error_does_not_mark_unknown() {
     let address = ServerAddress::parse("a:1234").unwrap();
-    let options = ClientOptions::builder()
+    let mut options = ClientOptions::builder()
         .hosts(vec![address.clone()])
         .build();
-    let topology = Topology::new(options, true).unwrap();
+    options.test_options_mut().disable_monitoring_threads = true;
+    let topology = Topology::new(options).unwrap();
 
     // get the one server in the topology
     let server = topology

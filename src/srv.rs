@@ -22,6 +22,7 @@ pub(crate) struct ResolvedConfig {
     pub(crate) load_balanced: Option<bool>,
 }
 
+#[derive(Debug, Clone)]
 pub(crate) struct LookupHosts {
     pub(crate) hosts: Vec<Result<ServerAddress>>,
     pub(crate) min_ttl: Duration,
