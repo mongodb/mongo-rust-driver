@@ -225,6 +225,7 @@ fn server_type_from_str(s: &str) -> Option<ServerType> {
         "RSArbiter" => ServerType::RsArbiter,
         "RSOther" => ServerType::RsOther,
         "RSGhost" => ServerType::RsGhost,
+        "LoadBalancer" => ServerType::LoadBalancer,
         "Unknown" | "PossiblePrimary" => ServerType::Unknown,
         _ => return None,
     };
@@ -522,6 +523,12 @@ async fn errors() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn monitoring() {
     run_spec_test(&["server-discovery-and-monitoring", "monitoring"], run_test).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn load_balanced() {
+    run_spec_test(&["server-discovery-and-monitoring", "load-balanced"], run_test).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
