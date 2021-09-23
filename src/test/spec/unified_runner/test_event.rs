@@ -53,19 +53,16 @@ impl From<CommandEvent> for ExpectedCommandEvent {
                 command_name: Some(event.command_name),
                 database_name: Some(event.db),
                 command: Some(event.command),
-                // TODO RUST-956 Populate the `has_service_id` field once `service_id` is present.
-                has_service_id: None,
+                has_service_id: Some(event.service_id.is_some()),
             },
             CommandEvent::Failed(event) => ExpectedCommandEvent::Failed {
                 command_name: Some(event.command_name),
-                // TODO RUST-956 Populate the `has_service_id` field once `service_id` is present.
-                has_service_id: None,
+                has_service_id: Some(event.service_id.is_some()),
             },
             CommandEvent::Succeeded(event) => ExpectedCommandEvent::Succeeded {
                 command_name: Some(event.command_name),
                 reply: Some(event.reply),
-                // TODO RUST-956 Populate the `has_service_id` field once `service_id` is present.
-                has_service_id: None,
+                has_service_id: Some(event.service_id.is_some()),
             },
         }
     }
@@ -118,10 +115,9 @@ impl From<CmapEvent> for ExpectedCmapEvent {
                 reason: Some(ev.reason),
             },
             CmapEvent::ConnectionCheckedOut(_) => Self::ConnectionCheckedOut {},
-            CmapEvent::PoolCleared(_) => {
-                // TODO RUST-956 populate `has_service_id`
+            CmapEvent::PoolCleared(ev) => {
                 Self::PoolCleared {
-                    has_service_id: None,
+                    has_service_id: Some(ev.service_id.is_some()),
                 }
             }
             CmapEvent::ConnectionCheckedIn(_) => Self::ConnectionCheckedIn {},
