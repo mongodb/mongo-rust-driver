@@ -167,13 +167,10 @@ impl<T> Collection<T> {
 
     /// Gets a clone of the `Collection` with a different type `U`.
     pub fn clone_with_type<U>(&self) -> Collection<U> {
-        let options = CollectionOptions::builder()
-            .selection_criteria(self.inner.selection_criteria.clone())
-            .read_concern(self.inner.read_concern.clone())
-            .write_concern(self.inner.write_concern.clone())
-            .build();
-
-        Collection::new(self.inner.db.clone(), &self.inner.name, Some(options))
+        Collection {
+            inner: self.inner.clone(),
+            _phantom: Default::default(),
+        }
     }
 
     /// Get the `Client` that this collection descended from.
