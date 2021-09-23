@@ -149,17 +149,16 @@ impl Topology {
                     .map_err(Error::internal)?;
             }
         }
-
         #[cfg(test)]
-        if !options
+        let disable_monitoring_threads = options
             .test_options
             .map(|to| to.disable_monitoring_threads)
-            .unwrap_or(false)
-        {
+            .unwrap_or(false);
+        #[cfg(not(test))]
+        let disable_monitoring_threads = false;
+        if !is_load_balanced && !disable_monitoring_threads {
             SrvPollingMonitor::start(topology.downgrade());
         }
-        #[cfg(not(test))]
-        SrvPollingMonitor::start(topology.downgrade());
 
         drop(topology_state);
         Ok(topology)
