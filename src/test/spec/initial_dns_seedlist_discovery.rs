@@ -48,7 +48,7 @@ impl ResolvedOptions {
 }
 
 #[derive(Debug, Deserialize, Default, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 struct ParsedOptions {
     user: Option<String>,
     password: Option<String>,
