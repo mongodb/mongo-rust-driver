@@ -12,6 +12,7 @@ use crate::{
 };
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct TestFile {
     uri: String,
     seeds: Vec<String>,
@@ -23,14 +24,31 @@ struct TestFile {
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ResolvedOptions {
     replica_set: Option<String>,
     auth_source: Option<String>,
     ssl: bool,
+    load_balanced: Option<bool>,
+    direct_connection: Option<bool>,
+}
+
+impl ResolvedOptions {
+    fn assert_eq(&self, options: &ClientOptions) {
+        // When an `authSource` is provided without any other authentication information, we do
+        // not keep track of it within a Credential. The options present in the spec tests
+        // expect the `authSource` be present regardless of whether a Credential should be
+        // created, so the value of the `authSource` is not asserted on to avoid this
+        // discrepancy.
+        assert_eq!(self.replica_set, options.repl_set_name);
+        assert_eq!(self.ssl, options.tls_options().is_some());
+        assert_eq!(self.load_balanced, options.load_balanced);
+        assert_eq!(self.direct_connection, options.direct_connection);
+    }
 }
 
 #[derive(Debug, Deserialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ParsedOptions {
     user: Option<String>,
     password: Option<String>,
@@ -40,6 +58,16 @@ struct ParsedOptions {
 async fn run_test(mut test_file: TestFile) {
     // TODO DRIVERS-796: unskip this test
     if test_file.uri == "mongodb+srv://test5.test.build.10gen.cc/?authSource=otherDB" {
+        return;
+    }
+
+    // TODO RUST-979 unskip these tests
+    if test_file
+        .options
+        .as_ref()
+        .and_then(|o| o.load_balanced)
+        .unwrap_or(false)
+    {
         return;
     }
 
@@ -148,13 +176,7 @@ async fn run_test(mut test_file: TestFile) {
     }
 
     if let Some(ref mut resolved_options) = test_file.options {
-        // When an `authSource` is provided without any other authentication information, we do
-        // not keep track of it within a Credential. The options present in the spec tests
-        // expect the `authSource` be present regardless of whether a Credential should be
-        // created, so the value of the `authSource` is not asserted on to avoid this
-        // discrepancy.
-        assert_eq!(resolved_options.replica_set, options.repl_set_name);
-        assert_eq!(resolved_options.ssl, options.tls_options().is_some());
+        resolved_options.assert_eq(&options);
     }
 
     if let Some(parsed_options) = test_file.parsed_options {
