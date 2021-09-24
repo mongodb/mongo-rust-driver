@@ -10,12 +10,12 @@ use crate::{
     bson::{doc, Bson, Document},
     client::auth::{ClientFirst, FirstRound},
     cmap::{options::ConnectionPoolOptions, Command, Connection, StreamDescription},
+    compression::Compressor,
     error::{ErrorKind, Result},
     event::sdam::SdamEventHandler,
     is_master::{is_master_command, run_is_master, IsMasterReply},
     options::{AuthMechanism, ClientOptions, Credential, DriverInfo, ServerApi},
     sdam::WeakTopology,
-    compression::Compressor,
 };
 
 #[cfg(feature = "tokio-runtime")]
@@ -288,7 +288,7 @@ impl Handshaker {
                                 }
                                 let level = level.try_into().unwrap_or(6);
                                 Some(Compressor::Zlib(level))
-                            },
+                            }
                             "zstd" => Some(Compressor::Zstd(0)),
                             "snappy" => None,
                             _ => None,

@@ -13,12 +13,12 @@ use tokio::sync::{mpsc, Mutex};
 use self::wire::Message;
 use super::manager::PoolManager;
 use crate::{
-    compression::Compressor,
     bson::oid::ObjectId,
     cmap::{
         options::{ConnectionOptions, StreamOptions},
         PoolGeneration,
     },
+    compression::Compressor,
     error::{load_balanced_mode_mismatch, Error, ErrorKind, Result},
     event::cmap::{
         CmapEventHandler,
