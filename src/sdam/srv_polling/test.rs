@@ -113,6 +113,7 @@ async fn load_balanced_no_srv_polling() {
     let mut options = ClientOptions::new_srv();
     let rescan_interval = options.original_srv_info.as_ref().cloned().unwrap().min_ttl;
     options.hosts = hosts.clone();
+    options.load_balanced = Some(true);
     options.test_options_mut().mock_lookup_hosts = Some(make_lookup_hosts(vec![
         localhost_test_build_10gen(27017),
         localhost_test_build_10gen(27018),
