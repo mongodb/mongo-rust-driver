@@ -34,7 +34,7 @@ macro_rules! run_on_each_doc {
 }
 
 async fn insert_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await.unwrap();
+    collection.drop(None).await?;
 
     // Start Example 1
     collection
@@ -105,7 +105,7 @@ async fn insert_examples(collection: &Collection<Document>) -> Result<()> {
 }
 
 async fn query_top_level_fields_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await.unwrap();
+    collection.drop(None).await?;
 
     // Start Example 6
     let docs = vec![
@@ -250,7 +250,7 @@ async fn query_top_level_fields_examples(collection: &Collection<Document>) -> R
 }
 
 async fn query_embedded_documents_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await.unwrap();
+    collection.drop(None).await?;
 
     // Start Example 14
     let docs = vec![
@@ -715,7 +715,7 @@ async fn query_array_embedded_documents_examples(collection: &Collection<Documen
 }
 
 async fn query_null_or_missing_fields_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await.unwrap();
+    collection.drop(None).await?;
 
     // Start Example 38
     let docs = vec![
@@ -1058,7 +1058,7 @@ async fn projection_examples(collection: &Collection<Document>) -> Result<()> {
 }
 
 async fn update_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await.unwrap();
+    collection.drop(None).await?;
 
     // Start Example 51
     let docs = vec![
@@ -1261,8 +1261,7 @@ async fn update_examples(collection: &Collection<Document>) -> Result<()> {
             },
             None,
         )
-        .await
-        .unwrap();
+        .await?;
     // End Example 54
 
     run_on_each_doc!(
@@ -1286,7 +1285,7 @@ async fn update_examples(collection: &Collection<Document>) -> Result<()> {
 }
 
 async fn delete_examples(collection: &Collection<Document>) -> Result<()> {
-    collection.drop(None).await.unwrap();
+    collection.drop(None).await?;
 
     // Start Example 55
     let docs = vec![
