@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test;
 
-use std::sync::Arc;
+use std::{convert::TryInto, sync::Arc};
 
 use lazy_static::lazy_static;
 use os_info::{Type, Version};
@@ -15,6 +15,7 @@ use crate::{
     is_master::{is_master_command, run_is_master, IsMasterReply},
     options::{AuthMechanism, ClientOptions, Credential, DriverInfo, ServerApi},
     sdam::WeakTopology,
+    compression::Compressor,
 };
 
 #[cfg(feature = "tokio-runtime")]
@@ -146,6 +147,7 @@ pub(crate) struct Handshaker {
     #[cfg(test)]
     mock_service_id: bool,
     compressors: Option<Vec<String>>,
+    zlib_compression_level: Option<i32>,
 }
 
 impl Handshaker {
@@ -154,6 +156,7 @@ impl Handshaker {
         let mut metadata = BASE_CLIENT_METADATA.clone();
         let mut credential = None;
         let mut compressors = None;
+        let mut zlib_compression_level = None;
 
         let mut command =
             is_master_command(options.as_ref().and_then(|opts| opts.server_api.as_ref()));
@@ -202,6 +205,7 @@ impl Handshaker {
                 command.body.insert("compression", compressors);
             }
             compressors = options.compressors;
+            zlib_compression_level = options.zlib_compression_level;
         }
 
         command.body.insert("client", metadata);
@@ -212,6 +216,7 @@ impl Handshaker {
             #[cfg(test)]
             mock_service_id,
             compressors,
+            zlib_compression_level,
         }
     }
 
@@ -267,12 +272,27 @@ impl Handshaker {
                 .map(|server_first| client_first.into_first_round(server_first))
         });
 
-        // Use the Client's first compressor choice that the server supports
+        // Check that master reply has a compressor list and unpack it
         if let Some(ref server_compressors) = is_master_reply.command_response.compressors {
+            // Check that client has a compressor list and unpack it
             if let Some(ref client_compressors) = self.compressors {
+                // Use the Client's first compressor choice that the server supports
                 for client_compressor in client_compressors {
                     if server_compressors.contains(client_compressor) {
-                        conn.compressor = Some(client_compressor.clone());
+                        conn.compressor = match client_compressor.as_str() {
+                            "zlib" => {
+                                // Default compression level is 6 (a level of -1 indicates default)
+                                let mut level: i32 = self.zlib_compression_level.unwrap_or(6);
+                                if level == -1 {
+                                    level = 6;
+                                }
+                                let level = level.try_into().unwrap_or(6);
+                                Some(Compressor::Zlib(level))
+                            },
+                            "zstd" => Some(Compressor::Zstd(0)),
+                            "snappy" => None,
+                            _ => None,
+                        };
                         break;
                     }
                 }
@@ -304,6 +324,7 @@ pub(crate) struct HandshakerOptions {
     app_name: Option<String>,
     credential: Option<Credential>,
     compressors: Option<Vec<String>>,
+    zlib_compression_level: Option<i32>,
     driver_info: Option<DriverInfo>,
     server_api: Option<ServerApi>,
     load_balanced: bool,
@@ -322,6 +343,7 @@ impl From<ConnectionPoolOptions> for HandshakerOptions {
             load_balanced: options.load_balanced.unwrap_or(false),
             #[cfg(test)]
             mock_service_id: options.mock_service_id,
+            zlib_compression_level: options.zlib_compression_level,
         }
     }
 }
@@ -337,6 +359,7 @@ impl From<ClientOptions> for HandshakerOptions {
             load_balanced: options.load_balanced.unwrap_or(false),
             #[cfg(test)]
             mock_service_id: options.test_options.map_or(false, |to| to.mock_service_id),
+            zlib_compression_level: options.zlib_compression,
         }
     }
 }

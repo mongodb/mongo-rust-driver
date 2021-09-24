@@ -48,6 +48,9 @@ pub(crate) struct ConnectionPoolOptions {
     /// The server responds with the intersection of its supported list of compressors.
     pub(crate) compressors: Option<Vec<String>>,
 
+    // The level of compression that the Zlib compressor should use (if it is used).
+    pub(crate) zlib_compression_level: Option<i32>,
+
     /// Interval between background thread maintenance runs (e.g. ensure minPoolSize).
     #[cfg(test)]
     #[serde(rename = "backgroundThreadIntervalMS")]
@@ -125,6 +128,7 @@ impl ConnectionPoolOptions {
                 .test_options
                 .as_ref()
                 .map_or(false, |to| to.mock_service_id),
+            zlib_compression_level: options.zlib_compression,
         }
     }
 

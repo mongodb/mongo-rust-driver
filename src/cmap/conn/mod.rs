@@ -13,6 +13,7 @@ use tokio::sync::{mpsc, Mutex};
 use self::wire::Message;
 use super::manager::PoolManager;
 use crate::{
+    compression::Compressor,
     bson::oid::ObjectId,
     cmap::{
         options::{ConnectionOptions, StreamOptions},
@@ -76,7 +77,7 @@ pub(crate) struct Connection {
 
     stream: AsyncStream,
 
-    pub(super) compressor: Option<String>,
+    pub(super) compressor: Option<Compressor>,
 
     /// If the connection is pinned to a cursor or transaction, the channel sender to return this
     /// connection to the pin holder.

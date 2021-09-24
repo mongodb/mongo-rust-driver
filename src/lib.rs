@@ -326,6 +326,7 @@ define_if_single_runtime_enabled! {
     mod cmap;
     mod coll;
     mod collation;
+    mod compression;
     mod concern;
     mod cursor;
     mod db;
