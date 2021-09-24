@@ -12,6 +12,7 @@ pub(crate) enum OpCode {
     Reply = 1,
     Query = 2004,
     Message = 2013,
+    Compressed = 2012,
 }
 
 impl OpCode {

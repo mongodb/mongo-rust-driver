@@ -290,7 +290,7 @@ impl Handshaker {
                                 Some(Compressor::Zlib(level))
                             }
                             "zstd" => Some(Compressor::Zstd(0)),
-                            "snappy" => None,
+                            "snappy" => Some(Compressor::Snappy),
                             _ => None,
                         };
                         break;
