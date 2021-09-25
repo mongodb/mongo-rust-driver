@@ -248,11 +248,18 @@ impl Connection {
         }
     }
 
-    async fn send_message(&mut self, message: Message) -> Result<RawCommandResponse> {
+    async fn send_message(
+        &mut self,
+        message: Message,
+        to_compress: bool,
+    ) -> Result<RawCommandResponse> {
         self.command_executing = true;
-        let write_result = message.write_to(&mut self.stream).await;
+        let write_result = message
+            .write_to(&mut self.stream, self.compressor.as_ref(), to_compress)
+            .await;
         self.error = write_result.is_err();
         write_result?;
+        println!("After sending message");
 
         let response_message_result = Message::read_from(&mut self.stream).await;
         self.command_executing = false;
@@ -271,8 +278,9 @@ impl Connection {
         command: Command,
         request_id: impl Into<Option<i32>>,
     ) -> Result<RawCommandResponse> {
+        let to_compress: bool = command.should_compress();
         let message = Message::with_command(command, request_id.into())?;
-        self.send_message(message).await
+        self.send_message(message, to_compress).await
     }
 
     /// Executes a `RawCommand` and returns a `CommandResponse` containing the result from the
@@ -286,8 +294,9 @@ impl Connection {
         command: RawCommand,
         request_id: impl Into<Option<i32>>,
     ) -> Result<RawCommandResponse> {
+        let to_compress = command.should_compress();
         let message = Message::with_raw_command(command, request_id.into());
-        self.send_message(message).await
+        self.send_message(message, to_compress).await
     }
 
     /// Gets the connection's StreamDescription.

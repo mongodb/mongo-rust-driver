@@ -374,6 +374,9 @@ pub enum ErrorKind {
     #[error("Command failed {0}")]
     Command(CommandError),
 
+    #[error("An error occurred during a compression call: {message}")]
+    Compression { message: String },
+
     /// An error occurred during DNS resolution.
     #[error("An error occurred during DNS resolution: {message}")]
     #[non_exhaustive]

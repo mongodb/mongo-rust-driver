@@ -121,6 +121,7 @@ impl From<TestIsMasterCommandResponse> for IsMasterCommandResponse {
             max_write_batch_size: test.max_write_batch_size.unwrap_or(1234),
             service_id: test.service_id,
             topology_version: None,
+            compressors: None,
         }
     }
 }

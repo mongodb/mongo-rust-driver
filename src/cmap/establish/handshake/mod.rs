@@ -279,7 +279,7 @@ impl Handshaker {
                 // Use the Client's first compressor choice that the server supports
                 for client_compressor in client_compressors {
                     if server_compressors.contains(client_compressor) {
-                        conn.compressor = match client_compressor.as_str() {
+                        conn.compressor = match client_compressor.to_lowercase().as_str() {
                             "zlib" => {
                                 // Default compression level is 6 (a level of -1 indicates default)
                                 let mut level: i32 = self.zlib_compression_level.unwrap_or(6);
