@@ -15,6 +15,7 @@ use crate::{
         conn::{command::RawCommand, wire::util::SyncCountReader},
         Command,
     },
+    compression::Compressor,
     error::{Error, ErrorKind, Result},
     runtime::{AsyncLittleEndianWrite, AsyncStream, SyncLittleEndianRead},
 };
@@ -84,6 +85,31 @@ impl Message {
         let mut reader = BufReader::new(reader);
         let header = Header::read_from(&mut reader).await?;
 
+        if header.op_code == OpCode::Message {
+            println!("In OP_MSG");
+            return Self::read_from_op_msg(reader, &header).await;
+        } else if header.op_code == OpCode::Compressed {
+            println!("In OP_COMPRESSED");
+            return Self::read_from_op_compressed(reader, &header).await;
+        }
+        println!("invalid op code");
+        Err(Error::new(
+            ErrorKind::InvalidResponse {
+                message: format!(
+                    "Invalid op code, expected {} or {} and got {}",
+                    OpCode::Message as u32,
+                    OpCode::Compressed as u32,
+                    header.op_code as u32
+                ),
+            },
+            Option::<Vec<String>>::None,
+        ))
+    }
+
+    async fn read_from_op_msg(
+        mut reader: BufReader<&mut AsyncStream>,
+        header: &Header,
+    ) -> Result<Self> {
         // TODO: RUST-616 ensure length is < maxMessageSizeBytes
         let mut length_remaining = header.length - Header::LENGTH as i32;
         let mut buf = vec![0u8; length_remaining as usize];
@@ -127,6 +153,13 @@ impl Message {
         })
     }
 
+    async fn read_from_op_compressed(
+        reader: BufReader<&mut AsyncStream>,
+        header: &Header,
+    ) -> Result<Self> {
+        panic!("parse op compressed unimplemented!")
+    }
+
     /// Serializes the Message to bytes and writes them to `writer`.
     pub(crate) async fn write_to(&self, stream: &mut AsyncStream) -> Result<()> {
         let mut writer = BufWriter::new(stream);
@@ -161,6 +194,26 @@ impl Message {
         }
 
         writer.flush().await?;
+
+        Ok(())
+    }
+
+    pub async fn write_compressed_to(
+        &self,
+        stream: &mut AsyncStream,
+        compressor: &Compressor,
+    ) -> Result<()> {
+        let mut encoder = compressor.to_encoder()?;
+        let compressor_id = compressor.to_compressor_id();
+
+        let mut writer = BufWriter::new(stream);
+        let mut sections_bytes = Vec::new();
+
+        for section in &self.sections {
+            section.write(&mut sections_bytes).await?;
+        }
+
+        encoder.write_all(sections_bytes.as_slice())?;
 
         Ok(())
     }

@@ -2,7 +2,7 @@ use crate::error::{Error, ErrorKind, Result};
 use flate2::{Compression, write::{ZlibEncoder, ZlibDecoder}};
 use std::{
     convert::TryInto,
-    io::{prelude::*, BufReader},
+    io::prelude::*,
 };
 
 const SNAPPY_ID: u8 = 1;
