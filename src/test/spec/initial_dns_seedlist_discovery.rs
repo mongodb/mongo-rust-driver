@@ -61,7 +61,7 @@ async fn run_test(mut test_file: TestFile) {
         return;
     }
 
-    // TODO RUST-979 unskip these tests
+    // TODO RUST-980 unskip these tests
     if test_file
         .options
         .as_ref()
