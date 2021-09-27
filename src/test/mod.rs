@@ -72,6 +72,11 @@ lazy_static! {
 }
 
 fn get_default_uri() -> String {
+    if let Some(uri) = LOAD_BALANCED_SINGLE_URI.clone() {
+        if !uri.is_empty() {
+            return uri;
+        }
+    }
     if let Ok(uri) = std::env::var("MONGODB_URI") {
         return uri;
     }
