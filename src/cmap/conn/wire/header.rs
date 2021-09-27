@@ -22,6 +22,7 @@ impl OpCode {
             1 => Ok(OpCode::Reply),
             2004 => Ok(OpCode::Query),
             2013 => Ok(OpCode::Message),
+            2012 => Ok(OpCode::Compressed),
             other => Err(ErrorKind::InvalidResponse {
                 message: format!("Invalid wire protocol opcode: {}", other),
             }

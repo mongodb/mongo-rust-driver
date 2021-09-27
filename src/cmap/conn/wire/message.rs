@@ -15,7 +15,7 @@ use crate::{
         conn::{command::RawCommand, wire::util::SyncCountReader},
         Command,
     },
-    compression::Compressor,
+    compression::{Compressor, Decoder},
     error::{Error, ErrorKind, Result},
     runtime::{AsyncLittleEndianWrite, AsyncStream, SyncLittleEndianRead},
 };
@@ -86,13 +86,11 @@ impl Message {
         let header = Header::read_from(&mut reader).await?;
 
         if header.op_code == OpCode::Message {
-            println!("In OP_MSG");
             return Self::read_from_op_msg(reader, &header).await;
         } else if header.op_code == OpCode::Compressed {
-            println!("In OP_COMPRESSED");
             return Self::read_from_op_compressed(reader, &header).await;
         }
-        println!("invalid op code");
+
         Err(Error::new(
             ErrorKind::InvalidResponse {
                 message: format!(
@@ -154,10 +152,87 @@ impl Message {
     }
 
     async fn read_from_op_compressed(
-        reader: BufReader<&mut AsyncStream>,
+        mut reader: BufReader<&mut AsyncStream>,
         header: &Header,
     ) -> Result<Self> {
-        panic!("parse op compressed unimplemented!")
+        let length_remaining = header.length - Header::LENGTH as i32;
+        let mut buf = vec![0u8; length_remaining as usize];
+        reader.read_exact(&mut buf).await?;
+        let mut reader = buf.as_slice();
+
+        // Read original opcode (should be OP_MSG)
+        let original_opcode = reader.read_i32()?;
+        if original_opcode != OpCode::Message as i32 {
+            return Err(ErrorKind::InvalidResponse {
+                message: format!(
+                    "The original opcode of the compressed message must be {}, but was {}.",
+                    OpCode::Message as i32,
+                    original_opcode,
+                ),
+            }
+            .into());
+        }
+
+        // Read uncompressed size
+        let uncompressed_size = reader.read_i32()?;
+
+        // Read compressor id
+        let compressor_id: u8 = reader.read_u8()?;
+
+        // Get decoder
+        let decoder = Decoder::from_compressor_id(compressor_id)?;
+
+        // Decode message
+        let decoded_message = decoder.decode(reader)?;
+
+        // Check that claimed length matches original length
+        if decoded_message.len() as i32 != uncompressed_size {
+            return Err(ErrorKind::InvalidResponse {
+                message: format!(
+                    "The server's message claims that the uncompressed length is {}, but was \
+                     computed to be {}.",
+                    uncompressed_size,
+                    decoded_message.len(),
+                ),
+            }
+            .into());
+        }
+
+        // Read decompressed message as a standard OP_MSG
+        let mut reader = decoded_message.as_slice();
+        let mut length_remaining = decoded_message.len();
+
+        let mut sections = Vec::new();
+        let flags = MessageFlags::from_bits_truncate(reader.read_u32()?);
+        length_remaining -= std::mem::size_of::<u32>();
+
+        let mut count_reader = SyncCountReader::new(&mut reader);
+
+        while length_remaining - count_reader.bytes_read() > 4 {
+            sections.push(MessageSection::read(&mut count_reader)?);
+        }
+
+        length_remaining -= count_reader.bytes_read();
+
+        let mut checksum = None;
+
+        if length_remaining == 4 && flags.contains(MessageFlags::CHECKSUM_PRESENT) {
+            checksum = Some(reader.read_u32()?);
+        } else if length_remaining != 0 {
+            return Err(ErrorKind::InvalidResponse {
+                message: "Leftover bytes in the message: a section must be greater than 4 bytes"
+                    .to_string(),
+            }
+            .into());
+        }
+
+        Ok(Self {
+            response_to: header.response_to,
+            flags,
+            sections,
+            checksum,
+            request_id: None,
+        })
     }
 
     /// Serializes the Message to bytes and writes them to `writer`.
@@ -198,6 +273,7 @@ impl Message {
         Ok(())
     }
 
+    // Serializes message to bytes, compresses those bytes, and writes the bytes.
     pub async fn write_compressed_to(
         &self,
         stream: &mut AsyncStream,
@@ -212,8 +288,37 @@ impl Message {
         for section in &self.sections {
             section.write(&mut sections_bytes).await?;
         }
-
+        let flag_bytes = &self.flags.bits().to_le_bytes();
+        let uncompressed_len = sections_bytes.len() + flag_bytes.len();
+        encoder.write_all(flag_bytes)?;
         encoder.write_all(sections_bytes.as_slice())?;
+        let compressed_bytes = encoder.finish()?;
+
+        let total_length = Header::LENGTH
+            + std::mem::size_of::<i32>()
+            + std::mem::size_of::<i32>()
+            + std::mem::size_of::<u8>()
+            + compressed_bytes.len();
+
+        let header = Header {
+            length: total_length as i32,
+            request_id: self.request_id.unwrap_or_else(super::util::next_request_id),
+            response_to: self.response_to,
+            op_code: OpCode::Compressed,
+        };
+
+        // Write header
+        header.write_to(&mut writer).await?;
+        // Write original (pre-compressed) opcode (always OP_MSG)
+        writer.write_i32(OpCode::Message as i32).await?;
+        // Write uncompressed size
+        writer.write_i32(uncompressed_len as i32).await?;
+        // Write compressor id
+        writer.write_u8(compressor_id).await?;
+        // Write compressed message
+        writer.write_all(compressed_bytes.as_slice()).await?;
+
+        writer.flush().await?;
 
         Ok(())
     }

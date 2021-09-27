@@ -1,10 +1,11 @@
 use crate::error::{Error, ErrorKind, Result};
-use flate2::{Compression, write::{ZlibEncoder, ZlibDecoder}};
-use std::{
-    convert::TryInto,
-    io::prelude::*,
+use flate2::{
+    write::{ZlibDecoder, ZlibEncoder},
+    Compression,
 };
+use std::{convert::TryInto, io::prelude::*};
 
+const NOOP_COMPRESSOR_ID: u8 = 0;
 const SNAPPY_ID: u8 = 1;
 const ZLIB_ID: u8 = 2;
 const ZSTD_ID: u8 = 3;
@@ -131,6 +132,7 @@ pub(crate) enum Decoder {
     Zstd,
     Zlib,
     Snappy,
+    Noop,
 }
 
 impl Decoder {
@@ -143,7 +145,7 @@ impl Decoder {
                         ErrorKind::Compression {
                             message: format!("Could not decode using zstd decoder: {}", e),
                         },
-                        Option::<Vec<String>>::None
+                        Option::<Vec<String>>::None,
                     )
                 })?;
                 Ok(ret)
@@ -153,17 +155,19 @@ impl Decoder {
                 decoder.write_all(source)?;
                 let output = decoder.finish()?;
                 Ok(output)
-            },
+            }
             Decoder::Snappy => {
                 let mut bytes = Vec::new();
-                let decoder = snap::read::FrameDecoder::new(source).read_to_end(&mut bytes)?;
+                snap::read::FrameDecoder::new(source).read_to_end(&mut bytes)?;
                 Ok(bytes)
-            },
+            }
+            Decoder::Noop => Ok(source.to_vec()),
         }
     }
 
     pub(crate) fn from_compressor_id(id: u8) -> Result<Self> {
         match id {
+            NOOP_COMPRESSOR_ID => Ok(Decoder::Noop),
             SNAPPY_ID => Ok(Decoder::Snappy),
             ZLIB_ID => Ok(Decoder::Zlib),
             ZSTD_ID => Ok(Decoder::Zstd),
