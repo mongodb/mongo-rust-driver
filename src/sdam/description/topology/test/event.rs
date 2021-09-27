@@ -81,7 +81,7 @@ impl PartialEq<TestServerDescription> for ServerDescription {
                     && other.passives.is_empty()
                     && other.primary.is_none()
                     && other.set_name.is_none()
-                    && other.server_type == ServerType::Unknown
+                    && other.server_type == self.server_type
             }
         }
     }

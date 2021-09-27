@@ -152,6 +152,21 @@ async fn server_selection_unknown() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn server_selection_load_balanced() {
+    run_spec_test(
+        &[
+            "server-selection",
+            "server_selection",
+            "LoadBalanced",
+            "read",
+        ],
+        run_test,
+    )
+    .await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn max_staleness_replica_set_no_primary() {
     run_spec_test(&["max-staleness", "ReplicaSetNoPrimary"], run_test).await;
 }

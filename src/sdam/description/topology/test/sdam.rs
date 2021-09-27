@@ -225,6 +225,7 @@ fn server_type_from_str(s: &str) -> Option<ServerType> {
         "RSArbiter" => ServerType::RsArbiter,
         "RSOther" => ServerType::RsOther,
         "RSGhost" => ServerType::RsGhost,
+        "LoadBalancer" => ServerType::LoadBalancer,
         "Unknown" | "PossiblePrimary" => ServerType::Unknown,
         _ => return None,
     };
@@ -241,20 +242,15 @@ async fn run_test(test_file: TestFile) {
         return;
     }
 
-    // TODO RUST-653 unskip load balancer test
-    if test_description.contains("load balancer") {
-        println!("Skipping {} (RUST-653)", test_description);
-        return;
-    }
-
     let mut options = ClientOptions::parse_uri(&test_file.uri, None)
         .await
         .expect(test_description);
 
     let handler = Arc::new(EventHandler::new());
     options.sdam_event_handler = Some(handler.clone());
+    options.test_options_mut().disable_monitoring_threads = true;
 
-    let topology = Topology::new_mocked(options.clone());
+    let topology = Topology::new(options.clone()).unwrap();
     let mut servers = topology.get_servers().await;
 
     for (i, phase) in test_file.phases.into_iter().enumerate() {
@@ -351,7 +347,13 @@ async fn run_test(test_file: TestFile) {
             }
             Outcome::Events(EventsOutcome { events: expected }) => {
                 let actual = handler.get_all_sdam_events();
-                assert_eq!(actual.len(), expected.len());
+                assert_eq!(
+                    actual.len(),
+                    expected.len(),
+                    "event list length mismatch:\n actual: {:#?}, expected: {:#?}",
+                    actual,
+                    expected
+                );
                 for (actual, expected) in actual.iter().zip(expected.iter()) {
                     assert_eq!(
                         actual, expected,
@@ -524,6 +526,16 @@ async fn monitoring() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn load_balanced() {
+    run_spec_test(
+        &["server-discovery-and-monitoring", "load-balanced"],
+        run_test,
+    )
+    .await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn topology_closed_event_last() {
     let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
@@ -676,10 +688,11 @@ async fn direct_connection() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn pool_cleared_error_does_not_mark_unknown() {
     let address = ServerAddress::parse("a:1234").unwrap();
-    let options = ClientOptions::builder()
+    let mut options = ClientOptions::builder()
         .hosts(vec![address.clone()])
         .build();
-    let topology = Topology::new_mocked(options);
+    options.test_options_mut().disable_monitoring_threads = true;
+    let topology = Topology::new(options).unwrap();
 
     // get the one server in the topology
     let server = topology

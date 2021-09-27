@@ -134,6 +134,7 @@ enum TestServerType {
     RsOther,
     #[serde(rename = "RSGhost")]
     RsGhost,
+    LoadBalancer,
     Unknown,
     PossiblePrimary,
 }
@@ -148,6 +149,7 @@ impl TestServerType {
             TestServerType::RsArbiter => Some(ServerType::RsArbiter),
             TestServerType::RsOther => Some(ServerType::RsOther),
             TestServerType::RsGhost => Some(ServerType::RsGhost),
+            TestServerType::LoadBalancer => Some(ServerType::LoadBalancer),
             TestServerType::Unknown => Some(ServerType::Unknown),
             TestServerType::PossiblePrimary => None,
         }

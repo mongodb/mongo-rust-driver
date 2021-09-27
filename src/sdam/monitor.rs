@@ -139,7 +139,9 @@ impl HeartbeatMonitor {
             #[cfg(test)]
             let min_frequency = self
                 .client_options
-                .heartbeat_freq_test
+                .test_options
+                .as_ref()
+                .and_then(|to| to.heartbeat_freq)
                 .unwrap_or(MIN_HEARTBEAT_FREQUENCY);
 
             #[cfg(not(test))]
