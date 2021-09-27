@@ -105,7 +105,8 @@ async fn no_results() {
     run_test(Ok(Vec::new()), DEFAULT_HOSTS.iter().cloned().collect()).await;
 }
 
-// SRV polling is not done for load-balanced clusters.
+// SRV polling is not done for load-balanced clusters (as per spec at
+// https://github.com/mongodb/specifications/blob/master/source/polling-srv-records-for-mongos-discovery/tests/README.rst#test-that-srv-polling-is-not-done-for-load-balalanced-clusters).
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn load_balanced_no_srv_polling() {
