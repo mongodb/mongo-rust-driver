@@ -7,6 +7,7 @@ use std::{
         Arc,
         Weak,
     },
+    time::Duration,
 };
 
 #[cfg(test)]
@@ -139,9 +140,11 @@ impl Topology {
         if is_load_balanced {
             for server_address in &options.hosts {
                 // Load-balanced clients don't have a heartbeat monitor, so we synthesize
-                // updating the server to `ServerType::LoadBalancer`.
+                // updating the server to `ServerType::LoadBalancer` with an RTT of 0 so it'll
+                // be selected.
                 let new_desc = ServerDescription {
                     server_type: ServerType::LoadBalancer,
+                    average_round_trip_time: Some(Duration::ZERO),
                     ..ServerDescription::new(server_address.clone(), None)
                 };
                 topology_state
