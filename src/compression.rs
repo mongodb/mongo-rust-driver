@@ -48,10 +48,7 @@ impl Compressor {
                 let encoder = ZlibEncoder::new(vec![], Compression::new(level));
                 Ok(Encoder::Zlib { encoder })
             }
-            Compressor::Snappy => {
-                let encoder = snap::write::FrameEncoder::new(vec![]);
-                Ok(Encoder::Snappy { encoder })
-            }
+            Compressor::Snappy => Ok(Encoder::Snappy { bytes: vec![] }),
         }
     }
 }
@@ -64,7 +61,7 @@ pub(crate) enum Encoder {
         encoder: ZlibEncoder<Vec<u8>>,
     },
     Snappy {
-        encoder: snap::write::FrameEncoder<Vec<u8>>,
+        bytes: Vec<u8>,
     },
 }
 
@@ -87,7 +84,7 @@ impl Encoder {
                     Option::<Vec<String>>::None,
                 )
             }),
-            Encoder::Snappy { ref mut encoder } => encoder.write_all(buf).map_err(|e| {
+            Encoder::Snappy { ref mut bytes } => bytes.write_all(buf).map_err(|e| {
                 Error::new(
                     ErrorKind::Compression {
                         message: format!("an error occured writing to the snappy encoder: {}", e),
@@ -116,14 +113,17 @@ impl Encoder {
                     Option::<Vec<String>>::None,
                 )
             }),
-            Encoder::Snappy { encoder } => encoder.into_inner().map_err(|e| {
-                Error::new(
-                    ErrorKind::Compression {
-                        message: format!("an error occured finishing snappy encoder: {}", e),
-                    },
-                    Option::<Vec<String>>::None,
-                )
-            }),
+            Encoder::Snappy { bytes } => {
+                let mut compressor = snap::raw::Encoder::new();
+                compressor.compress_vec(bytes.as_slice()).map_err(|e| {
+                    Error::new(
+                        ErrorKind::Compression {
+                            message: format!("an error occured finishing snappy encoder: {}", e),
+                        },
+                        Option::<Vec<String>>::None,
+                    )
+                })
+            }
         }
     }
 }
@@ -153,13 +153,25 @@ impl Decoder {
             Decoder::Zlib => {
                 let mut decoder = ZlibDecoder::new(vec![]);
                 decoder.write_all(source)?;
-                let output = decoder.finish()?;
-                Ok(output)
+                decoder.finish().map_err(|e| {
+                    Error::new(
+                        ErrorKind::Compression {
+                            message: format!("Could not decode using zlib decoder: {}", e),
+                        },
+                        Option::<Vec<String>>::None,
+                    )
+                })
             }
             Decoder::Snappy => {
-                let mut bytes = Vec::new();
-                snap::read::FrameDecoder::new(source).read_to_end(&mut bytes)?;
-                Ok(bytes)
+                let mut decompressor = snap::raw::Decoder::new();
+                decompressor.decompress_vec(source).map_err(|e| {
+                    Error::new(
+                        ErrorKind::Compression {
+                            message: format!("Could not decode using snappy decoder: {}", e),
+                        },
+                        Option::<Vec<String>>::None,
+                    )
+                })
             }
             Decoder::Noop => Ok(source.to_vec()),
         }
@@ -193,9 +205,9 @@ mod tests {
         let zlib_compressor = Compressor::Zlib(4);
         assert_eq!(ZLIB_ID, zlib_compressor.to_compressor_id());
         let mut encoder = zlib_compressor.to_encoder().unwrap();
-        encoder.write_all(b"foo");
-        encoder.write_all(b"bar");
-        encoder.write_all(b"ZLIB");
+        assert!(encoder.write_all(b"foo").is_ok());
+        assert!(encoder.write_all(b"bar").is_ok());
+        assert!(encoder.write_all(b"ZLIB").is_ok());
 
         let compressed_bytes = encoder.finish().unwrap();
 
@@ -209,9 +221,9 @@ mod tests {
         let zstd_compressor = Compressor::Zstd(0);
         assert_eq!(ZSTD_ID, zstd_compressor.to_compressor_id());
         let mut encoder = zstd_compressor.to_encoder().unwrap();
-        encoder.write_all(b"foo");
-        encoder.write_all(b"bar");
-        encoder.write_all(b"ZSTD");
+        assert!(encoder.write_all(b"foo").is_ok());
+        assert!(encoder.write_all(b"bar").is_ok());
+        assert!(encoder.write_all(b"ZSTD").is_ok());
 
         let compressed_bytes = encoder.finish().unwrap();
 
@@ -225,9 +237,9 @@ mod tests {
         let snappy_compressor = Compressor::Snappy;
         assert_eq!(SNAPPY_ID, snappy_compressor.to_compressor_id());
         let mut encoder = snappy_compressor.to_encoder().unwrap();
-        encoder.write_all(b"foo");
-        encoder.write_all(b"bar");
-        encoder.write_all(b"SNAPPY");
+        assert!(encoder.write_all(b"foo").is_ok());
+        assert!(encoder.write_all(b"bar").is_ok());
+        assert!(encoder.write_all(b"SNAPPY").is_ok());
 
         let compressed_bytes = encoder.finish().unwrap();
 
