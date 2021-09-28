@@ -287,7 +287,9 @@ impl Handshaker {
                                 .unwrap_or(crate::compression::ZLIB_DEFAULT_LEVEL);
                             // Level -1 indicates use default (which is set in from_str)
                             if level != -1 {
-                                conn.compressor = Some(Compressor::Zlib { level: level as u32 });
+                                conn.compressor = Some(Compressor::Zlib {
+                                    level: level as u32,
+                                });
                             }
                         }
                         break;

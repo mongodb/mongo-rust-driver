@@ -40,20 +40,23 @@ pub(crate) enum Compressor {
     Snappy,
 }
 
-pub(crate) struct ParseCompressorError{}
+pub(crate) struct ParseCompressorError {}
 
 impl FromStr for Compressor {
     type Err = ParseCompressorError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "zlib" => Ok(Compressor::Zlib { level: ZLIB_DEFAULT_LEVEL as u32}),
-            "zstd" => Ok(Compressor::Zstd {level: ZSTD_DEFAULT_LEVEL as u32}),
+            "zlib" => Ok(Compressor::Zlib {
+                level: ZLIB_DEFAULT_LEVEL as u32,
+            }),
+            "zstd" => Ok(Compressor::Zstd {
+                level: ZSTD_DEFAULT_LEVEL as u32,
+            }),
             "snappy" => Ok(Compressor::Snappy),
             _ => Err(Self::Err {}),
         }
     }
-
 }
 
 impl Compressor {
@@ -238,7 +241,7 @@ mod tests {
 
     #[test]
     fn test_zlib_compressor() {
-        let zlib_compressor = Compressor::Zlib{level: 4};
+        let zlib_compressor = Compressor::Zlib { level: 4 };
         assert_eq!(CompressorID::ZlibID, zlib_compressor.to_compressor_id());
         let mut encoder = zlib_compressor.to_encoder().unwrap();
         assert!(encoder.write_all(b"foo").is_ok());
@@ -254,7 +257,7 @@ mod tests {
 
     #[test]
     fn test_zstd_compressor() {
-        let zstd_compressor = Compressor::Zstd{level: 0};
+        let zstd_compressor = Compressor::Zstd { level: 0 };
         assert_eq!(CompressorID::ZstdID, zstd_compressor.to_compressor_id());
         let mut encoder = zstd_compressor.to_encoder().unwrap();
         assert!(encoder.write_all(b"foo").is_ok());
