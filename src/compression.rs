@@ -40,10 +40,8 @@ pub(crate) enum Compressor {
     Snappy,
 }
 
-pub(crate) struct ParseCompressorError {}
-
 impl FromStr for Compressor {
-    type Err = ParseCompressorError;
+    type Err = Error;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
@@ -54,7 +52,12 @@ impl FromStr for Compressor {
                 level: ZSTD_DEFAULT_LEVEL as u32,
             }),
             "snappy" => Ok(Compressor::Snappy),
-            _ => Err(Self::Err {}),
+            other => Err(Error::new(
+                ErrorKind::InvalidArgument {
+                    message: format!("Received invalid compressor: {}", other),
+                },
+                Option::<Vec<String>>::None,
+            )),
         }
     }
 }

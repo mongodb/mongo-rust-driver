@@ -1183,6 +1183,12 @@ impl ClientOptions {
             }
         }
 
+        if let Some(ref compressors) = self.compressors {
+            for compressor in compressors {
+                compressor.parse::<crate::compression::Compressor>()?;
+            }
+        }
+
         Ok(())
     }
 
