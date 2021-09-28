@@ -358,6 +358,7 @@ impl TopologyDescription {
             None if server_description.server_type.is_data_bearing()
                 || self.topology_type == TopologyType::Single =>
             {
+                dbg!("unsupported");
                 self.session_support_status = SessionSupportStatus::Unsupported {
                     logical_session_timeout: None,
                 }
@@ -465,6 +466,12 @@ impl TopologyDescription {
             server_description.address.clone(),
             server_description.clone(),
         );
+
+        if let TopologyType::LoadBalanced = self.topology_type {
+            // Load-balanced topologies don't have real server updates; attempting to update based
+            // on the synthesized one causes incorrect behavior.
+            return Ok(());
+        }
 
         // Update the topology's min logicalSessionTimeout.
         self.update_session_support_status(&server_description);
