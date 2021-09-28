@@ -25,7 +25,7 @@ use crate::{
     error::{CommandError, ErrorKind, Result},
     operation::RunCommand,
     options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
-    test::{LOAD_BALANCED_SINGLE_URI, Topology},
+    test::{Topology, LOAD_BALANCED_SINGLE_URI},
     Client,
     Collection,
 };
@@ -68,7 +68,10 @@ impl TestClient {
             options.sdam_event_handler = Some(handler);
         }
 
-        if LOAD_BALANCED_SINGLE_URI.as_ref().map_or(false, |uri| !uri.is_empty()) {
+        if LOAD_BALANCED_SINGLE_URI
+            .as_ref()
+            .map_or(false, |uri| !uri.is_empty())
+        {
             options.test_options_mut().mock_service_id = true;
         }
 

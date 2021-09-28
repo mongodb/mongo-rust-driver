@@ -114,7 +114,10 @@ impl ConnectionPoolOptions {
             ready: None,
             load_balanced: options.load_balanced,
             #[cfg(test)]
-            mock_service_id: options.test_options.as_ref().map_or(false, |to| to.mock_service_id),
+            mock_service_id: options
+                .test_options
+                .as_ref()
+                .map_or(false, |to| to.mock_service_id),
         }
     }
 

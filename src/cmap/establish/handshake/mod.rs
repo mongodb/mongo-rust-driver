@@ -192,7 +192,9 @@ impl Handshaker {
             }
 
             #[cfg(test)]
-            { mock_service_id = options.mock_service_id; }
+            {
+                mock_service_id = options.mock_service_id;
+            }
         }
 
         command.body.insert("client", metadata);
@@ -221,8 +223,18 @@ impl Handshaker {
         #[cfg(test)]
         {
             if self.command.body.contains_key("loadBalanced")
-            && is_master_reply.command_response.service_id.is_none() && self.mock_service_id {
-                is_master_reply.command_response.service_id = Some(is_master_reply.command_response.topology_version.as_ref().unwrap().get_object_id("processId").unwrap());
+                && is_master_reply.command_response.service_id.is_none()
+                && self.mock_service_id
+            {
+                is_master_reply.command_response.service_id = Some(
+                    is_master_reply
+                        .command_response
+                        .topology_version
+                        .as_ref()
+                        .unwrap()
+                        .get_object_id("processId")
+                        .unwrap(),
+                );
             }
         }
         if self.command.body.contains_key("loadBalanced")
