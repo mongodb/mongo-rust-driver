@@ -49,6 +49,12 @@ lazy_static! {
         let mut options = ClientOptions::parse_without_srv_resolution(&uri).unwrap();
         options.max_pool_size = Some(MAX_POOL_SIZE);
         options.server_api = SERVER_API.clone();
+        if LOAD_BALANCED_SINGLE_URI
+            .as_ref()
+            .map_or(false, |uri| !uri.is_empty())
+        {
+            options.test_options_mut().mock_service_id = true;
+        }
 
         options
     };

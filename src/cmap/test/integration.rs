@@ -34,7 +34,9 @@ async fn acquire_connection_and_send_command() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client_options = CLIENT_OPTIONS.clone();
+    dbg!(&client_options);
     let mut pool_options = ConnectionPoolOptions::from_client_options(&client_options);
+    dbg!(&pool_options);
     pool_options.ready = Some(true);
 
     let pool = ConnectionPool::new(
