@@ -180,7 +180,7 @@ impl Message {
         let compressor_id: u8 = reader.read_u8()?;
 
         // Get decoder
-        let decoder = Decoder::from_compressor_id(compressor_id)?;
+        let decoder = Decoder::from_u8(compressor_id)?;
 
         // Decode message
         let decoded_message = decoder.decode(reader)?;
@@ -280,7 +280,7 @@ impl Message {
         compressor: &Compressor,
     ) -> Result<()> {
         let mut encoder = compressor.to_encoder()?;
-        let compressor_id = compressor.to_compressor_id();
+        let compressor_id = compressor.to_compressor_id() as u8;
 
         let mut writer = BufWriter::new(stream);
         let mut sections_bytes = Vec::new();
@@ -290,6 +290,8 @@ impl Message {
         }
         let flag_bytes = &self.flags.bits().to_le_bytes();
         let uncompressed_len = sections_bytes.len() + flag_bytes.len();
+        // Compress the flags and sections.  Depending on the handshake
+        // this could use zlib, zstd or snappy
         encoder.write_all(flag_bytes)?;
         encoder.write_all(sections_bytes.as_slice())?;
         let compressed_bytes = encoder.finish()?;

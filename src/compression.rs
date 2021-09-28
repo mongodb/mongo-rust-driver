@@ -5,12 +5,32 @@ use flate2::{
 };
 use std::{convert::TryInto, io::prelude::*};
 
-const NOOP_COMPRESSOR_ID: u8 = 0;
-const SNAPPY_ID: u8 = 1;
-const ZLIB_ID: u8 = 2;
-const ZSTD_ID: u8 = 3;
+#[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
+pub(crate) enum CompressorID {
+    NoopID = 0,
+    SnappyID = 1,
+    ZlibID = 2,
+    ZstdID = 3,
+}
+
+impl CompressorID {
+    pub(crate) fn from_u8(id: u8) -> Result<Self> {
+        match id {
+            0 => Ok(CompressorID::NoopID),
+            1 => Ok(CompressorID::SnappyID),
+            2 => Ok(CompressorID::ZlibID),
+            3 => Ok(CompressorID::ZstdID),
+            other => Err(ErrorKind::InvalidResponse {
+                message: format!("Invalid wire protocol compressor id: {}", other),
+            }
+            .into()),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub(crate) enum Compressor {
     Zstd(u32),
     Zlib(u32),
@@ -18,11 +38,11 @@ pub(crate) enum Compressor {
 }
 
 impl Compressor {
-    pub(crate) fn to_compressor_id(&self) -> u8 {
+    pub(crate) fn to_compressor_id(&self) -> CompressorID {
         match *self {
-            Compressor::Zstd(_) => ZSTD_ID,
-            Compressor::Zlib(_) => ZLIB_ID,
-            Compressor::Snappy => SNAPPY_ID,
+            Compressor::Zstd(_) => CompressorID::ZstdID,
+            Compressor::Zlib(_) => CompressorID::ZlibID,
+            Compressor::Snappy => CompressorID::SnappyID,
         }
     }
 
@@ -53,6 +73,7 @@ impl Compressor {
     }
 }
 
+#[non_exhaustive]
 pub(crate) enum Encoder {
     Zstd {
         encoder: zstd::Encoder<'static, Vec<u8>>,
@@ -114,6 +135,8 @@ impl Encoder {
                 )
             }),
             Encoder::Snappy { bytes } => {
+                // The server doesn't use snappy frame format, so we need to use snap::raw::Encoder
+                // rather than snap::write::FrameEncoder.  Likewise for decoding.
                 let mut compressor = snap::raw::Encoder::new();
                 compressor.compress_vec(bytes.as_slice()).map_err(|e| {
                     Error::new(
@@ -128,6 +151,8 @@ impl Encoder {
     }
 }
 
+#[derive(Clone, Debug)]
+#[non_exhaustive]
 pub(crate) enum Decoder {
     Zstd,
     Zlib,
@@ -177,33 +202,25 @@ impl Decoder {
         }
     }
 
-    pub(crate) fn from_compressor_id(id: u8) -> Result<Self> {
-        match id {
-            NOOP_COMPRESSOR_ID => Ok(Decoder::Noop),
-            SNAPPY_ID => Ok(Decoder::Snappy),
-            ZLIB_ID => Ok(Decoder::Zlib),
-            ZSTD_ID => Ok(Decoder::Zstd),
-            _ => Err(Error::new(
-                ErrorKind::Compression {
-                    message: format!(
-                        "Received invalid compressor id.  Expected {}, {}, or {}, got {}",
-                        SNAPPY_ID, ZLIB_ID, ZSTD_ID, id
-                    ),
-                },
-                Option::<Vec<String>>::None,
-            )),
+    pub(crate) fn from_u8(id: u8) -> Result<Self> {
+        let compressor_id = CompressorID::from_u8(id)?;
+        match compressor_id {
+            CompressorID::NoopID => Ok(Decoder::Noop),
+            CompressorID::SnappyID => Ok(Decoder::Snappy),
+            CompressorID::ZlibID => Ok(Decoder::Zlib),
+            CompressorID::ZstdID => Ok(Decoder::Zstd),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::compression::{Compressor, Decoder, SNAPPY_ID, ZLIB_ID, ZSTD_ID};
+    use crate::compression::{Compressor, CompressorID, Decoder};
 
     #[test]
     fn test_zlib_compressor() {
         let zlib_compressor = Compressor::Zlib(4);
-        assert_eq!(ZLIB_ID, zlib_compressor.to_compressor_id());
+        assert_eq!(CompressorID::ZlibID, zlib_compressor.to_compressor_id());
         let mut encoder = zlib_compressor.to_encoder().unwrap();
         assert!(encoder.write_all(b"foo").is_ok());
         assert!(encoder.write_all(b"bar").is_ok());
@@ -211,7 +228,7 @@ mod tests {
 
         let compressed_bytes = encoder.finish().unwrap();
 
-        let decoder = Decoder::from_compressor_id(ZLIB_ID).unwrap();
+        let decoder = Decoder::from_u8(CompressorID::ZlibID as u8).unwrap();
         let original_bytes = decoder.decode(compressed_bytes.as_slice()).unwrap();
         assert_eq!(b"foobarZLIB", original_bytes.as_slice());
     }
@@ -219,7 +236,7 @@ mod tests {
     #[test]
     fn test_zstd_compressor() {
         let zstd_compressor = Compressor::Zstd(0);
-        assert_eq!(ZSTD_ID, zstd_compressor.to_compressor_id());
+        assert_eq!(CompressorID::ZstdID, zstd_compressor.to_compressor_id());
         let mut encoder = zstd_compressor.to_encoder().unwrap();
         assert!(encoder.write_all(b"foo").is_ok());
         assert!(encoder.write_all(b"bar").is_ok());
@@ -227,7 +244,7 @@ mod tests {
 
         let compressed_bytes = encoder.finish().unwrap();
 
-        let decoder = Decoder::from_compressor_id(ZSTD_ID).unwrap();
+        let decoder = Decoder::from_u8(CompressorID::ZstdID as u8).unwrap();
         let original_bytes = decoder.decode(compressed_bytes.as_slice()).unwrap();
         assert_eq!(b"foobarZSTD", original_bytes.as_slice());
     }
@@ -235,7 +252,7 @@ mod tests {
     #[test]
     fn test_snappy_compressor() {
         let snappy_compressor = Compressor::Snappy;
-        assert_eq!(SNAPPY_ID, snappy_compressor.to_compressor_id());
+        assert_eq!(CompressorID::SnappyID, snappy_compressor.to_compressor_id());
         let mut encoder = snappy_compressor.to_encoder().unwrap();
         assert!(encoder.write_all(b"foo").is_ok());
         assert!(encoder.write_all(b"bar").is_ok());
@@ -243,7 +260,7 @@ mod tests {
 
         let compressed_bytes = encoder.finish().unwrap();
 
-        let decoder = Decoder::from_compressor_id(SNAPPY_ID).unwrap();
+        let decoder = Decoder::from_u8(CompressorID::SnappyID as u8).unwrap();
         let original_bytes = decoder.decode(compressed_bytes.as_slice()).unwrap();
         assert_eq!(b"foobarSNAPPY", original_bytes.as_slice());
     }
