@@ -115,6 +115,12 @@ impl TestRunner {
                     options.command_event_handler = Some(observer.clone());
                     options.cmap_event_handler = Some(observer.clone());
                     options.server_api = server_api;
+                    if LOAD_BALANCED_SINGLE_URI
+                        .as_ref()
+                        .map_or(false, |uri| !uri.is_empty())
+                    {
+                        options.test_options_mut().mock_service_id = true;
+                    }
                     if TestClient::new().await.is_sharded() {
                         match client.use_multiple_mongoses {
                             Some(true) => {
