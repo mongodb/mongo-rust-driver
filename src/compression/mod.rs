@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod test;
+
 use crate::error::{Error, ErrorKind, Result};
 use flate2::{
     write::{ZlibDecoder, ZlibEncoder},
@@ -235,58 +238,5 @@ impl Decoder {
             CompressorID::ZlibID => Ok(Decoder::Zlib),
             CompressorID::ZstdID => Ok(Decoder::Zstd),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::compression::{Compressor, CompressorID, Decoder};
-
-    #[test]
-    fn test_zlib_compressor() {
-        let zlib_compressor = Compressor::Zlib { level: 4 };
-        assert_eq!(CompressorID::ZlibID, zlib_compressor.to_compressor_id());
-        let mut encoder = zlib_compressor.to_encoder().unwrap();
-        assert!(encoder.write_all(b"foo").is_ok());
-        assert!(encoder.write_all(b"bar").is_ok());
-        assert!(encoder.write_all(b"ZLIB").is_ok());
-
-        let compressed_bytes = encoder.finish().unwrap();
-
-        let decoder = Decoder::from_u8(CompressorID::ZlibID as u8).unwrap();
-        let original_bytes = decoder.decode(compressed_bytes.as_slice()).unwrap();
-        assert_eq!(b"foobarZLIB", original_bytes.as_slice());
-    }
-
-    #[test]
-    fn test_zstd_compressor() {
-        let zstd_compressor = Compressor::Zstd { level: 0 };
-        assert_eq!(CompressorID::ZstdID, zstd_compressor.to_compressor_id());
-        let mut encoder = zstd_compressor.to_encoder().unwrap();
-        assert!(encoder.write_all(b"foo").is_ok());
-        assert!(encoder.write_all(b"bar").is_ok());
-        assert!(encoder.write_all(b"ZSTD").is_ok());
-
-        let compressed_bytes = encoder.finish().unwrap();
-
-        let decoder = Decoder::from_u8(CompressorID::ZstdID as u8).unwrap();
-        let original_bytes = decoder.decode(compressed_bytes.as_slice()).unwrap();
-        assert_eq!(b"foobarZSTD", original_bytes.as_slice());
-    }
-
-    #[test]
-    fn test_snappy_compressor() {
-        let snappy_compressor = Compressor::Snappy;
-        assert_eq!(CompressorID::SnappyID, snappy_compressor.to_compressor_id());
-        let mut encoder = snappy_compressor.to_encoder().unwrap();
-        assert!(encoder.write_all(b"foo").is_ok());
-        assert!(encoder.write_all(b"bar").is_ok());
-        assert!(encoder.write_all(b"SNAPPY").is_ok());
-
-        let compressed_bytes = encoder.finish().unwrap();
-
-        let decoder = Decoder::from_u8(CompressorID::SnappyID as u8).unwrap();
-        let original_bytes = decoder.decode(compressed_bytes.as_slice()).unwrap();
-        assert_eq!(b"foobarSNAPPY", original_bytes.as_slice());
     }
 }
