@@ -595,6 +595,11 @@ async fn heartbeat_events() {
     )
     .await;
 
+    if client.is_load_balanced() {
+        println!("skipping heartbeat_events tests due to load-balanced topology");
+        return;
+    }
+
     subscriber
         .wait_for_event(Duration::from_millis(500), |event| {
             matches!(event, Event::Sdam(SdamEvent::ServerHeartbeatStarted(_)))

@@ -285,6 +285,10 @@ impl TestClient {
         self.base_topology() == Topology::Sharded
     }
 
+    pub fn is_load_balanced(&self) -> bool {
+        self.base_topology() == Topology::LoadBalanced
+    }
+
     pub fn server_version_eq(&self, major: u64, minor: u64) -> bool {
         self.server_version.major == major && self.server_version.minor == minor
     }
