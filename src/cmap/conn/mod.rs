@@ -313,6 +313,7 @@ impl Connection {
         let (tx, rx) = mpsc::channel(1);
         self.pinned_sender = Some(tx);
         Ok(PinnedConnectionHandle {
+            id: self.id,
             receiver: Arc::new(Mutex::new(rx)),
         })
     }
@@ -369,7 +370,8 @@ impl Drop for Connection {
         if let Some(pool_manager) = self.pool_manager.take() {
             let mut dropped_connection = self.take();
             let result = if let Some(sender) = self.pinned_sender.as_mut() {
-                // Preserve the timestamp for pinned connections.
+                // Preserve the pool manager and timestamp for pinned connections.
+                dropped_connection.pool_manager = Some(pool_manager.clone());
                 dropped_connection.ready_and_available_time = self.ready_and_available_time;
                 match sender.try_send(dropped_connection) {
                     Ok(()) => Ok(()),
@@ -385,7 +387,7 @@ impl Drop for Connection {
                     Err(mpsc::error::TrySendError::Full(mut conn)) => {
                         // Panic in debug mode
                         if cfg!(debug_assertions) {
-                            panic!("buffer full when attempting to return a pinned connection")
+                            panic!("buffer full when attempting to return a pinned connection (id = {})", conn.id);
                         }
                         // TODO RUST-230 log an error in non-debug mode.
                         conn.pinned_sender = None;
@@ -409,6 +411,7 @@ impl Drop for Connection {
 /// normal pool via this handle.
 #[derive(Debug)]
 pub(crate) struct PinnedConnectionHandle {
+    id: u32,
     receiver: Arc<Mutex<mpsc::Receiver<Connection>>>,
 }
 
@@ -418,6 +421,7 @@ impl PinnedConnectionHandle {
     /// normal borrow.
     pub(crate) fn replicate(&self) -> Self {
         Self {
+            id: self.id,
             receiver: self.receiver.clone(),
         }
     }
@@ -429,7 +433,7 @@ impl PinnedConnectionHandle {
         receiver
             .recv()
             .await
-            .ok_or_else(|| Error::internal("cannot take connection after unpin"))
+            .ok_or_else(|| Error::internal(format!("cannot take connection after unpin (id={})", self.id)))
     }
 
     /// Return the pinned connection to the normal connection pool.

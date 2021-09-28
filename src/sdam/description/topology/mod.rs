@@ -358,7 +358,6 @@ impl TopologyDescription {
             None if server_description.server_type.is_data_bearing()
                 || self.topology_type == TopologyType::Single =>
             {
-                dbg!("unsupported");
                 self.session_support_status = SessionSupportStatus::Unsupported {
                     logical_session_timeout: None,
                 }
