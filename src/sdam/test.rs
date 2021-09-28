@@ -32,6 +32,10 @@ async fn min_heartbeat_frequency() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
 
     let mut setup_client_options = CLIENT_OPTIONS.clone();
+    if setup_client_options.load_balanced.unwrap_or(false) {
+        println!("skipping min_heartbeat_frequency test due to load-balanced topology");
+        return;
+    }
     setup_client_options.hosts.drain(1..);
     setup_client_options.direct_connection = Some(true);
 
@@ -90,6 +94,10 @@ async fn sdam_pool_management() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
 
     let mut options = CLIENT_OPTIONS.clone();
+    if options.load_balanced.unwrap_or(false) {
+        println!("skipping sdam_pool_management test due to load-balanced topology");
+        return;
+    }
     options.hosts.drain(1..);
     options.direct_connection = Some(true);
     options.app_name = Some("SDAMPoolManagementTest".to_string());
@@ -179,6 +187,10 @@ async fn sdam_min_pool_size_error() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
 
     let mut setup_client_options = CLIENT_OPTIONS.clone();
+    if setup_client_options.load_balanced.unwrap_or(false) {
+        println!("skipping sdam_min_pool_size_error test due to load-balanced topology");
+        return;
+    }
     setup_client_options.hosts.drain(1..);
     setup_client_options.direct_connection = Some(true);
 

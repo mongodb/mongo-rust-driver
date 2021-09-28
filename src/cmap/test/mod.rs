@@ -425,6 +425,9 @@ async fn cmap_spec_tests() {
         let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
         let mut options = CLIENT_OPTIONS.clone();
+        if options.load_balanced.unwrap_or(false) {
+            return;
+        }
         options.hosts.drain(1..);
         options.direct_connection = Some(true);
         let client = EventClient::with_options(options).await;

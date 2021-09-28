@@ -78,6 +78,10 @@ async fn concurrent_connections() {
     let _guard = LOCK.run_exclusively().await;
 
     let mut options = CLIENT_OPTIONS.clone();
+    if options.load_balanced.unwrap_or(false) {
+        println!("skipping concurrent_connections test due to load-balanced topology");
+        return;
+    }
     options.direct_connection = Some(true);
     options.hosts.drain(1..);
 
@@ -163,6 +167,10 @@ async fn connection_error_during_establishment() {
     let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
 
     let mut client_options = CLIENT_OPTIONS.clone();
+    if client_options.load_balanced.unwrap_or(false) {
+        println!("skipping connection_error_during_establishment test due to load-balanced topology");
+        return;
+    }
     client_options.heartbeat_freq = Duration::from_secs(300).into(); // high so that monitors dont trip failpoint
     client_options.hosts.drain(1..);
     client_options.direct_connection = Some(true);

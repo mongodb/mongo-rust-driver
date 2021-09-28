@@ -274,19 +274,15 @@ impl TestClient {
     }
 
     pub fn is_standalone(&self) -> bool {
-        !self.is_replica_set() && !self.is_sharded()
+        self.base_topology() == Topology::Single
     }
 
     pub fn is_replica_set(&self) -> bool {
-        self.options.repl_set_name.is_some()
+        self.base_topology() == Topology::ReplicaSet
     }
 
     pub fn is_sharded(&self) -> bool {
-        self.server_info.msg.as_deref() == Some("isdbgrid")
-    }
-
-    pub fn is_load_balanced(&self) -> bool {
-        self.options.load_balanced.unwrap_or(false)
+        self.base_topology() == Topology::Sharded
     }
 
     pub fn server_version_eq(&self, major: u64, minor: u64) -> bool {
@@ -320,10 +316,23 @@ impl TestClient {
         drop_collection(&coll).await;
     }
 
+    /// Returns the `Topology' that can be determined without a server query, i.e. all except `Toplogy::ShardedReplicaSet`.
+    fn base_topology(&self) -> Topology {
+        if self.options.load_balanced.unwrap_or(false) {
+            return Topology::LoadBalanced;
+        }
+        if self.server_info.msg.as_deref() == Some("isdbgrid") {
+            return Topology::Sharded;
+        }
+        if self.options.repl_set_name.is_some() {
+            return Topology::ReplicaSet;
+        }
+        return Topology::Single;
+    }
+
     pub async fn topology(&self) -> Topology {
-        if self.is_load_balanced() {
-            Topology::LoadBalanced
-        } else if self.is_sharded() {
+        let bt = self.base_topology();
+        if let Topology::Sharded = bt {
             let shard_info = self
                 .database("config")
                 .collection::<Document>("shards")
@@ -335,27 +344,19 @@ impl TestClient {
             // If the host string has more than one host, a slash will separate the replica set name
             // and list of hosts.
             if hosts.contains('/') {
-                Topology::ShardedReplicaSet
-            } else {
-                Topology::Sharded
+                return Topology::ShardedReplicaSet
             }
-        } else if self.is_replica_set() {
-            Topology::ReplicaSet
-        } else {
-            Topology::Single
         }
+        bt
     }
 
     pub fn topology_string(&self) -> String {
-        if self.is_load_balanced() {
-            "load-balanced".to_string()
-        } else if self.is_sharded() {
-            "sharded".to_string()
-        } else if self.is_replica_set() {
-            "replicaset".to_string()
-        } else {
-            "single".to_string()
-        }
+        match self.base_topology() {
+            Topology::LoadBalanced => "load-balanced",
+            Topology::Sharded | Topology::ShardedReplicaSet => "sharded",
+            Topology::ReplicaSet => "replicaset",
+            Topology::Single => "single",
+        }.to_string()
     }
 }
 

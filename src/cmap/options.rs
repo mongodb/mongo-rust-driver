@@ -92,6 +92,7 @@ pub(crate) struct ConnectionPoolOptions {
 
     /// Whether or not to mock the `serviceId` field of a hello through a load balancer.
     #[cfg(test)]
+    #[serde(skip)]
     pub(crate) mock_service_id: bool,
 }
 
