@@ -174,8 +174,7 @@ impl ConnectionPoolWorker {
         let (connection_requester, request_receiver) =
             connection_requester::channel(address.clone(), handle);
         let (manager, management_receiver) = manager::channel();
-        let (generation_publisher, generation_subscriber) = status::channel();
-
+        
         let is_load_balanced = options
             .as_ref()
             .and_then(|opts| opts.load_balanced)
@@ -185,6 +184,7 @@ impl ConnectionPoolWorker {
         } else {
             PoolGeneration::normal()
         };
+        let (generation_publisher, generation_subscriber) = status::channel(generation.clone());
 
         #[cfg(test)]
         let mut state = if options

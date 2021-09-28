@@ -99,7 +99,7 @@ impl ConnectionPool {
         let (manager, _) = manager::channel();
         let handle = PoolWorkerHandle::new_mocked();
         let (connection_requester, _) = connection_requester::channel(Default::default(), handle);
-        let (_, generation_subscriber) = status::channel();
+        let (_, generation_subscriber) = status::channel(PoolGeneration::normal());
 
         Self {
             address,
