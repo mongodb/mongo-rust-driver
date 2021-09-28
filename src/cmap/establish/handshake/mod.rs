@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test;
 
-use std::{convert::TryInto, sync::Arc};
+use std::sync::Arc;
 
 use lazy_static::lazy_static;
 use os_info::{Type, Version};
@@ -279,20 +279,17 @@ impl Handshaker {
                 // Use the Client's first compressor choice that the server supports
                 for client_compressor in client_compressors {
                     if server_compressors.contains(client_compressor) {
-                        conn.compressor = match client_compressor.to_lowercase().as_str() {
-                            "zlib" => {
-                                // Default compression level is 6 (a level of -1 indicates default)
-                                let mut level: i32 = self.zlib_compression_level.unwrap_or(6);
-                                if level == -1 {
-                                    level = 6;
-                                }
-                                let level = level.try_into().unwrap_or(6);
-                                Some(Compressor::Zlib(level))
+                        conn.compressor = client_compressor.parse().ok();
+                        // If we're using Zlib and zlib_compression_level is set, then use it
+                        if let Some(Compressor::Zlib { level: _ }) = conn.compressor {
+                            let level = self
+                                .zlib_compression_level
+                                .unwrap_or(crate::compression::ZLIB_DEFAULT_LEVEL);
+                            // Level -1 indicates use default (which is set in from_str)
+                            if level != -1 {
+                                conn.compressor = Some(Compressor::Zlib { level: level as u32 });
                             }
-                            "zstd" => Some(Compressor::Zstd(0)),
-                            "snappy" => Some(Compressor::Snappy),
-                            _ => None,
-                        };
+                        }
                         break;
                     }
                 }

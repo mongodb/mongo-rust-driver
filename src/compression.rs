@@ -3,7 +3,10 @@ use flate2::{
     write::{ZlibDecoder, ZlibEncoder},
     Compression,
 };
-use std::{convert::TryInto, io::prelude::*};
+use std::{convert::TryInto, io::prelude::*, str::FromStr};
+
+pub(crate) const ZLIB_DEFAULT_LEVEL: i32 = 6;
+pub(crate) const ZSTD_DEFAULT_LEVEL: i32 = 0;
 
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
@@ -32,23 +35,39 @@ impl CompressorID {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub(crate) enum Compressor {
-    Zstd(u32),
-    Zlib(u32),
+    Zstd { level: u32 },
+    Zlib { level: u32 },
     Snappy,
+}
+
+pub(crate) struct ParseCompressorError{}
+
+impl FromStr for Compressor {
+    type Err = ParseCompressorError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "zlib" => Ok(Compressor::Zlib { level: ZLIB_DEFAULT_LEVEL as u32}),
+            "zstd" => Ok(Compressor::Zstd {level: ZSTD_DEFAULT_LEVEL as u32}),
+            "snappy" => Ok(Compressor::Snappy),
+            _ => Err(Self::Err {}),
+        }
+    }
+
 }
 
 impl Compressor {
     pub(crate) fn to_compressor_id(&self) -> CompressorID {
         match *self {
-            Compressor::Zstd(_) => CompressorID::ZstdID,
-            Compressor::Zlib(_) => CompressorID::ZlibID,
+            Compressor::Zstd { level: _ } => CompressorID::ZstdID,
+            Compressor::Zlib { level: _ } => CompressorID::ZlibID,
             Compressor::Snappy => CompressorID::SnappyID,
         }
     }
 
     pub(crate) fn to_encoder(&self) -> Result<Encoder> {
         match *self {
-            Compressor::Zstd(level) => {
+            Compressor::Zstd { level } => {
                 let encoder =
                     zstd::Encoder::new(vec![], level.try_into().unwrap()).map_err(|e| {
                         Error::new(
@@ -64,7 +83,7 @@ impl Compressor {
 
                 Ok(Encoder::Zstd { encoder })
             }
-            Compressor::Zlib(level) => {
+            Compressor::Zlib { level } => {
                 let encoder = ZlibEncoder::new(vec![], Compression::new(level));
                 Ok(Encoder::Zlib { encoder })
             }
@@ -219,7 +238,7 @@ mod tests {
 
     #[test]
     fn test_zlib_compressor() {
-        let zlib_compressor = Compressor::Zlib(4);
+        let zlib_compressor = Compressor::Zlib{level: 4};
         assert_eq!(CompressorID::ZlibID, zlib_compressor.to_compressor_id());
         let mut encoder = zlib_compressor.to_encoder().unwrap();
         assert!(encoder.write_all(b"foo").is_ok());
@@ -235,7 +254,7 @@ mod tests {
 
     #[test]
     fn test_zstd_compressor() {
-        let zstd_compressor = Compressor::Zstd(0);
+        let zstd_compressor = Compressor::Zstd{level: 0};
         assert_eq!(CompressorID::ZstdID, zstd_compressor.to_compressor_id());
         let mut encoder = zstd_compressor.to_encoder().unwrap();
         assert!(encoder.write_all(b"foo").is_ok());

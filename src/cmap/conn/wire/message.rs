@@ -109,46 +109,12 @@ impl Message {
         header: &Header,
     ) -> Result<Self> {
         // TODO: RUST-616 ensure length is < maxMessageSizeBytes
-        let mut length_remaining = header.length - Header::LENGTH as i32;
+        let length_remaining = header.length - Header::LENGTH as i32;
         let mut buf = vec![0u8; length_remaining as usize];
         reader.read_exact(&mut buf).await?;
         let mut reader = buf.as_slice();
 
-        let flags = MessageFlags::from_bits_truncate(reader.read_u32()?);
-        length_remaining -= std::mem::size_of::<u32>() as i32;
-
-        let mut count_reader = SyncCountReader::new(&mut reader);
-        let mut sections = Vec::new();
-
-        while length_remaining - count_reader.bytes_read() as i32 > 4 {
-            sections.push(MessageSection::read(&mut count_reader)?);
-        }
-
-        length_remaining -= count_reader.bytes_read() as i32;
-
-        let mut checksum = None;
-
-        if length_remaining == 4 && flags.contains(MessageFlags::CHECKSUM_PRESENT) {
-            checksum = Some(reader.read_u32()?);
-        } else if length_remaining != 0 {
-            return Err(ErrorKind::InvalidResponse {
-                message: format!(
-                    "The server indicated that the reply would be {} bytes long, but it instead \
-                     was {}",
-                    header.length,
-                    header.length - length_remaining + count_reader.bytes_read() as i32,
-                ),
-            }
-            .into());
-        }
-
-        Ok(Self {
-            response_to: header.response_to,
-            flags,
-            sections,
-            checksum,
-            request_id: None,
-        })
+        Self::read_op_common(&mut reader, length_remaining, &header)
     }
 
     async fn read_from_op_compressed(
@@ -200,19 +166,27 @@ impl Message {
 
         // Read decompressed message as a standard OP_MSG
         let mut reader = decoded_message.as_slice();
-        let mut length_remaining = decoded_message.len();
+        let length_remaining = decoded_message.len();
 
-        let mut sections = Vec::new();
+        Self::read_op_common(&mut reader, length_remaining as i32, &header)
+    }
+
+    fn read_op_common(
+        mut reader: &[u8],
+        mut length_remaining: i32,
+        header: &Header,
+    ) -> Result<Self> {
         let flags = MessageFlags::from_bits_truncate(reader.read_u32()?);
-        length_remaining -= std::mem::size_of::<u32>();
+        length_remaining -= std::mem::size_of::<u32>() as i32;
 
         let mut count_reader = SyncCountReader::new(&mut reader);
+        let mut sections = Vec::new();
 
-        while length_remaining - count_reader.bytes_read() > 4 {
+        while length_remaining - count_reader.bytes_read() as i32 > 4 {
             sections.push(MessageSection::read(&mut count_reader)?);
         }
 
-        length_remaining -= count_reader.bytes_read();
+        length_remaining -= count_reader.bytes_read() as i32;
 
         let mut checksum = None;
 
@@ -220,8 +194,12 @@ impl Message {
             checksum = Some(reader.read_u32()?);
         } else if length_remaining != 0 {
             return Err(ErrorKind::InvalidResponse {
-                message: "Leftover bytes in the message: a section must be greater than 4 bytes"
-                    .to_string(),
+                message: format!(
+                    "The server indicated that the reply would be {} bytes long, but it instead \
+                     was {}",
+                    header.length,
+                    header.length - length_remaining + count_reader.bytes_read() as i32,
+                ),
             }
             .into());
         }

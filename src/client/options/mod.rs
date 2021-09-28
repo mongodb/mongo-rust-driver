@@ -373,7 +373,7 @@ pub struct ClientOptions {
     /// The compressors that the Client is willing to use in the order they are specified
     /// in the configuration.  The Client sends this list of compressors to the server.
     /// The server responds with the intersection of its supported list of compressors.
-    #[builder(default, setter(skip))]
+    #[builder(default)]
     pub(crate) compressors: Option<Vec<String>>,
 
     /// The handler that should process all Connection Monitoring and Pooling events. See the
@@ -528,7 +528,7 @@ pub struct ClientOptions {
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 
-    #[builder(default, setter(skip))]
+    #[builder(default)]
     pub(crate) zlib_compression: Option<i32>,
 
     /// Information from the SRV URI that generated these client options, if applicable.
@@ -1671,7 +1671,7 @@ impl ClientOptionsParser {
                 self.auth_mechanism_properties = Some(doc);
             }
             "compressors" => {
-                self.compressors = Some(value.split(',').map(String::from).collect());
+                self.compressors = Some(value.split(',').map(str::to_lowercase).collect());
             }
             k @ "connecttimeoutms" => {
                 self.connect_timeout = Some(Duration::from_millis(get_duration!(value, k)));
