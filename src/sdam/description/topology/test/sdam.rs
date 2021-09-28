@@ -120,6 +120,7 @@ impl From<TestIsMasterCommandResponse> for IsMasterCommandResponse {
             max_bson_object_size: test.max_bson_object_size.unwrap_or(1234),
             max_write_batch_size: test.max_write_batch_size.unwrap_or(1234),
             service_id: test.service_id,
+            topology_version: None,
         }
     }
 }

@@ -89,6 +89,10 @@ pub(crate) struct ConnectionPoolOptions {
 
     /// Whether or not the client is connecting to a MongoDB cluster through a load balancer.
     pub(crate) load_balanced: Option<bool>,
+
+    /// Whether or not to mock the `serviceId` field of a hello through a load balancer.
+    #[cfg(test)]
+    pub(crate) mock_service_id: bool,
 }
 
 impl ConnectionPoolOptions {
@@ -109,6 +113,8 @@ impl ConnectionPoolOptions {
             #[cfg(test)]
             ready: None,
             load_balanced: options.load_balanced,
+            #[cfg(test)]
+            mock_service_id: options.test_options.as_ref().map_or(false, |to| to.mock_service_id),
         }
     }
 
