@@ -1,11 +1,11 @@
 use bson::{doc, Bson};
-use std::time::Duration;
 
 use crate::{
     compression::{Compressor, CompressorID, Decoder},
-    options::ClientOptions,
     test::TestClient,
 };
+
+use crate::test::CLIENT_OPTIONS;
 
 #[test]
 fn test_zlib_compressor() {
@@ -59,12 +59,9 @@ fn test_snappy_compressor() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn ping_server_with_zlib_compression() {
-    // Builds with localhost:27017 in hosts by default
-    let client_options = ClientOptions::builder()
-        .compressors(vec!["zlib".to_string()])
-        .zlib_compression(4)
-        .server_selection_timeout(Duration::new(2, 0))
-        .build();
+    let mut client_options = CLIENT_OPTIONS.clone();
+    client_options.compressors = Some(vec!["zlib".to_string()]);
+    client_options.zlib_compression = Some(4);
 
     let client = TestClient::with_options(Some(client_options)).await;
     let ret = client
@@ -81,10 +78,8 @@ async fn ping_server_with_zlib_compression() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn ping_server_with_zstd_compression() {
-    let client_options = ClientOptions::builder()
-        .compressors(vec!["zstd".to_string()])
-        .server_selection_timeout(Duration::new(2, 0))
-        .build();
+    let mut client_options = CLIENT_OPTIONS.clone();
+    client_options.compressors = Some(vec!["zstd".to_string()]);
 
     let client = TestClient::with_options(Some(client_options)).await;
     let ret = client
@@ -101,10 +96,8 @@ async fn ping_server_with_zstd_compression() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn ping_server_with_snappy_compression() {
-    let client_options = ClientOptions::builder()
-        .compressors(vec!["snappy".to_string()])
-        .server_selection_timeout(Duration::new(2, 0))
-        .build();
+    let mut client_options = CLIENT_OPTIONS.clone();
+    client_options.compressors = Some(vec!["snappy".to_string()]);
 
     let client = TestClient::with_options(Some(client_options)).await;
     let ret = client
