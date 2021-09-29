@@ -332,7 +332,7 @@ impl TestClient {
         if self.options.repl_set_name.is_some() {
             return Topology::ReplicaSet;
         }
-        return Topology::Single;
+        Topology::Single
     }
 
     pub async fn topology(&self) -> Topology {
