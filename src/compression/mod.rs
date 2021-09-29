@@ -35,7 +35,7 @@ impl CompressorID {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub(crate) enum Compressor {
     Zstd { level: u32 },

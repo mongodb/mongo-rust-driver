@@ -273,26 +273,23 @@ impl Handshaker {
         });
 
         // Check that master reply has a compressor list and unpack it
-        if let Some(ref server_compressors) = is_master_reply.command_response.compressors {
-            // Check that client has a compressor list and unpack it
-            if let Some(ref client_compressors) = self.compressors {
-                // Use the Client's first compressor choice that the server supports
-                for client_compressor in client_compressors {
-                    if server_compressors.contains(client_compressor) {
-                        conn.compressor = client_compressor.parse().ok();
-                        // If we're using Zlib and zlib_compression_level is set, then use it
-                        if let Some(Compressor::Zlib { level: _ }) = conn.compressor {
-                            let level = self
-                                .zlib_compression_level
-                                .unwrap_or(crate::compression::ZLIB_DEFAULT_LEVEL);
-                            // Level -1 indicates use default (which is set in from_str)
-                            if level != -1 {
-                                conn.compressor = Some(Compressor::Zlib {
-                                    level: level as u32,
-                                });
-                            }
-                        }
-                        break;
+        if let (Some(server_compressors), Some(client_compressors)) = (
+            is_master_reply.command_response.compressors.as_ref(),
+            self.compressors.as_ref(),
+        ) {
+            // Use the Client's first compressor choice that the server supports
+            if let Some(compressor) = client_compressors.iter().find(|c| server_compressors.contains(c)) {
+                conn.compressor = compressor.parse().ok();
+                // If we're using Zlib and zlib_compression_level is set, then use it
+                if let Some(Compressor::Zlib { level: _ }) = conn.compressor {
+                    let level = self
+                        .zlib_compression_level
+                        .unwrap_or(crate::compression::ZLIB_DEFAULT_LEVEL);
+                    // Level -1 indicates use default (which is set in from_str)
+                    if level != -1 {
+                        conn.compressor = Some(Compressor::Zlib {
+                            level: level as u32,
+                        });
                     }
                 }
             }

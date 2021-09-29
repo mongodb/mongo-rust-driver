@@ -255,19 +255,15 @@ impl Connection {
     ) -> Result<RawCommandResponse> {
         self.command_executing = true;
 
-        // If the connection has agreed on a compressor with the server, and the command
+        // If the client has agreed on a compressor with the server, and the command
         // is the right type of command, then compress the message.
         let write_result = match self.compressor {
-            Some(ref compressor) => {
-                if to_compress {
-                    message
-                        .write_compressed_to(&mut self.stream, compressor)
-                        .await
-                } else {
-                    message.write_to(&mut self.stream).await
-                }
+            Some(ref compressor) if to_compress => {
+                message
+                    .write_compressed_to(&mut self.stream, compressor)
+                    .await
             }
-            None => message.write_to(&mut self.stream).await,
+            _ => message.write_to(&mut self.stream).await,
         };
 
         self.error = write_result.is_err();
