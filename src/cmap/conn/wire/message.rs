@@ -112,9 +112,9 @@ impl Message {
         let length_remaining = header.length - Header::LENGTH as i32;
         let mut buf = vec![0u8; length_remaining as usize];
         reader.read_exact(&mut buf).await?;
-        let mut reader = buf.as_slice();
+        let reader = buf.as_slice();
 
-        Self::read_op_common(&mut reader, length_remaining, &header)
+        Self::read_op_common(reader, length_remaining, header)
     }
 
     async fn read_from_op_compressed(
@@ -165,10 +165,10 @@ impl Message {
         }
 
         // Read decompressed message as a standard OP_MSG
-        let mut reader = decoded_message.as_slice();
+        let reader = decoded_message.as_slice();
         let length_remaining = decoded_message.len();
 
-        Self::read_op_common(&mut reader, length_remaining as i32, &header)
+        Self::read_op_common(reader, length_remaining as i32, header)
     }
 
     fn read_op_common(
