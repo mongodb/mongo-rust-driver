@@ -174,7 +174,7 @@ impl ConnectionPoolWorker {
         let (connection_requester, request_receiver) =
             connection_requester::channel(address.clone(), handle);
         let (manager, management_receiver) = manager::channel();
-        
+
         let is_load_balanced = options
             .as_ref()
             .and_then(|opts| opts.load_balanced)

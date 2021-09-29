@@ -320,7 +320,8 @@ impl TestClient {
         drop_collection(&coll).await;
     }
 
-    /// Returns the `Topology' that can be determined without a server query, i.e. all except `Toplogy::ShardedReplicaSet`.
+    /// Returns the `Topology' that can be determined without a server query, i.e. all except
+    /// `Toplogy::ShardedReplicaSet`.
     fn base_topology(&self) -> Topology {
         if self.options.load_balanced.unwrap_or(false) {
             return Topology::LoadBalanced;
@@ -348,7 +349,7 @@ impl TestClient {
             // If the host string has more than one host, a slash will separate the replica set name
             // and list of hosts.
             if hosts.contains('/') {
-                return Topology::ShardedReplicaSet
+                return Topology::ShardedReplicaSet;
             }
         }
         bt
@@ -360,7 +361,8 @@ impl TestClient {
             Topology::Sharded | Topology::ShardedReplicaSet => "sharded",
             Topology::ReplicaSet => "replicaset",
             Topology::Single => "single",
-        }.to_string()
+        }
+        .to_string()
     }
 }
 

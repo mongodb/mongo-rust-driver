@@ -168,7 +168,9 @@ async fn connection_error_during_establishment() {
 
     let mut client_options = CLIENT_OPTIONS.clone();
     if client_options.load_balanced.unwrap_or(false) {
-        println!("skipping connection_error_during_establishment test due to load-balanced topology");
+        println!(
+            "skipping connection_error_during_establishment test due to load-balanced topology"
+        );
         return;
     }
     client_options.heartbeat_freq = Duration::from_secs(300).into(); // high so that monitors dont trip failpoint

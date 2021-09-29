@@ -387,7 +387,11 @@ impl Drop for Connection {
                     Err(mpsc::error::TrySendError::Full(mut conn)) => {
                         // Panic in debug mode
                         if cfg!(debug_assertions) {
-                            panic!("buffer full when attempting to return a pinned connection (id = {})", conn.id);
+                            panic!(
+                                "buffer full when attempting to return a pinned connection (id = \
+                                 {})",
+                                conn.id
+                            );
                         }
                         // TODO RUST-230 log an error in non-debug mode.
                         conn.pinned_sender = None;
@@ -430,10 +434,12 @@ impl PinnedConnectionHandle {
     /// connection has been unpinned.
     pub(crate) async fn take_connection(&self) -> Result<Connection> {
         let mut receiver = self.receiver.lock().await;
-        receiver
-            .recv()
-            .await
-            .ok_or_else(|| Error::internal(format!("cannot take connection after unpin (id={})", self.id)))
+        receiver.recv().await.ok_or_else(|| {
+            Error::internal(format!(
+                "cannot take connection after unpin (id={})",
+                self.id
+            ))
+        })
     }
 
     /// Return the pinned connection to the normal connection pool.
