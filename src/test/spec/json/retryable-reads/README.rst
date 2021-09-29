@@ -74,9 +74,22 @@ Each YAML file has the following keys:
     version.
 
   - ``topology`` (optional): An array of server topologies against which the
-    tests can be run successfully. Valid topologies are "single", "replicaset",
-    and "sharded". If this field is omitted, the default is all topologies (i.e.
-    ``["single", "replicaset", "sharded"]``).
+    tests can be run successfully. Valid topologies are "single",
+    "replicaset", "sharded", and "load-balanced". If this field is omitted,
+    the default is all topologies (i.e. ``["single", "replicaset", "sharded",
+    "load-balanced"]``).
+
+  - ``serverless``: Optional string. Whether or not the test should be run on
+    serverless instances imitating sharded clusters. Valid values are "require",
+    "forbid", and "allow". If "require", the test MUST only be run on serverless
+    instances. If "forbid", the test MUST NOT be run on serverless instances. If
+    omitted or "allow", this option has no effect.
+
+    The test runner MUST be informed whether or not serverless is being used in
+    order to determine if this requirement is met (e.g. through an environment
+    variable or configuration option). Since the serverless proxy imitates a
+    mongos, the runner is not capable of determining this by issuing a server
+    command such as ``buildInfo`` or ``hello``.
 
 - ``database_name`` and ``collection_name``: Optional. The database and
   collection to use for testing.
@@ -96,10 +109,18 @@ Each YAML file has the following keys:
     
   - ``clientOptions``: Optional, parameters to pass to MongoClient().
 
-  - ``useMultipleMongoses`` (optional): If ``true``, the MongoClient for this
-    test should be initialized with multiple mongos seed addresses. If ``false``
-    or omitted, only a single mongos address should be specified. This field has
-    no effect for non-sharded topologies.
+  - ``useMultipleMongoses`` (optional): If ``true``, and the topology type is
+    ``Sharded``, the MongoClient for this test should be initialized with multiple
+    mongos seed addresses. If ``false`` or omitted, only a single mongos address
+    should be specified.
+
+    If ``true``, and the topology type is ``LoadBalanced``, the MongoClient for
+    this test should be initialized with the URI of the load balancer fronting
+    multiple servers. If ``false`` or omitted, the MongoClient for this test
+    should be initialized with the URI of the load balancer fronting a single
+    server.
+
+    ``useMultipleMongoses`` only affects ``Sharded`` and ``LoadBalanced`` topologies.
     
   - ``skipReason``: Optional, string describing why this test should be skipped.
 
@@ -147,6 +168,7 @@ data.
 
 .. _GridFSBucket spec: https://github.com/mongodb/specifications/blob/master/source/gridfs/gridfs-spec.rst#configurable-gridfsbucket-class
     
+
 Speeding Up Tests
 -----------------
 
@@ -164,8 +186,50 @@ Optional Enumeration Commands
 A driver only needs to test the optional enumeration commands it has chosen to
 implement (e.g. ``Database.listCollectionNames()``).
 
+PoolClearedError Retryability Test
+==================================
+
+This test will be used to ensure drivers properly retry after encountering PoolClearedErrors.
+It MUST be implemented by any driver that implements the CMAP specification.
+This test requires MongoDB 4.2.9+ for ``blockConnection`` support in the failpoint.
+
+1. Create a client with maxPoolSize=1 and retryReads=true. If testing against a
+   sharded deployment, be sure to connect to only a single mongos.
+
+2. Enable the following failpoint::
+
+     {
+         configureFailPoint: "failCommand",
+         mode: { times: 1 },
+         data: {
+             failCommands: ["find"],
+             errorCode: 91,
+             blockConnection: true,
+             blockTimeMS: 1000
+         }
+     }
+
+3. Start two threads and attempt to perform a ``findOne`` simultaneously on both.
+
+4. Verify that both ``findOne`` attempts succeed.
+
+5. Via CMAP monitoring, assert that the first check out succeeds.
+
+6. Via CMAP monitoring, assert that a PoolClearedEvent is then emitted.
+
+7. Via CMAP monitoring, assert that the second check out then fails due to a
+   connection error.
+
+8. Via Command Monitoring, assert that exactly three ``find`` CommandStartedEvents
+   were observed in total.
+
+9. Disable the failpoint.
+
+
 Changelog
 =========
+
+:2021-08-27: Clarify behavior of ``useMultipleMongoses`` for ``LoadBalanced`` topologies.
 
 :2019-03-19: Add top-level ``runOn`` field to denote server version and/or
              topology requirements requirements for the test file. Removes the
@@ -175,3 +239,7 @@ Changelog
              Add test-level ``useMultipleMongoses`` field.
 
 :2020-09-16: Suggest lowering heartbeatFrequencyMS in addition to minHeartbeatFrequencyMS.
+
+:2021-03-23: Add prose test for retrying PoolClearedErrors
+
+:2021-04-29: Add ``load-balanced`` to test topology requirements.
