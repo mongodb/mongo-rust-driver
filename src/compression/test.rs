@@ -59,6 +59,7 @@ fn test_snappy_compressor() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn ping_server_with_zlib_compression() {
+    // Builds with localhost:27017 in hosts by default
     let client_options = ClientOptions::builder()
         .compressors(vec!["zlib".to_string()])
         .zlib_compression(4)
