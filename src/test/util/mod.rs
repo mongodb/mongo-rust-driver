@@ -25,7 +25,7 @@ use crate::{
     error::{CommandError, ErrorKind, Result},
     operation::RunCommand,
     options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
-    test::{Topology, LOAD_BALANCED_SINGLE_URI},
+    test::{Topology, LOAD_BALANCED_SINGLE_URI, LOAD_BALANCED_MULTIPLE_URI, client_options_for_uri},
     Client,
     Collection,
 };
@@ -127,16 +127,7 @@ impl TestClient {
         options: Option<ClientOptions>,
         use_multiple_mongoses: bool,
     ) -> Self {
-        let mut options = match options {
-            Some(mut options) => {
-                options.merge(CLIENT_OPTIONS.clone());
-                options
-            }
-            None => CLIENT_OPTIONS.clone(),
-        };
-        if !use_multiple_mongoses && Self::new().await.is_sharded() {
-            options.hosts = options.hosts.iter().cloned().take(1).collect();
-        }
+        let options = Self::options_for_multiple_mongoses(options, use_multiple_mongoses).await;
         Self::with_options(Some(options)).await
     }
 
@@ -363,6 +354,35 @@ impl TestClient {
             Topology::Single => "single",
         }
         .to_string()
+    }
+
+    pub async fn options_for_multiple_mongoses(options: Option<ClientOptions>, use_multiple_mongoses: bool) -> ClientOptions {
+        let is_load_balanced = options
+            .as_ref()
+            .and_then(|o| o.load_balanced)
+            .or_else(|| CLIENT_OPTIONS.load_balanced)
+            .unwrap_or(false);
+        let default_options = if is_load_balanced {
+            let uri = if use_multiple_mongoses {
+                LOAD_BALANCED_MULTIPLE_URI.as_ref().expect("MULTI_MONGOS_LB_URI is required")
+            } else {
+                LOAD_BALANCED_SINGLE_URI.as_ref().expect("SINGLE_MONGOS_LB_URI is required")
+            };
+            client_options_for_uri(uri)
+        } else {
+            CLIENT_OPTIONS.clone()
+        };
+        let mut options = match options {
+            Some(mut options) => {
+                options.merge(default_options);
+                options
+            }
+            None => default_options,
+        };
+        if Self::new().await.is_sharded() && !use_multiple_mongoses {
+            options.hosts = options.hosts.iter().cloned().take(1).collect();
+        }
+        options
     }
 }
 

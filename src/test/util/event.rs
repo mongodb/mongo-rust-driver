@@ -47,7 +47,7 @@ use crate::{
         },
     },
     options::ClientOptions,
-    test::{spec::ExpectedEventType, CLIENT_OPTIONS, LOCK},
+    test::{spec::ExpectedEventType, LOCK},
     RUNTIME,
 };
 
@@ -448,20 +448,11 @@ impl EventClient {
         use_multiple_mongoses: Option<bool>,
         event_handler: impl Into<Option<EventHandler>>,
     ) -> Self {
-        let mut options = match options.into() {
-            Some(mut options) => {
-                options.merge(CLIENT_OPTIONS.clone());
-                options
-            }
-            None => CLIENT_OPTIONS.clone(),
-        };
+        let mut options = TestClient::options_for_multiple_mongoses(options.into(), use_multiple_mongoses.unwrap_or(false)).await;
         options
             .test_options
             .get_or_insert_with(Default::default)
             .heartbeat_freq = heartbeat_freq;
-        if TestClient::new().await.is_sharded() && use_multiple_mongoses != Some(true) {
-            options.hosts = options.hosts.iter().cloned().take(1).collect();
-        }
         EventClient::with_options_and_handler(options, event_handler).await
     }
 

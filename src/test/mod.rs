@@ -44,20 +44,7 @@ use std::{fs::read_to_string, str::FromStr};
 const MAX_POOL_SIZE: u32 = 100;
 
 lazy_static! {
-    pub(crate) static ref CLIENT_OPTIONS: ClientOptions = {
-        let uri = DEFAULT_URI.clone();
-        let mut options = ClientOptions::parse_without_srv_resolution(&uri).unwrap();
-        options.max_pool_size = Some(MAX_POOL_SIZE);
-        options.server_api = SERVER_API.clone();
-        if LOAD_BALANCED_SINGLE_URI
-            .as_ref()
-            .map_or(false, |uri| !uri.is_empty())
-        {
-            options.test_options_mut().mock_service_id = true;
-        }
-
-        options
-    };
+    pub(crate) static ref CLIENT_OPTIONS: ClientOptions = client_options_for_uri(&DEFAULT_URI);
     pub(crate) static ref LOCK: TestLock = TestLock::new();
     pub(crate) static ref DEFAULT_URI: String = get_default_uri();
     pub(crate) static ref SERVER_API: Option<ServerApi> = match std::env::var("MONGODB_API_VERSION")
@@ -75,6 +62,20 @@ lazy_static! {
         std::env::var("SINGLE_MONGOS_LB_URI").ok();
     pub(crate) static ref LOAD_BALANCED_MULTIPLE_URI: Option<String> =
         std::env::var("MULTI_MONGOS_LB_URI").ok();
+}
+
+pub(crate) fn client_options_for_uri(uri: &str) -> ClientOptions {
+    let mut options = ClientOptions::parse_without_srv_resolution(uri).unwrap();
+    options.max_pool_size = Some(MAX_POOL_SIZE);
+    options.server_api = SERVER_API.clone();
+    if LOAD_BALANCED_SINGLE_URI
+        .as_ref()
+        .map_or(false, |uri| !uri.is_empty())
+    {
+        options.test_options_mut().mock_service_id = true;
+    }
+
+    options
 }
 
 fn get_default_uri() -> String {
