@@ -368,7 +368,7 @@ impl TestClient {
         let is_load_balanced = options
             .as_ref()
             .and_then(|o| o.load_balanced)
-            .or_else(|| CLIENT_OPTIONS.load_balanced)
+            .or(CLIENT_OPTIONS.load_balanced)
             .unwrap_or(false);
         let default_options = if is_load_balanced {
             let uri = if use_multiple_mongoses {
