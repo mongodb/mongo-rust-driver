@@ -448,7 +448,11 @@ impl EventClient {
         use_multiple_mongoses: Option<bool>,
         event_handler: impl Into<Option<EventHandler>>,
     ) -> Self {
-        let mut options = TestClient::options_for_multiple_mongoses(options.into(), use_multiple_mongoses.unwrap_or(false)).await;
+        let mut options = TestClient::options_for_multiple_mongoses(
+            options.into(),
+            use_multiple_mongoses.unwrap_or(false),
+        )
+        .await;
         options
             .test_options
             .get_or_insert_with(Default::default)

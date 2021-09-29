@@ -25,7 +25,12 @@ use crate::{
     error::{CommandError, ErrorKind, Result},
     operation::RunCommand,
     options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
-    test::{Topology, LOAD_BALANCED_SINGLE_URI, LOAD_BALANCED_MULTIPLE_URI, client_options_for_uri},
+    test::{
+        client_options_for_uri,
+        Topology,
+        LOAD_BALANCED_MULTIPLE_URI,
+        LOAD_BALANCED_SINGLE_URI,
+    },
     Client,
     Collection,
 };
@@ -356,7 +361,10 @@ impl TestClient {
         .to_string()
     }
 
-    pub async fn options_for_multiple_mongoses(options: Option<ClientOptions>, use_multiple_mongoses: bool) -> ClientOptions {
+    pub async fn options_for_multiple_mongoses(
+        options: Option<ClientOptions>,
+        use_multiple_mongoses: bool,
+    ) -> ClientOptions {
         let is_load_balanced = options
             .as_ref()
             .and_then(|o| o.load_balanced)
@@ -364,9 +372,13 @@ impl TestClient {
             .unwrap_or(false);
         let default_options = if is_load_balanced {
             let uri = if use_multiple_mongoses {
-                LOAD_BALANCED_MULTIPLE_URI.as_ref().expect("MULTI_MONGOS_LB_URI is required")
+                LOAD_BALANCED_MULTIPLE_URI
+                    .as_ref()
+                    .expect("MULTI_MONGOS_LB_URI is required")
             } else {
-                LOAD_BALANCED_SINGLE_URI.as_ref().expect("SINGLE_MONGOS_LB_URI is required")
+                LOAD_BALANCED_SINGLE_URI
+                    .as_ref()
+                    .expect("SINGLE_MONGOS_LB_URI is required")
             };
             client_options_for_uri(uri)
         } else {
