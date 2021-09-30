@@ -1405,7 +1405,7 @@ buildvariants:
     # haproxy isn't installed on windows / ubuntu-arm
     - if:
         os: ["ubuntu-18.04-arm64", "windows-64-vs2017"]
-        auth-and-tsl: "*"
+        auth-and-tls: "*"
         async-runtime: "*"
       then:
         remove_tasks: ".load_balancer"
