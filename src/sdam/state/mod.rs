@@ -144,7 +144,7 @@ impl Topology {
                 // be selected.
                 let new_desc = ServerDescription {
                     server_type: ServerType::LoadBalancer,
-                    average_round_trip_time: Some(Duration::ZERO),
+                    average_round_trip_time: Some(Duration::from_nanos(0)),
                     ..ServerDescription::new(server_address.clone(), None)
                 };
                 topology_state
