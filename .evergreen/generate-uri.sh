@@ -23,12 +23,6 @@ update_uri() {
     echo "${ORIG_URI}tls=true&tlsCAFile=${CA_FILE}&tlsCertificateKeyFile=${CERT_FILE}&tlsAllowInvalidCertificates=true"
 }
 
-if [[ "$MONGODB_URI" == *"?"* ]]; then
-    export MONGODB_URI="${MONGODB_URI}&"
-else
-    export MONGODB_URI="${MONGODB_URI}/?"
-fi
-
 export MONGODB_URI="$(update_uri ${MONGODB_URI})"
 export SINGLE_MONGOS_LB_URI="$(update_uri ${SINGLE_MONGOS_LB_URI})"
 export MULTI_MONGOS_LB_URI="$(update_uri ${MULTI_MONGOS_LB_URI})"
