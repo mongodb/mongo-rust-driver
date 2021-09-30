@@ -82,9 +82,6 @@ functions:
               export TOPOLOGY=${TOPOLOGY}
               export MONGODB_VERSION=${MONGODB_VERSION}
 
-              export SINGLE_MONGOS_LB_URI=${SINGLE_MONGOS_LB_URI}
-              export MULTI_MONGOS_LB_URI=${MULTI_MONGOS_LB_URI}
-
               if [ "Windows_NT" != "$OS" ]; then
                   ulimit -n 64000
               fi
@@ -368,6 +365,8 @@ functions:
           ${PREPARE_SHELL}
           export MONGODB_URI="${MONGODB_URI}"
           export SSL="${SSL}"
+          export SINGLE_MONGOS_LB_URI="${SINGLE_MONGOS_LB_URI}"
+          export MULTI_MONGOS_LB_URI="${MULTI_MONGOS_LB_URI}"
           . .evergreen/generate-uri.sh
 
           SINGLE_THREAD=${SINGLE_THREAD} \
