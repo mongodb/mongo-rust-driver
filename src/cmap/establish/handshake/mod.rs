@@ -147,6 +147,7 @@ pub(crate) struct Handshaker {
     #[cfg(test)]
     mock_service_id: bool,
     compressors: Option<Vec<String>>,
+    compressors: Option<Vec<Compressor>>,
     zlib_compression_level: Option<i32>,
 }
 
@@ -202,7 +203,13 @@ impl Handshaker {
             // Add compressors to handshake.
             // See https://github.com/mongodb/specifications/blob/master/source/compression/OP_COMPRESSED.rst
             if let Some(ref compressors) = options.compressors {
-                command.body.insert("compression", compressors);
+                command.body.insert(
+                    "compression",
+                    compressors
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>(),
+                );
             }
             compressors = options.compressors;
             zlib_compression_level = options.zlib_compression_level;
@@ -278,20 +285,12 @@ impl Handshaker {
             self.compressors.as_ref(),
         ) {
             // Use the Client's first compressor choice that the server supports
-            if let Some(compressor) = client_compressors.iter().find(|c| server_compressors.contains(c)) {
-                conn.compressor = compressor.parse().ok();
-                // If we're using Zlib and zlib_compression_level is set, then use it
-                if let Some(Compressor::Zlib { level: _ }) = conn.compressor {
-                    let level = self
-                        .zlib_compression_level
-                        .unwrap_or(crate::compression::ZLIB_DEFAULT_LEVEL);
-                    // Level -1 indicates use default (which is set in from_str)
-                    if level != -1 {
-                        conn.compressor = Some(Compressor::Zlib {
-                            level: level as u32,
-                        });
-                    }
-                }
+            if let Some(compressor) = client_compressors
+                .iter()
+                .find(|c| server_compressors.contains(&c.to_string()))
+            {
+                // zlib compression level is already set
+                conn.compressor = Some(compressor.clone());
             }
         }
 
@@ -319,7 +318,7 @@ pub(crate) struct HandshakeResult {
 pub(crate) struct HandshakerOptions {
     app_name: Option<String>,
     credential: Option<Credential>,
-    compressors: Option<Vec<String>>,
+    compressors: Option<Vec<Compressor>>,
     zlib_compression_level: Option<i32>,
     driver_info: Option<DriverInfo>,
     server_api: Option<ServerApi>,

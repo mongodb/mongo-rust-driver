@@ -1,16 +1,16 @@
 use bson::{doc, Bson};
 
 use crate::{
-    compression::{Compressor, CompressorID, Decoder},
-    test::TestClient,
+    client::options::ClientOptions,
+    compression::{Compressor, CompressorId, Decoder},
+    test::{TestClient, CLIENT_OPTIONS, LOCK},
 };
-
-use crate::test::CLIENT_OPTIONS;
+use tokio::sync::RwLockReadGuard;
 
 #[test]
 fn test_zlib_compressor() {
-    let zlib_compressor = Compressor::Zlib { level: 4 };
-    assert_eq!(CompressorID::ZlibID, zlib_compressor.to_compressor_id());
+    let zlib_compressor = Compressor::Zlib { level: Some(4) };
+    assert_eq!(CompressorId::Zlib, zlib_compressor.id());
     let mut encoder = zlib_compressor.to_encoder().unwrap();
     assert!(encoder.write_all(b"foo").is_ok());
     assert!(encoder.write_all(b"bar").is_ok());
@@ -18,15 +18,15 @@ fn test_zlib_compressor() {
 
     let compressed_bytes = encoder.finish().unwrap();
 
-    let decoder = Decoder::from_u8(CompressorID::ZlibID as u8).unwrap();
+    let decoder = Decoder::from_u8(CompressorId::Zlib as u8).unwrap();
     let original_bytes = decoder.decode(compressed_bytes.as_slice()).unwrap();
     assert_eq!(b"foobarZLIB", original_bytes.as_slice());
 }
 
 #[test]
 fn test_zstd_compressor() {
-    let zstd_compressor = Compressor::Zstd { level: 0 };
-    assert_eq!(CompressorID::ZstdID, zstd_compressor.to_compressor_id());
+    let zstd_compressor = Compressor::Zstd { level: None };
+    assert_eq!(CompressorId::Zstd, zstd_compressor.id());
     let mut encoder = zstd_compressor.to_encoder().unwrap();
     assert!(encoder.write_all(b"foo").is_ok());
     assert!(encoder.write_all(b"bar").is_ok());
@@ -34,7 +34,7 @@ fn test_zstd_compressor() {
 
     let compressed_bytes = encoder.finish().unwrap();
 
-    let decoder = Decoder::from_u8(CompressorID::ZstdID as u8).unwrap();
+    let decoder = Decoder::from_u8(CompressorId::Zstd as u8).unwrap();
     let original_bytes = decoder.decode(compressed_bytes.as_slice()).unwrap();
     assert_eq!(b"foobarZSTD", original_bytes.as_slice());
 }
@@ -42,7 +42,7 @@ fn test_zstd_compressor() {
 #[test]
 fn test_snappy_compressor() {
     let snappy_compressor = Compressor::Snappy;
-    assert_eq!(CompressorID::SnappyID, snappy_compressor.to_compressor_id());
+    assert_eq!(CompressorId::Snappy, snappy_compressor.id());
     let mut encoder = snappy_compressor.to_encoder().unwrap();
     assert!(encoder.write_all(b"foo").is_ok());
     assert!(encoder.write_all(b"bar").is_ok());
@@ -50,7 +50,7 @@ fn test_snappy_compressor() {
 
     let compressed_bytes = encoder.finish().unwrap();
 
-    let decoder = Decoder::from_u8(CompressorID::SnappyID as u8).unwrap();
+    let decoder = Decoder::from_u8(CompressorId::Snappy as u8).unwrap();
     let original_bytes = decoder.decode(compressed_bytes.as_slice()).unwrap();
     assert_eq!(b"foobarSNAPPY", original_bytes.as_slice());
 }
@@ -60,18 +60,8 @@ fn test_snappy_compressor() {
 #[function_name::named]
 async fn ping_server_with_zlib_compression() {
     let mut client_options = CLIENT_OPTIONS.clone();
-    client_options.compressors = Some(vec!["zlib".to_string()]);
-    client_options.zlib_compression = Some(4);
-
-    let client = TestClient::with_options(Some(client_options)).await;
-    let ret = client
-        .database("admin")
-        .run_command(doc! {"ping": 1}, None)
-        .await;
-
-    assert!(ret.is_ok());
-    let ret = ret.unwrap();
-    assert_eq!(ret.get("ok"), Some(Bson::Double(1.0)).as_ref());
+    client_options.compressors = Some(vec![Compressor::Zlib { level: Some(4) }]);
+    send_ping_with_compression(client_options).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -79,17 +69,8 @@ async fn ping_server_with_zlib_compression() {
 #[function_name::named]
 async fn ping_server_with_zstd_compression() {
     let mut client_options = CLIENT_OPTIONS.clone();
-    client_options.compressors = Some(vec!["zstd".to_string()]);
-
-    let client = TestClient::with_options(Some(client_options)).await;
-    let ret = client
-        .database("admin")
-        .run_command(doc! {"ping": 1}, None)
-        .await;
-
-    assert!(ret.is_ok());
-    let ret = ret.unwrap();
-    assert_eq!(ret.get("ok"), Some(Bson::Double(1.0)).as_ref());
+    client_options.compressors = Some(vec!["zstd".parse().unwrap()]);
+    send_ping_with_compression(client_options).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -97,8 +78,12 @@ async fn ping_server_with_zstd_compression() {
 #[function_name::named]
 async fn ping_server_with_snappy_compression() {
     let mut client_options = CLIENT_OPTIONS.clone();
-    client_options.compressors = Some(vec!["snappy".to_string()]);
+    client_options.compressors = Some(vec!["snappy".parse().unwrap()]);
+    send_ping_with_compression(client_options).await;
+}
 
+async fn send_ping_with_compression(client_options: ClientOptions) {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
     let client = TestClient::with_options(Some(client_options)).await;
     let ret = client
         .database("admin")

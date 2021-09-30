@@ -251,14 +251,14 @@ impl Message {
         Ok(())
     }
 
-    // Serializes message to bytes, compresses those bytes, and writes the bytes.
+    /// Serializes message to bytes, compresses those bytes, and writes the bytes.
     pub async fn write_compressed_to(
         &self,
         stream: &mut AsyncStream,
         compressor: &Compressor,
     ) -> Result<()> {
         let mut encoder = compressor.to_encoder()?;
-        let compressor_id = compressor.to_compressor_id() as u8;
+        let compressor_id = compressor.id() as u8;
 
         let mut writer = BufWriter::new(stream);
         let mut sections_bytes = Vec::new();

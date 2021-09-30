@@ -6,27 +6,23 @@ use flate2::{
     write::{ZlibDecoder, ZlibEncoder},
     Compression,
 };
-use std::{convert::TryInto, io::prelude::*, str::FromStr};
-
-pub(crate) const ZLIB_DEFAULT_LEVEL: i32 = 6;
-pub(crate) const ZSTD_DEFAULT_LEVEL: i32 = 0;
+use std::{io::prelude::*, str::FromStr, fmt};
 
 #[derive(Clone, Debug, PartialEq)]
-#[non_exhaustive]
-pub(crate) enum CompressorID {
-    NoopID = 0,
-    SnappyID = 1,
-    ZlibID = 2,
-    ZstdID = 3,
+pub(crate) enum CompressorId {
+    Noop = 0,
+    Snappy = 1,
+    Zlib = 2,
+    Zstd = 3,
 }
 
-impl CompressorID {
+impl CompressorId {
     pub(crate) fn from_u8(id: u8) -> Result<Self> {
         match id {
-            0 => Ok(CompressorID::NoopID),
-            1 => Ok(CompressorID::SnappyID),
-            2 => Ok(CompressorID::ZlibID),
-            3 => Ok(CompressorID::ZstdID),
+            0 => Ok(CompressorId::Noop),
+            1 => Ok(CompressorId::Snappy),
+            2 => Ok(CompressorId::Zlib),
+            3 => Ok(CompressorId::Zstd),
             other => Err(ErrorKind::InvalidResponse {
                 message: format!("Invalid wire protocol compressor id: {}", other),
             }
@@ -37,9 +33,9 @@ impl CompressorID {
 
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
-pub(crate) enum Compressor {
-    Zstd { level: u32 },
-    Zlib { level: u32 },
+pub enum Compressor {
+    Zstd { level: Option<i32> },
+    Zlib { level: Option<i32> },
     Snappy,
 }
 
@@ -48,29 +44,33 @@ impl FromStr for Compressor {
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "zlib" => Ok(Compressor::Zlib {
-                level: ZLIB_DEFAULT_LEVEL as u32,
-            }),
-            "zstd" => Ok(Compressor::Zstd {
-                level: ZSTD_DEFAULT_LEVEL as u32,
-            }),
+            "zlib" => Ok(Compressor::Zlib { level: None }),
+            "zstd" => Ok(Compressor::Zstd { level: None }),
             "snappy" => Ok(Compressor::Snappy),
-            other => Err(Error::new(
-                ErrorKind::InvalidArgument {
-                    message: format!("Received invalid compressor: {}", other),
-                },
-                Option::<Vec<String>>::None,
-            )),
+            other => Err(ErrorKind::InvalidArgument {
+                message: format!("Received invalid compressor: {}", other),
+            }
+            .into()),
+        }
+    }
+}
+
+impl fmt::Display for Compressor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            Compressor::Zstd { .. } => write!(f, "zstd"),
+            Compressor::Zlib { .. } => write!(f, "zlib"),
+            Compressor::Snappy => write!(f, "snappy"),
         }
     }
 }
 
 impl Compressor {
-    pub(crate) fn to_compressor_id(&self) -> CompressorID {
+    pub(crate) fn id(&self) -> CompressorId {
         match *self {
-            Compressor::Zstd { level: _ } => CompressorID::ZstdID,
-            Compressor::Zlib { level: _ } => CompressorID::ZlibID,
-            Compressor::Snappy => CompressorID::SnappyID,
+            Compressor::Zstd { level: _ } => CompressorId::Zstd,
+            Compressor::Zlib { level: _ } => CompressorId::Zlib,
+            Compressor::Snappy => CompressorId::Snappy,
         }
     }
 
@@ -78,22 +78,24 @@ impl Compressor {
         match *self {
             Compressor::Zstd { level } => {
                 let encoder =
-                    zstd::Encoder::new(vec![], level.try_into().unwrap()).map_err(|e| {
-                        Error::new(
-                            ErrorKind::Compression {
+                    zstd::Encoder::new(vec![], level.unwrap_or(zstd::DEFAULT_COMPRESSION_LEVEL))
+                        .map_err(|e| {
+                            Error::from(ErrorKind::Compression {
                                 message: format!(
                                     "an error occured getting a new zstd encoder: {}",
                                     e
                                 ),
-                            },
-                            Option::<Vec<String>>::None,
-                        )
-                    })?;
+                            })
+                        })?;
 
                 Ok(Encoder::Zstd { encoder })
             }
             Compressor::Zlib { level } => {
-                let encoder = ZlibEncoder::new(vec![], Compression::new(level));
+                let level = match level {
+                    Some(level) if level != -1 => Compression::new(level as u32),
+                    _ => Compression::default(),
+                };
+                let encoder = ZlibEncoder::new(vec![], level);
                 Ok(Encoder::Zlib { encoder })
             }
             Compressor::Snappy => Ok(Encoder::Snappy { bytes: vec![] }),
@@ -101,7 +103,6 @@ impl Compressor {
     }
 }
 
-#[non_exhaustive]
 pub(crate) enum Encoder {
     Zstd {
         encoder: zstd::Encoder<'static, Vec<u8>>,
@@ -118,28 +119,22 @@ impl Encoder {
     pub(crate) fn write_all(&mut self, buf: &[u8]) -> Result<()> {
         match *self {
             Encoder::Zstd { ref mut encoder } => encoder.write_all(buf).map_err(|e| {
-                Error::new(
-                    ErrorKind::Compression {
-                        message: format!("an error occured writing to the zstd encoder: {}", e),
-                    },
-                    Option::<Vec<String>>::None,
-                )
+                ErrorKind::Compression {
+                    message: format!("an error occured writing to the zstd encoder: {}", e),
+                }
+                .into()
             }),
             Encoder::Zlib { ref mut encoder } => encoder.write_all(buf).map_err(|e| {
-                Error::new(
-                    ErrorKind::Compression {
-                        message: format!("an error occured writing to the zlib encoder: {}", e),
-                    },
-                    Option::<Vec<String>>::None,
-                )
+                ErrorKind::Compression {
+                    message: format!("an error occured writing to the zlib encoder: {}", e),
+                }
+                .into()
             }),
             Encoder::Snappy { ref mut bytes } => bytes.write_all(buf).map_err(|e| {
-                Error::new(
-                    ErrorKind::Compression {
-                        message: format!("an error occured writing to the snappy encoder: {}", e),
-                    },
-                    Option::<Vec<String>>::None,
-                )
+                ErrorKind::Compression {
+                    message: format!("an error occured writing to the snappy encoder: {}", e),
+                }
+                .into()
             }),
         }
     }
@@ -147,32 +142,26 @@ impl Encoder {
     pub(crate) fn finish(self) -> Result<Vec<u8>> {
         match self {
             Encoder::Zstd { encoder } => encoder.finish().map_err(|e| {
-                Error::new(
-                    ErrorKind::Compression {
-                        message: format!("an error occured finishing zstd encoder: {}", e),
-                    },
-                    Option::<Vec<String>>::None,
-                )
+                ErrorKind::Compression {
+                    message: format!("an error occured finishing zstd encoder: {}", e),
+                }
+                .into()
             }),
             Encoder::Zlib { encoder } => encoder.finish().map_err(|e| {
-                Error::new(
-                    ErrorKind::Compression {
-                        message: format!("an error occured finishing zlib encoder: {}", e),
-                    },
-                    Option::<Vec<String>>::None,
-                )
+                ErrorKind::Compression {
+                    message: format!("an error occured finishing zlib encoder: {}", e),
+                }
+                .into()
             }),
             Encoder::Snappy { bytes } => {
                 // The server doesn't use snappy frame format, so we need to use snap::raw::Encoder
                 // rather than snap::write::FrameEncoder.  Likewise for decoding.
                 let mut compressor = snap::raw::Encoder::new();
                 compressor.compress_vec(bytes.as_slice()).map_err(|e| {
-                    Error::new(
-                        ErrorKind::Compression {
-                            message: format!("an error occured finishing snappy encoder: {}", e),
-                        },
-                        Option::<Vec<String>>::None,
-                    )
+                    ErrorKind::Compression {
+                        message: format!("an error occured finishing snappy encoder: {}", e),
+                    }
+                    .into()
                 })
             }
         }
@@ -180,7 +169,6 @@ impl Encoder {
 }
 
 #[derive(Clone, Debug)]
-#[non_exhaustive]
 pub(crate) enum Decoder {
     Zstd,
     Zlib,
@@ -194,12 +182,9 @@ impl Decoder {
             Decoder::Zstd => {
                 let mut ret = Vec::new();
                 zstd::stream::copy_decode(source, &mut ret).map_err(|e| {
-                    Error::new(
-                        ErrorKind::Compression {
-                            message: format!("Could not decode using zstd decoder: {}", e),
-                        },
-                        Option::<Vec<String>>::None,
-                    )
+                    Error::from(ErrorKind::Compression {
+                        message: format!("Could not decode using zstd decoder: {}", e),
+                    })
                 })?;
                 Ok(ret)
             }
@@ -207,23 +192,19 @@ impl Decoder {
                 let mut decoder = ZlibDecoder::new(vec![]);
                 decoder.write_all(source)?;
                 decoder.finish().map_err(|e| {
-                    Error::new(
-                        ErrorKind::Compression {
-                            message: format!("Could not decode using zlib decoder: {}", e),
-                        },
-                        Option::<Vec<String>>::None,
-                    )
+                    ErrorKind::Compression {
+                        message: format!("Could not decode using zlib decoder: {}", e),
+                    }
+                    .into()
                 })
             }
             Decoder::Snappy => {
                 let mut decompressor = snap::raw::Decoder::new();
                 decompressor.decompress_vec(source).map_err(|e| {
-                    Error::new(
-                        ErrorKind::Compression {
-                            message: format!("Could not decode using snappy decoder: {}", e),
-                        },
-                        Option::<Vec<String>>::None,
-                    )
+                    ErrorKind::Compression {
+                        message: format!("Could not decode using snappy decoder: {}", e),
+                    }
+                    .into()
                 })
             }
             Decoder::Noop => Ok(source.to_vec()),
@@ -231,12 +212,12 @@ impl Decoder {
     }
 
     pub(crate) fn from_u8(id: u8) -> Result<Self> {
-        let compressor_id = CompressorID::from_u8(id)?;
+        let compressor_id = CompressorId::from_u8(id)?;
         match compressor_id {
-            CompressorID::NoopID => Ok(Decoder::Noop),
-            CompressorID::SnappyID => Ok(Decoder::Snappy),
-            CompressorID::ZlibID => Ok(Decoder::Zlib),
-            CompressorID::ZstdID => Ok(Decoder::Zstd),
+            CompressorId::Noop => Ok(Decoder::Noop),
+            CompressorId::Snappy => Ok(Decoder::Snappy),
+            CompressorId::Zlib => Ok(Decoder::Zlib),
+            CompressorId::Zstd => Ok(Decoder::Zstd),
         }
     }
 }

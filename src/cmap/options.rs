@@ -11,6 +11,7 @@ use typed_builder::TypedBuilder;
 use crate::{
     bson_util,
     client::{auth::Credential, options::ServerApi},
+    compression::Compressor,
     event::cmap::{CmapEventHandler, ConnectionPoolOptions as EventOptions},
     options::{ClientOptions, DriverInfo, ServerAddress, TlsOptions},
 };
@@ -46,7 +47,8 @@ pub(crate) struct ConnectionPoolOptions {
     /// The compressors that the Client is willing to use in the order they are specified
     /// in the configuration.  The Client sends this list of compressors to the server.
     /// The server responds with the intersection of its supported list of compressors.
-    pub(crate) compressors: Option<Vec<String>>,
+    #[serde(skip)]
+    pub(crate) compressors: Option<Vec<Compressor>>,
 
     // The level of compression that the Zlib compressor should use (if it is used).
     pub(crate) zlib_compression_level: Option<i32>,

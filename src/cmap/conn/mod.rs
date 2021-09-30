@@ -77,6 +77,10 @@ pub(crate) struct Connection {
 
     stream: AsyncStream,
 
+    /// Compressor that the client will use before sending messages.
+    /// This compressor does not get used to decompress server messages.
+    /// The client will decompress server messages using whichever compressor
+    /// the server indicates in its message.
     pub(super) compressor: Option<Compressor>,
 
     /// If the connection is pinned to a cursor or transaction, the channel sender to return this
@@ -259,6 +263,9 @@ impl Connection {
         // is the right type of command, then compress the message.
         let write_result = match self.compressor {
             Some(ref compressor) if to_compress => {
+                if let Compressor::Zlib{level: Some(level)} = compressor {
+                    println!("{}", level);
+                }
                 message
                     .write_compressed_to(&mut self.stream, compressor)
                     .await
