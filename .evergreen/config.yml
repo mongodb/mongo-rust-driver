@@ -1402,6 +1402,13 @@ buildvariants:
         async-runtime: "*"
       then:
         remove_tasks: [".3.6", ".4.0"]
+    # haproxy isn't installed on windows / ubuntu-arm
+    - if:
+        os: ["ubuntu-18.04-arm64", "windows-64-vs2017"]
+        auth-and-tsl: "*"
+        async-runtime: "*"
+      then:
+        remove_tasks: ".load_balancer"
 - matrix_name: "x509-auth"
   matrix_spec:
     os:
