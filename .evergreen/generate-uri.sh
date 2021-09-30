@@ -15,6 +15,8 @@ update_uri() {
     if [[ "$ORIG_URI" == "" ]]; then
         return
     fi
+    # The rustls library requires a domain name.
+    ORIG_URI=$(echo "$ORIG_URI" | sed s/127.0.0.1/localhost/)
     if [[ "$ORIG_URI" == *"?"* ]]; then
         ORIG_URI="${ORIG_URI}&"
     else
