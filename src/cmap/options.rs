@@ -47,7 +47,6 @@ pub(crate) struct ConnectionPoolOptions {
     /// The compressors that the Client is willing to use in the order they are specified
     /// in the configuration.  The Client sends this list of compressors to the server.
     /// The server responds with the intersection of its supported list of compressors.
-    #[serde(skip)]
     pub(crate) compressors: Option<Vec<Compressor>>,
 
     // The level of compression that the Zlib compressor should use (if it is used).

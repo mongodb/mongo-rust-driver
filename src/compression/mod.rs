@@ -6,7 +6,8 @@ use flate2::{
     write::{ZlibDecoder, ZlibEncoder},
     Compression,
 };
-use std::{io::prelude::*, str::FromStr, fmt};
+use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize, Serializer};
+use std::{fmt, io::prelude::*, str::FromStr};
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum CompressorId {
@@ -24,7 +25,7 @@ impl CompressorId {
             2 => Ok(CompressorId::Zlib),
             3 => Ok(CompressorId::Zstd),
             other => Err(ErrorKind::InvalidResponse {
-                message: format!("Invalid wire protocol compressor id: {}", other),
+                message: format!("Invalid compressor id: {}", other),
             }
             .into()),
         }
@@ -65,6 +66,22 @@ impl fmt::Display for Compressor {
     }
 }
 
+impl<'de> Deserialize<'de> for Compressor {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        s.parse().map_err(|e| D::Error::custom(format!("{}", e)))
+    }
+}
+
+impl Serialize for Compressor {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.to_string().serialize(serializer)
+    }
+}
+
 impl Compressor {
     pub(crate) fn id(&self) -> CompressorId {
         match *self {
@@ -80,9 +97,9 @@ impl Compressor {
                 let encoder =
                     zstd::Encoder::new(vec![], level.unwrap_or(zstd::DEFAULT_COMPRESSION_LEVEL))
                         .map_err(|e| {
-                            Error::from(ErrorKind::Compression {
+                            Error::from(ErrorKind::Internal {
                                 message: format!(
-                                    "an error occured getting a new zstd encoder: {}",
+                                    "an error occurred getting a new zstd encoder: {}",
                                     e
                                 ),
                             })
@@ -119,20 +136,20 @@ impl Encoder {
     pub(crate) fn write_all(&mut self, buf: &[u8]) -> Result<()> {
         match *self {
             Encoder::Zstd { ref mut encoder } => encoder.write_all(buf).map_err(|e| {
-                ErrorKind::Compression {
-                    message: format!("an error occured writing to the zstd encoder: {}", e),
+                ErrorKind::Internal {
+                    message: format!("an error occurred writing to the zstd encoder: {}", e),
                 }
                 .into()
             }),
             Encoder::Zlib { ref mut encoder } => encoder.write_all(buf).map_err(|e| {
-                ErrorKind::Compression {
-                    message: format!("an error occured writing to the zlib encoder: {}", e),
+                ErrorKind::Internal {
+                    message: format!("an error occurred writing to the zlib encoder: {}", e),
                 }
                 .into()
             }),
             Encoder::Snappy { ref mut bytes } => bytes.write_all(buf).map_err(|e| {
-                ErrorKind::Compression {
-                    message: format!("an error occured writing to the snappy encoder: {}", e),
+                ErrorKind::Internal {
+                    message: format!("an error occurred writing to the snappy encoder: {}", e),
                 }
                 .into()
             }),
@@ -142,14 +159,14 @@ impl Encoder {
     pub(crate) fn finish(self) -> Result<Vec<u8>> {
         match self {
             Encoder::Zstd { encoder } => encoder.finish().map_err(|e| {
-                ErrorKind::Compression {
-                    message: format!("an error occured finishing zstd encoder: {}", e),
+                ErrorKind::Internal {
+                    message: format!("an error occurred finishing zstd encoder: {}", e),
                 }
                 .into()
             }),
             Encoder::Zlib { encoder } => encoder.finish().map_err(|e| {
-                ErrorKind::Compression {
-                    message: format!("an error occured finishing zlib encoder: {}", e),
+                ErrorKind::Internal {
+                    message: format!("an error occurred finishing zlib encoder: {}", e),
                 }
                 .into()
             }),
@@ -158,8 +175,8 @@ impl Encoder {
                 // rather than snap::write::FrameEncoder.  Likewise for decoding.
                 let mut compressor = snap::raw::Encoder::new();
                 compressor.compress_vec(bytes.as_slice()).map_err(|e| {
-                    ErrorKind::Compression {
-                        message: format!("an error occured finishing snappy encoder: {}", e),
+                    ErrorKind::Internal {
+                        message: format!("an error occurred finishing snappy encoder: {}", e),
                     }
                     .into()
                 })
@@ -182,7 +199,7 @@ impl Decoder {
             Decoder::Zstd => {
                 let mut ret = Vec::new();
                 zstd::stream::copy_decode(source, &mut ret).map_err(|e| {
-                    Error::from(ErrorKind::Compression {
+                    Error::from(ErrorKind::Internal {
                         message: format!("Could not decode using zstd decoder: {}", e),
                     })
                 })?;
@@ -192,7 +209,7 @@ impl Decoder {
                 let mut decoder = ZlibDecoder::new(vec![]);
                 decoder.write_all(source)?;
                 decoder.finish().map_err(|e| {
-                    ErrorKind::Compression {
+                    ErrorKind::Internal {
                         message: format!("Could not decode using zlib decoder: {}", e),
                     }
                     .into()
@@ -201,7 +218,7 @@ impl Decoder {
             Decoder::Snappy => {
                 let mut decompressor = snap::raw::Decoder::new();
                 decompressor.decompress_vec(source).map_err(|e| {
-                    ErrorKind::Compression {
+                    ErrorKind::Internal {
                         message: format!("Could not decode using snappy decoder: {}", e),
                     }
                     .into()

@@ -148,7 +148,6 @@ pub(crate) struct Handshaker {
     mock_service_id: bool,
     compressors: Option<Vec<String>>,
     compressors: Option<Vec<Compressor>>,
-    zlib_compression_level: Option<i32>,
 }
 
 impl Handshaker {
@@ -157,7 +156,6 @@ impl Handshaker {
         let mut metadata = BASE_CLIENT_METADATA.clone();
         let mut credential = None;
         let mut compressors = None;
-        let mut zlib_compression_level = None;
 
         let mut command =
             is_master_command(options.as_ref().and_then(|opts| opts.server_api.as_ref()));
@@ -212,7 +210,6 @@ impl Handshaker {
                 );
             }
             compressors = options.compressors;
-            zlib_compression_level = options.zlib_compression_level;
         }
 
         command.body.insert("client", metadata);
@@ -223,7 +220,6 @@ impl Handshaker {
             #[cfg(test)]
             mock_service_id,
             compressors,
-            zlib_compression_level,
         }
     }
 
@@ -284,11 +280,13 @@ impl Handshaker {
             is_master_reply.command_response.compressors.as_ref(),
             self.compressors.as_ref(),
         ) {
-            // Use the Client's first compressor choice that the server supports
-            if let Some(compressor) = client_compressors
-                .iter()
-                .find(|c| server_compressors.contains(&c.to_string()))
-            {
+            // Use the Client's first compressor choice that the server supports (comparing only on
+            // enum variant)
+            if let Some(compressor) = client_compressors.iter().find(|c| {
+                server_compressors
+                    .iter()
+                    .any(|x| std::mem::discriminant(x) == std::mem::discriminant(c))
+            }) {
                 // zlib compression level is already set
                 conn.compressor = Some(compressor.clone());
             }

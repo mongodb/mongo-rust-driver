@@ -21,6 +21,7 @@ use crate::{
     },
     sdam::{ServerType, WeakTopology},
     selection_criteria::TagSet,
+    compression::Compressor,
 };
 
 /// Construct an isMaster command.
@@ -146,7 +147,7 @@ pub(crate) struct IsMasterCommandResponse {
 
     #[serde(rename = "compression")]
     // The list of compatible compressors that the server returned.
-    pub compressors: Option<Vec<String>>,
+    pub compressors: Option<Vec<Compressor>>,
 
     /// The current replica set config version.
     pub set_version: Option<i32>,

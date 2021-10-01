@@ -82,6 +82,31 @@ async fn ping_server_with_snappy_compression() {
     send_ping_with_compression(client_options).await;
 }
 
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn ping_server_with_zlib_compression_multiple_compressors() {
+    let mut client_options = CLIENT_OPTIONS.clone();
+    client_options.compressors = Some(vec![
+        Compressor::Zlib { level: None },
+        Compressor::Zstd { level: None },
+    ]);
+    send_ping_with_compression(client_options).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[function_name::named]
+async fn ping_server_with_all_compressors() {
+    let mut client_options = CLIENT_OPTIONS.clone();
+    client_options.compressors = Some(vec![
+        Compressor::Snappy,
+        Compressor::Zlib { level: None },
+        Compressor::Zstd { level: None },
+    ]);
+    send_ping_with_compression(client_options).await;
+}
+
 async fn send_ping_with_compression(client_options: ClientOptions) {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
     let client = TestClient::with_options(Some(client_options)).await;

@@ -263,9 +263,6 @@ impl Connection {
         // is the right type of command, then compress the message.
         let write_result = match self.compressor {
             Some(ref compressor) if to_compress => {
-                if let Compressor::Zlib{level: Some(level)} = compressor {
-                    println!("{}", level);
-                }
                 message
                     .write_compressed_to(&mut self.stream, compressor)
                     .await
