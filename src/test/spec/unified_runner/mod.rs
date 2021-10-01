@@ -207,8 +207,6 @@ pub async fn run_unified_format_test(test_file: TestFile) {
             }
         }
 
-        test_runner.fail_point_guards.clear();
-
         if let Some(ref events) = test_case.expect_events {
             for expected in events {
                 let entity = test_runner.entities.get(&expected.client).unwrap();
@@ -244,6 +242,8 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                 }
             }
         }
+
+        test_runner.fail_point_guards.clear();
 
         if let Some(ref outcome) = test_case.outcome {
             for expected_data in outcome {
