@@ -10,6 +10,7 @@ use crate::{
         util::FailPointGuard,
         EventHandler,
         TestClient,
+        CLIENT_OPTIONS,
         DEFAULT_URI,
         LOAD_BALANCED_MULTIPLE_URI,
         LOAD_BALANCED_SINGLE_URI,
@@ -93,11 +94,7 @@ impl TestRunner {
                     let server_api = client.server_api.clone().or_else(|| SERVER_API.clone());
                     let observer = Arc::new(EventHandler::new());
 
-                    let is_load_balanced = client
-                        .uri_options
-                        .as_ref()
-                        .map_or(false, |opts| opts.get_bool("loadBalanced").unwrap_or(false));
-                    let given_uri = if is_load_balanced {
+                    let given_uri = if dbg!(CLIENT_OPTIONS.load_balanced.unwrap_or(false)) {
                         if client.use_multiple_mongoses.unwrap_or(true) {
                             LOAD_BALANCED_MULTIPLE_URI.as_ref().expect(
                                 "Test requires URI for load balancer fronting multiple servers",
@@ -111,6 +108,7 @@ impl TestRunner {
                         &DEFAULT_URI
                     };
                     let uri = merge_uri_options(given_uri, client.uri_options.as_ref());
+                    println!("dbg! client {} connecting to {}", id, uri);
                     let mut options = ClientOptions::parse_uri(&uri, None).await.unwrap();
                     options.command_event_handler = Some(observer.clone());
                     options.cmap_event_handler = Some(observer.clone());

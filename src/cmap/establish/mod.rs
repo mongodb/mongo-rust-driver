@@ -56,6 +56,7 @@ impl ConnectionEstablisher {
             .await
             .map_err(|e| EstablishError::pre_hello(e, pool_gen.clone()))?;
         let service_id = handshake.is_master_reply.command_response.service_id;
+        println!("dbg! service_id {:?}", service_id);
 
         // If the handshake response had a `serviceId` field, this is a connection to a load
         // balancer and must derive its generation from the service_generations map.
