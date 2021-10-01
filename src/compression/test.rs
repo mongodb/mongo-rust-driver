@@ -100,8 +100,8 @@ async fn ping_server_with_zlib_compression_multiple_compressors() {
 async fn ping_server_with_all_compressors() {
     let mut client_options = CLIENT_OPTIONS.clone();
     client_options.compressors = Some(vec![
-        Compressor::Snappy,
         Compressor::Zlib { level: None },
+        Compressor::Snappy,
         Compressor::Zstd { level: None },
     ]);
     send_ping_with_compression(client_options).await;
