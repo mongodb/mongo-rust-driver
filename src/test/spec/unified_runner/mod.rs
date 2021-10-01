@@ -35,7 +35,7 @@ pub use self::{
     test_runner::{EntityMap, TestRunner},
 };
 
-use self::operation::Expectation;
+use self::{operation::Expectation, test_file::TestCase};
 
 static SPEC_VERSIONS: &[Version] = &[
     Version::new(1, 0, 0),
@@ -56,6 +56,10 @@ const SKIPPED_OPERATIONS: &[&str] = &[
 ];
 
 pub async fn run_unified_format_test(test_file: TestFile) {
+    run_unified_format_test_filtered(test_file, |_| true).await
+}
+
+pub async fn run_unified_format_test_filtered(test_file: TestFile, pred: impl Fn(&TestCase) -> bool) {
     let version_matches = SPEC_VERSIONS.iter().any(|req| {
         if req.major != test_file.schema_version.major {
             return false;
@@ -100,6 +104,11 @@ pub async fn run_unified_format_test(test_file: TestFile) {
             .any(|op| SKIPPED_OPERATIONS.contains(&op.name.as_str()))
         {
             println!("Skipping {}", &test_case.description);
+            continue;
+        }
+
+        if !pred(&test_case) {
+            println!("Skipping {}", test_case.description);
             continue;
         }
 

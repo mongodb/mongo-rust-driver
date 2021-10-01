@@ -1817,6 +1817,7 @@ impl TestOperation for AssertNumberConnectionsCheckedOut {
     ) -> BoxFuture<'a, ()> {
         async move {
             let client = test_runner.get_client(&self.client);
+            client.sync_workers().await;
             assert_eq!(client.connections_checked_out(), self.connections);
         }
         .boxed()
