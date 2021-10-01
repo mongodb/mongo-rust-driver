@@ -261,12 +261,8 @@ impl TopologyDescription {
         match read_preference {
             ReadPreference::Secondary { .. }
             | ReadPreference::PrimaryPreferred { .. }
-            | ReadPreference::Nearest { .. } => {
-                command.set_read_preference(read_preference.clone())
-            }
-            ReadPreference::SecondaryPreferred { ref options }
-                if options.max_staleness.is_some() || options.tag_sets.is_some() =>
-            {
+            | ReadPreference::Nearest { .. }
+            | ReadPreference::SecondaryPreferred { .. } => {
                 command.set_read_preference(read_preference.clone())
             }
             _ => {}

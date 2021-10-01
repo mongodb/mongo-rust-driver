@@ -7,6 +7,7 @@ mod crud;
 mod crud_v1;
 #[cfg(not(feature = "sync"))]
 mod initial_dns_seedlist_discovery;
+mod load_balancers;
 mod ocsp;
 #[cfg(not(feature = "sync"))]
 mod read_write_concern;

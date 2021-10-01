@@ -155,7 +155,7 @@ impl<'de> Deserialize<'de> for ReadPreference {
             "PrimaryPreferred" => Ok(ReadPreference::PrimaryPreferred {
                 options: preference.options,
             }),
-            "SecondaryPreferred" => Ok(ReadPreference::SecondaryPreferred {
+            "SecondaryPreferred" | "secondaryPreferred" => Ok(ReadPreference::SecondaryPreferred {
                 options: preference.options,
             }),
             "Nearest" => Ok(ReadPreference::Nearest {
