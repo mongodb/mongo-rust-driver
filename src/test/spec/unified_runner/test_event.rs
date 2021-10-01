@@ -89,7 +89,7 @@ pub enum ExpectedCmapEvent {
     },
     #[serde(rename = "connectionCheckOutStartedEvent")]
     ConnectionCheckOutStarted {},
-    #[serde(rename = "connectionCheckOutFaildEvent", rename_all = "camelCase")]
+    #[serde(rename = "connectionCheckOutFailedEvent", rename_all = "camelCase")]
     ConnectionCheckOutFailed {
         reason: Option<ConnectionCheckoutFailedReason>,
     },
