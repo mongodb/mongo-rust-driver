@@ -155,6 +155,8 @@ impl Handshaker {
     pub(crate) fn new(options: Option<HandshakerOptions>) -> Self {
         let mut metadata = BASE_CLIENT_METADATA.clone();
         let mut credential = None;
+
+        #[allow(unused_mut)]
         let mut compressors = None;
 
         let mut command =
@@ -200,6 +202,11 @@ impl Handshaker {
             }
             // Add compressors to handshake.
             // See https://github.com/mongodb/specifications/blob/master/source/compression/OP_COMPRESSED.rst
+            #[cfg(any(
+                feature = "zstd-compression",
+                feature = "zlib-compression",
+                feature = "snappy-compression"
+            ))]
             if let Some(ref compressors) = options.compressors {
                 command.body.insert(
                     "compression",
@@ -209,7 +216,14 @@ impl Handshaker {
                         .collect::<Vec<String>>(),
                 );
             }
-            compressors = options.compressors;
+            #[cfg(any(
+                feature = "zstd-compression",
+                feature = "zlib-compression",
+                feature = "snappy-compression"
+            ))]
+            {
+                compressors = options.compressors;
+            }
         }
 
         command.body.insert("client", metadata);

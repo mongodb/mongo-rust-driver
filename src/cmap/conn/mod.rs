@@ -254,6 +254,7 @@ impl Connection {
         }
     }
 
+    #[allow(unused_variables)]
     async fn send_message(
         &mut self,
         message: Message,
@@ -264,6 +265,11 @@ impl Connection {
         // If the client has agreed on a compressor with the server, and the command
         // is the right type of command, then compress the message.
         let write_result = match self.compressor {
+            #[cfg(any(
+                feature = "zstd-compression",
+                feature = "zlib-compression",
+                feature = "snappy-compression"
+            ))]
             Some(ref compressor) if to_compress => {
                 message
                     .write_compressed_to(&mut self.stream, compressor)

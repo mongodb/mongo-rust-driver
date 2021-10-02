@@ -1,12 +1,35 @@
+// Tests OP_COMPRESSED.  To actually test compression you need to look at
+// server logs to see if decompression is happening.  Even if these tests
+// are run against a server that does not support compression
+// these tests won't fail because the messages will be sent without compression
+// (as indicated in the specs).
+
+#[cfg(any(
+    feature = "zstd-compression",
+    feature = "zlib-compression",
+    feature = "snappy-compression"
+))]
 use bson::{doc, Bson};
 
+#[cfg(any(
+    feature = "zstd-compression",
+    feature = "zlib-compression",
+    feature = "snappy-compression"
+))]
 use crate::{
     client::options::ClientOptions,
     compression::{Compressor, CompressorId, Decoder},
     test::{TestClient, CLIENT_OPTIONS, LOCK},
 };
+
+#[cfg(any(
+    feature = "zstd-compression",
+    feature = "zlib-compression",
+    feature = "snappy-compression"
+))]
 use tokio::sync::RwLockReadGuard;
 
+#[cfg(feature = "zlib-compression")]
 #[test]
 fn test_zlib_compressor() {
     let zlib_compressor = Compressor::Zlib { level: Some(4) };
@@ -23,6 +46,7 @@ fn test_zlib_compressor() {
     assert_eq!(b"foobarZLIB", original_bytes.as_slice());
 }
 
+#[cfg(feature = "zstd-compression")]
 #[test]
 fn test_zstd_compressor() {
     let zstd_compressor = Compressor::Zstd { level: None };
@@ -39,6 +63,7 @@ fn test_zstd_compressor() {
     assert_eq!(b"foobarZSTD", original_bytes.as_slice());
 }
 
+#[cfg(feature = "snappy-compression")]
 #[test]
 fn test_snappy_compressor() {
     let snappy_compressor = Compressor::Snappy;
@@ -57,6 +82,7 @@ fn test_snappy_compressor() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[cfg(feature = "zlib-compression")]
 #[function_name::named]
 async fn ping_server_with_zlib_compression() {
     let mut client_options = CLIENT_OPTIONS.clone();
@@ -66,6 +92,7 @@ async fn ping_server_with_zlib_compression() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[cfg(feature = "zstd-compression")]
 #[function_name::named]
 async fn ping_server_with_zstd_compression() {
     let mut client_options = CLIENT_OPTIONS.clone();
@@ -75,6 +102,7 @@ async fn ping_server_with_zstd_compression() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[cfg(feature = "snappy-compression")]
 #[function_name::named]
 async fn ping_server_with_snappy_compression() {
     let mut client_options = CLIENT_OPTIONS.clone();
@@ -84,18 +112,11 @@ async fn ping_server_with_snappy_compression() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-#[function_name::named]
-async fn ping_server_with_zlib_compression_multiple_compressors() {
-    let mut client_options = CLIENT_OPTIONS.clone();
-    client_options.compressors = Some(vec![
-        Compressor::Zlib { level: None },
-        Compressor::Zstd { level: None },
-    ]);
-    send_ping_with_compression(client_options).await;
-}
-
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[cfg(all(
+    feature = "zstd-compression",
+    feature = "zlib-compression",
+    feature = "snappy-compression"
+))]
 #[function_name::named]
 async fn ping_server_with_all_compressors() {
     let mut client_options = CLIENT_OPTIONS.clone();
@@ -107,6 +128,11 @@ async fn ping_server_with_all_compressors() {
     send_ping_with_compression(client_options).await;
 }
 
+#[cfg(any(
+    feature = "zstd-compression",
+    feature = "zlib-compression",
+    feature = "snappy-compression"
+))]
 async fn send_ping_with_compression(client_options: ClientOptions) {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
     let client = TestClient::with_options(Some(client_options)).await;

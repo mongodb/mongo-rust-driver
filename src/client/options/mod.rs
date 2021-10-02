@@ -374,8 +374,22 @@ pub struct ClientOptions {
     /// The compressors that the Client is willing to use in the order they are specified
     /// in the configuration.  The Client sends this list of compressors to the server.
     /// The server responds with the intersection of its supported list of compressors.
+    /// The order of compressors indicates preference of compressors.
     #[builder(default)]
+    #[cfg(any(
+        feature = "zstd-compression",
+        feature = "zlib-compression",
+        feature = "snappy-compression"
+    ))]
     pub compressors: Option<Vec<Compressor>>,
+
+    #[builder(default, setter(skip))]
+    #[cfg(not(any(
+        feature = "zstd-compression",
+        feature = "zlib-compression",
+        feature = "snappy-compression"
+    )))]
+    pub(crate) compressors: Option<Vec<Compressor>>,
 
     /// The handler that should process all Connection Monitoring and Pooling events. See the
     /// CmapEventHandler type documentation for more details.
@@ -1121,10 +1135,12 @@ impl ClientOptions {
 
         // If zlib and zlib_compression_level are specified then write zlib_compression_level into
         // zlib enum
+        #[cfg(feature = "zlib-compression")]
         if let (Some(compressors), Some(zlib_compression_level)) =
             (options.compressors.as_mut(), options.zlib_compression)
         {
             for compressor in compressors {
+                #[allow(irrefutable_let_patterns)]
                 if let Compressor::Zlib { ref mut level } = compressor {
                     *level = Some(zlib_compression_level);
                 }
@@ -1194,6 +1210,17 @@ impl ClientOptions {
                         .to_string(),
                 }
                 .into());
+            }
+        }
+
+        #[cfg(any(
+            feature = "zstd-compression",
+            feature = "zlib-compression",
+            feature = "snappy-compression"
+        ))]
+        if let Some(ref compressors) = self.compressors {
+            for compressor in compressors {
+                compressor.validate()?;
             }
         }
 

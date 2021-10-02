@@ -15,10 +15,16 @@ use crate::{
         conn::{command::RawCommand, wire::util::SyncCountReader},
         Command,
     },
-    compression::{Compressor, Decoder},
     error::{Error, ErrorKind, Result},
     runtime::{AsyncLittleEndianWrite, AsyncStream, SyncLittleEndianRead},
 };
+
+#[cfg(any(
+    feature = "zstd-compression",
+    feature = "zlib-compression",
+    feature = "snappy-compression"
+))]
+use crate::compression::{Compressor, Decoder};
 
 /// Represents an OP_MSG wire protocol operation.
 #[derive(Debug)]
@@ -87,7 +93,13 @@ impl Message {
 
         if header.op_code == OpCode::Message {
             return Self::read_from_op_msg(reader, &header).await;
-        } else if header.op_code == OpCode::Compressed {
+        }
+        #[cfg(any(
+            feature = "zstd-compression",
+            feature = "zlib-compression",
+            feature = "snappy-compression"
+        ))]
+        if header.op_code == OpCode::Compressed {
             return Self::read_from_op_compressed(reader, &header).await;
         }
 
@@ -117,6 +129,11 @@ impl Message {
         Self::read_op_common(reader, length_remaining, header)
     }
 
+    #[cfg(any(
+        feature = "zstd-compression",
+        feature = "zlib-compression",
+        feature = "snappy-compression"
+    ))]
     async fn read_from_op_compressed(
         mut reader: BufReader<&mut AsyncStream>,
         header: &Header,
@@ -252,6 +269,11 @@ impl Message {
     }
 
     /// Serializes message to bytes, compresses those bytes, and writes the bytes.
+    #[cfg(any(
+        feature = "zstd-compression",
+        feature = "zlib-compression",
+        feature = "snappy-compression"
+    ))]
     pub async fn write_compressed_to(
         &self,
         stream: &mut AsyncStream,

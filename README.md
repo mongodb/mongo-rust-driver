@@ -69,7 +69,11 @@ features = ["sync"]
 | `sync`              | Expose the synchronous API (`mongodb::sync`). This flag cannot be used in conjunction with either of the async runtime feature flags. | `async-std` 1.0                     | no      |
 | `aws-auth`          | Enable support for the MONGODB-AWS authentication mechanism.                                                                          | `reqwest` 0.11                      | no      |
 | `bson-uuid-0_8`     | Enable support for v0.8 of the [`uuid`](docs.rs/uuid/0.8) crate in the public API of the re-exported `bson` crate.                    | n/a                                 | no      |
-| `bson-chrono-0_4`   | Enable support for v0.4 of the [`chrono`](docs.rs/chrono/0.4) crate in the public API of the re-exported `bson` crate.                | n/a                                 | no      |
+| `bson-chrono-0_4`   | Enable support for v0.4 of the [`chrono`](docs.rs/chrono/0.4) crate in the public API of the re-exported `bson` crate.                | n/
+a                                 | no      |
+| `zlib-compression`  | Enable support for compressing messages with zlib                                                                                     | `flate2`                            | no      |
+| `zstd-compression`  | Enable support for compressing messages with zstd.  This flag requires rust version 1.54.                                             | `zstd`                              | no      |
+| `snappy-compression`| Enable support for compressing messages with snappy                                                                                   | `snap`                              | no      |
 
 ## Example Usage
 Below are simple examples of using the driver. For more specific examples and the API reference, see the driver's [docs.rs page](https://docs.rs/mongodb/latest).
@@ -159,7 +163,7 @@ typed_collection.insert_many(books, None).await?;
 ```
 
 #### Finding documents in a collection
-Results from queries are generally returned via [`Cursor`](https://docs.rs/mongodb/latest/mongodb/struct.Cursor.html), a struct which streams the results back from the server as requested. The [`Cursor`](https://docs.rs/mongodb/latest/mongodb/struct.Cursor.html) type implements the [`Stream`](https://docs.rs/futures/latest/futures/stream/index.html) trait from the [`futures`](https://crates.io/crates/futures) crate, and in order to access its streaming functionality you need to import at least one of the [`StreamExt`](https://docs.rs/futures/latest/futures/stream/trait.StreamExt.html) or [`TryStreamExt`](https://docs.rs/futures/latest/futures/stream/trait.TryStreamExt.html) traits. 
+Results from queries are generally returned via [`Cursor`](https://docs.rs/mongodb/latest/mongodb/struct.Cursor.html), a struct which streams the results back from the server as requested. The [`Cursor`](https://docs.rs/mongodb/latest/mongodb/struct.Cursor.html) type implements the [`Stream`](https://docs.rs/futures/latest/futures/stream/index.html) trait from the [`futures`](https://crates.io/crates/futures) crate, and in order to access its streaming functionality you need to import at least one of the [`StreamExt`](https://docs.rs/futures/latest/futures/stream/trait.StreamExt.html) or [`TryStreamExt`](https://docs.rs/futures/latest/futures/stream/trait.TryStreamExt.html) traits.
 
 ``` toml
 # In Cargo.toml, add the following dependency.
@@ -297,17 +301,17 @@ We encourage and would happily accept contributions in the form of GitHub pull r
 ### Integration and unit tests
 In order to run the tests (which are mostly integration tests), you must have access to a MongoDB deployment. You may specify a [MongoDB connection string](https://docs.mongodb.com/manual/reference/connection-string/) in the `MONGODB_URI` environment variable, and the tests will use it to connect to the deployment. If `MONGODB_URI` is unset, the tests will attempt to connect to a local deployment on port 27017.
 
-**Note:** The integration tests will clear out the databases/collections they need to use, but they do not clean up after themselves. 
+**Note:** The integration tests will clear out the databases/collections they need to use, but they do not clean up after themselves.
 
 To actually run the tests, you can use `cargo` like you would in any other crate:
 ```bash
 cargo test --verbose # runs against localhost:27017
-export MONGODB_URI="mongodb://localhost:123" 
+export MONGODB_URI="mongodb://localhost:123"
 cargo test --verbose # runs against localhost:123
 ```
 
 #### Auth tests
-The authentication tests will only be included in the test run if certain requirements are met: 
+The authentication tests will only be included in the test run if certain requirements are met:
 - The deployment must have `--auth` enabled
 - Credentials must be specified in `MONGODB_URI`
 - The credentials specified in `MONGODB_URI` must be valid and have root privileges on the deployment
@@ -327,7 +331,7 @@ cargo test --verbose
 ```
 
 #### Run the tests with TLS/SSL
-To run the tests with TLS/SSL enabled, you must enable it on the deployment and in `MONGODB_URI`. 
+To run the tests with TLS/SSL enabled, you must enable it on the deployment and in `MONGODB_URI`.
 ```bash
 export MONGODB_URI="mongodb://localhost:27017/?tls=true&tlsCertificateKeyFile=cert.pem&tlsCAFile=ca.pem"
 cargo test --verbose

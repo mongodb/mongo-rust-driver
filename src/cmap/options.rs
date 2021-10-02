@@ -49,7 +49,7 @@ pub(crate) struct ConnectionPoolOptions {
     /// The server responds with the intersection of its supported list of compressors.
     pub(crate) compressors: Option<Vec<Compressor>>,
 
-    // The level of compression that the Zlib compressor should use (if it is used).
+    /// The level of compression that the Zlib compressor should use (if it is used).
     pub(crate) zlib_compression_level: Option<i32>,
 
     /// Interval between background thread maintenance runs (e.g. ensure minPoolSize).

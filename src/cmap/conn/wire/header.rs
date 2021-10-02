@@ -22,6 +22,11 @@ impl OpCode {
             1 => Ok(OpCode::Reply),
             2004 => Ok(OpCode::Query),
             2013 => Ok(OpCode::Message),
+            #[cfg(any(
+                feature = "zstd-compression",
+                feature = "zlib-compression",
+                feature = "snappy-compression"
+            ))]
             2012 => Ok(OpCode::Compressed),
             other => Err(ErrorKind::InvalidResponse {
                 message: format!("Invalid wire protocol opcode: {}", other),
