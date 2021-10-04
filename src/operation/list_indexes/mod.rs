@@ -4,7 +4,7 @@ use crate::{
     cursor::CursorSpecification,
     error::Result,
     index::IndexModel,
-    operation::{append_options, Operation},
+    operation::Operation,
     options::ListIndexesOptions,
     selection_criteria::{ReadPreference, SelectionCriteria},
     Namespace,
@@ -48,7 +48,9 @@ impl Operation for ListIndexes {
         let mut body = doc! {
             "listIndexes": self.ns.coll.clone(),
         };
-        append_options(&mut body, self.options.as_ref())?;
+        if let Some(size) = self.options.as_ref().and_then(|o| o.batch_size) {
+            body.insert("cursor", doc! { "batchSize": size });
+        }
 
         Ok(Command::new(
             Self::NAME.to_string(),
