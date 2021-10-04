@@ -81,8 +81,8 @@ pub(crate) struct Connection {
     /// This compressor does not get used to decompress server messages.
     /// The client will decompress server messages using whichever compressor
     /// the server indicates in its message.  This compressor is the first
-    /// compressor that appears in both the server's compressior list, and
-    /// the client's compressor list.
+    /// compressor in the client's compressor list that also appears in the
+    /// server's compressor list.
     pub(super) compressor: Option<Compressor>,
 
     /// If the connection is pinned to a cursor or transaction, the channel sender to return this
