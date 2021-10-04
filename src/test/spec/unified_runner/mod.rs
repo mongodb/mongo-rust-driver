@@ -141,7 +141,6 @@ pub async fn run_unified_format_test_filtered(test_file: TestFile, pred: impl Fn
         }
 
         for operation in test_case.operations {
-            println!("dbg! operation {}", operation.name);
             match operation.object {
                 OperationObject::TestRunner => {
                     operation
