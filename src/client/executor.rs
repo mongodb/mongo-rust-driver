@@ -7,7 +7,13 @@ use std::{collections::HashSet, sync::Arc, time::Instant};
 use super::{session::TransactionState, Client, ClientSession};
 use crate::{
     bson::Document,
-    cmap::{conn::PinnedConnectionHandle, Connection, ConnectionPool, RawCommand, RawCommandResponse},
+    cmap::{
+        conn::PinnedConnectionHandle,
+        Connection,
+        ConnectionPool,
+        RawCommand,
+        RawCommandResponse,
+    },
     cursor::{session::SessionCursor, Cursor, CursorSpecification},
     error::{
         Error,
@@ -158,8 +164,10 @@ impl Client {
         Op: Operation<O = CursorSpecification<T>>,
         T: DeserializeOwned + Unpin + Send + Sync,
     {
-        let mut details = self.execute_operation_with_details(op, &mut *session).await?;
-        
+        let mut details = self
+            .execute_operation_with_details(op, &mut *session)
+            .await?;
+
         let pinned = if let Some(handle) = session.transaction.pinned_connection() {
             // Cursor operations on a transaction share the same pinned connection.
             Some(handle.replicate())
@@ -759,7 +767,11 @@ impl Client {
     }
 }
 
-async fn get_connection<T: Operation>(session: &Option<&mut ClientSession>, op: &T, pool: &ConnectionPool) -> Result<Connection> {
+async fn get_connection<T: Operation>(
+    session: &Option<&mut ClientSession>,
+    op: &T,
+    pool: &ConnectionPool,
+) -> Result<Connection> {
     let session_pinned = session
         .as_ref()
         .and_then(|s| s.transaction.pinned_connection());
@@ -770,7 +782,7 @@ async fn get_connection<T: Operation>(session: &Option<&mut ClientSession>, op: 
             debug_assert_eq!(session_handle.id(), op_handle.id());
             session_handle.take_connection().await
         }
-        (None, None) => pool.check_out().await
+        (None, None) => pool.check_out().await,
     }
 }
 

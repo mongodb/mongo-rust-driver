@@ -59,7 +59,10 @@ pub async fn run_unified_format_test(test_file: TestFile) {
     run_unified_format_test_filtered(test_file, |_| true).await
 }
 
-pub async fn run_unified_format_test_filtered(test_file: TestFile, pred: impl Fn(&TestCase) -> bool) {
+pub async fn run_unified_format_test_filtered(
+    test_file: TestFile,
+    pred: impl Fn(&TestCase) -> bool,
+) {
     let version_matches = SPEC_VERSIONS.iter().any(|req| {
         if req.major != test_file.schema_version.major {
             return false;
