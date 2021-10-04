@@ -19,6 +19,7 @@ pub use crate::{
     client::{auth::*, options::*},
     coll::options::*,
     collation::*,
+    compression::*,
     concern::*,
     db::options::*,
     index::options::*,

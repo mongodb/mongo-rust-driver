@@ -146,7 +146,6 @@ pub(crate) struct Handshaker {
     credential: Option<Credential>,
     #[cfg(test)]
     mock_service_id: bool,
-    compressors: Option<Vec<String>>,
     compressors: Option<Vec<Compressor>>,
 }
 
@@ -202,28 +201,16 @@ impl Handshaker {
             }
             // Add compressors to handshake.
             // See https://github.com/mongodb/specifications/blob/master/source/compression/OP_COMPRESSED.rst
-            #[cfg(any(
-                feature = "zstd-compression",
-                feature = "zlib-compression",
-                feature = "snappy-compression"
-            ))]
             if let Some(ref compressors) = options.compressors {
                 command.body.insert(
                     "compression",
                     compressors
                         .iter()
-                        .map(|x| x.to_string())
+                        .map(|x| x.to_variant_string())
                         .collect::<Vec<String>>(),
                 );
             }
-            #[cfg(any(
-                feature = "zstd-compression",
-                feature = "zlib-compression",
-                feature = "snappy-compression"
-            ))]
-            {
-                compressors = options.compressors;
-            }
+            compressors = options.compressors;
         }
 
         command.body.insert("client", metadata);
@@ -331,7 +318,6 @@ pub(crate) struct HandshakerOptions {
     app_name: Option<String>,
     credential: Option<Credential>,
     compressors: Option<Vec<Compressor>>,
-    zlib_compression_level: Option<i32>,
     driver_info: Option<DriverInfo>,
     server_api: Option<ServerApi>,
     load_balanced: bool,
@@ -350,7 +336,6 @@ impl From<ConnectionPoolOptions> for HandshakerOptions {
             load_balanced: options.load_balanced.unwrap_or(false),
             #[cfg(test)]
             mock_service_id: options.mock_service_id,
-            zlib_compression_level: options.zlib_compression_level,
         }
     }
 }
@@ -366,7 +351,6 @@ impl From<ClientOptions> for HandshakerOptions {
             load_balanced: options.load_balanced.unwrap_or(false),
             #[cfg(test)]
             mock_service_id: options.test_options.map_or(false, |to| to.mock_service_id),
-            zlib_compression_level: options.zlib_compression,
         }
     }
 }

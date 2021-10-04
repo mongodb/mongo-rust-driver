@@ -1,9 +1,10 @@
+#[cfg(any(
+    feature = "zstd-compression",
+    feature = "zlib-compression",
+    feature = "snappy-compression"
+))]
 #[cfg(test)]
 mod test;
-
-use crate::error::{Error, ErrorKind};
-use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize, Serializer};
-use std::{fmt, str::FromStr};
 
 #[cfg(feature = "zlib-compression")]
 use flate2::{
@@ -11,26 +12,15 @@ use flate2::{
     Compression,
 };
 
-#[cfg(any(
-    feature = "zstd-compression",
-    feature = "zlib-compression",
-    feature = "snappy-compression"
-))]
+#[cfg(feature = "zlib-compression")]
+use std::convert::TryInto;
+#[cfg(feature = "zstd-compression")]
 use std::io::prelude::*;
 
-#[cfg(any(
-    feature = "zstd-compression",
-    feature = "zlib-compression",
-    feature = "snappy-compression"
-))]
-use crate::error::Result;
+use crate::error::{Error, ErrorKind, Result};
+use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Clone, Debug, PartialEq)]
-#[cfg(any(
-    feature = "zstd-compression",
-    feature = "zlib-compression",
-    feature = "snappy-compression"
-))]
 pub(crate) enum CompressorId {
     Noop = 0,
     #[cfg(feature = "snappy-compression")]
@@ -41,11 +31,6 @@ pub(crate) enum CompressorId {
     Zstd = 3,
 }
 
-#[cfg(any(
-    feature = "zstd-compression",
-    feature = "zlib-compression",
-    feature = "snappy-compression"
-))]
 impl CompressorId {
     pub(crate) fn from_u8(id: u8) -> Result<Self> {
         match id {
@@ -66,99 +51,37 @@ impl CompressorId {
 
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
-#[cfg(any(
-    feature = "zstd-compression",
-    feature = "zlib-compression",
-    feature = "snappy-compression"
-))]
 /// Enum representing supported compressor algorithms.
-/// Used for compressing messages sent to the server.
-/// For compressors that take a level, use None to indicate the default level.
-/// Requires one of zstd-compression, zlib-compression, or snappy-compression
+/// Used for compressing and decompressing messages sent to and read from the server.
+/// For compressors that take a `level`, use `None` to indicate the default level.
+/// Higher `level` indicates more compression (and slower).
+/// Requires one of `zstd-compression`, `zlib-compression`, or `snappy-compression`
 /// feature flags.
 pub enum Compressor {
-    /// Zstd compressor.  Level 0 is the default.  Requires Rust version 1.54.
-    /// See Zstd [manual](http://facebook.github.io/zstd/zstd_manual.html) for more information
+    /// Zstd compressor.  Requires Rust version 1.54.
+    /// See [`Zstd`](http://facebook.github.io/zstd/zstd_manual.html) for more information
     #[cfg(feature = "zstd-compression")]
-    Zstd { level: Option<i32> },
-    /// Zlib compressor.  Levels -1 through 9 are valid.
-    /// Level -1 indicates default level.
-    /// Level 0 indicates no compression.
-    /// Higher level indicates more compression (and slower).
+    Zstd {
+        /// Zstd compression level
+        level: Option<i32>
+    },
+    /// Zlib compressor.
+    /// See [`Zlib`](https://zlib.net/) for more information.
     #[cfg(feature = "zlib-compression")]
-    Zlib { level: Option<i32> },
+    Zlib {
+        /// Zlib compression level
+        level: Option<i32>
+    },
     /// Snappy compressor.
+    /// See [`Snappy`](http://google.github.io/snappy/) for more information.
     #[cfg(feature = "snappy-compression")]
     Snappy,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-#[non_exhaustive]
-#[cfg(not(any(
-    feature = "zstd-compression",
-    feature = "zlib-compression",
-    feature = "snappy-compression"
-)))]
-pub(crate) enum Compressor {}
-
-impl FromStr for Compressor {
-    type Err = Error;
-
-    #[allow(unused_variables)]
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            #[cfg(feature = "zlib-compression")]
-            "zlib" => Ok(Compressor::Zlib { level: None }),
-            #[cfg(feature = "zstd-compression")]
-            "zstd" => Ok(Compressor::Zstd { level: None }),
-            #[cfg(feature = "snappy-compression")]
-            "snappy" => Ok(Compressor::Snappy),
-            other => {
-                #[cfg(not(any(
-                    feature = "zstd-compression",
-                    feature = "zlib-compression",
-                    feature = "snappy-compression"
-                )))]
-                {
-                    Err(ErrorKind::InvalidArgument {
-                        message: "No compressor flag enabled".to_string(),
-                    }
-                    .into())
-                }
-                #[cfg(any(
-                    feature = "zstd-compression",
-                    feature = "zlib-compression",
-                    feature = "snappy-compression"
-                ))]
-                {
-                    Err(ErrorKind::InvalidArgument {
-                        message: format!("Received invalid compressor: {}", other),
-                    }
-                    .into())
-                }
-            }
-        }
-    }
-}
-
-impl fmt::Display for Compressor {
-    #[allow(unused_variables)]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            #[cfg(feature = "zstd-compression")]
-            Compressor::Zstd { .. } => write!(f, "zstd"),
-            #[cfg(feature = "zlib-compression")]
-            Compressor::Zlib { .. } => write!(f, "zlib"),
-            #[cfg(feature = "snappy-compression")]
-            Compressor::Snappy => write!(f, "snappy"),
-        }
-    }
 }
 
 impl<'de> Deserialize<'de> for Compressor {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
-        s.parse().map_err(|e| D::Error::custom(format!("{}", e)))
+        Compressor::to_compressor(&s).map_err(|e| D::Error::custom(format!("{}", e)))
     }
 }
 
@@ -167,16 +90,44 @@ impl Serialize for Compressor {
     where
         S: Serializer,
     {
-        self.to_string().serialize(serializer)
+        self.to_variant_string().serialize(serializer)
     }
 }
 
-#[cfg(any(
-    feature = "zstd-compression",
-    feature = "zlib-compression",
-    feature = "snappy-compression"
-))]
 impl Compressor {
+    #[allow(unused_variables)]
+    pub(crate) fn write_zlib_level(&mut self, level: i32) {
+        #[cfg(feature = "zlib-compression")]
+        if let Compressor::Zlib{ level: ref mut zlib_level} = *self {
+            *zlib_level = if level == -1 { None } else { Some(level) }
+        }
+    }
+
+    pub(crate) fn to_compressor(s: &str) -> Result<Self> {
+        match s.to_lowercase().as_str() {
+            #[cfg(feature = "zlib-compression")]
+            "zlib" => Ok(Compressor::Zlib { level: None }),
+            #[cfg(feature = "zstd-compression")]
+            "zstd" => Ok(Compressor::Zstd { level: None }),
+            #[cfg(feature = "snappy-compression")]
+            "snappy" => Ok(Compressor::Snappy),
+            other => Err(Error::from(ErrorKind::InvalidArgument {
+                message: format!("Invalid compressor: {} was supplied but is invalid", other),
+            })),
+        }
+    }
+
+    pub(crate) fn to_variant_string(&self) -> String {
+        match *self {
+            #[cfg(feature = "zstd-compression")]
+            Compressor::Zstd { .. } => "zstd".to_string(),
+            #[cfg(feature = "zlib-compression")]
+            Compressor::Zlib { .. } => "zlib".to_string(),
+            #[cfg(feature = "snappy-compression")]
+            Compressor::Snappy => "snappy".to_string(),
+        }
+    }
+
     pub(crate) fn id(&self) -> CompressorId {
         match *self {
             #[cfg(feature = "zstd-compression")]
@@ -189,6 +140,7 @@ impl Compressor {
     }
 
     pub(crate) fn validate(&self) -> Result<()> {
+        #[allow(unreachable_patterns)]
         match *self {
             #[cfg(feature = "zstd-compression")]
             Compressor::Zstd { level: Some(level) }
@@ -197,13 +149,13 @@ impl Compressor {
                 Err(Error::from(ErrorKind::InvalidArgument {
                     message: format!("invalid zstd level: {}", level),
                 }))
-            }
+            },
             #[cfg(feature = "zlib-compression")]
             Compressor::Zlib { level: Some(level) } if !(-1..10).contains(&level) => {
                 Err(Error::from(ErrorKind::InvalidArgument {
                     message: format!("invalid zlib level: {}", level),
                 }))
-            }
+            },
             _ => Ok(()),
         }
     }
@@ -228,7 +180,14 @@ impl Compressor {
             #[cfg(feature = "zlib-compression")]
             Compressor::Zlib { level } => {
                 let level = match level {
-                    Some(level) if level != -1 => Compression::new(level as u32),
+                    Some(level) if level != -1 => Compression::new(level.try_into().map_err(|e| {
+                        Error::from(ErrorKind::Internal {
+                            message: format!(
+                                "an invalid zlib compression level was given: {}",
+                                e
+                            ),
+                        })
+                    })?),
                     _ => Compression::default(),
                 };
                 let encoder = ZlibEncoder::new(vec![], level);
@@ -240,11 +199,6 @@ impl Compressor {
     }
 }
 
-#[cfg(any(
-    feature = "zstd-compression",
-    feature = "zlib-compression",
-    feature = "snappy-compression"
-))]
 pub(crate) enum Encoder {
     #[cfg(feature = "zstd-compression")]
     Zstd {
@@ -256,11 +210,7 @@ pub(crate) enum Encoder {
     Snappy { bytes: Vec<u8> },
 }
 
-#[cfg(any(
-    feature = "zstd-compression",
-    feature = "zlib-compression",
-    feature = "snappy-compression"
-))]
+#[allow(unused_variables)]
 impl Encoder {
     pub(crate) fn write_all(&mut self, buf: &[u8]) -> Result<()> {
         match *self {
@@ -321,11 +271,6 @@ impl Encoder {
 }
 
 #[derive(Clone, Debug)]
-#[cfg(any(
-    feature = "zstd-compression",
-    feature = "zlib-compression",
-    feature = "snappy-compression"
-))]
 pub(crate) enum Decoder {
     #[cfg(feature = "zstd-compression")]
     Zstd,
@@ -336,11 +281,6 @@ pub(crate) enum Decoder {
     Noop,
 }
 
-#[cfg(any(
-    feature = "zstd-compression",
-    feature = "zlib-compression",
-    feature = "snappy-compression"
-))]
 impl Decoder {
     pub(crate) fn decode(self, source: &[u8]) -> Result<Vec<u8>> {
         match self {

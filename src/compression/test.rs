@@ -4,29 +4,14 @@
 // these tests won't fail because the messages will be sent without compression
 // (as indicated in the specs).
 
-#[cfg(any(
-    feature = "zstd-compression",
-    feature = "zlib-compression",
-    feature = "snappy-compression"
-))]
 use bson::{doc, Bson};
 
-#[cfg(any(
-    feature = "zstd-compression",
-    feature = "zlib-compression",
-    feature = "snappy-compression"
-))]
 use crate::{
     client::options::ClientOptions,
     compression::{Compressor, CompressorId, Decoder},
     test::{TestClient, CLIENT_OPTIONS, LOCK},
 };
 
-#[cfg(any(
-    feature = "zstd-compression",
-    feature = "zlib-compression",
-    feature = "snappy-compression"
-))]
 use tokio::sync::RwLockReadGuard;
 
 #[cfg(feature = "zlib-compression")]
@@ -96,7 +81,7 @@ async fn ping_server_with_zlib_compression() {
 #[function_name::named]
 async fn ping_server_with_zstd_compression() {
     let mut client_options = CLIENT_OPTIONS.clone();
-    client_options.compressors = Some(vec!["zstd".parse().unwrap()]);
+    client_options.compressors = Some(vec![Compressor::Zstd { level: None }]);
     send_ping_with_compression(client_options).await;
 }
 
@@ -106,7 +91,7 @@ async fn ping_server_with_zstd_compression() {
 #[function_name::named]
 async fn ping_server_with_snappy_compression() {
     let mut client_options = CLIENT_OPTIONS.clone();
-    client_options.compressors = Some(vec!["snappy".parse().unwrap()]);
+    client_options.compressors = Some(vec![Compressor::Snappy]);
     send_ping_with_compression(client_options).await;
 }
 
@@ -128,11 +113,6 @@ async fn ping_server_with_all_compressors() {
     send_ping_with_compression(client_options).await;
 }
 
-#[cfg(any(
-    feature = "zstd-compression",
-    feature = "zlib-compression",
-    feature = "snappy-compression"
-))]
 async fn send_ping_with_compression(client_options: ClientOptions) {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
     let client = TestClient::with_options(Some(client_options)).await;

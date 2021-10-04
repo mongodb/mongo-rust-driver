@@ -376,20 +376,7 @@ pub struct ClientOptions {
     /// The server responds with the intersection of its supported list of compressors.
     /// The order of compressors indicates preference of compressors.
     #[builder(default)]
-    #[cfg(any(
-        feature = "zstd-compression",
-        feature = "zlib-compression",
-        feature = "snappy-compression"
-    ))]
     pub compressors: Option<Vec<Compressor>>,
-
-    #[builder(default, setter(skip))]
-    #[cfg(not(any(
-        feature = "zstd-compression",
-        feature = "zlib-compression",
-        feature = "snappy-compression"
-    )))]
-    pub(crate) compressors: Option<Vec<Compressor>>,
 
     /// The handler that should process all Connection Monitoring and Pooling events. See the
     /// CmapEventHandler type documentation for more details.
@@ -543,10 +530,6 @@ pub struct ClientOptions {
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 
-    /// Zlib compression level.  This is irrelevant if zlib is not listed as a valid compressor.
-    #[builder(default, setter(skip))]
-    pub(crate) zlib_compression: Option<i32>,
-
     /// Information from the SRV URI that generated these client options, if applicable.
     #[builder(default, setter(skip))]
     #[serde(skip)]
@@ -687,8 +670,8 @@ impl Serialize for ClientOptions {
             sockettimeoutms: &self.socket_timeout,
             tls: &self.tls,
             writeconcern: &self.write_concern,
-            zlibcompressionlevel: &self.zlib_compression,
             loadbalanced: &self.load_balanced,
+            zlibcompressionlevel: &None,
         };
 
         client_options.serialize(serializer)
@@ -948,7 +931,6 @@ impl From<ClientOptionsParser> for ClientOptions {
             retry_reads: parser.retry_reads,
             retry_writes: parser.retry_writes,
             socket_timeout: parser.socket_timeout,
-            zlib_compression: parser.zlib_compression,
             direct_connection: parser.direct_connection,
             driver_info: None,
             credential: parser.credential,
@@ -1133,20 +1115,6 @@ impl ClientOptions {
             }
         }
 
-        // If zlib and zlib_compression_level are specified then write zlib_compression_level into
-        // zlib enum
-        #[cfg(feature = "zlib-compression")]
-        if let (Some(compressors), Some(zlib_compression_level)) =
-            (options.compressors.as_mut(), options.zlib_compression)
-        {
-            for compressor in compressors {
-                #[allow(irrefutable_let_patterns)]
-                if let Compressor::Zlib { ref mut level } = compressor {
-                    *level = Some(zlib_compression_level);
-                }
-            }
-        }
-
         options.validate()?;
         Ok(options)
     }
@@ -1213,11 +1181,6 @@ impl ClientOptions {
             }
         }
 
-        #[cfg(any(
-            feature = "zstd-compression",
-            feature = "zlib-compression",
-            feature = "snappy-compression"
-        ))]
         if let Some(ref compressors) = self.compressors {
             for compressor in compressors {
                 compressor.validate()?;
@@ -1257,7 +1220,6 @@ impl ClientOptions {
                 socket_timeout,
                 tls,
                 write_concern,
-                zlib_compression,
                 original_srv_info,
                 original_uri
             ]
@@ -1608,6 +1570,16 @@ impl ClientOptionsParser {
             }
         }
 
+        // If zlib and zlib_compression_level are specified then write zlib_compression_level into
+        // zlib enum
+        if let (Some(compressors), Some(zlib_compression_level)) =
+            (self.compressors.as_mut(), self.zlib_compression)
+        {
+            for compressor in compressors {
+                compressor.write_zlib_level(zlib_compression_level)
+            }
+        }
+
         Ok(())
     }
 
@@ -1712,12 +1684,15 @@ impl ClientOptionsParser {
                 self.auth_mechanism_properties = Some(doc);
             }
             "compressors" => {
-                self.compressors = Some(
-                    value
-                        .split(',')
-                        .map(str::parse)
-                        .collect::<Result<Vec<Compressor>>>()?,
-                );
+                let compressors = value
+                    .split(',')
+                    .filter_map(|x| Compressor::to_compressor(x).ok())
+                    .collect::<Vec<Compressor>>();
+                self.compressors = if compressors.is_empty() {
+                    None
+                } else {
+                    Some(compressors)
+                }
             }
             k @ "connecttimeoutms" => {
                 self.connect_timeout = Some(Duration::from_millis(get_duration!(value, k)));

@@ -71,9 +71,9 @@ features = ["sync"]
 | `bson-uuid-0_8`     | Enable support for v0.8 of the [`uuid`](docs.rs/uuid/0.8) crate in the public API of the re-exported `bson` crate.                    | n/a                                 | no      |
 | `bson-chrono-0_4`   | Enable support for v0.4 of the [`chrono`](docs.rs/chrono/0.4) crate in the public API of the re-exported `bson` crate.                | n/
 a                                 | no      |
-| `zlib-compression`  | Enable support for compressing messages with zlib                                                                                     | `flate2`                            | no      |
-| `zstd-compression`  | Enable support for compressing messages with zstd.  This flag requires rust version 1.54.                                             | `zstd`                              | no      |
-| `snappy-compression`| Enable support for compressing messages with snappy                                                                                   | `snap`                              | no      |
+| [`zlib-compression`](https://zlib.net/)  | Enable support for compressing messages with zlib                                                                                     | `flate2`                            | no      |
+| [`zstd-compression`](http://facebook.github.io/zstd/)  | Enable support for compressing messages with zstd.  This flag requires Rust version 1.54.                                             | `zstd`                              | no      |
+| [`snappy-compression`](http://google.github.io/snappy/)| Enable support for compressing messages with snappy                                                                                   | `snap`                              | no      |
 
 ## Example Usage
 Below are simple examples of using the driver. For more specific examples and the API reference, see the driver's [docs.rs page](https://docs.rs/mongodb/latest).

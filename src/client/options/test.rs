@@ -151,19 +151,6 @@ async fn run_uri_options_spec_tests() {
     run_spec_test(&["uri-options"], run_test).await;
 }
 
-// Only run compressor parsing tests if compressor flags are set
-// Otherwise, they will always fail.
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-#[cfg(all(
-    feature = "zstd-compression",
-    feature = "zlib-compression",
-    feature = "snappy-compression"
-))]
-async fn run_uri_compression_options_spec_tests() {
-    run_spec_test(&["uri-compression-options"], run_test).await;
-}
-
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_connection_string_spec_tests() {
