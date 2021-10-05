@@ -376,7 +376,7 @@ pub struct ClientOptions {
     /// The server responds with the intersection of its supported list of compressors.
     /// The order of compressors indicates preference of compressors.
     #[builder(default)]
-    #[serde(skip_deserializing)]
+    #[serde(skip)]
     pub compressors: Option<Vec<Compressor>>,
 
     /// The handler that should process all Connection Monitoring and Pooling events. See the
