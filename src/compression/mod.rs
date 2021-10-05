@@ -18,7 +18,6 @@ use std::convert::TryInto;
 use std::io::prelude::*;
 
 use crate::error::{Error, ErrorKind, Result};
-use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum CompressorId {
@@ -49,8 +48,6 @@ impl CompressorId {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-#[non_exhaustive]
 /// Enum representing supported compressor algorithms.
 /// Used for compressing and decompressing messages sent to and read from the server.
 /// For compressors that take a `level`, use `None` to indicate the default level.
@@ -58,41 +55,30 @@ impl CompressorId {
 /// Requires `zstd-compression` feature flag to use `Zstd` compressor,
 /// `zlib-compression` feature flag to use `Zlib` compressor, and
 /// `snappy-compression` feature flag to use `Snappy` Compressor.
+#[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum Compressor {
     /// Zstd compressor.  Requires Rust version 1.54.
     /// See [`Zstd`](http://facebook.github.io/zstd/zstd_manual.html) for more information
-    #[cfg(feature = "zstd-compression")]
+    #[cfg(any(feature = "zstd-compression", docsrs))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "zstd-compression")))]
     Zstd {
         /// Zstd compression level
         level: Option<i32>,
     },
     /// Zlib compressor.
     /// See [`Zlib`](https://zlib.net/) for more information.
-    #[cfg(feature = "zlib-compression")]
+    #[cfg(any(feature = "zlib-compression", docsrs))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "zlib-compression")))]
     Zlib {
         /// Zlib compression level
         level: Option<i32>,
     },
     /// Snappy compressor.
     /// See [`Snappy`](http://google.github.io/snappy/) for more information.
-    #[cfg(feature = "snappy-compression")]
+    #[cfg(any(feature = "snappy-compression", docsrs))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "snappy-compression")))]
     Snappy,
-}
-
-impl<'de> Deserialize<'de> for Compressor {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
-        let s = String::deserialize(deserializer)?;
-        Compressor::to_compressor(&s).map_err(|e| D::Error::custom(format!("{}", e)))
-    }
-}
-
-impl Serialize for Compressor {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.to_variant_string().serialize(serializer)
-    }
 }
 
 impl Compressor {
@@ -107,7 +93,7 @@ impl Compressor {
         }
     }
 
-    pub(crate) fn to_compressor(s: &str) -> Result<Self> {
+    pub(crate) fn parse_str(s: &str) -> Result<Self> {
         match s.to_lowercase().as_str() {
             #[cfg(feature = "zlib-compression")]
             "zlib" => Ok(Compressor::Zlib { level: None }),
@@ -121,14 +107,14 @@ impl Compressor {
         }
     }
 
-    pub(crate) fn to_variant_string(&self) -> String {
+    pub(crate) fn to_variant_string(&self) -> &'static str {
         match *self {
             #[cfg(feature = "zstd-compression")]
-            Compressor::Zstd { .. } => "zstd".to_string(),
+            Compressor::Zstd { .. } => "zstd",
             #[cfg(feature = "zlib-compression")]
-            Compressor::Zlib { .. } => "zlib".to_string(),
+            Compressor::Zlib { .. } => "zlib",
             #[cfg(feature = "snappy-compression")]
-            Compressor::Snappy => "snappy".to_string(),
+            Compressor::Snappy => "snappy",
         }
     }
 

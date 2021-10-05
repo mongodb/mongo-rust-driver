@@ -5,6 +5,7 @@ use crate::{
     bson::{Bson, Document},
     client::options::{ClientOptions, ClientOptionsParser, ServerAddress},
     error::ErrorKind,
+    options::Compressor,
     test::run_spec_test,
 };
 #[derive(Debug, Deserialize)]
@@ -105,6 +106,27 @@ async fn run_test(test_file: TestFile) {
                         .filter(|(ref key, _)| json_options.contains_key(key))
                         .collect();
 
+                    // This is required because compressor is not serialize, but the spec tests
+                    // still expect to see serialized compressors.
+                    // This hardcodes the compressors into the options.
+                    if options.compressors.is_some() {
+                        // Safe unwrap because options is some
+                        let compressors = options.compressors.unwrap();
+                        options_doc.insert(
+                            "compressors",
+                            compressors
+                                .iter()
+                                .map(Compressor::to_variant_string)
+                                .collect::<Vec<&str>>(),
+                        );
+                        #[cfg(feature = "zlib-compression")]
+                        for compressor in compressors {
+                            if let Compressor::Zlib { level: Some(level) } = compressor {
+                                options_doc.insert("zlibcompressionlevel", level);
+                            }
+                        }
+                    }
+
                     assert_eq!(options_doc, json_options, "{}", test_case.description)
                 }
                 // auth
@@ -149,6 +171,17 @@ async fn run_test(test_file: TestFile) {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_uri_options_spec_tests() {
     run_spec_test(&["uri-options"], run_test).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+#[cfg(all(
+    feature = "zstd-compression",
+    feature = "zlib-compression",
+    feature = "snappy-compression"
+))]
+async fn run_uri_compression_options_spec_tests() {
+    run_spec_test(&["uri-compression-options"], run_test).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

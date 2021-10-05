@@ -7,7 +7,8 @@ tests:
         hosts: ~
         auth: ~
         options:
-            compressors: {}
+            compressors:
+              - "zlib"
             zlibCompressionLevel: 9
     -
         description: "Multiple compressors are parsed correctly"
@@ -17,7 +18,9 @@ tests:
         hosts: ~
         auth: ~
         options:
-            compressors: {}
+            compressors:
+              - "snappy"
+              - "zlib"
     -
         description: "Non-numeric zlibCompressionLevel causes a warning"
         uri: "mongodb://example.com/?compressors=zlib&zlibCompressionLevel=invalid"

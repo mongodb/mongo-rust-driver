@@ -7,7 +7,12 @@
       "warning": false,
       "hosts": null,
       "auth": null,
-      "options": {}
+      "options": {
+        "compressors": [
+          "zlib"
+        ],
+        "zlibCompressionLevel": 9
+      }
     },
     {
       "description": "Multiple compressors are parsed correctly",
@@ -16,7 +21,12 @@
       "warning": false,
       "hosts": null,
       "auth": null,
-      "options": {}
+      "options": {
+        "compressors": [
+          "snappy",
+          "zlib"
+        ]
+      }
     },
     {
       "description": "Non-numeric zlibCompressionLevel causes a warning",

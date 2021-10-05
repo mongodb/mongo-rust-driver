@@ -376,6 +376,7 @@ pub struct ClientOptions {
     /// The server responds with the intersection of its supported list of compressors.
     /// The order of compressors indicates preference of compressors.
     #[builder(default)]
+    #[serde(skip_deserializing)]
     pub compressors: Option<Vec<Compressor>>,
 
     /// The handler that should process all Connection Monitoring and Pooling events. See the
@@ -595,7 +596,6 @@ impl Serialize for ClientOptions {
         #[derive(Serialize)]
         struct ClientOptionsHelper<'a> {
             appname: &'a Option<String>,
-            compressors: &'a Option<Vec<Compressor>>,
 
             #[serde(serialize_with = "bson_util::serialize_duration_option_as_int_millis")]
             connecttimeoutms: &'a Option<Duration>,
@@ -653,7 +653,6 @@ impl Serialize for ClientOptions {
         let client_options = ClientOptionsHelper {
             appname: &self.app_name,
             connecttimeoutms: &self.connect_timeout,
-            compressors: &self.compressors,
             credential: &self.credential,
             directconnection: &self.direct_connection,
             heartbeatfrequencyms: &self.heartbeat_freq,
@@ -1686,7 +1685,7 @@ impl ClientOptionsParser {
             "compressors" => {
                 let compressors = value
                     .split(',')
-                    .filter_map(|x| Compressor::to_compressor(x).ok())
+                    .filter_map(|x| Compressor::parse_str(x).ok())
                     .collect::<Vec<Compressor>>();
                 self.compressors = if compressors.is_empty() {
                     None

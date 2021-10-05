@@ -292,7 +292,7 @@ impl Connection {
         command: Command,
         request_id: impl Into<Option<i32>>,
     ) -> Result<RawCommandResponse> {
-        let to_compress: bool = command.should_compress();
+        let to_compress = command.should_compress();
         let message = Message::with_command(command, request_id.into())?;
         self.send_message(message, to_compress).await
     }

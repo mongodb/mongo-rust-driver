@@ -206,7 +206,7 @@ impl Handshaker {
                     compressors
                         .iter()
                         .map(|x| x.to_variant_string())
-                        .collect::<Vec<String>>(),
+                        .collect::<Vec<&'static str>>(),
                 );
             }
             compressors = options.compressors;
@@ -285,7 +285,7 @@ impl Handshaker {
             if let Some(compressor) = client_compressors.iter().find(|c| {
                 server_compressors
                     .iter()
-                    .any(|x| std::mem::discriminant(x) == std::mem::discriminant(c))
+                    .any(|x| c.to_variant_string() == x)
             }) {
                 // zlib compression level is already set
                 conn.compressor = Some(compressor.clone());
