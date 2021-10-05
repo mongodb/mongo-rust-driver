@@ -183,16 +183,11 @@ impl Compressor {
             #[cfg(feature = "zlib-compression")]
             Compressor::Zlib { level } => {
                 let level = match level {
-                    Some(level) if level != -1 => {
-                        Compression::new(level.try_into().map_err(|e| {
-                            Error::from(ErrorKind::Internal {
-                                message: format!(
-                                    "an invalid zlib compression level was given: {}",
-                                    e
-                                ),
-                            })
-                        })?)
-                    }
+                    Some(level) => Compression::new(level.try_into().map_err(|e| {
+                        Error::from(ErrorKind::Internal {
+                            message: format!("an invalid zlib compression level was given: {}", e),
+                        })
+                    })?),
                     _ => Compression::default(),
                 };
                 let encoder = ZlibEncoder::new(vec![], level);
