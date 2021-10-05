@@ -254,7 +254,6 @@ impl Connection {
         }
     }
 
-    #[allow(unused_variables)]
     async fn send_message(
         &mut self,
         message: Message,
