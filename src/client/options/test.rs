@@ -109,9 +109,7 @@ async fn run_test(test_file: TestFile) {
                     // This is required because compressor is not serialize, but the spec tests
                     // still expect to see serialized compressors.
                     // This hardcodes the compressors into the options.
-                    if options.compressors.is_some() {
-                        // Safe unwrap because options is some
-                        let compressors = options.compressors.unwrap();
+                    if let Some(compressors) = options.compressors {
                         options_doc.insert(
                             "compressors",
                             compressors
