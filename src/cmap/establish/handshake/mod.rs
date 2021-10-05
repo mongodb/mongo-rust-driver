@@ -155,7 +155,6 @@ impl Handshaker {
         let mut metadata = BASE_CLIENT_METADATA.clone();
         let mut credential = None;
 
-        #[allow(unused_mut)]
         let mut compressors = None;
 
         let mut command =
