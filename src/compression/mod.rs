@@ -63,14 +63,14 @@ pub enum Compressor {
     #[cfg(feature = "zstd-compression")]
     Zstd {
         /// Zstd compression level
-        level: Option<i32>
+        level: Option<i32>,
     },
     /// Zlib compressor.
     /// See [`Zlib`](https://zlib.net/) for more information.
     #[cfg(feature = "zlib-compression")]
     Zlib {
         /// Zlib compression level
-        level: Option<i32>
+        level: Option<i32>,
     },
     /// Snappy compressor.
     /// See [`Snappy`](http://google.github.io/snappy/) for more information.
@@ -98,7 +98,10 @@ impl Compressor {
     #[allow(unused_variables)]
     pub(crate) fn write_zlib_level(&mut self, level: i32) {
         #[cfg(feature = "zlib-compression")]
-        if let Compressor::Zlib{ level: ref mut zlib_level} = *self {
+        if let Compressor::Zlib {
+            level: ref mut zlib_level,
+        } = *self
+        {
             *zlib_level = if level == -1 { None } else { Some(level) }
         }
     }
@@ -149,13 +152,13 @@ impl Compressor {
                 Err(Error::from(ErrorKind::InvalidArgument {
                     message: format!("invalid zstd level: {}", level),
                 }))
-            },
+            }
             #[cfg(feature = "zlib-compression")]
             Compressor::Zlib { level: Some(level) } if !(-1..10).contains(&level) => {
                 Err(Error::from(ErrorKind::InvalidArgument {
                     message: format!("invalid zlib level: {}", level),
                 }))
-            },
+            }
             _ => Ok(()),
         }
     }
@@ -180,14 +183,16 @@ impl Compressor {
             #[cfg(feature = "zlib-compression")]
             Compressor::Zlib { level } => {
                 let level = match level {
-                    Some(level) if level != -1 => Compression::new(level.try_into().map_err(|e| {
-                        Error::from(ErrorKind::Internal {
-                            message: format!(
-                                "an invalid zlib compression level was given: {}",
-                                e
-                            ),
-                        })
-                    })?),
+                    Some(level) if level != -1 => {
+                        Compression::new(level.try_into().map_err(|e| {
+                            Error::from(ErrorKind::Internal {
+                                message: format!(
+                                    "an invalid zlib compression level was given: {}",
+                                    e
+                                ),
+                            })
+                        })?)
+                    }
                     _ => Compression::default(),
                 };
                 let encoder = ZlibEncoder::new(vec![], level);
