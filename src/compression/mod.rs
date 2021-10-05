@@ -55,8 +55,9 @@ impl CompressorId {
 /// Used for compressing and decompressing messages sent to and read from the server.
 /// For compressors that take a `level`, use `None` to indicate the default level.
 /// Higher `level` indicates more compression (and slower).
-/// Requires one of `zstd-compression`, `zlib-compression`, or `snappy-compression`
-/// feature flags.
+/// Requires `zstd-compression` feature flag to use `Zstd` compressor,
+/// `zlib-compression` feature flag to use `Zlib` compressor, and
+/// `snappy-compression` feature flag to use `Snappy` Compressor.
 pub enum Compressor {
     /// Zstd compressor.  Requires Rust version 1.54.
     /// See [`Zstd`](http://facebook.github.io/zstd/zstd_manual.html) for more information
