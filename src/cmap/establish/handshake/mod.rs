@@ -205,7 +205,7 @@ impl Handshaker {
                     "compression",
                     compressors
                         .iter()
-                        .map(|x| x.to_variant_string())
+                        .map(|x| x.name())
                         .collect::<Vec<&'static str>>(),
                 );
             }
@@ -282,11 +282,10 @@ impl Handshaker {
         ) {
             // Use the Client's first compressor choice that the server supports (comparing only on
             // enum variant)
-            if let Some(compressor) = client_compressors.iter().find(|c| {
-                server_compressors
-                    .iter()
-                    .any(|x| c.to_variant_string() == x)
-            }) {
+            if let Some(compressor) = client_compressors
+                .iter()
+                .find(|c| server_compressors.iter().any(|x| c.name() == x))
+            {
                 // zlib compression level is already set
                 conn.compressor = Some(compressor.clone());
             }

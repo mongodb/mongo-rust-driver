@@ -107,7 +107,7 @@ impl Compressor {
         }
     }
 
-    pub(crate) fn to_variant_string(&self) -> &'static str {
+    pub(crate) fn name(&self) -> &'static str {
         match *self {
             #[cfg(feature = "zstd-compression")]
             Compressor::Zstd { .. } => "zstd",

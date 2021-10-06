@@ -41,6 +41,18 @@ async fn run_test(test_file: TestFile) {
             || test_case.description.contains("serverSelectionTryOnce")
             || test_case.description.contains("Unix")
             || test_case.description.contains("relative path")
+            // Compression is implemented but will only pass the tests if all
+            // the appropriate feature flags are set.  That is because
+            // valid compressors are only parsed correctly if the corresponding feature flag is set.
+            // (otherwise they are treated as invalid, and hence ignored)
+            || (test_case.description.contains("compress") &&
+                    !cfg!(
+                        all(features = "zlib-compression",
+                            features = "zstd-compression",
+                            features = "snappy-compression"
+                        )
+                    )
+                )
         {
             continue;
         }
@@ -114,7 +126,7 @@ async fn run_test(test_file: TestFile) {
                             "compressors",
                             compressors
                                 .iter()
-                                .map(Compressor::to_variant_string)
+                                .map(Compressor::name)
                                 .collect::<Vec<&str>>(),
                         );
                         #[cfg(feature = "zlib-compression")]
@@ -169,17 +181,6 @@ async fn run_test(test_file: TestFile) {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run_uri_options_spec_tests() {
     run_spec_test(&["uri-options"], run_test).await;
-}
-
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-#[cfg(all(
-    feature = "zstd-compression",
-    feature = "zlib-compression",
-    feature = "snappy-compression"
-))]
-async fn run_uri_compression_options_spec_tests() {
-    run_spec_test(&["uri-compression-options"], run_test).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
