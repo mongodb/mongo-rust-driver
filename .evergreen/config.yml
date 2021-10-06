@@ -365,6 +365,8 @@ functions:
           ${PREPARE_SHELL}
           export MONGODB_URI="${MONGODB_URI}"
           export SSL="${SSL}"
+          export SINGLE_MONGOS_LB_URI="${SINGLE_MONGOS_LB_URI}"
+          export MULTI_MONGOS_LB_URI="${MULTI_MONGOS_LB_URI}"
           . .evergreen/generate-uri.sh
 
           SINGLE_THREAD=${SINGLE_THREAD} \
@@ -603,6 +605,24 @@ functions:
           ${PREPARE_SHELL}
           echo '{"results": [{ "status": "FAIL", "test_file": "Build", "log_raw": "No test-results.json found was created"  } ]}' > ${PROJECT_DIRECTORY}/test-results.json
 
+  "start load balancer":
+    - command: shell.exec
+      params:
+        script: |
+          ${PREPARE_SHELL}
+          export MONGODB_URI="${MONGODB_URI}"
+          ${DRIVERS_TOOLS}/.evergreen/run-load-balancer.sh start
+    - command: expansions.update
+      params:
+        file: lb-expansion.yml
+  
+  "stop load balancer":
+    - command: shell.exec
+      params:
+        script: |
+          ${PREPARE_SHELL}
+          ${DRIVERS_TOOLS}/.evergreen/run-load-balancer.sh stop
+
 pre:
   - func: "fetch source"
   - func: "prepare resources"
@@ -613,6 +633,7 @@ pre:
   - func: "install dependencies"
 
 post:
+  - func: "stop load balancer"
   - func: "stop mongo orchestration"
   - func: "upload-mo-artifacts"
   - func: "cleanup"
@@ -815,6 +836,17 @@ tasks:
           MONGODB_VERSION: "latest"
           TOPOLOGY: "sharded_cluster"
       - func: "run tests"
+  
+  - name: "test-latest-load_balancer"
+    tags: ["latest", "load_balancer"]
+    commands:
+      - func: "bootstrap mongo-orchestration"
+        vars:
+          MONGODB_VERSION: "latest"
+          TOPOLOGY: "sharded_cluster"
+      - func: "start load balancer"
+      - func: "run tests"
+
 
   - name: "test-latest-aws-auth"
     # "latest" explicitly left off to keep this out of the generic matrix
@@ -1369,6 +1401,13 @@ buildvariants:
         async-runtime: "*"
       then:
         remove_tasks: [".3.6", ".4.0"]
+    # haproxy isn't installed on windows / ubuntu-arm
+    - if:
+        os: ["ubuntu-18.04-arm64", "windows-64-vs2017"]
+        auth-and-tls: "*"
+        async-runtime: "*"
+      then:
+        remove_tasks: ".load_balancer"
 - matrix_name: "x509-auth"
   matrix_spec:
     os:

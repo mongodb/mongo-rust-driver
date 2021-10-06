@@ -121,6 +121,11 @@ async fn load_balancing_test() {
         return;
     }
 
+    if setup_client_options.load_balanced.unwrap_or(false) {
+        println!("skipping load_balancing_test test due to load-balanced topology");
+        return;
+    }
+
     setup_client_options.hosts.drain(1..);
     setup_client_options.direct_connection = Some(true);
     let setup_client = TestClient::with_options(Some(setup_client_options)).await;

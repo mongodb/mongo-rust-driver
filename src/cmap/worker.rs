@@ -174,7 +174,6 @@ impl ConnectionPoolWorker {
         let (connection_requester, request_receiver) =
             connection_requester::channel(address.clone(), handle);
         let (manager, management_receiver) = manager::channel();
-        let (generation_publisher, generation_subscriber) = status::channel();
 
         let is_load_balanced = options
             .as_ref()
@@ -185,6 +184,7 @@ impl ConnectionPoolWorker {
         } else {
             PoolGeneration::normal()
         };
+        let (generation_publisher, generation_subscriber) = status::channel(generation.clone());
 
         #[cfg(test)]
         let mut state = if options
@@ -513,7 +513,7 @@ impl ConnectionPoolWorker {
                 handler.handle_pool_cleared_event(event);
             });
 
-            if !self.generation.is_load_balanced() {
+            if !matches!(self.generation, PoolGeneration::LoadBalanced(_)) {
                 for request in self.wait_queue.drain(..) {
                     // an error means the other end hung up already, which is okay because we were
                     // returning an error anyways
@@ -752,10 +752,6 @@ impl PoolGeneration {
 
     fn load_balanced() -> Self {
         Self::LoadBalanced(HashMap::new())
-    }
-
-    fn is_load_balanced(&self) -> bool {
-        matches!(self, Self::LoadBalanced(_))
     }
 
     #[cfg(test)]

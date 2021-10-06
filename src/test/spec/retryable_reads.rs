@@ -91,6 +91,10 @@ async fn retry_read_pool_cleared() {
         println!("skipping retry_read_pool_cleared due to blockConnection not being supported");
         return;
     }
+    if client.is_load_balanced() {
+        println!("skipping retry_read_pool_cleared due to load-balanced topology");
+        return;
+    }
 
     let collection = client
         .database("retry_read_pool_cleared")

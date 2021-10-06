@@ -150,6 +150,11 @@ impl TopologyDescription {
         } else {
             SessionSupportStatus::Undetermined
         };
+        let transaction_support_status = if topology_type == TopologyType::LoadBalanced {
+            TransactionSupportStatus::Supported
+        } else {
+            TransactionSupportStatus::Undetermined
+        };
 
         Ok(Self {
             single_seed: servers.len() == 1,
@@ -159,7 +164,7 @@ impl TopologyDescription {
             max_election_id: None,
             compatibility_error: None,
             session_support_status,
-            transaction_support_status: TransactionSupportStatus::Undetermined,
+            transaction_support_status,
             cluster_time: None,
             local_threshold: options.local_threshold,
             heartbeat_freq: options.heartbeat_freq,
@@ -465,6 +470,12 @@ impl TopologyDescription {
             server_description.address.clone(),
             server_description.clone(),
         );
+
+        if let TopologyType::LoadBalanced = self.topology_type {
+            // Load-balanced topologies don't have real server updates; attempting to update based
+            // on the synthesized one causes incorrect behavior.
+            return Ok(());
+        }
 
         // Update the topology's min logicalSessionTimeout.
         self.update_session_support_status(&server_description);

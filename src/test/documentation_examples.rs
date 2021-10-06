@@ -1382,6 +1382,10 @@ async fn versioned_api_examples() -> std::result::Result<(), Box<dyn std::error:
         );
         return Ok(());
     }
+    if setup_client.is_load_balanced() {
+        println!("skipping versioned API examples due to load-balanced topology");
+        return Ok(());
+    }
 
     let uri = DEFAULT_URI.clone();
     // Start Versioned API Example 1

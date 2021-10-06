@@ -198,6 +198,9 @@ pub(crate) struct IsMasterCommandResponse {
 
     /// If the connection is to a load balancer, the id of the selected backend.
     pub service_id: Option<ObjectId>,
+
+    /// For internal use.
+    pub topology_version: Option<Document>,
 }
 
 impl PartialEq for IsMasterCommandResponse {

@@ -422,6 +422,11 @@ async fn retry_write_pool_cleared() {
         return;
     }
 
+    if client.is_load_balanced() {
+        println!("skipping retry_write_pool_cleared due to load-balanced topology");
+        return;
+    }
+
     let collection = client
         .database("retry_write_pool_cleared")
         .collection("retry_write_pool_cleared");

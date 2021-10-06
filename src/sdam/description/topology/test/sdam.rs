@@ -120,6 +120,7 @@ impl From<TestIsMasterCommandResponse> for IsMasterCommandResponse {
             max_bson_object_size: test.max_bson_object_size.unwrap_or(1234),
             max_write_batch_size: test.max_write_batch_size.unwrap_or(1234),
             service_id: test.service_id,
+            topology_version: None,
         }
     }
 }
@@ -593,6 +594,11 @@ async fn heartbeat_events() {
         event_handler.clone(),
     )
     .await;
+
+    if client.is_load_balanced() {
+        println!("skipping heartbeat_events tests due to load-balanced topology");
+        return;
+    }
 
     subscriber
         .wait_for_event(Duration::from_millis(500), |event| {

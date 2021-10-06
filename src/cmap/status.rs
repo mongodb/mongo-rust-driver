@@ -7,17 +7,9 @@ struct PoolStatus {
     generation: PoolGeneration,
 }
 
-impl Default for PoolStatus {
-    fn default() -> Self {
-        PoolStatus {
-            generation: PoolGeneration::normal(),
-        }
-    }
-}
-
 /// Create a channel for publishing and receiving updates to the pool's generation.
-pub(super) fn channel() -> (PoolGenerationPublisher, PoolGenerationSubscriber) {
-    let (sender, receiver) = tokio::sync::watch::channel(Default::default());
+pub(super) fn channel(init: PoolGeneration) -> (PoolGenerationPublisher, PoolGenerationSubscriber) {
+    let (sender, receiver) = tokio::sync::watch::channel(PoolStatus { generation: init });
     (
         PoolGenerationPublisher { sender },
         PoolGenerationSubscriber { receiver },
