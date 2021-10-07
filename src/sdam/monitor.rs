@@ -260,7 +260,11 @@ impl UpdateMonitor {
             match update.message() {
                 ServerUpdate::Error { error } => {
                     topology
-                        .handle_application_error(error.cause.clone(), error.handshake_phase.clone(), &server)
+                        .handle_application_error(
+                            error.cause.clone(),
+                            error.handshake_phase.clone(),
+                            &server,
+                        )
                         .await;
                 }
             }
