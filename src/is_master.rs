@@ -144,6 +144,10 @@ pub(crate) struct IsMasterCommandResponse {
     /// The address of the server that returned this `IsMasterCommandResponse`.
     pub me: Option<String>,
 
+    #[serde(rename = "compression")]
+    /// The list of compatible compressors that the server returned.
+    pub compressors: Option<Vec<String>>,
+
     /// The current replica set config version.
     pub set_version: Option<i32>,
 

@@ -168,6 +168,11 @@ impl<T: CommandBody> Command<T> {
         let name = self.name.to_lowercase();
         REDACTED_COMMANDS.contains(name.as_str()) || self.body.should_redact()
     }
+
+    pub(crate) fn should_compress(&self) -> bool {
+        let name = self.name.to_lowercase();
+        !REDACTED_COMMANDS.contains(name.as_str()) && !HELLO_COMMAND_NAMES.contains(name.as_str())
+    }
 }
 
 /// Trait modeling the behavior of a command response to a server operation.

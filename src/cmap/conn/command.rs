@@ -5,7 +5,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use super::wire::Message;
 use crate::{
     bson::Document,
-    client::{options::ServerApi, ClusterTime},
+    client::{options::ServerApi, ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     error::{Error, ErrorKind, Result},
     is_master::{IsMasterCommandResponse, IsMasterReply},
     operation::{CommandErrorBody, CommandResponse, Response},
@@ -20,6 +20,13 @@ pub(crate) struct RawCommand {
     pub(crate) name: String,
     pub(crate) target_db: String,
     pub(crate) bytes: Vec<u8>,
+}
+
+impl RawCommand {
+    pub(crate) fn should_compress(&self) -> bool {
+        let name = self.name.to_lowercase();
+        !REDACTED_COMMANDS.contains(name.as_str()) && !HELLO_COMMAND_NAMES.contains(name.as_str())
+    }
 }
 
 /// Driver-side model of a database command.

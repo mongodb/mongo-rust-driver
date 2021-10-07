@@ -19,6 +19,8 @@ use crate::{
     runtime::{AsyncLittleEndianWrite, AsyncStream, SyncLittleEndianRead},
 };
 
+use crate::compression::{Compressor, Decoder};
+
 /// Represents an OP_MSG wire protocol operation.
 #[derive(Debug)]
 pub(crate) struct Message {
@@ -84,12 +86,98 @@ impl Message {
         let mut reader = BufReader::new(reader);
         let header = Header::read_from(&mut reader).await?;
 
+        if header.op_code == OpCode::Message {
+            return Self::read_from_op_msg(reader, &header).await;
+        }
+        if header.op_code == OpCode::Compressed {
+            return Self::read_from_op_compressed(reader, &header).await;
+        }
+
+        Err(Error::new(
+            ErrorKind::InvalidResponse {
+                message: format!(
+                    "Invalid op code, expected {} or {} and got {}",
+                    OpCode::Message as u32,
+                    OpCode::Compressed as u32,
+                    header.op_code as u32
+                ),
+            },
+            Option::<Vec<String>>::None,
+        ))
+    }
+
+    async fn read_from_op_msg(
+        mut reader: BufReader<&mut AsyncStream>,
+        header: &Header,
+    ) -> Result<Self> {
         // TODO: RUST-616 ensure length is < maxMessageSizeBytes
-        let mut length_remaining = header.length - Header::LENGTH as i32;
+        let length_remaining = header.length - Header::LENGTH as i32;
+        let mut buf = vec![0u8; length_remaining as usize];
+        reader.read_exact(&mut buf).await?;
+        let reader = buf.as_slice();
+
+        Self::read_op_common(reader, length_remaining, header)
+    }
+
+    async fn read_from_op_compressed(
+        mut reader: BufReader<&mut AsyncStream>,
+        header: &Header,
+    ) -> Result<Self> {
+        let length_remaining = header.length - Header::LENGTH as i32;
         let mut buf = vec![0u8; length_remaining as usize];
         reader.read_exact(&mut buf).await?;
         let mut reader = buf.as_slice();
 
+        // Read original opcode (should be OP_MSG)
+        let original_opcode = reader.read_i32()?;
+        if original_opcode != OpCode::Message as i32 {
+            return Err(ErrorKind::InvalidResponse {
+                message: format!(
+                    "The original opcode of the compressed message must be {}, but was {}.",
+                    OpCode::Message as i32,
+                    original_opcode,
+                ),
+            }
+            .into());
+        }
+
+        // Read uncompressed size
+        let uncompressed_size = reader.read_i32()?;
+
+        // Read compressor id
+        let compressor_id: u8 = reader.read_u8()?;
+
+        // Get decoder
+        let decoder = Decoder::from_u8(compressor_id)?;
+
+        // Decode message
+        let decoded_message = decoder.decode(reader)?;
+
+        // Check that claimed length matches original length
+        if decoded_message.len() as i32 != uncompressed_size {
+            return Err(ErrorKind::InvalidResponse {
+                message: format!(
+                    "The server's message claims that the uncompressed length is {}, but was \
+                     computed to be {}.",
+                    uncompressed_size,
+                    decoded_message.len(),
+                ),
+            }
+            .into());
+        }
+
+        // Read decompressed message as a standard OP_MSG
+        let reader = decoded_message.as_slice();
+        let length_remaining = decoded_message.len();
+
+        Self::read_op_common(reader, length_remaining as i32, header)
+    }
+
+    fn read_op_common(
+        mut reader: &[u8],
+        mut length_remaining: i32,
+        header: &Header,
+    ) -> Result<Self> {
         let flags = MessageFlags::from_bits_truncate(reader.read_u32()?);
         length_remaining -= std::mem::size_of::<u32>() as i32;
 
@@ -159,6 +247,58 @@ impl Message {
         if let Some(checksum) = self.checksum {
             writer.write_u32(checksum).await?;
         }
+
+        writer.flush().await?;
+
+        Ok(())
+    }
+
+    /// Serializes message to bytes, compresses those bytes, and writes the bytes.
+    pub async fn write_compressed_to(
+        &self,
+        stream: &mut AsyncStream,
+        compressor: &Compressor,
+    ) -> Result<()> {
+        let mut encoder = compressor.to_encoder()?;
+        let compressor_id = compressor.id() as u8;
+
+        let mut writer = BufWriter::new(stream);
+        let mut sections_bytes = Vec::new();
+
+        for section in &self.sections {
+            section.write(&mut sections_bytes).await?;
+        }
+        let flag_bytes = &self.flags.bits().to_le_bytes();
+        let uncompressed_len = sections_bytes.len() + flag_bytes.len();
+        // Compress the flags and sections.  Depending on the handshake
+        // this could use zlib, zstd or snappy
+        encoder.write_all(flag_bytes)?;
+        encoder.write_all(sections_bytes.as_slice())?;
+        let compressed_bytes = encoder.finish()?;
+
+        let total_length = Header::LENGTH
+            + std::mem::size_of::<i32>()
+            + std::mem::size_of::<i32>()
+            + std::mem::size_of::<u8>()
+            + compressed_bytes.len();
+
+        let header = Header {
+            length: total_length as i32,
+            request_id: self.request_id.unwrap_or_else(super::util::next_request_id),
+            response_to: self.response_to,
+            op_code: OpCode::Compressed,
+        };
+
+        // Write header
+        header.write_to(&mut writer).await?;
+        // Write original (pre-compressed) opcode (always OP_MSG)
+        writer.write_i32(OpCode::Message as i32).await?;
+        // Write uncompressed size
+        writer.write_i32(uncompressed_len as i32).await?;
+        // Write compressor id
+        writer.write_u8(compressor_id).await?;
+        // Write compressed message
+        writer.write_all(compressed_bytes.as_slice()).await?;
 
         writer.flush().await?;
 

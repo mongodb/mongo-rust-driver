@@ -5,6 +5,7 @@ use crate::{
     bson::{Bson, Document},
     client::options::{ClientOptions, ClientOptionsParser, ServerAddress},
     error::ErrorKind,
+    options::Compressor,
     test::run_spec_test,
 };
 #[derive(Debug, Deserialize)]
@@ -40,6 +41,18 @@ async fn run_test(test_file: TestFile) {
             || test_case.description.contains("serverSelectionTryOnce")
             || test_case.description.contains("Unix")
             || test_case.description.contains("relative path")
+            // Compression is implemented but will only pass the tests if all
+            // the appropriate feature flags are set.  That is because
+            // valid compressors are only parsed correctly if the corresponding feature flag is set.
+            // (otherwise they are treated as invalid, and hence ignored)
+            || (test_case.description.contains("compress") &&
+                    !cfg!(
+                        all(features = "zlib-compression",
+                            features = "zstd-compression",
+                            features = "snappy-compression"
+                        )
+                    )
+                )
         {
             continue;
         }
@@ -104,6 +117,25 @@ async fn run_test(test_file: TestFile) {
                         .into_iter()
                         .filter(|(ref key, _)| json_options.contains_key(key))
                         .collect();
+
+                    // This is required because compressor is not serialize, but the spec tests
+                    // still expect to see serialized compressors.
+                    // This hardcodes the compressors into the options.
+                    if let Some(compressors) = options.compressors {
+                        options_doc.insert(
+                            "compressors",
+                            compressors
+                                .iter()
+                                .map(Compressor::name)
+                                .collect::<Vec<&str>>(),
+                        );
+                        #[cfg(feature = "zlib-compression")]
+                        for compressor in compressors {
+                            if let Compressor::Zlib { level: Some(level) } = compressor {
+                                options_doc.insert("zlibcompressionlevel", level);
+                            }
+                        }
+                    }
 
                     assert_eq!(options_doc, json_options, "{}", test_case.description)
                 }

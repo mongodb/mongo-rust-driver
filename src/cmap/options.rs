@@ -11,6 +11,7 @@ use typed_builder::TypedBuilder;
 use crate::{
     bson_util,
     client::{auth::Credential, options::ServerApi},
+    compression::Compressor,
     event::cmap::{CmapEventHandler, ConnectionPoolOptions as EventOptions},
     options::{ClientOptions, DriverInfo, ServerAddress, TlsOptions},
 };
@@ -42,6 +43,12 @@ pub(crate) struct ConnectionPoolOptions {
     #[derivative(Debug = "ignore", PartialEq = "ignore")]
     #[serde(skip)]
     pub(crate) cmap_event_handler: Option<Arc<dyn CmapEventHandler>>,
+
+    /// The compressors that the Client is willing to use in the order they are specified
+    /// in the configuration.  The Client sends this list of compressors to the server.
+    /// The server responds with the intersection of its supported list of compressors.
+    #[serde(skip)]
+    pub(crate) compressors: Option<Vec<Compressor>>,
 
     /// Interval between background thread maintenance runs (e.g. ensure minPoolSize).
     #[cfg(test)]
@@ -109,6 +116,7 @@ impl ConnectionPoolOptions {
             tls_options: options.tls_options(),
             credential: options.credential.clone(),
             cmap_event_handler: options.cmap_event_handler.clone(),
+            compressors: options.compressors.clone(),
             #[cfg(test)]
             background_thread_interval: None,
             #[cfg(test)]

@@ -10,6 +10,7 @@ use crate::{
     bson::{doc, Bson, Document},
     client::auth::{ClientFirst, FirstRound},
     cmap::{options::ConnectionPoolOptions, Command, Connection, StreamDescription},
+    compression::Compressor,
     error::{ErrorKind, Result},
     event::sdam::SdamEventHandler,
     is_master::{is_master_command, run_is_master, IsMasterReply},
@@ -145,6 +146,7 @@ pub(crate) struct Handshaker {
     credential: Option<Credential>,
     #[cfg(test)]
     mock_service_id: bool,
+    compressors: Option<Vec<Compressor>>,
 }
 
 impl Handshaker {
@@ -152,6 +154,8 @@ impl Handshaker {
     pub(crate) fn new(options: Option<HandshakerOptions>) -> Self {
         let mut metadata = BASE_CLIENT_METADATA.clone();
         let mut credential = None;
+
+        let mut compressors = None;
 
         let mut command =
             is_master_command(options.as_ref().and_then(|opts| opts.server_api.as_ref()));
@@ -190,11 +194,22 @@ impl Handshaker {
             if options.load_balanced {
                 command.body.insert("loadBalanced", true);
             }
-
             #[cfg(test)]
             {
                 mock_service_id = options.mock_service_id;
             }
+            // Add compressors to handshake.
+            // See https://github.com/mongodb/specifications/blob/master/source/compression/OP_COMPRESSED.rst
+            if let Some(ref compressors) = options.compressors {
+                command.body.insert(
+                    "compression",
+                    compressors
+                        .iter()
+                        .map(|x| x.name())
+                        .collect::<Vec<&'static str>>(),
+                );
+            }
+            compressors = options.compressors;
         }
 
         command.body.insert("client", metadata);
@@ -204,6 +219,7 @@ impl Handshaker {
             credential,
             #[cfg(test)]
             mock_service_id,
+            compressors,
         }
     }
 
@@ -259,6 +275,22 @@ impl Handshaker {
                 .map(|server_first| client_first.into_first_round(server_first))
         });
 
+        // Check that master reply has a compressor list and unpack it
+        if let (Some(server_compressors), Some(client_compressors)) = (
+            is_master_reply.command_response.compressors.as_ref(),
+            self.compressors.as_ref(),
+        ) {
+            // Use the Client's first compressor choice that the server supports (comparing only on
+            // enum variant)
+            if let Some(compressor) = client_compressors
+                .iter()
+                .find(|c| server_compressors.iter().any(|x| c.name() == x))
+            {
+                // zlib compression level is already set
+                conn.compressor = Some(compressor.clone());
+            }
+        }
+
         Ok(HandshakeResult {
             is_master_reply,
             first_round,
@@ -283,6 +315,7 @@ pub(crate) struct HandshakeResult {
 pub(crate) struct HandshakerOptions {
     app_name: Option<String>,
     credential: Option<Credential>,
+    compressors: Option<Vec<Compressor>>,
     driver_info: Option<DriverInfo>,
     server_api: Option<ServerApi>,
     load_balanced: bool,
@@ -294,6 +327,7 @@ impl From<ConnectionPoolOptions> for HandshakerOptions {
     fn from(options: ConnectionPoolOptions) -> Self {
         Self {
             app_name: options.app_name,
+            compressors: options.compressors,
             credential: options.credential,
             driver_info: options.driver_info,
             server_api: options.server_api,
@@ -308,6 +342,7 @@ impl From<ClientOptions> for HandshakerOptions {
     fn from(options: ClientOptions) -> Self {
         Self {
             app_name: options.app_name,
+            compressors: options.compressors,
             credential: options.credential,
             driver_info: options.driver_info,
             server_api: options.server_api,

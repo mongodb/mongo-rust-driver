@@ -12,6 +12,7 @@ pub(crate) enum OpCode {
     Reply = 1,
     Query = 2004,
     Message = 2013,
+    Compressed = 2012,
 }
 
 impl OpCode {
@@ -21,6 +22,7 @@ impl OpCode {
             1 => Ok(OpCode::Reply),
             2004 => Ok(OpCode::Query),
             2013 => Ok(OpCode::Message),
+            2012 => Ok(OpCode::Compressed),
             other => Err(ErrorKind::InvalidResponse {
                 message: format!("Invalid wire protocol opcode: {}", other),
             }

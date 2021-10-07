@@ -18,6 +18,7 @@ use crate::{
         options::{ConnectionOptions, StreamOptions},
         PoolGeneration,
     },
+    compression::Compressor,
     error::{load_balanced_mode_mismatch, Error, ErrorKind, Result},
     event::cmap::{
         CmapEventHandler,
@@ -76,6 +77,14 @@ pub(crate) struct Connection {
 
     stream: AsyncStream,
 
+    /// Compressor that the client will use before sending messages.
+    /// This compressor does not get used to decompress server messages.
+    /// The client will decompress server messages using whichever compressor
+    /// the server indicates in its message.  This compressor is the first
+    /// compressor in the client's compressor list that also appears in the
+    /// server's compressor list.
+    pub(super) compressor: Option<Compressor>,
+
     /// If the connection is pinned to a cursor or transaction, the channel sender to return this
     /// connection to the pin holder.
     pinned_sender: Option<mpsc::Sender<Connection>>,
@@ -109,6 +118,7 @@ impl Connection {
             stream_description: None,
             error: false,
             pinned_sender: None,
+            compressor: None,
         };
 
         Ok(conn)
@@ -244,9 +254,24 @@ impl Connection {
         }
     }
 
-    async fn send_message(&mut self, message: Message) -> Result<RawCommandResponse> {
+    async fn send_message(
+        &mut self,
+        message: Message,
+        to_compress: bool,
+    ) -> Result<RawCommandResponse> {
         self.command_executing = true;
-        let write_result = message.write_to(&mut self.stream).await;
+
+        // If the client has agreed on a compressor with the server, and the command
+        // is the right type of command, then compress the message.
+        let write_result = match self.compressor {
+            Some(ref compressor) if to_compress => {
+                message
+                    .write_compressed_to(&mut self.stream, compressor)
+                    .await
+            }
+            _ => message.write_to(&mut self.stream).await,
+        };
+
         self.error = write_result.is_err();
         write_result?;
 
@@ -267,8 +292,9 @@ impl Connection {
         command: Command,
         request_id: impl Into<Option<i32>>,
     ) -> Result<RawCommandResponse> {
+        let to_compress = command.should_compress();
         let message = Message::with_command(command, request_id.into())?;
-        self.send_message(message).await
+        self.send_message(message, to_compress).await
     }
 
     /// Executes a `RawCommand` and returns a `CommandResponse` containing the result from the
@@ -282,8 +308,9 @@ impl Connection {
         command: RawCommand,
         request_id: impl Into<Option<i32>>,
     ) -> Result<RawCommandResponse> {
+        let to_compress = command.should_compress();
         let message = Message::with_raw_command(command, request_id.into());
-        self.send_message(message).await
+        self.send_message(message, to_compress).await
     }
 
     /// Gets the connection's StreamDescription.
@@ -351,6 +378,7 @@ impl Connection {
             pool_manager: None,
             ready_and_available_time: None,
             pinned_sender: self.pinned_sender.clone(),
+            compressor: self.compressor.clone(),
         }
     }
 }

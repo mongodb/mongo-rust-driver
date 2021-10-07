@@ -43,6 +43,7 @@ use crate::{
     bson::{doc, Bson, Document},
     bson_util,
     client::auth::{AuthMechanism, Credential},
+    compression::Compressor,
     concern::{Acknowledgment, ReadConcern, WriteConcern},
     error::{ErrorKind, Result},
     event::{cmap::CmapEventHandler, command::CommandEventHandler, sdam::SdamEventHandler},
@@ -370,8 +371,13 @@ pub struct ClientOptions {
     #[builder(default)]
     pub app_name: Option<String>,
 
-    #[builder(default, setter(skip))]
-    pub(crate) compressors: Option<Vec<String>>,
+    /// The compressors that the Client is willing to use in the order they are specified
+    /// in the configuration.  The Client sends this list of compressors to the server.
+    /// The server responds with the intersection of its supported list of compressors.
+    /// The order of compressors indicates preference of compressors.
+    #[builder(default)]
+    #[serde(skip)]
+    pub compressors: Option<Vec<Compressor>>,
 
     /// The handler that should process all Connection Monitoring and Pooling events. See the
     /// CmapEventHandler type documentation for more details.
@@ -525,9 +531,6 @@ pub struct ClientOptions {
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 
-    #[builder(default, setter(skip))]
-    pub(crate) zlib_compression: Option<i32>,
-
     /// Information from the SRV URI that generated these client options, if applicable.
     #[builder(default, setter(skip))]
     #[serde(skip)]
@@ -593,7 +596,6 @@ impl Serialize for ClientOptions {
         #[derive(Serialize)]
         struct ClientOptionsHelper<'a> {
             appname: &'a Option<String>,
-            compressors: &'a Option<Vec<String>>,
 
             #[serde(serialize_with = "bson_util::serialize_duration_option_as_int_millis")]
             connecttimeoutms: &'a Option<Duration>,
@@ -650,7 +652,6 @@ impl Serialize for ClientOptions {
 
         let client_options = ClientOptionsHelper {
             appname: &self.app_name,
-            compressors: &self.compressors,
             connecttimeoutms: &self.connect_timeout,
             credential: &self.credential,
             directconnection: &self.direct_connection,
@@ -668,8 +669,8 @@ impl Serialize for ClientOptions {
             sockettimeoutms: &self.socket_timeout,
             tls: &self.tls,
             writeconcern: &self.write_concern,
-            zlibcompressionlevel: &self.zlib_compression,
             loadbalanced: &self.load_balanced,
+            zlibcompressionlevel: &None,
         };
 
         client_options.serialize(serializer)
@@ -693,7 +694,7 @@ struct ClientOptionsParser {
     pub min_pool_size: Option<u32>,
     pub max_idle_time: Option<Duration>,
     pub wait_queue_timeout: Option<Duration>,
-    pub compressors: Option<Vec<String>>,
+    pub compressors: Option<Vec<Compressor>>,
     pub connect_timeout: Option<Duration>,
     pub retry_reads: Option<bool>,
     pub retry_writes: Option<bool>,
@@ -929,7 +930,6 @@ impl From<ClientOptionsParser> for ClientOptions {
             retry_reads: parser.retry_reads,
             retry_writes: parser.retry_writes,
             socket_timeout: parser.socket_timeout,
-            zlib_compression: parser.zlib_compression,
             direct_connection: parser.direct_connection,
             driver_info: None,
             credential: parser.credential,
@@ -1180,6 +1180,12 @@ impl ClientOptions {
             }
         }
 
+        if let Some(ref compressors) = self.compressors {
+            for compressor in compressors {
+                compressor.validate()?;
+            }
+        }
+
         Ok(())
     }
 
@@ -1213,7 +1219,6 @@ impl ClientOptions {
                 socket_timeout,
                 tls,
                 write_concern,
-                zlib_compression,
                 original_srv_info,
                 original_uri
             ]
@@ -1564,6 +1569,16 @@ impl ClientOptionsParser {
             }
         }
 
+        // If zlib and zlib_compression_level are specified then write zlib_compression_level into
+        // zlib enum
+        if let (Some(compressors), Some(zlib_compression_level)) =
+            (self.compressors.as_mut(), self.zlib_compression)
+        {
+            for compressor in compressors {
+                compressor.write_zlib_level(zlib_compression_level)
+            }
+        }
+
         Ok(())
     }
 
@@ -1668,7 +1683,15 @@ impl ClientOptionsParser {
                 self.auth_mechanism_properties = Some(doc);
             }
             "compressors" => {
-                self.compressors = Some(value.split(',').map(String::from).collect());
+                let compressors = value
+                    .split(',')
+                    .filter_map(|x| Compressor::parse_str(x).ok())
+                    .collect::<Vec<Compressor>>();
+                self.compressors = if compressors.is_empty() {
+                    None
+                } else {
+                    Some(compressors)
+                }
             }
             k @ "connecttimeoutms" => {
                 self.connect_timeout = Some(Duration::from_millis(get_duration!(value, k)));
