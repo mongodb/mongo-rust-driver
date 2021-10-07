@@ -513,13 +513,11 @@ impl ConnectionPoolWorker {
                 handler.handle_pool_cleared_event(event);
             });
 
-            if !matches!(self.generation, PoolGeneration::LoadBalanced(_)) {
-                for request in self.wait_queue.drain(..) {
-                    // an error means the other end hung up already, which is okay because we were
-                    // returning an error anyways
-                    let _: std::result::Result<_, _> =
-                        request.fulfill(ConnectionRequestResult::PoolCleared(cause.clone()));
-                }
+            for request in self.wait_queue.drain(..) {
+                // an error means the other end hung up already, which is okay because we were
+                // returning an error anyways
+                let _: std::result::Result<_, _> =
+                    request.fulfill(ConnectionRequestResult::PoolCleared(cause.clone()));
             }
         }
     }
@@ -646,6 +644,7 @@ async fn establish_connection(
 
     match establish_result {
         Err(ref e) => {
+            server_updater.handle_error(e.clone()).await;
             if let Some(handler) = event_handler {
                 let event = ConnectionClosedEvent {
                     address,
@@ -654,7 +653,6 @@ async fn establish_connection(
                 };
                 handler.handle_connection_closed_event(event);
             }
-            server_updater.handle_error(e.clone()).await;
             manager.handle_connection_failed();
         }
         Ok(ref mut connection) => {
