@@ -255,13 +255,16 @@ impl UpdateMonitor {
                 _ => return,
             };
 
-            match update.into_message() {
+            // This needs to borrow the message rather than taking it so the update isn't sent
+            // until after the topology has processed the error.
+            match update.message() {
                 ServerUpdate::Error { error } => {
                     topology
-                        .handle_application_error(error.cause, error.handshake_phase, &server)
+                        .handle_application_error(error.cause.clone(), error.handshake_phase.clone(), &server)
                         .await;
                 }
             }
+            drop(update);
         }
     }
 }

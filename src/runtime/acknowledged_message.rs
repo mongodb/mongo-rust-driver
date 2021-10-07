@@ -21,8 +21,14 @@ impl<M, R> AcknowledgedMessage<M, R> {
     }
 
     /// Get the message.
+    #[allow(dead_code)]
     pub(crate) fn into_message(self) -> M {
         self.message
+    }
+
+    /// Borrow the message.
+    pub(crate) fn message(&self) -> &M {
+        &self.message
     }
 
     /// Send acknowledgement to the receiver.
