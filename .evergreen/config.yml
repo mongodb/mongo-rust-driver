@@ -1391,9 +1391,9 @@ buildvariants:
     compressors: "*"
   exclude_spec:
     - compressors: ["zlib-compression", "snappy-compression", "zstd-compression"]
-      auth-and-tls: noauth-and-notls
+      auth-and-tls: "noauth-and-notls"
     - compressors: ["zlib-compression", "snappy-compression", "zstd-compression"]
-      async-runtime: async-std
+      async-runtime: "async-std"
   display_name: "! ${os} ${auth-and-tls} with ${async-runtime}"
   tasks:
      - ".latest"
