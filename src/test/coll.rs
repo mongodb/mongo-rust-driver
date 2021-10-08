@@ -1058,7 +1058,9 @@ async fn cursor_batch_size() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
-    let coll = client.init_db_and_coll("cursor_batch_size", "cursor_batch_size").await;
+    let coll = client
+        .init_db_and_coll("cursor_batch_size", "cursor_batch_size")
+        .await;
 
     let doc = Document::new();
     coll.insert_many(vec![&doc; 10], None).await.unwrap();
@@ -1073,14 +1075,20 @@ async fn cursor_batch_size() {
         return;
     }
     let mut session = client.start_session(None).await.unwrap();
-    let mut cursor = coll.find_with_session(doc! {}, opts.clone(), &mut session).await.unwrap();
+    let mut cursor = coll
+        .find_with_session(doc! {}, opts.clone(), &mut session)
+        .await
+        .unwrap();
     let mut docs = Vec::new();
     while let Some(doc) = cursor.next(&mut session).await {
         docs.push(doc.unwrap());
     }
     assert_eq!(docs.len(), 10);
 
-    let mut cursor = coll.find_with_session(doc! {}, opts, &mut session).await.unwrap();
+    let mut cursor = coll
+        .find_with_session(doc! {}, opts, &mut session)
+        .await
+        .unwrap();
     let docs: Vec<_> = cursor.stream(&mut session).try_collect().await.unwrap();
     assert_eq!(docs.len(), 10);
 }
