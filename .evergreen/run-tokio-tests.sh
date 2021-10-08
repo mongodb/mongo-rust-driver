@@ -8,6 +8,9 @@ if [ "$SINGLE_THREAD" = true ]; then
 	OPTIONS="-- --test-threads=1"
 fi
 
-echo "cargo test options: ${OPTIONS}"
+FEATURE_FLAGS="zstd-compression,snappy-compression,zlib-compression"
 
-RUST_BACKTRACE=1 cargo test $OPTIONS
+echo "cargo test options: ${OPTIONS}"
+echo "features flags: ${FEATURE_FLAGS}"
+
+RUST_BACKTRACE=1 cargo test --features $FEATURE_FLAGS $OPTIONS
