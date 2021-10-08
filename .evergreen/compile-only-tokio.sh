@@ -8,7 +8,7 @@ set -o errexit
 FEATURE_FLAGS = "snappy-compression,zlib-compression"
 
 # Zstd requires Rust version 1.54
-if [[ $RUST_VERSION != "nightly" ]]; then
+if [[ $RUST_VERSION == "nightly" ]]; then
     FEATURE_FLAGS = "${FEATURE_FLAGS},zstd-compression"
 fi
 
