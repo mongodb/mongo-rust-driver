@@ -14,8 +14,13 @@ use flate2::{
 
 #[cfg(feature = "zlib-compression")]
 use std::convert::TryInto;
-#[cfg(feature = "zstd-compression")]
-use std::io::prelude::*;
+
+#[cfg(any(
+    feature = "zstd-compression",
+    feature = "zlib-compression",
+    feature = "snappy-compression"
+))]
+use std::io::Write;
 
 use crate::error::{Error, ErrorKind, Result};
 
