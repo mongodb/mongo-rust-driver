@@ -62,11 +62,11 @@ lazy_static! {
         std::env::var("SINGLE_MONGOS_LB_URI").ok();
     pub(crate) static ref LOAD_BALANCED_MULTIPLE_URI: Option<String> =
         std::env::var("MULTI_MONGOS_LB_URI").ok();
-    pub(crate) static ref ZSTD_COMPRESSION: bool =
+    pub(crate) static ref ZSTD_COMPRESSION_ENABLED: bool =
         matches!(std::env::var("ZSTD_COMPRESSION_ENABLED"), Ok(s) if s == "true");
-    pub(crate) static ref ZLIB_COMPRESSION: bool =
+    pub(crate) static ref ZLIB_COMPRESSION_ENABLED: bool =
         matches!(std::env::var("ZLIB_COMPRESSION_ENABLED"), Ok(s) if s == "true");
-    pub(crate) static ref SNAPPY_COMPRESSION: bool =
+    pub(crate) static ref SNAPPY_COMPRESSION_ENABLED: bool =
         matches!(std::env::var("SNAPPY_COMPRESSION_ENABLED"), Ok(s) if s == "true");
 }
 
@@ -87,15 +87,15 @@ pub(crate) fn client_options_for_uri(uri: &str) -> ClientOptions {
 fn get_compressors() -> Option<Vec<Compressor>> {
     let compressors = vec![];
     #[cfg(features = "snappy-compression")]
-    if SNAPPY_COMPRESSION {
+    if SNAPPY_COMPRESSION_ENABLED {
         compressors.push(Compressor::Snappy)
     }
     #[cfg(features = "zlib-compression")]
-    if ZLIB_COMPRESSION {
+    if ZLIB_COMPRESSION_ENABLED {
         compressors.push(Compressor::Zlib { level: None })
     }
     #[cfg(features = "zstd-compression")]
-    if ZSTD_COMPRESSION {
+    if ZSTD_COMPRESSION_ENABLED {
         compressors.push(Compressor::Zstd { level: None })
     }
     if compressors.is_empty() {
