@@ -61,7 +61,6 @@ pub struct SessionCursor<T>
 where
     T: DeserializeOwned + Unpin,
 {
-    exhausted: bool,
     client: Client,
     info: CursorInformation,
     buffer: VecDeque<T>,
@@ -79,10 +78,7 @@ where
         spec: CursorSpecification<T>,
         pinned: Option<PinnedConnectionHandle>,
     ) -> Self {
-        let exhausted = spec.id() == 0;
-
         Self {
-            exhausted,
             client,
             info: spec.info,
             buffer: spec.initial_buffer,
@@ -198,12 +194,25 @@ where
     }
 }
 
+impl<T> SessionCursor<T>
+where
+    T: DeserializeOwned + Unpin,
+{
+    fn mark_exhausted(&mut self) {
+        self.info.id = 0;
+    }
+
+    fn is_exhausted(&self) -> bool {
+        self.info.id == 0
+    }
+}
+
 impl<T> Drop for SessionCursor<T>
 where
     T: DeserializeOwned + Unpin,
 {
     fn drop(&mut self) {
-        if self.exhausted {
+        if self.is_exhausted() {
             return;
         }
 
@@ -254,7 +263,9 @@ where
     fn drop(&mut self) {
         // Update the parent cursor's state based on any iteration performed on this handle.
         self.session_cursor.buffer = self.generic_cursor.take_buffer();
-        self.session_cursor.exhausted = self.generic_cursor.is_exhausted();
+        if self.generic_cursor.is_exhausted() {
+            self.session_cursor.mark_exhausted();
+        }
     }
 }
 

@@ -1049,3 +1049,46 @@ async fn collection_generic_bounds() {
         .collection(function_name!());
     let _result = coll.insert_one(Bar {}, None).await;
 }
+
+/// Verify that a cursor with multiple batches whose last batch isn't full
+/// iterates without errors.
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn cursor_batch_size() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+    let coll = client
+        .init_db_and_coll("cursor_batch_size", "cursor_batch_size")
+        .await;
+
+    let doc = Document::new();
+    coll.insert_many(vec![&doc; 10], None).await.unwrap();
+
+    let opts = FindOptions::builder().batch_size(3).build();
+    let cursor_no_session = coll.find(doc! {}, opts.clone()).await.unwrap();
+    let docs: Vec<_> = cursor_no_session.try_collect().await.unwrap();
+    assert_eq!(docs.len(), 10);
+
+    // test session cursors
+    if client.is_standalone() {
+        return;
+    }
+    let mut session = client.start_session(None).await.unwrap();
+    let mut cursor = coll
+        .find_with_session(doc! {}, opts.clone(), &mut session)
+        .await
+        .unwrap();
+    let mut docs = Vec::new();
+    while let Some(doc) = cursor.next(&mut session).await {
+        docs.push(doc.unwrap());
+    }
+    assert_eq!(docs.len(), 10);
+
+    let mut cursor = coll
+        .find_with_session(doc! {}, opts, &mut session)
+        .await
+        .unwrap();
+    let docs: Vec<_> = cursor.stream(&mut session).try_collect().await.unwrap();
+    assert_eq!(docs.len(), 10);
+}
