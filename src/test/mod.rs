@@ -85,17 +85,19 @@ pub(crate) fn client_options_for_uri(uri: &str) -> ClientOptions {
 }
 
 fn get_compressors() -> Option<Vec<Compressor>> {
-    let compressors = vec![];
-    #[cfg(features = "snappy-compression")]
-    if SNAPPY_COMPRESSION_ENABLED {
+    #[allow(unused_mut)]
+    let mut compressors = vec![];
+
+    #[cfg(feature = "snappy-compression")]
+    if *SNAPPY_COMPRESSION_ENABLED {
         compressors.push(Compressor::Snappy)
     }
-    #[cfg(features = "zlib-compression")]
-    if ZLIB_COMPRESSION_ENABLED {
+    #[cfg(feature = "zlib-compression")]
+    if *ZLIB_COMPRESSION_ENABLED {
         compressors.push(Compressor::Zlib { level: None })
     }
-    #[cfg(features = "zstd-compression")]
-    if ZSTD_COMPRESSION_ENABLED {
+    #[cfg(feature = "zstd-compression")]
+    if *ZSTD_COMPRESSION_ENABLED {
         compressors.push(Compressor::Zstd { level: None })
     }
     if compressors.is_empty() {

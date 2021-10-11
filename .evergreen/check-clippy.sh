@@ -2,11 +2,7 @@
 
 set -o errexit
 
-FEATURE_FLAGS=snappy-compression,zlib-compression
-
-if [[ $RUST_VERSION == "nightly" ]]; then
-    FEATURE_FLAGS=$FEATURE_FLAGS,zstd-compression
-fi
+FEATURE_FLAGS=zstd-compression,snappy-compression,zlib-compression
 
 . ~/.cargo/env
 cargo clippy --all-targets -p mongodb -- -D warnings
