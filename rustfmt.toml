@@ -8,3 +8,4 @@ use_try_shorthand = true
 wrap_comments = true
 imports_layout = "HorizontalVertical"
 imports_granularity = "Crate"
+ignore = ["src/lib.rs"]
