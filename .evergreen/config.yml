@@ -1418,12 +1418,14 @@ buildvariants:
         os: "ubuntu-20.04"
         auth-and-tls: "*"
         async-runtime: "*"
+        compressor: "*"
       then:
         remove_tasks: [".3.6", ".4.0", ".4.2"]
     - if:
         os: "ubuntu-18.04"
         auth-and-tls: "auth-and-tls"
         async-runtime: "*"
+        compressor: "*"
       then:
         remove_tasks: ".3.6"
     # ubuntu 1804 ARM64 only has downloads for 4.2+
@@ -1431,6 +1433,7 @@ buildvariants:
         os: ["ubuntu-18.04-arm64"]
         auth-and-tls: "*"
         async-runtime: "*"
+        compressor: "*"
       then:
         remove_tasks: [".3.6", ".4.0"]
     # haproxy isn't installed on windows / ubuntu-arm
@@ -1438,6 +1441,7 @@ buildvariants:
         os: ["ubuntu-18.04-arm64", "windows-64-vs2017"]
         auth-and-tls: "*"
         async-runtime: "*"
+        compressor: "*"
       then:
         remove_tasks: ".load_balancer"
 - matrix_name: "x509-auth"
