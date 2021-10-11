@@ -10,7 +10,6 @@ fi
 
 FEATURE_FLAGS="zstd-compression,snappy-compression,zlib-compression"
 
-echo "cargo test options: ${OPTIONS}"
-echo "features flags: ${FEATURE_FLAGS}"
+echo "cargo test options: --features $FEATURE_FLAGS ${OPTIONS}"
 
 RUST_BACKTRACE=1 cargo test --features $FEATURE_FLAGS $OPTIONS
