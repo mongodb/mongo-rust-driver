@@ -32,6 +32,7 @@ async fn build() {
         cmd.body,
         doc! {
             "listIndexes": "test_coll",
+            "maxTimeMS": 42,
             "cursor": doc! {
                 "batchSize": 4,
             },
