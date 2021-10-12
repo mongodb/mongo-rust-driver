@@ -104,7 +104,7 @@ fn get_compressors() -> Option<Vec<Compressor>> {
         #[cfg(feature = "zstd-compression")]
         compressors.push(Compressor::Zstd { level: None });
         #[cfg(not(feature = "zstd-compression"))]
-        panic!("To use zlib compression, the \"zstd-compression\" feature flag must be set.");
+        panic!("To use zstd compression, the \"zstd-compression\" feature flag must be set.");
     }
     if compressors.is_empty() {
         None
