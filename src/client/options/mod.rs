@@ -1490,7 +1490,7 @@ impl ClientOptionsParser {
         };
 
         // set default database.
-        options.default_database = db.clone();
+        options.default_database = db;
 
         if options.tls.is_none() && options.srv {
             options.tls = Some(Tls::Enabled(Default::default()));
