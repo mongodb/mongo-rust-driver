@@ -13,16 +13,6 @@ pub enum ExpectedEvent {
     Sdam,
 }
 
-impl From<Event> for ExpectedEvent {
-    fn from(event: Event) -> Self {
-        match event {
-            Event::Command(sub) => ExpectedEvent::Command(sub.into()),
-            Event::Cmap(sub) => ExpectedEvent::Cmap(sub.into()),
-            Event::Sdam(_) => ExpectedEvent::Sdam,
-        }
-    }
-}
-
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub enum ExpectedCommandEvent {
@@ -44,28 +34,6 @@ pub enum ExpectedCommandEvent {
         command_name: Option<String>,
         has_service_id: Option<bool>,
     },
-}
-
-impl From<CommandEvent> for ExpectedCommandEvent {
-    fn from(event: CommandEvent) -> Self {
-        match event {
-            CommandEvent::Started(event) => ExpectedCommandEvent::Started {
-                command_name: Some(event.command_name),
-                database_name: Some(event.db),
-                command: Some(event.command),
-                has_service_id: Some(event.service_id.is_some()),
-            },
-            CommandEvent::Failed(event) => ExpectedCommandEvent::Failed {
-                command_name: Some(event.command_name),
-                has_service_id: Some(event.service_id.is_some()),
-            },
-            CommandEvent::Succeeded(event) => ExpectedCommandEvent::Succeeded {
-                command_name: Some(event.command_name),
-                reply: Some(event.reply),
-                has_service_id: Some(event.service_id.is_some()),
-            },
-        }
-    }
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -97,30 +65,6 @@ pub enum ExpectedCmapEvent {
     ConnectionCheckedOut {},
     #[serde(rename = "connectionCheckedInEvent")]
     ConnectionCheckedIn {},
-}
-
-impl From<CmapEvent> for ExpectedCmapEvent {
-    fn from(event: CmapEvent) -> Self {
-        match event {
-            CmapEvent::PoolCreated(_) => Self::PoolCreated {},
-            CmapEvent::PoolClosed(_) => Self::PoolClosed {},
-            CmapEvent::PoolReady(_) => Self::PoolReady {},
-            CmapEvent::ConnectionCreated(_) => Self::ConnectionCreated {},
-            CmapEvent::ConnectionReady(_) => Self::ConnectionReady {},
-            CmapEvent::ConnectionClosed(ev) => Self::ConnectionClosed {
-                reason: Some(ev.reason),
-            },
-            CmapEvent::ConnectionCheckOutStarted(_) => Self::ConnectionCheckOutStarted {},
-            CmapEvent::ConnectionCheckOutFailed(ev) => Self::ConnectionCheckOutFailed {
-                reason: Some(ev.reason),
-            },
-            CmapEvent::ConnectionCheckedOut(_) => Self::ConnectionCheckedOut {},
-            CmapEvent::PoolCleared(ev) => Self::PoolCleared {
-                has_service_id: Some(ev.service_id.is_some()),
-            },
-            CmapEvent::ConnectionCheckedIn(_) => Self::ConnectionCheckedIn {},
-        }
-    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Deserialize)]

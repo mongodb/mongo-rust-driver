@@ -257,10 +257,12 @@ impl ConnectionPoolWorker {
 
         loop {
             let task = tokio::select! {
+                // Management requests need priority over check out requests so that connections
+                // being checked in are available for immediate check out.
+                Some(request) = self.management_receiver.recv() => request.into(),
                 Some(request) = self.request_receiver.recv() => {
                     PoolTask::CheckOut(request)
                 },
-                Some(request) = self.management_receiver.recv() => request.into(),
                 _ = self.handle_listener.wait_for_all_handle_drops() => {
                     // all worker handles have been dropped meaning this
                     // pool has no more references and can be dropped itself.
