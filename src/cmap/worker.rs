@@ -515,11 +515,13 @@ impl ConnectionPoolWorker {
                 handler.handle_pool_cleared_event(event);
             });
 
-            for request in self.wait_queue.drain(..) {
-                // an error means the other end hung up already, which is okay because we were
-                // returning an error anyways
-                let _: std::result::Result<_, _> =
-                    request.fulfill(ConnectionRequestResult::PoolCleared(cause.clone()));
+            if !matches!(self.generation, PoolGeneration::LoadBalanced(_)) {
+                for request in self.wait_queue.drain(..) {
+                    // an error means the other end hung up already, which is okay because we were
+                    // returning an error anyways
+                    let _: std::result::Result<_, _> =
+                        request.fulfill(ConnectionRequestResult::PoolCleared(cause.clone()));
+                }
             }
         }
     }

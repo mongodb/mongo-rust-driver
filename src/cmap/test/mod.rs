@@ -165,8 +165,10 @@ impl Executor {
         let manager = pool.manager.clone();
         RUNTIME.execute(async move {
             while let Some(update) = update_receiver.recv().await {
-                match update.into_message() {
-                    ServerUpdate::Error { error, .. } => manager.clear(error.cause, None).await,
+                match update.message() {
+                    ServerUpdate::Error { error, .. } => {
+                        manager.clear(error.cause.clone(), None).await
+                    }
                 }
             }
         });
