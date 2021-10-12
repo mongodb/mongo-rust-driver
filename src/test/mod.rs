@@ -88,17 +88,23 @@ fn get_compressors() -> Option<Vec<Compressor>> {
     #[allow(unused_mut)]
     let mut compressors = vec![];
 
-    #[cfg(feature = "snappy-compression")]
     if *SNAPPY_COMPRESSION_ENABLED {
-        compressors.push(Compressor::Snappy)
+        #[cfg(feature = "snappy-compression")]
+        compressors.push(Compressor::Snappy);
+        #[cfg(not(feature = "snappy-compression"))]
+        panic!("To use snappy compression, the \"snappy-compression\" feature flag must be set.");
     }
-    #[cfg(feature = "zlib-compression")]
     if *ZLIB_COMPRESSION_ENABLED {
-        compressors.push(Compressor::Zlib { level: None })
+        #[cfg(feature = "zlib-compression")]
+        compressors.push(Compressor::Zlib { level: None });
+        #[cfg(not(feature = "zlib-compression"))]
+        panic!("To use zlib compression, the \"zlib-compression\" feature flag must be set.");
     }
-    #[cfg(feature = "zstd-compression")]
     if *ZSTD_COMPRESSION_ENABLED {
-        compressors.push(Compressor::Zstd { level: None })
+        #[cfg(feature = "zstd-compression")]
+        compressors.push(Compressor::Zstd { level: None });
+        #[cfg(not(feature = "zstd-compression"))]
+        panic!("To use zlib compression, the \"zstd-compression\" feature flag must be set.");
     }
     if compressors.is_empty() {
         None

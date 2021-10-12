@@ -1323,15 +1323,15 @@ axes:
       - id: "no-compression"
         display_name: No Compressor
       - id: "zstd-compression"
-        display_name: Zstd Compressor
+        display_name: Zstd
         variables:
           ZSTD_COMPRESSION_ENABLED: "true"
       - id: "zlib-compression"
-        display_name: Zlib Compressor
+        display_name: Zlib
         variables:
           ZLIB_COMPRESSION_ENABLED: "true"
       - id: "snappy-compression"
-        display_name: Snappy Compressor
+        display_name: Snappy
         variables:
           SNAPPY_COMPRESSION_ENABLED: "true"
 
