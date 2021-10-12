@@ -119,6 +119,13 @@ impl Client {
         Database::new(self.async_client.database_with_options(name, options))
     }
 
+    /// Gets a handle to default datbaase specified by MongoDB connection URI.
+    ///
+    /// If connection URI specified no default database, None will be returned.
+    pub fn default_database(&self) -> Option<Database> {
+        self.async_client.default_database().map(Database::new)
+    }
+
     /// Gets information about each database present in the cluster the Client is connected to.
     pub fn list_databases(
         &self,

@@ -517,6 +517,12 @@ pub struct ClientOptions {
     #[builder(default)]
     pub server_selection_timeout: Option<Duration>,
 
+    /// Default database for this client.
+    ///
+    /// By detault, no default database is specified.
+    #[builder(default)]
+    pub default_database: Option<String>,
+
     #[builder(default, setter(skip))]
     pub(crate) socket_timeout: Option<Duration>,
 
@@ -702,6 +708,7 @@ struct ClientOptionsParser {
     pub zlib_compression: Option<i32>,
     pub direct_connection: Option<bool>,
     pub credential: Option<Credential>,
+    pub default_database: Option<String>,
     max_staleness: Option<Duration>,
     tls_insecure: Option<bool>,
     auth_mechanism: Option<AuthMechanism>,
@@ -931,6 +938,7 @@ impl From<ClientOptionsParser> for ClientOptions {
             retry_writes: parser.retry_writes,
             socket_timeout: parser.socket_timeout,
             direct_connection: parser.direct_connection,
+            default_database: parser.default_database,
             driver_info: None,
             credential: parser.credential,
             cmap_event_handler: None,
@@ -1468,7 +1476,7 @@ impl ClientOptionsParser {
                     credential.source = options
                         .auth_source
                         .clone()
-                        .or(db)
+                        .or(db.clone())
                         .or_else(|| Some("admin".into()));
                 } else if authentication_requested {
                     return Err(ErrorKind::InvalidArgument {
@@ -1480,6 +1488,9 @@ impl ClientOptionsParser {
                 }
             }
         };
+
+        // set default database.
+        options.default_database = db.clone();
 
         if options.tls.is_none() && options.srv {
             options.tls = Some(Tls::Enabled(Default::default()));
@@ -2355,6 +2366,38 @@ mod tests {
                 local_threshold: Some(Duration::from_millis(4000)),
                 server_selection_timeout: Some(Duration::from_millis(2000)),
                 original_uri: Some(uri.into()),
+                ..Default::default()
+            }
+        );
+    }
+
+    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    async fn with_default_database() {
+        let uri = "mongodb://localhost/abc";
+
+        assert_eq!(
+            ClientOptions::parse(uri).await.unwrap(),
+            ClientOptions {
+                hosts: vec![host_without_port("localhost")],
+                original_uri: Some(uri.into()),
+                default_database: Some("abc".to_string()),
+                ..Default::default()
+            }
+        );
+    }
+
+    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
+    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+    async fn with_no_default_database() {
+        let uri = "mongodb://localhost/";
+
+        assert_eq!(
+            ClientOptions::parse(uri).await.unwrap(),
+            ClientOptions {
+                hosts: vec![host_without_port("localhost")],
+                original_uri: Some(uri.into()),
+                default_database: None,
                 ..Default::default()
             }
         );

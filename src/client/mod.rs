@@ -168,6 +168,17 @@ impl Client {
         Database::new(self.clone(), name, Some(options))
     }
 
+    /// Gets a handle to default datbaase specified by MongoDB connection URI.
+    ///
+    /// If connection URI specified no default database, None will be returned.
+    pub fn default_database(&self) -> Option<Database> {
+        self.inner
+            .options
+            .default_database
+            .as_ref()
+            .map(|db_name| Database::new(self.clone(), db_name, None))
+    }
+
     async fn list_databases_common(
         &self,
         filter: impl Into<Option<Document>>,

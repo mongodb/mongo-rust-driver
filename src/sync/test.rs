@@ -77,6 +77,23 @@ fn client() {
 
 #[test]
 #[function_name::named]
+fn default_database() {
+    // here we just test default database name matched, the database interactive logic
+    // is tested in `database`.
+    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
+
+    let options = CLIENT_OPTIONS.clone();
+    let client = Client::with_options(options).expect("client creation should succeed");
+    let default_db = client.default_database();
+    assert!(default_db.is_none());
+
+    let client = Client::with_uri_str("mongodb://localhost:27017/abcd").expect("client creation should succeed");
+    let default_db = client.default_database().expect("shoulld have a default database.");
+    assert_eq!(default_db.name(), "abcd");
+}
+
+#[test]
+#[function_name::named]
 fn database() {
     let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
 
