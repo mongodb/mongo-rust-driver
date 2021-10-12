@@ -1,6 +1,10 @@
 use bson::Document;
 
-use crate::{bson::{doc, spec::ElementType, Bson}, bson_util::get_int, test::{CmapEvent, CommandEvent, Event}};
+use crate::{
+    bson::{doc, spec::ElementType, Bson},
+    bson_util::get_int,
+    test::{CmapEvent, CommandEvent, Event},
+};
 
 use super::{EntityMap, ExpectedCmapEvent, ExpectedCommandEvent, ExpectedEvent};
 
@@ -31,19 +35,18 @@ fn match_opt<T: PartialEq>(actual: &T, expected: &Option<T>) -> bool {
     expected.is_none() || expected.as_ref() == Some(actual)
 }
 
-fn match_results_opt(actual: &Document, expected: &Option<Document>, entities: Option<&EntityMap>) -> bool {
+fn match_results_opt(
+    actual: &Document,
+    expected: &Option<Document>,
+    entities: Option<&EntityMap>,
+) -> bool {
     let expected_doc = if let Some(doc) = expected {
         Bson::Document(doc.clone())
     } else {
         return true;
     };
     let actual_doc = Some(Bson::Document(actual.clone()));
-    results_match(
-        actual_doc.as_ref(),
-        &expected_doc,
-        false,
-        entities,
-    )
+    results_match(actual_doc.as_ref(), &expected_doc, false, entities)
 }
 
 fn command_events_match(
@@ -115,34 +118,17 @@ fn command_events_match(
 
 fn cmap_events_match(actual: &CmapEvent, expected: &ExpectedCmapEvent) -> bool {
     match (actual, expected) {
-        (
-            CmapEvent::PoolCreated(_),
-            ExpectedCmapEvent::PoolCreated { },
-        ) => true,
-        (
-            CmapEvent::PoolReady(_),
-            ExpectedCmapEvent::PoolReady { },
-        ) => true,
+        (CmapEvent::PoolCreated(_), ExpectedCmapEvent::PoolCreated {}) => true,
+        (CmapEvent::PoolReady(_), ExpectedCmapEvent::PoolReady {}) => true,
         (
             CmapEvent::PoolCleared(actual),
             ExpectedCmapEvent::PoolCleared {
                 has_service_id: expected_has_service_id,
             },
-        ) => {
-            match_opt(&actual.service_id.is_some(), expected_has_service_id)
-        }
-        (
-            CmapEvent::PoolClosed(_),
-            ExpectedCmapEvent::PoolClosed { },
-        ) => true,
-        (
-            CmapEvent::ConnectionCreated(_),
-            ExpectedCmapEvent::ConnectionCreated { },
-        ) => true,
-        (
-            CmapEvent::ConnectionReady(_),
-            ExpectedCmapEvent::ConnectionReady { },
-        ) => true,
+        ) => match_opt(&actual.service_id.is_some(), expected_has_service_id),
+        (CmapEvent::PoolClosed(_), ExpectedCmapEvent::PoolClosed {}) => true,
+        (CmapEvent::ConnectionCreated(_), ExpectedCmapEvent::ConnectionCreated {}) => true,
+        (CmapEvent::ConnectionReady(_), ExpectedCmapEvent::ConnectionReady {}) => true,
         (
             CmapEvent::ConnectionClosed(actual),
             ExpectedCmapEvent::ConnectionClosed {
@@ -151,7 +137,7 @@ fn cmap_events_match(actual: &CmapEvent, expected: &ExpectedCmapEvent) -> bool {
         ) => match_opt(&actual.reason, expected_reason),
         (
             CmapEvent::ConnectionCheckOutStarted(_),
-            ExpectedCmapEvent::ConnectionCheckOutStarted { },
+            ExpectedCmapEvent::ConnectionCheckOutStarted {},
         ) => true,
         (
             CmapEvent::ConnectionCheckOutFailed(actual),
@@ -159,14 +145,8 @@ fn cmap_events_match(actual: &CmapEvent, expected: &ExpectedCmapEvent) -> bool {
                 reason: expected_reason,
             },
         ) => match_opt(&actual.reason, expected_reason),
-        (
-            CmapEvent::ConnectionCheckedOut(_),
-            ExpectedCmapEvent::ConnectionCheckedOut { },
-        ) => true,
-        (
-            CmapEvent::ConnectionCheckedIn(_),
-            ExpectedCmapEvent::ConnectionCheckedIn { },
-        ) => true,
+        (CmapEvent::ConnectionCheckedOut(_), ExpectedCmapEvent::ConnectionCheckedOut {}) => true,
+        (CmapEvent::ConnectionCheckedIn(_), ExpectedCmapEvent::ConnectionCheckedIn {}) => true,
         _ => false,
     }
 }

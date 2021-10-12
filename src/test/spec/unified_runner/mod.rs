@@ -229,10 +229,8 @@ pub async fn run_unified_format_test_filtered(
                     .event_type
                     .unwrap_or(test_file::ExpectedEventType::Command);
 
-                let actual_events: Vec<_> = client
-                    .get_filtered_events(event_type)
-                    .into_iter()
-                    .collect();
+                let actual_events: Vec<_> =
+                    client.get_filtered_events(event_type).into_iter().collect();
 
                 let expected_events = &expected.events;
 
