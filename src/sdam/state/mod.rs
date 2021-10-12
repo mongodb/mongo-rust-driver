@@ -80,6 +80,8 @@ struct TopologyState {
     servers: HashMap<ServerAddress, Arc<Server>>,
     #[cfg(test)]
     mocked: bool,
+    options: ClientOptions,
+    id: ObjectId,
 }
 
 impl Topology {
@@ -110,6 +112,8 @@ impl Topology {
             servers: Default::default(),
             http_client: http_client.clone(),
             mocked: true,
+            id,
+            options: options.clone(),
         };
 
         let topology = Self {
@@ -183,6 +187,8 @@ impl Topology {
             servers: Default::default(),
             http_client,
             mocked: false,
+            id,
+            options: options.clone(),
         };
 
         #[cfg(not(test))]
@@ -190,6 +196,8 @@ impl Topology {
             description,
             servers: Default::default(),
             http_client,
+            options: options.clone(),
+            id,
         };
 
         let state = Arc::new(RwLock::new(topology_state));
@@ -232,12 +240,6 @@ impl Topology {
 
     pub(crate) fn close(&self) {
         self.common.is_alive.store(false, Ordering::SeqCst);
-        if let Some(ref handler) = self.common.options.sdam_event_handler {
-            let event = TopologyClosedEvent {
-                topology_id: self.common.id,
-            };
-            handler.handle_topology_closed_event(event);
-        }
     }
 
     /// Gets the addresses of the servers in the cluster.
@@ -531,6 +533,26 @@ impl Topology {
             .iter()
             .map(|(addr, server)| (addr.clone(), Arc::downgrade(server)))
             .collect()
+    }
+}
+
+impl Drop for TopologyState {
+    fn drop(&mut self) {
+        if let Some(ref handler) = self.options.sdam_event_handler {
+            if matches!(self.description.topology_type, TopologyType::LoadBalanced) {
+                for host in self.servers.keys() {
+                    let event = ServerClosedEvent {
+                        address: host.clone(),
+                        topology_id: self.id,
+                    };
+                    handler.handle_server_closed_event(event);
+                }
+            }
+            let event = TopologyClosedEvent {
+                topology_id: self.id,
+            };
+            handler.handle_topology_closed_event(event);
+        }
     }
 }
 

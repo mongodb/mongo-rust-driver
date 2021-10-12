@@ -19,7 +19,7 @@ use crate::{
         ServerHeartbeatStartedEvent,
         ServerHeartbeatSucceededEvent,
     },
-    sdam::{ServerType, WeakTopology},
+    sdam::{ServerType, Topology},
     selection_criteria::TagSet,
 };
 
@@ -37,10 +37,15 @@ pub(crate) fn is_master_command(api: Option<&ServerApi>) -> Command {
     command
 }
 
+/// Execute an isMaster command, emiting events if a reference to the topology and a handler are
+/// provided.
+///
+/// A strong reference to the topology is used here to ensure it is still in scope and has not yet
+/// emitted a `TopologyClosedEvent`.
 pub(crate) async fn run_is_master(
     conn: &mut Connection,
     command: Command,
-    topology: Option<&WeakTopology>,
+    topology: Option<&Topology>,
     handler: &Option<Arc<dyn SdamEventHandler>>,
 ) -> Result<IsMasterReply> {
     emit_event(topology, handler, |handler| {
@@ -91,18 +96,13 @@ pub(crate) async fn run_is_master(
     }
 }
 
-fn emit_event<F>(
-    topology: Option<&WeakTopology>,
-    handler: &Option<Arc<dyn SdamEventHandler>>,
-    emit: F,
-) where
+fn emit_event<F>(topology: Option<&Topology>, handler: &Option<Arc<dyn SdamEventHandler>>, emit: F)
+where
     F: FnOnce(&Arc<dyn SdamEventHandler>),
 {
     if let Some(handler) = handler {
-        if let Some(topology) = topology {
-            if topology.is_alive() {
-                emit(handler);
-            }
+        if topology.is_some() {
+            emit(handler);
         }
     }
 }
