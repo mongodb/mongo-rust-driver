@@ -976,7 +976,7 @@ impl ClientOptions {
     ///   * `authSource`: maps to the `source` field of the `credential` field
     ///   * `authMechanismProperties`: maps to the `mechanism_properties` field of the `credential`
     ///     field
-    ///   * `compressors`: not yet implemented
+    ///   * `compressors`: maps to the `compressor` field
     ///   * `connectTimeoutMS`: maps to the `connect_timeout` field
     ///   * `direct`: maps to the `direct` field
     ///   * `heartbeatFrequencyMS`: maps to the `heartbeat_frequency` field
@@ -1010,7 +1010,8 @@ impl ClientOptions {
     ///   * `w`: maps to the `w` field of the `write_concern` field
     ///   * `waitQueueTimeoutMS`: unsupported, does not map to any field
     ///   * `wTimeoutMS`: maps to the `w_timeout` field of the `write_concern` field
-    ///   * `zlibCompressionLevel`: not yet implemented
+    ///   * `zlibCompressionLevel`: maps to the `level` field of the `Compressor::Zlib` variant
+    ///     (which requires the `zlib-compression` feature flag) of the [`Compressor`] enum
     ///
     /// Note: if the `sync` feature is enabled, then this method will be replaced with [the sync
     /// version](#method.parse-1).
