@@ -976,7 +976,7 @@ impl ClientOptions {
     ///   * `authSource`: maps to the `source` field of the `credential` field
     ///   * `authMechanismProperties`: maps to the `mechanism_properties` field of the `credential`
     ///     field
-    ///   * `compressors`: maps to the `compressor` field
+    ///   * `compressors`: maps to the `compressors` field
     ///   * `connectTimeoutMS`: maps to the `connect_timeout` field
     ///   * `direct`: maps to the `direct` field
     ///   * `heartbeatFrequencyMS`: maps to the `heartbeat_frequency` field
