@@ -26,6 +26,5 @@ pub(crate) use self::{
         server::{Server, ServerUpdate, ServerUpdateReceiver, ServerUpdateSender},
         HandshakePhase,
         Topology,
-        WeakTopology,
     },
 };

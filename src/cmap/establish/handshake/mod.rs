@@ -14,7 +14,7 @@ use crate::{
     event::sdam::SdamEventHandler,
     is_master::{is_master_command, run_is_master, IsMasterReply},
     options::{AuthMechanism, ClientOptions, Credential, DriverInfo, ServerApi},
-    sdam::WeakTopology,
+    sdam::Topology,
 };
 
 #[cfg(feature = "tokio-runtime")]
@@ -199,7 +199,7 @@ impl Handshaker {
     pub(crate) async fn handshake(
         &self,
         conn: &mut Connection,
-        topology: Option<&WeakTopology>,
+        topology: Option<&Topology>,
         handler: &Option<Arc<dyn SdamEventHandler>>,
     ) -> Result<HandshakeResult> {
         let mut command = self.command.clone();

@@ -158,7 +158,7 @@ impl HeartbeatMonitor {
     /// Returns true if the topology has changed and false otherwise.
     async fn check_server(&mut self, topology: &Topology, server: &Server) -> bool {
         let mut retried = false;
-        let check_result = match self.perform_is_master().await {
+        let check_result = match self.perform_is_master(topology).await {
             Ok(reply) => Ok(reply),
             Err(e) => {
                 let previous_description = topology.get_server_description(&server.address).await;
@@ -169,7 +169,7 @@ impl HeartbeatMonitor {
                 {
                     self.handle_error(e, topology, server).await;
                     retried = true;
-                    self.perform_is_master().await
+                    self.perform_is_master(topology).await
                 } else {
                     Err(e)
                 }
@@ -186,14 +186,14 @@ impl HeartbeatMonitor {
         }
     }
 
-    async fn perform_is_master(&mut self) -> Result<IsMasterReply> {
+    async fn perform_is_master(&mut self, topology: &Topology) -> Result<IsMasterReply> {
         let result = match self.connection {
             Some(ref mut conn) => {
                 let command = is_master_command(self.client_options.server_api.as_ref());
                 run_is_master(
                     conn,
                     command,
-                    Some(&self.topology),
+                    Some(topology),
                     &self.client_options.sdam_event_handler,
                 )
                 .await
@@ -210,7 +210,7 @@ impl HeartbeatMonitor {
                     .handshaker
                     .handshake(
                         &mut connection,
-                        Some(&self.topology),
+                        Some(topology),
                         &self.client_options.sdam_event_handler,
                     )
                     .await
