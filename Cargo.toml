@@ -8,7 +8,7 @@ repository = "https://github.com/mongodb/mongo-rust-driver"
 license = "Apache-2.0"
 readme = "README.md"
 name = "mongodb"
-version = "2.0.0"
+version = "2.0.1"
 
 exclude = [
     "etc/**",
@@ -39,7 +39,7 @@ aws-auth = ["reqwest"]
 async-trait = "0.1.42"
 base64 = "0.13.0"
 bitflags = "1.1.0"
-bson = "2.0.0"
+bson = "2.0.1"
 chrono = "0.4.7"
 derivative = "2.1.1"
 futures-core = "0.3.14"
