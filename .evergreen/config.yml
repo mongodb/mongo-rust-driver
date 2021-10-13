@@ -259,7 +259,7 @@ functions:
           ECS_SRC_DIR=$AUTH_AWS_DIR/src
 
           mkdir -p $ECS_SRC_DIR/.evergreen
-          
+
           # fix issue with `TestData` in SERVER-46340
           sed -i '1s+^+TestData = {};\n+' $AUTH_AWS_DIR/lib/ecs_hosted_test.js
 
@@ -294,7 +294,7 @@ functions:
           export MONGODB_URI="${MONGODB_URI}"
           export SSL="${SSL}"
           . .evergreen/generate-uri.sh
-          
+
           export CERT_PATH=$DRIVERS_TOOLS/.evergreen/x509gen/client.pem
 
           .evergreen/run-x509-tests.sh
@@ -320,7 +320,7 @@ functions:
           ${PREPARE_SHELL}
 
           .evergreen/run-connection-string-tests.sh
-            
+
   "prepare resources":
     - command: shell.exec
       params:
@@ -369,6 +369,9 @@ functions:
           export MULTI_MONGOS_LB_URI="${MULTI_MONGOS_LB_URI}"
           . .evergreen/generate-uri.sh
 
+          SNAPPY_COMPRESSION_ENABLED=${SNAPPY_COMPRESSION_ENABLED} \
+          ZLIB_COMPRESSION_ENABLED=${ZLIB_COMPRESSION_ENABLED} \
+          ZSTD_COMPRESSION_ENABLED=${ZSTD_COMPRESSION_ENABLED} \
           SINGLE_THREAD=${SINGLE_THREAD} \
             ASYNC_RUNTIME=${ASYNC_RUNTIME} \
             MONGODB_API_VERSION=${MONGODB_API_VERSION} \
@@ -546,7 +549,7 @@ functions:
       params:
         script: |
           ${PREPARE_SHELL}
-          
+
           cd "$MONGO_ORCHESTRATION_HOME"
           # source the mongo-orchestration virtualenv if it exists
           if [ -f venv/bin/activate ]; then
@@ -615,7 +618,7 @@ functions:
     - command: expansions.update
       params:
         file: lb-expansion.yml
-  
+
   "stop load balancer":
     - command: shell.exec
       params:
@@ -836,7 +839,7 @@ tasks:
           MONGODB_VERSION: "latest"
           TOPOLOGY: "sharded_cluster"
       - func: "run tests"
-  
+
   - name: "test-latest-load_balancer"
     tags: ["latest", "load_balancer"]
     commands:
@@ -1314,6 +1317,24 @@ axes:
            AUTH: "noauth"
            SSL: "nossl"
 
+  - id: "compressor"
+    display_name: "Compressor"
+    values:
+      - id: "no-compression"
+        display_name: No Compressor
+      - id: "zstd-compression"
+        display_name: Zstd
+        variables:
+          ZSTD_COMPRESSION_ENABLED: "true"
+      - id: "zlib-compression"
+        display_name: Zlib
+        variables:
+          ZLIB_COMPRESSION_ENABLED: "true"
+      - id: "snappy-compression"
+        display_name: Snappy
+        variables:
+          SNAPPY_COMPRESSION_ENABLED: "true"
+
   - id: "os"
     display_name: OS
     values:
@@ -1370,7 +1391,18 @@ buildvariants:
       - windows-64-vs2017
     auth-and-tls: "*"
     async-runtime: "*"
-  display_name: "! ${os} ${auth-and-tls} with ${async-runtime}"
+    compressor: "*"
+  exclude_spec:
+    - compressor: ["zlib-compression", "zstd-compression", "snappy-compression"]
+      auth-and-tls: "noauth-and-notls"
+      os: "*"
+      async-runtime: "*"
+    - compressor: ["zlib-compression", "zstd-compression", "snappy-compression"]
+      async-runtime: "async-std"
+      os: "*"
+      auth-and-tls: "*"
+
+  display_name: "! ${os} ${auth-and-tls} with ${async-runtime} and ${compressor}"
   tasks:
      - ".latest"
      - ".5.0"
@@ -1386,12 +1418,14 @@ buildvariants:
         os: "ubuntu-20.04"
         auth-and-tls: "*"
         async-runtime: "*"
+        compressor: "*"
       then:
         remove_tasks: [".3.6", ".4.0", ".4.2"]
     - if:
         os: "ubuntu-18.04"
         auth-and-tls: "auth-and-tls"
         async-runtime: "*"
+        compressor: "*"
       then:
         remove_tasks: ".3.6"
     # ubuntu 1804 ARM64 only has downloads for 4.2+
@@ -1399,6 +1433,7 @@ buildvariants:
         os: ["ubuntu-18.04-arm64"]
         auth-and-tls: "*"
         async-runtime: "*"
+        compressor: "*"
       then:
         remove_tasks: [".3.6", ".4.0"]
     # haproxy isn't installed on windows / ubuntu-arm
@@ -1406,6 +1441,7 @@ buildvariants:
         os: ["ubuntu-18.04-arm64", "windows-64-vs2017"]
         auth-and-tls: "*"
         async-runtime: "*"
+        compressor: "*"
       then:
         remove_tasks: ".load_balancer"
 - matrix_name: "x509-auth"
@@ -1432,7 +1468,7 @@ buildvariants:
   display_name: "${os} PLAIN auth with ${async-runtime}"
   tasks:
     - "test-plain-auth"
-    
+
 - matrix_name: "atlas-connect"
   matrix_spec:
     os:
