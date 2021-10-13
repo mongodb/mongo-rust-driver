@@ -166,7 +166,9 @@ impl Executor {
         RUNTIME.execute(async move {
             while let Some(update) = update_receiver.recv().await {
                 match update.message() {
-                    ServerUpdate::Error { error, .. } => manager.clear(error.cause.clone(), None).await,
+                    ServerUpdate::Error { error, .. } => {
+                        manager.clear(error.cause.clone(), None).await
+                    }
                 }
                 drop(update);
             }
