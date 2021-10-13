@@ -165,11 +165,10 @@ impl Executor {
         let manager = pool.manager.clone();
         RUNTIME.execute(async move {
             while let Some(update) = update_receiver.recv().await {
-                let error_cause = match update.message() {
-                    ServerUpdate::Error { error, .. } => error.cause.clone(),
-                };
+                match update.message() {
+                    ServerUpdate::Error { error, .. } => manager.clear(error.cause.clone(), None).await,
+                }
                 drop(update);
-                manager.clear(error_cause, None).await;
             }
         });
 
@@ -428,6 +427,7 @@ async fn cmap_spec_tests() {
 
         let mut options = CLIENT_OPTIONS.clone();
         if options.load_balanced.unwrap_or(false) {
+            println!("skipping due to load balanced topology");
             return;
         }
         options.hosts.drain(1..);
@@ -436,6 +436,7 @@ async fn cmap_spec_tests() {
         if let Some(ref run_on) = test_file.run_on {
             let can_run_on = run_on.iter().any(|run_on| run_on.can_run_on(&client));
             if !can_run_on {
+                println!("skipping due to runOn requirements");
                 return;
             }
         }
