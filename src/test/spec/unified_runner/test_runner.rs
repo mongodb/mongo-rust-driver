@@ -189,6 +189,15 @@ impl TestRunner {
         }
     }
 
+    pub async fn sync_workers(&self) {
+        self.internal_client.sync_workers().await;
+        for entity in self.entities.values() {
+            if let Entity::Client(client) = entity {
+                client.sync_workers().await;
+            }
+        }
+    }
+
     pub fn get_client(&self, id: &str) -> &ClientEntity {
         self.entities.get(id).unwrap().as_client()
     }
