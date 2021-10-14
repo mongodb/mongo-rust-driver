@@ -144,7 +144,6 @@ pub async fn run_unified_format_test_filtered(
         }
 
         for operation in test_case.operations {
-            test_runner.sync_workers().await;
             match operation.object {
                 OperationObject::TestRunner => {
                     operation

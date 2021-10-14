@@ -257,12 +257,10 @@ impl ConnectionPoolWorker {
 
         loop {
             let task = tokio::select! {
-                // Management requests need priority over check out requests so that connections
-                // being checked in are available for immediate check out.
-                Some(request) = self.management_receiver.recv() => request.into(),
                 Some(request) = self.request_receiver.recv() => {
                     PoolTask::CheckOut(request)
                 },
+                Some(request) = self.management_receiver.recv() => request.into(),
                 _ = self.handle_listener.wait_for_all_handle_drops() => {
                     // all worker handles have been dropped meaning this
                     // pool has no more references and can be dropped itself.
@@ -643,11 +641,17 @@ async fn establish_connection(
 ) -> Result<Connection> {
     let connection_id = pending_connection.id;
     let address = pending_connection.address.clone();
+    let is_load_balanced = pending_connection.generation.is_load_balanced();
 
     let mut establish_result = establisher.establish_connection(pending_connection).await;
 
     match establish_result {
         Err(ref e) => {
+            // Load-balanced tests expect the error to be handled before the `ConnectionClosedEvent`
+            // is emitted.
+            if is_load_balanced {
+                server_updater.handle_error(e.clone()).await;
+            }
             if let Some(handler) = event_handler {
                 let event = ConnectionClosedEvent {
                     address,
@@ -656,7 +660,9 @@ async fn establish_connection(
                 };
                 handler.handle_connection_closed_event(event);
             }
-            server_updater.handle_error(e.clone()).await;
+            if !is_load_balanced {
+                server_updater.handle_error(e.clone()).await;
+            }
             manager.handle_connection_failed();
         }
         Ok(ref mut connection) => {
@@ -754,6 +760,10 @@ impl PoolGeneration {
 
     fn load_balanced() -> Self {
         Self::LoadBalanced(HashMap::new())
+    }
+
+    pub(crate) fn is_load_balanced(&self) -> bool {
+        matches!(self, &PoolGeneration::LoadBalanced(_))
     }
 
     #[cfg(test)]
