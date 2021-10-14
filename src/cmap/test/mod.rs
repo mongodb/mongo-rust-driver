@@ -39,6 +39,8 @@ const TEST_DESCRIPTIONS_TO_SKIP: &[&str] = &[
     // WaitQueueTimeoutMS is not supported
     "must aggressively timeout threads enqueued longer than waitQueueTimeoutMS",
     "waiting on maxConnecting is limited by WaitQueueTimeoutMS",
+    // TODO DRIVERS-1785 remove this skip when test event order is fixed
+    "error during minPoolSize population clears pool",
 ];
 
 /// Many different types of CMAP events are emitted from tasks spawned in the drop

@@ -641,17 +641,12 @@ async fn establish_connection(
 ) -> Result<Connection> {
     let connection_id = pending_connection.id;
     let address = pending_connection.address.clone();
-    let is_load_balanced = pending_connection.generation.is_load_balanced();
 
     let mut establish_result = establisher.establish_connection(pending_connection).await;
 
     match establish_result {
         Err(ref e) => {
-            // Load-balanced tests expect the error to be handled before the `ConnectionClosedEvent`
-            // is emitted.
-            if is_load_balanced {
-                server_updater.handle_error(e.clone()).await;
-            }
+            server_updater.handle_error(e.clone()).await;
             if let Some(handler) = event_handler {
                 let event = ConnectionClosedEvent {
                     address,
@@ -659,9 +654,6 @@ async fn establish_connection(
                     connection_id,
                 };
                 handler.handle_connection_closed_event(event);
-            }
-            if !is_load_balanced {
-                server_updater.handle_error(e.clone()).await;
             }
             manager.handle_connection_failed();
         }
@@ -760,10 +752,6 @@ impl PoolGeneration {
 
     fn load_balanced() -> Self {
         Self::LoadBalanced(HashMap::new())
-    }
-
-    pub(crate) fn is_load_balanced(&self) -> bool {
-        matches!(self, &PoolGeneration::LoadBalanced(_))
     }
 
     #[cfg(test)]
