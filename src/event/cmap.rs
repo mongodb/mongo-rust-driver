@@ -48,7 +48,7 @@ pub struct ConnectionPoolOptions {
     pub max_idle_time: Option<Duration>,
 
     /// The maximum number of connections that the pool can have at a given time. This includes
-    /// connections which are currently checked out of the pool.
+    /// connections which are currently checked out of the pool.  A value of 0 means no limit.
     ///
     /// The default is 100.
     pub max_pool_size: Option<u32>,

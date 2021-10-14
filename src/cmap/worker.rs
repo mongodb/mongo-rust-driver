@@ -109,7 +109,7 @@ pub(crate) struct ConnectionPoolWorker {
     /// The maximum number of connections that the pool can manage, including connections checked
     /// out of the pool. If a thread requests a connection and the pool is empty + there are
     /// already max_pool_size connections in use, it will block until one is returned or the
-    /// wait_queue_timeout is exceeded.
+    /// wait_queue_timeout is exceeded.  A value of 0 means no limit.
     max_pool_size: u32,
 
     /// Receiver used to determine if any threads hold references to this pool. If all the
@@ -340,6 +340,10 @@ impl ConnectionPoolWorker {
         });
     }
 
+    fn below_max_connections(&self) -> bool {
+        self.max_pool_size == 0 || self.total_connection_count < self.max_pool_size
+    }
+
     fn can_service_connection_request(&self) -> bool {
         if !matches!(self.state, PoolState::Ready) {
             return false;
@@ -349,8 +353,7 @@ impl ConnectionPoolWorker {
             return true;
         }
 
-        self.total_connection_count < self.max_pool_size
-            && self.pending_connection_count < MAX_CONNECTING
+        self.below_max_connections() && self.pending_connection_count < MAX_CONNECTING
     }
 
     async fn check_out(&mut self, request: ConnectionRequest) {
@@ -381,7 +384,7 @@ impl ConnectionPoolWorker {
         }
 
         // otherwise, attempt to create a connection.
-        if self.total_connection_count < self.max_pool_size {
+        if self.below_max_connections() {
             let event_handler = self.event_handler.clone();
             let establisher = self.establisher.clone();
             let pending_connection = self.create_pending_connection();

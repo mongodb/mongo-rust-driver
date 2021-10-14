@@ -113,6 +113,15 @@ async fn run_test(test_file: TestFile) {
                         }
                     }
 
+                    // The default types parsed from the test file don't match those serialized
+                    // from the `ClientOptions` struct.
+                    if let Ok(min) = json_options.get_i32("minpoolsize") {
+                        json_options.insert("minpoolsize", Bson::Int64(min.into()));
+                    }
+                    if let Ok(max) = json_options.get_i32("maxpoolsize") {
+                        json_options.insert("maxpoolsize", Bson::Int64(max.into()));
+                    }
+
                     options_doc = options_doc
                         .into_iter()
                         .filter(|(ref key, _)| json_options.contains_key(key))
