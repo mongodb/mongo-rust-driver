@@ -27,9 +27,23 @@ use crate::{
 pub struct ReadConcern {
     /// The level of the read concern.
     pub level: ReadConcernLevel,
+}
+
+#[skip_serializing_none]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[serde(rename = "readConcern")]
+pub(crate) struct ReadConcernInternal {
+
+    /// The level of the read concern.
+    pub(crate) level: Option<ReadConcernLevel>,
 
     /// The snapshot read timestamp.
     pub(crate) at_cluster_time: Option<Timestamp>,
+
+    /// The time of most recent operation using this session.
+    /// Used for providing causal consistency.
+    pub(crate) after_cluster_time: Option<Timestamp>,
 }
 
 impl ReadConcern {
@@ -93,8 +107,7 @@ impl ReadConcern {
 impl From<ReadConcernLevel> for ReadConcern {
     fn from(level: ReadConcernLevel) -> Self {
         Self {
-            level,
-            at_cluster_time: None,
+            level: level,
         }
     }
 }

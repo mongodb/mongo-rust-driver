@@ -47,6 +47,10 @@ impl Operation for Aggregate {
 
     const NAME: &'static str = "aggregate";
 
+    fn supports_read_concern(&self) -> bool {
+        true
+    }
+
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = doc! {
             Self::NAME: self.target.to_bson(),

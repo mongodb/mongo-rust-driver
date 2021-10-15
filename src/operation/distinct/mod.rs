@@ -57,6 +57,10 @@ impl Operation for Distinct {
 
     const NAME: &'static str = "distinct";
 
+    fn supports_read_concern(&self) -> bool {
+        true
+    }
+
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body: Document = doc! {
             Self::NAME: self.ns.coll.clone(),

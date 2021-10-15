@@ -2391,10 +2391,31 @@ pub struct SessionOptions {
     /// associated with the operations within the transaction.
     pub default_transaction_options: Option<TransactionOptions>,
 
+    /// If true, all operations performed in the context of this session
+    /// will be [causally consistent](https://docs.mongodb.com/manual/core/causal-consistency-read-write-concerns/).
+    /// Note that causally consistent reads will NOT be causally consistent with respect to
+    /// unacknowledged writes.
+    /// Defaults to true.
+    pub causal_consistency: Option<bool>,
+
     /// If true, all read operations performed using this client session will share the same
     /// snapshot.  Defaults to false.
     // TODO RUST-18 enforce snapshot exclusivity with causalConsistency.
     pub snapshot: Option<bool>,
+}
+
+impl SessionOptions {
+    pub(crate) fn validate(&self) -> Result<()> {
+        if let (Some(causal_consistency), Some(snapshot)) = (self.causal_consistency, self.snapshot) {
+            if causal_consistency && snapshot {
+                return Err(ErrorKind::InvalidArgument {
+                    message: format!("snapshot and causal consistency are mutually exclusive"),
+                }
+                .into());
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Contains the options that can be used for a transaction.

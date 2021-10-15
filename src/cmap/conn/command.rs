@@ -3,16 +3,7 @@ use std::time::Duration;
 use serde::{de::DeserializeOwned, Serialize};
 
 use super::wire::Message;
-use crate::{
-    bson::Document,
-    client::{options::ServerApi, ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
-    error::{Error, ErrorKind, Result},
-    is_master::{IsMasterCommandResponse, IsMasterReply},
-    operation::{CommandErrorBody, CommandResponse, Response},
-    options::{ReadConcern, ServerAddress},
-    selection_criteria::ReadPreference,
-    ClientSession,
-};
+use crate::{ClientSession, bson::Document, client::{options::ServerApi, ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS}, error::{Error, ErrorKind, Result}, is_master::{IsMasterCommandResponse, IsMasterReply}, operation::{CommandErrorBody, CommandResponse, Response}, options::{ReadConcernLevel, ReadConcernInternal, ServerAddress}, selection_criteria::ReadPreference};
 
 /// A command that has been serialized to BSON.
 #[derive(Debug)]
@@ -60,7 +51,7 @@ pub(crate) struct Command<T = Document> {
 
     autocommit: Option<bool>,
 
-    read_concern: Option<ReadConcern>,
+    read_concern: Option<ReadConcernInternal>,
 
     recovery_token: Option<Document>,
 }
@@ -118,15 +109,32 @@ impl<T> Command<T> {
     pub(crate) fn set_txn_read_concern(&mut self, session: &ClientSession) {
         if let Some(ref options) = session.transaction.options {
             if let Some(ref read_concern) = options.read_concern {
-                self.read_concern = Some(read_concern.clone());
+                let inner = self.read_concern.get_or_insert(ReadConcernInternal {
+                    level: None,
+                    at_cluster_time: None,
+                    after_cluster_time: None,
+                });
+                inner.level = Some(read_concern.level.clone());
             }
         }
     }
 
     pub(crate) fn set_snapshot_read_concern(&mut self, session: &ClientSession) {
-        let mut concern = ReadConcern::snapshot();
-        concern.at_cluster_time = session.snapshot_time;
-        self.read_concern = Some(concern);
+        let inner = self.read_concern.get_or_insert(ReadConcernInternal {
+            level: Some(ReadConcernLevel::Snapshot),
+            at_cluster_time: None,
+            after_cluster_time: None,
+        });
+        inner.at_cluster_time = session.snapshot_time;
+    }
+
+    pub(crate) fn set_after_cluster_time(&mut self, session: &ClientSession) {
+        let inner = self.read_concern.get_or_insert(ReadConcernInternal {
+                level: None,
+                at_cluster_time: None,
+                after_cluster_time: None,
+            });
+        inner.after_cluster_time = session.operation_time;
     }
 }
 

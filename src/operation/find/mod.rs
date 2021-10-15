@@ -58,6 +58,10 @@ impl<T: DeserializeOwned> Operation for Find<T> {
     type Response = CursorResponse<T>;
     const NAME: &'static str = "find";
 
+    fn supports_read_concern(&self) -> bool {
+        true
+    }
+
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = doc! {
             Self::NAME: self.ns.coll.clone(),

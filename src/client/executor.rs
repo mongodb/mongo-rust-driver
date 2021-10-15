@@ -417,6 +417,17 @@ impl Client {
                     }
                     cmd.set_snapshot_read_concern(session);
                 }
+                // If this is a causally consistent session, set `readConcern.afterClusterTime`. Causal consistency
+                // defaults to true, unless snapshot is true.
+                else if session
+                    .options()
+                    .and_then(|opts| opts.causal_consistency)
+                    .unwrap_or(true)
+                    && matches!(session.transaction.state, TransactionState::None|TransactionState::Starting)
+                    && op.supports_read_concern()
+                {
+                    cmd.set_after_cluster_time(session);
+                }
                 match session.transaction.state {
                     TransactionState::Starting => {
                         cmd.set_start_transaction();
@@ -512,6 +523,9 @@ impl Client {
             Ok(response) => {
                 match T::Response::deserialize_response(&response) {
                     Ok(r) => {
+                        if let (Some(session), Some(ts)) = (session.as_mut(), r.operation_time()) {
+                            session.advance_operation_time(ts);
+                        }
                         self.update_cluster_time(&r, session).await;
                         if r.is_success() {
                             // Retrieve recovery token from successful response.
@@ -542,6 +556,11 @@ impl Client {
                         // a generic command response without the operation's body.
                         match response.body::<CommandResponse<Option<CommandErrorBody>>>() {
                             Ok(error_response) => {
+                                if let (Some(session), Some(ts)) =
+                                    (session.as_mut(), error_response.operation_time())
+                                {
+                                    session.advance_operation_time(ts);
+                                }
                                 self.update_cluster_time(&error_response, session).await;
                                 match error_response.body {
                                     // if the response was ok: 0, return the command error.

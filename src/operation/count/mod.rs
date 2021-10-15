@@ -46,6 +46,10 @@ impl Operation for Count {
 
     const NAME: &'static str = "count";
 
+    fn supports_read_concern(&self) -> bool {
+        true
+    }
+
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         let mut name = Self::NAME.to_string();
         let mut body = match description.max_wire_version {

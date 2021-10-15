@@ -109,6 +109,7 @@ pub struct ClientSession {
     options: Option<SessionOptions>,
     pub(crate) transaction: Transaction,
     pub(crate) snapshot_time: Option<Timestamp>,
+    pub(crate) operation_time: Option<Timestamp>,
 }
 
 #[derive(Debug)]
@@ -214,6 +215,7 @@ impl ClientSession {
             options,
             transaction: Default::default(),
             snapshot_time: None,
+            operation_time: None,
         }
     }
 
@@ -271,6 +273,15 @@ impl ClientSession {
     /// Gets the current txn_number.
     pub(crate) fn txn_number(&self) -> i64 {
         self.server_session.txn_number
+    }
+
+    /// Advance operation time
+    pub(crate) fn advance_operation_time(&mut self, ts: Timestamp) {
+        self.operation_time = match self.operation_time {
+            Some(current_op_time) if current_op_time < ts => Some(ts),
+            None => Some(ts),
+            _ => self.operation_time,
+        }
     }
 
     /// Increments the txn_number.
@@ -559,6 +570,7 @@ struct DroppedClientSession {
     options: Option<SessionOptions>,
     transaction: Transaction,
     snapshot_time: Option<Timestamp>,
+    operation_time: Option<Timestamp>,
 }
 
 impl From<DroppedClientSession> for ClientSession {
@@ -571,6 +583,7 @@ impl From<DroppedClientSession> for ClientSession {
             options: dropped_session.options,
             transaction: dropped_session.transaction,
             snapshot_time: dropped_session.snapshot_time,
+            operation_time: dropped_session.operation_time,
         }
     }
 }
@@ -586,6 +599,7 @@ impl Drop for ClientSession {
                 options: self.options.clone(),
                 transaction: self.transaction.take(),
                 snapshot_time: self.snapshot_time,
+                operation_time: self.operation_time,
             };
             RUNTIME.execute(async move {
                 let mut session: ClientSession = dropped_session.into();
