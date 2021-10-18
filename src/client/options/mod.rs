@@ -1150,15 +1150,6 @@ impl ClientOptions {
             write_concern.validate()?;
         }
 
-        // Disallow use of load-balanced configurations in non-test code.
-        // TODO RUST-653 Remove this when load balancer work is ready for release.
-        if !cfg!(test) && self.load_balanced.is_some() {
-            return Err(ErrorKind::InvalidArgument {
-                message: "loadBalanced is not supported".to_string(),
-            }
-            .into());
-        }
-
         if self.load_balanced.unwrap_or(false) {
             if self.hosts.len() > 1 {
                 return Err(ErrorKind::InvalidArgument {
