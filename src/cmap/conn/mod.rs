@@ -345,11 +345,6 @@ impl Connection {
         })
     }
 
-    /// Whether this connection has a live `PinnedConnectionHandle`.
-    pub(crate) fn is_pinned(&self) -> bool {
-        self.pinned_sender.is_some()
-    }
-
     /// Close this connection, emitting a `ConnectionClosedEvent` with the supplied reason.
     pub(super) fn close_and_drop(mut self, reason: ConnectionClosedReason) {
         self.close(reason);
@@ -470,12 +465,8 @@ impl PinnedConnectionHandle {
         })
     }
 
-    /// Return the pinned connection to the normal connection pool.
-    pub(crate) async fn unpin_connection(&self) {
-        let mut receiver = self.receiver.lock().await;
-        receiver.close();
-        // Ensure any connections buffered in the channel are dropped, returning them to the pool.
-        while receiver.recv().await.is_some() {}
+    pub(crate) fn id(&self) -> u32 {
+        self.id
     }
 }
 

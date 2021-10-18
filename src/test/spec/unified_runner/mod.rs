@@ -35,7 +35,7 @@ pub use self::{
     test_runner::{EntityMap, TestRunner},
 };
 
-use self::operation::Expectation;
+use self::{operation::Expectation, test_file::TestCase};
 
 static SPEC_VERSIONS: &[Version] = &[
     Version::new(1, 0, 0),
@@ -56,6 +56,13 @@ const SKIPPED_OPERATIONS: &[&str] = &[
 ];
 
 pub async fn run_unified_format_test(test_file: TestFile) {
+    run_unified_format_test_filtered(test_file, |_| true).await
+}
+
+pub async fn run_unified_format_test_filtered(
+    test_file: TestFile,
+    pred: impl Fn(&TestCase) -> bool,
+) {
     let version_matches = SPEC_VERSIONS.iter().any(|req| {
         if req.major != test_file.schema_version.major {
             return false;
@@ -103,6 +110,11 @@ pub async fn run_unified_format_test(test_file: TestFile) {
             continue;
         }
 
+        if !pred(&test_case) {
+            println!("Skipping {}", test_case.description);
+            continue;
+        }
+
         println!("Running {}", &test_case.description);
 
         if let Some(requirements) = test_case.run_on_requirements {
@@ -132,6 +144,7 @@ pub async fn run_unified_format_test(test_file: TestFile) {
         }
 
         for operation in test_case.operations {
+            test_runner.sync_workers().await;
             match operation.object {
                 OperationObject::TestRunner => {
                     operation
@@ -207,8 +220,6 @@ pub async fn run_unified_format_test(test_file: TestFile) {
             }
         }
 
-        test_runner.fail_point_guards.clear();
-
         if let Some(ref events) = test_case.expect_events {
             for expected in events {
                 let entity = test_runner.entities.get(&expected.client).unwrap();
@@ -218,11 +229,8 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                     .event_type
                     .unwrap_or(test_file::ExpectedEventType::Command);
 
-                let actual_events: Vec<ExpectedEvent> = client
-                    .get_filtered_events(event_type)
-                    .into_iter()
-                    .map(Into::into)
-                    .collect();
+                let actual_events: Vec<_> =
+                    client.get_filtered_events(event_type).into_iter().collect();
 
                 let expected_events = &expected.events;
 
@@ -237,13 +245,18 @@ pub async fn run_unified_format_test(test_file: TestFile) {
                 for (actual, expected) in actual_events.iter().zip(expected_events) {
                     assert!(
                         events_match(actual, expected, Some(&test_runner.entities)),
-                        "event mismatch: expected = {:#?}, actual = {:#?}",
+                        "event mismatch: expected = {:#?}, actual = {:#?}\nall \
+                         expected:\n{:#?}\nall actual:\n{:#?}",
                         expected,
                         actual,
+                        expected_events,
+                        actual_events,
                     );
                 }
             }
         }
+
+        test_runner.fail_point_guards.clear();
 
         if let Some(ref outcome) = test_case.outcome {
             for expected_data in outcome {

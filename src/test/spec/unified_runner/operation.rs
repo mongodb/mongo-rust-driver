@@ -1482,6 +1482,7 @@ impl TestOperation for AssertSameLsidOnLastTwoCommands {
     ) -> BoxFuture<'a, ()> {
         async move {
             let client = test_runner.entities.get(&self.client).unwrap().as_client();
+            client.sync_workers().await;
             let events = client.get_all_command_started_events();
 
             let lsid1 = events[events.len() - 1].command.get("lsid").unwrap();
@@ -1817,6 +1818,7 @@ impl TestOperation for AssertNumberConnectionsCheckedOut {
     ) -> BoxFuture<'a, ()> {
         async move {
             let client = test_runner.get_client(&self.client);
+            client.sync_workers().await;
             assert_eq!(client.connections_checked_out(), self.connections);
         }
         .boxed()

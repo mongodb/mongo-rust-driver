@@ -39,6 +39,8 @@ const TEST_DESCRIPTIONS_TO_SKIP: &[&str] = &[
     // WaitQueueTimeoutMS is not supported
     "must aggressively timeout threads enqueued longer than waitQueueTimeoutMS",
     "waiting on maxConnecting is limited by WaitQueueTimeoutMS",
+    // TODO DRIVERS-1785 remove this skip when test event order is fixed
+    "error during minPoolSize population clears pool",
 ];
 
 /// Many different types of CMAP events are emitted from tasks spawned in the drop
@@ -165,9 +167,12 @@ impl Executor {
         let manager = pool.manager.clone();
         RUNTIME.execute(async move {
             while let Some(update) = update_receiver.recv().await {
-                match update.into_message() {
-                    ServerUpdate::Error { error, .. } => manager.clear(error.cause, None).await,
+                match update.message() {
+                    ServerUpdate::Error { error, .. } => {
+                        manager.clear(error.cause.clone(), None).await
+                    }
                 }
+                drop(update);
             }
         });
 
@@ -426,6 +431,7 @@ async fn cmap_spec_tests() {
 
         let mut options = CLIENT_OPTIONS.clone();
         if options.load_balanced.unwrap_or(false) {
+            println!("skipping due to load balanced topology");
             return;
         }
         options.hosts.drain(1..);
@@ -434,6 +440,7 @@ async fn cmap_spec_tests() {
         if let Some(ref run_on) = test_file.run_on {
             let can_run_on = run_on.iter().any(|run_on| run_on.can_run_on(&client));
             if !can_run_on {
+                println!("skipping due to runOn requirements");
                 return;
             }
         }

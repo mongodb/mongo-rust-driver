@@ -48,6 +48,9 @@ impl Operation for ListIndexes {
         let mut body = doc! {
             "listIndexes": self.ns.coll.clone(),
         };
+        if let Some(size) = self.options.as_ref().and_then(|o| o.batch_size) {
+            body.insert("cursor", doc! { "batchSize": size });
+        }
         append_options(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(

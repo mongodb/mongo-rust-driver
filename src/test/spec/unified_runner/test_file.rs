@@ -310,6 +310,9 @@ pub struct ExpectedEvents {
 pub enum ExpectedEventType {
     Command,
     Cmap,
+    // TODO RUST-1055 Remove this when connection usage is serialized.
+    #[serde(skip)]
+    CmapWithoutConnectionReady,
 }
 
 #[derive(Debug, Deserialize)]

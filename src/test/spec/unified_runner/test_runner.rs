@@ -10,6 +10,7 @@ use crate::{
         util::FailPointGuard,
         EventHandler,
         TestClient,
+        CLIENT_OPTIONS,
         DEFAULT_URI,
         LOAD_BALANCED_MULTIPLE_URI,
         LOAD_BALANCED_SINGLE_URI,
@@ -93,11 +94,7 @@ impl TestRunner {
                     let server_api = client.server_api.clone().or_else(|| SERVER_API.clone());
                     let observer = Arc::new(EventHandler::new());
 
-                    let is_load_balanced = client
-                        .uri_options
-                        .as_ref()
-                        .map_or(false, |opts| opts.get_bool("loadBalanced").unwrap_or(false));
-                    let given_uri = if is_load_balanced {
+                    let given_uri = if CLIENT_OPTIONS.load_balanced.unwrap_or(false) {
                         if client.use_multiple_mongoses.unwrap_or(true) {
                             LOAD_BALANCED_MULTIPLE_URI.as_ref().expect(
                                 "Test requires URI for load balancer fronting multiple servers",
@@ -188,6 +185,15 @@ impl TestRunner {
             };
             if self.entities.insert(id.clone(), entity).is_some() {
                 panic!("Entity with id {} already present in entity map", id);
+            }
+        }
+    }
+
+    pub async fn sync_workers(&self) {
+        self.internal_client.sync_workers().await;
+        for entity in self.entities.values() {
+            if let Entity::Client(client) = entity {
+                client.sync_workers().await;
             }
         }
     }

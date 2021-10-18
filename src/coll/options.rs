@@ -920,7 +920,7 @@ pub struct ListIndexesOptions {
     pub max_time: Option<Duration>,
 
     /// The number of indexes the server should return per cursor batch.
-    #[serde(default, serialize_with = "bson_util::serialize_u32_option_as_i32")]
+    #[serde(default, skip_serializing)]
     pub batch_size: Option<u32>,
 }
 

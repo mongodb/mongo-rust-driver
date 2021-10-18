@@ -204,6 +204,11 @@ impl EventHandler {
                     .filter(|e| filter(e))
                     .collect()
             }
+            ExpectedEventType::CmapWithoutConnectionReady => {
+                let mut events = self.get_filtered_events(ExpectedEventType::Cmap, filter);
+                events.retain(|ev| !matches!(ev, Event::Cmap(CmapEvent::ConnectionReady(_))));
+                events
+            }
         }
     }
 

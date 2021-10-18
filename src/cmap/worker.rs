@@ -646,6 +646,7 @@ async fn establish_connection(
 
     match establish_result {
         Err(ref e) => {
+            server_updater.handle_error(e.clone()).await;
             if let Some(handler) = event_handler {
                 let event = ConnectionClosedEvent {
                     address,
@@ -654,7 +655,6 @@ async fn establish_connection(
                 };
                 handler.handle_connection_closed_event(event);
             }
-            server_updater.handle_error(e.clone()).await;
             manager.handle_connection_failed();
         }
         Ok(ref mut connection) => {

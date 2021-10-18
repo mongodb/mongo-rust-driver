@@ -283,12 +283,6 @@ impl PinnedConnection {
         matches!(self, Self::Invalid(_))
     }
 
-    async fn unpin(&self) {
-        if let Some(h) = self.handle() {
-            h.unpin_connection().await;
-        }
-    }
-
     fn invalidate(&mut self) {
         take_mut::take(self, |self_| {
             if let Self::Valid(c) = self_ {
@@ -318,6 +312,5 @@ pub(super) fn kill_cursor(
                 let _ = tx.send(());
             }
         }
-        pinned_conn.unpin().await;
     });
 }

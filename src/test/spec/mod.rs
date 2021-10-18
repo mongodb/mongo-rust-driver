@@ -7,6 +7,7 @@ mod crud;
 mod crud_v1;
 #[cfg(not(feature = "sync"))]
 mod initial_dns_seedlist_discovery;
+mod load_balancers;
 mod ocsp;
 #[cfg(not(feature = "sync"))]
 mod read_write_concern;
@@ -28,7 +29,13 @@ use std::{
 };
 
 pub use self::{
-    unified_runner::{merge_uri_options, run_unified_format_test, ExpectedEventType, Topology},
+    unified_runner::{
+        merge_uri_options,
+        run_unified_format_test,
+        run_unified_format_test_filtered,
+        ExpectedEventType,
+        Topology,
+    },
     v2_runner::{operation::Operation, run_v2_test, test_file::RunOn},
 };
 

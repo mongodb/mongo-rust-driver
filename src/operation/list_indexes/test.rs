@@ -33,7 +33,9 @@ async fn build() {
         doc! {
             "listIndexes": "test_coll",
             "maxTimeMS": 42,
-            "batchSize": 4,
+            "cursor": doc! {
+                "batchSize": 4,
+            },
         }
     );
 }

@@ -7,7 +7,13 @@ use std::{collections::HashSet, sync::Arc, time::Instant};
 use super::{session::TransactionState, Client, ClientSession};
 use crate::{
     bson::Document,
-    cmap::{conn::PinnedConnectionHandle, Connection, RawCommand, RawCommandResponse},
+    cmap::{
+        conn::PinnedConnectionHandle,
+        Connection,
+        ConnectionPool,
+        RawCommand,
+        RawCommandResponse,
+    },
     cursor::{session::SessionCursor, Cursor, CursorSpecification},
     error::{
         Error,
@@ -158,11 +164,13 @@ impl Client {
         Op: Operation<O = CursorSpecification<T>>,
         T: DeserializeOwned + Unpin + Send + Sync,
     {
-        let mut details = self.execute_operation_with_details(op, session).await?;
-        let pinned = if details.output.connection.is_pinned() {
-            // Cursor operations on load-balanced transactions will be pinned via the transaction
-            // pin.
-            None
+        let mut details = self
+            .execute_operation_with_details(op, &mut *session)
+            .await?;
+
+        let pinned = if let Some(handle) = session.transaction.pinned_connection() {
+            // Cursor operations on a transaction share the same pinned connection.
+            Some(handle.replicate())
         } else {
             self.pin_connection_for_cursor(&mut details.output)?
         };
@@ -225,20 +233,17 @@ impl Client {
             }
         };
 
-        let mut conn = match op.pinned_connection() {
-            Some(l) => l.take_connection().await?,
-            None => match server.pool.check_out().await {
-                Ok(c) => c,
-                Err(mut err) => {
-                    err.add_labels_and_update_pin(None, &mut session, None)?;
+        let mut conn = match get_connection(&session, &op, &server.pool).await {
+            Ok(c) => c,
+            Err(mut err) => {
+                err.add_labels_and_update_pin(None, &mut session, None)?;
 
-                    if err.is_pool_cleared() {
-                        return self.execute_retry(&mut op, &mut session, None, err).await;
-                    } else {
-                        return Err(err);
-                    }
+                if err.is_pool_cleared() {
+                    return self.execute_retry(&mut op, &mut session, None, err).await;
+                } else {
+                    return Err(err);
                 }
-            },
+            }
         };
 
         let retryability = self.get_retryability(&conn, &op, &session).await?;
@@ -326,23 +331,9 @@ impl Client {
             }
         };
 
-        let session_pinned = session
-            .as_ref()
-            .and_then(|s| s.transaction.pinned_connection());
-        let mut conn = match (session_pinned, op.pinned_connection()) {
-            (Some(c), None) | (None, Some(c)) => c.take_connection().await?,
-            (Some(c), Some(_)) => {
-                // An operation executing in a transaction should never have a pinned connection,
-                // but in case it does, prefer the transaction's pin.
-                if cfg!(debug_assertions) {
-                    panic!("pinned operation executing in pinned transaction");
-                }
-                c.take_connection().await?
-            }
-            (None, None) => match server.pool.check_out().await {
-                Ok(c) => c,
-                Err(_) => return Err(first_error),
-            },
+        let mut conn = match get_connection(session, op, &server.pool).await {
+            Ok(c) => c,
+            Err(_) => return Err(first_error),
         };
 
         let retryability = self.get_retryability(&conn, op, session).await?;
@@ -773,6 +764,25 @@ impl Client {
                 session.transaction.recovery_token = response.recovery_token().cloned();
             }
         }
+    }
+}
+
+async fn get_connection<T: Operation>(
+    session: &Option<&mut ClientSession>,
+    op: &T,
+    pool: &ConnectionPool,
+) -> Result<Connection> {
+    let session_pinned = session
+        .as_ref()
+        .and_then(|s| s.transaction.pinned_connection());
+    match (session_pinned, op.pinned_connection()) {
+        (Some(c), None) | (None, Some(c)) => c.take_connection().await,
+        (Some(session_handle), Some(op_handle)) => {
+            // An operation executing in a transaction should be sharing the same pinned connection.
+            debug_assert_eq!(session_handle.id(), op_handle.id());
+            session_handle.take_connection().await
+        }
+        (None, None) => pool.check_out().await,
     }
 }
 

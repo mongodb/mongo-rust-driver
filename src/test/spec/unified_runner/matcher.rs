@@ -1,6 +1,9 @@
+use bson::Document;
+
 use crate::{
     bson::{doc, spec::ElementType, Bson},
     bson_util::get_int,
+    test::{CmapEvent, CommandEvent, Event},
 };
 
 use super::{EntityMap, ExpectedCmapEvent, ExpectedCommandEvent, ExpectedEvent};
@@ -15,32 +18,45 @@ pub fn results_match(
 }
 
 pub fn events_match(
-    actual: &ExpectedEvent,
+    actual: &Event,
     expected: &ExpectedEvent,
     entities: Option<&EntityMap>,
 ) -> bool {
     match (actual, expected) {
-        (ExpectedEvent::Command(act), ExpectedEvent::Command(exp)) => {
+        (Event::Command(act), ExpectedEvent::Command(exp)) => {
             command_events_match(act, exp, entities)
         }
-        (ExpectedEvent::Cmap(act), ExpectedEvent::Cmap(exp)) => cmap_events_match(act, exp),
+        (Event::Cmap(act), ExpectedEvent::Cmap(exp)) => cmap_events_match(act, exp),
         _ => false,
     }
 }
 
+fn match_opt<T: PartialEq>(actual: &T, expected: &Option<T>) -> bool {
+    expected.is_none() || expected.as_ref() == Some(actual)
+}
+
+fn match_results_opt(
+    actual: &Document,
+    expected: &Option<Document>,
+    entities: Option<&EntityMap>,
+) -> bool {
+    let expected_doc = if let Some(doc) = expected {
+        Bson::Document(doc.clone())
+    } else {
+        return true;
+    };
+    let actual_doc = Some(Bson::Document(actual.clone()));
+    results_match(actual_doc.as_ref(), &expected_doc, false, entities)
+}
+
 fn command_events_match(
-    actual: &ExpectedCommandEvent,
+    actual: &CommandEvent,
     expected: &ExpectedCommandEvent,
     entities: Option<&EntityMap>,
 ) -> bool {
     match (actual, expected) {
         (
-            ExpectedCommandEvent::Started {
-                command_name: actual_command_name,
-                database_name: actual_database_name,
-                command: actual_command,
-                has_service_id: actual_has_service_id,
-            },
+            CommandEvent::Started(actual),
             ExpectedCommandEvent::Started {
                 command_name: expected_command_name,
                 database_name: expected_database_name,
@@ -48,114 +64,90 @@ fn command_events_match(
                 has_service_id: expected_has_service_id,
             },
         ) => {
-            if expected_command_name.is_some() && actual_command_name != expected_command_name {
+            if !match_opt(&actual.command_name, expected_command_name) {
                 return false;
             }
-            if expected_database_name.is_some() && actual_database_name != expected_database_name {
+            if !match_opt(&actual.db, expected_database_name) {
                 return false;
             }
-            if expected_has_service_id.is_some() && actual_has_service_id != expected_has_service_id
-            {
+            if !match_opt(&actual.service_id.is_some(), expected_has_service_id) {
                 return false;
             }
-            if let Some(expected_command) = expected_command {
-                let actual_command = actual_command
-                    .as_ref()
-                    .map(|doc| Bson::Document(doc.clone()));
-                results_match(
-                    actual_command.as_ref(),
-                    &Bson::Document(expected_command.clone()),
-                    false,
-                    entities,
-                )
-            } else {
-                true
+            if !match_results_opt(&actual.command, expected_command, entities) {
+                return false;
             }
+            true
         }
         (
-            ExpectedCommandEvent::Succeeded {
-                command_name: actual_command_name,
-                reply: actual_reply,
-                has_service_id: actual_has_service_id,
-            },
+            CommandEvent::Succeeded(actual),
             ExpectedCommandEvent::Succeeded {
                 command_name: expected_command_name,
                 reply: expected_reply,
                 has_service_id: expected_has_service_id,
             },
         ) => {
-            if expected_command_name.is_some() && actual_command_name != expected_command_name {
+            if !match_opt(&actual.command_name, expected_command_name) {
                 return false;
             }
-            if expected_has_service_id.is_some() && actual_has_service_id != expected_has_service_id
-            {
+            if !match_opt(&actual.service_id.is_some(), expected_has_service_id) {
                 return false;
             }
-            if let Some(expected_reply) = expected_reply {
-                let actual_reply = actual_reply.as_ref().map(|doc| Bson::Document(doc.clone()));
-                results_match(
-                    actual_reply.as_ref(),
-                    &Bson::Document(expected_reply.clone()),
-                    false,
-                    None,
-                )
-            } else {
-                true
+            if !match_results_opt(&actual.reply, expected_reply, None) {
+                return false;
             }
+            true
         }
         (
-            ExpectedCommandEvent::Failed {
-                command_name: actual_command_name,
-                has_service_id: actual_has_service_id,
-            },
+            CommandEvent::Failed(actual),
             ExpectedCommandEvent::Failed {
                 command_name: expected_command_name,
                 has_service_id: expected_has_service_id,
             },
         ) => {
-            if expected_has_service_id.is_some() && actual_has_service_id != expected_has_service_id
-            {
+            if !match_opt(&actual.service_id.is_some(), expected_has_service_id) {
                 return false;
             }
-            match (expected_command_name, actual_command_name) {
-                (Some(expected), Some(actual)) => expected == actual,
-                (Some(_), None) => false,
-                _ => true,
+            if !match_opt(&actual.command_name, expected_command_name) {
+                return false;
             }
+            true
         }
         _ => false,
     }
 }
 
-fn cmap_events_match(actual: &ExpectedCmapEvent, expected: &ExpectedCmapEvent) -> bool {
+fn cmap_events_match(actual: &CmapEvent, expected: &ExpectedCmapEvent) -> bool {
     match (actual, expected) {
+        (CmapEvent::PoolCreated(_), ExpectedCmapEvent::PoolCreated {}) => true,
+        (CmapEvent::PoolReady(_), ExpectedCmapEvent::PoolReady {}) => true,
         (
-            ExpectedCmapEvent::PoolCleared {
-                has_service_id: actual_has_service_id,
-            },
+            CmapEvent::PoolCleared(actual),
             ExpectedCmapEvent::PoolCleared {
                 has_service_id: expected_has_service_id,
             },
-        ) => {
-            expected_has_service_id.is_none() || (actual_has_service_id == expected_has_service_id)
-        }
+        ) => match_opt(&actual.service_id.is_some(), expected_has_service_id),
+        (CmapEvent::PoolClosed(_), ExpectedCmapEvent::PoolClosed {}) => true,
+        (CmapEvent::ConnectionCreated(_), ExpectedCmapEvent::ConnectionCreated {}) => true,
+        (CmapEvent::ConnectionReady(_), ExpectedCmapEvent::ConnectionReady {}) => true,
         (
-            ExpectedCmapEvent::ConnectionClosed {
-                reason: actual_reason,
-            },
+            CmapEvent::ConnectionClosed(actual),
             ExpectedCmapEvent::ConnectionClosed {
                 reason: expected_reason,
             },
-        ) => expected_reason.is_none() || (actual_reason == expected_reason),
+        ) => match_opt(&actual.reason, expected_reason),
         (
-            ExpectedCmapEvent::ConnectionCheckOutFailed {
-                reason: actual_reason,
-            },
+            CmapEvent::ConnectionCheckOutStarted(_),
+            ExpectedCmapEvent::ConnectionCheckOutStarted {},
+        ) => true,
+        (
+            CmapEvent::ConnectionCheckOutFailed(actual),
             ExpectedCmapEvent::ConnectionCheckOutFailed {
                 reason: expected_reason,
             },
-        ) => expected_reason.is_none() || (actual_reason == expected_reason),
-        _ => actual == expected,
+        ) => match_opt(&actual.reason, expected_reason),
+        (CmapEvent::ConnectionCheckedOut(_), ExpectedCmapEvent::ConnectionCheckedOut {}) => true,
+        (CmapEvent::ConnectionCheckedIn(_), ExpectedCmapEvent::ConnectionCheckedIn {}) => true,
+        _ => false,
     }
 }
 
