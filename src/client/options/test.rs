@@ -241,7 +241,10 @@ async fn parse_with_default_database() {
     assert_eq!(
         ClientOptions::parse(uri).await.unwrap(),
         ClientOptions {
-            hosts: vec![ServerAddress::Tcp { host: "localhost".to_string(), port: None }],
+            hosts: vec![ServerAddress::Tcp {
+                host: "localhost".to_string(),
+                port: None
+            }],
             original_uri: Some(uri.into()),
             default_database: Some("abc".to_string()),
             ..Default::default()
@@ -257,7 +260,10 @@ async fn parse_with_no_default_database() {
     assert_eq!(
         ClientOptions::parse(uri).await.unwrap(),
         ClientOptions {
-            hosts: vec![ServerAddress::Tcp { host: "localhost".to_string(), port: None }],
+            hosts: vec![ServerAddress::Tcp {
+                host: "localhost".to_string(),
+                port: None
+            }],
             original_uri: Some(uri.into()),
             default_database: None,
             ..Default::default()
