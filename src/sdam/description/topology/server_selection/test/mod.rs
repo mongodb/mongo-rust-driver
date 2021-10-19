@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use serde::Deserialize;
 
@@ -30,19 +30,14 @@ impl TestTopologyDescription {
         self,
         heartbeat_frequency: Option<Duration>,
     ) -> Option<TopologyDescription> {
-        let servers: Option<Vec<ServerDescription>> = self
+        let servers: HashMap<ServerAddress, ServerDescription> = self
             .servers
             .into_iter()
-        // The driver doesn't support server versions low enough not to support max staleness, so we
-        // just manually filter them out here.
-            .filter(|server| server.max_wire_version.map(|version| version >= 5).unwrap_or(true))
-            .map(|sd| sd.into_server_description())
+            .filter_map(|sd| {
+                sd.into_server_description()
+                    .map(|sd| (sd.address.clone(), sd))
+            })
             .collect();
-
-        let servers = match servers {
-            Some(servers) => servers,
-            None => return None,
-        };
 
         TopologyDescription {
             single_seed: servers.len() == 1,
@@ -56,10 +51,7 @@ impl TestTopologyDescription {
             cluster_time: None,
             local_threshold: None,
             heartbeat_freq: heartbeat_frequency,
-            servers: servers
-                .into_iter()
-                .map(|server| (server.address.clone(), server))
-                .collect(),
+            servers,
         }
         .into()
     }
