@@ -21,4 +21,5 @@ fi
 
 echo "cargo test options: ${DEFAULT_FEATURES} --features $FEATURE_FLAGS ${OPTIONS}"
 
-RUST_BACKTRACE=1 cargo test ${DEFAULT_FEATURES} --features $FEATURE_FLAGS $OPTIONS
+SERVERLESS="serverless" \
+    RUST_BACKTRACE=1 cargo test ${DEFAULT_FEATURES} --features $FEATURE_FLAGS $OPTIONS

@@ -1559,7 +1559,7 @@ buildvariants:
     async-runtime: "*"
   display_name: "Serverless ${os} with ${async-runtime}"
   tasks:
-    - ".serverless"
+    - "serverless_task_group"
 
 - matrix_name: "atlas-connect"
   matrix_spec:

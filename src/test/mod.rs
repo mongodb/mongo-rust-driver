@@ -35,10 +35,7 @@ use home::home_dir;
 use lazy_static::lazy_static;
 
 use self::util::TestLock;
-use crate::{
-    client::options::{ServerApi, ServerApiVersion},
-    options::{ClientOptions, Compressor},
-};
+use crate::{client::{auth::Credential, options::{ServerApi, ServerApiVersion}}, options::{ClientOptions, Compressor}};
 use std::{fs::read_to_string, str::FromStr};
 
 const MAX_POOL_SIZE: u32 = 100;
@@ -68,6 +65,10 @@ lazy_static! {
         matches!(std::env::var("ZLIB_COMPRESSION_ENABLED"), Ok(s) if s == "true");
     pub(crate) static ref SNAPPY_COMPRESSION_ENABLED: bool =
         matches!(std::env::var("SNAPPY_COMPRESSION_ENABLED"), Ok(s) if s == "true");
+    pub(crate) static ref SERVERLESS_ATLAS_USER: Option<String> =
+        std::env::var("SERVERLESS_ATLAS_USER").ok();
+    pub(crate) static ref SERVERLESS_ATLAS_PASSWORD: Option<String> =
+        std::env::var("SERVERLESS_ATLAS_PASSWORD").ok();
 }
 
 pub(crate) fn client_options_for_uri(uri: &str) -> ClientOptions {
@@ -81,6 +82,13 @@ pub(crate) fn client_options_for_uri(uri: &str) -> ClientOptions {
         options.test_options_mut().mock_service_id = true;
     }
     options.compressors = get_compressors();
+    if SERVERLESS_ATLAS_USER.is_some() || SERVERLESS_ATLAS_PASSWORD.is_some() {
+        options.credential = Some(Credential::builder()
+            .username(SERVERLESS_ATLAS_USER.clone())
+            .password(SERVERLESS_ATLAS_PASSWORD.clone())
+            .build()
+        );
+    }
     options
 }
 
