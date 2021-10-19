@@ -232,3 +232,35 @@ async fn parse_unknown_options() {
     .await;
     parse_uri("maxstalenessms", Some("maxstalenessseconds")).await;
 }
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn parse_with_default_database() {
+    let uri = "mongodb://localhost/abc";
+
+    assert_eq!(
+        ClientOptions::parse(uri).await.unwrap(),
+        ClientOptions {
+            hosts: vec![ServerAddress::Tcp { host: "localhost".to_string(), port: None }],
+            original_uri: Some(uri.into()),
+            default_database: Some("abc".to_string()),
+            ..Default::default()
+        }
+    );
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn parse_with_no_default_database() {
+    let uri = "mongodb://localhost/";
+
+    assert_eq!(
+        ClientOptions::parse(uri).await.unwrap(),
+        ClientOptions {
+            hosts: vec![ServerAddress::Tcp { host: "localhost".to_string(), port: None }],
+            original_uri: Some(uri.into()),
+            default_database: None,
+            ..Default::default()
+        }
+    );
+}

@@ -168,9 +168,10 @@ impl Client {
         Database::new(self.clone(), name, Some(options))
     }
 
-    /// Gets a handle to default datbaase specified by MongoDB connection URI.
+    /// Gets a handle to the default database specified in the `ClientOptions` or MongoDB connection string
+    /// used to construct this `Client`.
     ///
-    /// If connection URI specified no default database, None will be returned.
+    /// If no default database was specified, `None` will be returned.
     pub fn default_database(&self) -> Option<Database> {
         self.inner
             .options

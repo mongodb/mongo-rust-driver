@@ -977,6 +977,8 @@ impl ClientOptions {
     ///
     /// The format of a MongoDB connection string is described [here](https://docs.mongodb.com/manual/reference/connection-string/#connection-string-formats).
     ///
+    /// Note that [default_database](ClientOptions::default_database) will be set from `/defaultauthdb` in connection string.
+    ///
     /// The following options are supported in the options query string:
     ///
     ///   * `appName`: maps to the `app_name` field
@@ -2366,38 +2368,6 @@ mod tests {
                 local_threshold: Some(Duration::from_millis(4000)),
                 server_selection_timeout: Some(Duration::from_millis(2000)),
                 original_uri: Some(uri.into()),
-                ..Default::default()
-            }
-        );
-    }
-
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-    async fn with_default_database() {
-        let uri = "mongodb://localhost/abc";
-
-        assert_eq!(
-            ClientOptions::parse(uri).await.unwrap(),
-            ClientOptions {
-                hosts: vec![host_without_port("localhost")],
-                original_uri: Some(uri.into()),
-                default_database: Some("abc".to_string()),
-                ..Default::default()
-            }
-        );
-    }
-
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-    async fn with_no_default_database() {
-        let uri = "mongodb://localhost/";
-
-        assert_eq!(
-            ClientOptions::parse(uri).await.unwrap(),
-            ClientOptions {
-                hosts: vec![host_without_port("localhost")],
-                original_uri: Some(uri.into()),
-                default_database: None,
                 ..Default::default()
             }
         );
