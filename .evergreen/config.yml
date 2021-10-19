@@ -377,6 +377,30 @@ functions:
             MONGODB_API_VERSION=${MONGODB_API_VERSION} \
             .evergreen/run-tests.sh
 
+  "run serverless tests":
+    - command: shell.exec
+      type: test
+      params:
+        shell: bash
+        working_dir: "src"
+        script: |
+          ${PREPARE_SHELL}
+          export MONGODB_URI="${MONGODB_URI}"
+          export SSL="${SSL}"
+          export SINGLE_MONGOS_LB_URI="${SINGLE_ATLASPROXY_SERVERLESS_URI}"
+          export MULTI_MONGOS_LB_URI="${MULTI_ATLASPROXY_SERVERLESS_URI}"
+          . .evergreen/generate-uri.sh
+
+          SNAPPY_COMPRESSION_ENABLED="true" \
+          ZLIB_COMPRESSION_ENABLED="true" \
+          ZSTD_COMPRESSION_ENABLED="true" \
+          SERVERLESS_ATLAS_USER="${SERVERLESS_ATLAS_USER}" \
+          SERVERLESS_ATLAS_PASSWORD="${SERVERLESS_ATLAS_PASSWORD}" \
+          SINGLE_THREAD=${SINGLE_THREAD} \
+            ASYNC_RUNTIME=${ASYNC_RUNTIME} \
+            MONGODB_API_VERSION=${MONGODB_API_VERSION} \
+            .evergreen/run-serverless-tests.sh
+
   "run atlas tests":
     - command: shell.exec
       type: test
@@ -880,6 +904,11 @@ tasks:
   - name: "test-connection-string"
     commands:
       - func: "run connection string tests"
+
+  - name: "test-serverless"
+    tags: ["serverless"]
+    commands:
+      - func: "run serverless tests"
 
   - name: "test-atlas-connectivity"
     tags: ["atlas-connect"]
@@ -1387,6 +1416,52 @@ axes:
           REQUIRE_API_VERSION: "1"
           MONGODB_API_VERSION: "1"
 
+task_groups:
+  - name: serverless_task_group
+    setup_group_can_fail_task: true
+    setup_group_timeout_secs: 1800 # 30 minutes
+    setup_group:
+      - func: "fetch source"
+      - func: "prepare resources"
+      - func: "windows fix"
+      - func: "fix absolute paths"
+      - func: "init test-results"
+      - func: "make files executable"
+      - func: "install dependencies"
+      - command: shell.exec
+        params:
+          shell: "bash"
+          script: |
+            ${PREPARE_SHELL}
+            set +o xtrace
+            SERVERLESS_DRIVERS_GROUP=${SERVERLESS_DRIVERS_GROUP} \
+            SERVERLESS_API_PUBLIC_KEY=${SERVERLESS_API_PUBLIC_KEY} \
+            SERVERLESS_API_PRIVATE_KEY=${SERVERLESS_API_PRIVATE_KEY} \
+            LOADBALANCED=ON \
+              bash ${DRIVERS_TOOLS}/.evergreen/serverless/create-instance.sh
+      - command: expansions.update
+        params:
+          file: serverless-expansion.yml
+    teardown_group:
+      - command: shell.exec
+        params:
+          script: |
+            ${PREPARE_SHELL}
+            set +o xtrace
+            SERVERLESS_DRIVERS_GROUP=${SERVERLESS_DRIVERS_GROUP} \
+            SERVERLESS_API_PUBLIC_KEY=${SERVERLESS_API_PUBLIC_KEY} \
+            SERVERLESS_API_PRIVATE_KEY=${SERVERLESS_API_PRIVATE_KEY} \
+            SERVERLESS_INSTANCE_NAME=${SERVERLESS_INSTANCE_NAME} \
+              bash ${DRIVERS_TOOLS}/.evergreen/serverless/delete-instance.sh
+      - func: "stop load balancer"
+      - func: "stop mongo orchestration"
+      - func: "upload-mo-artifacts"
+      - func: "cleanup"
+
+    tasks:
+      - ".serverless"
+
+
 buildvariants:
 -
   matrix_name: "tests"
@@ -1476,6 +1551,15 @@ buildvariants:
   display_name: "${os} PLAIN auth with ${async-runtime}"
   tasks:
     - "test-plain-auth"
+
+- matrix_name: "serverless"
+  matrix_spec:
+    os:
+      - ubuntu-18.04
+    async-runtime: "*"
+  display_name: "Serverless ${os} with ${async-runtime}"
+  tasks:
+    - ".serverless"
 
 - matrix_name: "atlas-connect"
   matrix_spec:
