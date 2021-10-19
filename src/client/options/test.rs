@@ -53,6 +53,8 @@ async fn run_test(test_file: TestFile) {
                         )
                     )
                 )
+            // The Rust driver disallows `maxPoolSize=0`.
+            || test_case.description.contains("maxPoolSize=0 does not error")
         {
             continue;
         }

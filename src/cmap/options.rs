@@ -65,7 +65,7 @@ pub(crate) struct ConnectionPoolOptions {
     pub(crate) max_idle_time: Option<Duration>,
 
     /// The maximum number of connections that the pool can have at a given time. This includes
-    /// connections which are currently checked out of the pool.  A value of 0 means no limit.
+    /// connections which are currently checked out of the pool.
     ///
     /// The default is 10.
     pub(crate) max_pool_size: Option<u32>,

@@ -94,6 +94,13 @@ impl Error {
         .into()
     }
 
+    pub(crate) fn invalid_argument(message: impl Into<String>) -> Error {
+        ErrorKind::InvalidArgument {
+            message: message.into(),
+        }
+        .into()
+    }
+
     pub(crate) fn is_state_change_error(&self) -> bool {
         self.is_recovering() || self.is_not_master()
     }

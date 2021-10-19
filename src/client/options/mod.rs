@@ -449,8 +449,7 @@ pub struct ClientOptions {
     /// The maximum amount of connections that the Client should allow to be created in a
     /// connection pool for a given server. If an operation is attempted on a server while
     /// `max_pool_size` connections are checked out, the operation will block until an in-progress
-    /// operation finishes and its connection is checked back into the pool.  A value of 0 means no
-    /// limit.
+    /// operation finishes and its connection is checked back into the pool.
     ///
     /// The default value is 100.
     #[builder(default)]
@@ -1177,6 +1176,12 @@ impl ClientOptions {
             for compressor in compressors {
                 compressor.validate()?;
             }
+        }
+
+        if let Some(0) = self.max_pool_size {
+            return Err(crate::error::Error::invalid_argument(
+                "cannot specify maxPoolSize=0",
+            ));
         }
 
         Ok(())

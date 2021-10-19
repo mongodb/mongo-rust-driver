@@ -109,7 +109,7 @@ pub(crate) struct ConnectionPoolWorker {
     /// The maximum number of connections that the pool can manage, including connections checked
     /// out of the pool. If a thread requests a connection and the pool is empty + there are
     /// already max_pool_size connections in use, it will block until one is returned or the
-    /// wait_queue_timeout is exceeded.  A value of 0 means no limit.
+    /// wait_queue_timeout is exceeded.
     max_pool_size: u32,
 
     /// Receiver used to determine if any threads hold references to this pool. If all the
@@ -341,7 +341,7 @@ impl ConnectionPoolWorker {
     }
 
     fn below_max_connections(&self) -> bool {
-        self.max_pool_size == 0 || self.total_connection_count < self.max_pool_size
+        self.total_connection_count < self.max_pool_size
     }
 
     fn can_service_connection_request(&self) -> bool {
