@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 set -o errexit
 
@@ -21,5 +21,16 @@ fi
 
 echo "cargo test options: ${DEFAULT_FEATURES} --features $FEATURE_FLAGS ${OPTIONS}"
 
-SERVERLESS="serverless" \
-    RUST_BACKTRACE=1 cargo test ${DEFAULT_FEATURES} --features $FEATURE_FLAGS $OPTIONS
+cargo_test() {
+    SERVERLESS="serverless" \
+        RUST_BACKTRACE=1 cargo test ${DEFAULT_FEATURES} --features $FEATURE_FLAGS $1 $OPTIONS
+}
+
+cargo_test test::spec::crud
+cargo_test test::spec::retryable_reads
+cargo_test test::spec::retryable_writes
+cargo_test test::spec::versioned_api
+cargo_test test::spec::sessions
+cargo_test test::spec::transactions
+cargo_test test::spec::load_balancers
+cargo_test test::cursor

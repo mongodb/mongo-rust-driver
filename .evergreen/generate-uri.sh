@@ -22,7 +22,10 @@ update_uri() {
     else
         ORIG_URI="${ORIG_URI}/?"
     fi
-    echo "${ORIG_URI}tls=true&tlsCAFile=${CA_FILE}&tlsCertificateKeyFile=${CERT_FILE}&tlsAllowInvalidCertificates=true"
+    if [[ "$ORIG_URI" != *"tls=true"* ]]; then
+        ORIG_URI="${ORIG_URI}tls=true&"
+    fi
+    echo "${ORIG_URI}tlsCAFile=${CA_FILE}&tlsCertificateKeyFile=${CERT_FILE}&tlsAllowInvalidCertificates=true"
 }
 
 export MONGODB_URI="$(update_uri ${MONGODB_URI})"
