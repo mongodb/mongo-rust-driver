@@ -1178,6 +1178,12 @@ impl ClientOptions {
             }
         }
 
+        if let Some(0) = self.max_pool_size {
+            return Err(crate::error::Error::invalid_argument(
+                "cannot specify maxPoolSize=0",
+            ));
+        }
+
         Ok(())
     }
 

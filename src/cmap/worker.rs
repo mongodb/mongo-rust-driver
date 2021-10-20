@@ -340,6 +340,10 @@ impl ConnectionPoolWorker {
         });
     }
 
+    fn below_max_connections(&self) -> bool {
+        self.total_connection_count < self.max_pool_size
+    }
+
     fn can_service_connection_request(&self) -> bool {
         if !matches!(self.state, PoolState::Ready) {
             return false;
@@ -349,8 +353,7 @@ impl ConnectionPoolWorker {
             return true;
         }
 
-        self.total_connection_count < self.max_pool_size
-            && self.pending_connection_count < MAX_CONNECTING
+        self.below_max_connections() && self.pending_connection_count < MAX_CONNECTING
     }
 
     async fn check_out(&mut self, request: ConnectionRequest) {
@@ -381,7 +384,7 @@ impl ConnectionPoolWorker {
         }
 
         // otherwise, attempt to create a connection.
-        if self.total_connection_count < self.max_pool_size {
+        if self.below_max_connections() {
             let event_handler = self.event_handler.clone();
             let establisher = self.establisher.clone();
             let pending_connection = self.create_pending_connection();

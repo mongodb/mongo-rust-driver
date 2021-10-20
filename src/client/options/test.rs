@@ -53,6 +53,8 @@ async fn run_test(test_file: TestFile) {
                         )
                     )
                 )
+            // The Rust driver disallows `maxPoolSize=0`.
+            || test_case.description.contains("maxPoolSize=0 does not error")
         {
             continue;
         }
@@ -111,6 +113,15 @@ async fn run_test(test_file: TestFile) {
                             json_options
                                 .insert("tlsallowinvalidcertificates", !val.as_bool().unwrap());
                         }
+                    }
+
+                    // The default types parsed from the test file don't match those serialized
+                    // from the `ClientOptions` struct.
+                    if let Ok(min) = json_options.get_i32("minpoolsize") {
+                        json_options.insert("minpoolsize", Bson::Int64(min.into()));
+                    }
+                    if let Ok(max) = json_options.get_i32("maxpoolsize") {
+                        json_options.insert("maxpoolsize", Bson::Int64(max.into()));
                     }
 
                     options_doc = options_doc
