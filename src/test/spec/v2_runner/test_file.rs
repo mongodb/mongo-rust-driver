@@ -8,15 +8,7 @@ use serde::{Deserialize, Deserializer};
 use crate::{
     bson::Document,
     options::{FindOptions, ReadPreference, SelectionCriteria, SessionOptions},
-    test::{
-        spec::merge_uri_options,
-        EventClient,
-        FailPoint,
-        Serverless,
-        TestClient,
-        DEFAULT_URI,
-        SERVERLESS,
-    },
+    test::{spec::merge_uri_options, EventClient, FailPoint, Serverless, TestClient, DEFAULT_URI},
 };
 
 use super::{operation::Operation, test_event::CommandStartedEvent};
@@ -62,10 +54,8 @@ impl RunOn {
             }
         }
         if let Some(ref serverless) = self.serverless {
-            match serverless {
-                Serverless::Forbid if *SERVERLESS => return false,
-                Serverless::Require if !*SERVERLESS => return false,
-                _ => (),
+            if !serverless.can_run() {
+                return false;
             }
         }
         true

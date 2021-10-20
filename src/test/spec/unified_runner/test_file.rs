@@ -20,7 +20,7 @@ use crate::{
         SelectionCriteria,
         WriteConcern,
     },
-    test::{Serverless, TestClient, DEFAULT_URI, SERVERLESS},
+    test::{Serverless, TestClient, DEFAULT_URI},
 };
 
 #[derive(Debug, Deserialize)]
@@ -107,10 +107,8 @@ impl RunOnRequirement {
             }
         }
         if let Some(ref serverless) = self.serverless {
-            match serverless {
-                Serverless::Forbid if *SERVERLESS => return false,
-                Serverless::Require if !*SERVERLESS => return false,
-                _ => (),
+            if !serverless.can_run() {
+                return false;
             }
         }
         if let Some(ref auth) = self.auth {

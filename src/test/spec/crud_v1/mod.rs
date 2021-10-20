@@ -13,14 +13,21 @@ mod replace_one;
 mod update_many;
 mod update_one;
 
+use std::future::Future;
+
 use futures::stream::TryStreamExt;
 use serde::Deserialize;
 
 use crate::{bson::Document, Collection};
 
+use super::{run_spec_test, Serverless};
+
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct TestFile {
     pub data: Vec<Document>,
+    pub min_server_version: Option<String>,
+    pub(crate) serverless: Option<Serverless>,
     pub tests: Vec<TestCase>,
 }
 
@@ -57,4 +64,21 @@ pub async fn find_all(coll: &Collection<Document>) -> Vec<Document> {
         .try_collect()
         .await
         .unwrap()
+}
+
+pub async fn run_crud_v1_test<F, G>(spec: &[&str], run_test_file: F)
+where
+    F: Fn(TestFile) -> G,
+    G: Future<Output = ()>,
+{
+    run_spec_test(spec, |t: TestFile| async {
+        if let Some(ref serverless) = t.serverless {
+            if !serverless.can_run() {
+                return;
+            }
+        }
+
+        run_test_file(t).await
+    })
+    .await
 }
