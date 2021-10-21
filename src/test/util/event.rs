@@ -458,10 +458,7 @@ impl EventClient {
             use_multiple_mongoses.unwrap_or(false),
         )
         .await;
-        options
-            .test_options
-            .get_or_insert_with(Default::default)
-            .heartbeat_freq = heartbeat_freq;
+        options.test_options_mut().heartbeat_freq = heartbeat_freq;
         EventClient::with_options_and_handler(options, event_handler).await
     }
 

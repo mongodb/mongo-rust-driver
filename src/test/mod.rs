@@ -41,7 +41,11 @@ use std::{fs::read_to_string, str::FromStr};
 const MAX_POOL_SIZE: u32 = 100;
 
 lazy_static! {
-    pub(crate) static ref CLIENT_OPTIONS: ClientOptions = client_options_for_uri(&DEFAULT_URI);
+    pub(crate) static ref CLIENT_OPTIONS: ClientOptions = {
+        let mut options = ClientOptions::parse_without_srv_resolution(&DEFAULT_URI).unwrap();
+        update_options_for_testing(&mut options);
+        options
+    };
     pub(crate) static ref LOCK: TestLock = TestLock::new();
     pub(crate) static ref DEFAULT_URI: String = get_default_uri();
     pub(crate) static ref SERVER_API: Option<ServerApi> = match std::env::var("MONGODB_API_VERSION")
@@ -71,8 +75,7 @@ lazy_static! {
         std::env::var("SERVERLESS_ATLAS_PASSWORD").ok();
 }
 
-pub(crate) fn client_options_for_uri(uri: &str) -> ClientOptions {
-    let mut options = ClientOptions::parse_without_srv_resolution(uri).unwrap();
+pub(crate) fn update_options_for_testing(options: &mut ClientOptions) {
     options.max_pool_size = Some(MAX_POOL_SIZE);
     options.server_api = SERVER_API.clone();
     if LOAD_BALANCED_SINGLE_URI
@@ -89,7 +92,6 @@ pub(crate) fn client_options_for_uri(uri: &str) -> ClientOptions {
             .build()
         );
     }
-    options
 }
 
 fn get_compressors() -> Option<Vec<Compressor>> {

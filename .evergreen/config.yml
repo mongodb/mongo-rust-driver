@@ -384,6 +384,10 @@ functions:
         shell: bash
         working_dir: "src"
         script: |
+          # Exported before PREPARE_SHELL to avoid echo with xtrace
+          export SERVERLESS_ATLAS_USER="${SERVERLESS_ATLAS_USER}"
+          export SERVERLESS_ATLAS_PASSWORD="${SERVERLESS_ATLAS_PASSWORD}"
+
           ${PREPARE_SHELL}
           export MONGODB_URI="${MONGODB_URI}"
           export SSL="${SSL}"
@@ -394,8 +398,6 @@ functions:
           SNAPPY_COMPRESSION_ENABLED="true" \
           ZLIB_COMPRESSION_ENABLED="true" \
           ZSTD_COMPRESSION_ENABLED="true" \
-          SERVERLESS_ATLAS_USER="${SERVERLESS_ATLAS_USER}" \
-          SERVERLESS_ATLAS_PASSWORD="${SERVERLESS_ATLAS_PASSWORD}" \
           SINGLE_THREAD=${SINGLE_THREAD} \
             ASYNC_RUNTIME=${ASYNC_RUNTIME} \
             MONGODB_API_VERSION=${MONGODB_API_VERSION} \
