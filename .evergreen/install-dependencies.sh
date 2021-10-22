@@ -26,3 +26,7 @@ rustup toolchain install nightly -c rustfmt
 
 # Install tool for converting cargo test output to junit
 cargo install cargo2junit
+
+# Install tool for merging different junit reports into a single one
+npm install -g junit-report-merger
+
