@@ -1,21 +1,22 @@
-set -e
-set -x
+#! /usr/bin/env bash
 
-export BASEDIR="$PWD/.evergreen"
-export PATH="$BASEDIR/mingit/cmd:$BASEDIR/mingit/mingw64/libexec/git-core:$BASEDIR/git-2:$BASEDIR/node-v$NODE_JS_VERSION-win-x64:/opt/python/3.6/bin:/opt/chefdk/gitbin:/cygdrive/c/Python310/Scripts:/cygdrive/c/Python310:/cygdrive/c/cmake/bin:/opt/mongodbtoolchain/v3/bin:$PATH"
+export PATH="/opt/mongodbtoolchain/v2/bin:$PATH"
 
-. ~/.cargo/env
+source ~/.cargo/env
 
-if [ "$OS" != "Windows_NT" ]; then
-  if which realpath; then # No realpath on macOS, but also not needed there
-    export HOME="$(realpath "$HOME")" # Needed to de-confuse nvm when /home is a symlink
-  fi
-  export NVM_DIR="$HOME/.nvm"
-  echo "Setting NVM environment home: $NVM_DIR"
-  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-  export PATH="$NVM_BIN:$PATH"
+NODE_ARTIFACTS_PATH="${PROJECT_DIRECTORY}/node-artifacts"
+export NVM_DIR="${NODE_ARTIFACTS_PATH}/nvm"
 
-  if [ -x "$BASEDIR/git-2/git" ]; then
-    export GIT_EXEC_PATH="$BASEDIR/git-2"
-  fi
+if [[ "$OS" == "Windows_NT" ]]; then
+    NVM_HOME=$(cygpath -w "$NVM_DIR")
+    export NVM_HOME
+    NVM_SYMLINK=$(cygpath -w "$NODE_ARTIFACTS_PATH/bin")
+    export NVM_SYMLINK
+    NVM_ARTIFACTS_PATH=$(cygpath -w "$NODE_ARTIFACTS_PATH/bin")
+    export NVM_ARTIFACTS_PATH
+    PATH=$(cygpath $NVM_SYMLINK):$(cygpath $NVM_HOME):$PATH
+    export PATH
+    echo "updated path on windows PATH=$PATH"
+else
+    [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
 fi

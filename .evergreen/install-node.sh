@@ -1,38 +1,110 @@
-set -e
-set -x
+#!/bin/bash
+set -o errexit  # Exit the script with error if any of the commands fail
 
-export BASEDIR="$PWD/.evergreen"
-export PATH="$BASEDIR/mingit/cmd:$BASEDIR/mingit/mingw64/libexec/git-core:$BASEDIR/git-2:$BASEDIR/node-v$NODE_JS_VERSION-win-x64:/opt/python/3.6/bin:/opt/chefdk/gitbin:/cygdrive/c/Python310/Scripts:/cygdrive/c/Python310:/cygdrive/c/cmake/bin:/opt/mongodbtoolchain/v3/bin:$PATH"
+NVM_WINDOWS_URL="https://github.com/coreybutler/nvm-windows/releases/download/1.1.7/nvm-noinstall.zip"
+NVM_URL="https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh"
 
-if [ "$OS" == "Windows_NT" ]; then
-  powershell "$(cygpath -w "$BASEDIR")"/InstallNode.ps1
+NODE_LTS_NAME=${NODE_LTS_NAME:-erbium}
+MSVS_VERSION=${MSVS_VERSION:-2019}
+NODE_ARTIFACTS_PATH="${PROJECT_DIRECTORY}/node-artifacts"
+NPM_CACHE_DIR="${NODE_ARTIFACTS_PATH}/npm"
+NPM_TMP_DIR="${NODE_ARTIFACTS_PATH}/tmp"
 
-  # Explicitly grab a fresh portable Git for Windows build
-  curl -L https://github.com/git-for-windows/git/releases/download/v2.32.0.windows.2/MinGit-2.32.0.2-busybox-64-bit.zip -o "$BASEDIR/mingit-2.32.0.zip"
-  mkdir "$BASEDIR/mingit"
-  unzip "$BASEDIR/mingit-2.32.0.zip" -d "$BASEDIR/mingit"
+# this needs to be explicitly exported for the nvm install below
+export NVM_DIR="${NODE_ARTIFACTS_PATH}/nvm"
+export XDG_CONFIG_HOME=${NODE_ARTIFACTS_PATH}
+
+# create node artifacts path if needed
+mkdir -p ${NODE_ARTIFACTS_PATH}
+mkdir -p ${NPM_CACHE_DIR}
+mkdir -p "${NPM_TMP_DIR}"
+
+case $NODE_LTS_NAME in
+  "argon")
+    VERSION=4
+    ;;
+  "boron")
+    VERSION=6
+    ;;
+  "carbon")
+    VERSION=8
+    ;;
+  "dubnium")
+    VERSION=10
+    ;;
+  "erbium")
+    VERSION=12
+    ;;
+  "fermium")
+    VERSION=14
+    ;;
+  "gallium")
+    VERSION=16
+    ;;
+  "hydrogen")
+    VERSION=18
+    ;;
+  "iron")
+    VERSION=20
+    ;;
+  *)
+    echo "Unsupported Node LTS version $1"
+    exit 1
+    ;;
+esac
+
+NODE_VERSION=$(curl --retry 8 --retry-delay 5  --max-time 50 --silent -o- https://nodejs.org/download/release/latest-v${VERSION}.x/SHASUMS256.txt | head -n 1 | awk '{print $2};' | cut -d- -f2)
+export NODE_VERSION=${NODE_VERSION:1} # :1 gets rid of the leading 'v'
+
+# output node version to expansions file for use in subsequent scripts
+cat <<EOT > deps-expansion.yml
+  NODE_VERSION: "$NODE_VERSION"
+EOT
+
+# install Node.js on Windows
+if [[ "$OS" == "Windows_NT" ]]; then
+  # Delete pre-existing node to avoid version conflicts
+  rm -rf "/cygdrive/c/Program Files/nodejs"
+
+
+  NVM_HOME=$(cygpath -w "$NVM_DIR")
+  export NVM_HOME
+  NVM_SYMLINK=$(cygpath -w "$NODE_ARTIFACTS_PATH/bin")
+  export NVM_SYMLINK
+  NVM_ARTIFACTS_PATH=$(cygpath -w "$NODE_ARTIFACTS_PATH/bin")
+  export NVM_ARTIFACTS_PATH
+  PATH=$(cygpath $NVM_SYMLINK):$(cygpath $NVM_HOME):$PATH
+  export PATH
+
+  curl -L $NVM_WINDOWS_URL -o nvm.zip
+  unzip -d "$NVM_DIR" nvm.zip
+  rm nvm.zip
+
+  chmod 777 "$NVM_DIR"
+  chmod -R a+rx "$NVM_DIR"
+
+  cat <<EOT > "$NVM_DIR/settings.txt"
+root: $NVM_HOME
+path: $NVM_SYMLINK
+EOT
+  nvm install "$NODE_VERSION"
+  nvm use "$NODE_VERSION"
+  which node || echo "node not found, PATH=$PATH"
+  which npm || echo "npm not found, PATH=$PATH"
+  npm config set msvs_version ${MSVS_VERSION}
+  npm config set scripts-prepend-node-path true
+
+# install Node.js on Linux/MacOS
 else
-  if which realpath; then # No realpath on macOS, but also not needed there
-    export HOME="$(realpath "$HOME")" # Needed to de-confuse nvm when /home is a symlink
-  fi
-  export NVM_DIR="$HOME/.nvm"
+  curl -o- $NVM_URL | bash
+  [ -s "${NVM_DIR}/nvm.sh" ] && \. "${NVM_DIR}/nvm.sh"
+  nvm install --no-progress "$NODE_VERSION"
 
-  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
-
-  echo "Setting NVM environment home: $NVM_DIR"
-  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-  [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-
-  nvm install --no-progress $NODE_JS_VERSION
-  nvm alias default $NODE_JS_VERSION
-
-  if env PATH="/opt/chefdk/gitbin:$PATH" git --version | grep -q 'git version 1.'; then
-    (cd "$BASEDIR" &&
-      curl -sSfL https://github.com/git/git/archive/refs/tags/v2.31.1.tar.gz | tar -xvz &&
-      mv git-2.31.1 git-2 &&
-      cd git-2 &&
-      make -j8 NO_EXPAT=1)
-  fi
-
-  export PATH="$NVM_BIN:$PATH"
+  # setup npm cache in a local directory
+  cat <<EOT > .npmrc
+devdir=${NPM_CACHE_DIR}/.node-gyp
+init-module=${NPM_CACHE_DIR}/.npm-init.js
+cache=${NPM_CACHE_DIR}
+tmp=${NPM_TMP_DIR}
+EOT
 fi
