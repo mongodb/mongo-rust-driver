@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#!/bin/bash
 
 export PATH="/opt/mongodbtoolchain/v2/bin:$PATH"
 

@@ -1,8 +1,8 @@
-#!/bin/sh
+#!/bin/bash
 
 set -o errexit
 
-. ./.evergreen/env.sh
+source ./.evergreen/env.sh
 
 OPTIONS="-- -Z unstable-options --format json --report-time"
 
