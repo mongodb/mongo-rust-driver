@@ -2,7 +2,7 @@
 
 set -o errexit
 
-. ~/.cargo/env
+. ./.evergreen/env.sh
 
 OPTIONS="-- -Z unstable-options --format json --report-time"
 
