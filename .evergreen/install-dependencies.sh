@@ -27,6 +27,14 @@ rustup toolchain install nightly -c rustfmt
 # Install tool for converting cargo test output to junit
 cargo install cargo2junit
 
+# install npm/node
+NODE_JS_VERSION="14.18.1" . ./.evergreen/install-node.sh
+
+which node
+which npm
+node --version
+npm --version
+
 # Install tool for merging different junit reports into a single one
 npm install -g junit-report-merger
 
