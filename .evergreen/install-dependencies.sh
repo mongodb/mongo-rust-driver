@@ -23,3 +23,6 @@ echo "export CARGO_NET_GIT_FETCH_WITH_CLI=true" >> ~/.cargo/env
 
 # Install nightly rustfmt
 rustup toolchain install nightly -c rustfmt
+
+# Install tool for converting cargo test output to junit
+cargo install cargo2junit
