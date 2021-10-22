@@ -68,7 +68,7 @@ pub enum AuthMechanism {
     Gssapi,
 
     /// The SASL PLAIN mechanism, as defined in [RFC 4616](), is used in MongoDB to perform LDAP
-    /// authentication and cannot be used for any other type of authenticaiton.
+    /// authentication and cannot be used for any other type of authentication.
     /// Since the credentials are stored outside of MongoDB, the "$external" database must be used
     /// for authentication.
     ///
