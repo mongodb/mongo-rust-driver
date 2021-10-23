@@ -177,7 +177,7 @@ impl Client {
             .options
             .default_database
             .as_ref()
-            .map(|db_name| Database::new(self.clone(), db_name, None))
+            .map(|db_name| self.database(db_name))
     }
 
     async fn list_databases_common(
