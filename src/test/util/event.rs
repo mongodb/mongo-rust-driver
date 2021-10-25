@@ -64,10 +64,10 @@ pub enum Event {
 
 #[derive(Clone, Debug)]
 pub enum SdamEvent {
-    ServerDescriptionChanged(ServerDescriptionChangedEvent),
+    ServerDescriptionChanged(Box<ServerDescriptionChangedEvent>),
     ServerOpening(ServerOpeningEvent),
     ServerClosed(ServerClosedEvent),
-    TopologyDescriptionChanged(TopologyDescriptionChangedEvent),
+    TopologyDescriptionChanged(Box<TopologyDescriptionChangedEvent>),
     TopologyOpening(TopologyOpeningEvent),
     TopologyClosed(TopologyClosedEvent),
     ServerHeartbeatStarted(ServerHeartbeatStartedEvent),
@@ -293,7 +293,7 @@ impl CmapEventHandler for EventHandler {
 
 impl SdamEventHandler for EventHandler {
     fn handle_server_description_changed_event(&self, event: ServerDescriptionChangedEvent) {
-        let event = SdamEvent::ServerDescriptionChanged(event);
+        let event = SdamEvent::ServerDescriptionChanged(Box::new(event));
         self.handle(event.clone());
         self.sdam_events.write().unwrap().push_back(event);
     }
@@ -311,7 +311,7 @@ impl SdamEventHandler for EventHandler {
     }
 
     fn handle_topology_description_changed_event(&self, event: TopologyDescriptionChangedEvent) {
-        let event = SdamEvent::TopologyDescriptionChanged(event);
+        let event = SdamEvent::TopologyDescriptionChanged(Box::new(event));
         self.handle(event.clone());
         self.sdam_events.write().unwrap().push_back(event);
     }

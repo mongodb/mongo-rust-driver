@@ -17,7 +17,7 @@ use crate::{
 #[derive(Debug, Deserialize)]
 pub enum TestSdamEvent {
     #[serde(rename = "server_description_changed_event")]
-    ServerDescriptionChanged(TestServerDescriptionChangedEvent),
+    ServerDescriptionChanged(Box<TestServerDescriptionChangedEvent>),
     #[serde(rename = "server_opening_event")]
     ServerOpening(ServerOpeningEvent),
     #[serde(rename = "server_closed_event")]
@@ -34,12 +34,12 @@ impl PartialEq<TestSdamEvent> for SdamEvent {
     fn eq(&self, other: &TestSdamEvent) -> bool {
         match (self, other) {
             (Self::ServerDescriptionChanged(s), TestSdamEvent::ServerDescriptionChanged(o)) => {
-                s == o
+                s.as_ref() == o.as_ref()
             }
             (Self::ServerOpening(s), TestSdamEvent::ServerOpening(o)) => s.address == o.address,
             (Self::ServerClosed(s), TestSdamEvent::ServerClosed(o)) => s.address == o.address,
             (Self::TopologyDescriptionChanged(s), TestSdamEvent::TopologyDescriptionChanged(o)) => {
-                s == o
+                s.as_ref() == o
             }
             (Self::TopologyOpening(_), TestSdamEvent::TopologyOpening(_)) => true,
             (Self::TopologyClosed(_), TestSdamEvent::TopologyClosed(_)) => true,

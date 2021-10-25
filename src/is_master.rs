@@ -233,20 +233,18 @@ impl IsMasterCommandResponse {
         if self.msg.as_deref() == Some("isdbgrid") {
             ServerType::Mongos
         } else if self.set_name.is_some() {
-            if let Some(true) = self.hidden {
+            if self.hidden == Some(true) {
                 ServerType::RsOther
-            } else if let Some(true) = self.is_writable_primary {
+            } else if self.is_writable_primary == Some(true) || self.is_master == Some(true) {
                 ServerType::RsPrimary
-            } else if let Some(true) = self.is_master {
-                ServerType::RsPrimary
-            } else if let Some(true) = self.secondary {
+            } else if self.secondary == Some(true) {
                 ServerType::RsSecondary
-            } else if let Some(true) = self.arbiter_only {
+            } else if self.arbiter_only == Some(true) {
                 ServerType::RsArbiter
             } else {
                 ServerType::RsOther
             }
-        } else if let Some(true) = self.is_replica_set {
+        } else if self.is_replica_set == Some(true) {
             ServerType::RsGhost
         } else {
             ServerType::Standalone

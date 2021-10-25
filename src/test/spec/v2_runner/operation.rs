@@ -130,8 +130,10 @@ impl<'de> Deserialize<'de> for Operation {
             pub arguments: Document,
             pub error: Option<bool>,
             pub result: Option<OperationResult>,
+            // We don't need to use this field, but it needs to be included during deserialization
+            // so that we can use the deny_unknown_fields tag.
             #[serde(rename = "command_name")]
-            pub command_name: Option<String>,
+            pub _command_name: Option<String>,
         }
 
         fn default_arguments() -> Document {
@@ -1438,13 +1440,19 @@ impl TestOperation for ListIndexes {
             let indexes: Vec<IndexModel> = match session {
                 Some(session) => {
                     collection
-                        .list_indexes_with_session(None, session)
+                        .list_indexes_with_session(self.options.clone(), session)
                         .await?
                         .stream(session)
                         .try_collect()
                         .await?
                 }
-                None => collection.list_indexes(None).await?.try_collect().await?,
+                None => {
+                    collection
+                        .list_indexes(self.options.clone())
+                        .await?
+                        .try_collect()
+                        .await?
+                }
             };
             let indexes: Vec<Document> = indexes
                 .iter()

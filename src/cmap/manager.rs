@@ -27,7 +27,7 @@ impl PoolManager {
         if self
             .sender
             .send(PoolManagementRequest::Clear {
-                completion_handler: message,
+                _completion_handler: message,
                 cause,
                 service_id,
             })
@@ -43,7 +43,7 @@ impl PoolManager {
         if self
             .sender
             .send(PoolManagementRequest::MarkAsReady {
-                completion_handler: message,
+                _completion_handler: message,
             })
             .is_ok()
         {
@@ -54,7 +54,10 @@ impl PoolManager {
     /// Check in the given connection to the pool.
     /// This returns an error containing the connection if the pool has been dropped already.
     pub(crate) fn check_in(&self, connection: Connection) -> std::result::Result<(), Connection> {
-        if let Err(request) = self.sender.send(PoolManagementRequest::CheckIn(connection)) {
+        if let Err(request) = self
+            .sender
+            .send(PoolManagementRequest::CheckIn(Box::new(connection)))
+        {
             let conn = request.0.unwrap_check_in();
             return Err(conn);
         }
@@ -99,18 +102,18 @@ impl ManagementRequestReceiver {
 pub(super) enum PoolManagementRequest {
     /// Clear the pool, transitioning it to Paused.
     Clear {
-        completion_handler: AcknowledgedMessage<()>,
+        _completion_handler: AcknowledgedMessage<()>,
         cause: Error,
         service_id: Option<ObjectId>,
     },
 
     /// Mark the pool as Ready, allowing connections to be created and checked out.
     MarkAsReady {
-        completion_handler: AcknowledgedMessage<()>,
+        _completion_handler: AcknowledgedMessage<()>,
     },
 
     /// Check in the given connection.
-    CheckIn(Connection),
+    CheckIn(Box<Connection>),
 
     /// Update the pool based on the given establishment error.
     HandleConnectionFailed,
@@ -127,7 +130,7 @@ pub(super) enum PoolManagementRequest {
 impl PoolManagementRequest {
     fn unwrap_check_in(self) -> Connection {
         match self {
-            PoolManagementRequest::CheckIn(conn) => conn,
+            PoolManagementRequest::CheckIn(conn) => *conn,
             _ => panic!("tried to unwrap checkin but got {:?}", self),
         }
     }
@@ -135,7 +138,7 @@ impl PoolManagementRequest {
 
 #[derive(Debug)]
 pub(super) enum ConnectionSucceeded {
-    ForPool(Connection),
+    ForPool(Box<Connection>),
     Used { service_id: Option<ObjectId> },
 }
 

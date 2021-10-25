@@ -58,7 +58,7 @@ impl TestTopologyDescription {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct TestServerDescription {
     address: String,
     #[serde(rename = "avg_rtt_ms")]
@@ -68,7 +68,9 @@ struct TestServerDescription {
     tags: Option<TagSet>,
     last_update_time: Option<i32>,
     last_write: Option<LastWriteDate>,
-    max_wire_version: Option<i32>,
+    // We don't need to use this field, but it needs to be included during deserialization so that
+    // we can use the deny_unknown_fields tag.
+    _max_wire_version: Option<i32>,
 }
 
 impl TestServerDescription {

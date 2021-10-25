@@ -100,7 +100,7 @@ async fn deserialize_recovery_token() {
 
     #[derive(Debug, Deserialize)]
     struct B {
-        str: String,
+        _str: String,
     }
 
     let client = TestClient::new().await;

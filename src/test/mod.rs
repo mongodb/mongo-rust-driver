@@ -84,6 +84,7 @@ pub(crate) fn client_options_for_uri(uri: &str) -> ClientOptions {
     options
 }
 
+#[allow(clippy::if_then_panic)]
 fn get_compressors() -> Option<Vec<Compressor>> {
     #[allow(unused_mut)]
     let mut compressors = vec![];

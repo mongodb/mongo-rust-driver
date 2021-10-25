@@ -141,10 +141,7 @@ async fn find() {
 
     while let Some((i, result)) = cursor.next().await {
         let doc = result.unwrap();
-        if i > 4 {
-            panic!("expected 4 result, got {}", i);
-        }
-
+        assert!(i <= 4, "expected 4 result, got {}", i);
         assert_eq!(doc.len(), 2);
         assert!(doc.contains_key("_id"));
         assert_eq!(doc.get("x"), Some(&Bson::Int32(i as i32)));

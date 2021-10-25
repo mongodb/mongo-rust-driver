@@ -121,9 +121,10 @@ impl TestRunner {
                     if TestClient::new().await.is_sharded() {
                         match client.use_multiple_mongoses {
                             Some(true) => {
-                                if options.hosts.len() <= 1 {
-                                    panic!("Test requires multiple mongos hosts");
-                                }
+                                assert!(
+                                    options.hosts.len() > 1,
+                                    "Test requires multiple mongos hosts"
+                                );
                             }
                             Some(false) => {
                                 options.hosts.drain(1..);
@@ -183,9 +184,12 @@ impl TestRunner {
                     panic!("GridFS not implemented");
                 }
             };
-            if self.entities.insert(id.clone(), entity).is_some() {
-                panic!("Entity with id {} already present in entity map", id);
-            }
+            let previous_entity = self.entities.insert(id.clone(), entity);
+            assert!(
+                previous_entity.is_none(),
+                "Entity with id {} already present in entity map",
+                id
+            );
         }
     }
 

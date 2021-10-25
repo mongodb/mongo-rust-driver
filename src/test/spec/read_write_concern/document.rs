@@ -15,6 +15,9 @@ struct TestFile {
 }
 
 #[derive(Debug, Deserialize)]
+// TODO RUST-1077: remove the #[allow(dead_code)] tag and add #[serde(deny_unknown_fields)] to
+// ensure these tests are being fully run
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 struct TestCase {
     pub description: String,

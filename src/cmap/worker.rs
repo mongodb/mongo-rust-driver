@@ -171,8 +171,7 @@ impl ConnectionPoolWorker {
             .map(|pool_options| ConnectionOptions::from(pool_options.clone()));
 
         let (handle, handle_listener) = handle_channel();
-        let (connection_requester, request_receiver) =
-            connection_requester::channel(address.clone(), handle);
+        let (connection_requester, request_receiver) = connection_requester::channel(handle);
         let (manager, management_receiver) = manager::channel();
 
         let is_load_balanced = options
@@ -292,31 +291,29 @@ impl ConnectionPoolWorker {
                         ));
                     }
                 },
-                PoolTask::HandleManagementRequest(PoolManagementRequest::CheckIn(connection)) => {
-                    self.check_in(connection);
-                }
-                PoolTask::HandleManagementRequest(PoolManagementRequest::Clear {
-                    completion_handler: _,
-                    cause,
-                    service_id,
-                }) => {
-                    self.clear(cause, service_id);
-                }
-                PoolTask::HandleManagementRequest(PoolManagementRequest::MarkAsReady {
-                    completion_handler: _handler,
-                }) => {
-                    self.mark_as_ready();
-                }
-                PoolTask::HandleManagementRequest(
-                    PoolManagementRequest::HandleConnectionSucceeded(conn),
-                ) => self.handle_connection_succeeded(conn),
-                PoolTask::HandleManagementRequest(
-                    PoolManagementRequest::HandleConnectionFailed,
-                ) => self.handle_connection_failed(),
-                #[cfg(test)]
-                PoolTask::HandleManagementRequest(PoolManagementRequest::Sync(tx)) => {
-                    let _ = tx.send(());
-                }
+                PoolTask::HandleManagementRequest(request) => match *request {
+                    PoolManagementRequest::CheckIn(connection) => {
+                        self.check_in(*connection);
+                    }
+                    PoolManagementRequest::Clear {
+                        cause, service_id, ..
+                    } => {
+                        self.clear(cause, service_id);
+                    }
+                    PoolManagementRequest::MarkAsReady { .. } => {
+                        self.mark_as_ready();
+                    }
+                    PoolManagementRequest::HandleConnectionSucceeded(conn) => {
+                        self.handle_connection_succeeded(conn);
+                    }
+                    PoolManagementRequest::HandleConnectionFailed => {
+                        self.handle_connection_failed();
+                    }
+                    #[cfg(test)]
+                    PoolManagementRequest::Sync(tx) => {
+                        let _ = tx.send(());
+                    }
+                },
                 PoolTask::Maintenance => {
                     self.perform_maintenance();
                 }
@@ -372,7 +369,7 @@ impl ConnectionPoolWorker {
             }
 
             conn.mark_as_in_use(self.manager.clone());
-            if let Err(request) = request.fulfill(ConnectionRequestResult::Pooled(conn)) {
+            if let Err(request) = request.fulfill(ConnectionRequestResult::Pooled(Box::new(conn))) {
                 // checking out thread stopped listening, indicating it hit the WaitQueue
                 // timeout, so we put connection back into pool.
                 let mut connection = request.unwrap_pooled_connection();
@@ -466,7 +463,8 @@ impl ConnectionPoolWorker {
             let count = self.service_connection_count.entry(sid).or_insert(0);
             *count += 1;
         }
-        if let ConnectionSucceeded::ForPool(mut connection) = connection {
+        if let ConnectionSucceeded::ForPool(connection) = connection {
+            let mut connection = *connection;
             connection.mark_as_available();
             self.available_connections.push_back(connection);
         }
@@ -623,8 +621,9 @@ impl ConnectionPoolWorker {
                     .await;
 
                     if let Ok(connection) = connection {
-                        manager
-                            .handle_connection_succeeded(ConnectionSucceeded::ForPool(connection))
+                        manager.handle_connection_succeeded(ConnectionSucceeded::ForPool(Box::new(
+                            connection,
+                        )))
                     }
                 });
             }
@@ -690,7 +689,7 @@ enum PoolState {
 #[derive(Debug)]
 enum PoolTask {
     /// Handle a management request from a `PoolManager`.
-    HandleManagementRequest(PoolManagementRequest),
+    HandleManagementRequest(Box<PoolManagementRequest>),
 
     /// Fulfill the given connection request.
     CheckOut(ConnectionRequest),
@@ -701,7 +700,7 @@ enum PoolTask {
 
 impl From<PoolManagementRequest> for PoolTask {
     fn from(request: PoolManagementRequest) -> Self {
-        PoolTask::HandleManagementRequest(request)
+        PoolTask::HandleManagementRequest(Box::new(request))
     }
 }
 
@@ -709,14 +708,17 @@ impl From<PoolManagementRequest> for PoolTask {
 /// to it.
 fn handle_channel() -> (PoolWorkerHandle, HandleListener) {
     let (sender, receiver) = mpsc::channel(1);
-    (PoolWorkerHandle { sender }, HandleListener { receiver })
+    (
+        PoolWorkerHandle { _sender: sender },
+        HandleListener { receiver },
+    )
 }
 
 /// Handle to the worker. Once all handles have been dropped, the worker
 /// will stop waiting for new requests and drop the pool itself.
 #[derive(Debug, Clone)]
 pub(super) struct PoolWorkerHandle {
-    sender: mpsc::Sender<()>,
+    _sender: mpsc::Sender<()>,
 }
 
 impl PoolWorkerHandle {

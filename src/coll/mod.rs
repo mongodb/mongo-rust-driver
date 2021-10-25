@@ -1060,6 +1060,7 @@ where
             let docs: Vec<&T> = ds.iter().skip(n_attempted).map(Borrow::borrow).collect();
             let insert = Insert::new(self.namespace(), docs, options.clone());
 
+            #[allow(clippy::needless_option_as_deref)]
             match self
                 .client()
                 .execute_operation(insert, session.as_deref_mut())

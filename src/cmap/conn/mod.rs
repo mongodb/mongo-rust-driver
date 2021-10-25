@@ -409,6 +409,7 @@ impl Drop for Connection {
                     // check the connection back in.
                     Err(mpsc::error::TrySendError::Full(mut conn)) => {
                         // Panic in debug mode
+                        #[allow(clippy::if_then_panic)]
                         if cfg!(debug_assertions) {
                             panic!(
                                 "buffer full when attempting to return a pinned connection (id = \

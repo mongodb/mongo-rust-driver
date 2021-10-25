@@ -146,6 +146,8 @@ pub(crate) struct Handshaker {
     credential: Option<Credential>,
     #[cfg(test)]
     mock_service_id: bool,
+    // This field is not read without a compression feature flag turned on.
+    #[allow(dead_code)]
     compressors: Option<Vec<Compressor>>,
 }
 
@@ -286,8 +288,13 @@ impl Handshaker {
                 .iter()
                 .find(|c| server_compressors.iter().any(|x| c.name() == x))
             {
+                // Without a feature flag turned on, the Compressor enum is empty which causes an
+                // unreachable code warning.
+                #[allow(unreachable_code)]
                 // zlib compression level is already set
-                conn.compressor = Some(compressor.clone());
+                {
+                    conn.compressor = Some(compressor.clone());
+                }
             }
         }
 

@@ -7,6 +7,9 @@ use crate::{bson_util, cmap::options::ConnectionPoolOptions, error::Result, test
 use bson::Document;
 
 #[derive(Debug, Deserialize)]
+// TODO RUST-1079: remove the #[allow(dead_code)] tag and add #[serde(deny_unknown_fields)] to
+// ensure these tests are being fully run
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 pub struct TestFile {
     version: u8,
@@ -83,6 +86,9 @@ pub enum Operation {
 }
 
 #[derive(Debug, Deserialize)]
+// TODO RUST-1077: remove the #[allow(dead_code)] tag and add #[serde(deny_unknown_fields)] to
+// ensure these tests are being fully run
+#[allow(dead_code)]
 pub struct Error {
     #[serde(rename = "type")]
     pub type_: String,
