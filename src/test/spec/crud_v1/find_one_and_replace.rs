@@ -3,11 +3,11 @@ use std::cmp;
 use serde::Deserialize;
 use tokio::sync::RwLockReadGuard;
 
-use super::{Outcome, TestFile};
+use super::{run_crud_v1_test, Outcome, TestFile};
 use crate::{
     bson::{Bson, Document},
     options::{Collation, FindOneAndReplaceOptions, ReturnDocument},
-    test::{run_spec_test, util::TestClient, LOCK},
+    test::{util::TestClient, LOCK},
 };
 
 #[derive(Debug, Deserialize)]
@@ -100,5 +100,5 @@ async fn run_find_one_and_replace_test(test_file: TestFile) {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
-    run_spec_test(&["crud", "v1", "write"], run_find_one_and_replace_test).await;
+    run_crud_v1_test(&["crud", "v1", "write"], run_find_one_and_replace_test).await;
 }

@@ -42,7 +42,7 @@ pub use self::{
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::Value;
 
-use crate::bson::Bson;
+use crate::{bson::Bson, test::SERVERLESS};
 
 pub(crate) async fn run_spec_test<T, F, G>(spec: &[&str], run_test_file: F)
 where
@@ -117,4 +117,14 @@ pub(crate) enum Serverless {
     Require,
     Forbid,
     Allow,
+}
+
+impl Serverless {
+    pub(crate) fn can_run(&self) -> bool {
+        match self {
+            Self::Forbid if *SERVERLESS => false,
+            Self::Require if !*SERVERLESS => false,
+            _ => true,
+        }
+    }
 }
