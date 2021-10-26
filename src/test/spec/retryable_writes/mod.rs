@@ -79,8 +79,8 @@ async fn run_spec_tests() {
             if let Some(ref mut fail_point) = test_case.fail_point {
                 // TODO: DRIVERS-1385 remove this logic for moving errorLabels to the top level.
                 if let Some(Bson::Document(data)) = fail_point.get_mut("data") {
-                    if let Some(Bson::Document(wc_error)) = data.get_mut("writeConcernError") {
-                        if let Some(labels) = wc_error.remove("errorLabels") {
+                    if let Some(Bson::Document(wc_error)) = data.get("writeConcernError") {
+                        if let Some(labels) = wc_error.get("errorLabels").cloned() {
                             data.insert("errorLabels", labels);
                         }
                     }

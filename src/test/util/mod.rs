@@ -448,7 +448,7 @@ pub fn get_default_name(description: &str) -> String {
         .replace('$', "%")
         .replace(' ', "_")
         .replace('.', "_");
-    // database names must have fewer than 64 characters
-    db_name.truncate(63);
+    // database names must have fewer than 38 characters
+    db_name.truncate(37);
     db_name
 }

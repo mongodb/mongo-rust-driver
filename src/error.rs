@@ -138,7 +138,20 @@ impl Error {
     }
 
     pub(crate) fn is_write_retryable(&self) -> bool {
-        self.contains_label(RETRYABLE_WRITE_ERROR)
+        self.contains_label(RETRYABLE_WRITE_ERROR) || self.is_write_concern_write_retryable()
+    }
+
+    fn is_write_concern_write_retryable(&self) -> bool {
+        self.get_write_concern_error()
+            .map_or(false, |err| err.labels.iter().any(|l| l == RETRYABLE_WRITE_ERROR))
+    }
+
+    fn get_write_concern_error(&self) -> Option<&WriteConcernError> {
+        match &*self.kind {
+            ErrorKind::BulkWrite(BulkWriteFailure { write_concern_error, .. }) => write_concern_error.as_ref(),
+            ErrorKind::Write(WriteFailure::WriteConcernError(err)) => Some(err),
+            _ => None,
+        }
     }
 
     /// Whether a "RetryableWriteError" label should be added to this error. If max_wire_version
@@ -473,6 +486,10 @@ pub struct WriteConcernError {
     /// A document identifying the write concern setting related to the error.
     #[serde(rename = "errInfo")]
     pub details: Option<Document>,
+
+    /// Labels categorizing the error.
+    #[serde(rename = "errorLabels")]
+    pub labels: Vec<String>,
 }
 
 /// An error that occurred during a write operation that wasn't due to being unable to satisfy a
