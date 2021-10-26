@@ -45,7 +45,6 @@ async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<Collectio
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-#[allow(clippy::if_then_panic)]
 async fn is_master() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 

@@ -191,13 +191,7 @@ pub async fn run_unified_format_test_filtered(
                                     }
                                 }
                                 if let Some(id) = save_as_entity {
-                                    let previous_entity =
-                                        test_runner.entities.insert(id.clone(), entity);
-                                    assert!(
-                                        previous_entity.is_none(),
-                                        "Entity with id {} already present in entity map",
-                                        id
-                                    );
+                                    test_runner.insert_entity(id.clone(), entity);
                                 }
                             }
                         }
