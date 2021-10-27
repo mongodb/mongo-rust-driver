@@ -191,7 +191,7 @@ pub async fn run_unified_format_test_filtered(
                                     }
                                 }
                                 if let Some(id) = save_as_entity {
-                                    test_runner.insert_entity(&id, entity);
+                                    test_runner.insert_entity(id, entity);
                                 }
                             }
                         }
