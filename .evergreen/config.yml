@@ -626,6 +626,11 @@ functions:
           ${PREPARE_SHELL}
           ${DRIVERS_TOOLS}/.evergreen/run-load-balancer.sh stop
 
+  "upload test results":
+    - command: attach.xunit_results
+      params:
+        file: src/results.xml
+
 pre:
   - func: "fetch source"
   - func: "prepare resources"
@@ -638,6 +643,7 @@ pre:
 post:
   - func: "stop load balancer"
   - func: "stop mongo orchestration"
+  - func: "upload test results"
   - func: "upload-mo-artifacts"
   - func: "cleanup"
 

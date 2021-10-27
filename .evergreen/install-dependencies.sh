@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Make sure to use msvc toolchain rather than gnu, which is the default for cygwin
 if [ "Windows_NT" == "$OS" ]; then
@@ -19,7 +19,19 @@ echo 'export PATH=$PATH:~/.cargo/bin' >> ~/.cargo/env
 
 echo "export CARGO_NET_GIT_FETCH_WITH_CLI=true" >> ~/.cargo/env
 
-. ~/.cargo/env
+source ~/.cargo/env
 
 # Install nightly rustfmt
 rustup toolchain install nightly -c rustfmt
+
+# Install tool for converting cargo test output to junit
+cargo install cargo2junit
+
+# install npm/node
+./.evergreen/install-node.sh
+
+source ./.evergreen/env.sh
+
+# Install tool for merging different junit reports into a single one
+npm install -g junit-report-merger
+
