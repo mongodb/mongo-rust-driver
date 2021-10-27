@@ -184,13 +184,13 @@ impl TestRunner {
                     panic!("GridFS not implemented");
                 }
             };
-            self.insert_entity(id.clone(), entity);
+            self.insert_entity(&id, entity);
         }
     }
 
-    pub fn insert_entity(&mut self, id: String, entity: Entity) {
-        if self.entities.insert(id.clone(), entity).is_some() {
-            panic!("Entity with id {} already present in entity map", id,);
+    pub fn insert_entity(&mut self, id: &str, entity: Entity) {
+        if self.entities.insert(id.to_string(), entity).is_some() {
+            panic!("Entity with id {} already present in entity map", id);
         }
     }
 
