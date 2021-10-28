@@ -179,6 +179,8 @@ async fn run_spec_tests() {
                     .await
                     .unwrap();
             }
+
+            let _ = client.database(&db_name).drop(None).await;
         }
     }
 

@@ -45,16 +45,20 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub struct Error {
     /// The type of error that occurred.
     pub kind: Box<ErrorKind>,
-    pub(crate) labels: HashSet<String>,
+    labels: HashSet<String>,
 }
 
 impl Error {
     pub(crate) fn new(kind: ErrorKind, labels: Option<impl IntoIterator<Item = String>>) -> Self {
+        let mut labels: HashSet<String> = labels
+            .map(|labels| labels.into_iter().collect())
+            .unwrap_or_default();
+        if let Some(wc) = kind.get_write_concern_error() {
+            labels.extend(wc.labels.clone());
+        }
         Self {
             kind: Box::new(kind),
-            labels: labels
-                .map(|labels| labels.into_iter().collect())
-                .unwrap_or_default(),
+            labels,
         }
     }
 
@@ -138,20 +142,7 @@ impl Error {
     }
 
     pub(crate) fn is_write_retryable(&self) -> bool {
-        self.contains_label(RETRYABLE_WRITE_ERROR) || self.is_write_concern_write_retryable()
-    }
-
-    fn is_write_concern_write_retryable(&self) -> bool {
-        self.get_write_concern_error()
-            .map_or(false, |err| err.labels.iter().any(|l| l == RETRYABLE_WRITE_ERROR))
-    }
-
-    fn get_write_concern_error(&self) -> Option<&WriteConcernError> {
-        match &*self.kind {
-            ErrorKind::BulkWrite(BulkWriteFailure { write_concern_error, .. }) => write_concern_error.as_ref(),
-            ErrorKind::Write(WriteFailure::WriteConcernError(err)) => Some(err),
-            _ => None,
-        }
+        self.contains_label(RETRYABLE_WRITE_ERROR)
     }
 
     /// Whether a "RetryableWriteError" label should be added to this error. If max_wire_version
@@ -331,10 +322,7 @@ where
     ErrorKind: From<E>,
 {
     fn from(err: E) -> Self {
-        Self {
-            kind: Box::new(err.into()),
-            labels: Default::default(),
-        }
+        Error::new(err.into(), None::<Option<String>>)
     }
 }
 
@@ -444,6 +432,16 @@ pub enum ErrorKind {
     #[error("The server does not support a database operation: {message}")]
     #[non_exhaustive]
     IncompatibleServer { message: String },
+}
+
+impl ErrorKind {
+    fn get_write_concern_error(&self) -> Option<&WriteConcernError> {
+        match self {
+            ErrorKind::BulkWrite(BulkWriteFailure { write_concern_error, .. }) => write_concern_error.as_ref(),
+            ErrorKind::Write(WriteFailure::WriteConcernError(err)) => Some(err),
+            _ => None,
+        }
+    }
 }
 
 /// An error that occurred due to a database command failing.
