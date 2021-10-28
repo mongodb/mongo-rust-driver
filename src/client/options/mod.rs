@@ -519,7 +519,7 @@ pub struct ClientOptions {
 
     /// Default database for this client.
     ///
-    /// By detault, no default database is specified.
+    /// By default, no default database is specified.
     #[builder(default)]
     pub default_database: Option<String>,
 

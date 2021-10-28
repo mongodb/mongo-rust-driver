@@ -94,7 +94,7 @@ fn default_database() {
     let default_db = client.default_database().expect("shoulld have a default database.");
     assert_eq!(default_db.name(), "abcd");
 
-    // creeate client directly through uri_str.
+    // create client directly through uri_str.
     let client = Client::with_uri_str("mongodb://localhost:27017/abcd").expect("client creation should succeed");
     let default_db = client.default_database().expect("shoulld have a default database.");
     assert_eq!(default_db.name(), "abcd");
