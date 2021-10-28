@@ -12,7 +12,7 @@ use crate::{
 
 const DRIVER_MIN_DB_VERSION: &str = "3.6";
 const DRIVER_MIN_WIRE_VERSION: i32 = 6;
-const DRIVER_MAX_WIRE_VERSION: i32 = 13;
+const DRIVER_MAX_WIRE_VERSION: i32 = 14;
 
 #[derive(Debug, Deserialize, Clone, Copy, Eq, PartialEq)]
 #[non_exhaustive]
