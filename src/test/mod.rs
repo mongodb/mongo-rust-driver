@@ -76,21 +76,29 @@ lazy_static! {
 }
 
 pub(crate) fn update_options_for_testing(options: &mut ClientOptions) {
-    options.max_pool_size = Some(MAX_POOL_SIZE);
-    options.server_api = SERVER_API.clone();
+    if options.max_pool_size.is_none() {
+        options.max_pool_size = Some(MAX_POOL_SIZE);
+    }
+    if options.server_api.is_none() {
+        options.server_api = SERVER_API.clone();
+    }
     if LOAD_BALANCED_SINGLE_URI
         .as_ref()
         .map_or(false, |uri| !uri.is_empty())
     {
         options.test_options_mut().mock_service_id = true;
     }
-    options.compressors = get_compressors();
-    if SERVERLESS_ATLAS_USER.is_some() || SERVERLESS_ATLAS_PASSWORD.is_some() {
-        options.credential = Some(Credential::builder()
-            .username(SERVERLESS_ATLAS_USER.clone())
-            .password(SERVERLESS_ATLAS_PASSWORD.clone())
-            .build()
-        );
+    if options.compressors.is_none() {
+        options.compressors = get_compressors();
+    }
+    if options.credential.is_none() {
+        if SERVERLESS_ATLAS_USER.is_some() || SERVERLESS_ATLAS_PASSWORD.is_some() {
+            options.credential = Some(Credential::builder()
+                .username(SERVERLESS_ATLAS_USER.clone())
+                .password(SERVERLESS_ATLAS_PASSWORD.clone())
+                .build()
+            );
+        }
     }
 }
 
