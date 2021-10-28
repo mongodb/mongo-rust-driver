@@ -367,7 +367,7 @@ impl TestClient {
             .and_then(|o| o.load_balanced)
             .or(CLIENT_OPTIONS.load_balanced)
             .unwrap_or(false);
-        let mut default_options = if is_load_balanced {
+        let default_options = if is_load_balanced {
             let uri = if use_multiple_mongoses {
                 LOAD_BALANCED_MULTIPLE_URI
                     .as_ref()
@@ -384,9 +384,9 @@ impl TestClient {
             CLIENT_OPTIONS.clone()
         };
         let mut options = match options {
-            Some(options) => {
-                default_options.merge(options);
-                default_options
+            Some(mut options) => {
+                options.merge(default_options);
+                options
             }
             None => default_options,
         };
