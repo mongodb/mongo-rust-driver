@@ -93,7 +93,7 @@ fn default_database() {
     let client = Client::with_options(options).expect("client creation should succeed");
     let default_db = client
         .default_database()
-        .expect("shoulld have a default database.");
+        .expect("should have a default database.");
     assert_eq!(default_db.name(), "abcd");
 
     // create client directly through uri_str.
@@ -101,7 +101,7 @@ fn default_database() {
         .expect("client creation should succeed");
     let default_db = client
         .default_database()
-        .expect("shoulld have a default database.");
+        .expect("should have a default database.");
     assert_eq!(default_db.name(), "abcd");
 }
 
