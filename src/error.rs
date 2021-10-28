@@ -489,7 +489,7 @@ pub struct WriteConcernError {
     pub details: Option<Document>,
 
     /// Labels categorizing the error.
-    #[serde(rename = "errorLabels")]
+    #[serde(rename = "errorLabels", default)]
     pub labels: Vec<String>,
 }
 
