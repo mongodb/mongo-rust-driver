@@ -1314,7 +1314,10 @@ impl TestOperation for DropCollection {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct RunCommand {
     command: Document,
-    command_name: String,
+    // We don't need to use this field, but it needs to be included during deserialization so that
+    // we can use the deny_unknown_fields tag.
+    #[serde(rename = "commandName")]
+    _command_name: String,
     read_concern: Option<Document>,
     read_preference: Option<SelectionCriteria>,
     session: Option<String>,

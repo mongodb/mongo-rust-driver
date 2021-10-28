@@ -85,10 +85,9 @@ impl Operation for Count {
         description: &StreamDescription,
     ) -> Result<Self::O> {
         let response_body: ResponseBody = match (description.max_wire_version, response) {
-            (Some(v), Response::Aggregate(CursorBody { mut cursor, .. }))
-                if v >= SERVER_4_9_0_WIRE_VERSION =>
-            {
-                cursor
+            (Some(v), Response::Aggregate(mut cursor_body)) if v >= SERVER_4_9_0_WIRE_VERSION => {
+                cursor_body
+                    .cursor
                     .first_batch
                     .pop_front()
                     .and_then(|doc| bson::from_document(doc).ok())
@@ -133,7 +132,7 @@ impl Operation for Count {
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub(crate) enum Response {
-    Aggregate(CursorBody<Document>),
+    Aggregate(Box<CursorBody<Document>>),
     Count(ResponseBody),
 }
 

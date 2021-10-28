@@ -73,12 +73,11 @@ pub async fn run_unified_format_test_filtered(
         // patch versions do not affect the test file format
         true
     });
-    if !version_matches {
-        panic!(
-            "Test runner not compatible with specification version {}",
-            &test_file.schema_version
-        );
-    }
+    assert!(
+        version_matches,
+        "Test runner not compatible with specification version {}",
+        &test_file.schema_version
+    );
 
     let mut test_runner = TestRunner::new().await;
 
@@ -192,12 +191,7 @@ pub async fn run_unified_format_test_filtered(
                                     }
                                 }
                                 if let Some(id) = save_as_entity {
-                                    if test_runner.entities.insert(id.clone(), entity).is_some() {
-                                        panic!(
-                                            "Entity with id {} already present in entity map",
-                                            id
-                                        );
-                                    }
+                                    test_runner.insert_entity(id, entity);
                                 }
                             }
                         }

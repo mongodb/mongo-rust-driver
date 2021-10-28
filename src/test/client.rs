@@ -21,24 +21,30 @@ struct Metadata {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ClientMetadata {
     pub driver: DriverMetadata,
     pub os: OsMetadata,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct DriverMetadata {
     pub name: String,
     pub version: String,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OsMetadata {
     #[serde(rename = "type")]
     pub os_type: String,
     pub architecture: String,
 }
 
+// TODO RUST-1078: fix and run this test. Once this test is fully implemented we can remove the
+// #[allow(dead_code)] tags on the above structs.
+//
 // This test currently doesn't pass on replica sets and sharded clusters consistently due to
 // `currentOp` sometimes detecting heartbeats between the server. Eventually we can test this using
 // APM or coming up with something more clever, but for now, we're just disabling it.

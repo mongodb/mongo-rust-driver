@@ -98,7 +98,7 @@ impl ConnectionPool {
     pub(crate) fn new_mocked(address: ServerAddress) -> Self {
         let (manager, _) = manager::channel();
         let handle = PoolWorkerHandle::new_mocked();
-        let (connection_requester, _) = connection_requester::channel(Default::default(), handle);
+        let (connection_requester, _) = connection_requester::channel(handle);
         let (_, generation_subscriber) = status::channel(PoolGeneration::normal());
 
         Self {
@@ -134,7 +134,7 @@ impl ConnectionPool {
         let response = self.connection_requester.request().await;
 
         let conn = match response {
-            ConnectionRequestResult::Pooled(c) => Ok(c),
+            ConnectionRequestResult::Pooled(c) => Ok(*c),
             ConnectionRequestResult::Establishing(task) => task.await,
             ConnectionRequestResult::PoolCleared(e) => {
                 Err(Error::pool_cleared_error(&self.address, &e))

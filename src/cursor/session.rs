@@ -187,9 +187,10 @@ where
     /// on.
     #[cfg(test)]
     pub(crate) fn set_kill_watcher(&mut self, tx: oneshot::Sender<()>) {
-        if self.kill_watcher.is_some() {
-            panic!("cursor already has a kill_watcher");
-        }
+        assert!(
+            self.kill_watcher.is_none(),
+            "cursor already has a kill_watcher"
+        );
         self.kill_watcher = Some(tx);
     }
 }

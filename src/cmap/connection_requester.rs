@@ -3,21 +3,18 @@ use tokio::sync::{mpsc, oneshot};
 use super::{worker::PoolWorkerHandle, Connection};
 use crate::{
     error::{Error, Result},
-    options::ServerAddress,
     runtime::AsyncJoinHandle,
 };
 
 /// Returns a new requester/receiver pair.
 pub(super) fn channel(
-    address: ServerAddress,
     handle: PoolWorkerHandle,
 ) -> (ConnectionRequester, ConnectionRequestReceiver) {
     let (sender, receiver) = mpsc::unbounded_channel();
     (
         ConnectionRequester {
-            address,
             sender,
-            handle,
+            _handle: handle,
         },
         ConnectionRequestReceiver { receiver },
     )
@@ -28,9 +25,8 @@ pub(super) fn channel(
 /// the pool will stop servicing requests, drop its available connections, and close.
 #[derive(Clone, Debug)]
 pub(super) struct ConnectionRequester {
-    address: ServerAddress,
     sender: mpsc::UnboundedSender<oneshot::Sender<ConnectionRequestResult>>,
-    handle: PoolWorkerHandle,
+    _handle: PoolWorkerHandle,
 }
 
 impl ConnectionRequester {
@@ -83,7 +79,7 @@ impl ConnectionRequest {
 #[derive(Debug)]
 pub(super) enum ConnectionRequestResult {
     /// A connection that was already established and was simply checked out of the pool.
-    Pooled(Connection),
+    Pooled(Box<Connection>),
 
     /// A new connection in the process of being established.
     /// The handle can be awaited upon to receive the established connection.
@@ -97,7 +93,7 @@ pub(super) enum ConnectionRequestResult {
 impl ConnectionRequestResult {
     pub(super) fn unwrap_pooled_connection(self) -> Connection {
         match self {
-            ConnectionRequestResult::Pooled(c) => c,
+            ConnectionRequestResult::Pooled(c) => *c,
             _ => panic!("attempted to unwrap pooled connection when was establishing"),
         }
     }

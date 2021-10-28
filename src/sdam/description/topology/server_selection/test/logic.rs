@@ -10,6 +10,9 @@ use crate::{
 use super::{TestServerDescription, TestTopologyDescription};
 
 #[derive(Debug, Deserialize)]
+// TODO RUST-1080: remove the #[allow(dead_code)] tag and add #[serde(deny_unknown_fields)] to
+// ensure these tests are being fully run
+#[allow(dead_code)]
 struct TestFile {
     #[serde(rename = "heartbeatFrequencyMS")]
     heartbeat_frequency_ms: Option<u64>,

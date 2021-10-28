@@ -15,6 +15,7 @@ pub(crate) struct StreamDescription {
     pub(crate) max_wire_version: Option<i32>,
 
     /// The minimum wire version that the server understands.
+    #[allow(dead_code)]
     pub(crate) min_wire_version: Option<i32>,
 
     /// The supported authentication mechanisms that the server understands.

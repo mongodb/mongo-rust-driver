@@ -34,8 +34,10 @@ pub struct TestFile {
     pub create_entities: Option<Vec<TestFileEntity>>,
     pub initial_data: Option<Vec<CollectionData>>,
     pub tests: Vec<TestCase>,
+    // We don't need to use this field, but it needs to be included during deserialization so that
+    // we can use the deny_unknown_fields tag.
     #[serde(rename = "_yamlAnchors")]
-    yaml_anchors: Option<Document>,
+    _yaml_anchors: Option<Document>,
 }
 
 fn deserialize_schema_version<'de, D>(deserializer: D) -> std::result::Result<Version, D::Error>

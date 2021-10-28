@@ -140,9 +140,10 @@ async fn concurrent_connections() {
                     consecutive_creations += 1;
                 }
                 Event::ConnectionReady(_) => {
-                    if consecutive_creations < 2 {
-                        panic!("connections not created concurrently");
-                    }
+                    assert!(
+                        consecutive_creations >= 2,
+                        "connections not created concurrently"
+                    );
                 }
                 _ => (),
             }
