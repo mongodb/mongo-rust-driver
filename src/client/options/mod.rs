@@ -517,6 +517,12 @@ pub struct ClientOptions {
     #[builder(default)]
     pub server_selection_timeout: Option<Duration>,
 
+    /// Default database for this client.
+    ///
+    /// By default, no default database is specified.
+    #[builder(default)]
+    pub default_database: Option<String>,
+
     #[builder(default, setter(skip))]
     pub(crate) socket_timeout: Option<Duration>,
 
@@ -702,6 +708,7 @@ struct ClientOptionsParser {
     pub zlib_compression: Option<i32>,
     pub direct_connection: Option<bool>,
     pub credential: Option<Credential>,
+    pub default_database: Option<String>,
     max_staleness: Option<Duration>,
     tls_insecure: Option<bool>,
     auth_mechanism: Option<AuthMechanism>,
@@ -931,6 +938,7 @@ impl From<ClientOptionsParser> for ClientOptions {
             retry_writes: parser.retry_writes,
             socket_timeout: parser.socket_timeout,
             direct_connection: parser.direct_connection,
+            default_database: parser.default_database,
             driver_info: None,
             credential: parser.credential,
             cmap_event_handler: None,
@@ -968,6 +976,9 @@ impl ClientOptions {
     /// part of this method.
     ///
     /// The format of a MongoDB connection string is described [here](https://docs.mongodb.com/manual/reference/connection-string/#connection-string-formats).
+    ///
+    /// Note that [default_database](ClientOptions::default_database) will be set from
+    /// `/defaultauthdb` in connection string.
     ///
     /// The following options are supported in the options query string:
     ///
@@ -1468,7 +1479,7 @@ impl ClientOptionsParser {
                     credential.source = options
                         .auth_source
                         .clone()
-                        .or(db)
+                        .or(db.clone())
                         .or_else(|| Some("admin".into()));
                 } else if authentication_requested {
                     return Err(ErrorKind::InvalidArgument {
@@ -1480,6 +1491,9 @@ impl ClientOptionsParser {
                 }
             }
         };
+
+        // set default database.
+        options.default_database = db;
 
         if options.tls.is_none() && options.srv {
             options.tls = Some(Tls::Enabled(Default::default()));
