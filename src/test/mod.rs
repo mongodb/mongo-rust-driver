@@ -35,7 +35,13 @@ use home::home_dir;
 use lazy_static::lazy_static;
 
 use self::util::TestLock;
-use crate::{client::{auth::Credential, options::{ServerApi, ServerApiVersion}}, options::{ClientOptions, Compressor}};
+use crate::{
+    client::{
+        auth::Credential,
+        options::{ServerApi, ServerApiVersion},
+    },
+    options::{ClientOptions, Compressor},
+};
 use std::{fs::read_to_string, str::FromStr};
 
 const MAX_POOL_SIZE: u32 = 100;
@@ -93,10 +99,11 @@ pub(crate) fn update_options_for_testing(options: &mut ClientOptions) {
     }
     if options.credential.is_none() {
         if SERVERLESS_ATLAS_USER.is_some() || SERVERLESS_ATLAS_PASSWORD.is_some() {
-            options.credential = Some(Credential::builder()
-                .username(SERVERLESS_ATLAS_USER.clone())
-                .password(SERVERLESS_ATLAS_PASSWORD.clone())
-                .build()
+            options.credential = Some(
+                Credential::builder()
+                    .username(SERVERLESS_ATLAS_USER.clone())
+                    .password(SERVERLESS_ATLAS_PASSWORD.clone())
+                    .build(),
             );
         }
     }

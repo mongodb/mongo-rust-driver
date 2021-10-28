@@ -437,7 +437,10 @@ pub enum ErrorKind {
 impl ErrorKind {
     fn get_write_concern_error(&self) -> Option<&WriteConcernError> {
         match self {
-            ErrorKind::BulkWrite(BulkWriteFailure { write_concern_error, .. }) => write_concern_error.as_ref(),
+            ErrorKind::BulkWrite(BulkWriteFailure {
+                write_concern_error,
+                ..
+            }) => write_concern_error.as_ref(),
             ErrorKind::Write(WriteFailure::WriteConcernError(err)) => Some(err),
             _ => None,
         }

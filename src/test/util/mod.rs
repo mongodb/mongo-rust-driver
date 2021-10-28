@@ -128,9 +128,7 @@ impl TestClient {
         }
     }
 
-    pub async fn with_additional_options(
-        options: Option<ClientOptions>,
-    ) -> Self {
+    pub async fn with_additional_options(options: Option<ClientOptions>) -> Self {
         let options = Self::options_for_multiple_mongoses(options, false).await;
         Self::with_options(Some(options)).await
     }

@@ -1082,9 +1082,10 @@ where
                     let labels = e.labels().clone();
                     match *e.kind {
                         ErrorKind::BulkWrite(bw) => {
-                            // for ordered inserts this size will be incorrect, but knowing the batch
-                            // size isn't needed for ordered failures since we
-                            // return immediately from them anyways.
+                            // for ordered inserts this size will be incorrect, but knowing the
+                            // batch size isn't needed for ordered
+                            // failures since we return immediately from
+                            // them anyways.
                             let current_batch_size = bw.inserted_ids.len()
                                 + bw.write_errors.as_ref().map(|we| we.len()).unwrap_or(0);
 
@@ -1108,16 +1109,20 @@ where
                             error_labels.extend(labels);
 
                             if ordered {
-                                // this will always be true since we invoked get_or_insert_with above.
+                                // this will always be true since we invoked get_or_insert_with
+                                // above.
                                 if let Some(failure) = cumulative_failure {
-                                    return Err(Error::new(ErrorKind::BulkWrite(failure), Some(error_labels)));
+                                    return Err(Error::new(
+                                        ErrorKind::BulkWrite(failure),
+                                        Some(error_labels),
+                                    ));
                                 }
                             }
                             n_attempted += current_batch_size;
                         }
                         _ => return Err(e),
                     }
-                },
+                }
             }
         }
 
