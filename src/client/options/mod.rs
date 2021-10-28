@@ -977,7 +977,8 @@ impl ClientOptions {
     ///
     /// The format of a MongoDB connection string is described [here](https://docs.mongodb.com/manual/reference/connection-string/#connection-string-formats).
     ///
-    /// Note that [default_database](ClientOptions::default_database) will be set from `/defaultauthdb` in connection string.
+    /// Note that [default_database](ClientOptions::default_database) will be set from
+    /// `/defaultauthdb` in connection string.
     ///
     /// The following options are supported in the options query string:
     ///

@@ -91,12 +91,17 @@ fn default_database() {
     let mut options = CLIENT_OPTIONS.clone();
     options.default_database = Some("abcd".to_string());
     let client = Client::with_options(options).expect("client creation should succeed");
-    let default_db = client.default_database().expect("shoulld have a default database.");
+    let default_db = client
+        .default_database()
+        .expect("shoulld have a default database.");
     assert_eq!(default_db.name(), "abcd");
 
     // create client directly through uri_str.
-    let client = Client::with_uri_str("mongodb://localhost:27017/abcd").expect("client creation should succeed");
-    let default_db = client.default_database().expect("shoulld have a default database.");
+    let client = Client::with_uri_str("mongodb://localhost:27017/abcd")
+        .expect("client creation should succeed");
+    let default_db = client
+        .default_database()
+        .expect("shoulld have a default database.");
     assert_eq!(default_db.name(), "abcd");
 }
 

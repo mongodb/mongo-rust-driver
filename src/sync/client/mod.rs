@@ -119,8 +119,8 @@ impl Client {
         Database::new(self.async_client.database_with_options(name, options))
     }
 
-    /// Gets a handle to the default database specified in the `ClientOptions` or MongoDB connection string
-    /// used to construct this `Client`.
+    /// Gets a handle to the default database specified in the `ClientOptions` or MongoDB connection
+    /// string used to construct this `Client`.
     ///
     /// If no default database was specified, `None` will be returned.
     pub fn default_database(&self) -> Option<Database> {
