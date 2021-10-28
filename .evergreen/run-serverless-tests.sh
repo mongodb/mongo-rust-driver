@@ -23,7 +23,7 @@ echo "cargo test options: ${DEFAULT_FEATURES} --features $FEATURE_FLAGS ${OPTION
 
 cargo_test() {
     SERVERLESS="serverless" \
-        RUST_BACKTRACE=1 cargo test ${DEFAULT_FEATURES} --features $FEATURE_FLAGS $1 $OPTIONS
+        cargo test ${DEFAULT_FEATURES} --features $FEATURE_FLAGS $1 $OPTIONS
 }
 
 cargo_test test::spec::crud
