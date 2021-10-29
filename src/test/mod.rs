@@ -97,15 +97,13 @@ pub(crate) fn update_options_for_testing(options: &mut ClientOptions) {
     if options.compressors.is_none() {
         options.compressors = get_compressors();
     }
-    if options.credential.is_none() {
-        if SERVERLESS_ATLAS_USER.is_some() || SERVERLESS_ATLAS_PASSWORD.is_some() {
-            options.credential = Some(
-                Credential::builder()
-                    .username(SERVERLESS_ATLAS_USER.clone())
-                    .password(SERVERLESS_ATLAS_PASSWORD.clone())
-                    .build(),
-            );
-        }
+    if options.credential.is_none() && SERVERLESS_ATLAS_USER.is_some() {
+        options.credential = Some(
+            Credential::builder()
+                .username(SERVERLESS_ATLAS_USER.clone())
+                .password(SERVERLESS_ATLAS_PASSWORD.clone())
+                .build(),
+        );
     }
 }
 

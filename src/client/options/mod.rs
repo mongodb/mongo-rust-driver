@@ -1242,11 +1242,7 @@ impl ClientOptions {
         );
         #[cfg(test)]
         {
-            merge_options!(
-                other,
-                self,
-                [test_options]
-            );
+            merge_options!(other, self, [test_options]);
         }
     }
 

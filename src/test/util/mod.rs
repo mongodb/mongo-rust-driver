@@ -377,7 +377,7 @@ impl TestClient {
                     .as_ref()
                     .expect("SINGLE_MONGOS_LB_URI is required")
             };
-            let mut o = ClientOptions::parse(uri).await.unwrap();
+            let mut o = ClientOptions::parse_uri(uri, None).await.unwrap();
             update_options_for_testing(&mut o);
             o
         } else {
