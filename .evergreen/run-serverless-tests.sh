@@ -2,6 +2,8 @@
 
 set -o errexit
 
+source ./.evergreen/env.sh
+
 FEATURE_FLAGS="zstd-compression,snappy-compression,zlib-compression"
 DEFAULT_FEATURES=""
 
