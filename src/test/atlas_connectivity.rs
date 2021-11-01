@@ -49,3 +49,15 @@ async fn atlas_repl_set_srv() {
     )
     .await;
 }
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn atlas_serverless() {
+    run_test("MONGO_ATLAS_SERVERLESS_URI", None).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn atlas_serverless_srv() {
+    run_test("MONGO_ATLAS_SERVERLESS_URI_SRV", None).await;
+}
