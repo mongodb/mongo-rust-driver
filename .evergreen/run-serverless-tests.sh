@@ -15,22 +15,27 @@ fi
 
 . ~/.cargo/env
 
+OPTIONS="-- -Z unstable-options --format json --report-time"
+
 if [ "$SINGLE_THREAD" = true ]; then
-	OPTIONS="-- --test-threads=1"
+	OPTIONS="$OPTIONS --test-threads=1"
 fi
 
 echo "cargo test options: ${DEFAULT_FEATURES} --features $FEATURE_FLAGS ${OPTIONS}"
 
 cargo_test() {
+    RUST_BACKTRACE=1 \
     SERVERLESS="serverless" \
-        cargo test ${DEFAULT_FEATURES} --features $FEATURE_FLAGS $1 $OPTIONS
+        cargo test ${DEFAULT_FEATURES} --features $FEATURE_FLAGS $1 $OPTIONS | cargo2junit
 }
 
-cargo_test test::spec::crud
-cargo_test test::spec::retryable_reads
-cargo_test test::spec::retryable_writes
-cargo_test test::spec::versioned_api
-cargo_test test::spec::sessions
-cargo_test test::spec::transactions
-cargo_test test::spec::load_balancers
-cargo_test test::cursor
+cargo_test test::spec::crud > crud.xml
+cargo_test test::spec::retryable_reads > retryable_reads.xml
+cargo_test test::spec::retryable_writes > retryable_writes.xml
+cargo_test test::spec::versioned_api > versioned_api.xml
+cargo_test test::spec::sessions > sessions.xml
+cargo_test test::spec::transactions > transactions.xml
+cargo_test test::spec::load_balancers > load_balancers.xml
+cargo_test test::cursor > cursor.xml
+
+junit-report-merger results.xml crud.xml retryable_reads.xml retryable_writes.xml versioned_api.xml sessions.xml transactions.xml load_balancers.xml cursor.xml
