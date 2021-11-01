@@ -1205,11 +1205,7 @@ impl ClientOptions {
     /// Applies the options in other to these options if a value is not already present
     #[cfg(test)]
     pub(crate) fn merge(&mut self, other: ClientOptions) {
-        let default_hosts = vec![ServerAddress::Tcp {
-            host: "localhost".to_string(),
-            port: Some(27017),
-        }];
-        if self.hosts.is_empty() || self.hosts == default_hosts {
+        if self.hosts.is_empty() {
             self.hosts = other.hosts;
         }
         merge_options!(
