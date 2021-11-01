@@ -360,7 +360,10 @@ async fn label_not_added_second_read_error() {
 
 #[function_name::named]
 async fn label_not_added(retry_reads: bool) {
-    let options = ClientOptions::builder().hosts(vec![]).retry_reads(retry_reads).build();
+    let options = ClientOptions::builder()
+        .hosts(vec![])
+        .retry_reads(retry_reads)
+        .build();
     let client = TestClient::with_additional_options(Some(options)).await;
 
     // Configuring a failpoint is only supported on 4.0+ replica sets and 4.1.5+ sharded clusters.
