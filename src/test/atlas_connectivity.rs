@@ -60,4 +60,9 @@ async fn atlas_serverless() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn atlas_serverless_srv() {
     run_test("MONGO_ATLAS_SERVERLESS_URI_SRV", None).await;
+    run_test(
+        "MONGO_ATLAS_SERVERLESS_URI_SRV",
+        Some(ResolverConfig::cloudflare()),
+    )
+    .await;
 }
