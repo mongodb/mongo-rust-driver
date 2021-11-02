@@ -3,7 +3,16 @@ use std::time::Duration;
 use serde::{de::DeserializeOwned, Serialize};
 
 use super::wire::Message;
-use crate::{ClientSession, bson::Document, client::{options::ServerApi, ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS}, error::{Error, ErrorKind, Result}, is_master::{IsMasterCommandResponse, IsMasterReply}, operation::{CommandErrorBody, CommandResponse, Response}, options::{ReadConcernLevel, ReadConcernInternal, ServerAddress}, selection_criteria::ReadPreference};
+use crate::{
+    bson::Document,
+    client::{options::ServerApi, ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
+    error::{Error, ErrorKind, Result},
+    is_master::{IsMasterCommandResponse, IsMasterReply},
+    operation::{CommandErrorBody, CommandResponse, Response},
+    options::{ReadConcernInternal, ReadConcernLevel, ServerAddress},
+    selection_criteria::ReadPreference,
+    ClientSession,
+};
 
 /// A command that has been serialized to BSON.
 #[derive(Debug)]
@@ -130,10 +139,10 @@ impl<T> Command<T> {
 
     pub(crate) fn set_after_cluster_time(&mut self, session: &ClientSession) {
         let inner = self.read_concern.get_or_insert(ReadConcernInternal {
-                level: None,
-                at_cluster_time: None,
-                after_cluster_time: None,
-            });
+            level: None,
+            at_cluster_time: None,
+            after_cluster_time: None,
+        });
         inner.after_cluster_time = session.operation_time;
     }
 }

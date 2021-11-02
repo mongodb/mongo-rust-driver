@@ -417,17 +417,21 @@ impl Client {
                     }
                     cmd.set_snapshot_read_concern(session);
                 }
-                // If this is a causally consistent session, set `readConcern.afterClusterTime`. Causal consistency
-                // defaults to true, unless snapshot is true.
+                // If this is a causally consistent session, set `readConcern.afterClusterTime`.
+                // Causal consistency defaults to true, unless snapshot is true.
                 else if session
                     .options()
                     .and_then(|opts| opts.causal_consistency)
                     .unwrap_or(true)
-                    && matches!(session.transaction.state, TransactionState::None|TransactionState::Starting)
+                    && matches!(
+                        session.transaction.state,
+                        TransactionState::None | TransactionState::Starting
+                    )
                     && op.supports_read_concern()
                 {
                     cmd.set_after_cluster_time(session);
                 }
+
                 match session.transaction.state {
                     TransactionState::Starting => {
                         cmd.set_start_transaction();

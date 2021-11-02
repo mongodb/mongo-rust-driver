@@ -127,4 +127,8 @@ impl Operation for CountDocuments {
     fn retryability(&self) -> Retryability {
         Retryability::Read
     }
+
+    fn supports_read_concern(&self) -> bool {
+        self.aggregate.supports_read_concern()
+    }
 }

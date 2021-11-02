@@ -259,6 +259,21 @@ impl ClientSession {
         }
     }
 
+    /// Advance operation time for this session. If the provided timestamp is earlier than this
+    /// session's current operation time, then the operation time is unchanged.
+    pub fn advance_operation_time(&mut self, ts: Timestamp) {
+        self.operation_time = match self.operation_time {
+            Some(current_op_time) if current_op_time < ts => Some(ts),
+            None => Some(ts),
+            _ => self.operation_time,
+        }
+    }
+
+    /// The operation time returned by the last operation executed in this session.
+    pub fn operation_time(&self) -> Option<Timestamp> {
+        self.operation_time
+    }
+
     /// Mark this session (and the underlying server session) as dirty.
     pub(crate) fn mark_dirty(&mut self) {
         self.server_session.dirty = true;
@@ -273,15 +288,6 @@ impl ClientSession {
     /// Gets the current txn_number.
     pub(crate) fn txn_number(&self) -> i64 {
         self.server_session.txn_number
-    }
-
-    /// Advance operation time
-    pub(crate) fn advance_operation_time(&mut self, ts: Timestamp) {
-        self.operation_time = match self.operation_time {
-            Some(current_op_time) if current_op_time < ts => Some(ts),
-            None => Some(ts),
-            _ => self.operation_time,
-        }
     }
 
     /// Increments the txn_number.

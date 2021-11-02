@@ -533,65 +533,118 @@ async fn for_each_op_with_session<F>(
         .database(test_name)
         .collection::<bson::Document>(test_name);
     let initial_operation_time = session.operation_time;
-    coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session).await.unwrap();
+    coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session)
+        .await
+        .unwrap();
     test_func("insert", &client, &session, initial_operation_time, false);
 
     let initial_operation_time = session.operation_time;
-    coll.insert_many_with_session(vec![doc! { "x": 1 }], None, &mut session).await.unwrap();
+    coll.insert_many_with_session(vec![doc! { "x": 1 }], None, &mut session)
+        .await
+        .unwrap();
     test_func("insert", &client, &session, initial_operation_time, false);
 
     let initial_operation_time = session.operation_time;
-    coll.replace_one_with_session(doc! { "x": 1 }, doc! { "x": 2 }, None, &mut session).await.unwrap();
+    coll.replace_one_with_session(doc! { "x": 1 }, doc! { "x": 2 }, None, &mut session)
+        .await
+        .unwrap();
     test_func("update", &client, &session, initial_operation_time, false);
 
     let initial_operation_time = session.operation_time;
-    coll.update_one_with_session(doc! {}, doc! { "$inc": {"x": 5 } }, None, &mut session).await.unwrap();
+    coll.update_one_with_session(doc! {}, doc! { "$inc": {"x": 5 } }, None, &mut session)
+        .await
+        .unwrap();
     test_func("update", &client, &session, initial_operation_time, false);
 
     let initial_operation_time = session.operation_time;
-    coll.update_many_with_session(doc! {}, doc! { "$inc": {"x": 5 } }, None, &mut session).await.unwrap();
+    coll.update_many_with_session(doc! {}, doc! { "$inc": {"x": 5 } }, None, &mut session)
+        .await
+        .unwrap();
     test_func("update", &client, &session, initial_operation_time, false);
 
     let initial_operation_time = session.operation_time;
-    coll.delete_one_with_session(doc! { "x": 1 }, None, &mut session).await.unwrap();
+    coll.delete_one_with_session(doc! { "x": 1 }, None, &mut session)
+        .await
+        .unwrap();
     test_func("delete", &client, &session, initial_operation_time, false);
 
     let initial_operation_time = session.operation_time;
-    coll.delete_many_with_session(doc! { "x": 1 }, None, &mut session).await.unwrap();
+    coll.delete_many_with_session(doc! { "x": 1 }, None, &mut session)
+        .await
+        .unwrap();
     test_func("delete", &client, &session, initial_operation_time, false);
 
     let initial_operation_time = session.operation_time;
-    coll.find_one_and_delete_with_session(doc! { "x": 1 }, None, &mut session).await.unwrap();
-    test_func("findAndModify", &client, &session, initial_operation_time, false);
+    coll.find_one_and_delete_with_session(doc! { "x": 1 }, None, &mut session)
+        .await
+        .unwrap();
+    test_func(
+        "findAndModify",
+        &client,
+        &session,
+        initial_operation_time,
+        false,
+    );
 
     let initial_operation_time = session.operation_time;
-    coll.find_one_and_update_with_session(doc! {}, doc! { "$inc": { "x": 1 } }, None, &mut session).await.unwrap();
-    test_func("findAndModify", &client, &session, initial_operation_time, false);
+    coll.find_one_and_update_with_session(doc! {}, doc! { "$inc": { "x": 1 } }, None, &mut session)
+        .await
+        .unwrap();
+    test_func(
+        "findAndModify",
+        &client,
+        &session,
+        initial_operation_time,
+        false,
+    );
 
     let initial_operation_time = session.operation_time;
-    coll.find_one_and_replace_with_session(doc! {}, doc! {"x": 1}, None, &mut session).await.unwrap();
-    test_func("findAndModify", &client, &session, initial_operation_time, false);
+    coll.find_one_and_replace_with_session(doc! {}, doc! {"x": 1}, None, &mut session)
+        .await
+        .unwrap();
+    test_func(
+        "findAndModify",
+        &client,
+        &session,
+        initial_operation_time,
+        false,
+    );
 
     let initial_operation_time = session.operation_time;
-    coll.aggregate_with_session(vec![doc! { "$match": { "x": 1 } }], None, &mut session).await.unwrap();
-    test_func("aggregate", &client, &session, initial_operation_time, false);
+    coll.aggregate_with_session(vec![doc! { "$match": { "x": 1 } }], None, &mut session)
+        .await
+        .unwrap();
+    test_func(
+        "aggregate",
+        &client,
+        &session,
+        initial_operation_time,
+        false,
+    );
 
     let initial_operation_time = session.operation_time;
-    coll.find_with_session(doc! { "x": 1 }, None, &mut session).await.unwrap();
+    coll.find_with_session(doc! { "x": 1 }, None, &mut session)
+        .await
+        .unwrap();
     test_func("find", &client, &session, initial_operation_time, true);
 
     let initial_operation_time = session.operation_time;
-    coll.find_one_with_session(doc! { "x": 1 }, None, &mut session).await.unwrap();
+    coll.find_one_with_session(doc! { "x": 1 }, None, &mut session)
+        .await
+        .unwrap();
     test_func("find", &client, &session, initial_operation_time, true);
 
     let initial_operation_time = session.operation_time;
-    coll.distinct_with_session("x", None, None, &mut session).await.unwrap();
+    coll.distinct_with_session("x", None, None, &mut session)
+        .await
+        .unwrap();
     test_func("distinct", &client, &session, initial_operation_time, true);
 
     let initial_operation_time = session.operation_time;
-    coll.count_documents_with_session(None, None, &mut session).await.unwrap();
+    coll.count_documents_with_session(None, None, &mut session)
+        .await
+        .unwrap();
     test_func("aggregate", &client, &session, initial_operation_time, true);
-
 }
 
 /// Tests 1-4 of the causal consistency specs
@@ -612,15 +665,13 @@ async fn test_causal_consistency() {
         session: &ClientSession,
         initial_operation_time: Option<Timestamp>,
         is_read: bool,
-    )
-    {
+    ) {
         let (command_started, command_ended) =
             client.get_successful_command_execution(command_name);
 
-        println!("{}", command_started.command);
-
-        // Assert that the sent readConcern.afterClusterTime matches the session.operationTime (on a read)
-       if is_read {
+        // Assert that the sent readConcern.afterClusterTime matches the session.operationTime (on a
+        // read)
+        if is_read {
             assert_eq!(
                 command_started
                     .command
@@ -644,8 +695,11 @@ async fn test_causal_consistency() {
     let session = client.start_session(None).await.unwrap();
     assert!(session.operation_time.is_none());
 
-
-
-    for_each_op_with_session(function_name!(), session_operation_time_test, client, session).await;
-
+    for_each_op_with_session(
+        function_name!(),
+        session_operation_time_test,
+        client,
+        session,
+    )
+    .await;
 }

@@ -34,7 +34,6 @@ pub struct ReadConcern {
 #[serde(rename_all = "camelCase")]
 #[serde(rename = "readConcern")]
 pub(crate) struct ReadConcernInternal {
-
     /// The level of the read concern.
     pub(crate) level: Option<ReadConcernLevel>,
 
@@ -106,9 +105,7 @@ impl ReadConcern {
 
 impl From<ReadConcernLevel> for ReadConcern {
     fn from(level: ReadConcernLevel) -> Self {
-        Self {
-            level: level,
-        }
+        Self { level: level }
     }
 }
 

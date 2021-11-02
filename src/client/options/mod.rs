@@ -2393,8 +2393,7 @@ pub struct SessionOptions {
 
     /// If true, all operations performed in the context of this session
     /// will be [causally consistent](https://docs.mongodb.com/manual/core/causal-consistency-read-write-concerns/).
-    /// Note that causally consistent reads will NOT be causally consistent with respect to
-    /// unacknowledged writes.
+    ///
     /// Defaults to true.
     pub causal_consistency: Option<bool>,
 
@@ -2406,7 +2405,8 @@ pub struct SessionOptions {
 
 impl SessionOptions {
     pub(crate) fn validate(&self) -> Result<()> {
-        if let (Some(causal_consistency), Some(snapshot)) = (self.causal_consistency, self.snapshot) {
+        if let (Some(causal_consistency), Some(snapshot)) = (self.causal_consistency, self.snapshot)
+        {
             if causal_consistency && snapshot {
                 return Err(ErrorKind::InvalidArgument {
                     message: format!("snapshot and causal consistency are mutually exclusive"),
