@@ -15,8 +15,6 @@ elif [ "$ASYNC_RUNTIME" != "tokio" ]; then
     exit 1
 fi
 
-. ~/.cargo/env
-
 OPTIONS="-- -Z unstable-options --format json --report-time"
 
 if [ "$SINGLE_THREAD" = true ]; then

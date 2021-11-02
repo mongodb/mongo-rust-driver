@@ -490,7 +490,7 @@ pub struct WriteConcernError {
 
     /// Labels categorizing the error.
     #[serde(rename = "errorLabels", default)]
-    pub labels: Vec<String>,
+    pub(crate) labels: Vec<String>,
 }
 
 /// An error that occurred during a write operation that wasn't due to being unable to satisfy a

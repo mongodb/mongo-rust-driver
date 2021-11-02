@@ -384,11 +384,12 @@ functions:
         shell: bash
         working_dir: "src"
         script: |
-          # Exported before PREPARE_SHELL to avoid echo with xtrace
+          ${PREPARE_SHELL}
+          set +o xtrace
+          # Exported without xtrace to avoid leaking credentials
           export SERVERLESS_ATLAS_USER="${SERVERLESS_ATLAS_USER}"
           export SERVERLESS_ATLAS_PASSWORD="${SERVERLESS_ATLAS_PASSWORD}"
 
-          ${PREPARE_SHELL}
           export MONGODB_URI="${MONGODB_URI}"
           export SSL="${SSL}"
           export SINGLE_MONGOS_LB_URI="${SINGLE_ATLASPROXY_SERVERLESS_URI}"
