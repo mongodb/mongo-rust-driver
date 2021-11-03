@@ -1234,16 +1234,13 @@ impl ClientOptions {
                 server_api,
                 server_selection_timeout,
                 socket_timeout,
+                test_options,
                 tls,
                 write_concern,
                 original_srv_info,
                 original_uri
             ]
         );
-        #[cfg(test)]
-        {
-            merge_options!(other, self, [test_options]);
-        }
     }
 
     #[cfg(test)]

@@ -180,7 +180,7 @@ async fn run_spec_tests() {
                     .unwrap();
             }
 
-            let _ = client.database(&db_name).drop(None).await;
+            client.database(&db_name).drop(None).await.unwrap();
         }
     }
 
