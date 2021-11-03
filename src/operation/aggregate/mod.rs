@@ -12,7 +12,7 @@ use crate::{
     Namespace,
 };
 
-use super::{CursorBody, CursorResponse};
+use super::{CursorBody, CursorResponse, ReadConcernSupport};
 
 #[derive(Debug)]
 pub(crate) struct Aggregate {
@@ -46,10 +46,6 @@ impl Operation for Aggregate {
     type Response = CursorResponse<Document>;
 
     const NAME: &'static str = "aggregate";
-
-    fn supports_read_concern(&self) -> bool {
-        true
-    }
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = doc! {
@@ -93,6 +89,14 @@ impl Operation for Aggregate {
         self.options
             .as_ref()
             .and_then(|opts| opts.selection_criteria.as_ref())
+    }
+
+    fn read_concern_support(&self) -> ReadConcernSupport<'_> {
+        ReadConcernSupport::Supported(
+            self.options
+                .as_ref()
+                .and_then(|opts| opts.read_concern.as_ref()),
+        )
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

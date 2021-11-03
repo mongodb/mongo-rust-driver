@@ -466,6 +466,7 @@ pub struct ClientOptions {
     /// Specifies the default read concern for operations performed on the Client. See the
     /// ReadConcern type documentation for more details.
     #[builder(default)]
+    #[serde(skip_serializing)]
     pub read_concern: Option<ReadConcern>,
 
     /// The name of the replica set that the Client should connect to.

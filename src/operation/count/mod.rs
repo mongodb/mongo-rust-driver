@@ -13,7 +13,7 @@ use crate::{
     selection_criteria::SelectionCriteria,
 };
 
-use super::CommandResponse;
+use super::{CommandResponse, ReadConcernSupport};
 
 const SERVER_4_9_0_WIRE_VERSION: i32 = 12;
 
@@ -45,10 +45,6 @@ impl Operation for Count {
     type Response = CommandResponse<Response>;
 
     const NAME: &'static str = "count";
-
-    fn supports_read_concern(&self) -> bool {
-        true
-    }
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         let mut name = Self::NAME.to_string();
@@ -126,6 +122,14 @@ impl Operation for Count {
             return options.selection_criteria.as_ref();
         }
         None
+    }
+
+    fn read_concern_support(&self) -> super::ReadConcernSupport<'_> {
+        ReadConcernSupport::Supported(
+            self.options
+                .as_ref()
+                .and_then(|opts| opts.read_concern.as_ref()),
+        )
     }
 
     fn retryability(&self) -> Retryability {

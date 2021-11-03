@@ -9,7 +9,7 @@ use crate::{
     error::{Error, ErrorKind, Result},
     is_master::{IsMasterCommandResponse, IsMasterReply},
     operation::{CommandErrorBody, CommandResponse, Response},
-    options::{ReadConcernInternal, ReadConcernLevel, ServerAddress},
+    options::{ReadConcern, ReadConcernInternal, ReadConcernLevel, ServerAddress},
     selection_criteria::ReadPreference,
     ClientSession,
 };
@@ -115,6 +115,18 @@ impl<T> Command<T> {
         self.autocommit = Some(false);
     }
 
+    /// Sets the command's read concern to the provided read concern, overwriting any existing read
+    /// concern.
+    pub(crate) fn set_read_concern(&mut self, rc: ReadConcern) {
+        self.read_concern = Some(ReadConcernInternal {
+            level: Some(rc.level),
+            at_cluster_time: None,
+            after_cluster_time: None,
+        });
+    }
+
+    /// Sets the read concern level for this command according to the read concern specified on the
+    /// transaction. This does not overwrite any other read concern options.
     pub(crate) fn set_txn_read_concern(&mut self, session: &ClientSession) {
         if let Some(ref options) = session.transaction.options {
             if let Some(ref read_concern) = options.read_concern {
@@ -128,6 +140,8 @@ impl<T> Command<T> {
         }
     }
 
+    /// Sets the read concern level for this command to "snapshot" and sets the `atClusterTime`
+    /// field.
     pub(crate) fn set_snapshot_read_concern(&mut self, session: &ClientSession) {
         let inner = self.read_concern.get_or_insert(ReadConcernInternal {
             level: Some(ReadConcernLevel::Snapshot),
@@ -138,12 +152,14 @@ impl<T> Command<T> {
     }
 
     pub(crate) fn set_after_cluster_time(&mut self, session: &ClientSession) {
-        let inner = self.read_concern.get_or_insert(ReadConcernInternal {
-            level: None,
-            at_cluster_time: None,
-            after_cluster_time: None,
-        });
-        inner.after_cluster_time = session.operation_time;
+        if let Some(operation_time) = session.operation_time {
+            let inner = self.read_concern.get_or_insert(ReadConcernInternal {
+                level: None,
+                at_cluster_time: None,
+                after_cluster_time: None,
+            });
+            inner.after_cluster_time = Some(operation_time);
+        }
     }
 }
 

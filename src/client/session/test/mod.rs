@@ -1,15 +1,26 @@
+mod causal_consistency;
+
 use std::{future::Future, time::Duration};
 
 use bson::{Document, Timestamp};
-use futures::stream::StreamExt;
+use futures::{future::BoxFuture, stream::StreamExt, FutureExt};
 use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, Bson},
+    client::options::{ClientOptions, SessionOptions},
+    coll::options::CollectionOptions,
     error::Result,
-    options::{Acknowledgment, FindOptions, InsertOneOptions, ReadPreference, WriteConcern},
+    options::{
+        Acknowledgment,
+        FindOptions,
+        InsertOneOptions,
+        ReadConcern,
+        ReadPreference,
+        WriteConcern,
+    },
     selection_criteria::SelectionCriteria,
-    test::{EventClient, TestClient, CLIENT_OPTIONS, LOCK},
+    test::{CommandEvent, EventClient, TestClient, CLIENT_OPTIONS, LOCK},
     ClientSession,
     Collection,
     RUNTIME,
@@ -518,188 +529,4 @@ async fn find_and_getmore_share_session() {
     for read_pref in read_preferences {
         run_test(&client, &coll, read_pref).await;
     }
-}
-
-async fn for_each_op_with_session<F>(
-    test_name: &str,
-    test_func: F,
-    client: EventClient,
-    mut session: ClientSession,
-) where
-    F: Fn(&str, &EventClient, &ClientSession, Option<Timestamp>, bool) -> (),
-{
-    // collection operations
-    let coll = client
-        .database(test_name)
-        .collection::<bson::Document>(test_name);
-    let initial_operation_time = session.operation_time;
-    coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session)
-        .await
-        .unwrap();
-    test_func("insert", &client, &session, initial_operation_time, false);
-
-    let initial_operation_time = session.operation_time;
-    coll.insert_many_with_session(vec![doc! { "x": 1 }], None, &mut session)
-        .await
-        .unwrap();
-    test_func("insert", &client, &session, initial_operation_time, false);
-
-    let initial_operation_time = session.operation_time;
-    coll.replace_one_with_session(doc! { "x": 1 }, doc! { "x": 2 }, None, &mut session)
-        .await
-        .unwrap();
-    test_func("update", &client, &session, initial_operation_time, false);
-
-    let initial_operation_time = session.operation_time;
-    coll.update_one_with_session(doc! {}, doc! { "$inc": {"x": 5 } }, None, &mut session)
-        .await
-        .unwrap();
-    test_func("update", &client, &session, initial_operation_time, false);
-
-    let initial_operation_time = session.operation_time;
-    coll.update_many_with_session(doc! {}, doc! { "$inc": {"x": 5 } }, None, &mut session)
-        .await
-        .unwrap();
-    test_func("update", &client, &session, initial_operation_time, false);
-
-    let initial_operation_time = session.operation_time;
-    coll.delete_one_with_session(doc! { "x": 1 }, None, &mut session)
-        .await
-        .unwrap();
-    test_func("delete", &client, &session, initial_operation_time, false);
-
-    let initial_operation_time = session.operation_time;
-    coll.delete_many_with_session(doc! { "x": 1 }, None, &mut session)
-        .await
-        .unwrap();
-    test_func("delete", &client, &session, initial_operation_time, false);
-
-    let initial_operation_time = session.operation_time;
-    coll.find_one_and_delete_with_session(doc! { "x": 1 }, None, &mut session)
-        .await
-        .unwrap();
-    test_func(
-        "findAndModify",
-        &client,
-        &session,
-        initial_operation_time,
-        false,
-    );
-
-    let initial_operation_time = session.operation_time;
-    coll.find_one_and_update_with_session(doc! {}, doc! { "$inc": { "x": 1 } }, None, &mut session)
-        .await
-        .unwrap();
-    test_func(
-        "findAndModify",
-        &client,
-        &session,
-        initial_operation_time,
-        false,
-    );
-
-    let initial_operation_time = session.operation_time;
-    coll.find_one_and_replace_with_session(doc! {}, doc! {"x": 1}, None, &mut session)
-        .await
-        .unwrap();
-    test_func(
-        "findAndModify",
-        &client,
-        &session,
-        initial_operation_time,
-        false,
-    );
-
-    let initial_operation_time = session.operation_time;
-    coll.aggregate_with_session(vec![doc! { "$match": { "x": 1 } }], None, &mut session)
-        .await
-        .unwrap();
-    test_func(
-        "aggregate",
-        &client,
-        &session,
-        initial_operation_time,
-        false,
-    );
-
-    let initial_operation_time = session.operation_time;
-    coll.find_with_session(doc! { "x": 1 }, None, &mut session)
-        .await
-        .unwrap();
-    test_func("find", &client, &session, initial_operation_time, true);
-
-    let initial_operation_time = session.operation_time;
-    coll.find_one_with_session(doc! { "x": 1 }, None, &mut session)
-        .await
-        .unwrap();
-    test_func("find", &client, &session, initial_operation_time, true);
-
-    let initial_operation_time = session.operation_time;
-    coll.distinct_with_session("x", None, None, &mut session)
-        .await
-        .unwrap();
-    test_func("distinct", &client, &session, initial_operation_time, true);
-
-    let initial_operation_time = session.operation_time;
-    coll.count_documents_with_session(None, None, &mut session)
-        .await
-        .unwrap();
-    test_func("aggregate", &client, &session, initial_operation_time, true);
-}
-
-/// Tests 1-4 of the causal consistency specs
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-#[function_name::named]
-async fn test_causal_consistency() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
-    let client = TestClient::new().await;
-    if client.is_standalone() {
-        return;
-    }
-
-    fn session_operation_time_test(
-        command_name: &str,
-        client: &EventClient,
-        session: &ClientSession,
-        initial_operation_time: Option<Timestamp>,
-        is_read: bool,
-    ) {
-        let (command_started, command_ended) =
-            client.get_successful_command_execution(command_name);
-
-        // Assert that the sent readConcern.afterClusterTime matches the session.operationTime (on a
-        // read)
-        if is_read {
-            assert_eq!(
-                command_started
-                    .command
-                    .get_document("readConcern")
-                    .expect("no readConcern field found in command")
-                    .get_timestamp("afterClusterTime")
-                    .expect("no readConcern.afterClusterTime field found in command"),
-                initial_operation_time.unwrap(),
-            );
-        }
-
-        // Assert that after the command is completed, session.operationTime matches the
-        // operationTime field of the response
-        assert_eq!(
-            command_ended.reply.get_timestamp("operationTime").unwrap(),
-            session.operation_time.unwrap()
-        )
-    }
-
-    let client = EventClient::new().await;
-    let session = client.start_session(None).await.unwrap();
-    assert!(session.operation_time.is_none());
-
-    for_each_op_with_session(
-        function_name!(),
-        session_operation_time_test,
-        client,
-        session,
-    )
-    .await;
 }

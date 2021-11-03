@@ -325,7 +325,7 @@ impl TestClient {
         if self.server_info.msg.as_deref() == Some("isdbgrid") {
             return Topology::Sharded;
         }
-        if self.options.repl_set_name.is_some() {
+        if self.server_info.set_name.is_some() {
             return Topology::ReplicaSet;
         }
         Topology::Single

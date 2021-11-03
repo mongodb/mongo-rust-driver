@@ -12,7 +12,7 @@ use crate::{
     selection_criteria::SelectionCriteria,
 };
 
-use super::CommandResponse;
+use super::{CommandResponse, ReadConcernSupport};
 
 pub(crate) struct Distinct {
     ns: Namespace,
@@ -57,10 +57,6 @@ impl Operation for Distinct {
 
     const NAME: &'static str = "distinct";
 
-    fn supports_read_concern(&self) -> bool {
-        true
-    }
-
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body: Document = doc! {
             Self::NAME: self.ns.coll.clone(),
@@ -96,6 +92,14 @@ impl Operation for Distinct {
 
     fn retryability(&self) -> Retryability {
         Retryability::Read
+    }
+
+    fn read_concern_support(&self) -> super::ReadConcernSupport<'_> {
+        ReadConcernSupport::Supported(
+            self.options
+                .as_ref()
+                .and_then(|opts| opts.read_concern.as_ref()),
+        )
     }
 }
 

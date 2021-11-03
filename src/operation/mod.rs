@@ -43,7 +43,7 @@ use crate::{
         WriteConcernError,
         WriteFailure,
     },
-    options::WriteConcern,
+    options::{ReadConcern, WriteConcern},
     selection_criteria::SelectionCriteria,
     Namespace,
 };
@@ -88,11 +88,6 @@ pub(crate) trait Operation {
     /// The operation may store some additional state that is required for handling the response.
     fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>>;
 
-    /// Returns whether or not this command supports the `readConcern` field
-    fn supports_read_concern(&self) -> bool {
-        false
-    }
-
     /// Perform custom serialization of the built command.
     /// By default, this will just call through to the `Serialize` implementation of the command.
     fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
@@ -127,6 +122,12 @@ pub(crate) trait Operation {
     /// The write concern to use for this operation, if any.
     fn write_concern(&self) -> Option<&WriteConcern> {
         None
+    }
+
+    /// Returns whether or not this command supports the `readConcern` field, and if so, the read
+    /// concern's value.
+    fn read_concern_support(&self) -> ReadConcernSupport<'_> {
+        ReadConcernSupport::Unsupported
     }
 
     /// Whether this operation supports sessions or not.
@@ -451,4 +452,16 @@ pub(crate) enum Retryability {
     Write,
     Read,
     None,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum ReadConcernSupport<'a> {
+    Unsupported,
+    Supported(Option<&'a ReadConcern>),
+}
+
+impl<'a> ReadConcernSupport<'a> {
+    pub(crate) fn is_supported(self) -> bool {
+        matches!(self, Self::Supported(_))
+    }
 }

@@ -471,8 +471,7 @@ pub struct AggregateOptions {
     ///
     /// If none is specified, the read concern defined on the object executing this operation will
     /// be used.
-    #[builder(default)]
-    #[serde(default)]
+    #[serde(skip_serializing)]
     pub read_concern: Option<ReadConcern>,
 
     /// The criteria used to select a server for this operation.
@@ -537,6 +536,7 @@ pub struct CountOptions {
     pub selection_criteria: Option<SelectionCriteria>,
 
     /// The level of the read concern.
+    #[serde(skip_serializing)]
     pub read_concern: Option<ReadConcern>,
 }
 
@@ -572,6 +572,7 @@ pub struct EstimatedDocumentCountOptions {
     pub selection_criteria: Option<SelectionCriteria>,
 
     /// The level of the read concern.
+    #[serde(skip_serializing)]
     pub read_concern: Option<ReadConcern>,
 }
 
@@ -602,6 +603,7 @@ pub struct DistinctOptions {
     pub selection_criteria: Option<SelectionCriteria>,
 
     /// The level of the read concern.
+    #[serde(skip_serializing)]
     pub read_concern: Option<ReadConcern>,
 
     /// The collation to use for the operation.
@@ -691,6 +693,7 @@ pub struct FindOptions {
     /// The read concern to use for this find query.
     ///
     /// If none specified, the default set on the collection will be used.
+    #[serde(skip_serializing)]
     pub read_concern: Option<ReadConcern>,
 
     /// Whether to return only the index keys in the documents.
@@ -811,6 +814,7 @@ pub struct FindOneOptions {
     /// The read concern to use for this find query.
     ///
     /// If none specified, the default set on the collection will be used.
+    #[serde(skip_serializing)]
     pub read_concern: Option<ReadConcern>,
 
     /// Whether to return only the index keys in the documents.

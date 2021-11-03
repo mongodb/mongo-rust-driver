@@ -15,7 +15,7 @@ use crate::{
     Namespace,
 };
 
-use super::CursorResponse;
+use super::{CursorResponse, ReadConcernSupport};
 
 #[derive(Debug)]
 pub(crate) struct Find<T> {
@@ -57,10 +57,6 @@ impl<T: DeserializeOwned> Operation for Find<T> {
     type Command = Document;
     type Response = CursorResponse<T>;
     const NAME: &'static str = "find";
-
-    fn supports_read_concern(&self) -> bool {
-        true
-    }
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
         let mut body = doc! {
@@ -120,6 +116,14 @@ impl<T: DeserializeOwned> Operation for Find<T> {
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),
         ))
+    }
+
+    fn read_concern_support(&self) -> super::ReadConcernSupport<'_> {
+        ReadConcernSupport::Supported(
+            self.options
+                .as_ref()
+                .and_then(|opts| opts.read_concern.as_ref()),
+        )
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
