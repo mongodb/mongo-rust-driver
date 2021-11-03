@@ -7,19 +7,9 @@ use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 use crate::{
     bson::{doc, Bson},
     error::{CommandError, Error, ErrorKind},
-    operation::Operation,
-    options::{
-        Acknowledgment,
-        AuthMechanism,
-        ClientOptions,
-        Credential,
-        ListDatabasesOptions,
-        ReadConcern,
-        ServerAddress,
-        WriteConcern,
-    },
+    options::{AuthMechanism, ClientOptions, Credential, ListDatabasesOptions, ServerAddress},
     selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria},
-    test::{util::TestClient, EventClient, CLIENT_OPTIONS, LOCK},
+    test::{util::TestClient, CLIENT_OPTIONS, LOCK},
     Client,
     RUNTIME,
 };
@@ -666,60 +656,4 @@ async fn plain_auth() {
             authenticated: "yeah".into()
         }
     );
-}
-
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn client_options_inherited() {
-    async fn assert_options_inherited(client: &EventClient, command_name: &str) {
-        let events = client.get_command_started_events(&[command_name]);
-        let event = events.iter().last().unwrap();
-
-        let read_concern_doc = event.command.get_document("readConcern").unwrap();
-        assert_eq!(read_concern_doc.get_str("level").unwrap(), "majority");
-
-        let write_concern_doc = event.command.get_document("writeConcern").unwrap();
-        assert_eq!(read_concern_doc.get_str("w").unwrap(), "majority");
-
-        if client.is_standalone() {
-            let read_pref_doc = event.command.get_document("$readPreference").unwrap();
-            assert_eq!(read_pref_doc.get_str("mode").unwrap(), "primaryPreferred");
-        }
-    }
-
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
-    let wc = WriteConcern::builder().w(Acknowledgment::Majority).build();
-    let rc = ReadConcern::majority();
-    let rp = SelectionCriteria::ReadPreference(ReadPreference::PrimaryPreferred {
-        options: Default::default(),
-    });
-
-    let options = ClientOptions::builder()
-        .selection_criteria(rp)
-        .write_concern(wc)
-        .read_concern(rc)
-        .build();
-    let client = EventClient::with_options(options).await;
-
-    let mut session = client.start_session(None).await.unwrap();
-
-    let coll = client
-        .database("client_opts_inherited")
-        .collection::<Document>("client_opts_inherited");
-
-    coll.find_with_session(None, None, &mut session)
-        .await
-        .unwrap();
-    assert_options_inherited(&client, "find").await;
-
-    coll.find_one_with_session(None, None, &mut session)
-        .await
-        .unwrap();
-    assert_options_inherited(&client, "find").await;
-
-    coll.count_documents_with_session(None, None, &mut session)
-        .await
-        .unwrap();
-    assert_options_inherited(&client, "aggregate").await;
 }

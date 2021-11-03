@@ -1,4 +1,4 @@
-use bson::{doc, Document, Timestamp};
+use bson::{doc, Document};
 use futures::{future::BoxFuture, FutureExt};
 use tokio::sync::RwLockReadGuard;
 
@@ -22,11 +22,7 @@ struct Operation {
 }
 
 impl Operation {
-    async fn execute<'a>(
-        self,
-        coll: Collection<Document>,
-        session: &'a mut ClientSession,
-    ) -> Result<()> {
+    async fn execute(self, coll: Collection<Document>, session: &mut ClientSession) -> Result<()> {
         (self.fut)(coll, session).await
     }
 }
@@ -186,132 +182,132 @@ fn for_each_op_with_session_gen() -> impl IntoIterator<Item = Operation> {
 //     .unwrap();
 // test_func("aggregate", &client, &session, initial_operation_time, true);
 
-async fn for_each_op_with_session<F>(
-    test_name: &str,
-    test_func: F,
-    client: EventClient,
-    mut session: ClientSession,
-) where
-    F: Fn(&str, &EventClient, &ClientSession, Option<Timestamp>, bool) -> (),
-{
-    // collection operations
-    let coll = client
-        .database(test_name)
-        .collection::<bson::Document>(test_name);
-    let initial_operation_time = session.operation_time;
-    coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session)
-        .await
-        .unwrap();
-    test_func("insert", &client, &session, initial_operation_time, false);
+// async fn for_each_op_with_session<F>(
+//     test_name: &str,
+//     test_func: F,
+//     client: EventClient,
+//     mut session: ClientSession,
+// ) where
+//     F: Fn(&str, &EventClient, &ClientSession, Option<Timestamp>, bool),
+// {
+//     // collection operations
+//     let coll = client
+//         .database(test_name)
+//         .collection::<bson::Document>(test_name);
+//     let initial_operation_time = session.operation_time;
+//     coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session)
+//         .await
+//         .unwrap();
+//     test_func("insert", &client, &session, initial_operation_time, false);
 
-    let initial_operation_time = session.operation_time;
-    coll.insert_many_with_session(vec![doc! { "x": 1 }], None, &mut session)
-        .await
-        .unwrap();
-    test_func("insert", &client, &session, initial_operation_time, false);
+//     let initial_operation_time = session.operation_time;
+//     coll.insert_many_with_session(vec![doc! { "x": 1 }], None, &mut session)
+//         .await
+//         .unwrap();
+//     test_func("insert", &client, &session, initial_operation_time, false);
 
-    let initial_operation_time = session.operation_time;
-    coll.replace_one_with_session(doc! { "x": 1 }, doc! { "x": 2 }, None, &mut session)
-        .await
-        .unwrap();
-    test_func("update", &client, &session, initial_operation_time, false);
+//     let initial_operation_time = session.operation_time;
+//     coll.replace_one_with_session(doc! { "x": 1 }, doc! { "x": 2 }, None, &mut session)
+//         .await
+//         .unwrap();
+//     test_func("update", &client, &session, initial_operation_time, false);
 
-    let initial_operation_time = session.operation_time;
-    coll.update_one_with_session(doc! {}, doc! { "$inc": {"x": 5 } }, None, &mut session)
-        .await
-        .unwrap();
-    test_func("update", &client, &session, initial_operation_time, false);
+//     let initial_operation_time = session.operation_time;
+//     coll.update_one_with_session(doc! {}, doc! { "$inc": {"x": 5 } }, None, &mut session)
+//         .await
+//         .unwrap();
+//     test_func("update", &client, &session, initial_operation_time, false);
 
-    let initial_operation_time = session.operation_time;
-    coll.update_many_with_session(doc! {}, doc! { "$inc": {"x": 5 } }, None, &mut session)
-        .await
-        .unwrap();
-    test_func("update", &client, &session, initial_operation_time, false);
+//     let initial_operation_time = session.operation_time;
+//     coll.update_many_with_session(doc! {}, doc! { "$inc": {"x": 5 } }, None, &mut session)
+//         .await
+//         .unwrap();
+//     test_func("update", &client, &session, initial_operation_time, false);
 
-    let initial_operation_time = session.operation_time;
-    coll.delete_one_with_session(doc! { "x": 1 }, None, &mut session)
-        .await
-        .unwrap();
-    test_func("delete", &client, &session, initial_operation_time, false);
+//     let initial_operation_time = session.operation_time;
+//     coll.delete_one_with_session(doc! { "x": 1 }, None, &mut session)
+//         .await
+//         .unwrap();
+//     test_func("delete", &client, &session, initial_operation_time, false);
 
-    let initial_operation_time = session.operation_time;
-    coll.delete_many_with_session(doc! { "x": 1 }, None, &mut session)
-        .await
-        .unwrap();
-    test_func("delete", &client, &session, initial_operation_time, false);
+//     let initial_operation_time = session.operation_time;
+//     coll.delete_many_with_session(doc! { "x": 1 }, None, &mut session)
+//         .await
+//         .unwrap();
+//     test_func("delete", &client, &session, initial_operation_time, false);
 
-    let initial_operation_time = session.operation_time;
-    coll.find_one_and_delete_with_session(doc! { "x": 1 }, None, &mut session)
-        .await
-        .unwrap();
-    test_func(
-        "findAndModify",
-        &client,
-        &session,
-        initial_operation_time,
-        false,
-    );
+//     let initial_operation_time = session.operation_time;
+//     coll.find_one_and_delete_with_session(doc! { "x": 1 }, None, &mut session)
+//         .await
+//         .unwrap();
+//     test_func(
+//         "findAndModify",
+//         &client,
+//         &session,
+//         initial_operation_time,
+//         false,
+//     );
 
-    let initial_operation_time = session.operation_time;
-    coll.find_one_and_update_with_session(doc! {}, doc! { "$inc": { "x": 1 } }, None, &mut session)
-        .await
-        .unwrap();
-    test_func(
-        "findAndModify",
-        &client,
-        &session,
-        initial_operation_time,
-        false,
-    );
+//     let initial_operation_time = session.operation_time;
+//     coll.find_one_and_update_with_session(doc! {}, doc! { "$inc": { "x": 1 } }, None, &mut
+// session)         .await
+//         .unwrap();
+//     test_func(
+//         "findAndModify",
+//         &client,
+//         &session,
+//         initial_operation_time,
+//         false,
+//     );
 
-    let initial_operation_time = session.operation_time;
-    coll.find_one_and_replace_with_session(doc! {}, doc! {"x": 1}, None, &mut session)
-        .await
-        .unwrap();
-    test_func(
-        "findAndModify",
-        &client,
-        &session,
-        initial_operation_time,
-        false,
-    );
+//     let initial_operation_time = session.operation_time;
+//     coll.find_one_and_replace_with_session(doc! {}, doc! {"x": 1}, None, &mut session)
+//         .await
+//         .unwrap();
+//     test_func(
+//         "findAndModify",
+//         &client,
+//         &session,
+//         initial_operation_time,
+//         false,
+//     );
 
-    let initial_operation_time = session.operation_time;
-    coll.aggregate_with_session(vec![doc! { "$match": { "x": 1 } }], None, &mut session)
-        .await
-        .unwrap();
-    test_func(
-        "aggregate",
-        &client,
-        &session,
-        initial_operation_time,
-        false,
-    );
+//     let initial_operation_time = session.operation_time;
+//     coll.aggregate_with_session(vec![doc! { "$match": { "x": 1 } }], None, &mut session)
+//         .await
+//         .unwrap();
+//     test_func(
+//         "aggregate",
+//         &client,
+//         &session,
+//         initial_operation_time,
+//         false,
+//     );
 
-    let initial_operation_time = session.operation_time;
-    coll.find_with_session(doc! { "x": 1 }, None, &mut session)
-        .await
-        .unwrap();
-    test_func("find", &client, &session, initial_operation_time, true);
+//     let initial_operation_time = session.operation_time;
+//     coll.find_with_session(doc! { "x": 1 }, None, &mut session)
+//         .await
+//         .unwrap();
+//     test_func("find", &client, &session, initial_operation_time, true);
 
-    let initial_operation_time = session.operation_time;
-    coll.find_one_with_session(doc! { "x": 1 }, None, &mut session)
-        .await
-        .unwrap();
-    test_func("find", &client, &session, initial_operation_time, true);
+//     let initial_operation_time = session.operation_time;
+//     coll.find_one_with_session(doc! { "x": 1 }, None, &mut session)
+//         .await
+//         .unwrap();
+//     test_func("find", &client, &session, initial_operation_time, true);
 
-    let initial_operation_time = session.operation_time;
-    coll.distinct_with_session("x", None, None, &mut session)
-        .await
-        .unwrap();
-    test_func("distinct", &client, &session, initial_operation_time, true);
+//     let initial_operation_time = session.operation_time;
+//     coll.distinct_with_session("x", None, None, &mut session)
+//         .await
+//         .unwrap();
+//     test_func("distinct", &client, &session, initial_operation_time, true);
 
-    let initial_operation_time = session.operation_time;
-    coll.count_documents_with_session(None, None, &mut session)
-        .await
-        .unwrap();
-    test_func("aggregate", &client, &session, initial_operation_time, true);
-}
+//     let initial_operation_time = session.operation_time;
+//     coll.count_documents_with_session(None, None, &mut session)
+//         .await
+//         .unwrap();
+//     test_func("aggregate", &client, &session, initial_operation_time, true);
+// }
 
 /// Test 1 from the causal consistency specification.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -403,8 +399,7 @@ async fn first_op_update_op_time() {
         let event = client
             .get_command_events(&[name])
             .into_iter()
-            .filter(|e| matches!(e, CommandEvent::Succeeded(_) | CommandEvent::Failed(_)))
-            .next()
+            .find(|e| matches!(e, CommandEvent::Succeeded(_) | CommandEvent::Failed(_)))
             .unwrap();
 
         match event {
@@ -412,7 +407,7 @@ async fn first_op_update_op_time() {
                 let op_time = s.reply.get_timestamp("operationTime").unwrap();
                 assert_eq!(session.operation_time().unwrap(), op_time);
             }
-            CommandEvent::Failed(f) => {
+            CommandEvent::Failed(_f) => {
                 assert!(session.operation_time().is_some());
             }
             _ => panic!("should have been succeeded or failed"),
@@ -486,8 +481,6 @@ async fn find_after_write_includes_after_cluster_time() {
         .into_iter()
         .filter(|o| !o.is_read)
     {
-        let command_name = op.name;
-
         let session_options = SessionOptions::builder().causal_consistency(true).build();
         let mut session = client.start_session(Some(session_options)).await.unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
@@ -630,7 +623,7 @@ async fn omit_default_read_concern_level() {
 /// Test 9 from the causal consistency specification.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn test_causal_consistency_read_concern_merge_gen() {
+async fn test_causal_consistency_read_concern_merge() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let options = ClientOptions::builder()
@@ -659,8 +652,6 @@ async fn test_causal_consistency_read_concern_merge_gen() {
         .into_iter()
         .filter(|o| o.is_read)
     {
-        let initial_operation_time = session.operation_time();
-        let is_read = op.is_read;
         let command_name = op.name;
         coll.find_one_with_session(None, None, &mut session)
             .await
@@ -675,7 +666,7 @@ async fn test_causal_consistency_read_concern_merge_gen() {
         let rc_doc = command_started
             .command
             .get_document("readConcern")
-            .expect(format!("{} did not include read concern", command_name).as_str());
+            .unwrap_or_else(|_| panic!("{} did not include read concern", command_name));
 
         assert_eq!(rc_doc.get_str("level").unwrap(), "majority");
         assert_eq!(rc_doc.get_timestamp("afterClusterTime").unwrap(), op_time);

@@ -1480,7 +1480,7 @@ impl ClientOptionsParser {
                     credential.source = options
                         .auth_source
                         .clone()
-                        .or(db.clone())
+                        .or_else(|| db.clone())
                         .or_else(|| Some("admin".into()));
                 } else if authentication_requested {
                     return Err(ErrorKind::InvalidArgument {
@@ -2410,7 +2410,7 @@ impl SessionOptions {
         {
             if causal_consistency && snapshot {
                 return Err(ErrorKind::InvalidArgument {
-                    message: format!("snapshot and causal consistency are mutually exclusive"),
+                    message: "snapshot and causal consistency are mutually exclusive".to_string(),
                 }
                 .into());
             }

@@ -2,26 +2,16 @@ mod causal_consistency;
 
 use std::{future::Future, time::Duration};
 
-use bson::{Document, Timestamp};
-use futures::{future::BoxFuture, stream::StreamExt, FutureExt};
+use bson::Document;
+use futures::stream::StreamExt;
 use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, Bson},
-    client::options::{ClientOptions, SessionOptions},
-    coll::options::CollectionOptions,
     error::Result,
-    options::{
-        Acknowledgment,
-        FindOptions,
-        InsertOneOptions,
-        ReadConcern,
-        ReadPreference,
-        WriteConcern,
-    },
+    options::{Acknowledgment, FindOptions, InsertOneOptions, ReadPreference, WriteConcern},
     selection_criteria::SelectionCriteria,
-    test::{CommandEvent, EventClient, TestClient, CLIENT_OPTIONS, LOCK},
-    ClientSession,
+    test::{EventClient, TestClient, CLIENT_OPTIONS, LOCK},
     Collection,
     RUNTIME,
 };

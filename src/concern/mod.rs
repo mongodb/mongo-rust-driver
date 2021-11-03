@@ -105,7 +105,7 @@ impl ReadConcern {
 
 impl From<ReadConcernLevel> for ReadConcern {
     fn from(level: ReadConcernLevel) -> Self {
-        Self { level: level }
+        Self { level }
     }
 }
 
