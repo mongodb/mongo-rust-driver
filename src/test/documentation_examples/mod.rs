@@ -1369,9 +1369,11 @@ async fn delete_examples(collection: &Collection<Document>) -> Result<()> {
     Ok(())
 }
 
+type GenericResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
 #[allow(unused_variables)]
 #[cfg(not(feature = "sync"))]
-async fn versioned_api_examples() -> std::result::Result<(), Box<dyn std::error::Error>> {
+async fn versioned_api_examples() -> GenericResult<()> {
     let setup_client = TestClient::new().await;
     if setup_client.server_version_lt(4, 9) {
         println!("skipping versioned API examples due to unsupported server version");
@@ -1499,7 +1501,7 @@ async fn versioned_api_examples() -> std::result::Result<(), Box<dyn std::error:
     Ok(())
 }
 
-async fn aggregation_examples() -> Result<()> {
+async fn aggregation_examples() -> GenericResult<()> {
     let client = TestClient::new().await;
     let db = client.database("aggregation_examples");
     db.drop(None).await?;

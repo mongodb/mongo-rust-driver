@@ -1,19 +1,16 @@
-use bson::doc;
+use bson::{doc, DateTime};
 
-use crate::{error::Result, Database};
+use crate::Database;
 
-pub(crate) async fn populate(db: &Database) -> Result<()> {
-    fn iso_date(text: &str) -> bson::DateTime {
-        let chrono_dt = chrono::DateTime::parse_from_rfc3339(text).unwrap();
-        bson::DateTime::from_millis(chrono_dt.timestamp_millis())
-    }
+use super::GenericResult;
 
-    let date_20180208 = iso_date("2018-02-08T09:00:00.000Z");
-    let date_20180109 = iso_date("2018-01-09T07:12:00.000Z");
-    let date_20180127 = iso_date("2018-01-27T09:13:00.000Z");
-    let date_20180203 = iso_date("2018-02-03T07:58:00.000Z");
-    let date_20180205 = iso_date("2018-02-05T06:03:00.000Z");
-    let date_20180111 = iso_date("2018-01-11T07:15:00.000Z");
+pub(crate) async fn populate(db: &Database) -> GenericResult<()> {
+    let date_20180208 = DateTime::parse_rfc3339_str("2018-02-08T09:00:00.000Z")?;
+    let date_20180109 = DateTime::parse_rfc3339_str("2018-01-09T07:12:00.000Z")?;
+    let date_20180127 = DateTime::parse_rfc3339_str("2018-01-27T09:13:00.000Z")?;
+    let date_20180203 = DateTime::parse_rfc3339_str("2018-02-03T07:58:00.000Z")?;
+    let date_20180205 = DateTime::parse_rfc3339_str("2018-02-05T06:03:00.000Z")?;
+    let date_20180111 = DateTime::parse_rfc3339_str("2018-01-11T07:15:00.000Z")?;
 
     db.collection("sales")
         .insert_many(
