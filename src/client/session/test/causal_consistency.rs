@@ -141,251 +141,6 @@ fn all_session_ops() -> impl IntoIterator<Item = Operation> {
     ops
 }
 
-// // collection operations
-// let coll = client
-//     .database(test_name)
-//     .collection::<bson::Document>(test_name);
-// let initial_operation_time = session.operation_time;
-// coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session)
-//     .await
-//     .unwrap();
-// test_func("insert", &client, &session, initial_operation_time, false);
-
-// let initial_operation_time = session.operation_time;
-// coll.insert_many_with_session(vec![doc! { "x": 1 }], None, &mut session)
-//     .await
-//     .unwrap();
-// test_func("insert", &client, &session, initial_operation_time, false);
-
-// let initial_operation_time = session.operation_time;
-// coll.replace_one_with_session(doc! { "x": 1 }, doc! { "x": 2 }, None, &mut session)
-//     .await
-//     .unwrap();
-// test_func("update", &client, &session, initial_operation_time, false);
-
-// let initial_operation_time = session.operation_time;
-// coll.update_one_with_session(doc! {}, doc! { "$inc": {"x": 5 } }, None, &mut session)
-//     .await
-//     .unwrap();
-// test_func("update", &client, &session, initial_operation_time, false);
-
-// let initial_operation_time = session.operation_time;
-// coll.update_many_with_session(doc! {}, doc! { "$inc": {"x": 5 } }, None, &mut session)
-//     .await
-//     .unwrap();
-// test_func("update", &client, &session, initial_operation_time, false);
-
-// let initial_operation_time = session.operation_time;
-// coll.delete_one_with_session(doc! { "x": 1 }, None, &mut session)
-//     .await
-//     .unwrap();
-// test_func("delete", &client, &session, initial_operation_time, false);
-
-// let initial_operation_time = session.operation_time;
-// coll.delete_many_with_session(doc! { "x": 1 }, None, &mut session)
-//     .await
-//     .unwrap();
-// test_func("delete", &client, &session, initial_operation_time, false);
-
-// let initial_operation_time = session.operation_time;
-// coll.find_one_and_delete_with_session(doc! { "x": 1 }, None, &mut session)
-//     .await
-//     .unwrap();
-// test_func(
-//     "findAndModify",
-//     &client,
-//     &session,
-//     initial_operation_time,
-//     false,
-// );
-
-// let initial_operation_time = session.operation_time;
-// coll.find_one_and_update_with_session(doc! {}, doc! { "$inc": { "x": 1 } }, None, &mut session)
-//     .await
-//     .unwrap();
-// test_func(
-//     "findAndModify",
-//     &client,
-//     &session,
-//     initial_operation_time,
-//     false,
-// );
-
-// let initial_operation_time = session.operation_time;
-// coll.find_one_and_replace_with_session(doc! {}, doc! {"x": 1}, None, &mut session)
-//     .await
-//     .unwrap();
-// test_func(
-//     "findAndModify",
-//     &client,
-//     &session,
-//     initial_operation_time,
-//     false,
-// );
-
-// let initial_operation_time = session.operation_time;
-// coll.aggregate_with_session(vec![doc! { "$match": { "x": 1 } }], None, &mut session)
-//     .await
-//     .unwrap();
-// test_func(
-//     "aggregate",
-//     &client,
-//     &session,
-//     initial_operation_time,
-//     false,
-// );
-
-// let initial_operation_time = session.operation_time;
-// coll.find_with_session(doc! { "x": 1 }, None, &mut session)
-//     .await
-//     .unwrap();
-// test_func("find", &client, &session, initial_operation_time, true);
-
-// let initial_operation_time = session.operation_time;
-// coll.find_one_with_session(doc! { "x": 1 }, None, &mut session)
-//     .await
-//     .unwrap();
-// test_func("find", &client, &session, initial_operation_time, true);
-
-// let initial_operation_time = session.operation_time;
-// coll.distinct_with_session("x", None, None, &mut session)
-//     .await
-//     .unwrap();
-// test_func("distinct", &client, &session, initial_operation_time, true);
-
-// let initial_operation_time = session.operation_time;
-// coll.count_documents_with_session(None, None, &mut session)
-//     .await
-//     .unwrap();
-// test_func("aggregate", &client, &session, initial_operation_time, true);
-
-// async fn for_each_op_with_session<F>(
-//     test_name: &str,
-//     test_func: F,
-//     client: EventClient,
-//     mut session: ClientSession,
-// ) where
-//     F: Fn(&str, &EventClient, &ClientSession, Option<Timestamp>, bool),
-// {
-//     // collection operations
-//     let coll = client
-//         .database(test_name)
-//         .collection::<bson::Document>(test_name);
-//     let initial_operation_time = session.operation_time;
-//     coll.insert_one_with_session(doc! { "x": 1 }, None, &mut session)
-//         .await
-//         .unwrap();
-//     test_func("insert", &client, &session, initial_operation_time, false);
-
-//     let initial_operation_time = session.operation_time;
-//     coll.insert_many_with_session(vec![doc! { "x": 1 }], None, &mut session)
-//         .await
-//         .unwrap();
-//     test_func("insert", &client, &session, initial_operation_time, false);
-
-//     let initial_operation_time = session.operation_time;
-//     coll.replace_one_with_session(doc! { "x": 1 }, doc! { "x": 2 }, None, &mut session)
-//         .await
-//         .unwrap();
-//     test_func("update", &client, &session, initial_operation_time, false);
-
-//     let initial_operation_time = session.operation_time;
-//     coll.update_one_with_session(doc! {}, doc! { "$inc": {"x": 5 } }, None, &mut session)
-//         .await
-//         .unwrap();
-//     test_func("update", &client, &session, initial_operation_time, false);
-
-//     let initial_operation_time = session.operation_time;
-//     coll.update_many_with_session(doc! {}, doc! { "$inc": {"x": 5 } }, None, &mut session)
-//         .await
-//         .unwrap();
-//     test_func("update", &client, &session, initial_operation_time, false);
-
-//     let initial_operation_time = session.operation_time;
-//     coll.delete_one_with_session(doc! { "x": 1 }, None, &mut session)
-//         .await
-//         .unwrap();
-//     test_func("delete", &client, &session, initial_operation_time, false);
-
-//     let initial_operation_time = session.operation_time;
-//     coll.delete_many_with_session(doc! { "x": 1 }, None, &mut session)
-//         .await
-//         .unwrap();
-//     test_func("delete", &client, &session, initial_operation_time, false);
-
-//     let initial_operation_time = session.operation_time;
-//     coll.find_one_and_delete_with_session(doc! { "x": 1 }, None, &mut session)
-//         .await
-//         .unwrap();
-//     test_func(
-//         "findAndModify",
-//         &client,
-//         &session,
-//         initial_operation_time,
-//         false,
-//     );
-
-//     let initial_operation_time = session.operation_time;
-//     coll.find_one_and_update_with_session(doc! {}, doc! { "$inc": { "x": 1 } }, None, &mut
-// session)         .await
-//         .unwrap();
-//     test_func(
-//         "findAndModify",
-//         &client,
-//         &session,
-//         initial_operation_time,
-//         false,
-//     );
-
-//     let initial_operation_time = session.operation_time;
-//     coll.find_one_and_replace_with_session(doc! {}, doc! {"x": 1}, None, &mut session)
-//         .await
-//         .unwrap();
-//     test_func(
-//         "findAndModify",
-//         &client,
-//         &session,
-//         initial_operation_time,
-//         false,
-//     );
-
-//     let initial_operation_time = session.operation_time;
-//     coll.aggregate_with_session(vec![doc! { "$match": { "x": 1 } }], None, &mut session)
-//         .await
-//         .unwrap();
-//     test_func(
-//         "aggregate",
-//         &client,
-//         &session,
-//         initial_operation_time,
-//         false,
-//     );
-
-//     let initial_operation_time = session.operation_time;
-//     coll.find_with_session(doc! { "x": 1 }, None, &mut session)
-//         .await
-//         .unwrap();
-//     test_func("find", &client, &session, initial_operation_time, true);
-
-//     let initial_operation_time = session.operation_time;
-//     coll.find_one_with_session(doc! { "x": 1 }, None, &mut session)
-//         .await
-//         .unwrap();
-//     test_func("find", &client, &session, initial_operation_time, true);
-
-//     let initial_operation_time = session.operation_time;
-//     coll.distinct_with_session("x", None, None, &mut session)
-//         .await
-//         .unwrap();
-//     test_func("distinct", &client, &session, initial_operation_time, true);
-
-//     let initial_operation_time = session.operation_time;
-//     coll.count_documents_with_session(None, None, &mut session)
-//         .await
-//         .unwrap();
-//     test_func("aggregate", &client, &session, initial_operation_time, true);
-// }
-
 /// Test 1 from the causal consistency specification.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
@@ -395,6 +150,9 @@ async fn new_session_operation_time_null() {
     let client = EventClient::new().await;
 
     if client.is_standalone() {
+        println!(
+            "skipping new_session_operation_time_null due to unsupported topology: standalone"
+        );
         return;
     }
 
@@ -411,6 +169,9 @@ async fn first_read_no_after_cluser_time() {
     let client = EventClient::new().await;
 
     if client.is_standalone() {
+        println!(
+            "skipping first_read_no_after_cluser_time due to unsupported topology: standalone"
+        );
         return;
     }
 
@@ -447,6 +208,7 @@ async fn first_op_update_op_time() {
     let client = EventClient::new().await;
 
     if client.is_standalone() {
+        println!("skipping first_op_update_op_time due to unsupported topology: standalone");
         return;
     }
 
@@ -496,6 +258,9 @@ async fn read_includes_after_cluster_time() {
     let client = EventClient::new().await;
 
     if client.is_standalone() {
+        println!(
+            "skipping read_includes_after_cluster_time due to unsupported topology: standalone"
+        );
         return;
     }
 
@@ -539,6 +304,10 @@ async fn find_after_write_includes_after_cluster_time() {
     let client = EventClient::new().await;
 
     if client.is_standalone() {
+        println!(
+            "skipping find_after_write_includes_after_cluster_time due to unsupported topology: \
+             standalone"
+        );
         return;
     }
 
@@ -572,12 +341,16 @@ async fn find_after_write_includes_after_cluster_time() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-async fn not_causally_consitent_omits_after_cluster_time() {
+async fn not_causally_consistent_omits_after_cluster_time() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = EventClient::new().await;
 
     if client.is_standalone() {
+        println!(
+            "skipping not_causally_consistent_omits_after_cluster_time due to unsupported \
+             topology: standalone"
+        );
         return;
     }
 
@@ -613,6 +386,7 @@ async fn omit_after_cluster_time_standalone() {
     let client = EventClient::new().await;
 
     if !client.is_standalone() {
+        println!("skipping omit_after_cluster_time_standalone due to unsupported topology");
         return;
     }
 
@@ -648,6 +422,9 @@ async fn omit_default_read_concern_level() {
     let client = EventClient::new().await;
 
     if client.is_standalone() {
+        println!(
+            "skipping omit_default_read_concern_level due to unsupported topology: standalone"
+        );
         return;
     }
 
@@ -683,10 +460,7 @@ async fn omit_default_read_concern_level() {
 async fn test_causal_consistency_read_concern_merge() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
-    let options = ClientOptions::builder()
-        .read_concern(ReadConcern::majority())
-        .build();
-    let client = EventClient::with_options(options).await;
+    let client = EventClient::new().await;
     if client.is_standalone() {
         println!(
             "skipping test_causal_consistency_read_concern_merge due to unsupported topology: \
@@ -752,7 +526,7 @@ async fn omit_cluster_time_standalone() {
 /// Test 12 from the causal consistency specification.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn cluster_time_send_in_commands() {
+async fn cluster_time_sent_in_commands() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = EventClient::new().await;
