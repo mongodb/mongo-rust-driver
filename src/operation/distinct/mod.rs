@@ -94,7 +94,10 @@ impl Operation for Distinct {
         Retryability::Read
     }
 
-    fn read_concern_support(&self) -> super::ReadConcernSupport<'_> {
+    fn read_concern_support(
+        &self,
+        _description: &StreamDescription,
+    ) -> super::ReadConcernSupport<'_> {
         ReadConcernSupport::Supported(
             self.options
                 .as_ref()

@@ -12,7 +12,7 @@ use crate::{
     Namespace,
 };
 
-use super::{CursorBody, CursorResponse, ReadConcernSupport};
+use super::{CursorBody, CursorResponse, ReadConcernSupport, SERVER_4_2_0_WIRE_VERSION};
 
 #[derive(Debug)]
 pub(crate) struct Aggregate {
@@ -91,12 +91,19 @@ impl Operation for Aggregate {
             .and_then(|opts| opts.selection_criteria.as_ref())
     }
 
-    fn read_concern_support(&self) -> ReadConcernSupport<'_> {
-        ReadConcernSupport::Supported(
-            self.options
-                .as_ref()
-                .and_then(|opts| opts.read_concern.as_ref()),
-        )
+    fn read_concern_support(&self, description: &StreamDescription) -> ReadConcernSupport<'_> {
+        // for aggregates that write, read concern is only supported in MongoDB 4.2+.
+        if self.is_out_or_merge()
+            && description.max_wire_version.unwrap_or(0) < SERVER_4_2_0_WIRE_VERSION
+        {
+            ReadConcernSupport::Unsupported
+        } else {
+            ReadConcernSupport::Supported(
+                self.options
+                    .as_ref()
+                    .and_then(|opts| opts.read_concern.as_ref()),
+            )
+        }
     }
 
     fn write_concern(&self) -> Option<&WriteConcern> {

@@ -13,9 +13,7 @@ use crate::{
     selection_criteria::SelectionCriteria,
 };
 
-use super::{CommandResponse, ReadConcernSupport};
-
-const SERVER_4_9_0_WIRE_VERSION: i32 = 12;
+use super::{CommandResponse, ReadConcernSupport, SERVER_4_9_0_WIRE_VERSION};
 
 pub(crate) struct Count {
     ns: Namespace,
@@ -124,7 +122,10 @@ impl Operation for Count {
         None
     }
 
-    fn read_concern_support(&self) -> super::ReadConcernSupport<'_> {
+    fn read_concern_support(
+        &self,
+        _description: &StreamDescription,
+    ) -> super::ReadConcernSupport<'_> {
         ReadConcernSupport::Supported(
             self.options
                 .as_ref()

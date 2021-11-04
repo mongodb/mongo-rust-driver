@@ -70,6 +70,9 @@ pub(crate) use list_indexes::ListIndexes;
 pub(crate) use run_command::RunCommand;
 pub(crate) use update::Update;
 
+const SERVER_4_9_0_WIRE_VERSION: i32 = 12;
+const SERVER_4_2_0_WIRE_VERSION: i32 = 8;
+
 /// A trait modeling the behavior of a server side operation.
 pub(crate) trait Operation {
     /// The output type of this operation.
@@ -126,7 +129,7 @@ pub(crate) trait Operation {
 
     /// Returns whether or not this command supports the `readConcern` field, and if so, the read
     /// concern's value.
-    fn read_concern_support(&self) -> ReadConcernSupport<'_> {
+    fn read_concern_support(&self, _description: &StreamDescription) -> ReadConcernSupport<'_> {
         ReadConcernSupport::Unsupported
     }
 

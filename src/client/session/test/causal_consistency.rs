@@ -3,7 +3,7 @@ use futures::{future::BoxFuture, FutureExt};
 use tokio::sync::RwLockReadGuard;
 
 use crate::{
-    client::options::{ClientOptions, SessionOptions},
+    client::options::SessionOptions,
     coll::options::CollectionOptions,
     error::Result,
     options::ReadConcern,

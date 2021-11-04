@@ -391,7 +391,9 @@ impl Client {
             .update_command_with_read_pref(connection.address(), &mut cmd, op.selection_criteria())
             .await;
 
-        if let ReadConcernSupport::Supported(Some(rc)) = op.read_concern_support() {
+        if let ReadConcernSupport::Supported(Some(rc)) =
+            op.read_concern_support(&stream_description)
+        {
             cmd.set_read_concern(rc.clone());
         }
 
@@ -432,7 +434,7 @@ impl Client {
                         session.transaction.state,
                         TransactionState::None | TransactionState::Starting
                     )
-                    && op.read_concern_support().is_supported()
+                    && op.read_concern_support(&stream_description).is_supported()
                 {
                     cmd.set_after_cluster_time(session);
                 }
