@@ -12,54 +12,131 @@ use crate::{
     Collection,
 };
 
-type OperationFn =
-    Box<dyn FnOnce(Collection<Document>, &mut ClientSession) -> BoxFuture<Result<()>>>;
-
+/// Strunct encapsulating an operation that takes a session in, as well as some associated
+/// information.
 struct Operation {
     name: &'static str,
-    fut: OperationFn,
+    f: OperationFn,
     is_read: bool,
 }
 
+/// A Closure that executes an operation and returns the resultant future.
+type OperationFn =
+    Box<dyn FnOnce(Collection<Document>, &mut ClientSession) -> BoxFuture<Result<()>>>;
+
 impl Operation {
+    /// Execute the operation using the provided collection and session.
     async fn execute(self, coll: Collection<Document>, session: &mut ClientSession) -> Result<()> {
-        (self.fut)(coll, session).await
+        (self.f)(coll, session).await
     }
 }
 
-fn for_each_op_with_session_gen() -> impl IntoIterator<Item = Operation> {
+/// Shorthand macro for defining an Operation.
+macro_rules! op {
+    ($name:expr, $is_read: expr, |$coll:ident, $s:ident| $body:expr) => {
+        Operation {
+            f: Box::new({ move |$coll, $s| async move { $body.await.map(|_| ()) }.boxed() }),
+            name: $name,
+            is_read: $is_read,
+        }
+    };
+}
+
+fn all_session_ops() -> impl IntoIterator<Item = Operation> {
     let mut ops = vec![];
 
-    let f: OperationFn = Box::new({
-        move |c, s| {
-            async move {
-                c.insert_one_with_session(doc! { "x": 1 }, None, s)
-                    .await
-                    .map(|_| ())
-            }
-            .boxed()
-        }
-    });
-    ops.push(Operation {
-        fut: f,
-        name: "insert",
-        is_read: false,
-    });
+    ops.push(op!("insert", false, |coll, session| {
+        coll.insert_one_with_session(doc! { "x": 1 }, None, session)
+    }));
 
-    ops.push(Operation {
-        fut: Box::new({
-            move |coll, s| {
-                async move {
-                    coll.find_one_with_session(doc! { "x": 1 }, None, s)
-                        .await
-                        .map(|_| ())
-                }
-                .boxed()
-            }
-        }),
-        name: "find",
-        is_read: true,
-    });
+    ops.push(op!("insert", false, |coll, session| {
+        coll.insert_many_with_session(vec![doc! { "x": 1 }], None, session)
+    }));
+
+    ops.push(op!("find", true, |coll, session| coll
+        .find_one_with_session(doc! { "x": 1 }, None, session)));
+
+    ops.push(op!("find", true, |coll, session| coll.find_with_session(
+        doc! { "x": 1 },
+        None,
+        session
+    )));
+
+    ops.push(op!("update", false, |coll, s| coll
+        .update_one_with_session(
+            doc! { "x": 1 },
+            doc! { "$inc": { "x": 1 } },
+            None,
+            s,
+        )));
+
+    ops.push(op!("update", false, |coll, s| coll
+        .update_many_with_session(
+            doc! { "x": 1 },
+            doc! { "$inc": { "x": 1 } },
+            None,
+            s,
+        )));
+
+    ops.push(op!("update", false, |coll, s| coll
+        .replace_one_with_session(
+            doc! { "x": 1 },
+            doc! { "x": 2 },
+            None,
+            s,
+        )));
+
+    ops.push(op!("delete", false, |coll, s| coll
+        .delete_one_with_session(doc! { "x": 1 }, None, s,)));
+
+    ops.push(op!("delete", false, |coll, s| coll
+        .delete_many_with_session(doc! { "x": 1 }, None, s,)));
+
+    ops.push(op!("findAndModify", false, |coll, s| coll
+        .find_one_and_update_with_session(
+            doc! { "x": 1 },
+            doc! { "$inc": { "x": 1 } },
+            None,
+            s,
+        )));
+
+    ops.push(op!("findAndModify", false, |coll, s| coll
+        .find_one_and_replace_with_session(
+            doc! { "x": 1 },
+            doc! { "x": 1  },
+            None,
+            s,
+        )));
+
+    ops.push(op!("findAndModify", false, |coll, s| coll
+        .find_one_and_delete_with_session(doc! { "x": 1 }, None, s,)));
+
+    ops.push(op!("aggregate", true, |coll, s| coll
+        .count_documents_with_session(doc! { "x": 1 }, None, s,)));
+
+    ops.push(op!("aggregate", true, |coll, s| coll
+        .aggregate_with_session(
+            vec![doc! { "$match": { "x": 1 } }],
+            None,
+            s,
+        )));
+
+    ops.push(op!("aggregate", false, |coll, s| coll
+        .aggregate_with_session(
+            vec![
+                doc! { "$match": { "x": 1 } },
+                doc! { "$out": "some_other_coll" },
+            ],
+            None,
+            s,
+        )));
+
+    ops.push(op!("distinct", true, |coll, s| coll.distinct_with_session(
+        "x",
+        doc! {},
+        None,
+        s,
+    )));
 
     ops
 }
@@ -337,18 +414,14 @@ async fn first_read_no_after_cluser_time() {
         return;
     }
 
-    let mut session = client
-        .start_session(Some(
-            SessionOptions::builder().causal_consistency(true).build(),
-        ))
-        .await
-        .unwrap();
-    assert!(session.operation_time().is_none());
-
-    for op in for_each_op_with_session_gen()
-        .into_iter()
-        .filter(|o| o.is_read)
-    {
+    for op in all_session_ops().into_iter().filter(|o| o.is_read) {
+        let mut session = client
+            .start_session(Some(
+                SessionOptions::builder().causal_consistency(true).build(),
+            ))
+            .await
+            .unwrap();
+        assert!(session.operation_time().is_none());
         let name = op.name;
         op.execute(
             client
@@ -377,15 +450,14 @@ async fn first_op_update_op_time() {
         return;
     }
 
-    let mut session = client
-        .start_session(Some(
-            SessionOptions::builder().causal_consistency(true).build(),
-        ))
-        .await
-        .unwrap();
-    assert!(session.operation_time().is_none());
-
-    for op in for_each_op_with_session_gen() {
+    for op in all_session_ops() {
+        let mut session = client
+            .start_session(Some(
+                SessionOptions::builder().causal_consistency(true).build(),
+            ))
+            .await
+            .unwrap();
+        assert!(session.operation_time().is_none());
         let name = op.name;
         op.execute(
             client
@@ -400,7 +472,7 @@ async fn first_op_update_op_time() {
             .get_command_events(&[name])
             .into_iter()
             .find(|e| matches!(e, CommandEvent::Succeeded(_) | CommandEvent::Failed(_)))
-            .unwrap();
+            .unwrap_or_else(|| panic!("no event found for {}", name));
 
         match event {
             CommandEvent::Succeeded(s) => {
@@ -431,10 +503,7 @@ async fn read_includes_after_cluster_time() {
         .database("causal_consistency_4")
         .collection::<Document>("causal_consistency_4");
 
-    for op in for_each_op_with_session_gen()
-        .into_iter()
-        .filter(|o| o.is_read)
-    {
+    for op in all_session_ops().into_iter().filter(|o| o.is_read) {
         let command_name = op.name;
         let mut session = client.start_session(None).await.unwrap();
         coll.find_one_with_session(None, None, &mut session)
@@ -477,10 +546,7 @@ async fn find_after_write_includes_after_cluster_time() {
         .database("causal_consistency_5")
         .collection::<Document>("causal_consistency_5");
 
-    for op in for_each_op_with_session_gen()
-        .into_iter()
-        .filter(|o| !o.is_read)
-    {
+    for op in all_session_ops().into_iter().filter(|o| !o.is_read) {
         let session_options = SessionOptions::builder().causal_consistency(true).build();
         let mut session = client.start_session(Some(session_options)).await.unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
@@ -519,10 +585,7 @@ async fn not_causally_consitent_omits_after_cluster_time() {
         .database("causal_consistency_6")
         .collection::<Document>("causal_consistency_6");
 
-    for op in for_each_op_with_session_gen()
-        .into_iter()
-        .filter(|o| o.is_read)
-    {
+    for op in all_session_ops().into_iter().filter(|o| o.is_read) {
         let command_name = op.name;
 
         let session_options = SessionOptions::builder().causal_consistency(false).build();
@@ -557,10 +620,7 @@ async fn omit_after_cluster_time_standalone() {
         .database("causal_consistency_7")
         .collection::<Document>("causal_consistency_7");
 
-    for op in for_each_op_with_session_gen()
-        .into_iter()
-        .filter(|o| o.is_read)
-    {
+    for op in all_session_ops().into_iter().filter(|o| o.is_read) {
         let command_name = op.name;
 
         let session_options = SessionOptions::builder().causal_consistency(true).build();
@@ -595,10 +655,7 @@ async fn omit_default_read_concern_level() {
         .database("causal_consistency_8")
         .collection::<Document>("causal_consistency_8");
 
-    for op in for_each_op_with_session_gen()
-        .into_iter()
-        .filter(|o| o.is_read)
-    {
+    for op in all_session_ops().into_iter().filter(|o| o.is_read) {
         let command_name = op.name;
 
         let session_options = SessionOptions::builder().causal_consistency(true).build();
@@ -648,10 +705,7 @@ async fn test_causal_consistency_read_concern_merge() {
         .database("causal_consistency_9")
         .collection_with_options("causal_consistency_9", coll_options);
 
-    for op in for_each_op_with_session_gen()
-        .into_iter()
-        .filter(|o| o.is_read)
-    {
+    for op in all_session_ops().into_iter().filter(|o| o.is_read) {
         let command_name = op.name;
         coll.find_one_with_session(None, None, &mut session)
             .await
