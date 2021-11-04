@@ -43,7 +43,7 @@ use crate::{
         WriteConcernError,
         WriteFailure,
     },
-    options::{ReadConcern, WriteConcern},
+    options::WriteConcern,
     selection_criteria::SelectionCriteria,
     Namespace,
 };
@@ -129,8 +129,8 @@ pub(crate) trait Operation {
 
     /// Returns whether or not this command supports the `readConcern` field, and if so, the read
     /// concern's value.
-    fn read_concern_support(&self, _description: &StreamDescription) -> ReadConcernSupport<'_> {
-        ReadConcernSupport::Unsupported
+    fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
+        false
     }
 
     /// Whether this operation supports sessions or not.
@@ -455,16 +455,4 @@ pub(crate) enum Retryability {
     Write,
     Read,
     None,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum ReadConcernSupport<'a> {
-    Unsupported,
-    Supported(Option<&'a ReadConcern>),
-}
-
-impl<'a> ReadConcernSupport<'a> {
-    pub(crate) fn is_supported(self) -> bool {
-        matches!(self, Self::Supported(_))
-    }
 }

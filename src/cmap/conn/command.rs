@@ -83,6 +83,28 @@ impl<T> Command<T> {
         }
     }
 
+    pub(crate) fn new_read(
+        name: String,
+        target_db: String,
+        read_concern: Option<ReadConcern>,
+        body: T,
+    ) -> Self {
+        Self {
+            name,
+            target_db,
+            body,
+            lsid: None,
+            cluster_time: None,
+            server_api: None,
+            read_preference: None,
+            txn_number: None,
+            start_transaction: None,
+            autocommit: None,
+            read_concern: read_concern.map(Into::into),
+            recovery_token: None,
+        }
+    }
+
     pub(crate) fn set_session(&mut self, session: &ClientSession) {
         self.lsid = Some(session.id().clone())
     }
@@ -113,16 +135,6 @@ impl<T> Command<T> {
 
     pub(crate) fn set_autocommit(&mut self) {
         self.autocommit = Some(false);
-    }
-
-    /// Sets the command's read concern to the provided read concern, overwriting any existing read
-    /// concern.
-    pub(crate) fn set_read_concern(&mut self, rc: ReadConcern) {
-        self.read_concern = Some(ReadConcernInternal {
-            level: Some(rc.level),
-            at_cluster_time: None,
-            after_cluster_time: None,
-        });
     }
 
     /// Sets the read concern level for this command according to the read concern specified on the

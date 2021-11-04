@@ -30,7 +30,6 @@ use crate::{
         CommandResponse,
         CommitTransaction,
         Operation,
-        ReadConcernSupport,
         Response,
         Retryability,
     },
@@ -391,12 +390,6 @@ impl Client {
             .update_command_with_read_pref(connection.address(), &mut cmd, op.selection_criteria())
             .await;
 
-        if let ReadConcernSupport::Supported(Some(rc)) =
-            op.read_concern_support(&stream_description)
-        {
-            cmd.set_read_concern(rc.clone());
-        }
-
         match session {
             Some(ref mut session) if op.supports_sessions() && op.is_acknowledged() => {
                 cmd.set_session(session);
@@ -434,7 +427,7 @@ impl Client {
                         session.transaction.state,
                         TransactionState::None | TransactionState::Starting
                     )
-                    && op.read_concern_support(&stream_description).is_supported()
+                    && op.supports_read_concern(&stream_description)
                 {
                     cmd.set_after_cluster_time(session);
                 }

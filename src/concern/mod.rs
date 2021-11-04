@@ -29,6 +29,8 @@ pub struct ReadConcern {
     pub level: ReadConcernLevel,
 }
 
+/// An internal-only read concern type that allows the omission of a "level" as well as
+/// specification of "atClusterTime" and "afterClusterTime".
 #[skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -100,6 +102,16 @@ impl ReadConcern {
             readconcernlevel: concern.level.as_str(),
         });
         state.serialize(serializer)
+    }
+}
+
+impl From<ReadConcern> for ReadConcernInternal {
+    fn from(rc: ReadConcern) -> Self {
+        ReadConcernInternal {
+            level: Some(rc.level),
+            at_cluster_time: None,
+            after_cluster_time: None,
+        }
     }
 }
 

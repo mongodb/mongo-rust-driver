@@ -12,7 +12,7 @@ use crate::{
     selection_criteria::SelectionCriteria,
 };
 
-use super::{CommandResponse, ReadConcernSupport};
+use super::CommandResponse;
 
 pub(crate) struct Distinct {
     ns: Namespace,
@@ -69,9 +69,10 @@ impl Operation for Distinct {
 
         append_options(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(
+        Ok(Command::new_read(
             Self::NAME.to_string(),
             self.ns.db.clone(),
+            self.options.as_ref().and_then(|o| o.read_concern.clone()),
             body,
         ))
     }
@@ -94,15 +95,8 @@ impl Operation for Distinct {
         Retryability::Read
     }
 
-    fn read_concern_support(
-        &self,
-        _description: &StreamDescription,
-    ) -> super::ReadConcernSupport<'_> {
-        ReadConcernSupport::Supported(
-            self.options
-                .as_ref()
-                .and_then(|opts| opts.read_concern.as_ref()),
-        )
+    fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
+        true
     }
 }
 

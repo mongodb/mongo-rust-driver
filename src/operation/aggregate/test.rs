@@ -26,15 +26,18 @@ fn build_test(
 
     let mut aggregate = Aggregate::new(target.clone(), pipeline, options);
 
-    let mut cmd = aggregate.build(&StreamDescription::new_testing()).unwrap();
+    let cmd = aggregate.build(&StreamDescription::new_testing()).unwrap();
 
     assert_eq!(cmd.name.as_str(), "aggregate");
     assert_eq!(cmd.target_db.as_str(), target.db_name());
 
-    bson_util::sort_document(&mut expected_body);
-    bson_util::sort_document(&mut cmd.body);
+    let cmd_bytes = aggregate.serialize_command(cmd).unwrap();
+    let mut cmd_doc = bson::from_slice(&cmd_bytes).unwrap();
 
-    assert_eq!(cmd.body, expected_body);
+    bson_util::sort_document(&mut expected_body);
+    bson_util::sort_document(&mut cmd_doc);
+
+    assert_eq!(cmd_doc, expected_body);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -55,6 +58,7 @@ async fn build() {
 
     let expected_body = doc! {
         "aggregate": "test_coll",
+        "$db": "test_db",
         "pipeline": bson_util::to_bson_array(&pipeline),
         "cursor": {},
         "hint": {
@@ -82,6 +86,7 @@ async fn build_batch_size() {
 
     let mut expected_body = doc! {
         "aggregate": "test_coll",
+        "$db": "test_db",
         "pipeline": [],
         "cursor": {},
     };
@@ -135,6 +140,7 @@ async fn build_target() {
 
     let expected_body = doc! {
         "aggregate": "test_coll",
+        "$db": "test_db",
         "pipeline": [],
         "cursor": {},
     };
@@ -142,6 +148,7 @@ async fn build_target() {
 
     let expected_body = doc! {
         "aggregate": 1,
+        "$db": "test_db",
         "pipeline": [],
         "cursor": {}
     };
@@ -158,12 +165,13 @@ async fn build_max_await_time() {
 
     let body = doc! {
         "aggregate": 1,
+        "$db": "test_db",
         "cursor": {},
         "maxTimeMS": 10i32,
         "pipeline": []
     };
 
-    build_test("".to_string(), Vec::new(), Some(options), body);
+    build_test("test_db".to_string(), Vec::new(), Some(options), body);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

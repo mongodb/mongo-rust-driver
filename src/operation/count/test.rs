@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use crate::{
     bson::doc,
+    bson_util,
     cmap::StreamDescription,
     coll::{options::EstimatedDocumentCountOptions, Namespace},
     concern::ReadConcern,
@@ -52,15 +53,22 @@ async fn build_with_options() {
         .build(&StreamDescription::new_testing())
         .expect("error on build");
 
-    assert_eq!(
-        count_command.body,
-        doc! {
-            "count": "test_coll",
-            "maxTimeMS": max_time.as_millis() as i32,
-            "readConcern": doc!{"level": read_concern.level.as_str().to_string()}
-        }
-    );
     assert_eq!(count_command.target_db, "test_db");
+
+    let mut expected_body = doc! {
+        "count": "test_coll",
+        "$db": "test_db",
+        "maxTimeMS": max_time.as_millis() as i32,
+        "readConcern": doc! {"level": read_concern.level.as_str().to_string() },
+    };
+
+    let cmd_bytes = count_op.serialize_command(count_command).unwrap();
+    let mut cmd_doc = bson::from_slice(&cmd_bytes).unwrap();
+
+    bson_util::sort_document(&mut cmd_doc);
+    bson_util::sort_document(&mut expected_body);
+
+    assert_eq!(cmd_doc, expected_body);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
