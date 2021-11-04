@@ -186,12 +186,12 @@ async fn first_read_no_after_cluser_time() {
         let name = op.name;
         op.execute(
             client
-                .database("causal_consistency_2")
-                .collection("causal_consistency_2"),
+                .create_fresh_collection("causal_consistency_2", "causal_consistency_2", None)
+                .await,
             &mut session,
         )
         .await
-        .unwrap();
+        .unwrap_or_else(|e| panic!("{} failed: {}", name, e));
         let (started, _) = client.get_successful_command_execution(name);
 
         // assert that no read concern was set.
@@ -223,8 +223,8 @@ async fn first_op_update_op_time() {
         let name = op.name;
         op.execute(
             client
-                .database("causal_consistency_3")
-                .collection("causal_consistency_3"),
+                .create_fresh_collection("causal_consistency_3", "causal_consistency_3", None)
+                .await,
             &mut session,
         )
         .await
@@ -265,8 +265,8 @@ async fn read_includes_after_cluster_time() {
     }
 
     let coll = client
-        .database("causal_consistency_4")
-        .collection::<Document>("causal_consistency_4");
+        .create_fresh_collection("causal_consistency_4", "causal_consistency_4", None)
+        .await;
 
     for op in all_session_ops().into_iter().filter(|o| o.is_read) {
         let command_name = op.name;
@@ -312,8 +312,8 @@ async fn find_after_write_includes_after_cluster_time() {
     }
 
     let coll = client
-        .database("causal_consistency_5")
-        .collection::<Document>("causal_consistency_5");
+        .create_fresh_collection("causal_consistency_5", "causal_consistency_5", None)
+        .await;
 
     for op in all_session_ops().into_iter().filter(|o| !o.is_read) {
         let session_options = SessionOptions::builder().causal_consistency(true).build();
@@ -355,8 +355,8 @@ async fn not_causally_consistent_omits_after_cluster_time() {
     }
 
     let coll = client
-        .database("causal_consistency_6")
-        .collection::<Document>("causal_consistency_6");
+        .create_fresh_collection("causal_consistency_6", "causal_consistency_6", None)
+        .await;
 
     for op in all_session_ops().into_iter().filter(|o| o.is_read) {
         let command_name = op.name;
@@ -391,8 +391,8 @@ async fn omit_after_cluster_time_standalone() {
     }
 
     let coll = client
-        .database("causal_consistency_7")
-        .collection::<Document>("causal_consistency_7");
+        .create_fresh_collection("causal_consistency_7", "causal_consistency_7", None)
+        .await;
 
     for op in all_session_ops().into_iter().filter(|o| o.is_read) {
         let command_name = op.name;
@@ -429,8 +429,8 @@ async fn omit_default_read_concern_level() {
     }
 
     let coll = client
-        .database("causal_consistency_8")
-        .collection::<Document>("causal_consistency_8");
+        .create_fresh_collection("causal_consistency_8", "causal_consistency_8", None)
+        .await;
 
     for op in all_session_ops().into_iter().filter(|o| o.is_read) {
         let command_name = op.name;
@@ -475,6 +475,9 @@ async fn test_causal_consistency_read_concern_merge() {
     let coll_options = CollectionOptions::builder()
         .read_concern(ReadConcern::majority())
         .build();
+    let _ = client
+        .create_fresh_collection("causal_consistency_9", "causal_consistency_9", None)
+        .await;
     let coll = client
         .database("causal_consistency_9")
         .collection_with_options("causal_consistency_9", coll_options);
