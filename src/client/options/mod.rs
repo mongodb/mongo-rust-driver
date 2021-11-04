@@ -425,6 +425,11 @@ pub struct ClientOptions {
     #[builder(default)]
     pub heartbeat_freq: Option<Duration>,
 
+    /// Whether or not the client is connecting to a MongoDB cluster through a load balancer.
+    #[builder(default, setter(skip))]
+    #[serde(rename = "loadbalanced")]
+    pub load_balanced: Option<bool>,
+
     /// When running a read operation with a ReadPreference that allows selecting secondaries,
     /// `local_threshold` is used to determine how much longer the average round trip time between
     /// the driver and server is allowed compared to the least round trip time of all the suitable
@@ -553,11 +558,6 @@ pub struct ClientOptions {
     #[builder(default, setter(skip))]
     #[serde(skip)]
     pub(crate) resolver_config: Option<ResolverConfig>,
-
-    /// Whether or not the client is connecting to a MongoDB cluster through a load balancer.
-    #[builder(default, setter(skip))]
-    #[serde(rename = "loadbalanced")]
-    pub(crate) load_balanced: Option<bool>,
 
     /// Control test behavior of the client.
     #[cfg(test)]
