@@ -38,7 +38,9 @@ impl Operation for AbortTransaction {
             Self::NAME: 1,
         };
         if let Some(ref write_concern) = self.write_concern {
-            body.insert("writeConcern", bson::to_bson(write_concern)?);
+            if *write_concern != Default::default() {
+                body.insert("writeConcern", bson::to_bson(write_concern)?);
+            }
         }
 
         Ok(Command::new(
