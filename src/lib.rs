@@ -304,73 +304,57 @@
 #[cfg(all(feature = "aws-auth", feature = "async-std-runtime"))]
 compile_error!("The `aws-auth` feature flag is only supported on the tokio runtime.");
 
-macro_rules! define_if_single_runtime_enabled {
-    ( $( $def:item )+ ) => {
-        $(
-            #[cfg(any(
-                all(feature = "tokio-runtime", not(feature = "async-std-runtime")),
-                all(not(feature = "tokio-runtime"), feature = "async-std-runtime")
-            ))]
-            $def
-        )+
-    }
-}
+#[macro_use]
+pub mod options;
 
-// In the case that neither tokio nor async-std is enabled, we want to disable all compiler errors
-// and warnings other than our custom ones.
-define_if_single_runtime_enabled! {
-    #[macro_use]
-    pub mod options;
+pub use ::bson;
 
-    pub use ::bson;
+mod bson_util;
+mod client;
+mod cmap;
+mod coll;
+mod collation;
+mod compression;
+mod concern;
+mod cursor;
+mod db;
+pub mod error;
+pub mod event;
+mod index;
+mod is_master;
+mod operation;
+pub mod results;
+pub(crate) mod runtime;
+mod sdam;
+mod selection_criteria;
+mod srv;
+#[cfg(any(feature = "sync", docsrs))]
+#[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+pub mod sync;
+#[cfg(test)]
+mod test;
 
-    mod bson_util;
-    mod client;
-    mod cmap;
-    mod coll;
-    mod collation;
-    mod compression;
-    mod concern;
-    mod cursor;
-    mod db;
-    pub mod error;
-    pub mod event;
-    mod index;
-    mod is_master;
-    mod operation;
-    pub mod results;
-    pub(crate) mod runtime;
-    mod sdam;
-    mod selection_criteria;
-    mod srv;
-    #[cfg(any(feature = "sync", docsrs))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
-    pub mod sync;
-    #[cfg(test)]
-    mod test;
+#[cfg(test)]
+#[macro_use]
+extern crate derive_more;
 
-    #[cfg(test)]
-    #[macro_use]
-    extern crate derive_more;
+#[cfg(not(feature = "sync"))]
+pub use crate::{
+    client::{Client, session::ClientSession},
+    coll::Collection,
+    cursor::{Cursor, session::{SessionCursor, SessionCursorStream}},
+    db::Database,
+};
 
-    #[cfg(not(feature = "sync"))]
-    pub use crate::{
-        client::{Client, session::ClientSession},
-        coll::Collection,
-        cursor::{Cursor, session::{SessionCursor, SessionCursorStream}},
-        db::Database,
-    };
+#[cfg(feature = "sync")]
+pub(crate) use crate::{
+    client::{Client, session::ClientSession},
+    coll::Collection,
+    cursor::{Cursor, session::{SessionCursor, SessionCursorStream}},
+    db::Database,
+};
 
-    #[cfg(feature = "sync")]
-    pub(crate) use crate::{
-        client::{Client, session::ClientSession},
-        coll::Collection,
-        cursor::{Cursor, session::{SessionCursor, SessionCursorStream}},
-        db::Database,
-    };
-
-    pub use {coll::Namespace, index::IndexModel, client::session::ClusterTime};
-}
+pub use {coll::Namespace, index::IndexModel, client::session::ClusterTime};
 
 #[cfg(all(
     feature = "tokio-runtime",
