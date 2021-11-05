@@ -1,13 +1,13 @@
 use pretty_assertions::assert_eq;
 
 use crate::{
-    bson::{doc},
+    bson::doc,
     bson_util,
     client::session::TransactionPin,
-    concern::{Acknowledgment, WriteConcern},
     cmap::StreamDescription,
+    concern::{Acknowledgment, WriteConcern},
     operation::{AbortTransaction, Operation},
-    selection_criteria::{SelectionCriteria::ReadPreference, ReadPreference::Primary},
+    selection_criteria::{ReadPreference::Primary, SelectionCriteria::ReadPreference},
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -40,9 +40,12 @@ async fn build() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_no_write_concern() {
+    let wc = WriteConcern {
+        ..Default::default()
+    };
     let pinned = TransactionPin::Mongos(ReadPreference(Primary));
 
-    let mut op = AbortTransaction::new(None, Some(pinned));
+    let mut op = AbortTransaction::new(Some(wc), Some(pinned));
     let mut cmd = op.build(&StreamDescription::new_testing()).unwrap();
 
     assert_eq!(cmd.name, "abortTransaction");
