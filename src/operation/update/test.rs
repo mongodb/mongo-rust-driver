@@ -119,6 +119,52 @@ async fn build_hint() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_no_write_concern() {
+    let ns = Namespace {
+        db: "test_db".to_string(),
+        coll: "test_coll".to_string(),
+    };
+    let filter = doc! { "x": { "$gt": 1 } };
+    let update = UpdateModifications::Document(doc! { "x": { "$inc": 1 } });
+    let wc = WriteConcern {
+        ..Default::default()
+    };
+    let options = UpdateOptions {
+        upsert: Some(false),
+        bypass_document_validation: Some(true),
+        write_concern: Some(wc),
+        ..Default::default()
+    };
+
+    let mut op = Update::new(ns, filter.clone(), update.clone(), false, Some(options));
+
+    let description = StreamDescription::new_testing();
+    let mut cmd = op.build(&description).unwrap();
+
+    assert_eq!(cmd.name.as_str(), "update");
+    assert_eq!(cmd.target_db.as_str(), "test_db");
+
+    let mut expected_body = doc! {
+        "update": "test_coll",
+        "updates": [
+            {
+                "q": filter,
+                "u": update.to_bson(),
+                "upsert": false,
+            }
+        ],
+        "bypassDocumentValidation": true,
+        "ordered": true,
+    };
+
+    bson_util::sort_document(&mut cmd.body);
+    bson_util::sort_document(&mut expected_body);
+
+    assert_eq!(cmd.body, expected_body);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_many() {
     let ns = Namespace {
         db: "test_db".to_string(),
