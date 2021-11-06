@@ -121,7 +121,11 @@ where
             "query": self.query.clone(),
         };
 
-        append_options(&mut body, Some(&self.options))?;
+        let mut options = self.options.clone();
+        if *self.write_concern().unwrap() == Default::default() {
+            options.write_concern = None;
+        }
+        append_options(&mut body, Some(&options))?;
 
         Ok(Command::new(
             Self::NAME.to_string(),

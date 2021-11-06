@@ -177,7 +177,7 @@ pub enum TimeseriesGranularity {
 }
 
 /// Specifies the options to a [`Database::drop`](../struct.Database.html#method.drop) operation.
-#[derive(Debug, Default, TypedBuilder, Serialize)]
+#[derive(Clone, Debug, Default, TypedBuilder, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[builder(field_defaults(default, setter(into)))]
 #[non_exhaustive]

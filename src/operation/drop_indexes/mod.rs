@@ -47,7 +47,12 @@ impl Operation for DropIndexes {
             Self::NAME: self.ns.coll.clone(),
             "index": self.name.clone(),
         };
-        append_options(&mut body, self.options.as_ref())?;
+
+        let mut options = self.options.clone().unwrap_or_default();
+        if *self.write_concern().unwrap() == Default::default() {
+            options.write_concern = None;
+        }
+        append_options(&mut body, Some(&options))?;
 
         Ok(Command::new(
             Self::NAME.to_string(),
