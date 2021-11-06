@@ -27,7 +27,7 @@ struct TestFixtures {
 }
 
 /// Get an Insert operation and the documents/options used to construct it.
-fn fixtures() -> TestFixtures {
+fn fixtures(opts: Option<InsertManyOptions>) -> TestFixtures {
     lazy_static! {
         static ref DOCUMENTS: Vec<Document> = vec![
             Document::new(),
@@ -36,11 +36,11 @@ fn fixtures() -> TestFixtures {
         ];
     }
 
-    let options = InsertManyOptions {
+    let options = opts.unwrap_or(InsertManyOptions {
         ordered: Some(true),
         write_concern: Some(WriteConcern::builder().journal(true).build()),
         ..Default::default()
-    };
+    });
 
     let op = Insert::new(
         Namespace {
@@ -61,7 +61,7 @@ fn fixtures() -> TestFixtures {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build() {
-    let mut fixtures = fixtures();
+    let mut fixtures = fixtures(None);
 
     let description = StreamDescription::new_testing();
     let cmd = fixtures.op.build(&description).unwrap();
@@ -112,6 +112,38 @@ async fn build() {
             .map(|wc| bson::to_bson(wc).unwrap())
             .as_ref()
     );
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_no_write_concern() {
+    let options = InsertManyOptions {
+        ordered: Some(true),
+        write_concern: Some(WriteConcern::builder().build()),
+        ..Default::default()
+    };
+    let mut fixtures = fixtures(Some(options));
+    let cmd = fixtures
+        .op
+        .build(&StreamDescription::new_testing())
+        .unwrap();
+
+    let serialized = fixtures.op.serialize_command(cmd).unwrap();
+    let cmd_doc = Document::from_reader(serialized.as_slice()).unwrap();
+
+    assert_eq!(
+        cmd_doc.get("ordered"),
+        fixtures.options.ordered.map(Bson::Boolean).as_ref()
+    );
+    assert_eq!(
+        cmd_doc.get("bypassDocumentValidation"),
+        fixtures
+            .options
+            .bypass_document_validation
+            .map(Bson::Boolean)
+            .as_ref()
+    );
+    assert_eq!(cmd_doc.get("writeConcern"), None);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -268,7 +300,7 @@ async fn serialize_all_types() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success() {
-    let mut fixtures = fixtures();
+    let mut fixtures = fixtures(None);
 
     // populate _id for documents that don't provide it
     fixtures
@@ -287,14 +319,14 @@ async fn handle_success() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_invalid_response() {
-    let fixtures = fixtures();
+    let fixtures = fixtures(None);
     handle_response_test(&fixtures.op, doc! { "ok": 1.0, "asdfadsf": 123123 }).unwrap_err();
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_write_failure() {
-    let mut fixtures = fixtures();
+    let mut fixtures = fixtures(None);
 
     // generate _id for operations missing it.
     let _ = fixtures
