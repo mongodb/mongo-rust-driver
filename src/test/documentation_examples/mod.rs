@@ -1507,123 +1507,138 @@ async fn aggregation_examples() -> GenericResult<()> {
     db.drop(None).await?;
     aggregation_data::populate(&db).await?;
 
-    // Start Aggregation Example 1
-    let cursor = db
-        .collection::<Document>("sales")
-        .aggregate(
-            vec![
-                doc! { "$match": { "items.fruit": "banana" } },
-                doc! { "$sort": { "date": 1 } },
-            ],
-            None,
-        )
-        .await?;
-    // End Aggregation Example 1
-    let out: Vec<_> = cursor.try_collect().await?;
-    assert_eq!(5, out.len());
+    // Each example is within its own scope to allow the example to include 
+    // `use futures::TryStreamExt;` without causing multiple definition errors.
 
-    // Start Aggregation Example 2
-    let cursor = db
-        .collection::<Document>("sales")
-        .aggregate(
+    {
+        // Start Aggregation Example 1
+        use futures::TryStreamExt;
+        let cursor = db
+            .collection::<Document>("sales")
+            .aggregate(
+                vec![
+                    doc! { "$match": { "items.fruit": "banana" } },
+                    doc! { "$sort": { "date": 1 } },
+                ],
+                None,
+            )
+            .await?;
+        let values: Vec<_> = cursor.try_collect().await?;
+        // End Aggregation Example 1
+        assert_eq!(5, values.len());
+    }
+
+    {
+        // Start Aggregation Example 2
+        use futures::TryStreamExt;
+        let cursor = db
+            .collection::<Document>("sales")
+            .aggregate(
+                vec![
+                    doc! {
+                        "$unwind": "$items"
+                    },
+                    doc! { "$match": {
+                        "items.fruit": "banana",
+                    }},
+                    doc! {
+                        "$group": {
+                            "_id": { "day": { "$dayOfWeek": "$date" } },
+                            "count": { "$sum": "$items.quantity" }
+                        }
+                    },
+                    doc! {
+                        "$project": {
+                            "dayOfWeek": "$_id.day",
+                            "numberSold": "$count",
+                            "_id": 0
+                        }
+                    },
+                    doc! {
+                        "$sort": { "numberSold": 1 }
+                    },
+                ],
+                None,
+            )
+            .await?;
+        let values: Vec<_> = cursor.try_collect().await?;
+        // End Aggregation Example 2
+        assert_eq!(4, values.len());
+    }
+
+    {
+        // Start Aggregation Example 3
+        use futures::TryStreamExt;
+        let cursor = db.collection::<Document>("sales").aggregate(
             vec![
                 doc! {
                     "$unwind": "$items"
                 },
-                doc! { "$match": {
-                    "items.fruit": "banana",
-                }},
                 doc! {
                     "$group": {
                         "_id": { "day": { "$dayOfWeek": "$date" } },
-                        "count": { "$sum": "$items.quantity" }
+                        "items_sold": { "$sum": "$items.quantity" },
+                        "revenue": { "$sum": { "$multiply": [ "$items.quantity", "$items.price" ] } }
                     }
                 },
                 doc! {
                     "$project": {
-                        "dayOfWeek": "$_id.day",
-                        "numberSold": "$count",
-                        "_id": 0
-                    }
-                },
-                doc! {
-                    "$sort": { "numberSold": 1 }
-                },
-            ],
-            None,
-        )
-        .await?;
-    // End Aggregation Example 2
-    let out: Vec<_> = cursor.try_collect().await?;
-    assert_eq!(4, out.len());
-
-    // Start Aggregation Example 3
-    let cursor = db.collection::<Document>("sales").aggregate(
-        vec![
-            doc! {
-                "$unwind": "$items"
-            },
-            doc! {
-                "$group": {
-                    "_id": { "day": { "$dayOfWeek": "$date" } },
-                    "items_sold": { "$sum": "$items.quantity" },
-                    "revenue": { "$sum": { "$multiply": [ "$items.quantity", "$items.price" ] } }
-                }
-            },
-            doc! {
-                "$project": {
-                    "day": "$_id.day",
-                    "revenue": 1,
-                    "items_sold": 1,
-                    "discount": {
-                        "$cond": { "if": { "$lte": [ "$revenue", 250 ] }, "then": 25, "else": 0 }
-                    }
-                }
-            },
-        ],
-        None,
-    ).await?;
-    // End Aggregation Example 3
-    let out: Vec<_> = cursor.try_collect().await?;
-    assert_eq!(4, out.len());
-
-    // Start Aggregation Example 4
-    let cursor = db
-        .collection::<Document>("air_alliances")
-        .aggregate(
-            vec![
-                doc! {
-                    "$lookup": {
-                        "from": "air_airlines",
-                        "let": { "constituents": "$airlines" },
-                        "pipeline": [
-                            {
-                                "$match": { "$expr": { "$in": [ "$name", "$$constituents" ] } }
-                            }
-                        ],
-                        "as": "airlines"
-                    }
-                },
-                doc! {
-                    "$project": {
-                        "_id": 0,
-                        "name": 1,
-                        "airlines": {
-                            "$filter": {
-                                "input": "$airlines",
-                                "as": "airline",
-                                "cond": { "$eq": ["$$airline.country", "Canada"] }
-                            }
+                        "day": "$_id.day",
+                        "revenue": 1,
+                        "items_sold": 1,
+                        "discount": {
+                            "$cond": { "if": { "$lte": [ "$revenue", 250 ] }, "then": 25, "else": 0 }
                         }
                     }
                 },
             ],
             None,
-        )
-        .await?;
-    // End Aggregation Example 4
-    let out: Vec<_> = cursor.try_collect().await?;
-    assert_eq!(3, out.len());
+        ).await?;
+        let values: Vec<_> = cursor.try_collect().await?;
+        // End Aggregation Example 3
+        assert_eq!(4, values.len());
+    }
+
+    {
+        // Start Aggregation Example 4
+        use futures::TryStreamExt;
+        let cursor = db
+            .collection::<Document>("air_alliances")
+            .aggregate(
+                vec![
+                    doc! {
+                        "$lookup": {
+                            "from": "air_airlines",
+                            "let": { "constituents": "$airlines" },
+                            "pipeline": [
+                                {
+                                    "$match": { "$expr": { "$in": [ "$name", "$$constituents" ] } }
+                                }
+                            ],
+                            "as": "airlines"
+                        }
+                    },
+                    doc! {
+                        "$project": {
+                            "_id": 0,
+                            "name": 1,
+                            "airlines": {
+                                "$filter": {
+                                    "input": "$airlines",
+                                    "as": "airline",
+                                    "cond": { "$eq": ["$$airline.country", "Canada"] }
+                                }
+                            }
+                        }
+                    },
+                ],
+                None,
+            )
+            .await?;
+        let values: Vec<_> = cursor.try_collect().await?;
+        // End Aggregation Example 4
+        assert_eq!(3, values.len());
+    }
 
     Ok(())
 }
