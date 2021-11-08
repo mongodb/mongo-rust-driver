@@ -5,6 +5,7 @@ use crate::{
     bson_util,
     cmap::StreamDescription,
     coll::options::ReturnDocument,
+    concern::WriteConcern,
     operation::{test::handle_response_test, FindAndModify, Operation},
     options::{
         FindOneAndDeleteOptions,
@@ -528,4 +529,39 @@ async fn handle_null_value_update() {
 async fn handle_no_value_update() {
     let op = empty_update();
     handle_response_test(&op, doc! { "ok": 1.0 }).unwrap_err();
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_no_write_concern() {
+    let ns = Namespace {
+        db: "test_db".to_string(),
+        coll: "test_coll".to_string(),
+    };
+    let filter = doc! { "x": { "$gt": 1 } };
+    let options = FindOneAndDeleteOptions {
+        write_concern: Some(WriteConcern {
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    let mut op = FindAndModify::<Document>::with_delete(ns, filter.clone(), Some(options));
+
+    let description = StreamDescription::new_testing();
+    let mut cmd = op.build(&description).unwrap();
+
+    assert_eq!(cmd.name.as_str(), "findAndModify");
+    assert_eq!(cmd.target_db.as_str(), "test_db");
+
+    let mut expected_body = doc! {
+        "findAndModify": "test_coll",
+        "query": filter,
+        "remove": true
+    };
+
+    bson_util::sort_document(&mut cmd.body);
+    bson_util::sort_document(&mut expected_body);
+
+    assert_eq!(cmd.body, expected_body);
 }
