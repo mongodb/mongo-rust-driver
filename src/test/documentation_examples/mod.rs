@@ -1512,8 +1512,8 @@ async fn aggregation_examples() -> GenericResult<()> {
         .collection::<Document>("sales")
         .aggregate(
             vec![
-                doc! { "$match" : { "items.fruit":"banana" } },
-                doc! { "$sort" : { "date" : 1 } },
+                doc! { "$match": { "items.fruit": "banana" } },
+                doc! { "$sort": { "date": 1 } },
             ],
             None,
         )
@@ -1531,7 +1531,7 @@ async fn aggregation_examples() -> GenericResult<()> {
                     "$unwind": "$items"
                 },
                 doc! { "$match": {
-                    "items.fruit" : "banana",
+                    "items.fruit": "banana",
                 }},
                 doc! {
                     "$group": {
@@ -1543,7 +1543,7 @@ async fn aggregation_examples() -> GenericResult<()> {
                     "$project": {
                         "dayOfWeek": "$_id.day",
                         "numberSold": "$count",
-                        "_id":0
+                        "_id": 0
                     }
                 },
                 doc! {
