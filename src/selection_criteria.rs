@@ -323,8 +323,6 @@ impl ReadPreference {
     where
         S: serde::Serializer,
     {
-        use serde::ser::Serialize;
-
         #[derive(serde::Serialize)]
         struct ReadPreferenceHelper<'a> {
             readpreference: &'a str,

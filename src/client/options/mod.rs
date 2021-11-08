@@ -1479,7 +1479,7 @@ impl ClientOptionsParser {
                     credential.source = options
                         .auth_source
                         .clone()
-                        .or(db.clone())
+                        .or_else(|| db.clone())
                         .or_else(|| Some("admin".into()));
                 } else if authentication_requested {
                     return Err(ErrorKind::InvalidArgument {
