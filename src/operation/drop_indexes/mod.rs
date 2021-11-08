@@ -6,7 +6,7 @@ use crate::{
     cmap::{Command, StreamDescription},
     error::Result,
     operation::{append_options, Operation},
-    options::DropIndexOptions,
+    options::{DropIndexOptions, WriteConcern},
     Namespace,
 };
 
@@ -67,5 +67,11 @@ impl Operation for DropIndexes {
         _description: &StreamDescription,
     ) -> Result<Self::O> {
         Ok(())
+    }
+
+    fn write_concern(&self) -> Option<&WriteConcern> {
+        self.options
+            .as_ref()
+            .and_then(|opts| opts.write_concern.as_ref())
     }
 }

@@ -38,6 +38,31 @@ async fn build() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_no_write_concern() {
+    let ns = Namespace {
+        db: "test_db".to_string(),
+        coll: "test_coll".to_string(),
+    };
+
+    let options = DropIndexOptions::builder()
+        .write_concern(Some(WriteConcern::builder().build()))
+        .build();
+
+    let mut drop_index = DropIndexes::new(ns, "foo".to_string(), Some(options));
+    let cmd = drop_index
+        .build(&StreamDescription::new_testing())
+        .expect("DropIndex command failed to build when it should have succeeded.");
+    assert_eq!(
+        cmd.body,
+        doc! {
+            "dropIndexes": "test_coll",
+            "index": "foo",
+        }
+    )
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success() {
     let op = DropIndexes::empty();
     let response = doc! { "ok": 1 };
