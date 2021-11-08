@@ -1501,6 +1501,7 @@ async fn versioned_api_examples() -> GenericResult<()> {
     Ok(())
 }
 
+#[allow(unused_imports)]
 async fn aggregation_examples() -> GenericResult<()> {
     let client = TestClient::new().await;
     let db = client.database("aggregation_examples");
