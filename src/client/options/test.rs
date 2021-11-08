@@ -372,3 +372,15 @@ async fn parse_unknown_options() {
     .await;
     parse_uri("maxstalenessms", Some("maxstalenessseconds")).await;
 }
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn options_debug_omits_uri() {
+    let uri = "mongodb://username:password@localhost/";
+    let options = ClientOptions::parse(uri).await.unwrap();
+
+    let debug_output = format!("{:?}", options);
+    assert!(!debug_output.contains("username"));
+    assert!(!debug_output.contains("password"));
+    assert!(!debug_output.contains("uri"));
+}
