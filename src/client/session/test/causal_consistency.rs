@@ -42,7 +42,7 @@ macro_rules! op {
     };
 }
 
-fn all_session_ops() -> impl IntoIterator<Item = Operation> {
+fn all_session_ops() -> impl Iterator<Item = Operation> {
     let mut ops = vec![];
 
     ops.push(op!("insert", false, |coll, session| {
@@ -138,7 +138,7 @@ fn all_session_ops() -> impl IntoIterator<Item = Operation> {
         s,
     )));
 
-    ops
+    ops.into_iter()
 }
 
 /// Test 1 from the causal consistency specification.
@@ -175,7 +175,7 @@ async fn first_read_no_after_cluser_time() {
         return;
     }
 
-    for op in all_session_ops().into_iter().filter(|o| o.is_read) {
+    for op in all_session_ops().filter(|o| o.is_read) {
         let mut session = client
             .start_session(Some(
                 SessionOptions::builder().causal_consistency(true).build(),
@@ -268,7 +268,7 @@ async fn read_includes_after_cluster_time() {
         .create_fresh_collection("causal_consistency_4", "causal_consistency_4", None)
         .await;
 
-    for op in all_session_ops().into_iter().filter(|o| o.is_read) {
+    for op in all_session_ops().filter(|o| o.is_read) {
         let command_name = op.name;
         let mut session = client.start_session(None).await.unwrap();
         coll.find_one_with_session(None, None, &mut session)
@@ -315,7 +315,7 @@ async fn find_after_write_includes_after_cluster_time() {
         .create_fresh_collection("causal_consistency_5", "causal_consistency_5", None)
         .await;
 
-    for op in all_session_ops().into_iter().filter(|o| !o.is_read) {
+    for op in all_session_ops().filter(|o| !o.is_read) {
         let session_options = SessionOptions::builder().causal_consistency(true).build();
         let mut session = client.start_session(Some(session_options)).await.unwrap();
         op.execute(coll.clone(), &mut session).await.unwrap();
@@ -358,7 +358,7 @@ async fn not_causally_consistent_omits_after_cluster_time() {
         .create_fresh_collection("causal_consistency_6", "causal_consistency_6", None)
         .await;
 
-    for op in all_session_ops().into_iter().filter(|o| o.is_read) {
+    for op in all_session_ops().filter(|o| o.is_read) {
         let command_name = op.name;
 
         let session_options = SessionOptions::builder().causal_consistency(false).build();
@@ -394,7 +394,7 @@ async fn omit_after_cluster_time_standalone() {
         .create_fresh_collection("causal_consistency_7", "causal_consistency_7", None)
         .await;
 
-    for op in all_session_ops().into_iter().filter(|o| o.is_read) {
+    for op in all_session_ops().filter(|o| o.is_read) {
         let command_name = op.name;
 
         let session_options = SessionOptions::builder().causal_consistency(true).build();
@@ -432,7 +432,7 @@ async fn omit_default_read_concern_level() {
         .create_fresh_collection("causal_consistency_8", "causal_consistency_8", None)
         .await;
 
-    for op in all_session_ops().into_iter().filter(|o| o.is_read) {
+    for op in all_session_ops().filter(|o| o.is_read) {
         let command_name = op.name;
 
         let session_options = SessionOptions::builder().causal_consistency(true).build();
@@ -482,7 +482,7 @@ async fn test_causal_consistency_read_concern_merge() {
         .database("causal_consistency_9")
         .collection_with_options("causal_consistency_9", coll_options);
 
-    for op in all_session_ops().into_iter().filter(|o| o.is_read) {
+    for op in all_session_ops().filter(|o| o.is_read) {
         let command_name = op.name;
         coll.find_one_with_session(None, None, &mut session)
             .await
