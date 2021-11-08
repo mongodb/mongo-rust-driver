@@ -1,3 +1,5 @@
+mod aggregation_data;
+
 use bson::Document;
 use futures::TryStreamExt;
 use semver::Version;
@@ -1367,9 +1369,11 @@ async fn delete_examples(collection: &Collection<Document>) -> Result<()> {
     Ok(())
 }
 
+type GenericResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
 #[allow(unused_variables)]
 #[cfg(not(feature = "sync"))]
-async fn versioned_api_examples() -> std::result::Result<(), Box<dyn std::error::Error>> {
+async fn versioned_api_examples() -> GenericResult<()> {
     let setup_client = TestClient::new().await;
     if setup_client.server_version_lt(4, 9) {
         println!("skipping versioned API examples due to unsupported server version");
@@ -1497,6 +1501,258 @@ async fn versioned_api_examples() -> std::result::Result<(), Box<dyn std::error:
     Ok(())
 }
 
+#[allow(unused_imports)]
+async fn aggregation_examples() -> GenericResult<()> {
+    let client = TestClient::new().await;
+    let db = client.database("aggregation_examples");
+    db.drop(None).await?;
+    aggregation_data::populate(&db).await?;
+
+    // Each example is within its own scope to allow the example to include 
+    // `use futures::TryStreamExt;` without causing multiple definition errors.
+
+    {
+        // Start Aggregation Example 1
+        use futures::TryStreamExt;
+        let cursor = db
+            .collection::<Document>("sales")
+            .aggregate(
+                vec![
+                    doc! { "$match": { "items.fruit": "banana" } },
+                    doc! { "$sort": { "date": 1 } },
+                ],
+                None,
+            )
+            .await?;
+        let values: Vec<_> = cursor.try_collect().await?;
+        // End Aggregation Example 1
+        assert_eq!(5, values.len());
+    }
+
+    {
+        // Start Aggregation Example 2
+        use futures::TryStreamExt;
+        let cursor = db
+            .collection::<Document>("sales")
+            .aggregate(
+                vec![
+                    doc! {
+                        "$unwind": "$items"
+                    },
+                    doc! { "$match": {
+                        "items.fruit": "banana",
+                    }},
+                    doc! {
+                        "$group": {
+                            "_id": { "day": { "$dayOfWeek": "$date" } },
+                            "count": { "$sum": "$items.quantity" }
+                        }
+                    },
+                    doc! {
+                        "$project": {
+                            "dayOfWeek": "$_id.day",
+                            "numberSold": "$count",
+                            "_id": 0
+                        }
+                    },
+                    doc! {
+                        "$sort": { "numberSold": 1 }
+                    },
+                ],
+                None,
+            )
+            .await?;
+        let values: Vec<_> = cursor.try_collect().await?;
+        // End Aggregation Example 2
+        assert_eq!(4, values.len());
+    }
+
+    {
+        // Start Aggregation Example 3
+        use futures::TryStreamExt;
+        let cursor = db.collection::<Document>("sales").aggregate(
+            vec![
+                doc! {
+                    "$unwind": "$items"
+                },
+                doc! {
+                    "$group": {
+                        "_id": { "day": { "$dayOfWeek": "$date" } },
+                        "items_sold": { "$sum": "$items.quantity" },
+                        "revenue": { "$sum": { "$multiply": [ "$items.quantity", "$items.price" ] } }
+                    }
+                },
+                doc! {
+                    "$project": {
+                        "day": "$_id.day",
+                        "revenue": 1,
+                        "items_sold": 1,
+                        "discount": {
+                            "$cond": { "if": { "$lte": [ "$revenue", 250 ] }, "then": 25, "else": 0 }
+                        }
+                    }
+                },
+            ],
+            None,
+        ).await?;
+        let values: Vec<_> = cursor.try_collect().await?;
+        // End Aggregation Example 3
+        assert_eq!(4, values.len());
+    }
+
+    {
+        // Start Aggregation Example 4
+        use futures::TryStreamExt;
+        let cursor = db
+            .collection::<Document>("air_alliances")
+            .aggregate(
+                vec![
+                    doc! {
+                        "$lookup": {
+                            "from": "air_airlines",
+                            "let": { "constituents": "$airlines" },
+                            "pipeline": [
+                                {
+                                    "$match": { "$expr": { "$in": [ "$name", "$$constituents" ] } }
+                                }
+                            ],
+                            "as": "airlines"
+                        }
+                    },
+                    doc! {
+                        "$project": {
+                            "_id": 0,
+                            "name": 1,
+                            "airlines": {
+                                "$filter": {
+                                    "input": "$airlines",
+                                    "as": "airline",
+                                    "cond": { "$eq": ["$$airline.country", "Canada"] }
+                                }
+                            }
+                        }
+                    },
+                ],
+                None,
+            )
+            .await?;
+        let values: Vec<_> = cursor.try_collect().await?;
+        // End Aggregation Example 4
+        assert_eq!(3, values.len());
+    }
+
+    Ok(())
+}
+
+async fn run_command_examples() -> Result<()> {
+    let client = TestClient::new().await;
+    let db = client.database("run_command_examples");
+    db.drop(None).await?;
+    db.collection::<Document>("restaurants")
+        .insert_one(
+            doc! {
+                "name": "Chez Panisse",
+                "city": "Oakland",
+                "state": "California",
+                "country": "United States",
+                "rating": 4.4,
+            },
+            None,
+        )
+        .await?;
+
+    #[allow(unused)]
+    // Start runCommand Example 1
+    let info = db.run_command(doc! {"buildInfo": 1}, None).await?;
+    // End runCommand Example 1
+
+    #[allow(unused)]
+    // Start runCommand Example 2
+    let stats = db
+        .run_command(doc! {"collStats": "restaurants"}, None)
+        .await?;
+    // End runCommand Example 2
+
+    Ok(())
+}
+
+async fn index_examples() -> Result<()> {
+    let client = TestClient::new().await;
+    let db = client.database("index_examples");
+    db.drop(None).await?;
+    db.collection::<Document>("records")
+        .insert_many(
+            vec![
+                doc! {
+                    "student": "Marty McFly",
+                    "classYear": 1986,
+                    "school": "Hill Valley High",
+                    "score": 56.5,
+                },
+                doc! {
+                    "student": "Ferris F. Bueller",
+                    "classYear": 1987,
+                    "school": "Glenbrook North High",
+                    "status": "Suspended",
+                    "score": 76.0,
+                },
+            ],
+            None,
+        )
+        .await?;
+    db.collection::<Document>("restaurants")
+        .insert_many(
+            vec![
+                doc! {
+                    "name": "Chez Panisse",
+                    "city": "Oakland",
+                    "state": "California",
+                    "country": "United States",
+                    "rating": 4.4,
+                },
+                doc! {
+                    "name": "Eleven Madison Park",
+                    "cuisine": "French",
+                    "city": "New York City",
+                    "state": "New York",
+                    "country": "United States",
+                    "rating": 7.1,
+                },
+            ],
+            None,
+        )
+        .await?;
+
+    use crate::IndexModel;
+    // Start Index Example 1
+    db.collection::<Document>("records")
+        .create_index(
+            IndexModel::builder().keys(doc! { "score": 1 }).build(),
+            None,
+        )
+        .await?;
+    // End Index Example 1
+
+    use crate::options::IndexOptions;
+    // Start Index Example 2
+    db.collection::<Document>("records")
+        .create_index(
+            IndexModel::builder()
+                .keys(doc! { "cuisine": 1, "name": 1 })
+                .options(
+                    IndexOptions::builder()
+                        .partial_filter_expression(doc! { "rating": { "$gt": 5 } })
+                        .build(),
+                )
+                .build(),
+            None,
+        )
+        .await?;
+    // End Index Example 2
+
+    Ok(())
+}
+
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn test() {
@@ -1519,4 +1775,7 @@ async fn test() {
     update_examples(&coll).await.unwrap();
     delete_examples(&coll).await.unwrap();
     versioned_api_examples().await.unwrap();
+    aggregation_examples().await.unwrap();
+    run_command_examples().await.unwrap();
+    index_examples().await.unwrap();
 }
