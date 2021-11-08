@@ -1078,46 +1078,51 @@ where
 
                     n_attempted += current_batch_size;
                 }
-                Err(e) => match *e.kind {
-                    ErrorKind::BulkWrite(bw) => {
-                        // for ordered inserts this size will be incorrect, but knowing the batch
-                        // size isn't needed for ordered failures since we
-                        // return immediately from them anyways.
-                        let current_batch_size = bw.inserted_ids.len()
-                            + bw.write_errors.as_ref().map(|we| we.len()).unwrap_or(0);
+                Err(e) => {
+                    let labels = e.labels().clone();
+                    match *e.kind {
+                        ErrorKind::BulkWrite(bw) => {
+                            // for ordered inserts this size will be incorrect, but knowing the
+                            // batch size isn't needed for ordered
+                            // failures since we return immediately from
+                            // them anyways.
+                            let current_batch_size = bw.inserted_ids.len()
+                                + bw.write_errors.as_ref().map(|we| we.len()).unwrap_or(0);
 
-                        let failure_ref =
-                            cumulative_failure.get_or_insert_with(BulkWriteFailure::new);
-                        if let Some(write_errors) = bw.write_errors {
-                            for err in write_errors {
-                                let index = n_attempted + err.index;
+                            let failure_ref =
+                                cumulative_failure.get_or_insert_with(BulkWriteFailure::new);
+                            if let Some(write_errors) = bw.write_errors {
+                                for err in write_errors {
+                                    let index = n_attempted + err.index;
 
-                                failure_ref
-                                    .write_errors
-                                    .get_or_insert_with(Default::default)
-                                    .push(BulkWriteError { index, ..err });
+                                    failure_ref
+                                        .write_errors
+                                        .get_or_insert_with(Default::default)
+                                        .push(BulkWriteError { index, ..err });
+                                }
                             }
-                        }
 
-                        if let Some(wc_error) = bw.write_concern_error {
-                            failure_ref.write_concern_error = Some(wc_error);
-                        }
-
-                        error_labels.extend(e.labels);
-
-                        if ordered {
-                            // this will always be true since we invoked get_or_insert_with above.
-                            if let Some(failure) = cumulative_failure {
-                                return Err(Error {
-                                    kind: Box::new(ErrorKind::BulkWrite(failure)),
-                                    labels: error_labels,
-                                });
+                            if let Some(wc_error) = bw.write_concern_error {
+                                failure_ref.write_concern_error = Some(wc_error);
                             }
+
+                            error_labels.extend(labels);
+
+                            if ordered {
+                                // this will always be true since we invoked get_or_insert_with
+                                // above.
+                                if let Some(failure) = cumulative_failure {
+                                    return Err(Error::new(
+                                        ErrorKind::BulkWrite(failure),
+                                        Some(error_labels),
+                                    ));
+                                }
+                            }
+                            n_attempted += current_batch_size;
                         }
-                        n_attempted += current_batch_size;
+                        _ => return Err(e),
                     }
-                    _ => return Err(e),
-                },
+                }
             }
         }
 

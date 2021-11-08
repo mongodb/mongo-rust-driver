@@ -1205,6 +1205,9 @@ impl ClientOptions {
     /// Applies the options in other to these options if a value is not already present
     #[cfg(test)]
     pub(crate) fn merge(&mut self, other: ClientOptions) {
+        if self.hosts.is_empty() {
+            self.hosts = other.hosts;
+        }
         merge_options!(
             other,
             self,
@@ -1218,6 +1221,7 @@ impl ClientOptions {
                 direct_connection,
                 driver_info,
                 heartbeat_freq,
+                load_balanced,
                 local_threshold,
                 max_idle_time,
                 max_pool_size,
@@ -1230,6 +1234,7 @@ impl ClientOptions {
                 server_api,
                 server_selection_timeout,
                 socket_timeout,
+                test_options,
                 tls,
                 write_concern,
                 original_srv_info,

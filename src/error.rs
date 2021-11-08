@@ -45,16 +45,20 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub struct Error {
     /// The type of error that occurred.
     pub kind: Box<ErrorKind>,
-    pub(crate) labels: HashSet<String>,
+    labels: HashSet<String>,
 }
 
 impl Error {
     pub(crate) fn new(kind: ErrorKind, labels: Option<impl IntoIterator<Item = String>>) -> Self {
+        let mut labels: HashSet<String> = labels
+            .map(|labels| labels.into_iter().collect())
+            .unwrap_or_default();
+        if let Some(wc) = kind.get_write_concern_error() {
+            labels.extend(wc.labels.clone());
+        }
         Self {
             kind: Box::new(kind),
-            labels: labels
-                .map(|labels| labels.into_iter().collect())
-                .unwrap_or_default(),
+            labels,
         }
     }
 
@@ -318,10 +322,7 @@ where
     ErrorKind: From<E>,
 {
     fn from(err: E) -> Self {
-        Self {
-            kind: Box::new(err.into()),
-            labels: Default::default(),
-        }
+        Error::new(err.into(), None::<Option<String>>)
     }
 }
 
@@ -433,6 +434,22 @@ pub enum ErrorKind {
     IncompatibleServer { message: String },
 }
 
+impl ErrorKind {
+    // This is only used as part of a workaround to Atlas Proxy not returning
+    // toplevel error labels.
+    // TODO CLOUDP-105256 Remove this when Atlas Proxy error label behavior is fixed.
+    fn get_write_concern_error(&self) -> Option<&WriteConcernError> {
+        match self {
+            ErrorKind::BulkWrite(BulkWriteFailure {
+                write_concern_error,
+                ..
+            }) => write_concern_error.as_ref(),
+            ErrorKind::Write(WriteFailure::WriteConcernError(err)) => Some(err),
+            _ => None,
+        }
+    }
+}
+
 /// An error that occurred due to a database command failing.
 #[derive(Clone, Debug, Deserialize)]
 #[non_exhaustive]
@@ -473,6 +490,12 @@ pub struct WriteConcernError {
     /// A document identifying the write concern setting related to the error.
     #[serde(rename = "errInfo")]
     pub details: Option<Document>,
+
+    /// Labels categorizing the error.
+    // TODO CLOUDP-105256 Remove this when the Atlas Proxy properly returns
+    // error labels at the top level.
+    #[serde(rename = "errorLabels", default)]
+    pub(crate) labels: Vec<String>,
 }
 
 /// An error that occurred during a write operation that wasn't due to being unable to satisfy a

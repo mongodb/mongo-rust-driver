@@ -7,6 +7,7 @@ use crate::{
     db::options::CreateCollectionOptions,
     options::CollectionOptions,
     test::{
+        update_options_for_testing,
         util::FailPointGuard,
         EventHandler,
         TestClient,
@@ -109,6 +110,7 @@ impl TestRunner {
                     };
                     let uri = merge_uri_options(given_uri, client.uri_options.as_ref());
                     let mut options = ClientOptions::parse_uri(&uri, None).await.unwrap();
+                    update_options_for_testing(&mut options);
                     options.command_event_handler = Some(observer.clone());
                     options.cmap_event_handler = Some(observer.clone());
                     options.server_api = server_api;

@@ -258,6 +258,7 @@ async fn handle_write_concern_failure() {
                     "wtimeout": 0,
                     "provenance": "clientSupplied"
                 } }),
+                labels: vec![],
             };
             assert_eq!(wc_error, &expected_wc_err);
         }

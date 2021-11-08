@@ -26,7 +26,7 @@ use crate::{
     operation::RunCommand,
     options::{AuthMechanism, ClientOptions, CollectionOptions, CreateCollectionOptions},
     test::{
-        client_options_for_uri,
+        update_options_for_testing,
         Topology,
         LOAD_BALANCED_MULTIPLE_URI,
         LOAD_BALANCED_SINGLE_URI,
@@ -128,11 +128,8 @@ impl TestClient {
         }
     }
 
-    pub async fn with_additional_options(
-        options: Option<ClientOptions>,
-        use_multiple_mongoses: bool,
-    ) -> Self {
-        let options = Self::options_for_multiple_mongoses(options, use_multiple_mongoses).await;
+    pub async fn with_additional_options(options: Option<ClientOptions>) -> Self {
+        let options = Self::options_for_multiple_mongoses(options, false).await;
         Self::with_options(Some(options)).await
     }
 
@@ -380,7 +377,9 @@ impl TestClient {
                     .as_ref()
                     .expect("SINGLE_MONGOS_LB_URI is required")
             };
-            client_options_for_uri(uri)
+            let mut o = ClientOptions::parse_uri(uri, None).await.unwrap();
+            update_options_for_testing(&mut o);
+            o
         } else {
             CLIENT_OPTIONS.clone()
         };
@@ -447,7 +446,7 @@ pub fn get_default_name(description: &str) -> String {
         .replace('$', "%")
         .replace(' ', "_")
         .replace('.', "_");
-    // database names must have fewer than 64 characters
-    db_name.truncate(63);
+    // database names must have fewer than 38 characters
+    db_name.truncate(37);
     db_name
 }

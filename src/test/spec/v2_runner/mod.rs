@@ -18,6 +18,7 @@ use crate::{
         util::{get_default_name, FailPointGuard},
         EventClient,
         TestClient,
+        SERVERLESS,
     },
     RUNTIME,
 };
@@ -66,16 +67,20 @@ pub async fn run_v2_test(test_file: TestFile) {
             continue;
         }
 
-        match internal_client
-            .database("admin")
-            .run_command(doc! { "killAllSessions": [] }, None)
-            .await
-        {
-            Ok(_) => {}
-            Err(err) => match err.code() {
-                Some(11601) => {}
-                _ => panic!("{}: killAllSessions failed", test.description),
-            },
+        // `killAllSessions` isn't supported on serverless.
+        // TODO CLOUDP-84298 remove this conditional.
+        if !*SERVERLESS {
+            match internal_client
+                .database("admin")
+                .run_command(doc! { "killAllSessions": [] }, None)
+                .await
+            {
+                Ok(_) => {}
+                Err(err) => match err.code() {
+                    Some(11601) => {}
+                    _ => panic!("{}: killAllSessions failed", test.description),
+                },
+            }
         }
 
         let db_name = test_file
