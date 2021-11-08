@@ -127,8 +127,7 @@ pub(crate) trait Operation {
         None
     }
 
-    /// Returns whether or not this command supports the `readConcern` field, and if so, the read
-    /// concern's value.
+    /// Returns whether or not this command supports the `readConcern` field.
     fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
         false
     }
