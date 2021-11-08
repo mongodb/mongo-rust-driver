@@ -56,6 +56,42 @@ async fn build() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_no_write_concern() {
+    let ns = Namespace {
+        db: "test_db".to_string(),
+        coll: "test_coll".to_string(),
+    };
+
+    let index_options = IndexOptions::builder()
+        .name(Some("foo".to_string()))
+        .build();
+    let index_model = IndexModel::builder()
+        .keys(doc! { "x": 1 })
+        .options(Some(index_options))
+        .build();
+    let options = CreateIndexOptions::builder()
+        .write_concern(Some(WriteConcern::builder().build()))
+        .build();
+    let mut create_indexes = CreateIndexes::new(ns, vec![index_model], Some(options));
+
+    let cmd = create_indexes
+        .build(&StreamDescription::with_wire_version(10))
+        .expect("CreateIndexes command failed to build when it should have succeeded.");
+
+    assert_eq!(
+        cmd.body,
+        doc! {
+            "createIndexes": "test_coll",
+            "indexes": [{
+                "key": { "x": 1 },
+                "name": "foo"
+            }],
+        }
+    )
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success() {
     let a = IndexModel::builder()
         .keys(doc! { "a": 1 })
