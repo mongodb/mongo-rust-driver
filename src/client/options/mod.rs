@@ -484,6 +484,7 @@ pub struct ClientOptions {
     pub server_selection_timeout: Option<Duration>,
 
     #[builder(default, setter(skip))]
+    #[derivative(Debug = "ignore")]
     pub(crate) socket_timeout: Option<Duration>,
 
     /// The TLS configuration for the Client to use in its connections with the server.
@@ -503,9 +504,11 @@ pub struct ClientOptions {
     /// Information from the SRV URI that generated these client options, if applicable.
     #[builder(default, setter(skip))]
     #[serde(skip)]
+    #[derivative(Debug = "ignore")]
     pub(crate) original_srv_info: Option<OriginalSrvInfo>,
 
     #[builder(default, setter(skip))]
+    #[derivative(Debug = "ignore")]
     pub(crate) original_uri: Option<String>,
 
     /// Configuration of the trust-dns resolver used for SRV and TXT lookups.
@@ -515,6 +518,7 @@ pub struct ClientOptions {
     /// configuration, so a custom configuration is recommended.
     #[builder(default, setter(skip))]
     #[serde(skip)]
+    #[derivative(Debug = "ignore")]
     pub(crate) resolver_config: Option<ResolverConfig>,
 
     /// Used by tests to override MIN_HEARTBEAT_FREQUENCY.
