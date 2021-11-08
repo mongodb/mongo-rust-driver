@@ -99,6 +99,45 @@ async fn build_one() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_no_write_concern() {
+    let ns = Namespace {
+        db: "test_db".to_string(),
+        coll: "test_coll".to_string(),
+    };
+    let filter = doc! { "x": { "$gt": 1 } };
+
+    let wc = WriteConcern {
+        ..Default::default()
+    };
+    let options = DeleteOptions::builder().write_concern(wc).build();
+
+    let mut op = Delete::new(ns, filter.clone(), Some(1), Some(options));
+
+    let description = StreamDescription::new_testing();
+    let mut cmd = op.build(&description).unwrap();
+
+    assert_eq!(cmd.name.as_str(), "delete");
+    assert_eq!(cmd.target_db.as_str(), "test_db");
+
+    let mut expected_body = doc! {
+        "delete": "test_coll",
+        "deletes": [
+            {
+                "q": filter,
+                "limit": 1,
+            }
+        ],
+        "ordered": true,
+    };
+
+    bson_util::sort_document(&mut cmd.body);
+    bson_util::sort_document(&mut expected_body);
+
+    assert_eq!(cmd.body, expected_body);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success() {
     let op = Delete::empty();
 
