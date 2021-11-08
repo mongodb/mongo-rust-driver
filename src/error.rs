@@ -435,6 +435,9 @@ pub enum ErrorKind {
 }
 
 impl ErrorKind {
+    // This is only used as part of a workaround to Atlas Proxy not returning
+    // toplevel error labels.
+    // TODO CLOUDP-105256 Remove this when Atlas Proxy error label behavior is fixed.
     fn get_write_concern_error(&self) -> Option<&WriteConcernError> {
         match self {
             ErrorKind::BulkWrite(BulkWriteFailure {
@@ -489,6 +492,8 @@ pub struct WriteConcernError {
     pub details: Option<Document>,
 
     /// Labels categorizing the error.
+    // TODO CLOUDP-105256 Remove this when the Atlas Proxy properly returns
+    // error labels at the top level.
     #[serde(rename = "errorLabels", default)]
     pub(crate) labels: Vec<String>,
 }
