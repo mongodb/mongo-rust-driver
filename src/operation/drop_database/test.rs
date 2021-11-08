@@ -50,6 +50,31 @@ async fn build() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn build_no_write_concern() {
+    let mut op = DropDatabase {
+        target_db: "test_db".to_string(),
+        options: Some(DropDatabaseOptions {
+            write_concern: Some(WriteConcern {
+                ..Default::default()
+            }),
+        }),
+    };
+
+    let description = StreamDescription::new_testing();
+    let cmd = op.build(&description).expect("build should succeed");
+
+    assert_eq!(cmd.name.as_str(), "dropDatabase");
+    assert_eq!(cmd.target_db.as_str(), "test_db");
+    assert_eq!(
+        cmd.body,
+        doc! {
+            "dropDatabase": 1,
+        }
+    );
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success() {
     let op = DropDatabase::empty();
 

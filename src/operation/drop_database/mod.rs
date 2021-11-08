@@ -42,11 +42,10 @@ impl Operation for DropDatabase {
             Self::NAME: 1,
         };
 
-        let mut options = self.options.clone().unwrap_or_default();
-        if *self.write_concern().unwrap() == Default::default() {
-            options.write_concern = None;
+        let options = self.options.clone().unwrap_or_default();
+        if *self.write_concern().unwrap() != Default::default() {
+            append_options(&mut body, Some(&options))?;
         }
-        append_options(&mut body, Some(&options))?;
 
         Ok(Command::new(
             Self::NAME.to_string(),
