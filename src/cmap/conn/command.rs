@@ -137,19 +137,15 @@ impl<T> Command<T> {
         self.autocommit = Some(false);
     }
 
-    /// Sets the read concern level for this command according to the read concern specified on the
-    /// transaction. This does not overwrite any other read concern options.
-    pub(crate) fn set_txn_read_concern(&mut self, session: &ClientSession) {
-        if let Some(ref options) = session.transaction.options {
-            if let Some(ref read_concern) = options.read_concern {
-                let inner = self.read_concern.get_or_insert(ReadConcernInternal {
-                    level: None,
-                    at_cluster_time: None,
-                    after_cluster_time: None,
-                });
-                inner.level = Some(read_concern.level.clone());
-            }
-        }
+    /// Sets the read concern level for this command.
+    /// This does not overwrite any other read concern options.
+    pub(crate) fn set_read_concern_level(&mut self, level: ReadConcernLevel) {
+        let inner = self.read_concern.get_or_insert(ReadConcernInternal {
+            level: None,
+            at_cluster_time: None,
+            after_cluster_time: None,
+        });
+        inner.level = Some(level);
     }
 
     /// Sets the read concern level for this command to "snapshot" and sets the `atClusterTime`

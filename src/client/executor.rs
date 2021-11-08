@@ -436,7 +436,12 @@ impl Client {
                     TransactionState::Starting => {
                         cmd.set_start_transaction();
                         cmd.set_autocommit();
-                        cmd.set_txn_read_concern(*session);
+
+                        if let Some(ref options) = session.transaction.options {
+                            if let Some(ref read_concern) = options.read_concern {
+                                cmd.set_read_concern_level(read_concern.level.clone());
+                            }
+                        }
                         if self.is_load_balanced() {
                             session.pin_connection(connection.pin()?);
                         } else if is_sharded {
