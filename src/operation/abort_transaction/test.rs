@@ -2,7 +2,6 @@ use pretty_assertions::assert_eq;
 
 use crate::{
     bson::doc,
-    bson_util,
     client::session::TransactionPin,
     cmap::StreamDescription,
     concern::{Acknowledgment, WriteConcern},
@@ -20,21 +19,30 @@ async fn build() {
     let pinned = TransactionPin::Mongos(ReadPreference(Primary));
 
     let mut op = AbortTransaction::new(Some(wc), Some(pinned));
-    let mut cmd = op.build(&StreamDescription::new_testing()).unwrap();
+    let description = StreamDescription::new_testing();
+    let cmd = op.build(&description).expect("build should succeed");
 
     assert_eq!(cmd.name, "abortTransaction");
-
-    let mut expected_body = doc! {
+    assert_eq!(
+        cmd.body,
+        doc! {
         "abortTransaction": 1,
         "writeConcern": {
             "w": "majority"
-        },
-    };
+            },
+        }
+    );
 
-    bson_util::sort_document(&mut cmd.body);
-    bson_util::sort_document(&mut expected_body);
+    let mut op = AbortTransaction::new(None, None);
+    let cmd = op.build(&description).expect("build should succeed");
 
-    assert_eq!(cmd.body, expected_body);
+    assert_eq!(cmd.name, "abortTransaction");
+    assert_eq!(
+        cmd.body,
+        doc! {
+        "abortTransaction": 1,
+        }
+    );
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -46,16 +54,13 @@ async fn build_no_write_concern() {
     let pinned = TransactionPin::Mongos(ReadPreference(Primary));
 
     let mut op = AbortTransaction::new(Some(wc), Some(pinned));
-    let mut cmd = op.build(&StreamDescription::new_testing()).unwrap();
+    let cmd = op.build(&StreamDescription::new_testing()).unwrap();
 
     assert_eq!(cmd.name, "abortTransaction");
-
-    let mut expected_body = doc! {
+    assert_eq!(
+        cmd.body,
+        doc! {
         "abortTransaction": 1,
-    };
-
-    bson_util::sort_document(&mut cmd.body);
-    bson_util::sort_document(&mut expected_body);
-
-    assert_eq!(cmd.body, expected_body);
+        }
+    );
 }

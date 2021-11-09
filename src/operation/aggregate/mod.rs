@@ -55,7 +55,7 @@ impl Operation for Aggregate {
         };
 
         let mut options = self.options.clone().unwrap_or_default();
-        if *self.write_concern().unwrap() == Default::default() {
+        if self.options.is_some() && *self.write_concern().unwrap() == Default::default() {
             options.write_concern = None;
         }
         append_options(&mut body, Some(&options))?;
