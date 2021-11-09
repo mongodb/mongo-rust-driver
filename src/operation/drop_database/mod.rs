@@ -43,8 +43,10 @@ impl Operation for DropDatabase {
         };
 
         let options = self.options.clone().unwrap_or_default();
-        if self.options.is_some() && *self.write_concern().unwrap() != Default::default() {
-            append_options(&mut body, Some(&options))?;
+        if let Some(write_concern) = self.write_concern() {
+            if *write_concern != Default::default() {
+                append_options(&mut body, Some(&options))?;
+            }
         }
 
         Ok(Command::new(

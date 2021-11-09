@@ -113,8 +113,10 @@ impl<'a, T: Serialize> Operation for Insert<'a, T> {
 
         let mut options = self.options.clone().unwrap_or_default();
         options.ordered = Some(self.is_ordered());
-        if self.options.is_some() && *self.write_concern().unwrap() == Default::default() {
-            options.write_concern = None;
+        if let Some(write_concern) = self.write_concern() {
+            if *write_concern == Default::default() {
+                options.write_concern = None;
+            }
         }
 
         let body = InsertCommand {

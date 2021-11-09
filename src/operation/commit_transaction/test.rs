@@ -1,9 +1,9 @@
 use crate::{
     bson::doc,
+    client::options::TransactionOptions,
     cmap::StreamDescription,
     concern::{Acknowledgment, WriteConcern},
     operation::{CommitTransaction, Operation},
-    client::options::TransactionOptions,
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -31,9 +31,7 @@ async fn build() {
         }
     );
 
-    let mut op = CommitTransaction {
-        options: None,
-    };
+    let mut op = CommitTransaction { options: None };
     let cmd = op.build(&description).expect("build should succeed");
     assert_eq!(cmd.name.as_str(), "commitTransaction");
     assert_eq!(
@@ -67,4 +65,3 @@ async fn build_no_write_concern() {
         }
     );
 }
-

@@ -64,7 +64,7 @@ async fn build_no_write_concern() {
         coll: "test_coll".to_string(),
     };
 
-    let mut op = DropCollection::new(ns.clone(), Some(options));
+    let mut op = DropCollection::new(ns, Some(options));
 
     let description = StreamDescription::new_testing();
     let cmd = op.build(&description).expect("build should succeed");
