@@ -3,16 +3,20 @@ mod executor;
 pub mod options;
 pub mod session;
 
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use bson::Bson;
 use derivative::Derivative;
-use std::time::Instant;
+use serde::de::DeserializeOwned;
 
 #[cfg(test)]
 use crate::options::ServerAddress;
 use crate::{
     bson::Document,
+    change_stream::{event::ChangeStreamEvent, options::ChangeStreamOptions, ChangeStream},
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::{ErrorKind, Result},
@@ -253,6 +257,52 @@ impl Client {
                 .await),
             _ => Err(ErrorKind::SessionsNotSupported.into()),
         }
+    }
+
+    /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
+    /// for all changes in the cluster. The stream does not observe changes from system
+    /// collections or the "config", "local" or "admin" databases. Note that this method
+    /// (`watch` on a cluster) is only supported in MongoDB 4.0 or greater.
+    ///
+    /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
+    /// streams.
+    ///
+    /// Change streams require either a "majority" read concern or no read
+    /// concern. Anything else will cause a server error.
+    #[allow(unused)]
+    pub(crate) async fn watch(
+        &self,
+        options: impl Into<Option<ChangeStreamOptions>>,
+    ) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
+        todo!()
+    }
+
+    /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
+    /// for all changes in the cluster and processes them via the given aggregation pipeline. The
+    /// stream does not observe changes from system collections or the "config", "local" or "admin"
+    /// databases. Note that this method (`watch` on a cluster) is only supported in MongoDB 4.0 or
+    /// greater.
+    ///
+    /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
+    /// streams.
+    ///
+    /// Change streams require either a "majority" read concern or no read
+    /// concern. Anything else will cause a server error.
+    ///
+    /// Note that using a `$project` stage to remove any of the `_id` `operationType` or `ns` fields
+    /// will cause an error. The driver requires these fields to support resumability. For
+    /// more information on resumability, see the documentation for
+    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
+    #[allow(unused)]
+    pub(crate) async fn watch_with_pipeline<D>(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: impl Into<Option<ChangeStreamOptions>>,
+    ) -> Result<ChangeStream<D>>
+    where
+        D: DeserializeOwned + Unpin + Send + Sync,
+    {
+        todo!()
     }
 
     /// Check in a server session to the server session pool.

@@ -17,6 +17,7 @@ use self::options::*;
 use crate::{
     bson::{doc, to_document, Bson, Document},
     bson_util,
+    change_stream::{event::ChangeStreamEvent, options::ChangeStreamOptions, ChangeStream},
     client::session::TransactionState,
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
@@ -787,6 +788,54 @@ impl<T> Collection<T> {
             )
             .await?;
         Ok(())
+    }
+
+    /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
+    /// for all changes in this collection. A
+    /// [`ChangeStream`](change_stream/struct.ChangeStream.html) cannot be started on system
+    /// collections.
+    ///
+    /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
+    /// streams.
+    ///
+    /// Change streams require either a "majority" read concern or no read concern. Anything else
+    /// will cause a server error.
+    #[allow(unused)]
+    pub(crate) async fn watch(
+        &self,
+        options: impl Into<Option<ChangeStreamOptions>>,
+    ) -> Result<ChangeStream<ChangeStreamEvent<T>>>
+    where
+        T: DeserializeOwned + Unpin + Send + Sync,
+    {
+        todo!()
+    }
+
+    /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
+    /// for all changes in this collection and processes them via the given aggregation pipeline. A
+    /// [`ChangeStream`](change_stream/struct.ChangeStream.html) cannot be started on system
+    /// collections.
+    ///
+    /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
+    /// streams.
+    ///
+    /// Change streams require either a "majority" read concern or no read concern. Anything else
+    /// will cause a server error.
+    ///
+    /// Also note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
+    /// fields will cause an error. The driver requires these fields to support resumability. For
+    /// more information on resumability, see the documentation for
+    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
+    #[allow(unused)]
+    pub(crate) async fn watch_with_pipeline<D>(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: impl Into<Option<ChangeStreamOptions>>,
+    ) -> Result<ChangeStream<D>>
+    where
+        D: DeserializeOwned + Unpin + Send + Sync,
+    {
+        todo!()
     }
 }
 
