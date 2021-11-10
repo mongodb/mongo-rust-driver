@@ -13,9 +13,7 @@ use crate::{
     selection_criteria::SelectionCriteria,
 };
 
-use super::CommandResponse;
-
-const SERVER_4_9_0_WIRE_VERSION: i32 = 12;
+use super::{CommandResponse, SERVER_4_9_0_WIRE_VERSION};
 
 pub(crate) struct Count {
     ns: Namespace,
@@ -76,7 +74,12 @@ impl Operation for Count {
 
         append_options(&mut body, self.options.as_ref())?;
 
-        Ok(Command::new(name, self.ns.db.clone(), body))
+        Ok(Command::new_read(
+            name,
+            self.ns.db.clone(),
+            self.options.as_ref().and_then(|o| o.read_concern.clone()),
+            body,
+        ))
     }
 
     fn handle_response(
@@ -122,6 +125,10 @@ impl Operation for Count {
             return options.selection_criteria.as_ref();
         }
         None
+    }
+
+    fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
+        true
     }
 
     fn retryability(&self) -> Retryability {

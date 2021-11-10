@@ -9,7 +9,7 @@ use crate::{
     error::{Error, ErrorKind, Result},
     is_master::{IsMasterCommandResponse, IsMasterReply},
     operation::{CommandErrorBody, CommandResponse, Response},
-    options::{ReadConcern, ServerAddress},
+    options::{ReadConcern, ReadConcernInternal, ReadConcernLevel, ServerAddress},
     selection_criteria::ReadPreference,
     ClientSession,
 };
@@ -60,7 +60,7 @@ pub(crate) struct Command<T = Document> {
 
     autocommit: Option<bool>,
 
-    read_concern: Option<ReadConcern>,
+    read_concern: Option<ReadConcernInternal>,
 
     recovery_token: Option<Document>,
 }
@@ -79,6 +79,28 @@ impl<T> Command<T> {
             start_transaction: None,
             autocommit: None,
             read_concern: None,
+            recovery_token: None,
+        }
+    }
+
+    pub(crate) fn new_read(
+        name: String,
+        target_db: String,
+        read_concern: Option<ReadConcern>,
+        body: T,
+    ) -> Self {
+        Self {
+            name,
+            target_db,
+            body,
+            lsid: None,
+            cluster_time: None,
+            server_api: None,
+            read_preference: None,
+            txn_number: None,
+            start_transaction: None,
+            autocommit: None,
+            read_concern: read_concern.map(Into::into),
             recovery_token: None,
         }
     }
@@ -115,18 +137,37 @@ impl<T> Command<T> {
         self.autocommit = Some(false);
     }
 
-    pub(crate) fn set_txn_read_concern(&mut self, session: &ClientSession) {
-        if let Some(ref options) = session.transaction.options {
-            if let Some(ref read_concern) = options.read_concern {
-                self.read_concern = Some(read_concern.clone());
-            }
-        }
+    /// Sets the read concern level for this command.
+    /// This does not overwrite any other read concern options.
+    pub(crate) fn set_read_concern_level(&mut self, level: ReadConcernLevel) {
+        let inner = self.read_concern.get_or_insert(ReadConcernInternal {
+            level: None,
+            at_cluster_time: None,
+            after_cluster_time: None,
+        });
+        inner.level = Some(level);
     }
 
+    /// Sets the read concern level for this command to "snapshot" and sets the `atClusterTime`
+    /// field.
     pub(crate) fn set_snapshot_read_concern(&mut self, session: &ClientSession) {
-        let mut concern = ReadConcern::snapshot();
-        concern.at_cluster_time = session.snapshot_time;
-        self.read_concern = Some(concern);
+        let inner = self.read_concern.get_or_insert(ReadConcernInternal {
+            level: Some(ReadConcernLevel::Snapshot),
+            at_cluster_time: None,
+            after_cluster_time: None,
+        });
+        inner.at_cluster_time = session.snapshot_time;
+    }
+
+    pub(crate) fn set_after_cluster_time(&mut self, session: &ClientSession) {
+        if let Some(operation_time) = session.operation_time {
+            let inner = self.read_concern.get_or_insert(ReadConcernInternal {
+                level: None,
+                at_cluster_time: None,
+                after_cluster_time: None,
+            });
+            inner.after_cluster_time = Some(operation_time);
+        }
     }
 }
 

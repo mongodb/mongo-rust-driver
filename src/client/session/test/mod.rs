@@ -1,3 +1,5 @@
+mod causal_consistency;
+
 use std::{future::Future, time::Duration};
 
 use bson::Document;

@@ -98,9 +98,10 @@ impl<T: DeserializeOwned> Operation for Find<T> {
             body.insert("filter", filter.clone());
         }
 
-        Ok(Command::new(
+        Ok(Command::new_read(
             Self::NAME.to_string(),
             self.ns.db.clone(),
+            self.options.as_ref().and_then(|o| o.read_concern.clone()),
             body,
         ))
     }
@@ -116,6 +117,10 @@ impl<T: DeserializeOwned> Operation for Find<T> {
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),
         ))
+    }
+
+    fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
+        true
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

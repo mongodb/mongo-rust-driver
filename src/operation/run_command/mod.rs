@@ -150,6 +150,10 @@ impl super::Response for Response {
         self.recovery_token.as_ref()
     }
 
+    fn operation_time(&self) -> Option<Timestamp> {
+        self.doc.get_timestamp("operationTime").ok()
+    }
+
     fn into_body(self) -> Self::Body {
         self.doc
     }

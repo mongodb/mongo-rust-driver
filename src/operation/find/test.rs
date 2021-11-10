@@ -21,15 +21,18 @@ fn build_test(
 ) {
     let mut find = Find::<Document>::new(ns.clone(), filter, options);
 
-    let mut cmd = find.build(&StreamDescription::new_testing()).unwrap();
+    let cmd = find.build(&StreamDescription::new_testing()).unwrap();
 
     assert_eq!(cmd.name.as_str(), "find");
     assert_eq!(cmd.target_db.as_str(), ns.db.as_str());
 
-    bson_util::sort_document(&mut expected_body);
-    bson_util::sort_document(&mut cmd.body);
+    let cmd_bytes = find.serialize_command(cmd).unwrap();
+    let mut cmd_doc = bson::from_slice(&cmd_bytes).unwrap();
 
-    assert_eq!(cmd.body, expected_body);
+    bson_util::sort_document(&mut expected_body);
+    bson_util::sort_document(&mut cmd_doc);
+
+    assert_eq!(cmd_doc, expected_body);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -54,6 +57,7 @@ async fn build() {
 
     let expected_body = doc! {
         "find": "test_coll",
+        "$db": "test_db",
         "filter": filter.clone(),
         "hint": {
             "x": 1,
@@ -85,6 +89,7 @@ async fn build_cursor_type() {
 
     let non_tailable_body = doc! {
         "find": "test_coll",
+        "$db": "test_db",
     };
 
     build_test(
@@ -100,7 +105,8 @@ async fn build_cursor_type() {
 
     let tailable_body = doc! {
         "find": "test_coll",
-        "tailable": true
+        "tailable": true,
+        "$db": "test_db",
     };
 
     build_test(ns.clone(), None, Some(tailable_options), tailable_body);
@@ -111,6 +117,7 @@ async fn build_cursor_type() {
 
     let tailable_await_body = doc! {
         "find": "test_coll",
+        "$db": "test_db",
         "tailable": true,
         "awaitData": true,
     };
@@ -133,6 +140,7 @@ async fn build_max_await_time() {
 
     let body = doc! {
         "find": "test_coll",
+        "$db": "test_db",
         "maxTimeMS": 10i32
     };
 
@@ -151,6 +159,7 @@ async fn build_limit() {
 
     let positive_body = doc! {
         "find": "test_coll",
+        "$db": "test_db",
         "limit": 5_i64
     };
 
@@ -160,6 +169,7 @@ async fn build_limit() {
 
     let negative_body = doc! {
         "find": "test_coll",
+        "$db": "test_db",
         "limit": 5_i64,
         "singleBatch": true
     };
@@ -173,6 +183,7 @@ async fn build_batch_size() {
     let options = FindOptions::builder().batch_size(1).build();
     let body = doc! {
         "find": "",
+        "$db": "",
         "batchSize": 1
     };
     build_test(Namespace::empty(), None, Some(options), body);

@@ -109,6 +109,7 @@ pub struct ClientSession {
     options: Option<SessionOptions>,
     pub(crate) transaction: Transaction,
     pub(crate) snapshot_time: Option<Timestamp>,
+    pub(crate) operation_time: Option<Timestamp>,
 }
 
 #[derive(Debug)]
@@ -214,6 +215,7 @@ impl ClientSession {
             options,
             transaction: Default::default(),
             snapshot_time: None,
+            operation_time: None,
         }
     }
 
@@ -255,6 +257,21 @@ impl ClientSession {
         if self.cluster_time().map(|ct| ct < to).unwrap_or(true) {
             self.cluster_time = Some(to.clone());
         }
+    }
+
+    /// Advance operation time for this session. If the provided timestamp is earlier than this
+    /// session's current operation time, then the operation time is unchanged.
+    pub fn advance_operation_time(&mut self, ts: Timestamp) {
+        self.operation_time = match self.operation_time {
+            Some(current_op_time) if current_op_time < ts => Some(ts),
+            None => Some(ts),
+            _ => self.operation_time,
+        }
+    }
+
+    /// The operation time returned by the last operation executed in this session.
+    pub fn operation_time(&self) -> Option<Timestamp> {
+        self.operation_time
     }
 
     /// Mark this session (and the underlying server session) as dirty.
@@ -559,6 +576,7 @@ struct DroppedClientSession {
     options: Option<SessionOptions>,
     transaction: Transaction,
     snapshot_time: Option<Timestamp>,
+    operation_time: Option<Timestamp>,
 }
 
 impl From<DroppedClientSession> for ClientSession {
@@ -571,6 +589,7 @@ impl From<DroppedClientSession> for ClientSession {
             options: dropped_session.options,
             transaction: dropped_session.transaction,
             snapshot_time: dropped_session.snapshot_time,
+            operation_time: dropped_session.operation_time,
         }
     }
 }
@@ -586,6 +605,7 @@ impl Drop for ClientSession {
                 options: self.options.clone(),
                 transaction: self.transaction.take(),
                 snapshot_time: self.snapshot_time,
+                operation_time: self.operation_time,
             };
             RUNTIME.execute(async move {
                 let mut session: ClientSession = dropped_session.into();

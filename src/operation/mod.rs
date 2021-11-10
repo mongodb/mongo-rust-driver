@@ -70,6 +70,9 @@ pub(crate) use list_indexes::ListIndexes;
 pub(crate) use run_command::RunCommand;
 pub(crate) use update::Update;
 
+const SERVER_4_9_0_WIRE_VERSION: i32 = 12;
+const SERVER_4_2_0_WIRE_VERSION: i32 = 8;
+
 /// A trait modeling the behavior of a server side operation.
 pub(crate) trait Operation {
     /// The output type of this operation.
@@ -122,6 +125,11 @@ pub(crate) trait Operation {
     /// The write concern to use for this operation, if any.
     fn write_concern(&self) -> Option<&WriteConcern> {
         None
+    }
+
+    /// Returns whether or not this command supports the `readConcern` field.
+    fn supports_read_concern(&self, _description: &StreamDescription) -> bool {
+        false
     }
 
     /// Whether this operation supports sessions or not.
@@ -204,6 +212,9 @@ pub(crate) trait Response: Sized {
     /// The `recoveryToken` field of the response.
     fn recovery_token(&self) -> Option<&Document>;
 
+    /// The `operationTime` field of the response.
+    fn operation_time(&self) -> Option<Timestamp>;
+
     /// Convert into the body of the response.
     fn into_body(self) -> Self::Body;
 }
@@ -220,6 +231,8 @@ pub(crate) struct CommandResponse<T> {
     pub(crate) at_cluster_time: Option<Timestamp>,
 
     pub(crate) recovery_token: Option<Document>,
+
+    pub(crate) operation_time: Option<Timestamp>,
 
     #[serde(flatten)]
     pub(crate) body: T,
@@ -257,6 +270,10 @@ impl<T: DeserializeOwned> Response for CommandResponse<T> {
     fn into_body(self) -> Self::Body {
         self.body
     }
+
+    fn operation_time(&self) -> Option<Timestamp> {
+        self.operation_time
+    }
 }
 
 /// A response to commands that return cursors.
@@ -280,6 +297,10 @@ impl<T: DeserializeOwned> Response for CursorResponse<T> {
 
     fn cluster_time(&self) -> Option<&ClusterTime> {
         self.response.cluster_time()
+    }
+
+    fn operation_time(&self) -> Option<Timestamp> {
+        self.response.operation_time()
     }
 
     fn at_cluster_time(&self) -> Option<Timestamp> {

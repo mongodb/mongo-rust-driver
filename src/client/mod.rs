@@ -242,6 +242,9 @@ impl Client {
 
     /// Starts a new `ClientSession`.
     pub async fn start_session(&self, options: Option<SessionOptions>) -> Result<ClientSession> {
+        if let Some(ref options) = options {
+            options.validate()?;
+        }
         match self.get_session_support_status().await? {
             SessionSupportStatus::Supported {
                 logical_session_timeout,

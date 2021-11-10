@@ -57,12 +57,14 @@ async fn build_with_options() {
         coll: "test_coll".to_string(),
     };
     let mut count_op = CountDocuments::new(ns, None, Some(options)).unwrap();
-    let mut count_command = count_op
+    let count_command = count_op
         .build(&StreamDescription::new_testing())
         .expect("error on build");
+    assert_eq!(count_command.target_db, "test_db");
 
     let mut expected_body = doc! {
         "aggregate": "test_coll",
+        "$db": "test_db",
         "pipeline": [
             { "$match": {} },
             { "$skip": skip as i64 },
@@ -75,10 +77,11 @@ async fn build_with_options() {
     };
 
     bson_util::sort_document(&mut expected_body);
-    bson_util::sort_document(&mut count_command.body);
+    let serialized_command = count_op.serialize_command(count_command).unwrap();
+    let mut cmd_doc = bson::from_slice(&serialized_command).unwrap();
+    bson_util::sort_document(&mut cmd_doc);
 
-    assert_eq!(count_command.body, expected_body);
-    assert_eq!(count_command.target_db, "test_db");
+    assert_eq!(cmd_doc, expected_body);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
