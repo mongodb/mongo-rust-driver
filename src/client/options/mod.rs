@@ -2394,12 +2394,11 @@ pub struct SessionOptions {
     /// If true, all operations performed in the context of this session
     /// will be [causally consistent](https://docs.mongodb.com/manual/core/causal-consistency-read-write-concerns/).
     ///
-    /// Defaults to true.
+    /// Defaults to true if [`SessionOptions::snapshot`] is unspecified.
     pub causal_consistency: Option<bool>,
 
     /// If true, all read operations performed using this client session will share the same
     /// snapshot.  Defaults to false.
-    // TODO RUST-18 enforce snapshot exclusivity with causalConsistency.
     pub snapshot: Option<bool>,
 }
 
