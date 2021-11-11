@@ -114,9 +114,8 @@ async fn build() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build_no_write_concern() {
+#[test]
+fn build_no_write_concern() {
     let options = InsertManyOptions {
         ordered: Some(true),
         write_concern: Some(WriteConcern::builder().build()),

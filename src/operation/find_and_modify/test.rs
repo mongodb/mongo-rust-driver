@@ -531,9 +531,8 @@ async fn handle_no_value_update() {
     handle_response_test(&op, doc! { "ok": 1.0 }).unwrap_err();
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build_no_write_concern() {
+#[test]
+fn build_no_write_concern() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),

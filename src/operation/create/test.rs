@@ -43,9 +43,8 @@ async fn build() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build_no_write_concern() {
+#[test]
+fn build_no_write_concern() {
     let mut op = Create::new(
         Namespace {
             db: "test_db".to_string(),

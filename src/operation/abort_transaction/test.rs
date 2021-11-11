@@ -9,9 +9,8 @@ use crate::{
     selection_criteria::{ReadPreference::Primary, SelectionCriteria::ReadPreference},
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build() {
+#[test]
+fn build() {
     let wc = WriteConcern {
         w: Some(Acknowledgment::Majority),
         ..Default::default()
@@ -45,9 +44,8 @@ async fn build() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build_no_write_concern() {
+#[test]
+fn build_no_write_concern() {
     let wc = WriteConcern {
         ..Default::default()
     };

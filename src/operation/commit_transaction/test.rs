@@ -6,9 +6,8 @@ use crate::{
     operation::{CommitTransaction, Operation},
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build() {
+#[test]
+fn build() {
     let mut op = CommitTransaction {
         options: Some(TransactionOptions {
             write_concern: Some(WriteConcern {
@@ -42,9 +41,8 @@ async fn build() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build_no_write_concern() {
+#[test]
+fn build_no_write_concern() {
     let mut op = CommitTransaction {
         options: Some(TransactionOptions {
             write_concern: Some(WriteConcern {
