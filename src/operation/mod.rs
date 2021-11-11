@@ -25,7 +25,7 @@ mod test;
 
 use std::{collections::VecDeque, fmt::Debug, ops::Deref};
 
-use bson::Timestamp;
+use bson::{RawDocumentBuf, Timestamp};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
@@ -103,6 +103,15 @@ pub(crate) trait Operation {
         response: <Self::Response as Response>::Body,
         description: &StreamDescription,
     ) -> Result<Self::O>;
+
+    /// Interprets the server response to the command.
+    fn handle_raw_response(
+        &self,
+        response: RawCommandResponse,
+        description: &StreamDescription,
+    ) -> Result<Self::O> {
+        self.handle_response(Self::Response::deserialize_response(&response)?.into_body(), description)
+    }
 
     /// Interpret an error encountered while sending the built command to the server, potentially
     /// recovering.
@@ -278,12 +287,12 @@ impl<T: DeserializeOwned> Response for CommandResponse<T> {
 
 /// A response to commands that return cursors.
 #[derive(Debug)]
-pub(crate) struct CursorResponse<T> {
-    response: CommandResponse<CursorBody<T>>,
+pub(crate) struct CursorResponse {
+    response: CommandResponse<CursorBody>,
 }
 
-impl<T: DeserializeOwned> Response for CursorResponse<T> {
-    type Body = CursorBody<T>;
+impl Response for CursorResponse {
+    type Body = CursorBody;
 
     fn deserialize_response(raw: &RawCommandResponse) -> Result<Self> {
         Ok(Self {
@@ -429,21 +438,21 @@ impl<T> Deref for WriteResponseBody<T> {
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct CursorBody<T> {
-    cursor: CursorInfo<T>,
+pub(crate) struct CursorBody {
+    cursor: CursorInfo,
 
     #[serde(flatten)]
     write_concern_info: WriteConcernOnlyBody,
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub(crate) struct CursorInfo<T> {
+pub(crate) struct CursorInfo {
     pub(crate) id: i64,
 
     pub(crate) ns: Namespace,
 
     #[serde(rename = "firstBatch")]
-    pub(crate) first_batch: VecDeque<T>,
+    pub(crate) first_batch: VecDeque<RawDocumentBuf>,
 
     #[serde(rename = "atClusterTime")]
     pub(crate) at_cluster_time: Option<Timestamp>,

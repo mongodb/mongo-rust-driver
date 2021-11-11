@@ -78,7 +78,7 @@ impl CountDocuments {
 impl Operation for CountDocuments {
     type O = u64;
     type Command = Document;
-    type Response = CursorResponse<Document>;
+    type Response = CursorResponse;
 
     const NAME: &'static str = Aggregate::NAME;
 
@@ -88,7 +88,7 @@ impl Operation for CountDocuments {
 
     fn handle_response(
         &self,
-        mut response: CursorBody<Document>,
+        mut response: CursorBody,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
         let result_doc = match response.cursor.first_batch.pop_front() {
@@ -96,7 +96,7 @@ impl Operation for CountDocuments {
             None => return Ok(0),
         };
 
-        let n = match result_doc.get("n") {
+        let n = match result_doc.get("n")? {
             Some(n) => n,
             None => {
                 return Err(ErrorKind::InvalidResponse {
@@ -108,7 +108,7 @@ impl Operation for CountDocuments {
             }
         };
 
-        bson_util::get_u64(n).ok_or_else(|| {
+        bson_util::get_u64_raw(n).ok_or_else(|| {
             ErrorKind::InvalidResponse {
                 message: format!(
                     "server response to count_documents aggregate should have contained integer \

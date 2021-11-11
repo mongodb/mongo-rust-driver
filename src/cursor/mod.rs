@@ -97,7 +97,7 @@ where
 {
     pub(crate) fn new(
         client: Client,
-        spec: CursorSpecification<T>,
+        spec: CursorSpecification,
         session: Option<ClientSession>,
         pin: Option<PinnedConnectionHandle>,
     ) -> Self {
@@ -165,36 +165,35 @@ where
 
 /// A `GenericCursor` that optionally owns its own sessions.
 /// This is to be used by cursors associated with implicit sessions.
-type ImplicitSessionCursor<T> = GenericCursor<ImplicitSessionGetMoreProvider<T>, T>;
+type ImplicitSessionCursor<T> = GenericCursor<ImplicitSessionGetMoreProvider, T>;
 
-struct ImplicitSessionGetMoreResult<T> {
-    get_more_result: Result<GetMoreResult<T>>,
+struct ImplicitSessionGetMoreResult {
+    get_more_result: Result<GetMoreResult>,
     session: Option<Box<ClientSession>>,
 }
 
-impl<T> GetMoreProviderResult for ImplicitSessionGetMoreResult<T> {
+impl GetMoreProviderResult for ImplicitSessionGetMoreResult {
     type Session = Option<Box<ClientSession>>;
-    type DocumentType = T;
 
-    fn as_ref(&self) -> std::result::Result<&GetMoreResult<T>, &Error> {
+    fn as_ref(&self) -> std::result::Result<&GetMoreResult, &Error> {
         self.get_more_result.as_ref()
     }
 
-    fn into_parts(self) -> (Result<GetMoreResult<T>>, Self::Session) {
+    fn into_parts(self) -> (Result<GetMoreResult>, Self::Session) {
         (self.get_more_result, self.session)
     }
 }
 
 /// A `GetMoreProvider` that optionally owns its own session.
 /// This is to be used with cursors associated with implicit sessions.
-enum ImplicitSessionGetMoreProvider<T> {
-    Executing(BoxFuture<'static, ImplicitSessionGetMoreResult<T>>),
+enum ImplicitSessionGetMoreProvider {
+    Executing(BoxFuture<'static, ImplicitSessionGetMoreResult>),
     Idle(Option<Box<ClientSession>>),
     Done,
 }
 
-impl<T> ImplicitSessionGetMoreProvider<T> {
-    fn new(spec: &CursorSpecification<T>, session: Option<ClientSession>) -> Self {
+impl ImplicitSessionGetMoreProvider {
+    fn new(spec: &CursorSpecification, session: Option<ClientSession>) -> Self {
         if spec.id() == 0 {
             Self::Done
         } else {
@@ -203,10 +202,9 @@ impl<T> ImplicitSessionGetMoreProvider<T> {
     }
 }
 
-impl<T: Send + Sync + DeserializeOwned> GetMoreProvider for ImplicitSessionGetMoreProvider<T> {
-    type DocumentType = T;
-    type ResultType = ImplicitSessionGetMoreResult<T>;
-    type GetMoreFuture = BoxFuture<'static, ImplicitSessionGetMoreResult<T>>;
+impl GetMoreProvider for ImplicitSessionGetMoreProvider {
+    type ResultType = ImplicitSessionGetMoreResult;
+    type GetMoreFuture = BoxFuture<'static, ImplicitSessionGetMoreResult>;
 
     fn executing_future(&mut self) -> Option<&mut Self::GetMoreFuture> {
         match self {

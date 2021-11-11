@@ -38,9 +38,9 @@ impl ListIndexes {
 }
 
 impl Operation for ListIndexes {
-    type O = CursorSpecification<IndexModel>;
+    type O = CursorSpecification;
     type Command = Document;
-    type Response = CursorResponse<IndexModel>;
+    type Response = CursorResponse;
 
     const NAME: &'static str = "listIndexes";
 
@@ -62,7 +62,7 @@ impl Operation for ListIndexes {
 
     fn handle_response(
         &self,
-        response: CursorBody<IndexModel>,
+        response: CursorBody,
         description: &StreamDescription,
     ) -> Result<Self::O> {
         Ok(CursorSpecification::new(

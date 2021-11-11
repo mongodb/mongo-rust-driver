@@ -3,12 +3,12 @@ mod test;
 
 use std::{collections::VecDeque, marker::PhantomData, time::Duration};
 
-use bson::Document;
+use bson::{Document, RawDocumentBuf};
 use serde::{de::DeserializeOwned, Deserialize};
 
 use crate::{
     bson::doc,
-    cmap::{conn::PinnedConnectionHandle, Command, StreamDescription},
+    cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     cursor::CursorInformation,
     error::{ErrorKind, Result},
     operation::Operation,
@@ -20,17 +20,16 @@ use crate::{
 use super::CommandResponse;
 
 #[derive(Debug)]
-pub(crate) struct GetMore<'conn, T> {
+pub(crate) struct GetMore<'conn> {
     ns: Namespace,
     cursor_id: i64,
     selection_criteria: SelectionCriteria,
     batch_size: Option<u32>,
     max_time: Option<Duration>,
     pinned_connection: Option<&'conn PinnedConnectionHandle>,
-    _phantom: PhantomData<T>,
 }
 
-impl<'conn, T> GetMore<'conn, T> {
+impl<'conn> GetMore<'conn> {
     pub(crate) fn new(
         info: CursorInformation,
         pinned: Option<&'conn PinnedConnectionHandle>,
@@ -42,15 +41,14 @@ impl<'conn, T> GetMore<'conn, T> {
             batch_size: info.batch_size,
             max_time: info.max_time,
             pinned_connection: pinned,
-            _phantom: Default::default(),
         }
     }
 }
 
-impl<'conn, T: DeserializeOwned> Operation for GetMore<'conn, T> {
-    type O = GetMoreResult<T>;
+impl<'conn> Operation for GetMore<'conn> {
+    type O = GetMoreResult;
     type Command = Document;
-    type Response = CommandResponse<GetMoreResponseBody<T>>;
+    type Response = CommandResponse<GetMoreResponseBody>;
 
     const NAME: &'static str = "getMore";
 
@@ -84,9 +82,19 @@ impl<'conn, T: DeserializeOwned> Operation for GetMore<'conn, T> {
 
     fn handle_response(
         &self,
-        response: GetMoreResponseBody<T>,
+        response: <Self::Response as super::Response>::Body,
+        description: &StreamDescription,
+    ) -> Result<Self::O> {
+        todo!()
+    }
+
+    fn handle_raw_response(
+        &self,
+        response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: GetMoreResponseBody = bson::from_slice(response.as_bytes())?;
+
         Ok(GetMoreResult {
             batch: response.cursor.next_batch,
             exhausted: response.cursor.id == 0,
@@ -103,13 +111,13 @@ impl<'conn, T: DeserializeOwned> Operation for GetMore<'conn, T> {
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct GetMoreResponseBody<T> {
-    cursor: NextBatchBody<T>,
+pub(crate) struct GetMoreResponseBody {
+    cursor: NextBatchBody,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct NextBatchBody<T> {
+struct NextBatchBody {
     id: i64,
-    next_batch: VecDeque<T>,
+    next_batch: VecDeque<RawDocumentBuf>,
 }

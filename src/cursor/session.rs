@@ -1,9 +1,6 @@
-use std::{
-    collections::VecDeque,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::{collections::VecDeque, marker::PhantomData, pin::Pin, task::{Context, Poll}};
 
+use bson::RawDocumentBuf;
 use futures_core::{future::BoxFuture, Stream};
 use futures_util::StreamExt;
 use serde::de::DeserializeOwned;
@@ -63,8 +60,9 @@ where
 {
     client: Client,
     info: CursorInformation,
-    buffer: VecDeque<T>,
+    buffer: VecDeque<RawDocumentBuf>,
     pinned_connection: PinnedConnection,
+    _phantom: PhantomData<T>,
     #[cfg(test)]
     kill_watcher: Option<oneshot::Sender<()>>,
 }
@@ -75,7 +73,7 @@ where
 {
     pub(crate) fn new(
         client: Client,
-        spec: CursorSpecification<T>,
+        spec: CursorSpecification,
         pinned: Option<PinnedConnectionHandle>,
     ) -> Self {
         Self {
@@ -83,6 +81,7 @@ where
             info: spec.info,
             buffer: spec.initial_buffer,
             pinned_connection: PinnedConnection::new(pinned),
+            _phantom: Default::default(),
             #[cfg(test)]
             kill_watcher: None,
         }
@@ -231,7 +230,7 @@ where
 /// A `GenericCursor` that borrows its session.
 /// This is to be used with cursors associated with explicit sessions borrowed from the user.
 type ExplicitSessionCursor<'session, T> =
-    GenericCursor<ExplicitSessionGetMoreProvider<'session, T>, T>;
+    GenericCursor<ExplicitSessionGetMoreProvider<'session>, T>;
 
 /// A type that implements [`Stream`](https://docs.rs/futures/latest/futures/stream/index.html) which can be used to
 /// stream the results of a [`SessionCursor`]. Returned from [`SessionCursor::stream`].
@@ -272,11 +271,11 @@ where
 
 /// Enum determining whether a `SessionCursorHandle` is excuting a getMore or not.
 /// In charge of maintaining ownership of the session reference.
-enum ExplicitSessionGetMoreProvider<'session, T> {
+enum ExplicitSessionGetMoreProvider<'session> {
     /// The handle is currently executing a getMore via the future.
     ///
     /// This future owns the reference to the session and will return it on completion.
-    Executing(BoxFuture<'session, ExecutionResult<'session, T>>),
+    Executing(BoxFuture<'session, ExecutionResult<'session>>),
 
     /// No future is being executed.
     ///
@@ -285,18 +284,16 @@ enum ExplicitSessionGetMoreProvider<'session, T> {
     Idle(MutableSessionReference<'session>),
 }
 
-impl<'session, T> ExplicitSessionGetMoreProvider<'session, T> {
+impl<'session> ExplicitSessionGetMoreProvider<'session> {
     fn new(session: &'session mut ClientSession) -> Self {
         Self::Idle(MutableSessionReference { reference: session })
     }
 }
 
-impl<'session, T: Send + Sync + DeserializeOwned> GetMoreProvider
-    for ExplicitSessionGetMoreProvider<'session, T>
+impl<'session> GetMoreProvider for ExplicitSessionGetMoreProvider<'session>
 {
-    type DocumentType = T;
-    type ResultType = ExecutionResult<'session, T>;
-    type GetMoreFuture = BoxFuture<'session, ExecutionResult<'session, T>>;
+    type ResultType = ExecutionResult<'session>;
+    type GetMoreFuture = BoxFuture<'session, ExecutionResult<'session>>;
 
     fn executing_future(&mut self) -> Option<&mut Self::GetMoreFuture> {
         match self {
@@ -337,20 +334,19 @@ impl<'session, T: Send + Sync + DeserializeOwned> GetMoreProvider
 
 /// Struct returned from awaiting on a `GetMoreFuture` containing the result of the getMore as
 /// well as the reference to the `ClientSession` used for the getMore.
-struct ExecutionResult<'session, T> {
-    get_more_result: Result<GetMoreResult<T>>,
+struct ExecutionResult<'session> {
+    get_more_result: Result<GetMoreResult>,
     session: &'session mut ClientSession,
 }
 
-impl<'session, T> GetMoreProviderResult for ExecutionResult<'session, T> {
+impl<'session> GetMoreProviderResult for ExecutionResult<'session> {
     type Session = &'session mut ClientSession;
-    type DocumentType = T;
 
-    fn as_ref(&self) -> std::result::Result<&GetMoreResult<T>, &Error> {
+    fn as_ref(&self) -> std::result::Result<&GetMoreResult, &Error> {
         self.get_more_result.as_ref()
     }
 
-    fn into_parts(self) -> (Result<GetMoreResult<T>>, Self::Session) {
+    fn into_parts(self) -> (Result<GetMoreResult>, Self::Session) {
         (self.get_more_result, self.session)
     }
 }

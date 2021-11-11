@@ -2,12 +2,7 @@ use std::{convert::TryInto, path::PathBuf};
 
 use anyhow::{bail, Result};
 use futures::stream::StreamExt;
-use mongodb::{
-    bson::{Bson, Document},
-    Client,
-    Collection,
-    Database,
-};
+use mongodb::{Client, Collection, Database, bson::{self, Bson, Document, RawDocumentBuf}};
 use serde_json::Value;
 
 use crate::{
@@ -17,7 +12,7 @@ use crate::{
 
 pub struct FindManyBenchmark {
     db: Database,
-    coll: Collection<Document>,
+    coll: Collection<RawDocumentBuf>,
     uri: String,
 }
 
@@ -53,7 +48,7 @@ impl Benchmark for FindManyBenchmark {
 
         Ok(FindManyBenchmark {
             db,
-            coll,
+            coll: coll.clone_with_type(),
             uri: options.uri,
         })
     }
@@ -61,7 +56,7 @@ impl Benchmark for FindManyBenchmark {
     async fn do_task(&self) -> Result<()> {
         let mut cursor = self.coll.find(None, None).await?;
         while let Some(doc) = cursor.next().await {
-            doc?;
+            let _d: Document = bson::from_slice(doc?.as_bytes())?;
         }
 
         Ok(())

@@ -17,15 +17,14 @@ use crate::{
 use super::CursorResponse;
 
 #[derive(Debug)]
-pub(crate) struct ListCollections<T> {
+pub(crate) struct ListCollections {
     db: String,
     filter: Option<Document>,
     name_only: bool,
     options: Option<ListCollectionsOptions>,
-    _phantom: PhantomData<T>,
 }
 
-impl<T> ListCollections<T> {
+impl ListCollections {
     #[cfg(test)]
     fn empty() -> Self {
         Self::new(String::new(), None, false, None)
@@ -42,18 +41,14 @@ impl<T> ListCollections<T> {
             filter,
             name_only,
             options,
-            _phantom: PhantomData::default(),
         }
     }
 }
 
-impl<T> Operation for ListCollections<T>
-where
-    T: DeserializeOwned + Unpin + Send + Sync,
-{
-    type O = CursorSpecification<T>;
+impl Operation for ListCollections {
+    type O = CursorSpecification;
     type Command = Document;
-    type Response = CursorResponse<T>;
+    type Response = CursorResponse;
 
     const NAME: &'static str = "listCollections";
 
@@ -79,7 +74,7 @@ where
 
     fn handle_response(
         &self,
-        response: CursorBody<T>,
+        response: CursorBody,
         description: &StreamDescription,
     ) -> Result<Self::O> {
         Ok(CursorSpecification::new(

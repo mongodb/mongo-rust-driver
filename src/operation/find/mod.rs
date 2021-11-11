@@ -3,19 +3,12 @@ mod test;
 
 use std::marker::PhantomData;
 
+use bson::RawDocumentBuf;
 use serde::de::DeserializeOwned;
 
-use crate::{
-    bson::{doc, Document},
-    cmap::{Command, StreamDescription},
-    cursor::CursorSpecification,
-    error::{ErrorKind, Result},
-    operation::{append_options, CursorBody, Operation, Retryability},
-    options::{CursorType, FindOptions, SelectionCriteria},
-    Namespace,
-};
+use crate::{Namespace, bson::{doc, Document}, cmap::{Command, RawCommandResponse, StreamDescription}, cursor::CursorSpecification, error::{Error, ErrorKind, Result}, operation::{append_options, CursorBody, Operation, Retryability}, options::{CursorType, FindOptions, SelectionCriteria}};
 
-use super::CursorResponse;
+use super::{CursorInfo, CursorResponse};
 
 #[derive(Debug)]
 pub(crate) struct Find<T> {
@@ -53,9 +46,9 @@ impl<T> Find<T> {
 }
 
 impl<T: DeserializeOwned> Operation for Find<T> {
-    type O = CursorSpecification<T>;
+    type O = CursorSpecification;
     type Command = Document;
-    type Response = CursorResponse<T>;
+    type Response = CursorResponse;
     const NAME: &'static str = "find";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -108,11 +101,25 @@ impl<T: DeserializeOwned> Operation for Find<T> {
 
     fn handle_response(
         &self,
-        response: CursorBody<T>,
+        response: <Self::Response as super::Response>::Body,
         description: &StreamDescription,
     ) -> Result<Self::O> {
+        todo!()
+    }
+
+    fn handle_raw_response(
+        &self,
+        response: RawCommandResponse,
+        description: &StreamDescription,
+    ) -> Result<Self::O> {
+        let raw_doc = response.into_raw_document_buf();
+        let info = raw_doc
+            .get_document("cursor")
+            .map_err(Error::invalid_response)?;
+        let cursor_info: CursorInfo = bson::from_slice(info.as_bytes())?;
+
         Ok(CursorSpecification::new(
-            response.cursor,
+            cursor_info,
             description.server_address.clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),

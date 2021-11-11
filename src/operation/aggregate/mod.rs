@@ -41,9 +41,9 @@ impl Aggregate {
 }
 
 impl Operation for Aggregate {
-    type O = CursorSpecification<Document>;
+    type O = CursorSpecification;
     type Command = Document;
-    type Response = CursorResponse<Document>;
+    type Response = CursorResponse;
 
     const NAME: &'static str = "aggregate";
 
@@ -71,7 +71,7 @@ impl Operation for Aggregate {
 
     fn handle_response(
         &self,
-        response: CursorBody<Document>,
+        response: CursorBody,
         description: &StreamDescription,
     ) -> Result<Self::O> {
         if self.is_out_or_merge() {

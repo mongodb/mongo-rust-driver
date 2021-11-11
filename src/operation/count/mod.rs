@@ -93,7 +93,7 @@ impl Operation for Count {
                     .cursor
                     .first_batch
                     .pop_front()
-                    .and_then(|doc| bson::from_document(doc).ok())
+                    .and_then(|doc| bson::from_slice(doc.as_bytes()).ok())
                     .ok_or_else(|| {
                         Error::from(ErrorKind::InvalidResponse {
                             message: "invalid server response to count operation".into(),
@@ -139,7 +139,7 @@ impl Operation for Count {
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub(crate) enum Response {
-    Aggregate(Box<CursorBody<Document>>),
+    Aggregate(Box<CursorBody>),
     Count(ResponseBody),
 }
 
