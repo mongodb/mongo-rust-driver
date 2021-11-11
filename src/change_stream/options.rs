@@ -6,17 +6,18 @@ use typed_builder::TypedBuilder;
 
 use crate::{change_stream::event::ResumeToken, collation::Collation, options::AggregateOptions};
 
+/// These are the valid options that can be passed to the `watch` method for creating a
+/// [`ChangeStream`](crate::change_stream::ChangeStream).
 #[skip_serializing_none]
 #[derive(Clone, Debug, Default, Deserialize, Serialize, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-/// These are the valid options that can be passed to the `watch` method for creating a
-/// [`ChangeStream`](../struct.ChangeStream.html).
 pub struct ChangeStreamOptions {
-    /// When set to FullDocumentType::UpdateLookup, the `full_document` field of the
-    /// `ChangeStreamEvent` will be populated with a copy of the entire document that was updated
-    /// from some time after the change occurred when an "update" event occurs. By default, the
-    /// `full_document` field will be empty for updates.
+    /// When set to [`FullDocumentType::UpdateLookup`], the
+    /// [`ChangeStreamEvent::full_document`](`crate::change_stream::event::ChangeStreamEvent::full_document`)
+    /// field  will be populated with a copy of the entire document that was updated from some time
+    /// after the change occurred when an "update" event occurs. By default, the `full_document`
+    /// field will be empty for updates.
     #[builder(default)]
     pub full_document: Option<FullDocumentType>,
 
@@ -62,14 +63,15 @@ pub struct ChangeStreamOptions {
     pub start_after: Option<ResumeToken>,
 }
 
+/// Describes the modes for configuring the
+/// [`ChangeStreamEvent::full_document`](`crate::change_stream::event::ChangeStreamEvent::full_document`)
+/// field.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[non_exhaustive]
-/// Describes the modes for configuring the `full_document` field of a
-/// [`ChangeStreamEventDocument`](../document/struct.ChangeStreamEventDocument.html)
 pub enum FullDocumentType {
-    /// The `full_document` field of the
-    /// [`ChangeStreamEventDocument`](../document/struct.ChangeStreamEventDocument.html) will be
-    /// populated with a copy of the entire document that was updated.
+    /// The
+    /// [`ChangeStreamEvent::full_document`](`crate::change_stream::event::ChangeStreamEvent::full_document`)
+    /// field will be populated with a copy of the entire document that was updated.
     UpdateLookup,
 
     /// User-defined other types for forward compatibility.

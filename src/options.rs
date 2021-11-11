@@ -26,6 +26,9 @@ pub use crate::{
     selection_criteria::*,
 };
 
+#[allow(unused)]
+pub(crate) use crate::change_stream::options::*;
+
 /// Updates an options struct with the read preference/read concern/write concern of a
 /// client/database/collection.
 macro_rules! resolve_options {

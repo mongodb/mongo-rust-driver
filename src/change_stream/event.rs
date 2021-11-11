@@ -4,12 +4,11 @@ use bson::{Bson, Document};
 use serde::{Deserialize, Serialize};
 
 /// An opaque token used for resuming an interrupted
-/// [`ChangeStream`](../struct.ChangeStream.html).
+/// [`ChangeStream`](crate::change_stream::ChangeStream).
 ///
 /// When starting a new change stream,
-/// [`start_after`](../option/struct.ChangeStreamOptions.html#structfield.start_after)
-/// and [`resume_after`](../option/struct.ChangeStreamOptions.html#structfield.resume_after) fields
-/// on [`ChangeStreamOptions`](../option/struct.ChangeStreamOptions.html) can be specified
+/// [`crate::options::ChangeStreamOptions::start_after`] and
+/// [`crate::options::ChangeStreamOptions::resume_after`] fields can be specified
 /// with instances of `ResumeToken`.
 ///
 /// See the documentation
@@ -109,6 +108,7 @@ pub enum OperationType {
 /// Identifies which collection or database where an event occurred.
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
+#[non_exhaustive]
 pub enum ChangeStreamEventSource {
     /// Contains two fields: "db" and "coll" containing the database and collection name in which
     /// the change happened.

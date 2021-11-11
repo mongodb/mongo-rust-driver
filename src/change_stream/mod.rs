@@ -34,21 +34,20 @@ use crate::{
 /// stream of events. This is done automatically when the `ChangeStream` encounters certain
 /// ["resumable"](https://github.com/mongodb/specifications/blob/master/source/change-streams/change-streams.rst#resumable-error)
 /// errors, such as transient network failures. It can also be done manually by passing
-/// a [`ResumeToken`](document/struct.ResumeToken.html) retrieved from a past event
-/// into either the
-/// [`resume_after`](option/struct.ChangeStreamOptions.html#structfield.resume_after)
-/// or [`start_after`](option/struct.ChangeStreamOptions.html#structfield.start_after)
-/// (4.2+) options used to create the `ChangeStream`. Issuing a raw change stream aggregation is
-/// discouraged unless users wish to explicitly opt out of resumability.
+/// a [`ResumeToken`] retrieved from a past event into either the
+/// [`resume_after`](ChangeStreamOptions::resume_after) or
+/// [`start_after`](ChangeStreamOptions::start_after) (4.2+) options used to create the
+/// `ChangeStream`. Issuing a raw change stream aggregation is discouraged unless users wish to
+/// explicitly opt out of resumability.
 ///
 /// A `ChangeStream` can be iterated to return batches of instances of the result type.  For
-/// `watch`, this will be [`ChangeStreamEvent`](document/struct.ChangeStreamEvent.html)
-/// wrapping the value type (for `Collection::watch`) or a `Document` (for `Client::watch` and
-/// `Database::watch`).  For `watch_with_pipeline`, a deserializable type must be specified that
-/// matches the result of the aggregation pipeline; if the pipeline does not alter the event
-/// structure it may be convenient to reuse `ChangeStreamEvent` for that type.
+/// `watch`, this will be [`ChangeStreamEvent`] wrapping the value type (for [`Collection::watch`])
+/// or a [`Document`] (for [`Client::watch`] and [`Database::watch`]).  For `watch_with_pipeline`,
+/// a deserializable type must be specified that matches the result of the aggregation pipeline; if
+/// the pipeline does not alter the event structure it may be convenient to reuse
+/// [`ChangeStreamEvent`] for that type.
 ///
-/// A `ChangeStream` can be iterated like any other `Stream`:
+/// A `ChangeStream` can be iterated like any other [`Stream`]:
 ///
 /// ```rust
 /// # #[cfg(not(feature = "sync"))]
@@ -126,7 +125,7 @@ where
     /// See the documentation
     /// [here](https://docs.mongodb.com/manual/changeStreams/#change-stream-resume-token) for more
     /// information on change stream resume tokens.
-    pub fn resume_token(&self) -> Option<ResumeToken> {
+    pub fn resume_token(&self) -> Option<&ResumeToken> {
         todo!()
     }
 }
