@@ -60,7 +60,7 @@ async fn build_no_write_concern() {
     assert_eq!(
         cmd.body,
         doc! {
-        "abortTransaction": 1,
+            "abortTransaction": 1,
         }
     );
 }
