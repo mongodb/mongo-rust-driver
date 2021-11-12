@@ -12,8 +12,6 @@ use crate::{
     Namespace,
 };
 
-use super::CommandResponse;
-
 #[derive(Debug)]
 pub(crate) struct Create {
     ns: Namespace,

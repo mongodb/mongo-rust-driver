@@ -1,8 +1,7 @@
 use bson::RawDocumentBuf;
 
 use crate::{
-    bson::{doc, Bson, Document},
-    bson_util,
+    bson::{doc, Bson},
     cmap::StreamDescription,
     error::ErrorKind,
     operation::{test::handle_response_test, ListDatabases, Operation},

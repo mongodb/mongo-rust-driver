@@ -1,10 +1,6 @@
 #[cfg(test)]
 mod test;
 
-use std::marker::PhantomData;
-
-use serde::de::DeserializeOwned;
-
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
@@ -13,8 +9,6 @@ use crate::{
     operation::{append_options, CursorBody, Operation, Retryability},
     options::{ListCollectionsOptions, ReadPreference, SelectionCriteria},
 };
-
-use super::CursorResponse;
 
 #[derive(Debug)]
 pub(crate) struct ListCollections {

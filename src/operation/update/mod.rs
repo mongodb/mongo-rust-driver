@@ -14,8 +14,6 @@ use crate::{
     Namespace,
 };
 
-use super::CommandResponse;
-
 #[derive(Debug)]
 pub(crate) struct Update {
     ns: Namespace,

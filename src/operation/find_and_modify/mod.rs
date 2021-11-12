@@ -25,8 +25,6 @@ use crate::{
     options::WriteConcern,
 };
 
-use super::CommandResponse;
-
 pub(crate) struct FindAndModify<T = Document>
 where
     T: DeserializeOwned,

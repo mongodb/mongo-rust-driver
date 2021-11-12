@@ -10,8 +10,6 @@ use crate::{
     Namespace,
 };
 
-use super::{CommandResponse, EmptyBody};
-
 pub(crate) struct DropIndexes {
     ns: Namespace,
     name: String,

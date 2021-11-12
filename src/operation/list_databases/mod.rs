@@ -13,8 +13,6 @@ use crate::{
     selection_criteria::{ReadPreference, SelectionCriteria},
 };
 
-use super::CommandResponse;
-
 #[derive(Debug)]
 pub(crate) struct ListDatabases {
     filter: Option<Document>,

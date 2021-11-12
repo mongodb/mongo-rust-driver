@@ -91,8 +91,6 @@ impl Error {
         Error::authentication_error(mechanism_name, "invalid server response")
     }
 
-
-
     pub(crate) fn internal(message: impl Into<String>) -> Error {
         ErrorKind::Internal {
             message: message.into(),
@@ -105,10 +103,6 @@ impl Error {
             message: message.into(),
         }
         .into()
-    }
-
-    pub(crate) fn invalid_response(message: impl std::fmt::Display) -> Error {
-        ErrorKind::InvalidResponse { message: message.to_string() }.into()
     }
 
     pub(crate) fn is_state_change_error(&self) -> bool {

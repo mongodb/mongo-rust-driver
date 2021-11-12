@@ -3,14 +3,13 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
-    index::IndexModel,
     operation::{append_options, Operation},
     options::ListIndexesOptions,
     selection_criteria::{ReadPreference, SelectionCriteria},
     Namespace,
 };
 
-use super::{CursorBody, CursorResponse, Retryability};
+use super::{CursorBody, Retryability};
 
 #[cfg(test)]
 mod test;

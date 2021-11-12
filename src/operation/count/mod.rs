@@ -13,7 +13,7 @@ use crate::{
     selection_criteria::SelectionCriteria,
 };
 
-use super::{CommandResponse, SERVER_4_9_0_WIRE_VERSION};
+use super::SERVER_4_9_0_WIRE_VERSION;
 
 pub(crate) struct Count {
     ns: Namespace,

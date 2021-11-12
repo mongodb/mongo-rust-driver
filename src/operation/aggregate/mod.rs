@@ -12,7 +12,7 @@ use crate::{
     Namespace,
 };
 
-use super::{CursorBody, CursorResponse, SERVER_4_2_0_WIRE_VERSION};
+use super::{CursorBody, SERVER_4_2_0_WIRE_VERSION};
 
 #[derive(Debug)]
 pub(crate) struct Aggregate {

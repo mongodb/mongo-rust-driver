@@ -5,7 +5,7 @@ use std::convert::TryInto;
 
 use bson::{doc, Document, RawDocument};
 
-use super::{CursorBody, CursorResponse, Operation, Retryability};
+use super::{CursorBody, Operation, Retryability};
 use crate::{
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},

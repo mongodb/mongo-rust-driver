@@ -11,8 +11,6 @@ use crate::{
     options::{DropDatabaseOptions, WriteConcern},
 };
 
-use super::CommandResponse;
-
 #[derive(Debug)]
 pub(crate) struct DropDatabase {
     target_db: String,

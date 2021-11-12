@@ -12,8 +12,6 @@ use crate::{
     results::DeleteResult,
 };
 
-use super::CommandResponse;
-
 #[derive(Debug)]
 pub(crate) struct Delete {
     ns: Namespace,

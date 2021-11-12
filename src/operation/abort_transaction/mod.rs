@@ -10,7 +10,7 @@ use crate::{
     selection_criteria::SelectionCriteria,
 };
 
-use super::{CommandResponse, Response, WriteConcernOnlyBody};
+use super::WriteConcernOnlyBody;
 
 pub(crate) struct AbortTransaction {
     write_concern: Option<WriteConcern>,

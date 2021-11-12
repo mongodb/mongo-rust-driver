@@ -5,7 +5,6 @@ pub mod session;
 
 use std::{sync::Arc, time::Duration};
 
-use bson::Bson;
 use derivative::Derivative;
 use std::time::Instant;
 

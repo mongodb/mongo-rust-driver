@@ -24,15 +24,7 @@ use crate::{
         UNKNOWN_TRANSACTION_COMMIT_RESULT,
     },
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
-    operation::{
-        AbortTransaction,
-        CommandErrorBody,
-        CommandResponse,
-        CommitTransaction,
-        Operation,
-        Response,
-        Retryability,
-    },
+    operation::{AbortTransaction, CommandErrorBody, CommitTransaction, Operation, Retryability},
     options::SelectionCriteria,
     sdam::{
         HandshakePhase,
@@ -873,11 +865,6 @@ impl Error {
 
         Ok(())
     }
-}
-
-struct CommandResult<T> {
-    raw: RawCommandResponse,
-    deserialized: T,
 }
 
 struct ExecutionDetails<T: Operation> {

@@ -3,9 +3,8 @@ use bson::Timestamp;
 use super::RunCommand;
 use crate::{
     bson::doc,
-    client::ClusterTime,
-    cmap::{RawCommandResponse, StreamDescription},
-    operation::{test::handle_response_test, Operation, Response},
+    cmap::StreamDescription,
+    operation::{test::handle_response_test, Operation},
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

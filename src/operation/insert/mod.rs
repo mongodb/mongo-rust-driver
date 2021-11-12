@@ -18,7 +18,7 @@ use crate::{
     Namespace,
 };
 
-use super::{CommandBody, CommandResponse};
+use super::CommandBody;
 
 #[derive(Debug)]
 pub(crate) struct Insert<'a, T> {

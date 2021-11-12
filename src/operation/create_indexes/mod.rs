@@ -12,7 +12,7 @@ use crate::{
     Namespace,
 };
 
-use super::{CommandResponse, WriteConcernOnlyBody};
+use super::WriteConcernOnlyBody;
 
 #[derive(Debug)]
 pub(crate) struct CreateIndexes {

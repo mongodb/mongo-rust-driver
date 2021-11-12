@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::{RawDocument, RawDocumentBuf};
+use bson::RawDocumentBuf;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::wire::Message;

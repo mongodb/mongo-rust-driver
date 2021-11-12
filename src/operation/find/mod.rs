@@ -1,22 +1,15 @@
 #[cfg(test)]
 mod test;
 
-use std::marker::PhantomData;
-
-use bson::RawDocumentBuf;
-use serde::de::DeserializeOwned;
-
 use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
-    error::{Error, ErrorKind, Result},
+    error::{ErrorKind, Result},
     operation::{append_options, CursorBody, Operation, Retryability},
     options::{CursorType, FindOptions, SelectionCriteria},
     Namespace,
 };
-
-use super::{CursorInfo, CursorResponse};
 
 #[derive(Debug)]
 pub(crate) struct Find {

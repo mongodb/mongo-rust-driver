@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod test;
 
-use std::{collections::VecDeque, marker::PhantomData, time::Duration};
+use std::{collections::VecDeque, time::Duration};
 
 use bson::{Document, RawDocumentBuf};
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::Deserialize;
 
 use crate::{
     bson::doc,
@@ -16,8 +16,6 @@ use crate::{
     results::GetMoreResult,
     Namespace,
 };
-
-use super::CommandResponse;
 
 #[derive(Debug)]
 pub(crate) struct GetMore<'conn> {

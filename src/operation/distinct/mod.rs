@@ -12,8 +12,6 @@ use crate::{
     selection_criteria::SelectionCriteria,
 };
 
-use super::CommandResponse;
-
 pub(crate) struct Distinct {
     ns: Namespace,
     field_name: String,

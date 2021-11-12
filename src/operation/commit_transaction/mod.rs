@@ -9,7 +9,7 @@ use crate::{
     options::{Acknowledgment, TransactionOptions, WriteConcern},
 };
 
-use super::{CommandResponse, WriteConcernOnlyBody};
+use super::WriteConcernOnlyBody;
 
 pub(crate) struct CommitTransaction {
     options: Option<TransactionOptions>,
