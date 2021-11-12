@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod test;
 
+use std::convert::TryInto;
+
 use bson::{Bson, Timestamp};
 
 use super::Operation;
@@ -51,7 +53,6 @@ impl<'conn> RunCommand<'conn> {
 impl<'conn> Operation for RunCommand<'conn> {
     type O = Document;
     type Command = Document;
-    type Response = Response;
 
     // Since we can't actually specify a string statically here, we just put a descriptive string
     // that should fail loudly if accidentally passed to the server.
@@ -73,10 +74,10 @@ impl<'conn> Operation for RunCommand<'conn> {
 
     fn handle_response(
         &self,
-        response: Document,
+        response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
-        Ok(response)
+        Ok(response.into_raw_document_buf().try_into()?)
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

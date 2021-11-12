@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use bson::{RawBson, spec::ElementType};
+use bson::{spec::ElementType, RawBson};
 use serde::{de::Error as SerdeDeError, ser, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
@@ -28,9 +28,9 @@ pub(crate) fn get_int(val: &Bson) -> Option<i64> {
 /// or the conversion would be lossy (e.g. 1.5 -> 1), this returns `None`.
 pub(crate) fn get_int_raw<'a>(val: RawBson<'a>) -> Option<i64> {
     match val {
-        RawBson::Int32(i) => Some(i64::from(i)),
-        RawBson::Int64(i) => Some(i),
-        RawBson::Double(f) if (f - (f as i64 as f64)).abs() <= f64::EPSILON => Some(f as i64),
+        RawBson::Int32(i) => get_int(&Bson::Int32(i)),
+        RawBson::Int64(i) => get_int(&Bson::Int64(i)),
+        RawBson::Double(i) => get_int(&Bson::Double(i)),
         _ => None,
     }
 }
@@ -48,9 +48,9 @@ pub(crate) fn get_u64(val: &Bson) -> Option<u64> {
 
 pub(crate) fn get_u64_raw<'a>(val: RawBson<'a>) -> Option<u64> {
     match val {
-        RawBson::Int32(i) => u64::try_from(i).ok(),
-        RawBson::Int64(i) => u64::try_from(i).ok(),
-        RawBson::Double(f) if (f - (f as u64 as f64)).abs() <= f64::EPSILON => Some(f as u64),
+        RawBson::Int32(i) => get_u64(&Bson::Int32(i)),
+        RawBson::Int64(i) => get_u64(&Bson::Int64(i)),
+        RawBson::Double(i) => get_u64(&Bson::Double(i)),
         _ => None,
     }
 }

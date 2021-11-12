@@ -1,4 +1,10 @@
-use std::{collections::VecDeque, marker::PhantomData, pin::Pin, task::{Context, Poll}, time::Duration};
+use std::{
+    collections::VecDeque,
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
 
 use bson::RawDocumentBuf;
 use derivative::Derivative;
@@ -126,9 +132,7 @@ where
 
             match self.buffer.pop_front() {
                 Some(doc) => {
-                    // todo!()
-                    // // return Poll::Ready(Some(Ok(doc)));
-                    return Poll::Ready(Some(Ok(bson::from_slice(doc.as_bytes())?)))
+                    return Poll::Ready(Some(Ok(bson::from_slice(doc.as_bytes())?)));
                 }
                 None if !self.exhausted && !self.pinned_connection.is_invalid() => {
                     self.start_get_more();

@@ -5,7 +5,7 @@ use bson::Document;
 
 use crate::{
     bson::doc,
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
     operation::{append_options, Operation, WriteConcernOnlyBody},
     options::{DropDatabaseOptions, WriteConcern},
@@ -33,7 +33,6 @@ impl DropDatabase {
 impl Operation for DropDatabase {
     type O = ();
     type Command = Document;
-    type Response = CommandResponse<WriteConcernOnlyBody>;
 
     const NAME: &'static str = "dropDatabase";
 
@@ -53,9 +52,10 @@ impl Operation for DropDatabase {
 
     fn handle_response(
         &self,
-        response: WriteConcernOnlyBody,
+        response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: WriteConcernOnlyBody = response.body()?;
         response.validate()
     }
 

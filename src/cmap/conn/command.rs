@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use bson::{RawDocument, RawDocumentBuf};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::wire::Message;
 use crate::{
@@ -183,7 +183,10 @@ impl RawCommandResponse {
     pub(crate) fn with_document_and_address(source: ServerAddress, doc: Document) -> Result<Self> {
         let mut raw = Vec::new();
         doc.to_writer(&mut raw)?;
-        Ok(Self { source, raw: RawDocumentBuf::new(raw)? })
+        Ok(Self {
+            source,
+            raw: RawDocumentBuf::new(raw)?,
+        })
     }
 
     /// Initialize a response from a document.
@@ -200,10 +203,13 @@ impl RawCommandResponse {
 
     pub(crate) fn new(source: ServerAddress, message: Message) -> Result<Self> {
         let raw = message.single_document_response()?;
-        Ok(Self { source, raw: RawDocumentBuf::new(raw)? })
+        Ok(Self {
+            source,
+            raw: RawDocumentBuf::new(raw)?,
+        })
     }
 
-    pub(crate) fn body<T: DeserializeOwned>(&self) -> Result<T> {
+    pub(crate) fn body<'a, T: Deserialize<'a>>(&'a self) -> Result<T> {
         bson::from_slice(self.raw.as_bytes()).map_err(|e| {
             Error::from(ErrorKind::InvalidResponse {
                 message: format!("{}", e),

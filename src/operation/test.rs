@@ -11,8 +11,7 @@ use crate::{
 
 pub(crate) fn handle_response_test<T: Operation>(op: &T, response_doc: Document) -> Result<T::O> {
     let raw = RawCommandResponse::with_document(response_doc).unwrap();
-    let response = T::Response::deserialize_response(&raw)?;
-    op.handle_response(response.into_body(), &StreamDescription::new_testing())
+    op.handle_response(raw, &StreamDescription::new_testing())
 }
 
 pub(crate) fn handle_response_test_with_wire_version<T: Operation>(
@@ -21,11 +20,7 @@ pub(crate) fn handle_response_test_with_wire_version<T: Operation>(
     wire_version: i32,
 ) -> Result<T::O> {
     let raw = RawCommandResponse::with_document(response_doc).unwrap();
-    let response = T::Response::deserialize_response(&raw)?;
-    op.handle_response(
-        response.into_body(),
-        &StreamDescription::with_wire_version(wire_version),
-    )
+    op.handle_response(raw, &StreamDescription::with_wire_version(wire_version))
 }
 
 pub(crate) fn op_selection_criteria<F, T>(constructor: F)

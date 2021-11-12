@@ -1,6 +1,6 @@
 use crate::{
     bson::{doc, Document},
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
     index::IndexModel,
@@ -40,7 +40,6 @@ impl ListIndexes {
 impl Operation for ListIndexes {
     type O = CursorSpecification;
     type Command = Document;
-    type Response = CursorResponse;
 
     const NAME: &'static str = "listIndexes";
 
@@ -62,9 +61,10 @@ impl Operation for ListIndexes {
 
     fn handle_response(
         &self,
-        response: CursorBody,
+        raw_response: RawCommandResponse,
         description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: CursorBody = raw_response.body()?;
         Ok(CursorSpecification::new(
             response.cursor,
             description.server_address.clone(),

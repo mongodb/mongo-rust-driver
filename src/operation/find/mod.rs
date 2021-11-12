@@ -6,19 +6,26 @@ use std::marker::PhantomData;
 use bson::RawDocumentBuf;
 use serde::de::DeserializeOwned;
 
-use crate::{Namespace, bson::{doc, Document}, cmap::{Command, RawCommandResponse, StreamDescription}, cursor::CursorSpecification, error::{Error, ErrorKind, Result}, operation::{append_options, CursorBody, Operation, Retryability}, options::{CursorType, FindOptions, SelectionCriteria}};
+use crate::{
+    bson::{doc, Document},
+    cmap::{Command, RawCommandResponse, StreamDescription},
+    cursor::CursorSpecification,
+    error::{Error, ErrorKind, Result},
+    operation::{append_options, CursorBody, Operation, Retryability},
+    options::{CursorType, FindOptions, SelectionCriteria},
+    Namespace,
+};
 
 use super::{CursorInfo, CursorResponse};
 
 #[derive(Debug)]
-pub(crate) struct Find<T> {
+pub(crate) struct Find {
     ns: Namespace,
     filter: Option<Document>,
     options: Option<Box<FindOptions>>,
-    _phantom: PhantomData<T>,
 }
 
-impl<T> Find<T> {
+impl Find {
     #[cfg(test)]
     fn empty() -> Self {
         Self::new(
@@ -40,15 +47,13 @@ impl<T> Find<T> {
             ns,
             filter,
             options: options.map(Box::new),
-            _phantom: Default::default(),
         }
     }
 }
 
-impl<T: DeserializeOwned> Operation for Find<T> {
+impl Operation for Find {
     type O = CursorSpecification;
     type Command = Document;
-    type Response = CursorResponse;
     const NAME: &'static str = "find";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -100,14 +105,6 @@ impl<T: DeserializeOwned> Operation for Find<T> {
     }
 
     fn handle_response(
-        &self,
-        response: <Self::Response as super::Response>::Body,
-        description: &StreamDescription,
-    ) -> Result<Self::O> {
-        todo!()
-    }
-
-    fn handle_raw_response(
         &self,
         response: RawCommandResponse,
         description: &StreamDescription,

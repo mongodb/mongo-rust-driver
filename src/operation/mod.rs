@@ -81,9 +81,6 @@ pub(crate) trait Operation {
     /// The format of the command body constructed in `build`.
     type Command: CommandBody;
 
-    /// The format of the command response from the server.
-    type Response: Response;
-
     /// The name of the server side command associated with this operation.
     const NAME: &'static str;
 
@@ -100,18 +97,9 @@ pub(crate) trait Operation {
     /// Interprets the server response to the command.
     fn handle_response(
         &self,
-        response: <Self::Response as Response>::Body,
-        description: &StreamDescription,
-    ) -> Result<Self::O>;
-
-    /// Interprets the server response to the command.
-    fn handle_raw_response(
-        &self,
         response: RawCommandResponse,
         description: &StreamDescription,
-    ) -> Result<Self::O> {
-        self.handle_response(Self::Response::deserialize_response(&response)?.into_body(), description)
-    }
+    ) -> Result<Self::O>;
 
     /// Interpret an error encountered while sending the built command to the server, potentially
     /// recovering.
@@ -438,21 +426,21 @@ impl<T> Deref for WriteResponseBody<T> {
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct CursorBody {
-    cursor: CursorInfo,
+pub(crate) struct CursorBody<T = RawDocumentBuf> {
+    cursor: CursorInfo<T>,
 
     #[serde(flatten)]
     write_concern_info: WriteConcernOnlyBody,
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub(crate) struct CursorInfo {
+pub(crate) struct CursorInfo<T = RawDocumentBuf> {
     pub(crate) id: i64,
 
     pub(crate) ns: Namespace,
 
     #[serde(rename = "firstBatch")]
-    pub(crate) first_batch: VecDeque<RawDocumentBuf>,
+    pub(crate) first_batch: VecDeque<T>,
 
     #[serde(rename = "atClusterTime")]
     pub(crate) at_cluster_time: Option<Timestamp>,

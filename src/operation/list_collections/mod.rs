@@ -7,7 +7,7 @@ use serde::de::DeserializeOwned;
 
 use crate::{
     bson::{doc, Document},
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
     operation::{append_options, CursorBody, Operation, Retryability},
@@ -48,7 +48,6 @@ impl ListCollections {
 impl Operation for ListCollections {
     type O = CursorSpecification;
     type Command = Document;
-    type Response = CursorResponse;
 
     const NAME: &'static str = "listCollections";
 
@@ -74,9 +73,10 @@ impl Operation for ListCollections {
 
     fn handle_response(
         &self,
-        response: CursorBody,
+        raw_response: RawCommandResponse,
         description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: CursorBody = raw_response.body()?;
         Ok(CursorSpecification::new(
             response.cursor,
             description.server_address.clone(),

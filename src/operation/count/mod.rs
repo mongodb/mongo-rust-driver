@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use crate::{
     bson::doc,
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{options::EstimatedDocumentCountOptions, Namespace},
     error::{Error, ErrorKind, Result},
     operation::{append_options, CursorBody, Operation, Retryability},
@@ -40,7 +40,6 @@ impl Count {
 impl Operation for Count {
     type O = u64;
     type Command = Document;
-    type Response = CommandResponse<Response>;
 
     const NAME: &'static str = "count";
 
@@ -84,9 +83,11 @@ impl Operation for Count {
 
     fn handle_response(
         &self,
-        response: Response,
+        response: RawCommandResponse,
         description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: Response = response.body()?;
+
         let response_body: ResponseBody = match (description.max_wire_version, response) {
             (Some(v), Response::Aggregate(mut cursor_body)) if v >= SERVER_4_9_0_WIRE_VERSION => {
                 cursor_body

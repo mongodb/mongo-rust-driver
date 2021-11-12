@@ -1,4 +1,6 @@
-use std::time::Duration;
+use std::{convert::TryInto, time::Duration};
+
+use bson::RawDocumentBuf;
 
 use crate::{
     bson::{doc, Document},
@@ -26,7 +28,7 @@ fn build_test(
         batch_size,
         max_time,
     };
-    let mut get_more = GetMore::<Document>::new(info, None);
+    let mut get_more = GetMore::new(info, None);
 
     let build_result = get_more.build(&StreamDescription::new_testing());
     assert!(build_result.is_ok());
@@ -117,7 +119,7 @@ async fn build_batch_size() {
         batch_size: Some((std::i32::MAX as u32) + 1),
         max_time: None,
     };
-    let mut op = GetMore::<Document>::new(info, None);
+    let mut op = GetMore::new(info, None);
     assert!(op.build(&StreamDescription::new_testing()).is_err())
 }
 
@@ -136,7 +138,7 @@ async fn op_selection_criteria() {
         batch_size: None,
         max_time: None,
     };
-    let get_more = GetMore::<Document>::new(info, None);
+    let get_more = GetMore::new(info, None);
     let server_description = ServerDescription {
         address,
         server_type: ServerType::Unknown,
@@ -181,15 +183,18 @@ async fn handle_success() {
         batch_size: None,
         max_time: None,
     };
-    let get_more = GetMore::<Document>::new(info, None);
+    let get_more = GetMore::new(info, None);
 
-    let batch = vec![doc! { "_id": 1 }, doc! { "_id": 2 }, doc! { "_id": 3 }];
+    let batch = vec![doc! { "_id": 1 }, doc! { "_id": 2 }, doc! { "_id": 3 }]
+        .into_iter()
+        .map(|d| RawDocumentBuf::from_document(&d).unwrap())
+        .collect::<Vec<RawDocumentBuf>>();
 
     let response = doc! {
         "cursor": {
             "id": 123,
             "ns": "test_db.test_coll",
-            "nextBatch": bson_util::to_bson_array(&batch),
+            "nextBatch": bson::to_bson(&batch).unwrap(),
         },
         "ok": 1
     };
@@ -202,7 +207,7 @@ async fn handle_success() {
         "cursor": {
             "id": 0,
             "ns": "test_db.test_coll",
-            "nextBatch": bson_util::to_bson_array(&batch),
+            "nextBatch": bson::to_bson(&batch).unwrap(),
         },
         "ok": 1
     };

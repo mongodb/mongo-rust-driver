@@ -1,4 +1,9 @@
-use std::{collections::VecDeque, marker::PhantomData, pin::Pin, task::{Context, Poll}};
+use std::{
+    collections::VecDeque,
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use bson::RawDocumentBuf;
 use futures_core::{future::BoxFuture, Stream};
@@ -290,8 +295,7 @@ impl<'session> ExplicitSessionGetMoreProvider<'session> {
     }
 }
 
-impl<'session> GetMoreProvider for ExplicitSessionGetMoreProvider<'session>
-{
+impl<'session> GetMoreProvider for ExplicitSessionGetMoreProvider<'session> {
     type ResultType = ExecutionResult<'session>;
     type GetMoreFuture = BoxFuture<'session, ExecutionResult<'session>>;
 

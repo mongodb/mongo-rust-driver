@@ -1,22 +1,50 @@
-use bson::{RawBson, RawDocument, Timestamp, doc};
+use bson::{doc, RawBson, RawDocument, Timestamp};
 use lazy_static::lazy_static;
 use serde::de::DeserializeOwned;
 
 use std::{collections::HashSet, sync::Arc, time::Instant};
 
 use super::{session::TransactionState, Client, ClientSession};
-use crate::{ClusterTime, bson::Document, cmap::{
-        conn::PinnedConnectionHandle, Connection, ConnectionPool, RawCommand, RawCommandResponse,
-    }, cursor::{session::SessionCursor, Cursor, CursorSpecification}, error::{
-        Error, ErrorKind, Result, RETRYABLE_WRITE_ERROR, TRANSIENT_TRANSACTION_ERROR,
+use crate::{
+    bson::Document,
+    cmap::{
+        conn::PinnedConnectionHandle,
+        Connection,
+        ConnectionPool,
+        RawCommand,
+        RawCommandResponse,
+    },
+    cursor::{session::SessionCursor, Cursor, CursorSpecification},
+    error::{
+        Error,
+        ErrorKind,
+        Result,
+        RETRYABLE_WRITE_ERROR,
+        TRANSIENT_TRANSACTION_ERROR,
         UNKNOWN_TRANSACTION_COMMIT_RESULT,
-    }, event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent}, operation::{
-        AbortTransaction, CommandErrorBody, CommandResponse, CommitTransaction, Operation,
-        Response, Retryability,
-    }, options::SelectionCriteria, sdam::{
-        HandshakePhase, SelectedServer, ServerType, SessionSupportStatus, TopologyType,
+    },
+    event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
+    operation::{
+        AbortTransaction,
+        CommandErrorBody,
+        CommandResponse,
+        CommitTransaction,
+        Operation,
+        Response,
+        Retryability,
+    },
+    options::SelectionCriteria,
+    sdam::{
+        HandshakePhase,
+        SelectedServer,
+        ServerType,
+        SessionSupportStatus,
+        TopologyType,
         TransactionSupportStatus,
-    }, selection_criteria::ReadPreference};
+    },
+    selection_criteria::ReadPreference,
+    ClusterTime,
+};
 
 lazy_static! {
     pub(crate) static ref REDACTED_COMMANDS: HashSet<&'static str> = {
@@ -539,8 +567,17 @@ impl Client {
                         .and_then(RawBson::as_timestamp);
 
                     client
-                        .update_cluster_time_1(cluster_time, at_cluster_time, session)
+                        .update_cluster_time(cluster_time, at_cluster_time, session)
                         .await;
+
+                    if let (Some(session), Some(ts)) = (
+                        session.as_mut(),
+                        raw_doc
+                            .get("operationTime")?
+                            .and_then(RawBson::as_timestamp),
+                    ) {
+                        session.advance_operation_time(ts);
+                    }
 
                     if ok == 1 {
                         if let Some(ref mut session) = session {
@@ -568,83 +605,6 @@ impl Client {
                 }
 
                 handle_response(self, session, is_sharded, response).await
-                // match T::Response::deserialize_response(&response) {
-                //     Ok(r) => {
-
-                //         if let (Some(session), Some(ts)) = (session.as_mut(), r.operation_time()) {
-                //             session.advance_operation_time(ts);
-                //         }
-                //         self.update_cluster_time(&r, session).await;
-                //         if r.is_success() {
-                //             // Retrieve recovery token from successful response.
-                //             Client::update_recovery_token(is_sharded, &r, session).await;
-
-                //             Ok(CommandResult {
-                //                 raw: response,
-                //                 deserialized: r.into_body(),
-                //             })
-                //         } else {
-                //             // if command was ok: 0, try to deserialize the command error.
-                //             // if that fails, return a generic error.
-                //             Err(response
-                //                 .body::<CommandErrorBody>()
-                //                 .map(|error_response| error_response.into())
-                //                 .unwrap_or_else(|e| {
-                //                     Error::from(ErrorKind::InvalidResponse {
-                //                         message: format!(
-                //                             "error deserializing command error: {}",
-                //                             e
-                //                         ),
-                //                     })
-                //                 }))
-                //         }
-                //     }
-                //     Err(deserialize_error) => {
-                //         // if we failed to deserialize the whole response, try deserializing
-                //         // a generic command response without the operation's body.
-                //         match response.body::<CommandResponse<Option<CommandErrorBody>>>() {
-                //             Ok(error_response) => {
-                //                 if let (Some(session), Some(ts)) =
-                //                     (session.as_mut(), error_response.operation_time())
-                //                 {
-                //                     session.advance_operation_time(ts);
-                //                 }
-                //                 self.update_cluster_time(&error_response, session).await;
-                //                 match error_response.body {
-                //                     // if the response was ok: 0, return the command error.
-                //                     Some(command_error_response)
-                //                         if !error_response.is_success() =>
-                //                     {
-                //                         Err(command_error_response.into())
-                //                     }
-                //                     // if the response was ok: 0 but we couldnt deserialize the
-                //                     // command error,
-                //                     // return a generic error indicating so.
-                //                     None if !error_response.is_success() => {
-                //                         Err(Error::from(ErrorKind::InvalidResponse {
-                //                             message: "got command error but failed to deserialize \
-                //                                       response"
-                //                                 .to_string(),
-                //                         }))
-                //                     }
-                //                     // for ok: 1 just return the original deserialization error.
-                //                     _ => {
-                //                         Client::update_recovery_token(
-                //                             is_sharded,
-                //                             &error_response,
-                //                             session,
-                //                         )
-                //                         .await;
-                //                         Err(deserialize_error)
-                //                     }
-                //                 }
-                //             }
-                //             // We failed to deserialize even that, so just return the original
-                //             // deserialization error.
-                //             Err(_) => Err(deserialize_error),
-                //         }
-                //     }
-                // }
             }
             Err(err) => Err(err),
         };
@@ -696,7 +656,7 @@ impl Client {
                     handler.handle_command_succeeded_event(command_succeeded_event);
                 });
 
-                match op.handle_raw_response(response, connection.stream_description()?) {
+                match op.handle_response(response, connection.stream_description()?) {
                     Ok(response) => Ok(response),
                     Err(mut err) => {
                         err.add_labels_and_update_pin(
@@ -801,7 +761,7 @@ impl Client {
         Ok(Retryability::None)
     }
 
-    async fn update_cluster_time_1(
+    async fn update_cluster_time(
         &self,
         cluster_time: Option<ClusterTime>,
         at_cluster_time: Option<Timestamp>,
@@ -817,37 +777,6 @@ impl Client {
         if let Some(timestamp) = at_cluster_time {
             if let Some(ref mut session) = session {
                 session.snapshot_time = Some(timestamp);
-            }
-        }
-    }
-
-    async fn update_cluster_time<T: Response>(
-        &self,
-        command_response: &T,
-        session: &mut Option<&mut ClientSession>,
-    ) {
-        if let Some(cluster_time) = command_response.cluster_time() {
-            self.inner.topology.advance_cluster_time(cluster_time).await;
-            if let Some(ref mut session) = session {
-                session.advance_cluster_time(cluster_time)
-            }
-        }
-
-        if let Some(timestamp) = command_response.at_cluster_time() {
-            if let Some(ref mut session) = session {
-                session.snapshot_time = Some(timestamp);
-            }
-        }
-    }
-
-    async fn update_recovery_token<T: Response>(
-        is_sharded: bool,
-        response: &T,
-        session: &mut Option<&mut ClientSession>,
-    ) {
-        if let Some(ref mut session) = session {
-            if is_sharded && session.in_transaction() {
-                session.transaction.recovery_token = response.recovery_token().cloned();
             }
         }
     }

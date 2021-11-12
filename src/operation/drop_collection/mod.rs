@@ -5,7 +5,7 @@ use bson::Document;
 
 use crate::{
     bson::doc,
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, Result},
     operation::{append_options, Operation, WriteConcernOnlyBody},
     options::{DropCollectionOptions, WriteConcern},
@@ -40,7 +40,6 @@ impl DropCollection {
 impl Operation for DropCollection {
     type O = ();
     type Command = Document;
-    type Response = CommandResponse<WriteConcernOnlyBody>;
 
     const NAME: &'static str = "drop";
 
@@ -60,9 +59,10 @@ impl Operation for DropCollection {
 
     fn handle_response(
         &self,
-        response: WriteConcernOnlyBody,
+        response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: WriteConcernOnlyBody = response.body()?;
         response.validate()
     }
 

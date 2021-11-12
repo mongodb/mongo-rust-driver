@@ -1,5 +1,7 @@
 use std::{collections::VecDeque, time::Duration};
 
+use bson::RawDocumentBuf;
+
 use super::AggregateTarget;
 use crate::{
     bson::{doc, Document},
@@ -201,13 +203,16 @@ async fn handle_success() {
 
     let aggregate = Aggregate::new(ns.clone(), Vec::new(), None);
 
-    let first_batch = VecDeque::from(vec![doc! {"_id": 1}, doc! {"_id": 2}]);
+    let first_batch = VecDeque::from(vec![
+        RawDocumentBuf::from_document(&doc! {"_id": 1}).unwrap(),
+        RawDocumentBuf::from_document(&doc! {"_id": 2}).unwrap(),
+    ]);
     let response = doc! {
         "ok": 1.0,
         "cursor": {
             "id": 123,
             "ns": "test_db.test_coll",
-            "firstBatch": Vec::from(first_batch.clone()),
+            "firstBatch": bson::to_bson(&first_batch).unwrap(),
         }
     };
 

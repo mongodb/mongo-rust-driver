@@ -3,7 +3,7 @@ use std::time::Duration;
 use bson::{doc, Document};
 
 use crate::{
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
     operation::{append_options, Operation, Retryability},
     options::{Acknowledgment, TransactionOptions, WriteConcern},
@@ -24,7 +24,6 @@ impl CommitTransaction {
 impl Operation for CommitTransaction {
     type O = ();
     type Command = Document;
-    type Response = CommandResponse<WriteConcernOnlyBody>;
 
     const NAME: &'static str = "commitTransaction";
 
@@ -44,9 +43,10 @@ impl Operation for CommitTransaction {
 
     fn handle_response(
         &self,
-        response: WriteConcernOnlyBody,
+        response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: WriteConcernOnlyBody = response.body()?;
         response.validate()
     }
 

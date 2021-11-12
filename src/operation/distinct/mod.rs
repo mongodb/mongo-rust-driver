@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use crate::{
     bson::{doc, Bson, Document},
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{options::DistinctOptions, Namespace},
     error::Result,
     operation::{append_options, Operation, Retryability},
@@ -53,7 +53,6 @@ impl Distinct {
 impl Operation for Distinct {
     type O = Vec<Bson>;
     type Command = Document;
-    type Response = CommandResponse<Response>;
 
     const NAME: &'static str = "distinct";
 
@@ -78,9 +77,10 @@ impl Operation for Distinct {
     }
     fn handle_response(
         &self,
-        response: Response,
+        response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: Response = response.body()?;
         Ok(response.values)
     }
 

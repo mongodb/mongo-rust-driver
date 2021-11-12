@@ -10,7 +10,7 @@ use self::options::FindAndModifyOptions;
 use crate::{
     bson::{doc, from_document, Bson, Document},
     bson_util,
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{
         options::{
             FindOneAndDeleteOptions,
@@ -103,7 +103,6 @@ where
 {
     type O = Option<T>;
     type Command = Document;
-    type Response = CommandResponse<Response>;
     const NAME: &'static str = "findAndModify";
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
@@ -132,9 +131,11 @@ where
 
     fn handle_response(
         &self,
-        response: Response,
+        response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: Response = response.body()?;
+
         match response.value {
             Bson::Document(doc) => Ok(Some(from_document(doc)?)),
             Bson::Null => Ok(None),

@@ -48,7 +48,6 @@ impl<'conn> GetMore<'conn> {
 impl<'conn> Operation for GetMore<'conn> {
     type O = GetMoreResult;
     type Command = Document;
-    type Response = CommandResponse<GetMoreResponseBody>;
 
     const NAME: &'static str = "getMore";
 
@@ -82,18 +81,10 @@ impl<'conn> Operation for GetMore<'conn> {
 
     fn handle_response(
         &self,
-        response: <Self::Response as super::Response>::Body,
-        description: &StreamDescription,
-    ) -> Result<Self::O> {
-        todo!()
-    }
-
-    fn handle_raw_response(
-        &self,
         response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
-        let response: GetMoreResponseBody = bson::from_slice(response.as_bytes())?;
+        let response: GetMoreResponseBody = response.body()?;
 
         Ok(GetMoreResult {
             batch: response.cursor.next_batch,

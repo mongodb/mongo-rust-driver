@@ -9,7 +9,7 @@ use serde::Serialize;
 use crate::{
     bson::doc,
     bson_util,
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     error::{BulkWriteFailure, Error, ErrorKind, Result},
     operation::{Operation, Retryability, WriteResponseBody},
     options::{InsertManyOptions, WriteConcern},
@@ -53,7 +53,6 @@ impl<'a, T> Insert<'a, T> {
 impl<'a, T: Serialize> Operation for Insert<'a, T> {
     type O = InsertManyResult;
     type Command = InsertCommand;
-    type Response = CommandResponse<WriteResponseBody>;
 
     const NAME: &'static str = "insert";
 
@@ -170,9 +169,11 @@ impl<'a, T: Serialize> Operation for Insert<'a, T> {
 
     fn handle_response(
         &self,
-        response: WriteResponseBody,
+        raw_response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: WriteResponseBody = raw_response.body()?;
+
         let mut map = HashMap::new();
         if self.is_ordered() {
             // in ordered inserts, only the first n were attempted.

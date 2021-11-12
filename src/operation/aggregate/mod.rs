@@ -4,7 +4,7 @@ mod test;
 use crate::{
     bson::{doc, Bson, Document},
     bson_util,
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
     operation::{append_options, Operation, Retryability},
@@ -43,7 +43,6 @@ impl Aggregate {
 impl Operation for Aggregate {
     type O = CursorSpecification;
     type Command = Document;
-    type Response = CursorResponse;
 
     const NAME: &'static str = "aggregate";
 
@@ -71,9 +70,11 @@ impl Operation for Aggregate {
 
     fn handle_response(
         &self,
-        response: CursorBody,
+        response: RawCommandResponse,
         description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: CursorBody = response.body()?;
+
         if self.is_out_or_merge() {
             response.write_concern_info.validate()?;
         };

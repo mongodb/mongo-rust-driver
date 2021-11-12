@@ -5,7 +5,7 @@ use bson::Document;
 
 use crate::{
     bson::doc,
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
     operation::{append_options, Operation, WriteConcernOnlyBody},
     options::{CreateCollectionOptions, WriteConcern},
@@ -40,7 +40,6 @@ impl Create {
 impl Operation for Create {
     type O = ();
     type Command = Document;
-    type Response = CommandResponse<WriteConcernOnlyBody>;
 
     const NAME: &'static str = "create";
 
@@ -59,9 +58,10 @@ impl Operation for Create {
 
     fn handle_response(
         &self,
-        response: WriteConcernOnlyBody,
+        response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: WriteConcernOnlyBody = response.body()?;
         response.validate()
     }
 

@@ -1,11 +1,12 @@
 #[cfg(test)]
 mod test;
 
+use bson::RawDocumentBuf;
 use serde::Deserialize;
 
 use crate::{
     bson::{doc, Document},
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
     operation::{append_options, Operation, Retryability},
     options::ListDatabasesOptions,
@@ -45,9 +46,8 @@ impl ListDatabases {
 }
 
 impl Operation for ListDatabases {
-    type O = Vec<Document>;
+    type O = Vec<RawDocumentBuf>;
     type Command = Document;
-    type Response = CommandResponse<Response>;
 
     const NAME: &'static str = "listDatabases";
 
@@ -72,9 +72,10 @@ impl Operation for ListDatabases {
 
     fn handle_response(
         &self,
-        response: Response,
+        raw_response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: Response = raw_response.body()?;
         Ok(response.databases)
     }
 
@@ -89,5 +90,5 @@ impl Operation for ListDatabases {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Response {
-    databases: Vec<Document>,
+    databases: Vec<RawDocumentBuf>,
 }

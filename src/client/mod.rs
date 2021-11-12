@@ -189,7 +189,9 @@ impl Client {
         let op = ListDatabases::new(filter.into(), false, options.into());
         self.execute_operation(op, session).await.and_then(|dbs| {
             dbs.into_iter()
-                .map(|db_spec| bson::from_document(db_spec).map_err(crate::error::Error::from))
+                .map(|db_spec| {
+                    bson::from_slice(db_spec.as_bytes()).map_err(crate::error::Error::from)
+                })
                 .collect()
         })
     }
@@ -226,13 +228,13 @@ impl Client {
             Ok(databases) => databases
                 .into_iter()
                 .map(|doc| {
-                    let name = doc.get("name").and_then(Bson::as_str).ok_or_else(|| {
-                        ErrorKind::InvalidResponse {
+                    let name = doc
+                        .get_str("name")
+                        .map_err(|_| ErrorKind::InvalidResponse {
                             message: "Expected \"name\" field in server response, but it was not \
                                       found"
                                 .to_string(),
-                        }
-                    })?;
+                        })?;
                     Ok(name.to_string())
                 })
                 .collect(),

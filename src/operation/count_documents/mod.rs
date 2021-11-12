@@ -3,12 +3,12 @@ mod test;
 
 use std::convert::TryInto;
 
-use bson::{doc, Document};
+use bson::{doc, Document, RawDocument};
 
 use super::{CursorBody, CursorResponse, Operation, Retryability};
 use crate::{
     bson_util,
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, ErrorKind, Result},
     operation::aggregate::Aggregate,
     options::{AggregateOptions, CountOptions},
@@ -78,7 +78,6 @@ impl CountDocuments {
 impl Operation for CountDocuments {
     type O = u64;
     type Command = Document;
-    type Response = CursorResponse;
 
     const NAME: &'static str = Aggregate::NAME;
 
@@ -88,9 +87,11 @@ impl Operation for CountDocuments {
 
     fn handle_response(
         &self,
-        mut response: CursorBody,
+        response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
+        let mut response: CursorBody<&RawDocument> = response.body()?;
+
         let result_doc = match response.cursor.first_batch.pop_front() {
             Some(doc) => doc,
             None => return Ok(0),

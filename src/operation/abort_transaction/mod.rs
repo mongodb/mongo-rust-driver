@@ -3,7 +3,7 @@ use bson::Document;
 use crate::{
     bson::doc,
     client::session::TransactionPin,
-    cmap::{conn::PinnedConnectionHandle, Command, StreamDescription},
+    cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::Result,
     operation::{Operation, Retryability},
     options::WriteConcern,
@@ -29,7 +29,6 @@ impl AbortTransaction {
 impl Operation for AbortTransaction {
     type O = ();
     type Command = Document;
-    type Response = CommandResponse<WriteConcernOnlyBody>;
 
     const NAME: &'static str = "abortTransaction";
 
@@ -50,9 +49,10 @@ impl Operation for AbortTransaction {
 
     fn handle_response(
         &self,
-        response: <Self::Response as Response>::Body,
+        response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: WriteConcernOnlyBody = response.body()?;
         response.validate()
     }
 

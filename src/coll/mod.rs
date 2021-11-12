@@ -803,7 +803,7 @@ where
         let mut options = options.into();
         resolve_options!(self, options, [read_concern, selection_criteria]);
 
-        let find = Find::<T>::new(self.namespace(), filter.into(), options);
+        let find = Find::new(self.namespace(), filter.into(), options);
         let client = self.client();
 
         client.execute_cursor_operation(find).await
@@ -820,7 +820,7 @@ where
         resolve_read_concern_with_session!(self, options, Some(&mut *session))?;
         resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
 
-        let find = Find::<T>::new(self.namespace(), filter.into(), options);
+        let find = Find::new(self.namespace(), filter.into(), options);
         let client = self.client();
 
         client.execute_session_cursor_operation(find, session).await
