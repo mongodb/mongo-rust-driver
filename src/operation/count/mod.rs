@@ -90,16 +90,11 @@ impl Operation for Count {
 
         let response_body: ResponseBody = match (description.max_wire_version, response) {
             (Some(v), Response::Aggregate(mut cursor_body)) if v >= SERVER_4_9_0_WIRE_VERSION => {
-                cursor_body
-                    .cursor
-                    .first_batch
-                    .pop_front()
-                    .and_then(|doc| bson::from_slice(doc.as_bytes()).ok())
-                    .ok_or_else(|| {
-                        Error::from(ErrorKind::InvalidResponse {
-                            message: "invalid server response to count operation".into(),
-                        })
-                    })?
+                cursor_body.cursor.first_batch.pop_front().ok_or_else(|| {
+                    Error::from(ErrorKind::InvalidResponse {
+                        message: "invalid server response to count operation".into(),
+                    })
+                })?
             }
             (_, Response::Count(body)) => body,
             _ => {
@@ -140,7 +135,7 @@ impl Operation for Count {
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub(crate) enum Response {
-    Aggregate(Box<CursorBody>),
+    Aggregate(Box<CursorBody<ResponseBody>>),
     Count(ResponseBody),
 }
 

@@ -557,7 +557,7 @@ impl Client {
                     };
 
                     let cluster_time: Option<ClusterTime> = raw_doc
-                        .get("clusterTime")?
+                        .get("$clusterTime")?
                         .and_then(RawBson::as_document)
                         .map(|d| bson::from_slice(d.as_bytes()))
                         .transpose()?;
