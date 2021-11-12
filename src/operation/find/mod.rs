@@ -109,14 +109,10 @@ impl Operation for Find {
         response: RawCommandResponse,
         description: &StreamDescription,
     ) -> Result<Self::O> {
-        let raw_doc = response.into_raw_document_buf();
-        let info = raw_doc
-            .get_document("cursor")
-            .map_err(Error::invalid_response)?;
-        let cursor_info: CursorInfo = bson::from_slice(info.as_bytes())?;
+        let response: CursorBody = response.body()?;
 
         Ok(CursorSpecification::new(
-            cursor_info,
+            response.cursor,
             description.server_address.clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),
