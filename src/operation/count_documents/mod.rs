@@ -85,6 +85,10 @@ impl Operation for CountDocuments {
         self.aggregate.build(description)
     }
 
+    fn extract_at_cluster_time(&self, response: &RawDocument) -> Result<Option<bson::Timestamp>> {
+        self.aggregate.extract_at_cluster_time(response)
+    }
+
     fn handle_response(
         &self,
         response: RawCommandResponse,

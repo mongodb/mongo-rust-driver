@@ -25,7 +25,7 @@ mod test;
 
 use std::{collections::VecDeque, fmt::Debug, ops::Deref};
 
-use bson::{RawDocumentBuf, Timestamp};
+use bson::{RawBson, RawDocument, RawDocumentBuf, Timestamp};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
@@ -92,6 +92,12 @@ pub(crate) trait Operation {
     /// By default, this will just call through to the `Serialize` implementation of the command.
     fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
         Ok(bson::to_vec(&cmd)?)
+    }
+
+    /// Parse the response for the atClusterTime field.
+    /// Depending on the operation, this may be found in different locations.
+    fn extract_at_cluster_time(&self, _response: &RawDocument) -> Result<Option<Timestamp>> {
+        Ok(None)
     }
 
     /// Interprets the server response to the command.
@@ -431,6 +437,18 @@ pub(crate) struct CursorBody<T = RawDocumentBuf> {
 
     #[serde(flatten)]
     write_concern_info: WriteConcernOnlyBody,
+}
+
+impl CursorBody {
+    fn extract_at_cluster_time(response: &RawDocument) -> Result<Option<Timestamp>> {
+        Ok(response
+            .get("cursor")?
+            .and_then(RawBson::as_document)
+            .map(|d| d.get("atClusterTime"))
+            .transpose()?
+            .flatten()
+            .and_then(RawBson::as_timestamp))
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]

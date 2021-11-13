@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod test;
 
+use bson::RawBson;
 use serde::Deserialize;
 
 use crate::{
@@ -73,6 +74,16 @@ impl Operation for Distinct {
             body,
         ))
     }
+
+    fn extract_at_cluster_time(
+        &self,
+        response: &bson::RawDocument,
+    ) -> Result<Option<bson::Timestamp>> {
+        Ok(response
+            .get("atClusterTime")?
+            .and_then(RawBson::as_timestamp))
+    }
+
     fn handle_response(
         &self,
         response: RawCommandResponse,

@@ -523,8 +523,9 @@ impl Client {
         let start_time = Instant::now();
         let command_result = match connection.send_raw_command(raw_cmd, request_id).await {
             Ok(response) => {
-                async fn handle_response(
+                async fn handle_response<T: Operation>(
                     client: &Client,
+                    op: &T,
                     session: &mut Option<&mut ClientSession>,
                     is_sharded: bool,
                     response: RawCommandResponse,
@@ -554,9 +555,7 @@ impl Client {
                         .map(|d| bson::from_slice(d.as_bytes()))
                         .transpose()?;
 
-                    let at_cluster_time: Option<Timestamp> = raw_doc
-                        .get("atClusterTime")?
-                        .and_then(RawBson::as_timestamp);
+                    let at_cluster_time = op.extract_at_cluster_time(&raw_doc)?;
 
                     client
                         .update_cluster_time(cluster_time, at_cluster_time, session)
@@ -596,7 +595,7 @@ impl Client {
                     }
                 }
 
-                handle_response(self, session, is_sharded, response).await
+                handle_response(self, op, session, is_sharded, response).await
             }
             Err(err) => Err(err),
         };

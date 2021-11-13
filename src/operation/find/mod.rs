@@ -97,6 +97,13 @@ impl Operation for Find {
         ))
     }
 
+    fn extract_at_cluster_time(
+        &self,
+        response: &bson::RawDocument,
+    ) -> Result<Option<bson::Timestamp>> {
+        CursorBody::extract_at_cluster_time(response)
+    }
+
     fn handle_response(
         &self,
         response: RawCommandResponse,
