@@ -33,7 +33,6 @@ use crate::{
         TransactionOptions,
         UpdateModifications,
         UpdateOptions,
-        WriteConcern,
     },
     selection_criteria::{ReadPreference, SelectionCriteria},
     test::{FailPoint, TestClient},
