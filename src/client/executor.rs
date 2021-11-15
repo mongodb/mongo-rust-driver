@@ -555,7 +555,7 @@ impl Client {
                         .map(|d| bson::from_slice(d.as_bytes()))
                         .transpose()?;
 
-                    let at_cluster_time = op.extract_at_cluster_time(&raw_doc)?;
+                    let at_cluster_time = op.extract_at_cluster_time(raw_doc)?;
 
                     client
                         .update_cluster_time(cluster_time, at_cluster_time, session)

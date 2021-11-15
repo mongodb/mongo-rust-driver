@@ -113,7 +113,7 @@ async fn handle_success() {
 
     let raw_databases = databases
         .iter()
-        .map(|d| RawDocumentBuf::from_document(&d).unwrap())
+        .map(|d| RawDocumentBuf::from_document(d).unwrap())
         .collect::<Vec<_>>();
 
     let actual_values = handle_response_test(

@@ -340,7 +340,9 @@ impl From<bson::ser::Error> for ErrorKind {
 
 impl From<bson::raw::Error> for ErrorKind {
     fn from(err: bson::raw::Error) -> Self {
-        Self::InvalidResponse { message: err.to_string() }
+        Self::InvalidResponse {
+            message: err.to_string(),
+        }
     }
 }
 
