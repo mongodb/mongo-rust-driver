@@ -1,3 +1,4 @@
+//! Types for change streams using sessions.
 use std::{
     pin::Pin,
     task::{Context, Poll},
@@ -15,7 +16,7 @@ use super::{event::ResumeToken, ChangeStreamData};
 /// be iterated using one. To iterate, use [`SessionChangeStream::next`] or retrieve a
 /// [`SessionCursorStream`] using [`SessionChangeStream::stream`]:
 ///
-/// ```rust
+/// ```ignore
 /// # use mongodb::{bson::Document, Client, error::Result, ClientSession, SessionCursor};
 /// #
 /// # async fn do_stuff() -> Result<()> {
@@ -25,15 +26,15 @@ use super::{event::ResumeToken, ChangeStreamData};
 /// #
 /// // iterate using next()
 /// let mut cs = coll.watch_with_session(None, None, &mut session).await?;
-/// while let Some(doc) = cursor.next(&mut session).await.transpose()? {
-///     println!("{}", doc)
+/// while let Some(event) = cs.next(&mut session).await.transpose()? {
+///     println!("{:?}", event)
 /// }
 ///
 /// // iterate using `Stream`:
 /// use futures::stream::TryStreamExt;
 ///
 /// let mut cs = coll.watch_with_session(None, None, &mut session).await?;
-/// let results: Vec<_> = cursor.stream(&mut session).try_collect().await?;
+/// let results: Vec<_> = cs.values(&mut session).try_collect().await?;
 /// #
 /// # Ok(())
 /// # }
@@ -72,9 +73,9 @@ where
     /// of this stream. In order to do that, either use [`SessionChangeStream::next`] instead or
     /// drop the stream before using the session.
     ///
-    /// ```
+    /// ```ignore
     /// # use bson::{doc, Document};
-    /// # use mongodb::{Client, error::Result};
+    /// # use mongodb::{Client, change_stream::event::ChangeStreamEvent, error::Result};
     /// # fn main() {
     /// # async {
     /// # let client = Client::with_uri_str("foo").await?;
@@ -86,22 +87,23 @@ where
     ///
     /// // iterate over the results
     /// let mut cs = coll.watch_with_session(None, None, &mut session).await?;
-    /// while let Some(doc) = cs.stream(&mut session).try_next().await? {
-    ///     println!("{}", doc);
+    /// while let Some(event) = cs.values(&mut session).try_next().await? {
+    ///     println!("{:?}", event);
     /// }
     ///
     /// // collect the results
     /// let mut cs1 = coll.watch_with_session(None, None, &mut session).await?;
-    /// let v: Vec<Document> = cs1.stream(&mut session).try_collect().await?;
+    /// let v: Vec<ChangeStreamEvent<Document>> = cs1.values(&mut session).try_collect().await?;
     ///
     /// // use session between iterations
     /// let mut cs2 = coll.watch_with_session(None, None, &mut session).await?;
     /// loop {
-    ///     let doc = match cs2.stream(&mut session).try_next().await? {
+    ///     let event = match cs2.values(&mut session).try_next().await? {
     ///         Some(d) => d,
     ///         None => break,
     ///     };
-    ///     other_coll.insert_one_with_session(doc, None, &mut session).await?;
+    ///     let id = bson::to_bson(&event.id)?;
+    ///     other_coll.insert_one_with_session(doc! { "id": id }, None, &mut session).await?;
     /// }
     /// # Ok::<(), mongodb::error::Error>(())
     /// # };
@@ -120,7 +122,7 @@ where
     /// Use this method when the session needs to be used again between iterations or when the added
     /// functionality of `Stream` is not needed.
     ///
-    /// ```
+    /// ```ignore
     /// # use bson::{doc, Document};
     /// # use mongodb::Client;
     /// # fn main() {
@@ -130,8 +132,9 @@ where
     /// # let other_coll = coll.clone();
     /// # let mut session = client.start_session(None).await?;
     /// let mut cs = coll.watch_with_session(None, None, &mut session).await?;
-    /// while let Some(doc) = cs.next(&mut session).await.transpose()? {
-    ///     other_coll.insert_one_with_session(doc, None, &mut session).await?;
+    /// while let Some(event) = cs.next(&mut session).await.transpose()? {
+    ///     let id = bson::to_bson(&event.id)?;
+    ///     other_coll.insert_one_with_session(doc! { "id": id }, None, &mut session).await?;
     /// }
     /// # Ok::<(), mongodb::error::Error>(())
     /// # };

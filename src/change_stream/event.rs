@@ -118,6 +118,6 @@ pub enum ChangeStreamEventSource {
     /// The [`Namespace`] containing the database and collection in which the change occurred.
     Namespace(Namespace),
 
-    // Contains the name of the database in which the change happened.
+    /// Contains the name of the database in which the change happened.
     Database(String),
 }

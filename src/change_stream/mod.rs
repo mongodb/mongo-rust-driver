@@ -43,11 +43,11 @@ use crate::{
 ///
 /// A `ChangeStream` can be iterated like any other [`Stream`]:
 ///
-/// ```rust
+/// ```ignore
 /// # #[cfg(not(feature = "sync"))]
 /// # use futures::stream::StreamExt;
 /// # use mongodb::{Client, error::Result, bson::doc,
-/// # change_stream::document::ChangeStreamEventDocument};
+/// # change_stream::event::ChangeStreamEvent};
 /// # #[cfg(feature = "async-std-runtime")]
 /// # use async_std::task;
 /// # #[cfg(feature = "tokio-runtime")]
@@ -56,12 +56,12 @@ use crate::{
 /// # async fn func() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// # let coll = client.database("foo").collection("bar");
-/// let mut change_stream = coll.watch(None).await?;
+/// let mut change_stream = coll.watch(None, None).await?;
 /// let coll_ref = coll.clone();
 /// task::spawn(async move {
 ///     coll_ref.insert_one(doc! { "x": 1 }, None).await;
 /// });
-/// while let Some(event) = change_stream.next().await {
+/// while let Some(event) = change_stream.next().await.transpose()? {
 ///     println!("operation performed: {:?}, document: {:?}", event.operation_type, event.full_document);
 ///     // operation performed: Insert, document: Some(Document({"x": Int32(1)}))
 /// }
