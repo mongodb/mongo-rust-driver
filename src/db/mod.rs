@@ -4,14 +4,36 @@ use std::{fmt::Debug, sync::Arc};
 
 use futures_util::stream::TryStreamExt;
 
-use crate::{Client, ClientSession, Collection, Namespace, SessionCursor, bson::{Bson, Document}, change_stream::{ChangeStream, event::ChangeStreamEvent, options::ChangeStreamOptions, session::SessionChangeStream}, client::session::TransactionState, cmap::conn::PinnedConnectionHandle, concern::{ReadConcern, WriteConcern}, cursor::Cursor, error::{Error, ErrorKind, Result}, operation::{Aggregate, Create, DropDatabase, ListCollections, RunCommand}, options::{
+use crate::{
+    bson::{Bson, Document},
+    change_stream::{
+        event::ChangeStreamEvent,
+        options::ChangeStreamOptions,
+        session::SessionChangeStream,
+        ChangeStream,
+    },
+    client::session::TransactionState,
+    cmap::conn::PinnedConnectionHandle,
+    concern::{ReadConcern, WriteConcern},
+    cursor::Cursor,
+    error::{Error, ErrorKind, Result},
+    operation::{Aggregate, Create, DropDatabase, ListCollections, RunCommand},
+    options::{
         AggregateOptions,
         CollectionOptions,
         CreateCollectionOptions,
         DatabaseOptions,
         DropDatabaseOptions,
         ListCollectionsOptions,
-    }, results::CollectionSpecification, selection_criteria::SelectionCriteria};
+    },
+    results::CollectionSpecification,
+    selection_criteria::SelectionCriteria,
+    Client,
+    ClientSession,
+    Collection,
+    Namespace,
+    SessionCursor,
+};
 
 /// `Database` is the client-side abstraction of a MongoDB database. It can be used to perform
 /// database-level operations or to obtain handles to specific collections within the database. A

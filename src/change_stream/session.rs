@@ -1,13 +1,13 @@
 use bson::Document;
 use serde::de::DeserializeOwned;
 
-use crate::{ClientSession, SessionCursor, SessionCursorStream, error::Result};
+use crate::{error::Result, ClientSession, SessionCursor, SessionCursorStream};
 
-use super::{ChangeStreamData, event::ResumeToken};
+use super::{event::ResumeToken, ChangeStreamData};
 
-/// A [`SessionChangeStream`] is a change stream that was created with a [`ClientSession`] that must be iterated
-/// using one. To iterate, use [`SessionChangeStream::next`] or retrieve a [`SessionCursorStream`] using
-/// [`SessionChangeStream::stream`]:
+/// A [`SessionChangeStream`] is a change stream that was created with a [`ClientSession`] that must
+/// be iterated using one. To iterate, use [`SessionChangeStream::next`] or retrieve a
+/// [`SessionCursorStream`] using [`SessionChangeStream::stream`]:
 ///
 /// ```rust
 /// # use mongodb::{bson::Document, Client, error::Result, ClientSession, SessionCursor};
@@ -59,12 +59,12 @@ where
         todo!()
     }
 
-    /// Retrieves a [`SessionCursorStream`] to iterate this change stream. The session provided must be the
-    /// same session used to create the cursor.
+    /// Retrieves a [`SessionCursorStream`] to iterate this change stream. The session provided must
+    /// be the same session used to create the cursor.
     ///
     /// Note that the borrow checker will not allow the session to be reused in between iterations
-    /// of this stream. In order to do that, either use [`SessionChangeStream::next`] instead or drop
-    /// the stream before using the session.
+    /// of this stream. In order to do that, either use [`SessionChangeStream::next`] instead or
+    /// drop the stream before using the session.
     ///
     /// ```
     /// # use bson::{doc, Document};

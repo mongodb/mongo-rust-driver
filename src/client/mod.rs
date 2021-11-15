@@ -13,14 +13,31 @@ use derivative::Derivative;
 
 #[cfg(test)]
 use crate::options::ServerAddress;
-use crate::{ClientSession, bson::Document, change_stream::{ChangeStream, event::ChangeStreamEvent, options::ChangeStreamOptions, session::SessionChangeStream}, concern::{ReadConcern, WriteConcern}, db::Database, error::{ErrorKind, Result}, event::command::CommandEventHandler, operation::ListDatabases, options::{
+use crate::{
+    bson::Document,
+    change_stream::{
+        event::ChangeStreamEvent,
+        options::ChangeStreamOptions,
+        session::SessionChangeStream,
+        ChangeStream,
+    },
+    concern::{ReadConcern, WriteConcern},
+    db::Database,
+    error::{ErrorKind, Result},
+    event::command::CommandEventHandler,
+    operation::ListDatabases,
+    options::{
         ClientOptions,
         DatabaseOptions,
         ListDatabasesOptions,
         ReadPreference,
         SelectionCriteria,
         SessionOptions,
-    }, results::DatabaseSpecification, sdam::{SelectedServer, SessionSupportStatus, Topology}};
+    },
+    results::DatabaseSpecification,
+    sdam::{SelectedServer, SessionSupportStatus, Topology},
+    ClientSession,
+};
 pub(crate) use executor::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS};
 pub(crate) use session::{ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS};
 

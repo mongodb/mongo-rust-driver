@@ -14,7 +14,21 @@ use serde::{
 };
 
 use self::options::*;
-use crate::{Client, ClientSession, Cursor, Database, SessionCursor, bson::{doc, to_document, Bson, Document}, bson_util, change_stream::{ChangeStream, event::ChangeStreamEvent, options::ChangeStreamOptions, session::SessionChangeStream}, client::session::TransactionState, cmap::conn::PinnedConnectionHandle, concern::{ReadConcern, WriteConcern}, error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result}, index::IndexModel, operation::{
+use crate::{
+    bson::{doc, to_document, Bson, Document},
+    bson_util,
+    change_stream::{
+        event::ChangeStreamEvent,
+        options::ChangeStreamOptions,
+        session::SessionChangeStream,
+        ChangeStream,
+    },
+    client::session::TransactionState,
+    cmap::conn::PinnedConnectionHandle,
+    concern::{ReadConcern, WriteConcern},
+    error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
+    index::IndexModel,
+    operation::{
         Aggregate,
         Count,
         CountDocuments,
@@ -28,14 +42,22 @@ use crate::{Client, ClientSession, Cursor, Database, SessionCursor, bson::{doc, 
         Insert,
         ListIndexes,
         Update,
-    }, results::{
+    },
+    results::{
         CreateIndexResult,
         CreateIndexesResult,
         DeleteResult,
         InsertManyResult,
         InsertOneResult,
         UpdateResult,
-    }, selection_criteria::SelectionCriteria};
+    },
+    selection_criteria::SelectionCriteria,
+    Client,
+    ClientSession,
+    Cursor,
+    Database,
+    SessionCursor,
+};
 
 /// `Collection` is the client-side abstraction of a MongoDB Collection. It can be used to
 /// perform collection-level operations such as CRUD operations. A `Collection` can be obtained
