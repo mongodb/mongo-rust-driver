@@ -7,7 +7,13 @@ use crate::{
     coll::Namespace,
     collation::Collation,
     error::{convert_bulk_errors, Result},
-    operation::{append_options, Operation, Retryability, WriteResponseBody},
+    operation::{
+        append_options,
+        remove_empty_write_concern,
+        Operation,
+        Retryability,
+        WriteResponseBody,
+    },
     options::{DeleteOptions, Hint, WriteConcern},
     results::DeleteResult,
 };
@@ -83,11 +89,7 @@ impl Operation for Delete {
         };
 
         let mut options = self.options.clone().unwrap_or_default();
-        if let Some(write_concern) = self.write_concern() {
-            if *write_concern == Default::default() {
-                options.write_concern = None;
-            }
-        }
+        remove_empty_write_concern!(&mut options, self.write_concern());
         append_options(&mut body, Some(&options))?;
 
         Ok(Command::new(

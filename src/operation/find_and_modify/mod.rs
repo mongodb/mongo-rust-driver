@@ -21,7 +21,7 @@ use crate::{
         Namespace,
     },
     error::{ErrorKind, Result},
-    operation::{append_options, Operation, Retryability},
+    operation::{append_options, remove_empty_write_concern, Operation, Retryability},
     options::WriteConcern,
 };
 
@@ -122,11 +122,7 @@ where
         };
 
         let mut options = self.options.clone();
-        if let Some(write_concern) = self.write_concern() {
-            if *write_concern == Default::default() {
-                options.write_concern = None;
-            }
-        }
+        remove_empty_write_concern!(&mut options, self.write_concern());
         append_options(&mut body, Some(&options))?;
 
         Ok(Command::new(

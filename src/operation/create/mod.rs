@@ -7,7 +7,7 @@ use crate::{
     bson::doc,
     cmap::{Command, StreamDescription},
     error::Result,
-    operation::{append_options, Operation, WriteConcernOnlyBody},
+    operation::{append_options, remove_empty_write_concern, Operation, WriteConcernOnlyBody},
     options::{CreateCollectionOptions, WriteConcern},
     Namespace,
 };
@@ -50,11 +50,7 @@ impl Operation for Create {
         };
 
         let mut options = self.options.clone().unwrap_or_default();
-        if let Some(write_concern) = self.write_concern() {
-            if *write_concern == Default::default() {
-                options.write_concern = None;
-            }
-        }
+        remove_empty_write_concern!(&mut options, self.write_concern());
         append_options(&mut body, Some(&options))?;
 
         Ok(Command::new(

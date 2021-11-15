@@ -5,7 +5,7 @@ use crate::{
     bson::{doc, Document},
     cmap::{Command, StreamDescription},
     error::Result,
-    operation::{append_options, Operation},
+    operation::{append_options, remove_empty_write_concern, Operation},
     options::{DropIndexOptions, WriteConcern},
     Namespace,
 };
@@ -49,11 +49,7 @@ impl Operation for DropIndexes {
         };
 
         let mut options = self.options.clone().unwrap_or_default();
-        if let Some(write_concern) = self.write_concern() {
-            if *write_concern == Default::default() {
-                options.write_concern = None;
-            }
-        }
+        remove_empty_write_concern!(&mut options, self.write_concern());
         append_options(&mut body, Some(&options))?;
 
         Ok(Command::new(

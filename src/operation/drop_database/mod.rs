@@ -44,7 +44,7 @@ impl Operation for DropDatabase {
 
         let options = self.options.clone().unwrap_or_default();
         if let Some(write_concern) = self.write_concern() {
-            if *write_concern != Default::default() {
+            if !write_concern.is_empty() {
                 append_options(&mut body, Some(&options))?;
             }
         }

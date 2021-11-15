@@ -96,7 +96,7 @@ impl Operation for Update {
             }
 
             if let Some(ref write_concern) = options.write_concern {
-                if *write_concern != Default::default() {
+                if !write_concern.is_empty() {
                     body.insert("writeConcern", bson::to_bson(write_concern)?);
                 }
             }

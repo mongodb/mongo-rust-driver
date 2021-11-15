@@ -71,7 +71,7 @@ impl<'conn> Operation for RunCommand<'conn> {
             .map(|doc| bson::from_bson::<WriteConcern>(doc.clone()))
             .transpose()?
         {
-            if write_concern == Default::default() {
+            if write_concern.is_empty() {
                 command.remove("writeConcern");
             }
         }

@@ -434,3 +434,15 @@ pub(crate) enum Retryability {
     Read,
     None,
 }
+
+macro_rules! remove_empty_write_concern {
+    ($opts:expr, $wc:expr) => {
+        if let Some(write_concern) = $wc {
+            if write_concern.is_empty() {
+                $opts.write_concern = None;
+            }
+        }
+    };
+}
+
+pub(crate) use remove_empty_write_concern;
