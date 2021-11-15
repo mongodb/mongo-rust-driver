@@ -1,4 +1,10 @@
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+};
+
 use bson::Document;
+use futures_core::Stream;
 use serde::de::DeserializeOwned;
 
 use crate::{error::Result, ClientSession, SessionCursor, SessionCursorStream};
@@ -101,10 +107,10 @@ where
     /// # };
     /// # }
     /// ```
-    pub fn stream<'session>(
+    pub fn values<'session>(
         &mut self,
         session: &'session mut ClientSession,
-    ) -> SessionCursorStream<'_, 'session, T> {
+    ) -> SessionChangeStreamValues<'_, 'session, T> {
         todo!()
     }
 
@@ -132,6 +138,30 @@ where
     /// # }
     /// ```
     pub async fn next(&mut self, session: &mut ClientSession) -> Option<Result<T>> {
+        todo!()
+    }
+}
+
+/// A type that implements [`Stream`](https://docs.rs/futures/latest/futures/stream/index.html) which can be used to
+/// stream the results of a [`SessionChangeStream`]. Returned from [`SessionChangeStream::values`].
+///
+/// This updates the buffer of the parent [`SessionChangeStream`] when dropped.
+/// [`SessionChangeStream::next`] or any further streams created from
+/// [`SessionChangeStream::values`] will pick up where this one left off.
+pub struct SessionChangeStreamValues<'cursor, 'session, T>
+where
+    T: DeserializeOwned + Unpin + Send + Sync,
+{
+    stream: SessionCursorStream<'cursor, 'session, T>,
+}
+
+impl<'cursor, 'session, T> Stream for SessionChangeStreamValues<'cursor, 'session, T>
+where
+    T: DeserializeOwned + Unpin + Send + Sync,
+{
+    type Item = Result<T>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         todo!()
     }
 }
