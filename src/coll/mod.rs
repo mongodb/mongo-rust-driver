@@ -14,16 +14,7 @@ use serde::{
 };
 
 use self::options::*;
-use crate::{
-    bson::{doc, to_document, Bson, Document},
-    bson_util,
-    change_stream::{event::ChangeStreamEvent, options::ChangeStreamOptions, ChangeStream},
-    client::session::TransactionState,
-    cmap::conn::PinnedConnectionHandle,
-    concern::{ReadConcern, WriteConcern},
-    error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
-    index::IndexModel,
-    operation::{
+use crate::{Client, ClientSession, Cursor, Database, SessionCursor, bson::{doc, to_document, Bson, Document}, bson_util, change_stream::{ChangeStream, event::ChangeStreamEvent, options::ChangeStreamOptions, session::SessionChangeStream}, client::session::TransactionState, cmap::conn::PinnedConnectionHandle, concern::{ReadConcern, WriteConcern}, error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result}, index::IndexModel, operation::{
         Aggregate,
         Count,
         CountDocuments,
@@ -37,22 +28,14 @@ use crate::{
         Insert,
         ListIndexes,
         Update,
-    },
-    results::{
+    }, results::{
         CreateIndexResult,
         CreateIndexesResult,
         DeleteResult,
         InsertManyResult,
         InsertOneResult,
         UpdateResult,
-    },
-    selection_criteria::SelectionCriteria,
-    Client,
-    ClientSession,
-    Cursor,
-    Database,
-    SessionCursor,
-};
+    }, selection_criteria::SelectionCriteria};
 
 /// `Collection` is the client-side abstraction of a MongoDB Collection. It can be used to
 /// perform collection-level operations such as CRUD operations. A `Collection` can be obtained
@@ -814,6 +797,19 @@ impl<T> Collection<T> {
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<ChangeStreamOptions>>,
     ) -> Result<ChangeStream<ChangeStreamEvent<T>>>
+    where
+        T: DeserializeOwned + Unpin + Send + Sync,
+    {
+        todo!()
+    }
+
+    #[allow(unused)]
+    pub(crate) async fn watch_with_session(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: impl Into<Option<ChangeStreamOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<SessionChangeStream<ChangeStreamEvent<T>>>
     where
         T: DeserializeOwned + Unpin + Send + Sync,
     {

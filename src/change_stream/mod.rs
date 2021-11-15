@@ -1,6 +1,7 @@
 //! Contains the functionality for ChangeStreams.
 pub mod event;
 pub(crate) mod options;
+pub mod session;
 
 use std::{
     marker::PhantomData,
@@ -40,13 +41,6 @@ use crate::{
 /// `ChangeStream`. Issuing a raw change stream aggregation is discouraged unless users wish to
 /// explicitly opt out of resumability.
 ///
-/// A `ChangeStream` can be iterated to return batches of instances of the result type.  For
-/// `watch`, this will be [`ChangeStreamEvent`] wrapping the value type (for [`Collection::watch`])
-/// or a [`Document`] (for [`Client::watch`] and [`Database::watch`]).  For `watch_with_pipeline`,
-/// a deserializable type must be specified that matches the result of the aggregation pipeline; if
-/// the pipeline does not alter the event structure it may be convenient to reuse
-/// [`ChangeStreamEvent`] for that type.
-///
 /// A `ChangeStream` can be iterated like any other [`Stream`]:
 ///
 /// ```rust
@@ -78,6 +72,7 @@ use crate::{
 ///
 /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams) for more
 /// details. Also see the documentation on [usage recommendations](https://docs.mongodb.com/manual/administration/change-streams-production-recommendations/).
+#[derive(Debug)]
 pub struct ChangeStream<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
@@ -85,34 +80,8 @@ where
     /// The cursor to iterate over event instances.
     cursor: Cursor<T>,
 
-    /// The pipeline of stages to append to an initial `$changeStream` stage.
-    pipeline: Vec<Document>,
-
-    /// The client that was used for the initial `$changeStream` aggregation, used for server
-    /// selection during an automatic resume.
-    client: Client,
-
-    /// The original target of the change stream, used for re-issuing the aggregation during
-    /// an automatic resume.
-    target: ChangeStreamTarget<T>,
-
-    /// The cached resume token.
-    resume_token: Option<ResumeToken>,
-
-    /// The options provided to the initial `$changeStream` stage.
-    options: Option<ChangeStreamOptions>,
-
-    /// The read preference for the initial `$changeStream` aggregation, used for server selection
-    /// during an automatic resume.
-    read_preference: Option<ReadPreference>,
-
-    /// Whether or not the change stream has attempted a resume, used to attempt a resume only
-    /// once.
-    resume_attempted: bool,
-
-    /// Whether or not the change stream has returned a document, used to update resume token
-    /// during an automatic resume.
-    document_returned: bool,
+    /// The information associate with this change stream.
+    data: ChangeStreamData,
 }
 
 impl<T> ChangeStream<T>
@@ -135,9 +104,41 @@ where
     }
 }
 
+#[derive(Debug)]
+struct ChangeStreamData {
+    /// The pipeline of stages to append to an initial `$changeStream` stage.
+    pipeline: Vec<Document>,
+
+    /// The client that was used for the initial `$changeStream` aggregation, used for server
+    /// selection during an automatic resume.
+    client: Client,
+
+    /// The original target of the change stream, used for re-issuing the aggregation during
+    /// an automatic resume.
+    target: ChangeStreamTarget,
+
+    /// The cached resume token.
+    resume_token: Option<ResumeToken>,
+
+    /// The options provided to the initial `$changeStream` stage.
+    options: Option<ChangeStreamOptions>,
+
+    /// The read preference for the initial `$changeStream` aggregation, used for server selection
+    /// during an automatic resume.
+    read_preference: Option<ReadPreference>,
+
+    /// Whether or not the change stream has attempted a resume, used to attempt a resume only
+    /// once.
+    resume_attempted: bool,
+
+    /// Whether or not the change stream has returned a document, used to update resume token
+    /// during an automatic resume.
+    document_returned: bool,
+}
+
 #[derive(Debug, Clone)]
-pub(crate) enum ChangeStreamTarget<T> {
-    Collection(Collection<T>),
+pub(crate) enum ChangeStreamTarget {
+    Collection(Collection<Document>),
     Database(Database),
     Cluster(Database),
 }

@@ -13,26 +13,14 @@ use derivative::Derivative;
 
 #[cfg(test)]
 use crate::options::ServerAddress;
-use crate::{
-    bson::Document,
-    change_stream::{event::ChangeStreamEvent, options::ChangeStreamOptions, ChangeStream},
-    concern::{ReadConcern, WriteConcern},
-    db::Database,
-    error::{ErrorKind, Result},
-    event::command::CommandEventHandler,
-    operation::ListDatabases,
-    options::{
+use crate::{ClientSession, bson::Document, change_stream::{ChangeStream, event::ChangeStreamEvent, options::ChangeStreamOptions, session::SessionChangeStream}, concern::{ReadConcern, WriteConcern}, db::Database, error::{ErrorKind, Result}, event::command::CommandEventHandler, operation::ListDatabases, options::{
         ClientOptions,
         DatabaseOptions,
         ListDatabasesOptions,
         ReadPreference,
         SelectionCriteria,
         SessionOptions,
-    },
-    results::DatabaseSpecification,
-    sdam::{SelectedServer, SessionSupportStatus, Topology},
-    ClientSession,
-};
+    }, results::DatabaseSpecification, sdam::{SelectedServer, SessionSupportStatus, Topology}};
 pub(crate) use executor::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS};
 pub(crate) use session::{ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS};
 
@@ -282,6 +270,16 @@ impl Client {
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<ChangeStreamOptions>>,
     ) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
+        todo!()
+    }
+
+    #[allow(unused)]
+    pub(crate) async fn watch_with_session(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: impl Into<Option<ChangeStreamOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
         todo!()
     }
 
