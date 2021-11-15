@@ -472,6 +472,8 @@ impl Database {
         todo!()
     }
 
+    /// Starts a new [`SessionChangeStream`] that receives events for all changes in this database
+    /// using the provided [`ClientSession`].  See [`Database::watch`] for more information.
     #[allow(unused)]
     pub(crate) async fn watch_with_session(
         &self,

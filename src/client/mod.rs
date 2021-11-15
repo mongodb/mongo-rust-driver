@@ -290,6 +290,8 @@ impl Client {
         todo!()
     }
 
+    /// Starts a new [`SessionChangeStream`] that receives events for all changes in the cluster
+    /// using the provided [`ClientSession`].  See [`Client::watch`] for more information.
     #[allow(unused)]
     pub(crate) async fn watch_with_session(
         &self,

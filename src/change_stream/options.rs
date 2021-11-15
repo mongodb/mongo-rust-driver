@@ -4,7 +4,12 @@ use serde_with::skip_serializing_none;
 use std::time::Duration;
 use typed_builder::TypedBuilder;
 
-use crate::{change_stream::event::ResumeToken, collation::Collation, options::AggregateOptions};
+use crate::{
+    bson::Timestamp,
+    change_stream::event::ResumeToken,
+    collation::Collation,
+    options::AggregateOptions,
+};
 
 /// These are the valid options that can be passed to the `watch` method for creating a
 /// [`ChangeStream`](crate::change_stream::ChangeStream).
@@ -13,9 +18,10 @@ use crate::{change_stream::event::ResumeToken, collation::Collation, options::Ag
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ChangeStreamOptions {
+    #[rustfmt::skip]
     /// When set to [`FullDocumentType::UpdateLookup`], the
-    /// [`ChangeStreamEvent::full_document`](`crate::change_stream::event::ChangeStreamEvent::
-    /// full_document`) field  will be populated with a copy of the entire document that was
+    /// [`ChangeStreamEvent::full_document`](crate::change_stream::event::ChangeStreamEvent::full_document)
+    /// field  will be populated with a copy of the entire document that was
     /// updated from some time after the change occurred when an "update" event occurs. By
     /// default, the `full_document` field will be empty for updates.
     #[builder(default)]
@@ -49,7 +55,7 @@ pub struct ChangeStreamOptions {
     /// timestamp. Any command run against the server will return an operation time that can be
     /// used here.
     #[builder(default)]
-    pub start_at_operation_time: Option<i64>,
+    pub start_at_operation_time: Option<Timestamp>,
 
     /// Takes a resume token and starts a new change stream returning the first notification after
     /// the token. This will allow users to watch collections that have been dropped and
@@ -63,16 +69,17 @@ pub struct ChangeStreamOptions {
     pub start_after: Option<ResumeToken>,
 }
 
+#[rustfmt::skip]
 /// Describes the modes for configuring the
-/// [`ChangeStreamEvent::full_document`](`crate::change_stream::event::ChangeStreamEvent::
-/// full_document`) field.
+/// [`ChangeStreamEvent::full_document`](crate::change_stream::event::ChangeStreamEvent::full_document)
+/// field.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[non_exhaustive]
 pub enum FullDocumentType {
+    #[rustfmt::skip]
     /// The
-    /// [`ChangeStreamEvent::full_document`](`crate::change_stream::event::ChangeStreamEvent::
-    /// full_document`) field will be populated with a copy of the entire document that was
-    /// updated.
+    /// [`ChangeStreamEvent::full_document`](crate::change_stream::event::ChangeStreamEvent::full_document)
+    /// field will be populated with a copy of the entire document that was updated.
     UpdateLookup,
 
     /// User-defined other types for forward compatibility.

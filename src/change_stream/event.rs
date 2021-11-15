@@ -43,23 +43,27 @@ pub struct ChangeStreamEvent<T> {
     /// The new name for the `ns` collection.  Only included for `OperationType::Rename`.
     pub to: Option<Namespace>,
 
-    /// For unsharded collections this contains a single field, id, with the value of the id of the
-    /// document updated.  For sharded collections, this will contain all the components of the
-    /// shard key in order, followed by the id if the id isn’t part of the shard key.
+    /// A `Document` that contains the `_id` of the document created or modified by the `insert`,
+    /// `replace`, `delete`, `update` operations (i.e. CRUD operations). For sharded collections,
+    /// also displays the full shard key for the document. The `_id` field is not repeated if it is
+    /// already a part of the shard key.
     pub document_key: Option<Document>,
 
-    /// A `Document` describing the fields that were updated or removed by the update operation.
+    /// A description of the fields that were updated or removed by the update operation.
     /// Only specified if `operation_type` is `OperationType::Update`.
     pub update_description: Option<UpdateDescription>,
 
-    /// For operations of type "insert" and "replace", this key will contain the document being
-    /// inserted, or the new version of the document that is replacing the existing
-    /// document, respectively.
+    /// The `Document` created or modified by the `insert`, `replace`, `delete`, `update`
+    /// operations (i.e. CRUD operations).
     ///
-    /// For operations of type "update", when the `ChangeStream's` full document type is
-    /// `UpdateLookup`, this key will contain a copy of the full version of the document from
-    /// some point after the update occurred. If the document was deleted since the updated
-    /// happened, it will be `None`.
+    /// For `insert` and `replace` operations, this represents the new document created by the
+    /// operation.  For `delete` operations, this field is `None`.
+    ///
+    /// For `update` operations, this field only appears if you configured the change stream with
+    /// [`full_document`](crate::options::ChangeStreamOptions::full_document) set to
+    /// [`UpdateLookup`](crate::options::FullDocumentType::UpdateLookup). This field then
+    /// represents the most current majority-committed version of the document modified by the
+    /// update operation.
     pub full_document: Option<T>,
 }
 
@@ -111,8 +115,7 @@ pub enum OperationType {
 #[serde(untagged)]
 #[non_exhaustive]
 pub enum ChangeStreamEventSource {
-    /// Contains two fields: "db" and "coll" containing the database and collection name in which
-    /// the change happened.
+    /// The [`Namespace`] containing the database and collection in which the change occurred.
     Namespace(Namespace),
 
     // Contains the name of the database in which the change happened.
