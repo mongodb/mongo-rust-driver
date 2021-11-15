@@ -9,7 +9,7 @@ use crate::{
     client::{options::ServerApi, ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     error::{Error, ErrorKind, Result},
     is_master::{IsMasterCommandResponse, IsMasterReply},
-    operation::{CommandErrorBody, CommandResponse, Response},
+    operation::{CommandErrorBody, CommandResponse},
     options::{ReadConcern, ReadConcernInternal, ReadConcernLevel, ServerAddress},
     selection_criteria::ReadPreference,
     ClientSession,

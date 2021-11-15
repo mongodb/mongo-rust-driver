@@ -3,9 +3,9 @@ mod test;
 
 use std::convert::TryInto;
 
-use bson::{Bson, Timestamp};
+use bson::RawBson;
 
-use super::Operation;
+use super::{CursorBody, Operation};
 use crate::{
     bson::Document,
     client::{ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS},
@@ -72,6 +72,17 @@ impl<'conn> Operation for RunCommand<'conn> {
         ))
     }
 
+    fn extract_at_cluster_time(
+        &self,
+        response: &bson::RawDocument,
+    ) -> Result<Option<bson::Timestamp>> {
+        if let Some(RawBson::Timestamp(ts)) = response.get("atClusterTime")? {
+            Ok(Some(ts))
+        } else {
+            CursorBody::extract_at_cluster_time(response)
+        }
+    }
+
     fn handle_response(
         &self,
         response: RawCommandResponse,
@@ -106,56 +117,4 @@ pub(crate) struct Response {
     doc: Document,
     cluster_time: Option<ClusterTime>,
     recovery_token: Option<Document>,
-}
-
-impl super::Response for Response {
-    type Body = Document;
-
-    fn deserialize_response(raw: &RawCommandResponse) -> Result<Self> {
-        let doc: Document = raw.body()?;
-
-        let cluster_time = doc
-            .get_document("$clusterTime")
-            .ok()
-            .and_then(|doc| bson::from_document(doc.clone()).ok());
-
-        let recovery_token = doc.get_document("recoveryToken").ok().cloned();
-
-        Ok(Self {
-            doc,
-            cluster_time,
-            recovery_token,
-        })
-    }
-
-    fn ok(&self) -> Option<&Bson> {
-        self.doc.get("ok")
-    }
-
-    fn cluster_time(&self) -> Option<&ClusterTime> {
-        self.cluster_time.as_ref()
-    }
-
-    fn at_cluster_time(&self) -> Option<Timestamp> {
-        self.doc
-            .get_timestamp("atClusterTime")
-            .or_else(|_| {
-                self.doc
-                    .get_document("cursor")
-                    .and_then(|subdoc| subdoc.get_timestamp("atClusterTime"))
-            })
-            .ok()
-    }
-
-    fn recovery_token(&self) -> Option<&Document> {
-        self.recovery_token.as_ref()
-    }
-
-    fn operation_time(&self) -> Option<Timestamp> {
-        self.doc.get_timestamp("operationTime").ok()
-    }
-
-    fn into_body(self) -> Self::Body {
-        self.doc
-    }
 }

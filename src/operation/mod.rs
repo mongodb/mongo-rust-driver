@@ -186,42 +186,6 @@ impl<T: CommandBody> Command<T> {
     }
 }
 
-/// Trait modeling the behavior of a command response to a server operation.
-pub(crate) trait Response: Sized {
-    /// The command-specific portion of a command response.
-    /// This type will be passed to the associated operation's `handle_response` method.
-    type Body;
-
-    /// Deserialize a response from the given raw response.
-    fn deserialize_response(raw: &RawCommandResponse) -> Result<Self>;
-
-    /// The `ok` field of the response.
-    fn ok(&self) -> Option<&Bson>;
-
-    /// Whether the command succeeeded or not (i.e. if this response is ok: 1).
-    fn is_success(&self) -> bool {
-        match self.ok() {
-            Some(b) => bson_util::get_int(b) == Some(1),
-            None => false,
-        }
-    }
-
-    /// The `clusterTime` field of the response.
-    fn cluster_time(&self) -> Option<&ClusterTime>;
-
-    /// The `atClusterTime` field of the response.
-    fn at_cluster_time(&self) -> Option<Timestamp>;
-
-    /// The `recoveryToken` field of the response.
-    fn recovery_token(&self) -> Option<&Document>;
-
-    /// The `operationTime` field of the response.
-    fn operation_time(&self) -> Option<Timestamp>;
-
-    /// Convert into the body of the response.
-    fn into_body(self) -> Self::Body;
-}
-
 /// A response to a command with a body shaped deserialized to a `T`.
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -242,80 +206,13 @@ pub(crate) struct CommandResponse<T> {
 }
 
 impl<T: DeserializeOwned> CommandResponse<T> {
+    /// Whether the command succeeeded or not (i.e. if this response is ok: 1).
     pub(crate) fn is_success(&self) -> bool {
-        <Self as Response>::is_success(self)
-    }
-}
-
-impl<T: DeserializeOwned> Response for CommandResponse<T> {
-    type Body = T;
-
-    fn deserialize_response(raw: &RawCommandResponse) -> Result<Self> {
-        raw.body()
+        bson_util::get_int(&self.ok) == Some(1)
     }
 
-    fn ok(&self) -> Option<&Bson> {
-        Some(&self.ok)
-    }
-
-    fn cluster_time(&self) -> Option<&ClusterTime> {
+    pub(crate) fn cluster_time(&self) -> Option<&ClusterTime> {
         self.cluster_time.as_ref()
-    }
-
-    fn at_cluster_time(&self) -> Option<Timestamp> {
-        self.at_cluster_time
-    }
-
-    fn recovery_token(&self) -> Option<&Document> {
-        self.recovery_token.as_ref()
-    }
-
-    fn into_body(self) -> Self::Body {
-        self.body
-    }
-
-    fn operation_time(&self) -> Option<Timestamp> {
-        self.operation_time
-    }
-}
-
-/// A response to commands that return cursors.
-#[derive(Debug)]
-pub(crate) struct CursorResponse {
-    response: CommandResponse<CursorBody>,
-}
-
-impl Response for CursorResponse {
-    type Body = CursorBody;
-
-    fn deserialize_response(raw: &RawCommandResponse) -> Result<Self> {
-        Ok(Self {
-            response: raw.body()?,
-        })
-    }
-
-    fn ok(&self) -> Option<&Bson> {
-        self.response.ok()
-    }
-
-    fn cluster_time(&self) -> Option<&ClusterTime> {
-        self.response.cluster_time()
-    }
-
-    fn operation_time(&self) -> Option<Timestamp> {
-        self.response.operation_time()
-    }
-
-    fn at_cluster_time(&self) -> Option<Timestamp> {
-        self.response.body.cursor.at_cluster_time
-    }
-
-    fn recovery_token(&self) -> Option<&Document> {
-        self.response.recovery_token()
-    }
-
-    fn into_body(self) -> Self::Body {
-        self.response.body
     }
 }
 
