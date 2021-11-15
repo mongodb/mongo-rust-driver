@@ -128,6 +128,11 @@ where
     pub fn resume_token(&self) -> Option<&ResumeToken> {
         todo!()
     }
+
+    /// Update the type streamed values will be parsed as.
+    pub fn with_type<D: DeserializeOwned + Unpin + Send + Sync>(self) -> ChangeStream<D> {
+        todo!()
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -10,7 +10,6 @@ use std::{
 
 use bson::Bson;
 use derivative::Derivative;
-use serde::de::DeserializeOwned;
 
 #[cfg(test)]
 use crate::options::ServerAddress;
@@ -259,29 +258,10 @@ impl Client {
         }
     }
 
-    /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
-    /// for all changes in the cluster. The stream does not observe changes from system
-    /// collections or the "config", "local" or "admin" databases. Note that this method
-    /// (`watch` on a cluster) is only supported in MongoDB 4.0 or greater.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
-    /// streams.
-    ///
-    /// Change streams require either a "majority" read concern or no read
-    /// concern. Anything else will cause a server error.
-    #[allow(unused)]
-    pub(crate) async fn watch(
-        &self,
-        options: impl Into<Option<ChangeStreamOptions>>,
-    ) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
-        todo!()
-    }
-
-    /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
-    /// for all changes in the cluster and processes them via the given aggregation pipeline. The
-    /// stream does not observe changes from system collections or the "config", "local" or "admin"
-    /// databases. Note that this method (`watch` on a cluster) is only supported in MongoDB 4.0 or
-    /// greater.
+    /// Starts a new [`ChangeStream`] that receives events for all changes in the cluster. The
+    /// stream does not observe changes from system collections or the "config", "local" or
+    /// "admin" databases. Note that this method (`watch` on a cluster) is only supported in
+    /// MongoDB 4.0 or greater.
     ///
     /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
     /// streams.
@@ -293,15 +273,15 @@ impl Client {
     /// will cause an error. The driver requires these fields to support resumability. For
     /// more information on resumability, see the documentation for
     /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
+    ///
+    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
+    /// changed via [`ChangeStream::with_type`].
     #[allow(unused)]
-    pub(crate) async fn watch_with_pipeline<D>(
+    pub(crate) async fn watch(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<ChangeStreamOptions>>,
-    ) -> Result<ChangeStream<D>>
-    where
-        D: DeserializeOwned + Unpin + Send + Sync,
-    {
+    ) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
         todo!()
     }
 

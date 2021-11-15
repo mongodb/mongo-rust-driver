@@ -800,40 +800,22 @@ impl<T> Collection<T> {
     ///
     /// Change streams require either a "majority" read concern or no read concern. Anything else
     /// will cause a server error.
-    #[allow(unused)]
-    pub(crate) async fn watch(
-        &self,
-        options: impl Into<Option<ChangeStreamOptions>>,
-    ) -> Result<ChangeStream<ChangeStreamEvent<T>>>
-    where
-        T: DeserializeOwned + Unpin + Send + Sync,
-    {
-        todo!()
-    }
-
-    /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
-    /// for all changes in this collection and processes them via the given aggregation pipeline. A
-    /// [`ChangeStream`](change_stream/struct.ChangeStream.html) cannot be started on system
-    /// collections.
-    ///
-    /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
-    /// streams.
-    ///
-    /// Change streams require either a "majority" read concern or no read concern. Anything else
-    /// will cause a server error.
     ///
     /// Also note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
     /// fields will cause an error. The driver requires these fields to support resumability. For
     /// more information on resumability, see the documentation for
     /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
+    ///
+    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
+    /// changed via [`ChangeStream::with_type`].
     #[allow(unused)]
-    pub(crate) async fn watch_with_pipeline<D>(
+    pub(crate) async fn watch(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<ChangeStreamOptions>>,
-    ) -> Result<ChangeStream<D>>
+    ) -> Result<ChangeStream<ChangeStreamEvent<T>>>
     where
-        D: DeserializeOwned + Unpin + Send + Sync,
+        T: DeserializeOwned + Unpin + Send + Sync,
     {
         todo!()
     }

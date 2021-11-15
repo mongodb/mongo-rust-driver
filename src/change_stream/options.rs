@@ -14,10 +14,10 @@ use crate::{change_stream::event::ResumeToken, collation::Collation, options::Ag
 #[non_exhaustive]
 pub struct ChangeStreamOptions {
     /// When set to [`FullDocumentType::UpdateLookup`], the
-    /// [`ChangeStreamEvent::full_document`](`crate::change_stream::event::ChangeStreamEvent::full_document`)
-    /// field  will be populated with a copy of the entire document that was updated from some time
-    /// after the change occurred when an "update" event occurs. By default, the `full_document`
-    /// field will be empty for updates.
+    /// [`ChangeStreamEvent::full_document`](`crate::change_stream::event::ChangeStreamEvent::
+    /// full_document`) field  will be populated with a copy of the entire document that was
+    /// updated from some time after the change occurred when an "update" event occurs. By
+    /// default, the `full_document` field will be empty for updates.
     #[builder(default)]
     pub full_document: Option<FullDocumentType>,
 
@@ -64,14 +64,15 @@ pub struct ChangeStreamOptions {
 }
 
 /// Describes the modes for configuring the
-/// [`ChangeStreamEvent::full_document`](`crate::change_stream::event::ChangeStreamEvent::full_document`)
-/// field.
+/// [`ChangeStreamEvent::full_document`](`crate::change_stream::event::ChangeStreamEvent::
+/// full_document`) field.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[non_exhaustive]
 pub enum FullDocumentType {
     /// The
-    /// [`ChangeStreamEvent::full_document`](`crate::change_stream::event::ChangeStreamEvent::full_document`)
-    /// field will be populated with a copy of the entire document that was updated.
+    /// [`ChangeStreamEvent::full_document`](`crate::change_stream::event::ChangeStreamEvent::
+    /// full_document`) field will be populated with a copy of the entire document that was
+    /// updated.
     UpdateLookup,
 
     /// User-defined other types for forward compatibility.
