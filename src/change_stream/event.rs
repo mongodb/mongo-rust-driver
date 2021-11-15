@@ -1,4 +1,4 @@
-//! Contains documents related to a ChangeStream event.
+//! Contains the types related to a `ChangeStream` event.
 use crate::coll::Namespace;
 use bson::{Bson, Document};
 use serde::{Deserialize, Serialize};
@@ -37,10 +37,10 @@ pub struct ChangeStreamEvent<T> {
     /// Describes the type of operation represented in this change notification.
     pub operation_type: OperationType,
 
-    /// Identifies which collection or database where the event occurred.
+    /// Identifies the collection or database on which the event occurred.
     pub ns: Option<ChangeStreamEventSource>,
 
-    /// The new name for the ns collection.  Only included for `OperationType::Rename`.
+    /// The new name for the `ns` collection.  Only included for `OperationType::Rename`.
     pub to: Option<Namespace>,
 
     /// For unsharded collections this contains a single field, id, with the value of the id of the
@@ -48,7 +48,8 @@ pub struct ChangeStreamEvent<T> {
     /// shard key in order, followed by the id if the id isn’t part of the shard key.
     pub document_key: Option<Document>,
 
-    /// Contains a description of updated and removed fields in this operation.
+    /// A `Document` describing the fields that were updated or removed by the update operation.
+    /// Only specified if `operation_type` is `OperationType::Update`.
     pub update_description: Option<UpdateDescription>,
 
     /// For operations of type "insert" and "replace", this key will contain the document being
@@ -105,7 +106,7 @@ pub enum OperationType {
     Invalidate,
 }
 
-/// Identifies which collection or database where an event occurred.
+/// Identifies the collection or database on which an event occurred.
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
 #[non_exhaustive]
@@ -114,6 +115,6 @@ pub enum ChangeStreamEventSource {
     /// the change happened.
     Namespace(Namespace),
 
-    // Contains the name of the dabatase in which the change happened.
+    // Contains the name of the database in which the change happened.
     Database(String),
 }

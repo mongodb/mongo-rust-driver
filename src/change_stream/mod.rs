@@ -1,4 +1,4 @@
-//! Contains the functionality for ChangeStreams.
+//! Contains the functionality for change streams.
 pub mod event;
 pub(crate) mod options;
 pub mod session;
@@ -31,7 +31,7 @@ use crate::{
 /// deployment. `ChangeStream` instances should be created with method `watch` or
 /// `watch_with_pipeline` against the relevant target.
 ///
-/// `ChangeStream`'s are "resumable", meaning that they can be restarted at a given place in the
+/// `ChangeStream`s are "resumable", meaning that they can be restarted at a given place in the
 /// stream of events. This is done automatically when the `ChangeStream` encounters certain
 /// ["resumable"](https://github.com/mongodb/specifications/blob/master/source/change-streams/change-streams.rst#resumable-error)
 /// errors, such as transient network failures. It can also be done manually by passing
