@@ -27,21 +27,6 @@ async fn build() {
     );
 }
 
-#[test]
-fn build_no_write_concern() {
-    let mut op = RunCommand::new(
-        "foo".into(),
-        doc! { "hello": 1, "writeConcern": {} },
-        None,
-        None,
-    )
-    .unwrap();
-
-    let command = op.build(&StreamDescription::new_testing()).unwrap();
-
-    assert_eq!(command.body.get("writeConcern"), None);
-}
-
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_success() {

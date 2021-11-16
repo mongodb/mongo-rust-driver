@@ -43,34 +43,6 @@ async fn build() {
     );
 }
 
-#[test]
-fn build_no_write_concern() {
-    let mut op = Create::new(
-        Namespace {
-            db: "test_db".to_string(),
-            coll: "test_coll".to_string(),
-        },
-        Some(CreateCollectionOptions {
-            write_concern: Some(WriteConcern {
-                ..Default::default()
-            }),
-            ..Default::default()
-        }),
-    );
-
-    let description = StreamDescription::new_testing();
-    let cmd = op.build(&description).unwrap();
-
-    assert_eq!(cmd.name.as_str(), "create");
-    assert_eq!(cmd.target_db.as_str(), "test_db");
-    assert_eq!(
-        cmd.body,
-        doc! {
-            "create": "test_coll",
-        }
-    );
-}
-
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_validator() {

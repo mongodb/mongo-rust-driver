@@ -114,37 +114,6 @@ async fn build() {
     );
 }
 
-#[test]
-fn build_no_write_concern() {
-    let options = InsertManyOptions {
-        ordered: Some(true),
-        write_concern: Some(WriteConcern::builder().build()),
-        ..Default::default()
-    };
-    let mut fixtures = fixtures(Some(options));
-    let cmd = fixtures
-        .op
-        .build(&StreamDescription::new_testing())
-        .unwrap();
-
-    let serialized = fixtures.op.serialize_command(cmd).unwrap();
-    let cmd_doc = Document::from_reader(serialized.as_slice()).unwrap();
-
-    assert_eq!(
-        cmd_doc.get("ordered"),
-        fixtures.options.ordered.map(Bson::Boolean).as_ref()
-    );
-    assert_eq!(
-        cmd_doc.get("bypassDocumentValidation"),
-        fixtures
-            .options
-            .bypass_document_validation
-            .map(Bson::Boolean)
-            .as_ref()
-    );
-    assert_eq!(cmd_doc.get("writeConcern"), None);
-}
-
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_ordered() {

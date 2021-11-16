@@ -40,26 +40,3 @@ fn build() {
         }
     );
 }
-
-#[test]
-fn build_no_write_concern() {
-    let mut op = CommitTransaction {
-        options: Some(TransactionOptions {
-            write_concern: Some(WriteConcern {
-                ..Default::default()
-            }),
-            ..Default::default()
-        }),
-    };
-
-    let description = StreamDescription::new_testing();
-    let cmd = op.build(&description).expect("build should succeed");
-
-    assert_eq!(cmd.name.as_str(), "commitTransaction");
-    assert_eq!(
-        cmd.body,
-        doc! {
-            "commitTransaction": 1,
-        }
-    );
-}

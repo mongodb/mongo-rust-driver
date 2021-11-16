@@ -43,22 +43,3 @@ fn build() {
         }
     );
 }
-
-#[test]
-fn build_no_write_concern() {
-    let wc = WriteConcern {
-        ..Default::default()
-    };
-    let pinned = TransactionPin::Mongos(ReadPreference(Primary));
-
-    let mut op = AbortTransaction::new(Some(wc), Some(pinned));
-    let cmd = op.build(&StreamDescription::new_testing()).unwrap();
-
-    assert_eq!(cmd.name, "abortTransaction");
-    assert_eq!(
-        cmd.body,
-        doc! {
-            "abortTransaction": 1,
-        }
-    );
-}

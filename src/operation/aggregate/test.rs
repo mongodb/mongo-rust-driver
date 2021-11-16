@@ -70,30 +70,6 @@ async fn build() {
     build_test(ns, pipeline, Some(options), expected_body);
 }
 
-#[test]
-fn build_no_write_concern() {
-    let ns = Namespace {
-        db: "test_db".to_string(),
-        coll: "test_coll".to_string(),
-    };
-
-    let pipeline = Vec::new();
-
-    let options = AggregateOptions::builder()
-        .write_concern(WriteConcern {
-            ..Default::default()
-        })
-        .build();
-
-    let expected_body = doc! {
-        "aggregate": "test_coll",
-        "pipeline": [],
-        "cursor": {},
-    };
-
-    build_test(ns, pipeline, Some(options), expected_body);
-}
-
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn build_batch_size() {
