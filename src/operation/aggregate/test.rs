@@ -5,7 +5,7 @@ use crate::{
     bson::{doc, Document},
     bson_util,
     cmap::StreamDescription,
-    concern::{ReadConcern, ReadConcernLevel, WriteConcern},
+    concern::{ReadConcern, ReadConcernLevel},
     error::{ErrorKind, WriteFailure},
     operation::{
         test::{self, handle_response_test},

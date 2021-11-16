@@ -5,7 +5,6 @@ use crate::{
     bson_util,
     cmap::StreamDescription,
     coll::options::ReturnDocument,
-    concern::WriteConcern,
     operation::{test::handle_response_test, FindAndModify, Operation},
     options::{
         FindOneAndDeleteOptions,
