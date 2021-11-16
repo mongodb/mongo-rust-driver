@@ -13,19 +13,10 @@ use bson::Document;
 use futures_core::Stream;
 use serde::{de::DeserializeOwned, Deserialize};
 
-use crate::{
-    change_stream::{
+use crate::{Client, Collection, Cursor, Database, change_stream::{
         event::{ChangeStreamEvent, ResumeToken},
         options::ChangeStreamOptions,
-    },
-    error::Result,
-    options::AggregateOptions,
-    selection_criteria::ReadPreference,
-    Client,
-    Collection,
-    Cursor,
-    Database,
-};
+    }, error::Result, options::AggregateOptions, selection_criteria::{ReadPreference, SelectionCriteria}};
 
 /// A `ChangeStream` streams the ongoing changes of its associated collection, database or
 /// deployment. `ChangeStream` instances should be created with method `watch` or
@@ -88,6 +79,10 @@ impl<T> ChangeStream<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
+    pub(crate) fn new(cursor: Cursor<T>, data: ChangeStreamData) -> Self {
+        Self { cursor, data }
+    }
+
     /// Returns the cached resume token that can be used to resume after the most recently returned
     /// change.
     ///
@@ -105,7 +100,7 @@ where
 }
 
 #[derive(Debug)]
-struct ChangeStreamData {
+pub(crate) struct ChangeStreamData {
     /// The pipeline of stages to append to an initial `$changeStream` stage.
     pipeline: Vec<Document>,
 
@@ -123,9 +118,9 @@ struct ChangeStreamData {
     /// The options provided to the initial `$changeStream` stage.
     options: Option<ChangeStreamOptions>,
 
-    /// The read preference for the initial `$changeStream` aggregation, used for server selection
+    /// The selection criteria for the initial `$changeStream` aggregation, used for server selection
     /// during an automatic resume.
-    read_preference: Option<ReadPreference>,
+    selection_criteria: Option<SelectionCriteria>,
 
     /// Whether or not the change stream has attempted a resume, used to attempt a resume only
     /// once.
@@ -134,6 +129,21 @@ struct ChangeStreamData {
     /// Whether or not the change stream has returned a document, used to update resume token
     /// during an automatic resume.
     document_returned: bool,
+}
+
+impl ChangeStreamData {
+    pub(crate) fn new(pipeline: Vec<Document>, client: Client, target: ChangeStreamTarget, options: Option<ChangeStreamOptions>, selection_criteria: Option<SelectionCriteria>) -> Self {
+        Self {
+            pipeline,
+            client,
+            target,
+            resume_token: None,
+            options,
+            selection_criteria,
+            resume_attempted: false,
+            document_returned: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

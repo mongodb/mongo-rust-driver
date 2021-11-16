@@ -1,6 +1,6 @@
 pub mod options;
 
-use std::{borrow::Borrow, collections::HashSet, fmt, fmt::Debug, sync::Arc};
+use std::{borrow::Borrow, collections::HashSet, fmt, fmt::Debug, marker::PhantomData, sync::Arc};
 
 use futures_util::{
     future,
@@ -14,21 +14,7 @@ use serde::{
 };
 
 use self::options::*;
-use crate::{
-    bson::{doc, to_document, Bson, Document},
-    bson_util,
-    change_stream::{
-        event::ChangeStreamEvent,
-        options::ChangeStreamOptions,
-        session::SessionChangeStream,
-        ChangeStream,
-    },
-    client::session::TransactionState,
-    cmap::conn::PinnedConnectionHandle,
-    concern::{ReadConcern, WriteConcern},
-    error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
-    index::IndexModel,
-    operation::{
+use crate::{Client, ClientSession, Cursor, Database, SessionCursor, bson::{doc, to_document, Bson, Document}, bson_util, change_stream::{ChangeStream, ChangeStreamData, ChangeStreamTarget, event::ChangeStreamEvent, options::ChangeStreamOptions, session::SessionChangeStream}, client::session::TransactionState, cmap::conn::PinnedConnectionHandle, concern::{ReadConcern, WriteConcern}, error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result}, index::IndexModel, operation::{
         Aggregate,
         Count,
         CountDocuments,
@@ -42,22 +28,14 @@ use crate::{
         Insert,
         ListIndexes,
         Update,
-    },
-    results::{
+    }, results::{
         CreateIndexResult,
         CreateIndexesResult,
         DeleteResult,
         InsertManyResult,
         InsertOneResult,
         UpdateResult,
-    },
-    selection_criteria::SelectionCriteria,
-    Client,
-    ClientSession,
-    Cursor,
-    Database,
-    SessionCursor,
-};
+    }, selection_criteria::SelectionCriteria};
 
 /// `Collection` is the client-side abstraction of a MongoDB Collection. It can be used to
 /// perform collection-level operations such as CRUD operations. A `Collection` can be obtained
@@ -822,7 +800,40 @@ impl<T> Collection<T> {
     where
         T: DeserializeOwned + Unpin + Send + Sync,
     {
-        todo!()
+        let pipeline: Vec<_> = pipeline.into_iter().collect();
+        let options = options.into();
+
+        let mut agg_options: Option<AggregateOptions> = None;
+        resolve_options!(
+            self,
+            agg_options,
+            [read_concern, write_concern, selection_criteria]
+        );
+        let selection_criteria = agg_options.as_ref().and_then(|o| o.selection_criteria.clone());
+
+        let bson_opts = match &options {
+            None => bson::to_bson(&ChangeStreamOptions::default())?,
+            Some(o) => bson::to_bson(o)?,
+        };
+        let agg_pipeline = std::iter::once(doc! {
+            "$changeStream": bson_opts,
+        })
+        .chain(pipeline.iter().cloned());
+
+        let aggregate = Aggregate::new(self.namespace(), agg_pipeline, agg_options);
+        let client = self.client();
+        let cursor = client.execute_cursor_operation(aggregate).await?;
+
+        Ok(ChangeStream::new(
+            cursor.with_type(),
+            ChangeStreamData::new(
+                pipeline,
+                client.clone(),
+                ChangeStreamTarget::Collection(self.clone().with_document()),
+                options,
+                selection_criteria,
+            ),
+        ))
     }
 
     /// Starts a new [`SessionChangeStream`] that receives events for all changes in this collection
@@ -838,6 +849,13 @@ impl<T> Collection<T> {
         T: DeserializeOwned + Unpin + Send + Sync,
     {
         todo!()
+    }
+
+    pub(crate) fn with_document(self) -> Collection<Document> {
+        Collection {
+            inner: self.inner,
+            _phantom: PhantomData::default(),
+        }
     }
 }
 

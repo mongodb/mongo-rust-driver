@@ -130,6 +130,14 @@ where
         );
         self.kill_watcher = Some(tx);
     }
+
+    pub(crate) fn with_type<D>(self) -> Cursor<D>
+    where
+    D: DeserializeOwned + Unpin + Send + Sync,
+    {
+        todo!()
+    }
+
 }
 
 impl<T> Stream for Cursor<T>
