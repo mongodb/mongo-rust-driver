@@ -1,31 +1,24 @@
 #[cfg(test)]
 mod test;
 
-use std::marker::PhantomData;
-
-use serde::de::DeserializeOwned;
-
 use crate::{
     bson::{doc, Document},
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
     operation::{append_options, CursorBody, Operation, Retryability},
     options::{ListCollectionsOptions, ReadPreference, SelectionCriteria},
 };
 
-use super::CursorResponse;
-
 #[derive(Debug)]
-pub(crate) struct ListCollections<T> {
+pub(crate) struct ListCollections {
     db: String,
     filter: Option<Document>,
     name_only: bool,
     options: Option<ListCollectionsOptions>,
-    _phantom: PhantomData<T>,
 }
 
-impl<T> ListCollections<T> {
+impl ListCollections {
     #[cfg(test)]
     fn empty() -> Self {
         Self::new(String::new(), None, false, None)
@@ -42,18 +35,13 @@ impl<T> ListCollections<T> {
             filter,
             name_only,
             options,
-            _phantom: PhantomData::default(),
         }
     }
 }
 
-impl<T> Operation for ListCollections<T>
-where
-    T: DeserializeOwned + Unpin + Send + Sync,
-{
-    type O = CursorSpecification<T>;
+impl Operation for ListCollections {
+    type O = CursorSpecification;
     type Command = Document;
-    type Response = CursorResponse<T>;
 
     const NAME: &'static str = "listCollections";
 
@@ -79,9 +67,10 @@ where
 
     fn handle_response(
         &self,
-        response: CursorBody<T>,
+        raw_response: RawCommandResponse,
         description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: CursorBody = raw_response.body()?;
         Ok(CursorSpecification::new(
             response.cursor,
             description.server_address.clone(),

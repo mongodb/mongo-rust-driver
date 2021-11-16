@@ -6,14 +6,14 @@ use serde::Deserialize;
 
 use crate::{
     bson::doc,
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{options::EstimatedDocumentCountOptions, Namespace},
     error::{Error, ErrorKind, Result},
     operation::{append_options, CursorBody, Operation, Retryability},
     selection_criteria::SelectionCriteria,
 };
 
-use super::{CommandResponse, SERVER_4_9_0_WIRE_VERSION};
+use super::SERVER_4_9_0_WIRE_VERSION;
 
 pub(crate) struct Count {
     ns: Namespace,
@@ -40,7 +40,6 @@ impl Count {
 impl Operation for Count {
     type O = u64;
     type Command = Document;
-    type Response = CommandResponse<Response>;
 
     const NAME: &'static str = "count";
 
@@ -84,21 +83,18 @@ impl Operation for Count {
 
     fn handle_response(
         &self,
-        response: Response,
+        response: RawCommandResponse,
         description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: Response = response.body()?;
+
         let response_body: ResponseBody = match (description.max_wire_version, response) {
             (Some(v), Response::Aggregate(mut cursor_body)) if v >= SERVER_4_9_0_WIRE_VERSION => {
-                cursor_body
-                    .cursor
-                    .first_batch
-                    .pop_front()
-                    .and_then(|doc| bson::from_document(doc).ok())
-                    .ok_or_else(|| {
-                        Error::from(ErrorKind::InvalidResponse {
-                            message: "invalid server response to count operation".into(),
-                        })
-                    })?
+                cursor_body.cursor.first_batch.pop_front().ok_or_else(|| {
+                    Error::from(ErrorKind::InvalidResponse {
+                        message: "invalid server response to count operation".into(),
+                    })
+                })?
             }
             (_, Response::Count(body)) => body,
             _ => {
@@ -139,7 +135,7 @@ impl Operation for Count {
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub(crate) enum Response {
-    Aggregate(Box<CursorBody<Document>>),
+    Aggregate(Box<CursorBody<ResponseBody>>),
     Count(ResponseBody),
 }
 

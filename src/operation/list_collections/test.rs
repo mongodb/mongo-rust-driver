@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 use crate::{
     bson::{doc, Document},
     bson_util,
@@ -7,11 +9,7 @@ use crate::{
     Namespace,
 };
 
-fn build_test(
-    db_name: &str,
-    mut list_collections: ListCollections<Document>,
-    mut expected_body: Document,
-) {
+fn build_test(db_name: &str, mut list_collections: ListCollections, mut expected_body: Document) {
     let mut cmd = list_collections
         .build(&StreamDescription::new_testing())
         .expect("build should succeed");
@@ -128,7 +126,7 @@ async fn build_batch_size() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn op_selection_criteria() {
-    assert!(ListCollections::<Document>::empty()
+    assert!(ListCollections::empty()
         .selection_criteria()
         .expect("should have criteria")
         .is_read_pref_primary());
@@ -183,6 +181,7 @@ async fn handle_success() {
         cursor_spec
             .initial_buffer
             .into_iter()
+            .map(|d| d.try_into().unwrap())
             .collect::<Vec<Document>>(),
         first_batch
     );
@@ -204,6 +203,7 @@ async fn handle_success() {
         cursor_spec
             .initial_buffer
             .into_iter()
+            .map(|d| d.try_into().unwrap())
             .collect::<Vec<Document>>(),
         first_batch
     );
@@ -243,6 +243,7 @@ async fn handle_success_name_only() {
         cursor_spec
             .initial_buffer
             .into_iter()
+            .map(|d| d.try_into().unwrap())
             .collect::<Vec<Document>>(),
         first_batch
     );
@@ -251,7 +252,7 @@ async fn handle_success_name_only() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_invalid_response() {
-    let list_collections = ListCollections::<Document>::empty();
+    let list_collections = ListCollections::empty();
 
     let garbled = doc! { "asdfasf": "ASdfasdf" };
     handle_response_test(&list_collections, garbled).expect_err("garbled response should fail");

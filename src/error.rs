@@ -338,6 +338,14 @@ impl From<bson::ser::Error> for ErrorKind {
     }
 }
 
+impl From<bson::raw::Error> for ErrorKind {
+    fn from(err: bson::raw::Error) -> Self {
+        Self::InvalidResponse {
+            message: err.to_string(),
+        }
+    }
+}
+
 impl From<std::io::Error> for ErrorKind {
     fn from(err: std::io::Error) -> Self {
         Self::Io(Arc::new(err))

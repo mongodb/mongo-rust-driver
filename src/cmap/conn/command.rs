@@ -1,6 +1,7 @@
 use std::time::Duration;
 
-use serde::{de::DeserializeOwned, Serialize};
+use bson::RawDocumentBuf;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::wire::Message;
 use crate::{
@@ -8,7 +9,7 @@ use crate::{
     client::{options::ServerApi, ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     error::{Error, ErrorKind, Result},
     is_master::{IsMasterCommandResponse, IsMasterReply},
-    operation::{CommandErrorBody, CommandResponse, Response},
+    operation::{CommandErrorBody, CommandResponse},
     options::{ReadConcern, ReadConcernInternal, ReadConcernLevel, ServerAddress},
     selection_criteria::ReadPreference,
     ClientSession,
@@ -174,7 +175,7 @@ impl<T> Command<T> {
 #[derive(Debug, Clone)]
 pub(crate) struct RawCommandResponse {
     pub(crate) source: ServerAddress,
-    raw: Vec<u8>,
+    raw: RawDocumentBuf,
 }
 
 impl RawCommandResponse {
@@ -182,7 +183,10 @@ impl RawCommandResponse {
     pub(crate) fn with_document_and_address(source: ServerAddress, doc: Document) -> Result<Self> {
         let mut raw = Vec::new();
         doc.to_writer(&mut raw)?;
-        Ok(Self { source, raw })
+        Ok(Self {
+            source,
+            raw: RawDocumentBuf::new(raw)?,
+        })
     }
 
     /// Initialize a response from a document.
@@ -199,15 +203,22 @@ impl RawCommandResponse {
 
     pub(crate) fn new(source: ServerAddress, message: Message) -> Result<Self> {
         let raw = message.single_document_response()?;
-        Ok(Self { source, raw })
+        Ok(Self {
+            source,
+            raw: RawDocumentBuf::new(raw)?,
+        })
     }
 
-    pub(crate) fn body<T: DeserializeOwned>(&self) -> Result<T> {
-        bson::from_slice(self.raw.as_slice()).map_err(|e| {
+    pub(crate) fn body<'a, T: Deserialize<'a>>(&'a self) -> Result<T> {
+        bson::from_slice(self.raw.as_bytes()).map_err(|e| {
             Error::from(ErrorKind::InvalidResponse {
                 message: format!("{}", e),
             })
         })
+    }
+
+    pub(crate) fn as_bytes(&self) -> &[u8] {
+        self.raw.as_bytes()
     }
 
     /// Deserialize the body of this response, returning an authentication error if it fails.
@@ -247,5 +258,9 @@ impl RawCommandResponse {
     /// The address of the server that sent this response.
     pub(crate) fn source_address(&self) -> &ServerAddress {
         &self.source
+    }
+
+    pub(crate) fn into_raw_document_buf(self) -> RawDocumentBuf {
+        self.raw
     }
 }

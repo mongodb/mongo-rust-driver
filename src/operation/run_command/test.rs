@@ -3,9 +3,8 @@ use bson::Timestamp;
 use super::RunCommand;
 use crate::{
     bson::doc,
-    client::ClusterTime,
-    cmap::{RawCommandResponse, StreamDescription},
-    operation::{test::handle_response_test, Operation, Response},
+    cmap::StreamDescription,
+    operation::{test::handle_response_test, Operation},
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -46,33 +45,4 @@ async fn handle_success() {
     };
     let result_doc = handle_response_test(&op, doc.clone()).unwrap();
     assert_eq!(result_doc, doc);
-}
-
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn response() {
-    let cluster_timestamp = Timestamp {
-        time: 123,
-        increment: 345,
-    };
-    let doc = doc! {
-        "ok": 1,
-        "some": "field",
-        "other": true,
-        "$clusterTime": {
-            "clusterTime": cluster_timestamp,
-            "signature": {}
-        }
-    };
-    let raw = RawCommandResponse::with_document(doc).unwrap();
-    let response = <RunCommand as Operation>::Response::deserialize_response(&raw).unwrap();
-
-    assert!(response.is_success());
-    assert_eq!(
-        response.cluster_time(),
-        Some(&ClusterTime {
-            cluster_time: cluster_timestamp,
-            signature: doc! {},
-        })
-    );
 }

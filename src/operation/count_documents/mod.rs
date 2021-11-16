@@ -3,12 +3,12 @@ mod test;
 
 use std::convert::TryInto;
 
-use bson::{doc, Document};
+use bson::{doc, Document, RawDocument};
 
-use super::{CursorBody, CursorResponse, Operation, Retryability};
+use super::{CursorBody, Operation, Retryability};
 use crate::{
     bson_util,
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, ErrorKind, Result},
     operation::aggregate::Aggregate,
     options::{AggregateOptions, CountOptions},
@@ -78,7 +78,6 @@ impl CountDocuments {
 impl Operation for CountDocuments {
     type O = u64;
     type Command = Document;
-    type Response = CursorResponse<Document>;
 
     const NAME: &'static str = Aggregate::NAME;
 
@@ -86,17 +85,23 @@ impl Operation for CountDocuments {
         self.aggregate.build(description)
     }
 
+    fn extract_at_cluster_time(&self, response: &RawDocument) -> Result<Option<bson::Timestamp>> {
+        self.aggregate.extract_at_cluster_time(response)
+    }
+
     fn handle_response(
         &self,
-        mut response: CursorBody<Document>,
+        response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
+        let mut response: CursorBody<&RawDocument> = response.body()?;
+
         let result_doc = match response.cursor.first_batch.pop_front() {
             Some(doc) => doc,
             None => return Ok(0),
         };
 
-        let n = match result_doc.get("n") {
+        let n = match result_doc.get("n")? {
             Some(n) => n,
             None => {
                 return Err(ErrorKind::InvalidResponse {
@@ -108,7 +113,7 @@ impl Operation for CountDocuments {
             }
         };
 
-        bson_util::get_u64(n).ok_or_else(|| {
+        bson_util::get_u64_raw(n).ok_or_else(|| {
             ErrorKind::InvalidResponse {
                 message: format!(
                     "server response to count_documents aggregate should have contained integer \

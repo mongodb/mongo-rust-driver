@@ -4,7 +4,7 @@ mod test;
 use crate::{
     bson::{doc, Bson, Document},
     bson_util,
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
     operation::{append_options, Operation, Retryability},
@@ -12,7 +12,7 @@ use crate::{
     Namespace,
 };
 
-use super::{CursorBody, CursorResponse, SERVER_4_2_0_WIRE_VERSION};
+use super::{CursorBody, SERVER_4_2_0_WIRE_VERSION};
 
 #[derive(Debug)]
 pub(crate) struct Aggregate {
@@ -41,9 +41,8 @@ impl Aggregate {
 }
 
 impl Operation for Aggregate {
-    type O = CursorSpecification<Document>;
+    type O = CursorSpecification;
     type Command = Document;
-    type Response = CursorResponse<Document>;
 
     const NAME: &'static str = "aggregate";
 
@@ -69,11 +68,20 @@ impl Operation for Aggregate {
         ))
     }
 
+    fn extract_at_cluster_time(
+        &self,
+        response: &bson::RawDocument,
+    ) -> Result<Option<bson::Timestamp>> {
+        CursorBody::extract_at_cluster_time(response)
+    }
+
     fn handle_response(
         &self,
-        response: CursorBody<Document>,
+        response: RawCommandResponse,
         description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: CursorBody = response.body()?;
+
         if self.is_out_or_merge() {
             response.write_concern_info.validate()?;
         };

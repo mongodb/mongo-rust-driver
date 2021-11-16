@@ -1,18 +1,17 @@
 #[cfg(test)]
 mod test;
 
+use bson::RawBson;
 use serde::Deserialize;
 
 use crate::{
     bson::{doc, Bson, Document},
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{options::DistinctOptions, Namespace},
     error::Result,
     operation::{append_options, Operation, Retryability},
     selection_criteria::SelectionCriteria,
 };
-
-use super::CommandResponse;
 
 pub(crate) struct Distinct {
     ns: Namespace,
@@ -53,7 +52,6 @@ impl Distinct {
 impl Operation for Distinct {
     type O = Vec<Bson>;
     type Command = Document;
-    type Response = CommandResponse<Response>;
 
     const NAME: &'static str = "distinct";
 
@@ -76,11 +74,22 @@ impl Operation for Distinct {
             body,
         ))
     }
+
+    fn extract_at_cluster_time(
+        &self,
+        response: &bson::RawDocument,
+    ) -> Result<Option<bson::Timestamp>> {
+        Ok(response
+            .get("atClusterTime")?
+            .and_then(RawBson::as_timestamp))
+    }
+
     fn handle_response(
         &self,
-        response: Response,
+        response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: Response = response.body()?;
         Ok(response.values)
     }
 

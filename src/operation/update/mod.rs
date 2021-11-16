@@ -6,15 +6,13 @@ use serde::Deserialize;
 use crate::{
     bson::{doc, Bson, Document},
     bson_util,
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     error::{convert_bulk_errors, Result},
     operation::{Operation, Retryability, WriteResponseBody},
     options::{UpdateModifications, UpdateOptions, WriteConcern},
     results::UpdateResult,
     Namespace,
 };
-
-use super::CommandResponse;
 
 #[derive(Debug)]
 pub(crate) struct Update {
@@ -60,7 +58,6 @@ impl Update {
 impl Operation for Update {
     type O = UpdateResult;
     type Command = Document;
-    type Response = CommandResponse<WriteResponseBody<UpdateBody>>;
 
     const NAME: &'static str = "update";
 
@@ -116,9 +113,10 @@ impl Operation for Update {
 
     fn handle_response(
         &self,
-        response: WriteResponseBody<UpdateBody>,
+        raw_response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: WriteResponseBody<UpdateBody> = raw_response.body()?;
         response.validate().map_err(convert_bulk_errors)?;
 
         let modified_count = response.n_modified;

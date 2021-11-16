@@ -5,14 +5,13 @@ use crate::{
     client::ClusterTime,
     cmap::{RawCommandResponse, StreamDescription},
     error::{Result, TRANSIENT_TRANSACTION_ERROR},
-    operation::{CommandErrorBody, CommandResponse, Operation, Response},
+    operation::{CommandErrorBody, CommandResponse, Operation},
     options::{ReadPreference, SelectionCriteria},
 };
 
 pub(crate) fn handle_response_test<T: Operation>(op: &T, response_doc: Document) -> Result<T::O> {
     let raw = RawCommandResponse::with_document(response_doc).unwrap();
-    let response = T::Response::deserialize_response(&raw)?;
-    op.handle_response(response.into_body(), &StreamDescription::new_testing())
+    op.handle_response(raw, &StreamDescription::new_testing())
 }
 
 pub(crate) fn handle_response_test_with_wire_version<T: Operation>(
@@ -21,11 +20,7 @@ pub(crate) fn handle_response_test_with_wire_version<T: Operation>(
     wire_version: i32,
 ) -> Result<T::O> {
     let raw = RawCommandResponse::with_document(response_doc).unwrap();
-    let response = T::Response::deserialize_response(&raw)?;
-    op.handle_response(
-        response.into_body(),
-        &StreamDescription::with_wire_version(wire_version),
-    )
+    op.handle_response(raw, &StreamDescription::with_wire_version(wire_version))
 }
 
 pub(crate) fn op_selection_criteria<F, T>(constructor: F)
@@ -62,7 +57,7 @@ async fn response_success() {
         }
     };
     let raw = RawCommandResponse::with_document(doc.clone()).unwrap();
-    let response = CommandResponse::<Document>::deserialize_response(&raw).unwrap();
+    let response: CommandResponse<Document> = raw.body().unwrap();
 
     assert!(response.is_success());
     assert_eq!(
@@ -72,10 +67,7 @@ async fn response_success() {
             signature: doc! {},
         })
     );
-    assert_eq!(
-        response.into_body(),
-        doc! { "some": "field", "other": true }
-    );
+    assert_eq!(response.body, doc! { "some": "field", "other": true });
 
     #[derive(Deserialize, Debug, PartialEq)]
     struct Body {
@@ -87,7 +79,7 @@ async fn response_success() {
     }
 
     let raw = RawCommandResponse::with_document(doc).unwrap();
-    let response = CommandResponse::<Body>::deserialize_response(&raw).unwrap();
+    let response: CommandResponse<Body> = raw.body().unwrap();
 
     assert!(response.is_success());
     assert_eq!(
@@ -98,7 +90,7 @@ async fn response_success() {
         })
     );
     assert_eq!(
-        response.into_body(),
+        response.body,
         Body {
             some: "field".to_string(),
             o: true,
@@ -126,7 +118,7 @@ async fn response_failure() {
         }
     };
     let raw = RawCommandResponse::with_document(doc.clone()).unwrap();
-    let response = CommandResponse::<Document>::deserialize_response(&raw).unwrap();
+    let response: CommandResponse<Document> = raw.body().unwrap();
 
     assert!(!response.is_success());
     assert_eq!(
@@ -137,7 +129,7 @@ async fn response_failure() {
         })
     );
     assert_eq!(
-        response.into_body(),
+        response.body,
         doc! {
             "code": 123,
             "codeName": "name",
@@ -147,7 +139,7 @@ async fn response_failure() {
     );
 
     let raw = RawCommandResponse::with_document(doc).unwrap();
-    let response = CommandResponse::<CommandErrorBody>::deserialize_response(&raw).unwrap();
+    let response: CommandResponse<CommandErrorBody> = raw.body().unwrap();
 
     assert!(!response.is_success());
     assert_eq!(
@@ -157,7 +149,7 @@ async fn response_failure() {
             signature: doc! {},
         })
     );
-    let command_error: CommandErrorBody = response.into_body();
+    let command_error = response.body;
     assert_eq!(command_error.command_error.code, 123);
     assert_eq!(command_error.command_error.code_name, "name");
     assert_eq!(command_error.command_error.message, "some message");

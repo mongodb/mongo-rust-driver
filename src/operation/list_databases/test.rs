@@ -1,6 +1,7 @@
+use bson::RawDocumentBuf;
+
 use crate::{
-    bson::{doc, Bson, Document},
-    bson_util,
+    bson::{doc, Bson},
     cmap::StreamDescription,
     error::ErrorKind,
     operation::{test::handle_response_test, ListDatabases, Operation},
@@ -92,7 +93,7 @@ async fn build_with_options() {
 async fn handle_success() {
     let total_size = 251658240;
 
-    let databases: Vec<Document> = vec![
+    let databases = vec![
         doc! {
            "name" : "admin",
            "sizeOnDisk" : 83886080,
@@ -110,17 +111,22 @@ async fn handle_success() {
         },
     ];
 
+    let raw_databases = databases
+        .iter()
+        .map(|d| RawDocumentBuf::from_document(d).unwrap())
+        .collect::<Vec<_>>();
+
     let actual_values = handle_response_test(
         &ListDatabases::empty(),
         doc! {
-           "databases" : bson_util::to_bson_array(&databases),
+           "databases" : databases,
            "totalSize" : total_size,
            "ok" : 1
         },
     )
     .expect("should succeed");
 
-    assert_eq!(actual_values, databases);
+    assert_eq!(actual_values, raw_databases);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

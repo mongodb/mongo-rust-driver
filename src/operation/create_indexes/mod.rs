@@ -3,7 +3,7 @@ mod test;
 
 use crate::{
     bson::{doc, Document},
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     error::{ErrorKind, Result},
     index::IndexModel,
     operation::{append_options, Operation},
@@ -12,7 +12,7 @@ use crate::{
     Namespace,
 };
 
-use super::{CommandResponse, WriteConcernOnlyBody};
+use super::WriteConcernOnlyBody;
 
 #[derive(Debug)]
 pub(crate) struct CreateIndexes {
@@ -50,7 +50,6 @@ impl CreateIndexes {
 impl Operation for CreateIndexes {
     type O = CreateIndexesResult;
     type Command = Document;
-    type Response = CommandResponse<WriteConcernOnlyBody>;
     const NAME: &'static str = "createIndexes";
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
@@ -86,9 +85,10 @@ impl Operation for CreateIndexes {
 
     fn handle_response(
         &self,
-        response: WriteConcernOnlyBody,
+        response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: WriteConcernOnlyBody = response.body()?;
         response.validate()?;
         let index_names = self.indexes.iter().filter_map(|i| i.get_name()).collect();
         Ok(CreateIndexesResult { index_names })

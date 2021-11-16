@@ -3,14 +3,12 @@ mod test;
 
 use crate::{
     bson::{doc, Document},
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
     operation::{append_options, Operation},
     options::DropIndexOptions,
     Namespace,
 };
-
-use super::{CommandResponse, EmptyBody};
 
 pub(crate) struct DropIndexes {
     ns: Namespace,
@@ -39,7 +37,6 @@ impl DropIndexes {
 impl Operation for DropIndexes {
     type O = ();
     type Command = Document;
-    type Response = CommandResponse<EmptyBody>;
     const NAME: &'static str = "dropIndexes";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -58,7 +55,7 @@ impl Operation for DropIndexes {
 
     fn handle_response(
         &self,
-        _response: EmptyBody,
+        _response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
         Ok(())

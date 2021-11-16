@@ -1,4 +1,4 @@
-use bson::doc;
+use bson::{doc, RawBson, RawDocument, Timestamp};
 use lazy_static::lazy_static;
 use serde::de::DeserializeOwned;
 
@@ -24,15 +24,7 @@ use crate::{
         UNKNOWN_TRANSACTION_COMMIT_RESULT,
     },
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
-    operation::{
-        AbortTransaction,
-        CommandErrorBody,
-        CommandResponse,
-        CommitTransaction,
-        Operation,
-        Response,
-        Retryability,
-    },
+    operation::{AbortTransaction, CommandErrorBody, CommitTransaction, Operation, Retryability},
     options::SelectionCriteria,
     sdam::{
         HandshakePhase,
@@ -43,6 +35,7 @@ use crate::{
         TransactionSupportStatus,
     },
     selection_criteria::ReadPreference,
+    ClusterTime,
 };
 
 lazy_static! {
@@ -139,7 +132,7 @@ impl Client {
     /// Server selection be will performed using the criteria specified on the operation, if any.
     pub(crate) async fn execute_cursor_operation<Op, T>(&self, op: Op) -> Result<Cursor<T>>
     where
-        Op: Operation<O = CursorSpecification<T>>,
+        Op: Operation<O = CursorSpecification>,
         T: DeserializeOwned + Unpin + Send + Sync,
     {
         Box::pin(async {
@@ -161,7 +154,7 @@ impl Client {
         session: &mut ClientSession,
     ) -> Result<SessionCursor<T>>
     where
-        Op: Operation<O = CursorSpecification<T>>,
+        Op: Operation<O = CursorSpecification>,
         T: DeserializeOwned + Unpin + Send + Sync,
     {
         let mut details = self
@@ -185,12 +178,12 @@ impl Client {
         self.inner.options.load_balanced.unwrap_or(false)
     }
 
-    fn pin_connection_for_cursor<Op, T>(
+    fn pin_connection_for_cursor<Op>(
         &self,
         details: &mut ExecutionOutput<Op>,
     ) -> Result<Option<PinnedConnectionHandle>>
     where
-        Op: Operation<O = CursorSpecification<T>>,
+        Op: Operation<O = CursorSpecification>,
     {
         if self.is_load_balanced() && details.operation_output.info.id != 0 {
             Ok(Some(details.connection.pin()?))
@@ -530,82 +523,79 @@ impl Client {
         let start_time = Instant::now();
         let command_result = match connection.send_raw_command(raw_cmd, request_id).await {
             Ok(response) => {
-                match T::Response::deserialize_response(&response) {
-                    Ok(r) => {
-                        if let (Some(session), Some(ts)) = (session.as_mut(), r.operation_time()) {
-                            session.advance_operation_time(ts);
-                        }
-                        self.update_cluster_time(&r, session).await;
-                        if r.is_success() {
-                            // Retrieve recovery token from successful response.
-                            Client::update_recovery_token(is_sharded, &r, session).await;
+                async fn handle_response<T: Operation>(
+                    client: &Client,
+                    op: &T,
+                    session: &mut Option<&mut ClientSession>,
+                    is_sharded: bool,
+                    response: RawCommandResponse,
+                ) -> Result<RawCommandResponse> {
+                    let raw_doc = RawDocument::new(response.as_bytes())?;
 
-                            Ok(CommandResult {
-                                raw: response,
-                                deserialized: r.into_body(),
-                            })
-                        } else {
-                            // if command was ok: 0, try to deserialize the command error.
-                            // if that fails, return a generic error.
-                            Err(response
-                                .body::<CommandErrorBody>()
-                                .map(|error_response| error_response.into())
-                                .unwrap_or_else(|e| {
-                                    Error::from(ErrorKind::InvalidResponse {
-                                        message: format!(
-                                            "error deserializing command error: {}",
-                                            e
-                                        ),
-                                    })
-                                }))
-                        }
-                    }
-                    Err(deserialize_error) => {
-                        // if we failed to deserialize the whole response, try deserializing
-                        // a generic command response without the operation's body.
-                        match response.body::<CommandResponse<Option<CommandErrorBody>>>() {
-                            Ok(error_response) => {
-                                if let (Some(session), Some(ts)) =
-                                    (session.as_mut(), error_response.operation_time())
-                                {
-                                    session.advance_operation_time(ts);
-                                }
-                                self.update_cluster_time(&error_response, session).await;
-                                match error_response.body {
-                                    // if the response was ok: 0, return the command error.
-                                    Some(command_error_response)
-                                        if !error_response.is_success() =>
-                                    {
-                                        Err(command_error_response.into())
-                                    }
-                                    // if the response was ok: 0 but we couldnt deserialize the
-                                    // command error,
-                                    // return a generic error indicating so.
-                                    None if !error_response.is_success() => {
-                                        Err(Error::from(ErrorKind::InvalidResponse {
-                                            message: "got command error but failed to deserialize \
-                                                      response"
-                                                .to_string(),
-                                        }))
-                                    }
-                                    // for ok: 1 just return the original deserialization error.
-                                    _ => {
-                                        Client::update_recovery_token(
-                                            is_sharded,
-                                            &error_response,
-                                            session,
-                                        )
-                                        .await;
-                                        Err(deserialize_error)
-                                    }
-                                }
+                    let ok = match raw_doc.get("ok")? {
+                        Some(b) => crate::bson_util::get_int_raw(b).ok_or_else(|| {
+                            ErrorKind::InvalidResponse {
+                                message: format!(
+                                    "expected ok value to be a number, instead got {:?}",
+                                    b
+                                ),
                             }
-                            // We failed to deserialize even that, so just return the original
-                            // deserialization error.
-                            Err(_) => Err(deserialize_error),
+                        })?,
+                        None => {
+                            return Err(ErrorKind::InvalidResponse {
+                                message: "missing 'ok' value in response".to_string(),
+                            }
+                            .into())
                         }
+                    };
+
+                    let cluster_time: Option<ClusterTime> = raw_doc
+                        .get("$clusterTime")?
+                        .and_then(RawBson::as_document)
+                        .map(|d| bson::from_slice(d.as_bytes()))
+                        .transpose()?;
+
+                    let at_cluster_time = op.extract_at_cluster_time(raw_doc)?;
+
+                    client
+                        .update_cluster_time(cluster_time, at_cluster_time, session)
+                        .await;
+
+                    if let (Some(session), Some(ts)) = (
+                        session.as_mut(),
+                        raw_doc
+                            .get("operationTime")?
+                            .and_then(RawBson::as_timestamp),
+                    ) {
+                        session.advance_operation_time(ts);
+                    }
+
+                    if ok == 1 {
+                        if let Some(ref mut session) = session {
+                            if is_sharded && session.in_transaction() {
+                                let recovery_token = raw_doc
+                                    .get("recoveryToken")?
+                                    .and_then(RawBson::as_document)
+                                    .map(|d| bson::from_slice(d.as_bytes()))
+                                    .transpose()?;
+                                session.transaction.recovery_token = recovery_token;
+                            }
+                        }
+
+                        Ok(response)
+                    } else {
+                        Err(response
+                            .body::<CommandErrorBody>()
+                            .map(|error_response| error_response.into())
+                            .unwrap_or_else(|e| {
+                                Error::from(ErrorKind::InvalidResponse {
+                                    message: format!("error deserializing command error: {}", e),
+                                })
+                            }))
                     }
                 }
+
+                handle_response(self, op, session, is_sharded, response).await
             }
             Err(err) => Err(err),
         };
@@ -642,7 +632,6 @@ impl Client {
                         Document::new()
                     } else {
                         response
-                            .raw
                             .body()
                             .unwrap_or_else(|e| doc! { "deserialization error": e.to_string() })
                     };
@@ -658,7 +647,7 @@ impl Client {
                     handler.handle_command_succeeded_event(command_succeeded_event);
                 });
 
-                match op.handle_response(response.deserialized, connection.stream_description()?) {
+                match op.handle_response(response, connection.stream_description()?) {
                     Ok(response) => Ok(response),
                     Err(mut err) => {
                         err.add_labels_and_update_pin(
@@ -763,33 +752,22 @@ impl Client {
         Ok(Retryability::None)
     }
 
-    async fn update_cluster_time<T: Response>(
+    async fn update_cluster_time(
         &self,
-        command_response: &T,
+        cluster_time: Option<ClusterTime>,
+        at_cluster_time: Option<Timestamp>,
         session: &mut Option<&mut ClientSession>,
     ) {
-        if let Some(cluster_time) = command_response.cluster_time() {
+        if let Some(ref cluster_time) = cluster_time {
             self.inner.topology.advance_cluster_time(cluster_time).await;
             if let Some(ref mut session) = session {
                 session.advance_cluster_time(cluster_time)
             }
         }
 
-        if let Some(timestamp) = command_response.at_cluster_time() {
+        if let Some(timestamp) = at_cluster_time {
             if let Some(ref mut session) = session {
                 session.snapshot_time = Some(timestamp);
-            }
-        }
-    }
-
-    async fn update_recovery_token<T: Response>(
-        is_sharded: bool,
-        response: &T,
-        session: &mut Option<&mut ClientSession>,
-    ) {
-        if let Some(ref mut session) = session {
-            if is_sharded && session.in_transaction() {
-                session.transaction.recovery_token = response.recovery_token().cloned();
             }
         }
     }
@@ -886,11 +864,6 @@ impl Error {
 
         Ok(())
     }
-}
-
-struct CommandResult<T> {
-    raw: RawCommandResponse,
-    deserialized: T,
 }
 
 struct ExecutionDetails<T: Operation> {

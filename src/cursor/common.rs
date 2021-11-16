@@ -1,10 +1,12 @@
 use std::{
     collections::VecDeque,
+    marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
 };
 
+use bson::RawDocumentBuf;
 use derivative::Derivative;
 use futures_core::{Future, Stream};
 use serde::de::DeserializeOwned;
@@ -28,25 +30,26 @@ use crate::{
 #[derivative(Debug)]
 pub(super) struct GenericCursor<P, T>
 where
-    P: GetMoreProvider<DocumentType = T>,
+    P: GetMoreProvider,
 {
     #[derivative(Debug = "ignore")]
     provider: P,
     client: Client,
     info: CursorInformation,
-    buffer: VecDeque<T>,
+    buffer: VecDeque<RawDocumentBuf>,
     exhausted: bool,
     pinned_connection: PinnedConnection,
+    _phantom: PhantomData<T>,
 }
 
 impl<P, T> GenericCursor<P, T>
 where
-    P: GetMoreProvider<DocumentType = T>,
+    P: GetMoreProvider,
     T: DeserializeOwned,
 {
     pub(super) fn new(
         client: Client,
-        spec: CursorSpecification<T>,
+        spec: CursorSpecification,
         pinned_connection: PinnedConnection,
         get_more_provider: P,
     ) -> Self {
@@ -58,10 +61,11 @@ where
             buffer: spec.initial_buffer,
             info: spec.info,
             pinned_connection,
+            _phantom: Default::default(),
         }
     }
 
-    pub(super) fn take_buffer(&mut self) -> VecDeque<T> {
+    pub(super) fn take_buffer(&mut self) -> VecDeque<RawDocumentBuf> {
         std::mem::take(&mut self.buffer)
     }
 
@@ -91,7 +95,7 @@ where
 
 impl<P, T> Stream for GenericCursor<P, T>
 where
-    P: GetMoreProvider<DocumentType = T>,
+    P: GetMoreProvider,
     T: DeserializeOwned + Unpin,
 {
     type Item = Result<T>;
@@ -128,7 +132,7 @@ where
 
             match self.buffer.pop_front() {
                 Some(doc) => {
-                    return Poll::Ready(Some(Ok(doc)));
+                    return Poll::Ready(Some(Ok(bson::from_slice(doc.as_bytes())?)));
                 }
                 None if !self.exhausted && !self.pinned_connection.is_invalid() => {
                     self.start_get_more();
@@ -142,11 +146,8 @@ where
 /// A trait implemented by objects that can provide batches of documents to a cursor via the getMore
 /// command.
 pub(super) trait GetMoreProvider: Unpin {
-    /// The type that the invididual documents will be deserialized to.
-    type DocumentType;
-
     /// The result type that the future running the getMore evaluates to.
-    type ResultType: GetMoreProviderResult<DocumentType = Self::DocumentType>;
+    type ResultType: GetMoreProviderResult;
 
     /// The type of future created by this provider when running a getMore.
     type GetMoreFuture: Future<Output = Self::ResultType> + Unpin;
@@ -173,11 +174,10 @@ pub(super) trait GetMoreProvider: Unpin {
 /// Trait describing results returned from a `GetMoreProvider`.
 pub(crate) trait GetMoreProviderResult {
     type Session;
-    type DocumentType;
 
-    fn as_ref(&self) -> std::result::Result<&GetMoreResult<Self::DocumentType>, &Error>;
+    fn as_ref(&self) -> std::result::Result<&GetMoreResult, &Error>;
 
-    fn into_parts(self) -> (Result<GetMoreResult<Self::DocumentType>>, Self::Session);
+    fn into_parts(self) -> (Result<GetMoreResult>, Self::Session);
 
     /// Whether the response from the server indicated the cursor was exhausted or not.
     fn exhausted(&self) -> bool {
@@ -192,14 +192,14 @@ pub(crate) trait GetMoreProviderResult {
 
 /// Specification used to create a new cursor.
 #[derive(Debug, Clone)]
-pub(crate) struct CursorSpecification<T> {
+pub(crate) struct CursorSpecification {
     pub(crate) info: CursorInformation,
-    pub(crate) initial_buffer: VecDeque<T>,
+    pub(crate) initial_buffer: VecDeque<RawDocumentBuf>,
 }
 
-impl<T> CursorSpecification<T> {
+impl CursorSpecification {
     pub(crate) fn new(
-        info: operation::CursorInfo<T>,
+        info: operation::CursorInfo,
         address: ServerAddress,
         batch_size: impl Into<Option<u32>>,
         max_time: impl Into<Option<Duration>>,

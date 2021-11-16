@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{convert::TryInto, time::Duration};
 
 use crate::{
     bson::{doc, Document},
@@ -19,7 +19,7 @@ fn build_test(
     options: Option<FindOptions>,
     mut expected_body: Document,
 ) {
-    let mut find = Find::<Document>::new(ns.clone(), filter, options);
+    let mut find = Find::new(ns.clone(), filter, options);
 
     let cmd = find.build(&StreamDescription::new_testing()).unwrap();
 
@@ -191,7 +191,7 @@ async fn build_batch_size() {
     let options = FindOptions::builder()
         .batch_size((std::i32::MAX as u32) + 1)
         .build();
-    let mut op = Find::<Document>::new(Namespace::empty(), None, Some(options));
+    let mut op = Find::new(Namespace::empty(), None, Some(options));
     assert!(op.build(&StreamDescription::new_testing()).is_err())
 }
 
@@ -203,7 +203,7 @@ async fn op_selection_criteria() {
             selection_criteria,
             ..Default::default()
         };
-        Find::<Document>::new(Namespace::empty(), None, Some(options))
+        Find::new(Namespace::empty(), None, Some(options))
     });
 }
 
@@ -220,7 +220,7 @@ async fn handle_success() {
         port: None,
     };
 
-    let find = Find::<Document>::empty();
+    let find = Find::empty();
 
     let first_batch = vec![doc! {"_id": 1}, doc! {"_id": 2}];
 
@@ -241,6 +241,7 @@ async fn handle_success() {
         cursor_spec
             .initial_buffer
             .into_iter()
+            .map(|d| d.try_into().unwrap())
             .collect::<Vec<Document>>(),
         first_batch
     );
@@ -258,6 +259,7 @@ async fn handle_success() {
         cursor_spec
             .initial_buffer
             .into_iter()
+            .map(|d| d.try_into().unwrap())
             .collect::<Vec<Document>>(),
         first_batch
     );
@@ -265,7 +267,7 @@ async fn handle_success() {
 
 fn verify_max_await_time(max_await_time: Option<Duration>, cursor_type: Option<CursorType>) {
     let ns = Namespace::empty();
-    let find = Find::<Document>::new(
+    let find = Find::new(
         ns,
         None,
         Some(FindOptions {
@@ -309,7 +311,7 @@ async fn handle_max_await_time() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn handle_invalid_response() {
-    let find = Find::<Document>::empty();
+    let find = Find::empty();
 
     let garbled = doc! { "asdfasf": "ASdfasdf" };
     handle_response_test(&find, garbled).unwrap_err();

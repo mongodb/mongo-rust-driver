@@ -1,16 +1,15 @@
 use crate::{
     bson::{doc, Document},
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
-    index::IndexModel,
     operation::{append_options, Operation},
     options::ListIndexesOptions,
     selection_criteria::{ReadPreference, SelectionCriteria},
     Namespace,
 };
 
-use super::{CursorBody, CursorResponse, Retryability};
+use super::{CursorBody, Retryability};
 
 #[cfg(test)]
 mod test;
@@ -38,9 +37,8 @@ impl ListIndexes {
 }
 
 impl Operation for ListIndexes {
-    type O = CursorSpecification<IndexModel>;
+    type O = CursorSpecification;
     type Command = Document;
-    type Response = CursorResponse<IndexModel>;
 
     const NAME: &'static str = "listIndexes";
 
@@ -62,9 +60,10 @@ impl Operation for ListIndexes {
 
     fn handle_response(
         &self,
-        response: CursorBody<IndexModel>,
+        raw_response: RawCommandResponse,
         description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: CursorBody = raw_response.body()?;
         Ok(CursorSpecification::new(
             response.cursor,
             description.server_address.clone(),

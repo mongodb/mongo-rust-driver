@@ -1,13 +1,9 @@
 #[cfg(test)]
 mod test;
 
-use std::marker::PhantomData;
-
-use serde::de::DeserializeOwned;
-
 use crate::{
     bson::{doc, Document},
-    cmap::{Command, StreamDescription},
+    cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::{ErrorKind, Result},
     operation::{append_options, CursorBody, Operation, Retryability},
@@ -15,17 +11,14 @@ use crate::{
     Namespace,
 };
 
-use super::CursorResponse;
-
 #[derive(Debug)]
-pub(crate) struct Find<T> {
+pub(crate) struct Find {
     ns: Namespace,
     filter: Option<Document>,
     options: Option<Box<FindOptions>>,
-    _phantom: PhantomData<T>,
 }
 
-impl<T> Find<T> {
+impl Find {
     #[cfg(test)]
     fn empty() -> Self {
         Self::new(
@@ -47,15 +40,13 @@ impl<T> Find<T> {
             ns,
             filter,
             options: options.map(Box::new),
-            _phantom: Default::default(),
         }
     }
 }
 
-impl<T: DeserializeOwned> Operation for Find<T> {
-    type O = CursorSpecification<T>;
+impl Operation for Find {
+    type O = CursorSpecification;
     type Command = Document;
-    type Response = CursorResponse<T>;
     const NAME: &'static str = "find";
 
     fn build(&mut self, _description: &StreamDescription) -> Result<Command> {
@@ -106,11 +97,20 @@ impl<T: DeserializeOwned> Operation for Find<T> {
         ))
     }
 
+    fn extract_at_cluster_time(
+        &self,
+        response: &bson::RawDocument,
+    ) -> Result<Option<bson::Timestamp>> {
+        CursorBody::extract_at_cluster_time(response)
+    }
+
     fn handle_response(
         &self,
-        response: CursorBody<T>,
+        response: RawCommandResponse,
         description: &StreamDescription,
     ) -> Result<Self::O> {
+        let response: CursorBody = response.body()?;
+
         Ok(CursorSpecification::new(
             response.cursor,
             description.server_address.clone(),
