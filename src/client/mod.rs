@@ -3,16 +3,24 @@ mod executor;
 pub mod options;
 pub mod session;
 
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use bson::Bson;
 use derivative::Derivative;
-use std::time::Instant;
 
 #[cfg(test)]
 use crate::options::ServerAddress;
 use crate::{
     bson::Document,
+    change_stream::{
+        event::ChangeStreamEvent,
+        options::ChangeStreamOptions,
+        session::SessionChangeStream,
+        ChangeStream,
+    },
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::{ErrorKind, Result},
@@ -253,6 +261,45 @@ impl Client {
                 .await),
             _ => Err(ErrorKind::SessionsNotSupported.into()),
         }
+    }
+
+    /// Starts a new [`ChangeStream`] that receives events for all changes in the cluster. The
+    /// stream does not observe changes from system collections or the "config", "local" or
+    /// "admin" databases. Note that this method (`watch` on a cluster) is only supported in
+    /// MongoDB 4.0 or greater.
+    ///
+    /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
+    /// streams.
+    ///
+    /// Change streams require either a "majority" read concern or no read
+    /// concern. Anything else will cause a server error.
+    ///
+    /// Note that using a `$project` stage to remove any of the `_id` `operationType` or `ns` fields
+    /// will cause an error. The driver requires these fields to support resumability. For
+    /// more information on resumability, see the documentation for
+    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
+    ///
+    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
+    /// changed via [`ChangeStream::with_type`].
+    #[allow(unused)]
+    pub(crate) async fn watch(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: impl Into<Option<ChangeStreamOptions>>,
+    ) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
+        todo!()
+    }
+
+    /// Starts a new [`SessionChangeStream`] that receives events for all changes in the cluster
+    /// using the provided [`ClientSession`].  See [`Client::watch`] for more information.
+    #[allow(unused)]
+    pub(crate) async fn watch_with_session(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: impl Into<Option<ChangeStreamOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
+        todo!()
     }
 
     /// Check in a server session to the server session pool.

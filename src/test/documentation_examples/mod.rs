@@ -1508,7 +1508,7 @@ async fn aggregation_examples() -> GenericResult<()> {
     db.drop(None).await?;
     aggregation_data::populate(&db).await?;
 
-    // Each example is within its own scope to allow the example to include 
+    // Each example is within its own scope to allow the example to include
     // `use futures::TryStreamExt;` without causing multiple definition errors.
 
     {
