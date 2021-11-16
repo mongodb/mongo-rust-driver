@@ -54,9 +54,8 @@ impl Operation for Aggregate {
             "cursor": {}
         };
 
-        let mut options = self.options.clone().unwrap_or_default();
-        remove_empty_write_concern!(&mut options, self.write_concern());
-        append_options(&mut body, Some(&options))?;
+        remove_empty_write_concern!(self.options);
+        append_options(&mut body, Some(&self.options))?;
 
         if self.is_out_or_merge() {
             if let Ok(cursor_doc) = body.get_document_mut("cursor") {

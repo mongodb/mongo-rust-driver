@@ -436,10 +436,12 @@ pub(crate) enum Retryability {
 }
 
 macro_rules! remove_empty_write_concern {
-    ($opts:expr, $wc:expr) => {
-        if let Some(write_concern) = $wc {
-            if write_concern.is_empty() {
-                $opts.write_concern = None;
+    ($opts:expr) => {
+        if let Some(ref mut options) = $opts {
+            if let Some(ref write_concern) = options.write_concern {
+                if write_concern.is_empty() {
+                    options.write_concern = None;
+                }
             }
         }
     };

@@ -110,10 +110,7 @@ impl<'a, T: Serialize> Operation for Insert<'a, T> {
             }
             .into());
         }
-
-        let mut options = self.options.clone().unwrap_or_default();
-        options.ordered = Some(self.is_ordered());
-        remove_empty_write_concern!(&mut options, self.write_concern());
+        remove_empty_write_concern!(self.options);
 
         let body = InsertCommand {
             insert: self.ns.coll.clone(),
@@ -121,7 +118,7 @@ impl<'a, T: Serialize> Operation for Insert<'a, T> {
                 documents: docs,
                 length: size as i32,
             },
-            options,
+            options: self.options.clone().unwrap_or_default(),
         };
 
         Ok(Command::new("insert".to_string(), self.ns.db.clone(), body))

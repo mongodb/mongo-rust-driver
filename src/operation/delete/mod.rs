@@ -88,9 +88,8 @@ impl Operation for Delete {
             "ordered": true, // command monitoring tests expect this (SPEC-1130)
         };
 
-        let mut options = self.options.clone().unwrap_or_default();
-        remove_empty_write_concern!(&mut options, self.write_concern());
-        append_options(&mut body, Some(&options))?;
+        remove_empty_write_concern!(self.options);
+        append_options(&mut body, Some(&self.options))?;
 
         Ok(Command::new(
             Self::NAME.to_string(),
