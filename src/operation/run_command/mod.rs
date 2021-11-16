@@ -8,7 +8,7 @@ use bson::RawBson;
 use super::{CursorBody, Operation};
 use crate::{
     bson::Document,
-    client::{ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS},
+    client::SESSIONS_UNSUPPORTED_COMMANDS,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::{ErrorKind, Result},
     options::WriteConcern,
@@ -110,11 +110,4 @@ impl<'conn> Operation for RunCommand<'conn> {
     fn pinned_connection(&self) -> Option<&PinnedConnectionHandle> {
         self.pinned_connection
     }
-}
-
-#[derive(Debug)]
-pub(crate) struct Response {
-    doc: Document,
-    cluster_time: Option<ClusterTime>,
-    recovery_token: Option<Document>,
 }
