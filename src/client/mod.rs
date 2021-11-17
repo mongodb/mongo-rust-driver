@@ -294,7 +294,11 @@ impl Client {
         let mut options = options.unwrap_or_default();
         options.all_changes_for_cluster = Some(true);
 
-        let (aggregate, cs_data) = self.build_watch(AggregateTarget::Database("admin".to_string()), pipeline, Some(options))?;
+        let (aggregate, cs_data) = self.build_watch(
+            AggregateTarget::Database("admin".to_string()),
+            pipeline,
+            Some(options),
+        )?;
         let cursor = self
             .execute_cursor_operation::<_, ChangeStreamEvent<Document>>(aggregate)
             .await?;
@@ -317,7 +321,11 @@ impl Client {
         let mut options = options.unwrap_or_default();
         options.all_changes_for_cluster = Some(true);
 
-        let (aggregate, cs_data) = self.build_watch(AggregateTarget::Database("admin".to_string()), pipeline, Some(options))?;
+        let (aggregate, cs_data) = self.build_watch(
+            AggregateTarget::Database("admin".to_string()),
+            pipeline,
+            Some(options),
+        )?;
         let cursor = self
             .execute_session_cursor_operation::<_, ChangeStreamEvent<Document>>(aggregate, session)
             .await?;
