@@ -54,10 +54,10 @@ pub struct ChangeStreamOptions {
     #[builder(default)]
     pub start_after: Option<ResumeToken>,
 
+    /// If `true`, the change stream will monitor all changes for the given cluster.
     #[builder(default, setter(skip))]
     pub(crate) all_changes_for_cluster: Option<bool>,
 
-    // The options below are passed to the server via `AggregateOperations`.
     /// The maximum amount of time for the server to wait on new documents to satisfy a change
     /// stream query.
     #[builder(default)]
