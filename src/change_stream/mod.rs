@@ -95,7 +95,10 @@ where
 
     /// Update the type streamed values will be parsed as.
     pub fn with_type<D: DeserializeOwned + Unpin + Send + Sync>(self) -> ChangeStream<D> {
-        todo!()
+        ChangeStream {
+            cursor: self.cursor.with_type(),
+            data: self.data,
+        }
     }
 }
 

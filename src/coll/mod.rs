@@ -808,9 +808,9 @@ impl<T> Collection<T> {
         );
 
         let (aggregate, cs_data) = self.build_watch_aggregate(pipeline, options, agg_options)?;
-        let cursor = self.client().execute_cursor_operation(aggregate).await?;
+        let cursor = self.client().execute_cursor_operation::<_, ChangeStreamEvent<T>>(aggregate).await?;
 
-        Ok(ChangeStream::new(cursor.with_type(), cs_data))
+        Ok(ChangeStream::new(cursor, cs_data))
     }
 
     /// Starts a new [`SessionChangeStream`] that receives events for all changes in this collection
@@ -831,9 +831,9 @@ impl<T> Collection<T> {
         resolve_selection_criteria_with_session!(self, agg_options, Some(&mut *session))?;
         
         let (aggregate, cs_data) = self.build_watch_aggregate(pipeline, options, agg_options)?;
-        let cursor = self.client().execute_session_cursor_operation(aggregate, session).await?;
+        let cursor = self.client().execute_session_cursor_operation::<_, ChangeStreamEvent<T>>(aggregate, session).await?;
 
-        Ok(SessionChangeStream::new(cursor.with_type(), cs_data))
+        Ok(SessionChangeStream::new(cursor, cs_data))
     }
 
     fn build_watch_aggregate(
