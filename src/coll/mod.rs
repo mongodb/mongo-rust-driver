@@ -800,40 +800,17 @@ impl<T> Collection<T> {
     where
         T: DeserializeOwned + Unpin + Send + Sync,
     {
-        let pipeline: Vec<_> = pipeline.into_iter().collect();
-        let options = options.into();
-
         let mut agg_options: Option<AggregateOptions> = None;
         resolve_options!(
             self,
             agg_options,
             [read_concern, write_concern, selection_criteria]
         );
-        let selection_criteria = agg_options.as_ref().and_then(|o| o.selection_criteria.clone());
 
-        let bson_opts = match &options {
-            None => bson::to_bson(&ChangeStreamOptions::default())?,
-            Some(o) => bson::to_bson(o)?,
-        };
-        let agg_pipeline = std::iter::once(doc! {
-            "$changeStream": bson_opts,
-        })
-        .chain(pipeline.iter().cloned());
+        let (aggregate, cs_data) = self.build_watch_aggregate(pipeline, options, agg_options)?;
+        let cursor = self.client().execute_cursor_operation(aggregate).await?;
 
-        let aggregate = Aggregate::new(self.namespace(), agg_pipeline, agg_options);
-        let client = self.client();
-        let cursor = client.execute_cursor_operation(aggregate).await?;
-
-        Ok(ChangeStream::new(
-            cursor.with_type(),
-            ChangeStreamData::new(
-                pipeline,
-                client.clone(),
-                ChangeStreamTarget::Collection(self.clone().with_document()),
-                options,
-                selection_criteria,
-            ),
-        ))
+        Ok(ChangeStream::new(cursor.with_type(), cs_data))
     }
 
     /// Starts a new [`SessionChangeStream`] that receives events for all changes in this collection
@@ -848,7 +825,50 @@ impl<T> Collection<T> {
     where
         T: DeserializeOwned + Unpin + Send + Sync,
     {
-        todo!()
+        let mut agg_options: Option<AggregateOptions> = None;
+        resolve_read_concern_with_session!(self, agg_options, Some(&mut *session))?;
+        resolve_write_concern_with_session!(self, agg_options, Some(&mut *session))?;
+        resolve_selection_criteria_with_session!(self, agg_options, Some(&mut *session))?;
+        
+        let (aggregate, cs_data) = self.build_watch_aggregate(pipeline, options, agg_options)?;
+        let cursor = self.client().execute_session_cursor_operation(aggregate, session).await?;
+
+        Ok(SessionChangeStream::new(cursor.with_type(), cs_data))
+    }
+
+    fn build_watch_aggregate(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: impl Into<Option<ChangeStreamOptions>>,
+        agg_options: Option<AggregateOptions>,
+    ) -> Result<(Aggregate, ChangeStreamData)>
+    {
+        let pipeline: Vec<_> = pipeline.into_iter().collect();
+        let options = options.into();
+        let selection_criteria = agg_options.as_ref().and_then(|o| o.selection_criteria.clone());
+        let default_options;
+        let bson_options = bson::to_bson(match &options {
+            None => {
+                default_options = ChangeStreamOptions::default();
+                &default_options
+            }
+            Some(o) => o,
+        })?;
+        let agg_pipeline = std::iter::once(doc! {
+            "$changeStream": bson_options,
+        })
+        .chain(pipeline.iter().cloned());
+
+        Ok((
+            Aggregate::new(self.namespace(), agg_pipeline, agg_options),
+            ChangeStreamData::new(
+                pipeline,
+                self.client().clone(),
+                ChangeStreamTarget::Collection(self.clone().with_document()),
+                options,
+                selection_criteria,
+            )
+        ))
     }
 
     pub(crate) fn with_document(self) -> Collection<Document> {
