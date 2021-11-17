@@ -8,7 +8,9 @@ use crate::{
     bson::Timestamp,
     change_stream::event::ResumeToken,
     collation::Collation,
+    concern::ReadConcern,
     options::AggregateOptions,
+    selection_criteria::SelectionCriteria,
 };
 
 /// These are the valid options that can be passed to the `watch` method for creating a
@@ -35,22 +37,6 @@ pub struct ChangeStreamOptions {
     #[builder(default)]
     pub resume_after: Option<ResumeToken>,
 
-    /// The maximum amount of time for the server to wait on new documents to satisfy a change
-    /// stream query.
-    #[builder(default)]
-    #[serde(skip_serializing)]
-    pub max_await_time: Option<Duration>,
-
-    /// The number of documents to return per batch.
-    #[builder(default)]
-    #[serde(skip_serializing)]
-    pub batch_size: Option<i32>,
-
-    /// Specifies a collation.
-    #[builder(default)]
-    #[serde(skip_serializing)]
-    pub collation: Option<Collation>,
-
     /// The change stream will only provide changes that occurred at or after the specified
     /// timestamp. Any command run against the server will return an operation time that can be
     /// used here.
@@ -67,6 +53,54 @@ pub struct ChangeStreamOptions {
     /// information.
     #[builder(default)]
     pub start_after: Option<ResumeToken>,
+
+    #[builder(default, setter(skip))]
+    pub(crate) all_changes_for_cluster: Option<bool>,
+
+    // The options below are passed to the server via `AggregateOperations`.
+    /// The maximum amount of time for the server to wait on new documents to satisfy a change
+    /// stream query.
+    #[builder(default)]
+    #[serde(skip_serializing)]
+    pub max_await_time: Option<Duration>,
+
+    /// The number of documents to return per batch.
+    #[builder(default)]
+    #[serde(skip_serializing)]
+    pub batch_size: Option<u32>,
+
+    /// Specifies a collation.
+    #[builder(default)]
+    #[serde(skip_serializing)]
+    pub collation: Option<Collation>,
+
+    /// The read concern to use for the operation.
+    ///
+    /// If none is specified, the read concern defined on the object executing this operation will
+    /// be used.
+    #[builder(default)]
+    #[serde(skip_serializing)]
+    pub read_concern: Option<ReadConcern>,
+
+    /// The criteria used to select a server for this operation.
+    ///
+    /// If none is specified, the selection criteria defined on the object executing this operation
+    /// will be used.
+    #[builder(default)]
+    #[serde(skip_serializing)]
+    pub selection_criteria: Option<SelectionCriteria>,
+}
+
+impl ChangeStreamOptions {
+    pub(crate) fn aggregate_options(&self) -> AggregateOptions {
+        AggregateOptions::builder()
+            .batch_size(self.batch_size)
+            .collation(self.collation.clone())
+            .max_await_time(self.max_await_time)
+            .read_concern(self.read_concern.clone())
+            .selection_criteria(self.selection_criteria.clone())
+            .build()
+    }
 }
 
 #[rustfmt::skip]

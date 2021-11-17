@@ -13,10 +13,20 @@ use bson::Document;
 use futures_core::Stream;
 use serde::{de::DeserializeOwned, Deserialize};
 
-use crate::{Client, Collection, Cursor, Database, change_stream::{
+use crate::{
+    change_stream::{
         event::{ChangeStreamEvent, ResumeToken},
         options::ChangeStreamOptions,
-    }, error::Result, options::AggregateOptions, selection_criteria::{ReadPreference, SelectionCriteria}};
+    },
+    error::Result,
+    operation::AggregateTarget,
+    options::AggregateOptions,
+    selection_criteria::{ReadPreference, SelectionCriteria},
+    Client,
+    Collection,
+    Cursor,
+    Database,
+};
 
 /// A `ChangeStream` streams the ongoing changes of its associated collection, database or
 /// deployment. `ChangeStream` instances should be created with method `watch` or
@@ -113,17 +123,13 @@ pub(crate) struct ChangeStreamData {
 
     /// The original target of the change stream, used for re-issuing the aggregation during
     /// an automatic resume.
-    target: ChangeStreamTarget,
+    target: AggregateTarget,
 
     /// The cached resume token.
     resume_token: Option<ResumeToken>,
 
     /// The options provided to the initial `$changeStream` stage.
     options: Option<ChangeStreamOptions>,
-
-    /// The selection criteria for the initial `$changeStream` aggregation, used for server selection
-    /// during an automatic resume.
-    selection_criteria: Option<SelectionCriteria>,
 
     /// Whether or not the change stream has attempted a resume, used to attempt a resume only
     /// once.
@@ -135,25 +141,22 @@ pub(crate) struct ChangeStreamData {
 }
 
 impl ChangeStreamData {
-    pub(crate) fn new(pipeline: Vec<Document>, client: Client, target: ChangeStreamTarget, options: Option<ChangeStreamOptions>, selection_criteria: Option<SelectionCriteria>) -> Self {
+    pub(crate) fn new(
+        pipeline: Vec<Document>,
+        client: Client,
+        target: AggregateTarget,
+        options: Option<ChangeStreamOptions>,
+    ) -> Self {
         Self {
             pipeline,
             client,
             target,
             resume_token: None,
             options,
-            selection_criteria,
             resume_attempted: false,
             document_returned: false,
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub(crate) enum ChangeStreamTarget {
-    Collection(Collection<Document>),
-    Database(Database),
-    Cluster(Database),
 }
 
 impl<T> Stream for ChangeStream<T>

@@ -13,18 +13,19 @@ use derivative::Derivative;
 #[cfg(test)]
 use crate::options::ServerAddress;
 use crate::{
-    bson::Document,
+    bson::{doc, Document},
     change_stream::{
         event::ChangeStreamEvent,
         options::ChangeStreamOptions,
         session::SessionChangeStream,
         ChangeStream,
+        ChangeStreamData,
     },
     concern::{ReadConcern, WriteConcern},
     db::Database,
     error::{ErrorKind, Result},
     event::command::CommandEventHandler,
-    operation::ListDatabases,
+    operation::{append_options, Aggregate, AggregateTarget, ListDatabases},
     options::{
         ClientOptions,
         DatabaseOptions,
@@ -413,6 +414,29 @@ impl Client {
                 .into());
             }
         }
+    }
+
+    pub(crate) fn build_watch(
+        &self,
+        target: impl Into<AggregateTarget>,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: Option<ChangeStreamOptions>,
+    ) -> Result<(Aggregate, ChangeStreamData)> {
+        let target = target.into();
+        let pipeline: Vec<_> = pipeline.into_iter().collect();
+        let mut bson_options = Document::new();
+        append_options(&mut bson_options, options.as_ref())?;
+
+        let mut agg_pipeline = vec![doc! { "$changeStream": bson_options }];
+        agg_pipeline.extend(pipeline.iter().cloned());
+        Ok((
+            Aggregate::new(
+                target.clone(),
+                agg_pipeline,
+                options.as_ref().map(|o| o.aggregate_options()),
+            ),
+            ChangeStreamData::new(pipeline, self.clone(), target, options),
+        ))
     }
 
     #[cfg(all(test, not(feature = "sync")))]

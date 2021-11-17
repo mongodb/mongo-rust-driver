@@ -1,6 +1,6 @@
 pub mod options;
 
-use std::{borrow::Borrow, collections::HashSet, fmt, fmt::Debug, marker::PhantomData, sync::Arc};
+use std::{borrow::Borrow, collections::HashSet, fmt, fmt::Debug, sync::Arc};
 
 use futures_util::{
     future,
@@ -14,7 +14,21 @@ use serde::{
 };
 
 use self::options::*;
-use crate::{Client, ClientSession, Cursor, Database, SessionCursor, bson::{doc, to_document, Bson, Document}, bson_util, change_stream::{ChangeStream, ChangeStreamData, ChangeStreamTarget, event::ChangeStreamEvent, options::ChangeStreamOptions, session::SessionChangeStream}, client::session::TransactionState, cmap::conn::PinnedConnectionHandle, concern::{ReadConcern, WriteConcern}, error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result}, index::IndexModel, operation::{
+use crate::{
+    bson::{doc, to_document, Bson, Document},
+    bson_util,
+    change_stream::{
+        event::ChangeStreamEvent,
+        options::ChangeStreamOptions,
+        session::SessionChangeStream,
+        ChangeStream,
+    },
+    client::session::TransactionState,
+    cmap::conn::PinnedConnectionHandle,
+    concern::{ReadConcern, WriteConcern},
+    error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
+    index::IndexModel,
+    operation::{
         Aggregate,
         Count,
         CountDocuments,
@@ -28,14 +42,22 @@ use crate::{Client, ClientSession, Cursor, Database, SessionCursor, bson::{doc, 
         Insert,
         ListIndexes,
         Update,
-    }, results::{
+    },
+    results::{
         CreateIndexResult,
         CreateIndexesResult,
         DeleteResult,
         InsertManyResult,
         InsertOneResult,
         UpdateResult,
-    }, selection_criteria::SelectionCriteria};
+    },
+    selection_criteria::SelectionCriteria,
+    Client,
+    ClientSession,
+    Cursor,
+    Database,
+    SessionCursor,
+};
 
 /// `Collection` is the client-side abstraction of a MongoDB Collection. It can be used to
 /// perform collection-level operations such as CRUD operations. A `Collection` can be obtained
@@ -800,15 +822,14 @@ impl<T> Collection<T> {
     where
         T: DeserializeOwned + Unpin + Send + Sync,
     {
-        let mut agg_options: Option<AggregateOptions> = None;
-        resolve_options!(
-            self,
-            agg_options,
-            [read_concern, write_concern, selection_criteria]
-        );
+        let mut options = options.into();
+        resolve_options!(self, options, [read_concern, selection_criteria]);
 
-        let (aggregate, cs_data) = self.build_watch_aggregate(pipeline, options, agg_options)?;
-        let cursor = self.client().execute_cursor_operation::<_, ChangeStreamEvent<T>>(aggregate).await?;
+        let client = self.client();
+        let (aggregate, cs_data) = client.build_watch(self.namespace(), pipeline, options)?;
+        let cursor = client
+            .execute_cursor_operation::<_, ChangeStreamEvent<T>>(aggregate)
+            .await?;
 
         Ok(ChangeStream::new(cursor, cs_data))
     }
@@ -825,57 +846,17 @@ impl<T> Collection<T> {
     where
         T: DeserializeOwned + Unpin + Send + Sync,
     {
-        let mut agg_options: Option<AggregateOptions> = None;
-        resolve_read_concern_with_session!(self, agg_options, Some(&mut *session))?;
-        resolve_write_concern_with_session!(self, agg_options, Some(&mut *session))?;
-        resolve_selection_criteria_with_session!(self, agg_options, Some(&mut *session))?;
-        
-        let (aggregate, cs_data) = self.build_watch_aggregate(pipeline, options, agg_options)?;
-        let cursor = self.client().execute_session_cursor_operation::<_, ChangeStreamEvent<T>>(aggregate, session).await?;
+        let mut options = options.into();
+        resolve_read_concern_with_session!(self, options, Some(&mut *session))?;
+        resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
+
+        let client = self.client();
+        let (aggregate, cs_data) = client.build_watch(self.namespace(), pipeline, options)?;
+        let cursor = client
+            .execute_session_cursor_operation::<_, ChangeStreamEvent<T>>(aggregate, session)
+            .await?;
 
         Ok(SessionChangeStream::new(cursor, cs_data))
-    }
-
-    fn build_watch_aggregate(
-        &self,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: impl Into<Option<ChangeStreamOptions>>,
-        agg_options: Option<AggregateOptions>,
-    ) -> Result<(Aggregate, ChangeStreamData)>
-    {
-        let pipeline: Vec<_> = pipeline.into_iter().collect();
-        let options = options.into();
-        let selection_criteria = agg_options.as_ref().and_then(|o| o.selection_criteria.clone());
-        let default_options;
-        let bson_options = bson::to_bson(match &options {
-            None => {
-                default_options = ChangeStreamOptions::default();
-                &default_options
-            }
-            Some(o) => o,
-        })?;
-        let agg_pipeline = std::iter::once(doc! {
-            "$changeStream": bson_options,
-        })
-        .chain(pipeline.iter().cloned());
-
-        Ok((
-            Aggregate::new(self.namespace(), agg_pipeline, agg_options),
-            ChangeStreamData::new(
-                pipeline,
-                self.client().clone(),
-                ChangeStreamTarget::Collection(self.clone().with_document()),
-                options,
-                selection_criteria,
-            )
-        ))
-    }
-
-    pub(crate) fn with_document(self) -> Collection<Document> {
-        Collection {
-            inner: self.inner,
-            _phantom: PhantomData::default(),
-        }
     }
 }
 

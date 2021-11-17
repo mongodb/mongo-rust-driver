@@ -85,7 +85,8 @@ where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
     client: Client,
-    // `wrapped_cursor` is an `Option` so that it can be `None` for the `drop` impl for a cursor that's had `with_type` called; in all other circumstances it will be `Some`.
+    // `wrapped_cursor` is an `Option` so that it can be `None` for the `drop` impl for a cursor
+    // that's had `with_type` called; in all other circumstances it will be `Some`.
     wrapped_cursor: Option<ImplicitSessionCursor<T>>,
     #[cfg(test)]
     kill_watcher: Option<oneshot::Sender<()>>,
@@ -121,7 +122,7 @@ where
     /// Update the type streamed values will be parsed as.
     pub fn with_type<D>(mut self) -> Cursor<D>
     where
-    D: DeserializeOwned + Unpin + Send + Sync,
+        D: DeserializeOwned + Unpin + Send + Sync,
     {
         Cursor {
             client: self.client.clone(),

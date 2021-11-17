@@ -187,7 +187,7 @@ where
     /// Update the type streamed values will be parsed as.
     pub fn with_type<D>(mut self) -> SessionCursor<D>
     where
-    D: DeserializeOwned + Unpin + Send + Sync,
+        D: DeserializeOwned + Unpin + Send + Sync,
     {
         let out = SessionCursor {
             client: self.client.clone(),
@@ -198,7 +198,7 @@ where
             #[cfg(test)]
             kill_watcher: self.kill_watcher.take(),
         };
-        self.mark_exhausted();  // prevent a `kill_cursor` call in `drop`
+        self.mark_exhausted(); // prevent a `kill_cursor` call in `drop`
         out
     }
 
