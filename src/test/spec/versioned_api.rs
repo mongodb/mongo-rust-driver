@@ -44,6 +44,7 @@ async fn run_transaction_handling_spec_test() {
 
 async fn run_non_transaction_handling_test(path: PathBuf, file: TestFile) {
     if path.ends_with("transaction-handling.json") {
+        println!("skipping run_non_transaction_handling_test");
         return;
     }
     run_unified_format_test(file).await
@@ -63,6 +64,7 @@ async fn transaction_handling() {
     options.server_api = Some(version);
     let client = EventClient::with_options(options).await;
     if !client.is_replica_set() || client.server_version_lt(5, 0) {
+        println!("skipping transaction_handling due to test configuration");
         return;
     }
 

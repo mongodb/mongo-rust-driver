@@ -12,6 +12,7 @@ use crate::{
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
     if std::env::var_os("MONGO_OCSP_TESTS").is_none() {
+        println!("skipping test due to missing environment variable MONGO_OCSP_TESTS");
         return;
     }
 

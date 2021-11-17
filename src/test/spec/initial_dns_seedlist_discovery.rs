@@ -58,16 +58,7 @@ struct ParsedOptions {
 async fn run_test(mut test_file: TestFile) {
     // TODO DRIVERS-796: unskip this test
     if test_file.uri == "mongodb+srv://test5.test.build.10gen.cc/?authSource=otherDB" {
-        return;
-    }
-
-    // TODO RUST-980 unskip these tests
-    if test_file
-        .options
-        .as_ref()
-        .and_then(|o| o.load_balanced)
-        .unwrap_or(false)
-    {
+        println!("skipping initial_dns_seedlist_discovery due to authSource being specified without credentials");
         return;
     }
 
@@ -115,7 +106,6 @@ async fn run_test(mut test_file: TestFile) {
         None => true,
     };
     let client = TestClient::new().await;
-    // TODO RUST-395: log this test skip
     if requires_tls == client.options.tls_options().is_some()
         && client.is_replica_set()
         && client.options.repl_set_name.as_deref() == Some("repl0")
@@ -173,6 +163,8 @@ async fn run_test(mut test_file: TestFile) {
 
             RUNTIME.delay_for(Duration::from_millis(500)).await;
         }
+    } else {
+        println!("skipping test due to test configuration");
     }
 
     if let Some(ref mut resolved_options) = test_file.options {

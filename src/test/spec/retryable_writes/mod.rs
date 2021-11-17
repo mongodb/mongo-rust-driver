@@ -197,6 +197,7 @@ async fn transaction_ids_excluded() {
     let client = EventClient::new().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
+        println!("skipping transaction_ids_excluded due to test configuration");
         return;
     }
 
@@ -250,6 +251,7 @@ async fn transaction_ids_included() {
     let client = EventClient::new().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
+        println!("skipping transaction_ids_included due to test configuration");
         return;
     }
 
@@ -312,6 +314,7 @@ async fn mmapv1_error_raised() {
 
     let req = semver::VersionReq::parse("<=4.0").unwrap();
     if !req.matches(&client.server_version) || !client.is_replica_set() {
+        println!("skipping mmapv1_error_raised due to test configuration");
         return;
     }
 
@@ -328,6 +331,7 @@ async fn mmapv1_error_raised() {
         .get_str("name")
         .unwrap();
     if name != "mmapv1" {
+        println!("skipping mmapv1_error_raised due to incorrect storage engine");
         return;
     }
 
@@ -372,6 +376,7 @@ async fn label_not_added(retry_reads: bool) {
     if client.is_sharded() && !sharded_req.matches(&client.server_version)
         || !req.matches(&client.server_version)
     {
+        println!("skipping label_not_added due to unsupported replica set or sharded cluster version");
         return;
     }
 

@@ -43,6 +43,7 @@ async fn client_errors() {
 
     let client = TestClient::new().await;
     if !client.is_replica_set() || client.server_version_lt(4, 0) {
+        println!("skipping client_errors due to test configuration");
         return;
     }
 
@@ -105,6 +106,7 @@ async fn deserialize_recovery_token() {
 
     let client = TestClient::new().await;
     if !client.is_sharded() || client.server_version_lt(4, 2) {
+        println!("skipping deserialize_recovery_token due to test configuration");
         return;
     }
 
