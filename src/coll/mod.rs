@@ -23,7 +23,6 @@ use crate::{
         session::SessionChangeStream,
         ChangeStream,
     },
-    client::session::TransactionState,
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},

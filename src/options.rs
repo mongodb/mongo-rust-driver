@@ -80,6 +80,7 @@ macro_rules! resolve_write_concern_with_session {
 
 macro_rules! resolve_rw_concern_with_session {
     ($obj:expr, $opts:expr, $session:expr, $concern:ident, $name:expr) => {{
+        use crate::client::session::TransactionState;
         if let Some(session) = $session {
             match session.transaction.state {
                 TransactionState::Starting | TransactionState::InProgress => {
@@ -115,6 +116,7 @@ macro_rules! resolve_rw_concern_with_session {
 /// operation or inherit it from the collection/database.
 macro_rules! resolve_selection_criteria_with_session {
     ($obj:expr, $opts:expr, $session:expr) => {{
+        use crate::client::session::TransactionState;
         if let Some(session) = $session {
             match session.transaction.state {
                 TransactionState::Starting | TransactionState::InProgress => {

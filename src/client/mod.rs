@@ -289,7 +289,17 @@ impl Client {
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<ChangeStreamOptions>>,
     ) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
-        todo!()
+        let mut options = options.into();
+        resolve_options!(self, options, [read_concern, selection_criteria]);
+        let mut options = options.unwrap_or_default();
+        options.all_changes_for_cluster = Some(true);
+
+        let (aggregate, cs_data) = self.build_watch(AggregateTarget::Database("admin".to_string()), pipeline, Some(options))?;
+        let cursor = self
+            .execute_cursor_operation::<_, ChangeStreamEvent<Document>>(aggregate)
+            .await?;
+
+        Ok(ChangeStream::new(cursor, cs_data))
     }
 
     /// Starts a new [`SessionChangeStream`] that receives events for all changes in the cluster
@@ -301,7 +311,18 @@ impl Client {
         options: impl Into<Option<ChangeStreamOptions>>,
         session: &mut ClientSession,
     ) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
-        todo!()
+        let mut options = options.into();
+        resolve_read_concern_with_session!(self, options, Some(&mut *session))?;
+        resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
+        let mut options = options.unwrap_or_default();
+        options.all_changes_for_cluster = Some(true);
+
+        let (aggregate, cs_data) = self.build_watch(AggregateTarget::Database("admin".to_string()), pipeline, Some(options))?;
+        let cursor = self
+            .execute_session_cursor_operation::<_, ChangeStreamEvent<Document>>(aggregate, session)
+            .await?;
+
+        Ok(SessionChangeStream::new(cursor, cs_data))
     }
 
     /// Check in a server session to the server session pool.
