@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use bson::Document;
 
 use crate::{

@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod test;
-
 use std::time::Duration;
 
 use bson::{doc, Document};
