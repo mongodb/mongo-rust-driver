@@ -64,22 +64,10 @@ impl<'conn> Operation for RunCommand<'conn> {
                 message: "an empty document cannot be passed to a run_command operation".into(),
             })?;
 
-        let mut command = self.command.clone();
-        if let Some(write_concern) = self
-            .command
-            .get("writeConcern")
-            .map(|doc| bson::from_bson::<WriteConcern>(doc.clone()))
-            .transpose()?
-        {
-            if write_concern.is_empty() {
-                command.remove("writeConcern");
-            }
-        }
-
         Ok(Command::new(
             command_name.to_string(),
             self.db.clone(),
-            command,
+            self.command.clone(),
         ))
     }
 
