@@ -64,7 +64,7 @@ async fn transaction_handling() {
     options.server_api = Some(version);
     let client = EventClient::with_options(options).await;
     if !client.is_replica_set() || client.server_version_lt(5, 0) {
-        println!("skipping transaction_handling due to test configuration");
+        println!("skipping transaction_handling due to test topology");
         return;
     }
 

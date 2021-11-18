@@ -74,6 +74,7 @@ where
     run_spec_test(spec, |t: TestFile| async {
         if let Some(ref serverless) = t.serverless {
             if !serverless.can_run() {
+                println!("skipping crud_v1_test");
                 return;
             }
         }

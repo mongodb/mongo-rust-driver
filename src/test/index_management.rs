@@ -286,6 +286,7 @@ async fn commit_quorum_error() {
 
     let client = TestClient::new().await;
     if client.is_standalone() {
+        println!("skipping commit_quorum_error due to standalone topology");
         return;
     }
 

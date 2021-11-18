@@ -197,7 +197,7 @@ async fn transaction_ids_excluded() {
     let client = EventClient::new().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
-        println!("skipping transaction_ids_excluded due to test configuration");
+        println!("skipping transaction_ids_excluded due to test topology");
         return;
     }
 
@@ -251,7 +251,7 @@ async fn transaction_ids_included() {
     let client = EventClient::new().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
-        println!("skipping transaction_ids_included due to test configuration");
+        println!("skipping transaction_ids_included due to test topology");
         return;
     }
 
@@ -314,7 +314,7 @@ async fn mmapv1_error_raised() {
 
     let req = semver::VersionReq::parse("<=4.0").unwrap();
     if !req.matches(&client.server_version) || !client.is_replica_set() {
-        println!("skipping mmapv1_error_raised due to test configuration");
+        println!("skipping mmapv1_error_raised due to test topology");
         return;
     }
 
@@ -331,7 +331,7 @@ async fn mmapv1_error_raised() {
         .get_str("name")
         .unwrap();
     if name != "mmapv1" {
-        println!("skipping mmapv1_error_raised due to incorrect storage engine");
+        println!("skipping mmapv1_error_raised due to unsupported storage engine");
         return;
     }
 

@@ -3,6 +3,7 @@ use bson::Document;
 
 async fn run_test(uri_env_var: &str, resolver_config: Option<ResolverConfig>) {
     if std::env::var_os("MONGO_ATLAS_TESTS").is_none() {
+        println!("skipping test due to undefined environment variable MONGO_ATLAS_TESTS");
         return;
     }
 

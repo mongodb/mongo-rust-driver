@@ -266,6 +266,7 @@ async fn db_aggregate() {
     let client = TestClient::new().await;
 
     if client.server_version_lt(4, 0) {
+        println!("skipping db_aggregate due to server version < 4.0");
         return;
     }
 
@@ -310,6 +311,7 @@ async fn db_aggregate_disk_use() {
     let client = TestClient::new().await;
 
     if client.server_version_lt(4, 0) {
+        println!("skipping db_aggregate_disk_use due to server version < 4.0");
         return;
     }
 

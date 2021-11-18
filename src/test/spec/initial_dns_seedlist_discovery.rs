@@ -164,7 +164,7 @@ async fn run_test(mut test_file: TestFile) {
             RUNTIME.delay_for(Duration::from_millis(500)).await;
         }
     } else {
-        println!("skipping test due to test configuration");
+        println!("skipping test due to test topology");
     }
 
     if let Some(ref mut resolved_options) = test_file.options {
