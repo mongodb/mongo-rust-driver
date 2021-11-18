@@ -122,7 +122,7 @@ where
         };
 
         remove_empty_write_concern!(Some(&mut self.options));
-        append_options(&mut body, Some(&self.options))?;
+        append_options(&mut body, Some(&self.options).as_ref())?;
 
         Ok(Command::new(
             Self::NAME.to_string(),

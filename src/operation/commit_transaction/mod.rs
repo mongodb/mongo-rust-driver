@@ -34,7 +34,7 @@ impl Operation for CommitTransaction {
         };
 
         remove_empty_write_concern!(self.options);
-        append_options(&mut body, Some(&self.options))?;
+        append_options(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(
             Self::NAME.to_string(),
