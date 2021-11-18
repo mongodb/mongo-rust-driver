@@ -376,7 +376,9 @@ async fn label_not_added(retry_reads: bool) {
     if client.is_sharded() && !sharded_req.matches(&client.server_version)
         || !req.matches(&client.server_version)
     {
-        println!("skipping label_not_added due to unsupported replica set or sharded cluster version");
+        println!(
+            "skipping label_not_added due to unsupported replica set or sharded cluster version"
+        );
         return;
     }
 

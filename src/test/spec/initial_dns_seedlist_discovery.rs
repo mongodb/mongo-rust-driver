@@ -58,7 +58,10 @@ struct ParsedOptions {
 async fn run_test(mut test_file: TestFile) {
     // TODO DRIVERS-796: unskip this test
     if test_file.uri == "mongodb+srv://test5.test.build.10gen.cc/?authSource=otherDB" {
-        println!("skipping initial_dns_seedlist_discovery due to authSource being specified without credentials");
+        println!(
+            "skipping initial_dns_seedlist_discovery due to authSource being specified without \
+             credentials"
+        );
         return;
     }
 

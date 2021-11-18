@@ -658,7 +658,7 @@ async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>,
 
     let req = VersionReq::parse(">= 4.2").unwrap();
     if options.is_some() && !req.matches(&client.server_version) {
-        println("skipping find_one_and_delete_hint_test due to test configuration");
+        println!("skipping find_one_and_delete_hint_test due to test configuration");
         return;
     }
 
