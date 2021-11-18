@@ -13,7 +13,7 @@ use derivative::Derivative;
 #[cfg(test)]
 use crate::options::ServerAddress;
 use crate::{
-    bson::{doc, Document},
+    bson::Document,
     change_stream::{
         event::ChangeStreamEvent,
         options::ChangeStreamOptions,
@@ -25,7 +25,7 @@ use crate::{
     db::Database,
     error::{ErrorKind, Result},
     event::command::CommandEventHandler,
-    operation::{append_options, Aggregate, AggregateTarget, ListDatabases},
+    operation::{Aggregate, AggregateTarget, ListDatabases},
     options::{
         ClientOptions,
         DatabaseOptions,
@@ -289,21 +289,23 @@ impl Client {
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<ChangeStreamOptions>>,
     ) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
+        let pipeline: Vec<_> = pipeline.into_iter().collect();
         let mut options = options.into();
         resolve_options!(self, options, [read_concern, selection_criteria]);
-        let mut options = options.unwrap_or_default();
-        options.all_changes_for_cluster = Some(true);
+        options
+            .get_or_insert_with(Default::default)
+            .all_changes_for_cluster = Some(true);
 
-        let (aggregate, cs_data) = self.build_watch(
-            AggregateTarget::Database("admin".to_string()),
-            pipeline,
-            Some(options),
-        )?;
+        let target = AggregateTarget::Database("admin".to_string());
+        let aggregate = Aggregate::new_watch(&target, &pipeline, &options)?;
         let cursor = self
             .execute_cursor_operation::<_, ChangeStreamEvent<Document>>(aggregate)
             .await?;
 
-        Ok(ChangeStream::new(cursor, cs_data))
+        Ok(ChangeStream::new(
+            cursor,
+            ChangeStreamData::new(pipeline, self.clone(), target, options),
+        ))
     }
 
     /// Starts a new [`SessionChangeStream`] that receives events for all changes in the cluster
@@ -315,22 +317,24 @@ impl Client {
         options: impl Into<Option<ChangeStreamOptions>>,
         session: &mut ClientSession,
     ) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
+        let pipeline: Vec<_> = pipeline.into_iter().collect();
         let mut options = options.into();
         resolve_read_concern_with_session!(self, options, Some(&mut *session))?;
         resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
-        let mut options = options.unwrap_or_default();
-        options.all_changes_for_cluster = Some(true);
+        options
+            .get_or_insert_with(Default::default)
+            .all_changes_for_cluster = Some(true);
 
-        let (aggregate, cs_data) = self.build_watch(
-            AggregateTarget::Database("admin".to_string()),
-            pipeline,
-            Some(options),
-        )?;
+        let target = AggregateTarget::Database("admin".to_string());
+        let aggregate = Aggregate::new_watch(&target, &pipeline, &options)?;
         let cursor = self
             .execute_session_cursor_operation::<_, ChangeStreamEvent<Document>>(aggregate, session)
             .await?;
 
-        Ok(SessionChangeStream::new(cursor, cs_data))
+        Ok(SessionChangeStream::new(
+            cursor,
+            ChangeStreamData::new(pipeline, self.clone(), target, options),
+        ))
     }
 
     /// Check in a server session to the server session pool.
@@ -443,29 +447,6 @@ impl Client {
                 .into());
             }
         }
-    }
-
-    pub(crate) fn build_watch(
-        &self,
-        target: impl Into<AggregateTarget>,
-        pipeline: impl IntoIterator<Item = Document>,
-        options: Option<ChangeStreamOptions>,
-    ) -> Result<(Aggregate, ChangeStreamData)> {
-        let target = target.into();
-        let pipeline: Vec<_> = pipeline.into_iter().collect();
-        let mut bson_options = Document::new();
-        append_options(&mut bson_options, options.as_ref())?;
-
-        let mut agg_pipeline = vec![doc! { "$changeStream": bson_options }];
-        agg_pipeline.extend(pipeline.iter().cloned());
-        Ok((
-            Aggregate::new(
-                target.clone(),
-                agg_pipeline,
-                options.as_ref().map(|o| o.aggregate_options()),
-            ),
-            ChangeStreamData::new(pipeline, self.clone(), target, options),
-        ))
     }
 
     #[cfg(all(test, not(feature = "sync")))]

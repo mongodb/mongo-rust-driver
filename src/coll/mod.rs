@@ -22,6 +22,7 @@ use crate::{
         options::ChangeStreamOptions,
         session::SessionChangeStream,
         ChangeStream,
+        ChangeStreamData,
     },
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
@@ -821,16 +822,21 @@ impl<T> Collection<T> {
     where
         T: DeserializeOwned + Unpin + Send + Sync,
     {
+        let pipeline: Vec<_> = pipeline.into_iter().collect();
         let mut options = options.into();
         resolve_options!(self, options, [read_concern, selection_criteria]);
 
         let client = self.client();
-        let (aggregate, cs_data) = client.build_watch(self.namespace(), pipeline, options)?;
+        let target = self.namespace().into();
+        let aggregate = Aggregate::new_watch(&target, &pipeline, &options)?;
         let cursor = client
             .execute_cursor_operation::<_, ChangeStreamEvent<T>>(aggregate)
             .await?;
 
-        Ok(ChangeStream::new(cursor, cs_data))
+        Ok(ChangeStream::new(
+            cursor,
+            ChangeStreamData::new(pipeline, self.client().clone(), target, options),
+        ))
     }
 
     /// Starts a new [`SessionChangeStream`] that receives events for all changes in this collection
@@ -845,17 +851,22 @@ impl<T> Collection<T> {
     where
         T: DeserializeOwned + Unpin + Send + Sync,
     {
+        let pipeline: Vec<_> = pipeline.into_iter().collect();
         let mut options = options.into();
         resolve_read_concern_with_session!(self, options, Some(&mut *session))?;
         resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
 
         let client = self.client();
-        let (aggregate, cs_data) = client.build_watch(self.namespace(), pipeline, options)?;
+        let target = self.namespace().into();
+        let aggregate = Aggregate::new_watch(&target, &pipeline, &options)?;
         let cursor = client
             .execute_session_cursor_operation::<_, ChangeStreamEvent<T>>(aggregate, session)
             .await?;
 
-        Ok(SessionChangeStream::new(cursor, cs_data))
+        Ok(SessionChangeStream::new(
+            cursor,
+            ChangeStreamData::new(pipeline, self.client().clone(), target, options),
+        ))
     }
 }
 

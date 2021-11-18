@@ -8,7 +8,7 @@ use crate::{
     cursor::CursorSpecification,
     error::Result,
     operation::{append_options, remove_empty_write_concern, Operation, Retryability},
-    options::{AggregateOptions, SelectionCriteria, WriteConcern},
+    options::{AggregateOptions, ChangeStreamOptions, SelectionCriteria, WriteConcern},
     Namespace,
 };
 
@@ -37,6 +37,23 @@ impl Aggregate {
             pipeline: pipeline.into_iter().collect(),
             options,
         }
+    }
+
+    pub(crate) fn new_watch(
+        target: &AggregateTarget,
+        pipeline: &[Document],
+        options: &Option<ChangeStreamOptions>,
+    ) -> Result<Self> {
+        let mut bson_options = Document::new();
+        append_options(&mut bson_options, options.as_ref())?;
+
+        let mut agg_pipeline = vec![doc! { "$changeStream": bson_options }];
+        agg_pipeline.extend(pipeline.iter().cloned());
+        Ok(Self {
+            target: target.clone(),
+            pipeline: agg_pipeline,
+            options: options.as_ref().map(|o| o.aggregate_options()),
+        })
     }
 }
 
