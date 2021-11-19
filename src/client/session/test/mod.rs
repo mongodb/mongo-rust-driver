@@ -1,12 +1,14 @@
 mod causal_consistency;
 
+use std::sync::Arc;
 use std::{future::Future, time::Duration};
 
 use bson::Document;
 use futures::stream::StreamExt;
 use tokio::sync::RwLockReadGuard;
 
-use crate::options::InsertOneOptions;
+use crate::coll::options::CountOptions;
+use crate::sdam::ServerInfo;
 use crate::{
     bson::{doc, Bson},
     coll::options::InsertManyOptions,
@@ -450,7 +452,8 @@ async fn find_and_getmore_share_session() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = EventClient::new().await;
-    if !client.is_replica_set() {
+    if client.is_standalone() {
+        println!("skipping find_and_getmore_share_session due to unsupported topology: Standalone");
         return;
     }
 
@@ -525,6 +528,14 @@ async fn find_and_getmore_share_session() {
             .get("lsid")
             .expect("count documents should use implicit session");
         assert_eq!(getmore_session_id, session_id);
+    }
+
+    for host in CLIENT_OPTIONS.hosts.iter() {
+        let rp = Arc::new(move |si: &ServerInfo| si.address() == host);
+        let options = CountOptions::builder()
+            .selection_criteria(SelectionCriteria::Predicate(rp))
+            .build();
+        while coll.count_documents(None, options.clone()).await.unwrap() != 3 {}
     }
 
     for read_pref in read_preferences {
