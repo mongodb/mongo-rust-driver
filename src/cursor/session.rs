@@ -192,7 +192,7 @@ where
         let out = SessionCursor {
             client: self.client.clone(),
             info: self.info.clone(),
-            buffer: self.buffer.drain(..).collect(),
+            buffer: std::mem::take(&mut self.buffer),
             pinned_connection: self.pinned_connection.take(),
             _phantom: Default::default(),
             #[cfg(test)]
