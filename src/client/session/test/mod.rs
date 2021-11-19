@@ -6,14 +6,15 @@ use bson::Document;
 use futures::stream::StreamExt;
 use tokio::sync::RwLockReadGuard;
 
+use crate::options::InsertOneOptions;
 use crate::{
     bson::{doc, Bson},
+    coll::options::InsertManyOptions,
     error::Result,
-    options::{Acknowledgment, FindOptions, InsertOneOptions, ReadPreference, WriteConcern},
+    options::{Acknowledgment, FindOptions, ReadPreference, WriteConcern},
     selection_criteria::SelectionCriteria,
     test::{EventClient, TestClient, CLIENT_OPTIONS, LOCK},
-    Collection,
-    RUNTIME,
+    Collection, RUNTIME,
 };
 
 /// Macro defining a closure that returns a future populated by an operation on the
@@ -457,14 +458,10 @@ async fn find_and_getmore_share_session() {
         .init_db_and_coll(function_name!(), function_name!())
         .await;
 
-    let options = InsertOneOptions::builder()
+    let options = InsertManyOptions::builder()
         .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
         .build();
-    for _ in 0..3 {
-        coll.insert_one(doc! {}, options.clone())
-            .await
-            .expect("insert should succeed");
-    }
+    coll.insert_many(vec![doc! {}; 3], options).await.unwrap();
 
     let read_preferences: Vec<ReadPreference> = vec![
         ReadPreference::Primary,
@@ -489,7 +486,7 @@ async fn find_and_getmore_share_session() {
     ) {
         let options = FindOptions::builder()
             .batch_size(2)
-            .selection_criteria(SelectionCriteria::ReadPreference(read_preference))
+            .selection_criteria(SelectionCriteria::ReadPreference(read_preference.clone()))
             .build();
 
         let mut cursor = coll
@@ -498,7 +495,21 @@ async fn find_and_getmore_share_session() {
             .expect("find should succeed");
 
         for _ in 0..3 {
-            assert!(matches!(cursor.next().await, Some(Ok(_))));
+            cursor
+                .next()
+                .await
+                .unwrap_or_else(|| {
+                    panic!(
+                        "should get result with read preference {:?}",
+                        read_preference
+                    )
+                })
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "result should not be error with read preference {:?}, but got {:?}",
+                        read_preference, e
+                    )
+                });
         }
 
         let (find_started, _) = client.get_successful_command_execution("find");
