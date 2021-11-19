@@ -12,31 +12,19 @@ use derivative::Derivative;
 
 #[cfg(test)]
 use crate::options::ServerAddress;
-use crate::{
-    bson::Document,
-    change_stream::{
+use crate::{ClientSession, bson::Document, change_stream::{
         event::ChangeStreamEvent,
         options::ChangeStreamOptions,
         session::SessionChangeStream,
         ChangeStream,
-    },
-    concern::{ReadConcern, WriteConcern},
-    db::Database,
-    error::{ErrorKind, Result},
-    event::command::CommandEventHandler,
-    operation::ListDatabases,
-    options::{
+    }, concern::{ReadConcern, WriteConcern}, db::Database, error::{ErrorKind, Result}, event::command::CommandEventHandler, operation::ListDatabases, options::{
         ClientOptions,
         DatabaseOptions,
         ListDatabasesOptions,
         ReadPreference,
         SelectionCriteria,
         SessionOptions,
-    },
-    results::DatabaseSpecification,
-    sdam::{SelectedServer, SessionSupportStatus, Topology},
-    ClientSession,
-};
+    }, results::DatabaseSpecification, sdam::{SelectedServer, SessionSupportStatus, Topology, TopologyDescription}};
 pub(crate) use executor::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS};
 pub(crate) use session::{ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS};
 
@@ -427,5 +415,10 @@ impl Client {
     #[cfg(test)]
     pub(crate) async fn sync_workers(&self) {
         self.inner.topology.sync_workers().await;
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn topology_description(&self) -> TopologyDescription {
+        self.inner.topology.description().await
     }
 }

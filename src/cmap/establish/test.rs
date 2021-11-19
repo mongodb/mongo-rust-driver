@@ -42,6 +42,8 @@ async fn speculative_auth_test(
     );
     pool_options.tls_options = CLIENT_OPTIONS.tls_options();
 
+    let description = client.topology_description().await;
+
     let handshaker = Handshaker::new(Some(pool_options.clone().into()));
 
     let mut conn = Connection::new_testing(1, Default::default(), 1, Some(pool_options.into()))
