@@ -175,7 +175,7 @@ impl TopologyDescription {
         });
     }
 
-    fn servers_with_type<'a>(
+    pub(crate) fn servers_with_type<'a>(
         &'a self,
         types: &'a [ServerType],
     ) -> impl Iterator<Item = &'a ServerDescription> {

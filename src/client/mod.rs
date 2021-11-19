@@ -24,7 +24,7 @@ use crate::{ClientSession, bson::Document, change_stream::{
         ReadPreference,
         SelectionCriteria,
         SessionOptions,
-    }, results::DatabaseSpecification, sdam::{SelectedServer, SessionSupportStatus, Topology, TopologyDescription}};
+    }, results::DatabaseSpecification, sdam::{SelectedServer, SessionSupportStatus, Topology}};
 pub(crate) use executor::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS};
 pub(crate) use session::{ClusterTime, SESSIONS_UNSUPPORTED_COMMANDS};
 
@@ -418,7 +418,7 @@ impl Client {
     }
 
     #[cfg(test)]
-    pub(crate) async fn topology_description(&self) -> TopologyDescription {
+    pub(crate) async fn topology_description(&self) -> crate::sdam::TopologyDescription {
         self.inner.topology.description().await
     }
 }
