@@ -1,22 +1,22 @@
 mod causal_consistency;
 
-use std::sync::Arc;
-use std::{future::Future, time::Duration};
+use std::{future::Future, sync::Arc, time::Duration};
 
 use bson::Document;
 use futures::stream::StreamExt;
 use tokio::sync::RwLockReadGuard;
 
-use crate::coll::options::CountOptions;
-use crate::sdam::ServerInfo;
 use crate::{
     bson::{doc, Bson},
-    coll::options::InsertManyOptions,
+    coll::options::{CountOptions, InsertManyOptions},
     error::Result,
     options::{Acknowledgment, FindOptions, ReadPreference, WriteConcern},
+    sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
     test::{EventClient, TestClient, CLIENT_OPTIONS, LOCK},
-    Collection, RUNTIME,
+    Collection,
+    ServerType,
+    RUNTIME,
 };
 
 /// Macro defining a closure that returns a future populated by an operation on the
@@ -530,13 +530,38 @@ async fn find_and_getmore_share_session() {
         assert_eq!(getmore_session_id, session_id);
     }
 
-    for host in CLIENT_OPTIONS.hosts.iter() {
-        println!("counting {}", host);
-        let rp = Arc::new(move |si: &ServerInfo| si.address() == host);
+    let topology_description = client.topology_description().await;
+    for (addr, server) in topology_description.servers {
+        if matches!(server.server_type, ServerType::RsArbiter) {
+            continue;
+        }
+
+        let a = addr.clone();
+        let rp = Arc::new(move |si: &ServerInfo| si.address() == &a);
         let options = CountOptions::builder()
             .selection_criteria(SelectionCriteria::Predicate(rp))
             .build();
-        while coll.count_documents(None, options.clone()).await.unwrap() != 3 {}
+
+        loop {
+            let count = match coll.count_documents(None, options.clone()).await {
+                Ok(c) => c,
+                Err(e) => {
+                    let desc = client.topology_description().await;
+                    if matches!(
+                        desc.servers.get(&addr).unwrap().server_type,
+                        ServerType::RsArbiter
+                    ) {
+                        break;
+                    } else {
+                        panic!("{:?}", e);
+                    }
+                }
+            };
+
+            if count == 3 {
+                break;
+            }
+        }
     }
 
     for read_pref in read_preferences {

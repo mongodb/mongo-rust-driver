@@ -119,7 +119,11 @@ impl TopologyDescription {
             SelectionCriteria::Predicate(ref filter) => self
                 .servers
                 .values()
-                .filter(|s| s.is_available() && filter(&ServerInfo::new_borrowed(s)))
+                .filter(|s| {
+                    s.is_available()
+                        && !matches!(s.server_type, ServerType::RsArbiter)
+                        && filter(&ServerInfo::new_borrowed(s))
+                })
                 .collect(),
         };
 
