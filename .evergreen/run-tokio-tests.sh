@@ -4,7 +4,7 @@ set -o errexit
 
 source ./.evergreen/env.sh
 
-OPTIONS="-- -Z unstable-options --format json --report-time --nocapture"
+OPTIONS="-- -Z unstable-options --format json --report-time"
 
 if [ "$SINGLE_THREAD" = true ]; then
 	OPTIONS="$OPTIONS --test-threads=1"
