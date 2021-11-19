@@ -531,6 +531,7 @@ async fn find_and_getmore_share_session() {
     }
 
     for host in CLIENT_OPTIONS.hosts.iter() {
+        println!("counting {}", host);
         let rp = Arc::new(move |si: &ServerInfo| si.address() == host);
         let options = CountOptions::builder()
             .selection_criteria(SelectionCriteria::Predicate(rp))
