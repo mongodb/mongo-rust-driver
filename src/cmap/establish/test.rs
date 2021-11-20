@@ -47,14 +47,13 @@ async fn speculative_auth_test(
 
     // if running against a replica set, use the primary to ensure the user creation has propagated.
     let addr = match description.topology_type {
-        TopologyType::Sharded => Default::default(),
         TopologyType::ReplicaSetWithPrimary => description
             .servers_with_type(&[ServerType::RsPrimary])
             .next()
             .unwrap()
             .address
             .clone(),
-        _ => panic!(),
+        _ => Default::default(),
     };
 
     let handshaker = Handshaker::new(Some(pool_options.clone().into()));
