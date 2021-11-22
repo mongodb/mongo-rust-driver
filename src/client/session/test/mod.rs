@@ -1,6 +1,6 @@
 mod causal_consistency;
 
-use std::{future::Future, sync::Arc, time::Duration};
+use std::{future::Future, time::Duration};
 
 use bson::Document;
 use futures::stream::StreamExt;
@@ -8,14 +8,12 @@ use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, Bson},
-    coll::options::{CountOptions, InsertManyOptions},
+    coll::options::InsertManyOptions,
     error::Result,
     options::{Acknowledgment, FindOptions, ReadPreference, WriteConcern},
-    sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
     test::{EventClient, TestClient, CLIENT_OPTIONS, LOCK},
     Collection,
-    ServerType,
     RUNTIME,
 };
 
@@ -461,8 +459,17 @@ async fn find_and_getmore_share_session() {
         .init_db_and_coll(function_name!(), function_name!())
         .await;
 
+    // ensure writes are propagated to all nodes in replica set.
+    let topology_description = client.topology_description().await;
+    let w = match topology_description.topology_type() {
+        crate::TopologyType::ReplicaSetWithPrimary => {
+            Acknowledgment::Nodes(topology_description.servers.len() as u32)
+        }
+        _ => Acknowledgment::Majority,
+    };
+
     let options = InsertManyOptions::builder()
-        .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
+        .write_concern(WriteConcern::builder().w(w).build())
         .build();
     coll.insert_many(vec![doc! {}; 3], options).await.unwrap();
 
@@ -528,40 +535,6 @@ async fn find_and_getmore_share_session() {
             .get("lsid")
             .expect("count documents should use implicit session");
         assert_eq!(getmore_session_id, session_id);
-    }
-
-    let topology_description = client.topology_description().await;
-    for (addr, server) in topology_description.servers {
-        if matches!(server.server_type, ServerType::RsArbiter) {
-            continue;
-        }
-
-        let a = addr.clone();
-        let rp = Arc::new(move |si: &ServerInfo| si.address() == &a);
-        let options = CountOptions::builder()
-            .selection_criteria(SelectionCriteria::Predicate(rp))
-            .build();
-
-        loop {
-            let count = match coll.count_documents(None, options.clone()).await {
-                Ok(c) => c,
-                Err(e) => {
-                    let desc = client.topology_description().await;
-                    if matches!(
-                        desc.servers.get(&addr).unwrap().server_type,
-                        ServerType::RsArbiter
-                    ) {
-                        break;
-                    } else {
-                        panic!("{:?}", e);
-                    }
-                }
-            };
-
-            if count == 3 {
-                break;
-            }
-        }
     }
 
     for read_pref in read_preferences {
