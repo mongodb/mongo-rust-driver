@@ -11,7 +11,7 @@ use crate::{
     bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{BulkWriteFailure, Error, ErrorKind, Result},
-    operation::{Operation, Retryability, WriteResponseBody},
+    operation::{remove_empty_write_concern, Operation, Retryability, WriteResponseBody},
     options::{InsertManyOptions, WriteConcern},
     results::InsertManyResult,
     runtime::SyncLittleEndianWrite,
@@ -109,9 +109,9 @@ impl<'a, T: Serialize> Operation for Insert<'a, T> {
             }
             .into());
         }
-
         let mut options = self.options.clone().unwrap_or_default();
         options.ordered = Some(self.is_ordered());
+        remove_empty_write_concern!(Some(&mut options));
 
         let body = InsertCommand {
             insert: self.ns.coll.clone(),

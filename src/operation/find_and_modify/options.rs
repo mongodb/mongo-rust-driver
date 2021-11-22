@@ -18,7 +18,7 @@ use crate::{
     concern::WriteConcern,
 };
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub(super) enum Modification {
     #[serde(rename = "remove", serialize_with = "self::serialize_true")]
     Delete,
@@ -31,7 +31,7 @@ fn serialize_true<S: Serializer>(s: S) -> std::result::Result<S::Ok, S::Error> {
 }
 
 #[serde_with::skip_serializing_none]
-#[derive(Debug, TypedBuilder, Serialize)]
+#[derive(Clone, Debug, TypedBuilder, Serialize)]
 #[builder(field_defaults(setter(into)))]
 #[serde(rename_all = "camelCase")]
 pub(super) struct FindAndModifyOptions {

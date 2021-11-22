@@ -5,7 +5,7 @@ use bson::{doc, Document};
 use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{append_options, Operation, Retryability},
+    operation::{append_options, remove_empty_write_concern, Operation, Retryability},
     options::{Acknowledgment, TransactionOptions, WriteConcern},
 };
 
@@ -32,6 +32,7 @@ impl Operation for CommitTransaction {
             Self::NAME: 1,
         };
 
+        remove_empty_write_concern!(self.options);
         append_options(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(

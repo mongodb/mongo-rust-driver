@@ -6,7 +6,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{ErrorKind, Result},
     index::IndexModel,
-    operation::{append_options, Operation},
+    operation::{append_options, remove_empty_write_concern, Operation},
     options::{CreateIndexOptions, WriteConcern},
     results::CreateIndexesResult,
     Namespace,
@@ -74,6 +74,8 @@ impl Operation for CreateIndexes {
             Self::NAME: self.ns.coll.clone(),
             "indexes": indexes,
         };
+
+        remove_empty_write_concern!(self.options);
         append_options(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(

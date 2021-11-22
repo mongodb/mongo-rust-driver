@@ -290,6 +290,10 @@ impl WriteConcern {
         self.w != Some(Acknowledgment::Nodes(0)) || self.journal == Some(true)
     }
 
+    pub(crate) fn is_empty(&self) -> bool {
+        self.w == None && self.w_timeout == None && self.journal == None
+    }
+
     /// Validates that the write concern. A write concern is invalid if both the `w` field is 0
     /// and the `j` field is `true`.
     pub(crate) fn validate(&self) -> Result<()> {

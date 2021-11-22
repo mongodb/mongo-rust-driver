@@ -5,8 +5,8 @@ use crate::{
     bson::{doc, Document},
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{append_options, Operation},
-    options::DropIndexOptions,
+    operation::{append_options, remove_empty_write_concern, Operation},
+    options::{DropIndexOptions, WriteConcern},
     Namespace,
 };
 
@@ -44,6 +44,8 @@ impl Operation for DropIndexes {
             Self::NAME: self.ns.coll.clone(),
             "index": self.name.clone(),
         };
+
+        remove_empty_write_concern!(self.options);
         append_options(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(
@@ -59,5 +61,11 @@ impl Operation for DropIndexes {
         _description: &StreamDescription,
     ) -> Result<Self::O> {
         Ok(())
+    }
+
+    fn write_concern(&self) -> Option<&WriteConcern> {
+        self.options
+            .as_ref()
+            .and_then(|opts| opts.write_concern.as_ref())
     }
 }

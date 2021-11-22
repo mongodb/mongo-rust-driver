@@ -7,7 +7,7 @@ use crate::{
     bson::doc,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::Result,
-    operation::{append_options, Operation, WriteConcernOnlyBody},
+    operation::{append_options, remove_empty_write_concern, Operation, WriteConcernOnlyBody},
     options::{DropDatabaseOptions, WriteConcern},
 };
 
@@ -39,6 +39,7 @@ impl Operation for DropDatabase {
             Self::NAME: 1,
         };
 
+        remove_empty_write_concern!(self.options);
         append_options(&mut body, self.options.as_ref())?;
 
         Ok(Command::new(

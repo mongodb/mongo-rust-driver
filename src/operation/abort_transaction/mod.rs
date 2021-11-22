@@ -36,8 +36,10 @@ impl Operation for AbortTransaction {
         let mut body = doc! {
             Self::NAME: 1,
         };
-        if let Some(ref write_concern) = self.write_concern {
-            body.insert("writeConcern", bson::to_bson(write_concern)?);
+        if let Some(ref write_concern) = self.write_concern() {
+            if !write_concern.is_empty() {
+                body.insert("writeConcern", bson::to_bson(write_concern)?);
+            }
         }
 
         Ok(Command::new(

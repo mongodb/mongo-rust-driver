@@ -21,7 +21,7 @@ use crate::{
         Namespace,
     },
     error::{ErrorKind, Result},
-    operation::{append_options, Operation, Retryability},
+    operation::{append_options, remove_empty_write_concern, Operation, Retryability},
     options::WriteConcern,
 };
 
@@ -118,7 +118,8 @@ where
             "query": self.query.clone(),
         };
 
-        append_options(&mut body, Some(&self.options))?;
+        remove_empty_write_concern!(Some(&mut self.options));
+        append_options(&mut body, Some(&self.options).as_ref())?;
 
         Ok(Command::new(
             Self::NAME.to_string(),

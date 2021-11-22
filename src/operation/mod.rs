@@ -367,3 +367,17 @@ pub(crate) enum Retryability {
     Read,
     None,
 }
+
+macro_rules! remove_empty_write_concern {
+    ($opts:expr) => {
+        if let Some(ref mut options) = $opts {
+            if let Some(ref write_concern) = options.write_concern {
+                if write_concern.is_empty() {
+                    options.write_concern = None;
+                }
+            }
+        }
+    };
+}
+
+pub(crate) use remove_empty_write_concern;

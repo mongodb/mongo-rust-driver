@@ -7,7 +7,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
-    operation::{append_options, Operation, Retryability},
+    operation::{append_options, remove_empty_write_concern, Operation, Retryability},
     options::{AggregateOptions, SelectionCriteria, WriteConcern},
     Namespace,
 };
@@ -52,6 +52,8 @@ impl Operation for Aggregate {
             "pipeline": bson_util::to_bson_array(&self.pipeline),
             "cursor": {}
         };
+
+        remove_empty_write_concern!(self.options);
         append_options(&mut body, self.options.as_ref())?;
 
         if self.is_out_or_merge() {

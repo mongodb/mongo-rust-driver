@@ -33,7 +33,6 @@ use crate::{
         TransactionOptions,
         UpdateModifications,
         UpdateOptions,
-        WriteConcern,
     },
     selection_criteria::{ReadPreference, SelectionCriteria},
     test::{FailPoint, TestClient},
@@ -145,20 +144,6 @@ impl<'de> Deserialize<'de> for Operation {
             .arguments
             .remove("session")
             .map(|session| session.as_str().unwrap().to_string());
-
-        // TODO RUST-829 remove this once we handle default write concerns properly
-        if let Some(ref mut collection_options) = definition.collection_options {
-            if collection_options.write_concern == Some(WriteConcern::builder().build()) {
-                collection_options.write_concern = None;
-            }
-        }
-
-        // TODO RUST-829 remove this once we handle default write concerns properly
-        if let Some(ref mut database_options) = definition.database_options {
-            if database_options.write_concern == Some(WriteConcern::builder().build()) {
-                database_options.write_concern = None;
-            }
-        }
 
         let boxed_op = match definition.name.as_str() {
             "insertOne" => {
