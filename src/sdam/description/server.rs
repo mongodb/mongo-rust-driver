@@ -14,22 +14,41 @@ const DRIVER_MIN_DB_VERSION: &str = "3.6";
 const DRIVER_MIN_WIRE_VERSION: i32 = 6;
 const DRIVER_MAX_WIRE_VERSION: i32 = 14;
 
+/// Enum representing the possible types of servers that the driver can connect to.
 #[derive(Debug, Deserialize, Clone, Copy, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum ServerType {
+    /// A single, non-replica set mongod.
     Standalone,
+
+    /// A router used in sharded deployments.
     Mongos,
+
+    /// The primary node in a replica set.
     #[serde(rename = "RSPrimary")]
     RsPrimary,
+
+    /// A secondary node in a replica set.
     #[serde(rename = "RSSecondary")]
     RsSecondary,
+
+    /// A non-data bearing node in a replica set which can participate in elections.
     #[serde(rename = "RSArbiter")]
     RsArbiter,
+
+    /// Hidden, starting up, or recovering nodes in a replica set.
     #[serde(rename = "RSOther")]
     RsOther,
+
+    /// A member of an uninitialized replica set or a member that has been removed from the replica
+    /// set config.
     #[serde(rename = "RSGhost")]
     RsGhost,
+
+    /// A load-balancing proxy between the driver and the MongoDB deployment.
     LoadBalancer,
+
+    /// A server that the driver hasn't yet communicated with or can't connect to.
     #[serde(alias = "PossiblePrimary")]
     Unknown,
 }

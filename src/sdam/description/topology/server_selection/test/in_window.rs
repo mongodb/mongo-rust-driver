@@ -65,8 +65,7 @@ async fn run_test(test_file: TestFile) {
 
     let topology_description = test_file
         .topology_description
-        .into_topology_description(None)
-        .unwrap();
+        .into_topology_description(None);
 
     let read_pref = ReadPreference::Nearest {
         options: Default::default(),

@@ -66,13 +66,9 @@ async fn run_test(test_file: TestFile) {
         None => return,
     };
 
-    let topology = match test_file
+    let topology = test_file
         .topology_description
-        .into_topology_description(test_file.heartbeat_frequency_ms.map(Duration::from_millis))
-    {
-        Some(t) => t,
-        None => return,
-    };
+        .into_topology_description(test_file.heartbeat_frequency_ms.map(Duration::from_millis));
 
     if let Some(ref expected_suitable_servers) = test_file.suitable_servers {
         let mut actual_servers: Vec<_> = topology.suitable_servers(&read_pref).unwrap();
