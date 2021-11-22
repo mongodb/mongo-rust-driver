@@ -462,9 +462,13 @@ async fn find_and_getmore_share_session() {
     // ensure writes are propagated to all nodes in replica set.
     let topology_description = client.topology_description().await;
     let w = match topology_description.topology_type() {
-        crate::TopologyType::ReplicaSetWithPrimary => {
-            Acknowledgment::Nodes(topology_description.servers.len() as u32)
-        }
+        crate::TopologyType::ReplicaSetWithPrimary => Acknowledgment::Nodes(
+            topology_description
+                .servers
+                .iter()
+                .filter(|s| s.1.server_type.is_data_bearing())
+                .count() as u32,
+        ),
         _ => Acknowledgment::Majority,
     };
 

@@ -187,11 +187,7 @@ fn is_master_response_from_server_type(server_type: ServerType) -> Option<IsMast
 #[test]
 fn predicate_omits_unavailable() {
     let criteria = SelectionCriteria::Predicate(Arc::new(|si| {
-        si.address()
-            == &ServerAddress::Tcp {
-                host: "localhost".to_string(),
-                port: Some(27018),
-            }
+        !matches!(si.server_type(), ServerType::RsPrimary)
     }));
 
     let desc = TestTopologyDescription {
@@ -215,28 +211,8 @@ fn predicate_omits_unavailable() {
                 last_write: None,
                 _max_wire_version: None,
             },
-        ],
-    }
-    .into_topology_description(None);
-    assert_eq!(
-        desc.suitable_servers_in_latency_window(&criteria).unwrap(),
-        Vec::<&ServerDescription>::new()
-    );
-
-    let desc = TestTopologyDescription {
-        topology_type: TopologyType::ReplicaSetWithPrimary,
-        servers: vec![
             TestServerDescription {
-                address: "localhost:27017".to_string(),
-                avg_rtt_ms: Some(12.0),
-                server_type: TestServerType::RsPrimary,
-                tags: None,
-                last_update_time: None,
-                last_write: None,
-                _max_wire_version: None,
-            },
-            TestServerDescription {
-                address: "localhost:27018".to_string(),
+                address: "localhost:27019".to_string(),
                 avg_rtt_ms: Some(12.0),
                 server_type: TestServerType::RsArbiter,
                 tags: None,
@@ -244,10 +220,28 @@ fn predicate_omits_unavailable() {
                 last_write: None,
                 _max_wire_version: None,
             },
+            TestServerDescription {
+                address: "localhost:27020".to_string(),
+                avg_rtt_ms: Some(12.0),
+                server_type: TestServerType::RsGhost,
+                tags: None,
+                last_update_time: None,
+                last_write: None,
+                _max_wire_version: None,
+            },
+            TestServerDescription {
+                address: "localhost:27021".to_string(),
+                avg_rtt_ms: Some(12.0),
+                server_type: TestServerType::RsOther,
+                tags: None,
+                last_update_time: None,
+                last_write: None,
+                _max_wire_version: None,
+            },
         ],
     }
     .into_topology_description(None);
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         desc.suitable_servers_in_latency_window(&criteria).unwrap(),
         Vec::<&ServerDescription>::new()
     );
