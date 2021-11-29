@@ -62,7 +62,7 @@ where
     /// [here](https://docs.mongodb.com/manual/changeStreams/#change-stream-resume-token) for more
     /// information on change stream resume tokens.
     pub fn resume_token(&self) -> Option<&ResumeToken> {
-        todo!()
+        self.data.resume_token.as_ref()
     }
 
     /// Update the type streamed values will be parsed as.
