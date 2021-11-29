@@ -10,12 +10,13 @@ use crate::{
     bson::{doc, Bson},
     coll::options::{CountOptions, InsertManyOptions},
     error::Result,
-    operation::Operation,
     options::{Acknowledgment, FindOptions, ReadPreference, WriteConcern},
     sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
     test::{EventClient, TestClient, CLIENT_OPTIONS, LOCK},
-    Collection, ServerType, RUNTIME,
+    Collection,
+    ServerType,
+    RUNTIME,
 };
 
 /// Macro defining a closure that returns a future populated by an operation on the
@@ -530,12 +531,38 @@ async fn find_and_getmore_share_session() {
     }
 
     let topology_description = client.topology_description().await;
+    for (addr, server) in topology_description.servers {
+        if matches!(server.server_type, ServerType::RsArbiter) {
+            continue;
+        }
 
-    // ensure documents have propagated to the secondaries
-    let options = CountOptions::builder().selection_criteria(
-        SelectionCriteria::ReadPreference(ReadPreference::Secondary).build(),
-    );
-    while coll.count_documents(None, options.clone()).await? != 3 {}
+        let a = addr.clone();
+        let rp = Arc::new(move |si: &ServerInfo| si.address() == &a);
+        let options = CountOptions::builder()
+            .selection_criteria(SelectionCriteria::Predicate(rp))
+            .build();
+
+        loop {
+            let count = match coll.count_documents(None, options.clone()).await {
+                Ok(c) => c,
+                Err(e) => {
+                    let desc = client.topology_description().await;
+                    if matches!(
+                        desc.servers.get(&addr).unwrap().server_type,
+                        ServerType::RsArbiter
+                    ) {
+                        break;
+                    } else {
+                        panic!("{:?}", e);
+                    }
+                }
+            };
+
+            if count == 3 {
+                break;
+            }
+        }
+    }
 
     for read_pref in read_preferences {
         run_test(&client, &coll, read_pref).await;
