@@ -7,7 +7,11 @@ use std::{collections::HashSet, sync::Arc, time::Instant};
 use super::{session::TransactionState, Client, ClientSession};
 use crate::{
     bson::{Bson, Document},
-    change_stream::{ChangeStream, ChangeStreamData, event::{ChangeStreamEvent, ResumeToken}},
+    change_stream::{
+        event::{ChangeStreamEvent, ResumeToken},
+        ChangeStream,
+        ChangeStreamData,
+    },
     cmap::{
         conn::PinnedConnectionHandle,
         Connection,
@@ -25,7 +29,15 @@ use crate::{
         UNKNOWN_TRANSACTION_COMMIT_RESULT,
     },
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
-    operation::{AbortTransaction, Aggregate, AggregateTarget, CommandErrorBody, CommitTransaction, Operation, Retryability},
+    operation::{
+        AbortTransaction,
+        Aggregate,
+        AggregateTarget,
+        CommandErrorBody,
+        CommitTransaction,
+        Operation,
+        Retryability,
+    },
     options::{ChangeStreamOptions, SelectionCriteria},
     sdam::{
         HandshakePhase,
@@ -197,7 +209,7 @@ impl Client {
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<ChangeStreamOptions>,
-        target: AggregateTarget
+        target: AggregateTarget,
     ) -> Result<ChangeStream<ChangeStreamEvent<T>>>
     where
         T: DeserializeOwned + Unpin + Send + Sync,
@@ -208,7 +220,12 @@ impl Client {
 
             let mut details = self.execute_operation_with_details(op, None).await?;
             let pinned = self.pin_connection_for_cursor(&mut details.output)?;
-            let resume_token = details.output.operation_output.post_batch_resume_token.clone().map(|d| ResumeToken(Bson::Document(d)));
+            let resume_token = details
+                .output
+                .operation_output
+                .post_batch_resume_token
+                .clone()
+                .map(|d| ResumeToken(Bson::Document(d)));
             let cursor = Cursor::new(
                 self.clone(),
                 details.output.operation_output,
@@ -219,7 +236,7 @@ impl Client {
             Ok(ChangeStream::new(
                 cursor,
                 ChangeStreamData::new(pipeline, self.clone(), target, options, resume_token),
-            ))    
+            ))
         })
         .await
     }

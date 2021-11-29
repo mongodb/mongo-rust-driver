@@ -148,12 +148,12 @@ impl ChangeStreamData {
         options: Option<ChangeStreamOptions>,
         resume_token: Option<ResumeToken>,
     ) -> Self {
-        let resume_token = resume_token.or_else(||
+        let resume_token = resume_token.or_else(|| {
             options
                 .as_ref()
                 .and_then(|o| o.start_after.as_ref().or(o.resume_after.as_ref()))
                 .cloned()
-        );
+        });
         Self {
             pipeline,
             client,
