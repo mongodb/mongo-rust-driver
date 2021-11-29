@@ -6,8 +6,8 @@ use std::{collections::HashSet, sync::Arc, time::Instant};
 
 use super::{session::TransactionState, Client, ClientSession};
 use crate::{
-    bson::Document,
-    change_stream::{ChangeStream, ChangeStreamData, event::ChangeStreamEvent},
+    bson::{Bson, Document},
+    change_stream::{ChangeStream, ChangeStreamData, event::{ChangeStreamEvent, ResumeToken}},
     cmap::{
         conn::PinnedConnectionHandle,
         Connection,
@@ -208,6 +208,7 @@ impl Client {
 
             let mut details = self.execute_operation_with_details(op, None).await?;
             let pinned = self.pin_connection_for_cursor(&mut details.output)?;
+            let resume_token = details.output.operation_output.post_batch_resume_token.clone().map(|d| ResumeToken(Bson::Document(d)));
             let cursor = Cursor::new(
                 self.clone(),
                 details.output.operation_output,
@@ -217,7 +218,7 @@ impl Client {
 
             Ok(ChangeStream::new(
                 cursor,
-                ChangeStreamData::new(pipeline, self.clone(), target, options),
+                ChangeStreamData::new(pipeline, self.clone(), target, options, resume_token),
             ))    
         })
         .await

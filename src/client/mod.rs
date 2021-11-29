@@ -323,7 +323,7 @@ impl Client {
 
         Ok(SessionChangeStream::new(
             cursor,
-            ChangeStreamData::new(pipeline, self.clone(), target, options),
+            ChangeStreamData::new(pipeline, self.clone(), target, options, todo!()),
         ))
     }
 

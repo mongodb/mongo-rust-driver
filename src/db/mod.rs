@@ -499,7 +499,7 @@ impl Database {
 
         Ok(SessionChangeStream::new(
             cursor,
-            ChangeStreamData::new(pipeline, self.client().clone(), target, options),
+            ChangeStreamData::new(pipeline, self.client().clone(), target, options, todo!()),
         ))
     }
 }

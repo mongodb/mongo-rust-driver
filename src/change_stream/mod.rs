@@ -146,15 +146,19 @@ impl ChangeStreamData {
         client: Client,
         target: AggregateTarget,
         options: Option<ChangeStreamOptions>,
+        resume_token: Option<ResumeToken>,
     ) -> Self {
+        let resume_token = resume_token.or_else(||
+            options
+                .as_ref()
+                .and_then(|o| o.start_after.as_ref().or(o.resume_after.as_ref()))
+                .cloned()
+        );
         Self {
             pipeline,
             client,
             target,
-            resume_token: options
-                .as_ref()
-                .and_then(|o| o.start_after.as_ref().or(o.resume_after.as_ref()))
-                .cloned(),
+            resume_token,
             options,
             resume_attempted: false,
             document_returned: false,
