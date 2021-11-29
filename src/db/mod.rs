@@ -11,13 +11,14 @@ use crate::{
         options::ChangeStreamOptions,
         session::SessionChangeStream,
         ChangeStream,
+        ChangeStreamData,
     },
     client::session::TransactionState,
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
     cursor::Cursor,
     error::{Error, ErrorKind, Result},
-    operation::{Aggregate, Create, DropDatabase, ListCollections, RunCommand},
+    operation::{Aggregate, AggregateTarget, Create, DropDatabase, ListCollections, RunCommand},
     options::{
         AggregateOptions,
         CollectionOptions,
@@ -469,7 +470,21 @@ impl Database {
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<ChangeStreamOptions>>,
     ) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
-        todo!()
+        let pipeline: Vec<_> = pipeline.into_iter().collect();
+        let mut options = options.into();
+        resolve_options!(self, options, [read_concern, selection_criteria]);
+
+        let client = self.client();
+        let target = AggregateTarget::Database(self.name().to_string());
+        let aggregate = Aggregate::new_watch(&target, &pipeline, &options)?;
+        let cursor = client
+            .execute_cursor_operation::<_, ChangeStreamEvent<Document>>(aggregate)
+            .await?;
+
+        Ok(ChangeStream::new(
+            cursor,
+            ChangeStreamData::new(pipeline, self.client().clone(), target, options),
+        ))
     }
 
     /// Starts a new [`SessionChangeStream`] that receives events for all changes in this database
@@ -481,6 +496,21 @@ impl Database {
         options: impl Into<Option<ChangeStreamOptions>>,
         session: &mut ClientSession,
     ) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
-        todo!()
+        let pipeline: Vec<_> = pipeline.into_iter().collect();
+        let mut options = options.into();
+        resolve_read_concern_with_session!(self, options, Some(&mut *session))?;
+        resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
+
+        let client = self.client();
+        let target = AggregateTarget::Database(self.name().to_string());
+        let aggregate = Aggregate::new_watch(&target, &pipeline, &options)?;
+        let cursor = client
+            .execute_session_cursor_operation::<_, ChangeStreamEvent<Document>>(aggregate, session)
+            .await?;
+
+        Ok(SessionChangeStream::new(
+            cursor,
+            ChangeStreamData::new(pipeline, self.client().clone(), target, options),
+        ))
     }
 }

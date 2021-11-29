@@ -19,8 +19,9 @@ use crate::{
         options::ChangeStreamOptions,
     },
     error::Result,
+    operation::AggregateTarget,
     options::AggregateOptions,
-    selection_criteria::ReadPreference,
+    selection_criteria::{ReadPreference, SelectionCriteria},
     Client,
     Collection,
     Cursor,
@@ -88,6 +89,10 @@ impl<T> ChangeStream<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
+    pub(crate) fn new(cursor: Cursor<T>, data: ChangeStreamData) -> Self {
+        Self { cursor, data }
+    }
+
     /// Returns the cached resume token that can be used to resume after the most recently returned
     /// change.
     ///
@@ -100,12 +105,15 @@ where
 
     /// Update the type streamed values will be parsed as.
     pub fn with_type<D: DeserializeOwned + Unpin + Send + Sync>(self) -> ChangeStream<D> {
-        todo!()
+        ChangeStream {
+            cursor: self.cursor.with_type(),
+            data: self.data,
+        }
     }
 }
 
 #[derive(Debug)]
-struct ChangeStreamData {
+pub(crate) struct ChangeStreamData {
     /// The pipeline of stages to append to an initial `$changeStream` stage.
     pipeline: Vec<Document>,
 
@@ -115,17 +123,13 @@ struct ChangeStreamData {
 
     /// The original target of the change stream, used for re-issuing the aggregation during
     /// an automatic resume.
-    target: ChangeStreamTarget,
+    target: AggregateTarget,
 
     /// The cached resume token.
     resume_token: Option<ResumeToken>,
 
     /// The options provided to the initial `$changeStream` stage.
     options: Option<ChangeStreamOptions>,
-
-    /// The read preference for the initial `$changeStream` aggregation, used for server selection
-    /// during an automatic resume.
-    read_preference: Option<ReadPreference>,
 
     /// Whether or not the change stream has attempted a resume, used to attempt a resume only
     /// once.
@@ -136,11 +140,23 @@ struct ChangeStreamData {
     document_returned: bool,
 }
 
-#[derive(Debug, Clone)]
-pub(crate) enum ChangeStreamTarget {
-    Collection(Collection<Document>),
-    Database(Database),
-    Cluster(Database),
+impl ChangeStreamData {
+    pub(crate) fn new(
+        pipeline: Vec<Document>,
+        client: Client,
+        target: AggregateTarget,
+        options: Option<ChangeStreamOptions>,
+    ) -> Self {
+        Self {
+            pipeline,
+            client,
+            target,
+            resume_token: None,
+            options,
+            resume_attempted: false,
+            document_returned: false,
+        }
+    }
 }
 
 impl<T> Stream for ChangeStream<T>

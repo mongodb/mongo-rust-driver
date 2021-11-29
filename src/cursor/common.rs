@@ -91,6 +91,18 @@ where
         self.provider
             .start_execution(info, client, self.pinned_connection.handle());
     }
+
+    pub(super) fn with_type<D: DeserializeOwned>(self) -> GenericCursor<P, D> {
+        GenericCursor {
+            exhausted: self.exhausted,
+            client: self.client,
+            provider: self.provider,
+            buffer: self.buffer,
+            info: self.info,
+            pinned_connection: self.pinned_connection,
+            _phantom: Default::default(),
+        }
+    }
 }
 
 impl<P, T> Stream for GenericCursor<P, T>
@@ -270,6 +282,12 @@ impl PinnedConnection {
             Self::Invalid(h) => Self::Invalid(h.replicate()),
             Self::Unpinned => Self::Unpinned,
         }
+    }
+
+    pub(crate) fn take(&mut self) -> PinnedConnection {
+        let out = self.replicate();
+        *self = Self::Unpinned;
+        out
     }
 
     fn handle(&self) -> Option<&PinnedConnectionHandle> {

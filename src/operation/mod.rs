@@ -49,7 +49,7 @@ use crate::{
 };
 
 pub(crate) use abort_transaction::AbortTransaction;
-pub(crate) use aggregate::Aggregate;
+pub(crate) use aggregate::{Aggregate, AggregateTarget};
 pub(crate) use commit_transaction::CommitTransaction;
 pub(crate) use count::Count;
 pub(crate) use count_documents::CountDocuments;

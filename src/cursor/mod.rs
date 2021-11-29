@@ -85,7 +85,9 @@ where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
     client: Client,
-    wrapped_cursor: ImplicitSessionCursor<T>,
+    // `wrapped_cursor` is an `Option` so that it can be `None` for the `drop` impl for a cursor
+    // that's had `with_type` called; in all other circumstances it will be `Some`.
+    wrapped_cursor: Option<ImplicitSessionCursor<T>>,
     #[cfg(test)]
     kill_watcher: Option<oneshot::Sender<()>>,
     _phantom: std::marker::PhantomData<T>,
@@ -105,14 +107,28 @@ where
 
         Self {
             client: client.clone(),
-            wrapped_cursor: ImplicitSessionCursor::new(
+            wrapped_cursor: Some(ImplicitSessionCursor::new(
                 client,
                 spec,
                 PinnedConnection::new(pin),
                 provider,
-            ),
+            )),
             #[cfg(test)]
             kill_watcher: None,
+            _phantom: Default::default(),
+        }
+    }
+
+    /// Update the type streamed values will be parsed as.
+    pub fn with_type<D>(mut self) -> Cursor<D>
+    where
+        D: DeserializeOwned + Unpin + Send + Sync,
+    {
+        Cursor {
+            client: self.client.clone(),
+            wrapped_cursor: self.wrapped_cursor.take().map(|c| c.with_type()),
+            #[cfg(test)]
+            kill_watcher: self.kill_watcher.take(),
             _phantom: Default::default(),
         }
     }
@@ -139,7 +155,8 @@ where
     type Item = Result<T>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.wrapped_cursor).poll_next(cx)
+        // This `unwrap` is safe because `wrapped_cursor` is always `Some` outside of `drop`.
+        Pin::new(self.wrapped_cursor.as_mut().unwrap()).poll_next(cx)
     }
 }
 
@@ -148,15 +165,19 @@ where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
     fn drop(&mut self) {
-        if self.wrapped_cursor.is_exhausted() {
+        let wrapped_cursor = match &self.wrapped_cursor {
+            None => return,
+            Some(c) => c,
+        };
+        if wrapped_cursor.is_exhausted() {
             return;
         }
 
         kill_cursor(
             self.client.clone(),
-            self.wrapped_cursor.namespace(),
-            self.wrapped_cursor.id(),
-            self.wrapped_cursor.pinned_connection().replicate(),
+            wrapped_cursor.namespace(),
+            wrapped_cursor.id(),
+            wrapped_cursor.pinned_connection().replicate(),
             #[cfg(test)]
             self.kill_watcher.take(),
         );
