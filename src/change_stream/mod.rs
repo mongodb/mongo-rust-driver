@@ -151,7 +151,10 @@ impl ChangeStreamData {
             pipeline,
             client,
             target,
-            resume_token: None,
+            resume_token: options
+                .as_ref()
+                .and_then(|o| o.start_after.as_ref().or(o.resume_after.as_ref()))
+                .cloned(),
             options,
             resume_attempted: false,
             document_returned: false,
@@ -166,6 +169,6 @@ where
     type Item = Result<T>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        todo!()
+        Pin::new(&mut self.cursor).poll_next(cx)
     }
 }
