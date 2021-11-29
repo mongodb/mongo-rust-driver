@@ -5,6 +5,7 @@ use crate::{
     cmap::{establish::Handshaker, Command, Connection, ConnectionPoolOptions},
     operation::CommandResponse,
     options::{AuthMechanism, ClientOptions, Credential, ReadPreference},
+    sdam::{ServerType, TopologyType},
     test::{TestClient, CLIENT_OPTIONS, LOCK},
 };
 
@@ -42,9 +43,22 @@ async fn speculative_auth_test(
     );
     pool_options.tls_options = CLIENT_OPTIONS.tls_options();
 
+    let description = client.topology_description().await;
+
+    // if running against a replica set, use the primary to ensure the user creation has propagated.
+    let addr = match description.topology_type {
+        TopologyType::ReplicaSetWithPrimary => description
+            .servers_with_type(&[ServerType::RsPrimary])
+            .next()
+            .unwrap()
+            .address
+            .clone(),
+        _ => Default::default(),
+    };
+
     let handshaker = Handshaker::new(Some(pool_options.clone().into()));
 
-    let mut conn = Connection::new_testing(1, Default::default(), 1, Some(pool_options.into()))
+    let mut conn = Connection::new_testing(1, addr, 1, Some(pool_options.into()))
         .await
         .unwrap();
 
