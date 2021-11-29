@@ -67,7 +67,10 @@ where
 
     /// Update the type streamed values will be parsed as.
     pub fn with_type<D: DeserializeOwned + Unpin + Send + Sync>(self) -> SessionChangeStream<D> {
-        todo!()
+        SessionChangeStream {
+            cursor: self.cursor.with_type(),
+            data: self.data,
+        }
     }
 
     /// Retrieves a [`SessionCursorStream`] to iterate this change stream. The session provided must
