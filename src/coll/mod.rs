@@ -822,21 +822,10 @@ impl<T> Collection<T> {
     where
         T: DeserializeOwned + Unpin + Send + Sync,
     {
-        let pipeline: Vec<_> = pipeline.into_iter().collect();
         let mut options = options.into();
         resolve_options!(self, options, [read_concern, selection_criteria]);
-
-        let client = self.client();
         let target = self.namespace().into();
-        let aggregate = Aggregate::new_watch(&target, &pipeline, &options)?;
-        let cursor = client
-            .execute_cursor_operation::<_, ChangeStreamEvent<T>>(aggregate)
-            .await?;
-
-        Ok(ChangeStream::new(
-            cursor,
-            ChangeStreamData::new(pipeline, self.client().clone(), target, options),
-        ))
+        self.client().execute_watch(pipeline, options, target).await
     }
 
     /// Starts a new [`SessionChangeStream`] that receives events for all changes in this collection

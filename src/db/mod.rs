@@ -470,21 +470,10 @@ impl Database {
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<ChangeStreamOptions>>,
     ) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
-        let pipeline: Vec<_> = pipeline.into_iter().collect();
         let mut options = options.into();
         resolve_options!(self, options, [read_concern, selection_criteria]);
-
-        let client = self.client();
         let target = AggregateTarget::Database(self.name().to_string());
-        let aggregate = Aggregate::new_watch(&target, &pipeline, &options)?;
-        let cursor = client
-            .execute_cursor_operation::<_, ChangeStreamEvent<Document>>(aggregate)
-            .await?;
-
-        Ok(ChangeStream::new(
-            cursor,
-            ChangeStreamData::new(pipeline, self.client().clone(), target, options),
-        ))
+        self.client().execute_watch(pipeline, options, target).await
     }
 
     /// Starts a new [`SessionChangeStream`] that receives events for all changes in this database

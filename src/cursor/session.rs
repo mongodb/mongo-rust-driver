@@ -145,6 +145,7 @@ where
         let spec = CursorSpecification {
             info: self.info.clone(),
             initial_buffer: std::mem::take(&mut self.buffer),
+            post_batch_resume_token: None,
         };
         SessionCursorStream {
             generic_cursor: ExplicitSessionCursor::new(

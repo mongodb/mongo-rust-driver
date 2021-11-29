@@ -207,6 +207,7 @@ pub(crate) trait GetMoreProviderResult {
 pub(crate) struct CursorSpecification {
     pub(crate) info: CursorInformation,
     pub(crate) initial_buffer: VecDeque<RawDocumentBuf>,
+    pub(crate) post_batch_resume_token: Option<Document>,
 }
 
 impl CursorSpecification {
@@ -225,6 +226,7 @@ impl CursorSpecification {
                 max_time: max_time.into(),
             },
             initial_buffer: info.first_batch,
+            post_batch_resume_token: info.post_batch_resume_token,
         }
     }
 

@@ -7,6 +7,7 @@ use std::{collections::HashSet, sync::Arc, time::Instant};
 use super::{session::TransactionState, Client, ClientSession};
 use crate::{
     bson::Document,
+    change_stream::{ChangeStream, ChangeStreamData, event::ChangeStreamEvent},
     cmap::{
         conn::PinnedConnectionHandle,
         Connection,
@@ -24,8 +25,8 @@ use crate::{
         UNKNOWN_TRANSACTION_COMMIT_RESULT,
     },
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
-    operation::{AbortTransaction, CommandErrorBody, CommitTransaction, Operation, Retryability},
-    options::SelectionCriteria,
+    operation::{AbortTransaction, Aggregate, AggregateTarget, CommandErrorBody, CommitTransaction, Operation, Retryability},
+    options::{ChangeStreamOptions, SelectionCriteria},
     sdam::{
         HandshakePhase,
         SelectedServer,
@@ -190,6 +191,36 @@ impl Client {
         } else {
             Ok(None)
         }
+    }
+
+    pub(crate) async fn execute_watch<T>(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: Option<ChangeStreamOptions>,
+        target: AggregateTarget
+    ) -> Result<ChangeStream<ChangeStreamEvent<T>>>
+    where
+        T: DeserializeOwned + Unpin + Send + Sync,
+    {
+        Box::pin(async {
+            let pipeline: Vec<_> = pipeline.into_iter().collect();
+            let op = Aggregate::new_watch(&target, &pipeline, &options)?;
+
+            let mut details = self.execute_operation_with_details(op, None).await?;
+            let pinned = self.pin_connection_for_cursor(&mut details.output)?;
+            let cursor = Cursor::new(
+                self.clone(),
+                details.output.operation_output,
+                details.implicit_session,
+                pinned,
+            );
+
+            Ok(ChangeStream::new(
+                cursor,
+                ChangeStreamData::new(pipeline, self.clone(), target, options),
+            ))    
+        })
+        .await
     }
 
     /// Selects a server and executes the given operation on it, optionally using a provided
