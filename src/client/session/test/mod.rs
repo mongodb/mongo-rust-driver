@@ -10,12 +10,11 @@ use crate::{
     bson::{doc, Bson},
     coll::options::{CountOptions, InsertManyOptions},
     error::Result,
-    options::{Acknowledgment, FindOptions, ReadPreference, WriteConcern},
+    options::{Acknowledgment, FindOptions, ReadConcern, ReadPreference, WriteConcern},
     sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
     test::{EventClient, TestClient, CLIENT_OPTIONS, LOCK},
     Collection,
-    ServerType,
     RUNTIME,
 };
 
@@ -490,6 +489,7 @@ async fn find_and_getmore_share_session() {
         let options = FindOptions::builder()
             .batch_size(2)
             .selection_criteria(SelectionCriteria::ReadPreference(read_preference.clone()))
+            .read_concern(ReadConcern::local())
             .build();
 
         let mut cursor = coll
@@ -532,7 +532,7 @@ async fn find_and_getmore_share_session() {
 
     let topology_description = client.topology_description().await;
     for (addr, server) in topology_description.servers {
-        if matches!(server.server_type, ServerType::RsArbiter) {
+        if !server.server_type.is_data_bearing() {
             continue;
         }
 
@@ -540,28 +540,10 @@ async fn find_and_getmore_share_session() {
         let rp = Arc::new(move |si: &ServerInfo| si.address() == &a);
         let options = CountOptions::builder()
             .selection_criteria(SelectionCriteria::Predicate(rp))
+            .read_concern(ReadConcern::local())
             .build();
 
-        loop {
-            let count = match coll.count_documents(None, options.clone()).await {
-                Ok(c) => c,
-                Err(e) => {
-                    let desc = client.topology_description().await;
-                    if matches!(
-                        desc.servers.get(&addr).unwrap().server_type,
-                        ServerType::RsArbiter
-                    ) {
-                        break;
-                    } else {
-                        panic!("{:?}", e);
-                    }
-                }
-            };
-
-            if count == 3 {
-                break;
-            }
-        }
+        while coll.count_documents(None, options.clone()).await.unwrap() != 3 {}
     }
 
     for read_pref in read_preferences {
