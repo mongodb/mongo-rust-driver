@@ -6,16 +6,7 @@ use std::{collections::VecDeque, time::Duration};
 use bson::{Document, RawDocumentBuf};
 use serde::Deserialize;
 
-use crate::{
-    bson::doc,
-    cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
-    cursor::CursorInformation,
-    error::{ErrorKind, Result},
-    operation::Operation,
-    options::SelectionCriteria,
-    results::GetMoreResult,
-    Namespace,
-};
+use crate::{Namespace, bson::doc, change_stream::event::ResumeToken, cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription}, cursor::CursorInformation, error::{ErrorKind, Result}, operation::Operation, options::SelectionCriteria, results::GetMoreResult};
 
 #[derive(Debug)]
 pub(crate) struct GetMore<'conn> {
@@ -87,6 +78,7 @@ impl<'conn> Operation for GetMore<'conn> {
         Ok(GetMoreResult {
             batch: response.cursor.next_batch,
             exhausted: response.cursor.id == 0,
+            post_batch_resume_token: ResumeToken::from_raw(response.cursor.post_batch_resume_token)?,
         })
     }
 

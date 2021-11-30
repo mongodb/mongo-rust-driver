@@ -1,9 +1,9 @@
 //! Contains the types related to a `ChangeStream` event.
 use std::convert::TryInto;
 
-use crate::{coll::Namespace, cursor::CursorSpecification, options::ChangeStreamOptions};
+use crate::{coll::Namespace, cursor::CursorSpecification, options::ChangeStreamOptions, error::Result};
 
-use bson::{Bson, Document};
+use bson::{Bson, Document, RawDocument, RawDocumentBuf};
 use serde::{Deserialize, Serialize};
 
 /// An opaque token used for resuming an interrupted
@@ -35,12 +35,17 @@ impl ResumeToken {
         let spec_token = if spec.initial_buffer.is_empty() {
             spec.post_batch_resume_token
                 .clone()
-                .and_then(|d| d.try_into().ok())
-                .map(|d| ResumeToken(Bson::Document(d)))
         } else {
             None
         };
         spec_token.or(options_token)
+    }
+
+    pub(crate) fn from_raw(doc: Option<RawDocumentBuf>) -> Result<Option<ResumeToken>> {
+        Ok(match doc {
+            None => None,
+            Some(doc) => Some(ResumeToken(Bson::Document(doc.try_into()?))),
+        })
     }
 }
 

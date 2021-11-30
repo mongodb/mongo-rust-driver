@@ -38,9 +38,10 @@ where
     client: Client,
     info: CursorInformation,
     buffer: VecDeque<RawDocumentBuf>,
+    post_batch_resume_token: Option<ResumeToken>,
     exhausted: bool,
     pinned_connection: PinnedConnection,
-    resume_token: Option<ResumeToken>,
+    cached_resume_token: Option<ResumeToken>,
     _phantom: PhantomData<T>,
 }
 
@@ -62,9 +63,10 @@ where
             client,
             provider: get_more_provider,
             buffer: spec.initial_buffer,
+            post_batch_resume_token: None,
             info: spec.info,
             pinned_connection,
-            resume_token,
+            cached_resume_token: resume_token,
             _phantom: Default::default(),
         }
     }
@@ -90,7 +92,7 @@ where
     }
 
     pub(super) fn resume_token(&self) -> Option<&ResumeToken> {
-        self.resume_token.as_ref()
+        self.cached_resume_token.as_ref()
     }
 
     fn start_get_more(&mut self) {
@@ -106,9 +108,10 @@ where
             client: self.client,
             provider: self.provider,
             buffer: self.buffer,
+            post_batch_resume_token: self.post_batch_resume_token,
             info: self.info,
             pinned_connection: self.pinned_connection,
-            resume_token: self.resume_token,
+            cached_resume_token: self.cached_resume_token,
             _phantom: Default::default(),
         }
     }
@@ -145,7 +148,12 @@ where
 
                         self.exhausted = exhausted;
                         self.provider.clear_execution(session, exhausted);
-                        self.buffer = result?.batch;
+                        let result = result?;
+                        self.buffer = result.batch;
+                        self.post_batch_resume_token = result.post_batch_resume_token;
+                        if self.buffer.is_empty() {
+                            self.cached_resume_token = self.post_batch_resume_token.clone();
+                        }
                     }
                     Poll::Pending => return Poll::Pending,
                 }
@@ -216,7 +224,7 @@ pub(crate) trait GetMoreProviderResult {
 pub(crate) struct CursorSpecification {
     pub(crate) info: CursorInformation,
     pub(crate) initial_buffer: VecDeque<RawDocumentBuf>,
-    pub(crate) post_batch_resume_token: Option<RawDocumentBuf>,
+    pub(crate) post_batch_resume_token: Option<ResumeToken>,
 }
 
 impl CursorSpecification {
@@ -225,8 +233,8 @@ impl CursorSpecification {
         address: ServerAddress,
         batch_size: impl Into<Option<u32>>,
         max_time: impl Into<Option<Duration>>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        Ok(Self {
             info: CursorInformation {
                 ns: info.ns,
                 id: info.id,
@@ -235,8 +243,8 @@ impl CursorSpecification {
                 max_time: max_time.into(),
             },
             initial_buffer: info.first_batch,
-            post_batch_resume_token: info.post_batch_resume_token,
-        }
+            post_batch_resume_token: ResumeToken::from_raw(info.post_batch_resume_token)?,
+        })
     }
 
     pub(crate) fn id(&self) -> i64 {
