@@ -232,12 +232,15 @@ impl Client {
 
             let mut details = self.execute_operation_with_details(op, None).await?;
             let pinned = self.pin_connection_for_cursor(&mut details.output)?;
-            let resume_token = details
-                .output
-                .operation_output
-                .post_batch_resume_token
-                .clone()
-                .map(|d| ResumeToken(Bson::Document(d)));
+            let spec = &details.output.operation_output;
+            let resume_token = if spec.initial_buffer.is_empty() {
+                spec
+                    .post_batch_resume_token
+                    .clone()
+                    .map(|d| ResumeToken(Bson::Document(d)))
+            } else {
+                None
+            };
             let cursor = Cursor::new(
                 self.clone(),
                 details.output.operation_output,
@@ -271,12 +274,15 @@ impl Client {
                 .execute_operation_with_details(op, &mut *session)
                 .await?;
             let pinned = self.pin_connection_for_session(&mut details.output, session)?;
-            let resume_token = details
-                .output
-                .operation_output
-                .post_batch_resume_token
-                .clone()
-                .map(|d| ResumeToken(Bson::Document(d)));
+            let spec = &details.output.operation_output;
+            let resume_token = if spec.initial_buffer.is_empty() {
+                spec
+                    .post_batch_resume_token
+                    .clone()
+                    .map(|d| ResumeToken(Bson::Document(d)))
+            } else {
+                None
+            };
             let cursor = SessionCursor::new(self.clone(), details.output.operation_output, pinned);
 
             Ok(SessionChangeStream::new(
