@@ -109,4 +109,5 @@ pub(crate) struct GetMoreResponseBody {
 struct NextBatchBody {
     id: i64,
     next_batch: VecDeque<RawDocumentBuf>,
+    post_batch_resume_token: Option<RawDocumentBuf>,
 }

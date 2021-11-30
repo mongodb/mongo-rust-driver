@@ -1,4 +1,6 @@
 //! Contains the types related to a `ChangeStream` event.
+use std::convert::TryInto;
+
 use crate::{coll::Namespace, cursor::CursorSpecification, options::ChangeStreamOptions};
 
 use bson::{Bson, Document};
@@ -15,6 +17,7 @@ use serde::{Deserialize, Serialize};
 /// See the documentation
 /// [here](https://docs.mongodb.com/manual/changeStreams/#change-stream-resume-token) for more
 /// information on resume tokens.
+// TODO(RUST-1045): Switch this to RawBson
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ResumeToken(pub(crate) Bson);
 
@@ -32,6 +35,7 @@ impl ResumeToken {
         let spec_token = if spec.initial_buffer.is_empty() {
             spec.post_batch_resume_token
                 .clone()
+                .and_then(|d| d.try_into().ok())
                 .map(|d| ResumeToken(Bson::Document(d)))
         } else {
             None
