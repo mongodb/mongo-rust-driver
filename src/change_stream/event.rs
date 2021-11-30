@@ -1,7 +1,12 @@
 //! Contains the types related to a `ChangeStream` event.
 use std::convert::TryInto;
 
-use crate::{coll::Namespace, cursor::CursorSpecification, options::ChangeStreamOptions, error::Result};
+use crate::{
+    coll::Namespace,
+    cursor::CursorSpecification,
+    error::Result,
+    options::ChangeStreamOptions,
+};
 
 use bson::{Bson, Document, RawDocument, RawDocumentBuf};
 use serde::{Deserialize, Serialize};
@@ -33,8 +38,7 @@ impl ResumeToken {
             .cloned();
         // Token from initial response from `aggregate`
         let spec_token = if spec.initial_buffer.is_empty() {
-            spec.post_batch_resume_token
-                .clone()
+            spec.post_batch_resume_token.clone()
         } else {
             None
         };

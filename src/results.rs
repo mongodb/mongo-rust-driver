@@ -2,7 +2,12 @@
 
 use std::collections::{HashMap, VecDeque};
 
-use crate::{bson::{Bson, Document}, bson_util, change_stream::event::ResumeToken, db::options::CreateCollectionOptions};
+use crate::{
+    bson::{Bson, Document},
+    bson_util,
+    change_stream::event::ResumeToken,
+    db::options::CreateCollectionOptions,
+};
 
 use bson::{Binary, RawDocumentBuf};
 use serde::{Deserialize, Serialize};
