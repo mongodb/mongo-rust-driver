@@ -9,6 +9,7 @@ use crate::{
     bson::{Bson, Document},
     change_stream::{
         event::{ChangeStreamEvent, ResumeToken},
+        session::SessionChangeStream,
         ChangeStream,
         ChangeStreamData,
     },
@@ -174,12 +175,7 @@ impl Client {
             .execute_operation_with_details(op, &mut *session)
             .await?;
 
-        let pinned = if let Some(handle) = session.transaction.pinned_connection() {
-            // Cursor operations on a transaction share the same pinned connection.
-            Some(handle.replicate())
-        } else {
-            self.pin_connection_for_cursor(&mut details.output)?
-        };
+        let pinned = self.pin_connection_for_session(&mut details.output, session)?;
         Ok(SessionCursor::new(
             self.clone(),
             details.output.operation_output,
@@ -202,6 +198,22 @@ impl Client {
             Ok(Some(details.connection.pin()?))
         } else {
             Ok(None)
+        }
+    }
+
+    fn pin_connection_for_session<Op>(
+        &self,
+        details: &mut ExecutionOutput<Op>,
+        session: &mut ClientSession,
+    ) -> Result<Option<PinnedConnectionHandle>>
+    where
+        Op: Operation<O = CursorSpecification>,
+    {
+        if let Some(handle) = session.transaction.pinned_connection() {
+            // Cursor operations on a transaction share the same pinned connection.
+            Ok(Some(handle.replicate()))
+        } else {
+            self.pin_connection_for_cursor(details)
         }
     }
 
@@ -234,6 +246,40 @@ impl Client {
             );
 
             Ok(ChangeStream::new(
+                cursor,
+                ChangeStreamData::new(pipeline, self.clone(), target, options, resume_token),
+            ))
+        })
+        .await
+    }
+
+    pub(crate) async fn execute_watch_with_session<T>(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: Option<ChangeStreamOptions>,
+        target: AggregateTarget,
+        session: &mut ClientSession,
+    ) -> Result<SessionChangeStream<ChangeStreamEvent<T>>>
+    where
+        T: DeserializeOwned + Unpin + Send + Sync,
+    {
+        Box::pin(async {
+            let pipeline: Vec<_> = pipeline.into_iter().collect();
+            let op = Aggregate::new_watch(&target, &pipeline, &options)?;
+
+            let mut details = self
+                .execute_operation_with_details(op, &mut *session)
+                .await?;
+            let pinned = self.pin_connection_for_session(&mut details.output, session)?;
+            let resume_token = details
+                .output
+                .operation_output
+                .post_batch_resume_token
+                .clone()
+                .map(|d| ResumeToken(Bson::Document(d)));
+            let cursor = SessionCursor::new(self.clone(), details.output.operation_output, pinned);
+
+            Ok(SessionChangeStream::new(
                 cursor,
                 ChangeStreamData::new(pipeline, self.clone(), target, options, resume_token),
             ))

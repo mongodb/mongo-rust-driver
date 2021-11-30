@@ -11,7 +11,6 @@ use crate::{
         options::ChangeStreamOptions,
         session::SessionChangeStream,
         ChangeStream,
-        ChangeStreamData,
     },
     client::session::TransactionState,
     cmap::conn::PinnedConnectionHandle,
@@ -485,21 +484,12 @@ impl Database {
         options: impl Into<Option<ChangeStreamOptions>>,
         session: &mut ClientSession,
     ) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
-        let pipeline: Vec<_> = pipeline.into_iter().collect();
         let mut options = options.into();
         resolve_read_concern_with_session!(self, options, Some(&mut *session))?;
         resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
-
-        let client = self.client();
         let target = AggregateTarget::Database(self.name().to_string());
-        let aggregate = Aggregate::new_watch(&target, &pipeline, &options)?;
-        let cursor = client
-            .execute_session_cursor_operation::<_, ChangeStreamEvent<Document>>(aggregate, session)
-            .await?;
-
-        Ok(SessionChangeStream::new(
-            cursor,
-            ChangeStreamData::new(pipeline, self.client().clone(), target, options, todo!()),
-        ))
+        self.client()
+            .execute_watch_with_session(pipeline, options, target, session)
+            .await
     }
 }
