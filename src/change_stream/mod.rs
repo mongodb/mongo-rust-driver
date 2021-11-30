@@ -100,7 +100,7 @@ where
     /// [here](https://docs.mongodb.com/manual/changeStreams/#change-stream-resume-token) for more
     /// information on change stream resume tokens.
     pub fn resume_token(&self) -> Option<&ResumeToken> {
-        self.data.resume_token.as_ref()
+        self.cursor.resume_token()
     }
 
     /// Update the type streamed values will be parsed as.
@@ -125,9 +125,6 @@ pub(crate) struct ChangeStreamData {
     /// an automatic resume.
     target: AggregateTarget,
 
-    /// The cached resume token.
-    resume_token: Option<ResumeToken>,
-
     /// The options provided to the initial `$changeStream` stage.
     options: Option<ChangeStreamOptions>,
 
@@ -146,19 +143,11 @@ impl ChangeStreamData {
         client: Client,
         target: AggregateTarget,
         options: Option<ChangeStreamOptions>,
-        resume_token: Option<ResumeToken>,
     ) -> Self {
-        let resume_token = resume_token.or_else(|| {
-            options
-                .as_ref()
-                .and_then(|o| o.start_after.as_ref().or(o.resume_after.as_ref()))
-                .cloned()
-        });
         Self {
             pipeline,
             client,
             target,
-            resume_token,
             options,
             resume_attempted: false,
             document_returned: false,

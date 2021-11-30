@@ -12,6 +12,7 @@ use serde::de::DeserializeOwned;
 use tokio::sync::oneshot;
 
 use crate::{
+    change_stream::event::ResumeToken,
     cmap::conn::PinnedConnectionHandle,
     error::{Error, Result},
     operation::GetMore,
@@ -102,6 +103,7 @@ where
         spec: CursorSpecification,
         session: Option<ClientSession>,
         pin: Option<PinnedConnectionHandle>,
+        resume_token: Option<ResumeToken>,
     ) -> Self {
         let provider = ImplicitSessionGetMoreProvider::new(&spec, session);
 
@@ -111,12 +113,17 @@ where
                 client,
                 spec,
                 PinnedConnection::new(pin),
+                resume_token,
                 provider,
             )),
             #[cfg(test)]
             kill_watcher: None,
             _phantom: Default::default(),
         }
+    }
+
+    pub(crate) fn resume_token(&self) -> Option<&ResumeToken> {
+        self.wrapped_cursor.as_ref().and_then(|c| c.resume_token())
     }
 
     /// Update the type streamed values will be parsed as.

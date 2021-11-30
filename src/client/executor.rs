@@ -6,7 +6,7 @@ use std::{collections::HashSet, sync::Arc, time::Instant};
 
 use super::{session::TransactionState, Client, ClientSession};
 use crate::{
-    bson::{Bson, Document},
+    bson::Document,
     change_stream::{
         event::{ChangeStreamEvent, ResumeToken},
         session::SessionChangeStream,
@@ -157,6 +157,7 @@ impl Client {
                 details.output.operation_output,
                 details.implicit_session,
                 pinned,
+                None,
             ))
         })
         .await
@@ -180,6 +181,7 @@ impl Client {
             self.clone(),
             details.output.operation_output,
             pinned,
+            None,
         ))
     }
 
@@ -232,25 +234,18 @@ impl Client {
 
             let mut details = self.execute_operation_with_details(op, None).await?;
             let pinned = self.pin_connection_for_cursor(&mut details.output)?;
-            let spec = &details.output.operation_output;
-            let resume_token = if spec.initial_buffer.is_empty() {
-                spec
-                    .post_batch_resume_token
-                    .clone()
-                    .map(|d| ResumeToken(Bson::Document(d)))
-            } else {
-                None
-            };
+            let resume_token = ResumeToken::initial(&options, &details.output.operation_output);
             let cursor = Cursor::new(
                 self.clone(),
                 details.output.operation_output,
                 details.implicit_session,
                 pinned,
+                resume_token,
             );
 
             Ok(ChangeStream::new(
                 cursor,
-                ChangeStreamData::new(pipeline, self.clone(), target, options, resume_token),
+                ChangeStreamData::new(pipeline, self.clone(), target, options),
             ))
         })
         .await
@@ -274,20 +269,17 @@ impl Client {
                 .execute_operation_with_details(op, &mut *session)
                 .await?;
             let pinned = self.pin_connection_for_session(&mut details.output, session)?;
-            let spec = &details.output.operation_output;
-            let resume_token = if spec.initial_buffer.is_empty() {
-                spec
-                    .post_batch_resume_token
-                    .clone()
-                    .map(|d| ResumeToken(Bson::Document(d)))
-            } else {
-                None
-            };
-            let cursor = SessionCursor::new(self.clone(), details.output.operation_output, pinned);
+            let resume_token = ResumeToken::initial(&options, &details.output.operation_output);
+            let cursor = SessionCursor::new(
+                self.clone(),
+                details.output.operation_output,
+                pinned,
+                resume_token,
+            );
 
             Ok(SessionChangeStream::new(
                 cursor,
-                ChangeStreamData::new(pipeline, self.clone(), target, options, resume_token),
+                ChangeStreamData::new(pipeline, self.clone(), target, options),
             ))
         })
         .await

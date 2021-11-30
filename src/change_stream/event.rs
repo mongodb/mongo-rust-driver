@@ -1,5 +1,6 @@
 //! Contains the types related to a `ChangeStream` event.
-use crate::coll::Namespace;
+use crate::{coll::Namespace, cursor::CursorSpecification, options::ChangeStreamOptions};
+
 use bson::{Bson, Document};
 use serde::{Deserialize, Serialize};
 
@@ -16,6 +17,28 @@ use serde::{Deserialize, Serialize};
 /// information on resume tokens.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ResumeToken(pub(crate) Bson);
+
+impl ResumeToken {
+    pub(crate) fn initial(
+        options: &Option<ChangeStreamOptions>,
+        spec: &CursorSpecification,
+    ) -> Option<ResumeToken> {
+        // Token from options passed to `watch`
+        let options_token = options
+            .as_ref()
+            .and_then(|o| o.start_after.as_ref().or(o.resume_after.as_ref()))
+            .cloned();
+        // Token from initial response from `aggregate`
+        let spec_token = if spec.initial_buffer.is_empty() {
+            spec.post_batch_resume_token
+                .clone()
+                .map(|d| ResumeToken(Bson::Document(d)))
+        } else {
+            None
+        };
+        spec_token.or(options_token)
+    }
+}
 
 /// A `ChangeStreamEvent` represents a
 /// [change event](https://docs.mongodb.com/manual/reference/change-events/) in the associated change stream.

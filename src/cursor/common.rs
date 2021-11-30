@@ -15,6 +15,7 @@ use tokio::sync::oneshot;
 
 use crate::{
     bson::Document,
+    change_stream::event::ResumeToken,
     cmap::conn::PinnedConnectionHandle,
     error::{Error, ErrorKind, Result},
     operation,
@@ -39,6 +40,7 @@ where
     buffer: VecDeque<RawDocumentBuf>,
     exhausted: bool,
     pinned_connection: PinnedConnection,
+    resume_token: Option<ResumeToken>,
     _phantom: PhantomData<T>,
 }
 
@@ -51,6 +53,7 @@ where
         client: Client,
         spec: CursorSpecification,
         pinned_connection: PinnedConnection,
+        resume_token: Option<ResumeToken>,
         get_more_provider: P,
     ) -> Self {
         let exhausted = spec.id() == 0;
@@ -61,6 +64,7 @@ where
             buffer: spec.initial_buffer,
             info: spec.info,
             pinned_connection,
+            resume_token,
             _phantom: Default::default(),
         }
     }
@@ -85,6 +89,10 @@ where
         &self.pinned_connection
     }
 
+    pub(super) fn resume_token(&self) -> Option<&ResumeToken> {
+        self.resume_token.as_ref()
+    }
+
     fn start_get_more(&mut self) {
         let info = self.info.clone();
         let client = self.client.clone();
@@ -100,6 +108,7 @@ where
             buffer: self.buffer,
             info: self.info,
             pinned_connection: self.pinned_connection,
+            resume_token: self.resume_token,
             _phantom: Default::default(),
         }
     }
