@@ -6,9 +6,10 @@ mod http;
 mod interval;
 mod join_handle;
 mod resolver;
-mod stream;
+pub mod stream;
 
 use std::{future::Future, net::SocketAddr, time::Duration};
+pub use stream::{AsyncStream,AsyncTcpStream};
 
 pub(crate) use self::{
     acknowledged_message::AcknowledgedMessage,
@@ -16,7 +17,6 @@ pub(crate) use self::{
     async_write_ext::{AsyncLittleEndianWrite, SyncLittleEndianWrite},
     join_handle::AsyncJoinHandle,
     resolver::AsyncResolver,
-    stream::AsyncStream,
 };
 use crate::{error::Result, options::ServerAddress};
 pub(crate) use http::HttpClient;

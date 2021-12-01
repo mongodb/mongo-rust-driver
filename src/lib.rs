@@ -342,22 +342,30 @@ extern crate derive_more;
 
 #[cfg(not(feature = "sync"))]
 pub use crate::{
-    client::{Client, session::ClientSession},
+    client::{session::ClientSession, Client},
     coll::Collection,
-    cursor::{Cursor, session::{SessionCursor, SessionCursorStream}},
+    cursor::{
+        session::{SessionCursor, SessionCursorStream},
+        Cursor,
+    },
     db::Database,
 };
 
 #[cfg(feature = "sync")]
 pub(crate) use crate::{
-    client::{Client, session::ClientSession},
+    client::{session::ClientSession, Client},
     coll::Collection,
-    cursor::{Cursor, session::{SessionCursor, SessionCursorStream}},
+    cursor::{
+        session::{SessionCursor, SessionCursorStream},
+        Cursor,
+    },
     db::Database,
 };
 
-pub use {coll::Namespace, index::IndexModel, client::session::ClusterTime, sdam::public::*};
+pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*};
 
+pub use cmap::conn::wire::{read_msg, Header, Message, MessageSection, MongoMsg};
+pub use runtime::{AsyncStream, AsyncTcpStream};
 #[cfg(all(
     feature = "tokio-runtime",
     feature = "async-std-runtime",

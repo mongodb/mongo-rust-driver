@@ -10,7 +10,7 @@ use lazy_static::lazy_static;
 use crate::error::Result;
 
 /// Closure to obtain a new, unique request ID.
-pub(crate) fn next_request_id() -> i32 {
+pub fn next_request_id() -> i32 {
     lazy_static! {
         static ref REQUEST_ID: AtomicI32 = AtomicI32::new(0);
     }

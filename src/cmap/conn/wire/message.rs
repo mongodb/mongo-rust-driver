@@ -4,11 +4,11 @@ use bitflags::bitflags;
 use futures_io::AsyncWrite;
 use futures_util::{
     io::{BufReader, BufWriter},
-    AsyncReadExt,
-    AsyncWriteExt,
+    AsyncReadExt, AsyncWriteExt,
 };
 
 use super::header::{Header, OpCode};
+use crate::compression::{Compressor, Decoder};
 use crate::{
     bson_util,
     cmap::{
@@ -19,16 +19,15 @@ use crate::{
     runtime::{AsyncLittleEndianWrite, AsyncStream, SyncLittleEndianRead},
 };
 
-use crate::compression::{Compressor, Decoder};
-
 /// Represents an OP_MSG wire protocol operation.
+#[allow(missing_docs)]
 #[derive(Debug)]
-pub(crate) struct Message {
-    pub(crate) response_to: i32,
+pub struct Message {
+    pub response_to: i32,
     pub(crate) flags: MessageFlags,
-    pub(crate) sections: Vec<MessageSection>,
-    pub(crate) checksum: Option<u32>,
-    pub(crate) request_id: Option<i32>,
+    pub sections: Vec<MessageSection>,
+    pub checksum: Option<u32>,
+    pub request_id: Option<i32>,
 }
 
 impl Message {
@@ -173,7 +172,7 @@ impl Message {
         Self::read_op_common(reader, length_remaining as i32, header)
     }
 
-    fn read_op_common(
+    pub(crate) fn read_op_common(
         mut reader: &[u8],
         mut length_remaining: i32,
         header: &Header,
@@ -316,8 +315,9 @@ bitflags! {
 }
 
 /// Represents a section as defined by the OP_MSG spec.
+#[allow(missing_docs)]
 #[derive(Debug)]
-pub(crate) enum MessageSection {
+pub enum MessageSection {
     Document(Vec<u8>),
     Sequence {
         size: i32,

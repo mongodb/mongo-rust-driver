@@ -1,6 +1,6 @@
 mod command;
 mod stream_description;
-mod wire;
+pub(crate) mod wire;
 
 use std::{
     sync::Arc,

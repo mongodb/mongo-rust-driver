@@ -8,7 +8,7 @@ use crate::{
 
 /// The wire protocol op codes.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum OpCode {
+pub enum OpCode {
     Reply = 1,
     Query = 2004,
     Message = 2013,
@@ -32,8 +32,9 @@ impl OpCode {
 }
 
 /// The header for any wire protocol message.
+#[allow(missing_docs)]
 #[derive(Debug)]
-pub(crate) struct Header {
+pub struct Header {
     pub length: i32,
     pub request_id: i32,
     pub response_to: i32,
@@ -44,7 +45,7 @@ impl Header {
     pub(crate) const LENGTH: usize = 4 * std::mem::size_of::<i32>();
 
     /// Serializes the Header and writes the bytes to `w`.
-    pub(crate) async fn write_to<W: AsyncWrite + Unpin>(&self, stream: &mut W) -> Result<()> {
+    pub async fn write_to<W: AsyncWrite + Unpin>(&self, stream: &mut W) -> Result<()> {
         stream.write(&self.length.to_le_bytes()).await?;
         stream.write(&self.request_id.to_le_bytes()).await?;
         stream.write(&self.response_to.to_le_bytes()).await?;

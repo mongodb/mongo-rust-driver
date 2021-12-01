@@ -23,9 +23,9 @@ const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const KEEPALIVE_TIME: Duration = Duration::from_secs(120);
 
 /// A runtime-agnostic async stream possibly using TLS.
-#[allow(clippy::large_enum_variant)]
+#[allow(clippy::large_enum_variant, missing_docs)]
 #[derive(Debug)]
-pub(crate) enum AsyncStream {
+pub enum AsyncStream {
     Null,
 
     /// A basic TCP connection to the server.
@@ -37,7 +37,7 @@ pub(crate) enum AsyncStream {
 
 /// A runtime-agnostic async stream.
 #[derive(Debug)]
-pub(crate) enum AsyncTcpStream {
+pub enum AsyncTcpStream {
     /// Wrapper around `tokio::net:TcpStream`.
     #[cfg(feature = "tokio-runtime")]
     Tokio(tokio::net::TcpStream),
