@@ -8,7 +8,7 @@ use crate::{
     options::ChangeStreamOptions,
 };
 
-use bson::{Bson, Document, RawDocument, RawDocumentBuf};
+use bson::{Bson, Document, RawBson, RawDocument, RawDocumentBuf};
 use serde::{Deserialize, Serialize};
 
 /// An opaque token used for resuming an interrupted
@@ -22,9 +22,8 @@ use serde::{Deserialize, Serialize};
 /// See the documentation
 /// [here](https://docs.mongodb.com/manual/changeStreams/#change-stream-resume-token) for more
 /// information on resume tokens.
-// TODO(RUST-1045): Switch this to RawBson
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ResumeToken(pub(crate) Bson);
+pub struct ResumeToken(pub(crate) RawBson);
 
 impl ResumeToken {
     pub(crate) fn initial(
@@ -45,11 +44,8 @@ impl ResumeToken {
         spec_token.or(options_token)
     }
 
-    pub(crate) fn from_raw(doc: Option<RawDocumentBuf>) -> Result<Option<ResumeToken>> {
-        Ok(match doc {
-            None => None,
-            Some(doc) => Some(ResumeToken(Bson::Document(doc.try_into()?))),
-        })
+    pub(crate) fn from_raw(doc: Option<RawDocumentBuf>) -> Option<ResumeToken> {
+        doc.map(|doc| ResumeToken(RawBson::Document(doc)))
     }
 }
 

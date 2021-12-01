@@ -116,7 +116,7 @@ impl Operation for Find {
             description.server_address.clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),
-        )?)
+        ))
     }
 
     fn supports_read_concern(&self, _description: &StreamDescription) -> bool {

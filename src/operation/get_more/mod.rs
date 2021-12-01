@@ -90,7 +90,7 @@ impl<'conn> Operation for GetMore<'conn> {
             exhausted: response.cursor.id == 0,
             post_batch_resume_token: ResumeToken::from_raw(
                 response.cursor.post_batch_resume_token,
-            )?,
+            ),
         })
     }
 

@@ -1,6 +1,5 @@
 use std::{
     collections::VecDeque,
-    convert::TryInto,
     marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
@@ -167,7 +166,7 @@ where
                     } else {
                         self.cached_resume_token = match doc.get("_id")? {
                             None => None,
-                            Some(val) => Some(ResumeToken(val.try_into()?)),
+                            Some(val) => Some(ResumeToken(val.to_raw_bson())),
                         };
                     }
                     return Poll::Ready(Some(Ok(bson::from_slice(doc.as_bytes())?)));
@@ -242,8 +241,8 @@ impl CursorSpecification {
         address: ServerAddress,
         batch_size: impl Into<Option<u32>>,
         max_time: impl Into<Option<Duration>>,
-    ) -> Result<Self> {
-        Ok(Self {
+    ) -> Self {
+        Self {
             info: CursorInformation {
                 ns: info.ns,
                 id: info.id,
@@ -252,8 +251,8 @@ impl CursorSpecification {
                 max_time: max_time.into(),
             },
             initial_buffer: info.first_batch,
-            post_batch_resume_token: ResumeToken::from_raw(info.post_batch_resume_token)?,
-        })
+            post_batch_resume_token: ResumeToken::from_raw(info.post_batch_resume_token),
+        }
     }
 
     pub(crate) fn id(&self) -> i64 {
