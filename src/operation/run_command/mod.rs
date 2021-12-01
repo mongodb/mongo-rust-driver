@@ -3,7 +3,7 @@ mod test;
 
 use std::convert::TryInto;
 
-use bson::RawBson;
+use bson::RawBsonRef;
 
 use super::{CursorBody, Operation};
 use crate::{
@@ -76,7 +76,7 @@ impl<'conn> Operation for RunCommand<'conn> {
         &self,
         response: &bson::RawDocument,
     ) -> Result<Option<bson::Timestamp>> {
-        if let Some(RawBson::Timestamp(ts)) = response.get("atClusterTime")? {
+        if let Some(RawBsonRef::Timestamp(ts)) = response.get("atClusterTime")? {
             Ok(Some(ts))
         } else {
             CursorBody::extract_at_cluster_time(response)

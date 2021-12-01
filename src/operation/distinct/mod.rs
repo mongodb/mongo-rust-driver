@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test;
 
-use bson::RawBson;
+use bson::RawBsonRef;
 use serde::Deserialize;
 
 use crate::{
@@ -81,7 +81,7 @@ impl Operation for Distinct {
     ) -> Result<Option<bson::Timestamp>> {
         Ok(response
             .get("atClusterTime")?
-            .and_then(RawBson::as_timestamp))
+            .and_then(RawBsonRef::as_timestamp))
     }
 
     fn handle_response(
