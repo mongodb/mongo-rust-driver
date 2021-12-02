@@ -58,7 +58,7 @@ pub(super) async fn authenticate_stream(
             .auth_response_body("MONGODB-X509")?,
     };
 
-    if server_response.get_str("dbname") != Ok("$external") {
+    if server_response.get_i32("ok") != Ok(1) {
         return Err(Error::authentication_error(
             "MONGODB-X509",
             "Authentication failed",
