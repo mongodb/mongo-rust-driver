@@ -195,12 +195,6 @@ pub(crate) struct CommandResponse<T> {
     #[serde(rename = "$clusterTime")]
     pub(crate) cluster_time: Option<ClusterTime>,
 
-    pub(crate) at_cluster_time: Option<Timestamp>,
-
-    pub(crate) recovery_token: Option<Document>,
-
-    pub(crate) operation_time: Option<Timestamp>,
-
     #[serde(flatten)]
     pub(crate) body: T,
 }
@@ -356,9 +350,6 @@ pub(crate) struct CursorInfo<T = RawDocumentBuf> {
 
     #[serde(rename = "firstBatch")]
     pub(crate) first_batch: VecDeque<T>,
-
-    #[serde(rename = "atClusterTime")]
-    pub(crate) at_cluster_time: Option<Timestamp>,
 }
 
 #[derive(Debug, PartialEq)]

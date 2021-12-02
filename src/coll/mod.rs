@@ -1111,6 +1111,7 @@ impl<T> Collection<T>
 where
     T: Serialize,
 {
+    #[allow(clippy::needless_option_as_deref)]
     async fn insert_many_common(
         &self,
         docs: impl IntoIterator<Item = impl Borrow<T>>,
