@@ -1,4 +1,4 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use serde::Deserialize;
 
@@ -12,7 +12,7 @@ use crate::{
         ServerType,
         TopologyDescription,
     },
-    selection_criteria::TagSet,
+    selection_criteria::{SelectionCriteria, TagSet},
 };
 
 mod in_window;
@@ -29,7 +29,7 @@ impl TestTopologyDescription {
     fn into_topology_description(
         self,
         heartbeat_frequency: Option<Duration>,
-    ) -> Option<TopologyDescription> {
+    ) -> TopologyDescription {
         let servers: HashMap<ServerAddress, ServerDescription> = self
             .servers
             .into_iter()
@@ -53,7 +53,6 @@ impl TestTopologyDescription {
             heartbeat_freq: heartbeat_frequency,
             servers,
         }
-        .into()
     }
 }
 
@@ -183,4 +182,67 @@ fn is_master_response_from_server_type(server_type: ServerType) -> Option<IsMast
     };
 
     Some(response)
+}
+
+#[test]
+fn predicate_omits_unavailable() {
+    let criteria = SelectionCriteria::Predicate(Arc::new(|si| {
+        !matches!(si.server_type(), ServerType::RsPrimary)
+    }));
+
+    let desc = TestTopologyDescription {
+        topology_type: TopologyType::ReplicaSetWithPrimary,
+        servers: vec![
+            TestServerDescription {
+                address: "localhost:27017".to_string(),
+                avg_rtt_ms: Some(12.0),
+                server_type: TestServerType::RsPrimary,
+                tags: None,
+                last_update_time: None,
+                last_write: None,
+                _max_wire_version: None,
+            },
+            TestServerDescription {
+                address: "localhost:27018".to_string(),
+                avg_rtt_ms: Some(12.0),
+                server_type: TestServerType::Unknown,
+                tags: None,
+                last_update_time: None,
+                last_write: None,
+                _max_wire_version: None,
+            },
+            TestServerDescription {
+                address: "localhost:27019".to_string(),
+                avg_rtt_ms: Some(12.0),
+                server_type: TestServerType::RsArbiter,
+                tags: None,
+                last_update_time: None,
+                last_write: None,
+                _max_wire_version: None,
+            },
+            TestServerDescription {
+                address: "localhost:27020".to_string(),
+                avg_rtt_ms: Some(12.0),
+                server_type: TestServerType::RsGhost,
+                tags: None,
+                last_update_time: None,
+                last_write: None,
+                _max_wire_version: None,
+            },
+            TestServerDescription {
+                address: "localhost:27021".to_string(),
+                avg_rtt_ms: Some(12.0),
+                server_type: TestServerType::RsOther,
+                tags: None,
+                last_update_time: None,
+                last_write: None,
+                _max_wire_version: None,
+            },
+        ],
+    }
+    .into_topology_description(None);
+    pretty_assertions::assert_eq!(
+        desc.suitable_servers_in_latency_window(&criteria).unwrap(),
+        Vec::<&ServerDescription>::new()
+    );
 }
