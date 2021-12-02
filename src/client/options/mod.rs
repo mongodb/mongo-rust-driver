@@ -846,22 +846,40 @@ impl TlsOptions {
             };
 
             file.seek(SeekFrom::Start(0))?;
-            let key = match pemfile::rsa_private_keys(&mut file) {
-                Ok(key) => key,
-                Err(()) => {
-                    return Err(ErrorKind::InvalidTlsConfig {
+            let mut keys =
+                pemfile::pkcs8_private_keys(&mut file).map_err(|_| -> crate::error::Error {
+                    ErrorKind::InvalidTlsConfig {
+                        message: format!(
+                            "Unable to parse PEM-encoded PKCS8 key from {}",
+                            path.display()
+                        ),
+                    }
+                    .into()
+                })?;
+            file.seek(SeekFrom::Start(0))?;
+            keys.append(&mut pemfile::rsa_private_keys(&mut file).map_err(
+                |_| -> crate::error::Error {
+                    ErrorKind::InvalidTlsConfig {
                         message: format!(
                             "Unable to parse PEM-encoded RSA key from {}",
                             path.display()
                         ),
                     }
-                    .into())
-                }
-            };
+                    .into()
+                },
+            )?);
+            let key = keys
+                .into_iter()
+                .next()
+                .ok_or_else(|| -> crate::error::Error {
+                    ErrorKind::InvalidTlsConfig {
+                        message: format!("No PEM-encoded keys in {}", path.display()),
+                    }
+                    .into()
+                })?;
 
-            // TODO: Get rid of unwrap.
             config
-                .set_single_client_cert(certs, key.into_iter().next().unwrap())
+                .set_single_client_cert(certs, key)
                 .map_err(|e| ErrorKind::InvalidTlsConfig {
                     message: e.to_string(),
                 })?;
