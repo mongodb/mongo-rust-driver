@@ -354,7 +354,7 @@ pub(crate) use crate::{
     db::Database,
 };
 
-pub use {coll::Namespace, index::IndexModel, client::session::ClusterTime};
+pub use {coll::Namespace, index::IndexModel, client::session::ClusterTime, sdam::public::*};
 
 #[cfg(all(
     feature = "tokio-runtime",

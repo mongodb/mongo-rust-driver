@@ -1,6 +1,6 @@
 mod causal_consistency;
 
-use std::{future::Future, time::Duration};
+use std::{future::Future, sync::Arc, time::Duration};
 
 use bson::Document;
 use futures::stream::StreamExt;
@@ -8,8 +8,10 @@ use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, Bson},
+    coll::options::{CountOptions, InsertManyOptions},
     error::Result,
-    options::{Acknowledgment, FindOptions, InsertOneOptions, ReadPreference, WriteConcern},
+    options::{Acknowledgment, FindOptions, ReadConcern, ReadPreference, WriteConcern},
+    sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
     test::{EventClient, TestClient, CLIENT_OPTIONS, LOCK},
     Collection,
@@ -449,7 +451,8 @@ async fn find_and_getmore_share_session() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = EventClient::new().await;
-    if !client.is_replica_set() {
+    if client.is_standalone() {
+        println!("skipping find_and_getmore_share_session due to unsupported topology: Standalone");
         return;
     }
 
@@ -457,14 +460,10 @@ async fn find_and_getmore_share_session() {
         .init_db_and_coll(function_name!(), function_name!())
         .await;
 
-    let options = InsertOneOptions::builder()
+    let options = InsertManyOptions::builder()
         .write_concern(WriteConcern::builder().w(Acknowledgment::Majority).build())
         .build();
-    for _ in 0..3 {
-        coll.insert_one(doc! {}, options.clone())
-            .await
-            .expect("insert should succeed");
-    }
+    coll.insert_many(vec![doc! {}; 3], options).await.unwrap();
 
     let read_preferences: Vec<ReadPreference> = vec![
         ReadPreference::Primary,
@@ -489,7 +488,8 @@ async fn find_and_getmore_share_session() {
     ) {
         let options = FindOptions::builder()
             .batch_size(2)
-            .selection_criteria(SelectionCriteria::ReadPreference(read_preference))
+            .selection_criteria(SelectionCriteria::ReadPreference(read_preference.clone()))
+            .read_concern(ReadConcern::local())
             .build();
 
         let mut cursor = coll
@@ -498,7 +498,21 @@ async fn find_and_getmore_share_session() {
             .expect("find should succeed");
 
         for _ in 0..3 {
-            assert!(matches!(cursor.next().await, Some(Ok(_))));
+            cursor
+                .next()
+                .await
+                .unwrap_or_else(|| {
+                    panic!(
+                        "should get result with read preference {:?}",
+                        read_preference
+                    )
+                })
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "result should not be error with read preference {:?}, but got {:?}",
+                        read_preference, e
+                    )
+                });
         }
 
         let (find_started, _) = client.get_successful_command_execution("find");
@@ -514,6 +528,22 @@ async fn find_and_getmore_share_session() {
             .get("lsid")
             .expect("count documents should use implicit session");
         assert_eq!(getmore_session_id, session_id);
+    }
+
+    let topology_description = client.topology_description().await;
+    for (addr, server) in topology_description.servers {
+        if !server.server_type.is_data_bearing() {
+            continue;
+        }
+
+        let a = addr.clone();
+        let rp = Arc::new(move |si: &ServerInfo| si.address() == &a);
+        let options = CountOptions::builder()
+            .selection_criteria(SelectionCriteria::Predicate(rp))
+            .read_concern(ReadConcern::local())
+            .build();
+
+        while coll.count_documents(None, options.clone()).await.unwrap() != 3 {}
     }
 
     for read_pref in read_preferences {

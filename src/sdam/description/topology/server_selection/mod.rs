@@ -119,7 +119,7 @@ impl TopologyDescription {
             SelectionCriteria::Predicate(ref filter) => self
                 .servers
                 .values()
-                .filter(|s| filter(&ServerInfo::new_borrowed(s)))
+                .filter(|s| s.server_type.is_data_bearing() && filter(&ServerInfo::new_borrowed(s)))
                 .collect(),
         };
 

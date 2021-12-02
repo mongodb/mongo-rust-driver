@@ -367,6 +367,11 @@ impl Client {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) async fn topology_description(&self) -> crate::sdam::TopologyDescription {
+        self.inner.topology.description().await
+    }
+
     #[cfg(all(test, not(feature = "sync")))]
     pub(crate) async fn get_hosts(&self) -> Vec<String> {
         let servers = self.inner.topology.servers().await;
