@@ -88,9 +88,7 @@ impl<'conn> Operation for GetMore<'conn> {
         Ok(GetMoreResult {
             batch: response.cursor.next_batch,
             exhausted: response.cursor.id == 0,
-            post_batch_resume_token: ResumeToken::from_raw(
-                response.cursor.post_batch_resume_token,
-            ),
+            post_batch_resume_token: ResumeToken::from_raw(response.cursor.post_batch_resume_token),
         })
     }
 

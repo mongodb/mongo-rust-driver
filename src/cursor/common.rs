@@ -161,14 +161,12 @@ where
 
             match self.buffer.pop_front() {
                 Some(doc) => {
-                    if self.buffer.is_empty() && self.post_batch_resume_token.is_some() {
-                        self.cached_resume_token = self.post_batch_resume_token.clone();
-                    } else {
-                        self.cached_resume_token = match doc.get("_id")? {
-                            None => None,
-                            Some(val) => Some(ResumeToken(val.to_raw_bson())),
+                    self.cached_resume_token =
+                        if self.buffer.is_empty() && self.post_batch_resume_token.is_some() {
+                            self.post_batch_resume_token.clone()
+                        } else {
+                            doc.get("_id")?.map(|val| ResumeToken(val.to_raw_bson()))
                         };
-                    }
                     return Poll::Ready(Some(Ok(bson::from_slice(doc.as_bytes())?)));
                 }
                 None if !self.exhausted && !self.pinned_connection.is_invalid() => {

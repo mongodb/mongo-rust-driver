@@ -33,7 +33,7 @@ impl ResumeToken {
         // Token from options passed to `watch`
         let options_token = options
             .as_ref()
-            .and_then(|o| o.start_after.as_ref().or(o.resume_after.as_ref()))
+            .and_then(|o| o.start_after.as_ref().or_else(|| o.resume_after.as_ref()))
             .cloned();
         // Token from initial response from `aggregate`
         let spec_token = if spec.initial_buffer.is_empty() {
