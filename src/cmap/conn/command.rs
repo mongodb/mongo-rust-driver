@@ -185,7 +185,7 @@ impl RawCommandResponse {
         doc.to_writer(&mut raw)?;
         Ok(Self {
             source,
-            raw: RawDocumentBuf::new(raw)?,
+            raw: RawDocumentBuf::from_bytes(raw)?,
         })
     }
 
@@ -205,7 +205,7 @@ impl RawCommandResponse {
         let raw = message.single_document_response()?;
         Ok(Self {
             source,
-            raw: RawDocumentBuf::new(raw)?,
+            raw: RawDocumentBuf::from_bytes(raw)?,
         })
     }
 

@@ -25,7 +25,7 @@ mod test;
 
 use std::{collections::VecDeque, fmt::Debug, ops::Deref};
 
-use bson::{RawBson, RawDocument, RawDocumentBuf, Timestamp};
+use bson::{RawBsonRef, RawDocument, RawDocumentBuf, Timestamp};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
@@ -340,11 +340,11 @@ impl CursorBody {
     fn extract_at_cluster_time(response: &RawDocument) -> Result<Option<Timestamp>> {
         Ok(response
             .get("cursor")?
-            .and_then(RawBson::as_document)
+            .and_then(RawBsonRef::as_document)
             .map(|d| d.get("atClusterTime"))
             .transpose()?
             .flatten()
-            .and_then(RawBson::as_timestamp))
+            .and_then(RawBsonRef::as_timestamp))
     }
 }
 
