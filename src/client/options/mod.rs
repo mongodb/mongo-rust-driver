@@ -26,6 +26,7 @@ use rustls::{
     ServerCertVerifier,
     TLSError,
 };
+use rustls_pemfile::{read_one, Item};
 use serde::{
     de::{Error, Unexpected},
     Deserialize,
@@ -846,37 +847,29 @@ impl TlsOptions {
             };
 
             file.seek(SeekFrom::Start(0))?;
-            let mut keys =
-                pemfile::pkcs8_private_keys(&mut file).map_err(|_| -> crate::error::Error {
-                    ErrorKind::InvalidTlsConfig {
-                        message: format!(
-                            "Unable to parse PEM-encoded PKCS8 key from {}",
-                            path.display()
-                        ),
+            let key = loop {
+                match read_one(&mut file) {
+                    Ok(Some(Item::PKCS8Key(bytes))) | Ok(Some(Item::RSAKey(bytes))) => {
+                        break rustls::PrivateKey(bytes)
                     }
-                    .into()
-                })?;
-            file.seek(SeekFrom::Start(0))?;
-            keys.append(&mut pemfile::rsa_private_keys(&mut file).map_err(
-                |_| -> crate::error::Error {
-                    ErrorKind::InvalidTlsConfig {
-                        message: format!(
-                            "Unable to parse PEM-encoded RSA key from {}",
-                            path.display()
-                        ),
+                    Ok(Some(_)) => continue,
+                    Ok(None) => {
+                        return Err(ErrorKind::InvalidTlsConfig {
+                            message: format!("No PEM-encoded keys in {}", path.display()),
+                        }
+                        .into())
                     }
-                    .into()
-                },
-            )?);
-            let key = keys
-                .into_iter()
-                .next()
-                .ok_or_else(|| -> crate::error::Error {
-                    ErrorKind::InvalidTlsConfig {
-                        message: format!("No PEM-encoded keys in {}", path.display()),
+                    Err(_) => {
+                        return Err(ErrorKind::InvalidTlsConfig {
+                            message: format!(
+                                "Unable to parse PEM-encoded item from {}",
+                                path.display()
+                            ),
+                        }
+                        .into())
                     }
-                    .into()
-                })?;
+                }
+            };
 
             config
                 .set_single_client_cert(certs, key)

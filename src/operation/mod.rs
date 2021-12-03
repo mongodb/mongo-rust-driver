@@ -189,6 +189,7 @@ impl<T: CommandBody> Command<T> {
 /// A response to a command with a body shaped deserialized to a `T`.
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub(crate) struct CommandResponse<T> {
     pub(crate) ok: Bson,
 
@@ -343,6 +344,7 @@ impl CursorBody {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
 pub(crate) struct CursorInfo<T = RawDocumentBuf> {
     pub(crate) id: i64,
 
