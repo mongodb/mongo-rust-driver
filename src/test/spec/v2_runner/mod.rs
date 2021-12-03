@@ -16,9 +16,7 @@ use crate::{
     test::{
         assert_matches,
         util::{get_default_name, FailPointGuard},
-        EventClient,
-        TestClient,
-        SERVERLESS,
+        EventClient, TestClient, SERVERLESS,
     },
     RUNTIME,
 };
@@ -306,7 +304,12 @@ pub async fn run_v2_test(test_file: TestFile) {
                             assert!(message.contains(&error_contains));
                         }
                         if let Some(error_code_name) = operation_error.error_code_name {
-                            let code_name = error.code_name().unwrap();
+                            let code_name = error.code_name().unwrap_or_else(|| {
+                                panic!(
+                                    "expected to get code name \"{}\", got none from error {:#?}",
+                                    error_code_name, error
+                                )
+                            });
                             assert_eq!(error_code_name, code_name);
                         }
                         if let Some(error_code) = operation_error.error_code {
