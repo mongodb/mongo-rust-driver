@@ -2,7 +2,7 @@ use crate::{
     bson::{doc, Document},
     client::options::ServerApi,
     cmap::{Command, Connection, RawCommandResponse},
-    error::Result,
+    error::{Error, Result},
     options::Credential,
 };
 
@@ -51,10 +51,23 @@ pub(super) async fn authenticate_stream(
     server_api: Option<&ServerApi>,
     server_first: impl Into<Option<Document>>,
 ) -> Result<()> {
-    if server_first.into().is_none() {
-        send_client_first(conn, credential, server_api)
+    let server_response = match server_first.into() {
+        Some(server_first) => server_first,
+        None => send_client_first(conn, credential, server_api)
             .await?
-            .auth_response_body("MONGODB-X509")?;
+            .auth_response_body("MONGODB-X509")?,
+    };
+
+    if server_response
+        .get("ok")
+        .and_then(crate::bson_util::get_int)
+        != Some(1)
+        && server_response.get_str("dbname") != Ok("$external")
+    {
+        return Err(Error::authentication_error(
+            "MONGODB-X509",
+            "Authentication failed",
+        ));
     }
 
     Ok(())
