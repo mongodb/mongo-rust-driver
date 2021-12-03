@@ -16,7 +16,12 @@ use crate::{
     test::{
         assert_matches,
         util::{get_default_name, FailPointGuard},
-        EventClient, TestClient, SERVERLESS,
+        CommandEvent,
+        Event,
+        EventClient,
+        TestClient,
+        EVENT_TIMEOUT,
+        SERVERLESS,
     },
     RUNTIME,
 };
@@ -166,6 +171,8 @@ pub async fn run_v2_test(test_file: TestFile) {
         };
         let mut session1 = Some(client.start_session(options).await.unwrap());
         let session1_lsid = session1.as_ref().unwrap().id().clone();
+
+        let mut event_subscriber = client.subscribe_to_events();
 
         for operation in test.operations {
             let db = match &operation.database_options {
@@ -342,19 +349,39 @@ pub async fn run_v2_test(test_file: TestFile) {
         }
 
         if let Some(expectations) = test.expectations {
-            let events: Vec<CommandStartedEvent> = client
-                .get_all_command_started_events()
-                .into_iter()
-                .map(Into::into)
-                .collect();
+            let mut events = Vec::<CommandStartedEvent>::new();
+            while events.len() < expectations.len() {
+                if let Some(Event::Command(CommandEvent::Started(s))) = event_subscriber
+                    .wait_for_event(EVENT_TIMEOUT, |event| match event {
+                        Event::Command(CommandEvent::Started(s))
+                            if s.command_name != "configureFailPoint" =>
+                        {
+                            true
+                        }
+                        _ => false,
+                    })
+                    .await
+                {
+                    events.push(s.into());
+                } else {
+                    panic!(
+                        "timed out waiting for events, expected {:#?}, seen {:#?} so far",
+                        expectations, events
+                    );
+                }
+            }
 
             assert!(events.len() >= expectations.len(), "{}", test.description);
             for (actual_event, expected_event) in events.iter().zip(expectations.iter()) {
-                assert!(actual_event.matches_expected(
+                assert!(
+                    actual_event.matches_expected(expected_event, &session0_lsid, &session1_lsid),
+                    "{}: {:#?} did not match {:#?}, all events: {:#?}, expcted events: {:#?}",
+                    test.description,
+                    actual_event,
                     expected_event,
-                    &session0_lsid,
-                    &session1_lsid
-                ));
+                    events,
+                    expectations
+                );
             }
         }
 

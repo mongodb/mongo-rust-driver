@@ -1,10 +1,7 @@
 use serde::Deserialize;
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
-use super::{
-    event::{Event, EventHandler},
-    EVENT_TIMEOUT,
-};
+use super::event::{Event, EventHandler};
 use crate::{
     bson::{doc, Document},
     cmap::{options::ConnectionPoolOptions, Command, ConnectionPool},
@@ -12,7 +9,15 @@ use crate::{
     operation::CommandResponse,
     sdam::ServerUpdateSender,
     selection_criteria::ReadPreference,
-    test::{FailCommandOptions, FailPoint, FailPointMode, TestClient, CLIENT_OPTIONS, LOCK},
+    test::{
+        FailCommandOptions,
+        FailPoint,
+        FailPointMode,
+        TestClient,
+        CLIENT_OPTIONS,
+        EVENT_TIMEOUT,
+        LOCK,
+    },
     RUNTIME,
 };
 use semver::VersionReq;

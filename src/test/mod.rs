@@ -42,9 +42,19 @@ use crate::{
     },
     options::{ClientOptions, Compressor},
 };
-use std::{fs::read_to_string, str::FromStr};
+use std::{fs::read_to_string, str::FromStr, time::Duration};
 
 const MAX_POOL_SIZE: u32 = 100;
+
+/// Many different types of events are emitted from tasks spawned in the drop
+/// implementations of various types (Connections, pools, etc.). Sometimes it takes
+/// a longer amount of time for these tasks to get scheduled and thus their associated
+/// events to get emitted, requiring the runner to wait for a little bit before asserting
+/// the events were actually fired.
+///
+/// This value was purposefully chosen to be large to prevent test failures, though it is not
+/// expected that the 3s timeout will regularly or ever be hit.
+pub(crate) const EVENT_TIMEOUT: Duration = Duration::from_secs(3);
 
 lazy_static! {
     pub(crate) static ref CLIENT_OPTIONS: ClientOptions = {
