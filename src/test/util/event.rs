@@ -219,6 +219,12 @@ impl EventHandler {
     pub fn connections_checked_out(&self) -> u32 {
         *self.connections_checked_out.lock().unwrap()
     }
+
+    pub fn clear_cached_events(&self) {
+        self.command_events.write().unwrap().clear();
+        self.cmap_events.write().unwrap().clear();
+        self.sdam_events.write().unwrap().clear();
+    }
 }
 
 impl CmapEventHandler for EventHandler {
@@ -538,8 +544,7 @@ impl EventClient {
     }
 
     pub fn clear_cached_events(&self) {
-        self.handler.command_events.write().unwrap().clear();
-        self.handler.cmap_events.write().unwrap().clear();
+        self.handler.clear_cached_events()
     }
 }
 
