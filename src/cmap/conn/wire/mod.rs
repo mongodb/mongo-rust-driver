@@ -7,7 +7,8 @@ mod util;
 
 pub use self::{
     header::Header,
-    message::{Message, MessageSection},
-    op_message::{read_msg, MongoMsg},
+    header::OpCode,
+    message::{Message, MessageSection,MessageFlags},
+    op_message::*,
     util::next_request_id,
 };

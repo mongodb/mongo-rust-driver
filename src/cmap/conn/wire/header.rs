@@ -5,9 +5,10 @@ use crate::{
     error::{ErrorKind, Result},
     runtime::AsyncLittleEndianRead,
 };
+use serde::{Deserialize, Serialize};
 
 /// The wire protocol op codes.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum OpCode {
     Reply = 1,
     Query = 2004,
@@ -33,7 +34,7 @@ impl OpCode {
 
 /// The header for any wire protocol message.
 #[allow(missing_docs)]
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Header {
     pub length: i32,
     pub request_id: i32,

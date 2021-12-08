@@ -9,25 +9,26 @@ use futures_util::{
     io::{BufReader, BufWriter},
     AsyncBufReadExt, AsyncReadExt, AsyncWriteExt,
 };
+use serde::{Deserialize, Serialize};
 use std::io::Read;
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ReplyOp {
-    pub(crate) flags: MessageFlags,
-    cursor_id: u64,
-    start_from: u32,
-    number_returned: u32,
-    documents: Vec<Document>,
+    pub flags: MessageFlags,
+    pub cursor_id: u64,
+    pub start_from: u32,
+    pub number_returned: u32,
+    pub documents: Vec<Document>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct QueryOp {
     pub(crate) flags: MessageFlags,
-    collection: String,
-    skip: i32,
-    limit: i32,
-    query: Document,
-    selector: Option<Document>,
+    pub collection: String,
+    pub skip: i32,
+    pub limit: i32,
+    pub query: Document,
+    pub selector: Option<Document>,
 }
 impl ReplyOp {
     async fn read_reply_common(
@@ -67,20 +68,26 @@ impl ReplyOp {
     /// Serializes the Message to bytes and writes them to `writer`.
     pub async fn write_to<T: AsyncWrite + Unpin + Send>(
         &self,
-        header: &Header,
+        mut header: Header,
         stream: &mut T,
     ) -> Result<()> {
-        let mut writer = BufWriter::new(stream);
-        header.write_to(&mut writer).await?;
-        writer.write_u32(self.flags.bits()).await?;
-        writer.write_all(&self.cursor_id.to_le_bytes()).await?;
-        writer.write_u32(self.start_from).await?;
-        writer.write_u32(self.number_returned).await?;
+        let mut reply_writer = Vec::new();
+        reply_writer.write_u32(self.flags.bits()).await?;
+        reply_writer
+            .write_all(&self.cursor_id.to_le_bytes())
+            .await?;
+        reply_writer.write_u32(self.start_from).await?;
+        reply_writer.write_u32(self.number_returned).await?;
         for doc in &self.documents {
             let mut s = Vec::new();
             doc.to_writer(&mut s)?;
-            writer.write_all(&s).await?;
+            reply_writer.write_all(&s).await?;
         }
+        let total_length = Header::LENGTH + reply_writer.len();
+        header.length = total_length as i32;
+        let mut writer = BufWriter::new(stream);
+        header.write_to(&mut writer).await?;
+        writer.write_all(&reply_writer).await?;
         writer.flush().await?;
         Ok(())
     }
@@ -96,6 +103,7 @@ impl QueryOp {
         //length_remaining -= std::mem::size_of::<u32>() as i32;
         let mut collect = Vec::new();
         reader.read_until(0, &mut collect).await?;
+        collect.pop().unwrap();
         let collection: String = String::from_utf8(collect).unwrap();
         let skip = reader.read_i32()?;
         let limit = reader.read_i32()?;
@@ -140,6 +148,7 @@ impl QueryOp {
         header.write_to(&mut writer).await?;
         writer.write_u32(self.flags.bits()).await?;
         writer.write_all(self.collection.as_bytes()).await?;
+        writer.write_u8(0).await?;
         writer.write_i32(self.skip).await?;
         writer.write_i32(self.limit).await?;
         let mut query = Vec::new();
@@ -155,7 +164,7 @@ impl QueryOp {
     }
 }
 /// all mongo message
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub enum MongoMsg {
     /// _OP_MSG
     Message(Message),

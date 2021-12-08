@@ -1,12 +1,3 @@
-use std::io::Read;
-
-use bitflags::bitflags;
-use futures_io::AsyncWrite;
-use futures_util::{
-    io::{BufReader, BufWriter},
-    AsyncReadExt, AsyncWriteExt,
-};
-
 use super::header::{Header, OpCode};
 use crate::compression::{Compressor, Decoder};
 use crate::{
@@ -18,10 +9,18 @@ use crate::{
     error::{Error, ErrorKind, Result},
     runtime::{AsyncLittleEndianWrite, AsyncStream, SyncLittleEndianRead},
 };
+use bitflags::bitflags;
+use futures_io::AsyncWrite;
+use futures_util::{
+    io::{BufReader, BufWriter},
+    AsyncReadExt, AsyncWriteExt,
+};
+use serde::{Deserialize, Serialize};
+use std::io::Read;
 
 /// Represents an OP_MSG wire protocol operation.
 #[allow(missing_docs)]
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Message {
     pub response_to: i32,
     pub(crate) flags: MessageFlags,
@@ -307,7 +306,8 @@ impl Message {
 
 bitflags! {
     /// Represents the bitwise flags for an OP_MSG as defined in the spec.
-    pub(crate) struct MessageFlags: u32 {
+    #[derive(Serialize,Deserialize)]
+    pub struct MessageFlags: u32 {
         const CHECKSUM_PRESENT = 0b_0000_0000_0000_0000_0000_0000_0000_0001;
         const MORE_TO_COME     = 0b_0000_0000_0000_0000_0000_0000_0000_0010;
         const EXHAUST_ALLOWED  = 0b_0000_0000_0000_0001_0000_0000_0000_0000;
@@ -316,7 +316,7 @@ bitflags! {
 
 /// Represents a section as defined by the OP_MSG spec.
 #[allow(missing_docs)]
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub enum MessageSection {
     Document(Vec<u8>),
     Sequence {

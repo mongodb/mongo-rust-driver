@@ -364,7 +364,7 @@ pub(crate) use crate::{
 
 pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*};
 
-pub use cmap::conn::wire::{read_msg, Header, Message, MessageSection, MongoMsg};
+pub use cmap::conn::wire::*;
 pub use runtime::{AsyncStream, AsyncTcpStream};
 #[cfg(all(
     feature = "tokio-runtime",
