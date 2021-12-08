@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::io::Read;
 
 #[derive(Debug, Deserialize, Serialize)]
+#[allow(missing_docs)]
 pub struct ReplyOp {
     pub flags: MessageFlags,
     pub cursor_id: u64,
@@ -22,6 +23,7 @@ pub struct ReplyOp {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[allow(missing_docs)]
 pub struct QueryOp {
     pub(crate) flags: MessageFlags,
     pub collection: String,

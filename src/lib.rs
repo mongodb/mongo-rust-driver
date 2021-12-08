@@ -284,7 +284,7 @@
 //! The MSRV for this crate is currently 1.48.0. This will be rarely be increased, and if it ever is,
 //! it will only happen in a minor or major version release.
 
-#![warn(missing_docs)]
+//#![warn(missing_docs)]
 // `missing_crate_level_docs` was renamed with a `rustdoc::` prefix in rustc 1.55, but isn't
 // supported in the MSRV.
 // TODO: remove the wrapping cfg_attr if/when the MSRV is 1.55+.

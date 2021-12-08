@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 /// The wire protocol op codes.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[allow(missing_docs)]
 pub enum OpCode {
     Reply = 1,
     Query = 2004,
