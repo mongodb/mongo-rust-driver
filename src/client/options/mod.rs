@@ -26,6 +26,7 @@ use rustls::{
     ServerCertVerifier,
     TLSError,
 };
+use rustls_pemfile::{read_one, Item};
 use serde::{
     de::{Error, Unexpected},
     Deserialize,
@@ -846,22 +847,32 @@ impl TlsOptions {
             };
 
             file.seek(SeekFrom::Start(0))?;
-            let key = match pemfile::rsa_private_keys(&mut file) {
-                Ok(key) => key,
-                Err(()) => {
-                    return Err(ErrorKind::InvalidTlsConfig {
-                        message: format!(
-                            "Unable to parse PEM-encoded RSA key from {}",
-                            path.display()
-                        ),
+            let key = loop {
+                match read_one(&mut file) {
+                    Ok(Some(Item::PKCS8Key(bytes))) | Ok(Some(Item::RSAKey(bytes))) => {
+                        break rustls::PrivateKey(bytes)
                     }
-                    .into())
+                    Ok(Some(_)) => continue,
+                    Ok(None) => {
+                        return Err(ErrorKind::InvalidTlsConfig {
+                            message: format!("No PEM-encoded keys in {}", path.display()),
+                        }
+                        .into())
+                    }
+                    Err(_) => {
+                        return Err(ErrorKind::InvalidTlsConfig {
+                            message: format!(
+                                "Unable to parse PEM-encoded item from {}",
+                                path.display()
+                            ),
+                        }
+                        .into())
+                    }
                 }
             };
 
-            // TODO: Get rid of unwrap.
             config
-                .set_single_client_cert(certs, key.into_iter().next().unwrap())
+                .set_single_client_cert(certs, key)
                 .map_err(|e| ErrorKind::InvalidTlsConfig {
                     message: e.to_string(),
                 })?;
