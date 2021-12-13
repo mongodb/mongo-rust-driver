@@ -115,6 +115,66 @@ where
             _phantom: Default::default(),
         }
     }
+
+    pub(super) fn todo_name(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue<T>>>
+        where T: Unpin
+    {
+        // If there is a get more in flight, check on its status.
+        if let Some(future) = self.provider.executing_future() {
+            match Pin::new(future).poll(cx) {
+                // If a result is ready, retrieve the buffer and update the exhausted status.
+                Poll::Ready(get_more_result) => {
+                    let exhausted = get_more_result.exhausted();
+                    let (result, session) = get_more_result.into_parts();
+                    if exhausted {
+                        // If the cursor is exhausted, the driver must return the pinned
+                        // connection to the pool.
+                        self.pinned_connection = PinnedConnection::Unpinned;
+                    }
+                    if let Err(e) = &result {
+                        if e.is_network_error() {
+                            // Flag the connection as invalid, preventing a killCursors command,
+                            // but leave the connection pinned.
+                            self.pinned_connection.invalidate();
+                        }
+                    }
+
+                    self.exhausted = exhausted;
+                    self.provider.clear_execution(session, exhausted);
+                    let result = result?;
+                    self.buffer = result.batch;
+                    self.post_batch_resume_token = result.post_batch_resume_token;
+                    if self.buffer.is_empty() {
+                        self.cached_resume_token = self.post_batch_resume_token.clone();
+                    }
+                }
+                Poll::Pending => return Poll::Pending,
+            }
+        }
+
+        match self.buffer.pop_front() {
+            Some(doc) => {
+                self.cached_resume_token =
+                    if self.buffer.is_empty() && self.post_batch_resume_token.is_some() {
+                        self.post_batch_resume_token.clone()
+                    } else {
+                        doc.get("_id")?.map(|val| ResumeToken(val.to_raw_bson()))
+                    };
+                return Poll::Ready(Ok(BatchValue::Some(bson::from_slice(doc.as_bytes())?)));
+            }
+            None if !self.exhausted && !self.pinned_connection.is_invalid() => {
+                self.start_get_more();
+                return Poll::Ready(Ok(BatchValue::Empty))
+            }
+            None => return Poll::Ready(Ok(BatchValue::Exhausted)),
+        }
+    }
+}
+
+pub(super) enum BatchValue<T> {
+    Some(T),
+    Empty,
+    Exhausted,
 }
 
 impl<P, T> Stream for GenericCursor<P, T>
@@ -126,53 +186,15 @@ where
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         loop {
-            // If there is a get more in flight, check on its status.
-            if let Some(future) = self.provider.executing_future() {
-                match Pin::new(future).poll(cx) {
-                    // If a result is ready, retrieve the buffer and update the exhausted status.
-                    Poll::Ready(get_more_result) => {
-                        let exhausted = get_more_result.exhausted();
-                        let (result, session) = get_more_result.into_parts();
-                        if exhausted {
-                            // If the cursor is exhausted, the driver must return the pinned
-                            // connection to the pool.
-                            self.pinned_connection = PinnedConnection::Unpinned;
-                        }
-                        if let Err(e) = &result {
-                            if e.is_network_error() {
-                                // Flag the connection as invalid, preventing a killCursors command,
-                                // but leave the connection pinned.
-                                self.pinned_connection.invalidate();
-                            }
-                        }
-
-                        self.exhausted = exhausted;
-                        self.provider.clear_execution(session, exhausted);
-                        let result = result?;
-                        self.buffer = result.batch;
-                        self.post_batch_resume_token = result.post_batch_resume_token;
-                        if self.buffer.is_empty() {
-                            self.cached_resume_token = self.post_batch_resume_token.clone();
-                        }
+            match self.todo_name(cx) {
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(bv) => {
+                    match bv? {
+                        BatchValue::Some(v) => return Poll::Ready(Some(Ok(v))),
+                        BatchValue::Empty => continue,
+                        BatchValue::Exhausted => return Poll::Ready(None),
                     }
-                    Poll::Pending => return Poll::Pending,
                 }
-            }
-
-            match self.buffer.pop_front() {
-                Some(doc) => {
-                    self.cached_resume_token =
-                        if self.buffer.is_empty() && self.post_batch_resume_token.is_some() {
-                            self.post_batch_resume_token.clone()
-                        } else {
-                            doc.get("_id")?.map(|val| ResumeToken(val.to_raw_bson()))
-                        };
-                    return Poll::Ready(Some(Ok(bson::from_slice(doc.as_bytes())?)));
-                }
-                None if !self.exhausted && !self.pinned_connection.is_invalid() => {
-                    self.start_get_more();
-                }
-                None => return Poll::Ready(None),
             }
         }
     }
