@@ -7,6 +7,7 @@ use serde::Deserialize;
 use tokio::sync::RwLockWriteGuard;
 
 use crate::{
+    client::options::ClientOptions,
     options::ServerAddress,
     runtime::AsyncJoinHandle,
     sdam::{description::topology::server_selection, Server},
@@ -117,12 +118,6 @@ async fn load_balancing_test() {
 
     let mut setup_client_options = CLIENT_OPTIONS.clone();
 
-    // TODO: RUST-1004 unskip on auth variants
-    if setup_client_options.credential.is_some() {
-        println!("skipping load_balancing_test test due to auth being enabled");
-        return;
-    }
-
     if setup_client_options.load_balanced.unwrap_or(false) {
         println!("skipping load_balancing_test test due to load-balanced topology");
         return;
@@ -219,8 +214,12 @@ async fn load_balancing_test() {
 
     let mut handler = EventHandler::new();
     let mut subscriber = handler.subscribe();
-    let client = TestClient::with_handler(Some(Arc::new(handler.clone())), None).await;
+    let options = ClientOptions::builder()
+        .local_threshold(Duration::from_secs(30))
+        .build();
+    let client = TestClient::with_handler(Some(Arc::new(handler.clone())), options).await;
 
+    // wait for both servers to be discovered.
     subscriber
         .wait_for_event(Duration::from_secs(30), |event| {
             if let Event::Sdam(SdamEvent::TopologyDescriptionChanged(event)) = event {
