@@ -41,7 +41,6 @@ where
     post_batch_resume_token: Option<ResumeToken>,
     exhausted: bool,
     pinned_connection: PinnedConnection,
-    cached_resume_token: Option<ResumeToken>,
     _phantom: PhantomData<T>,
 }
 
@@ -54,7 +53,6 @@ where
         client: Client,
         spec: CursorSpecification,
         pinned_connection: PinnedConnection,
-        resume_token: Option<ResumeToken>,
         get_more_provider: P,
     ) -> Self {
         let exhausted = spec.id() == 0;
@@ -66,7 +64,6 @@ where
             post_batch_resume_token: None,
             info: spec.info,
             pinned_connection,
-            cached_resume_token: resume_token,
             _phantom: Default::default(),
         }
     }
@@ -91,8 +88,8 @@ where
         &self.pinned_connection
     }
 
-    pub(super) fn resume_token(&self) -> Option<&ResumeToken> {
-        self.cached_resume_token.as_ref()
+    pub(super) fn post_batch_resume_token(&self) -> Option<&ResumeToken> {
+        self.post_batch_resume_token.as_ref()
     }
 
     fn start_get_more(&mut self) {
@@ -111,12 +108,11 @@ where
             post_batch_resume_token: self.post_batch_resume_token,
             info: self.info,
             pinned_connection: self.pinned_connection,
-            cached_resume_token: self.cached_resume_token,
             _phantom: Default::default(),
         }
     }
 
-    pub(super) fn todo_name(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue<T>>>
+    pub(super) fn todo_name(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>>
         where T: Unpin
     {
         // If there is a get more in flight, check on its status.
@@ -144,9 +140,6 @@ where
                     let result = result?;
                     self.buffer = result.batch;
                     self.post_batch_resume_token = result.post_batch_resume_token;
-                    if self.buffer.is_empty() {
-                        self.cached_resume_token = self.post_batch_resume_token.clone();
-                    }
                 }
                 Poll::Pending => return Poll::Pending,
             }
@@ -154,13 +147,10 @@ where
 
         match self.buffer.pop_front() {
             Some(doc) => {
-                self.cached_resume_token =
-                    if self.buffer.is_empty() && self.post_batch_resume_token.is_some() {
-                        self.post_batch_resume_token.clone()
-                    } else {
-                        doc.get("_id")?.map(|val| ResumeToken(val.to_raw_bson()))
-                    };
-                return Poll::Ready(Ok(BatchValue::Some(bson::from_slice(doc.as_bytes())?)));
+                return Poll::Ready(Ok(BatchValue::Some {
+                    doc,
+                    is_last: self.buffer.is_empty(),
+                }));
             }
             None if !self.exhausted && !self.pinned_connection.is_invalid() => {
                 self.start_get_more();
@@ -171,8 +161,11 @@ where
     }
 }
 
-pub(super) enum BatchValue<T> {
-    Some(T),
+pub(crate) enum BatchValue {
+    Some {
+        doc: RawDocumentBuf,
+        is_last: bool,
+    },
     Empty,
     Exhausted,
 }
@@ -190,7 +183,9 @@ where
                 Poll::Pending => return Poll::Pending,
                 Poll::Ready(bv) => {
                     match bv? {
-                        BatchValue::Some(v) => return Poll::Ready(Some(Ok(v))),
+                        BatchValue::Some { doc, .. } => {
+                            return Poll::Ready(Some(Ok(bson::from_slice(doc.as_bytes())?)))
+                        },
                         BatchValue::Empty => continue,
                         BatchValue::Exhausted => return Poll::Ready(None),
                     }

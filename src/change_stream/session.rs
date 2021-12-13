@@ -45,14 +45,15 @@ where
 {
     cursor: SessionCursor<T>,
     data: ChangeStreamData,
+    resume_token: Option<ResumeToken>,
 }
 
 impl<T> SessionChangeStream<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
-    pub(crate) fn new(cursor: SessionCursor<T>, data: ChangeStreamData) -> Self {
-        Self { cursor, data }
+    pub(crate) fn new(cursor: SessionCursor<T>, data: ChangeStreamData, resume_token: Option<ResumeToken>) -> Self {
+        Self { cursor, data, resume_token }
     }
 
     /// Returns the cached resume token that can be used to resume after the most recently returned
@@ -62,7 +63,7 @@ where
     /// [here](https://docs.mongodb.com/manual/changeStreams/#change-stream-resume-token) for more
     /// information on change stream resume tokens.
     pub fn resume_token(&self) -> Option<&ResumeToken> {
-        self.cursor.resume_token()
+        self.resume_token.as_ref()
     }
 
     /// Update the type streamed values will be parsed as.
@@ -70,6 +71,7 @@ where
         SessionChangeStream {
             cursor: self.cursor.with_type(),
             data: self.data,
+            resume_token: self.resume_token,
         }
     }
 

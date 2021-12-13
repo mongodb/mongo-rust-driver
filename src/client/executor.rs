@@ -157,7 +157,6 @@ impl Client {
                 details.output.operation_output,
                 details.implicit_session,
                 pinned,
-                None,
             ))
         })
         .await
@@ -181,7 +180,6 @@ impl Client {
             self.clone(),
             details.output.operation_output,
             pinned,
-            None,
         ))
     }
 
@@ -240,12 +238,12 @@ impl Client {
                 details.output.operation_output,
                 details.implicit_session,
                 pinned,
-                resume_token,
             );
 
             Ok(ChangeStream::new(
                 cursor,
                 ChangeStreamData::new(pipeline, self.clone(), target, options),
+                resume_token,
             ))
         })
         .await
@@ -274,12 +272,12 @@ impl Client {
                 self.clone(),
                 details.output.operation_output,
                 pinned,
-                resume_token,
             );
 
             Ok(SessionChangeStream::new(
                 cursor,
                 ChangeStreamData::new(pipeline, self.clone(), target, options),
+                resume_token,
             ))
         })
         .await

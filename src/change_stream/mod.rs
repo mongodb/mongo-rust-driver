@@ -18,6 +18,7 @@ use crate::{
         event::{ChangeStreamEvent, ResumeToken},
         options::ChangeStreamOptions,
     },
+    cursor::BatchValue,
     error::Result,
     operation::AggregateTarget,
     options::AggregateOptions,
@@ -83,14 +84,17 @@ where
 
     /// The information associate with this change stream.
     data: ChangeStreamData,
+
+    /// The cached resume token.
+    resume_token: Option<ResumeToken>,
 }
 
 impl<T> ChangeStream<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
-    pub(crate) fn new(cursor: Cursor<T>, data: ChangeStreamData) -> Self {
-        Self { cursor, data }
+    pub(crate) fn new(cursor: Cursor<T>, data: ChangeStreamData, resume_token: Option<ResumeToken>) -> Self {
+        Self { cursor, data, resume_token }
     }
 
     /// Returns the cached resume token that can be used to resume after the most recently returned
@@ -100,7 +104,7 @@ where
     /// [here](https://docs.mongodb.com/manual/changeStreams/#change-stream-resume-token) for more
     /// information on change stream resume tokens.
     pub fn resume_token(&self) -> Option<&ResumeToken> {
-        self.cursor.resume_token()
+        self.resume_token.as_ref()
     }
 
     /// Update the type streamed values will be parsed as.
@@ -108,6 +112,33 @@ where
         ChangeStream {
             cursor: self.cursor.with_type(),
             data: self.data,
+            resume_token: self.resume_token,
+        }
+    }
+
+    fn todo_name(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
+        match self.cursor.todo_name(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(bv) => {
+                let bv = bv?;
+                match &bv {
+                    BatchValue::Some { doc, is_last } => {
+                        let batch_token = self.cursor.post_batch_resume_token();
+                        self.resume_token = if *is_last && batch_token.is_some() {
+                            batch_token.cloned()
+                        } else {
+                            doc.get("_id")?.map(|val| ResumeToken(val.to_raw_bson()))
+                        };
+                    }
+                    BatchValue::Empty => {
+                        if let Some(token) = self.cursor.post_batch_resume_token() {
+                            self.resume_token = Some(token.clone());
+                        }
+                    }
+                    BatchValue::Exhausted => {},
+                }
+                Poll::Ready(Ok(bv))
+            }
         }
     }
 }
@@ -161,7 +192,21 @@ where
 {
     type Item = Result<T>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.cursor).poll_next(cx)
+    // This is identical to `GenericCursor::poll_next`; the difference is that this calls `ChangeStream::todo_name`, which tracks the resume token.
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        loop {
+            match self.todo_name(cx) {
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(bv) => {
+                    match bv? {
+                        BatchValue::Some { doc, .. } => {
+                            return Poll::Ready(Some(Ok(bson::from_slice(doc.as_bytes())?)))
+                        },
+                        BatchValue::Empty => continue,
+                        BatchValue::Exhausted => return Poll::Ready(None),
+                    }
+                }
+            }
+        }
     }
 }
