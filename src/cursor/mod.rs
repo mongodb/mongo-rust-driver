@@ -20,7 +20,7 @@ use crate::{
     ClientSession, change_stream::event::ResumeToken,
 };
 use common::{kill_cursor, GenericCursor, GetMoreProvider, GetMoreProviderResult};
-pub(crate) use common::{BatchValue, CursorInformation, CursorSpecification, PinnedConnection};
+pub(crate) use common::{BatchValue, CursorInformation, CursorSpecification, CursorStream, PinnedConnection, stream_poll_next};
 
 /// A [`Cursor`] streams the result of a query. When a query is made, the returned [`Cursor`] will
 /// contain the first batch of results from the server; the individual results will then be returned
@@ -123,12 +123,6 @@ where
         self.wrapped_cursor.as_ref().and_then(|c| c.post_batch_resume_token())
     }
 
-    pub(crate) fn todo_name(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>>
-        where T: Unpin
-    {
-        self.wrapped_cursor.as_mut().unwrap().todo_name(cx)
-    }
-
     /// Update the type streamed values will be parsed as.
     pub fn with_type<D>(mut self) -> Cursor<D>
     where
@@ -155,6 +149,14 @@ where
             "cursor already has a kill_watcher"
         );
         self.kill_watcher = Some(tx);
+    }
+}
+
+impl<T> CursorStream for Cursor<T>
+where T: DeserializeOwned + Unpin + Send + Sync
+{
+    fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
+        self.wrapped_cursor.as_mut().unwrap().poll_next_in_batch(cx)
     }
 }
 

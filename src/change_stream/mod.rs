@@ -18,7 +18,7 @@ use crate::{
         event::{ChangeStreamEvent, ResumeToken},
         options::ChangeStreamOptions,
     },
-    cursor::BatchValue,
+    cursor::{BatchValue, stream_poll_next, CursorStream},
     error::Result,
     operation::AggregateTarget,
     options::AggregateOptions,
@@ -115,32 +115,6 @@ where
             resume_token: self.resume_token,
         }
     }
-
-    fn todo_name(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
-        match self.cursor.todo_name(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(bv) => {
-                let bv = bv?;
-                match &bv {
-                    BatchValue::Some { doc, is_last } => {
-                        let batch_token = self.cursor.post_batch_resume_token();
-                        self.resume_token = if *is_last && batch_token.is_some() {
-                            batch_token.cloned()
-                        } else {
-                            doc.get("_id")?.map(|val| ResumeToken(val.to_raw_bson()))
-                        };
-                    }
-                    BatchValue::Empty => {
-                        if let Some(token) = self.cursor.post_batch_resume_token() {
-                            self.resume_token = Some(token.clone());
-                        }
-                    }
-                    BatchValue::Exhausted => {},
-                }
-                Poll::Ready(Ok(bv))
-            }
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -186,27 +160,44 @@ impl ChangeStreamData {
     }
 }
 
+impl<T> CursorStream for ChangeStream<T>
+where
+    T: DeserializeOwned + Unpin + Send + Sync,
+{
+    fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
+        match self.cursor.poll_next_in_batch(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(bv) => {
+                let bv = bv?;
+                match &bv {
+                    BatchValue::Some { doc, is_last } => {
+                        let batch_token = self.cursor.post_batch_resume_token();
+                        self.resume_token = if *is_last && batch_token.is_some() {
+                            batch_token.cloned()
+                        } else {
+                            doc.get("_id")?.map(|val| ResumeToken(val.to_raw_bson()))
+                        };
+                    }
+                    BatchValue::Empty => {
+                        if let Some(token) = self.cursor.post_batch_resume_token() {
+                            self.resume_token = Some(token.clone());
+                        }
+                    }
+                    BatchValue::Exhausted => {},
+                }
+                Poll::Ready(Ok(bv))
+            }
+        }
+    }  
+}
+
 impl<T> Stream for ChangeStream<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
     type Item = Result<T>;
 
-    // This is identical to `GenericCursor::poll_next`; the difference is that this calls `ChangeStream::todo_name`, which tracks the resume token.
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        loop {
-            match self.todo_name(cx) {
-                Poll::Pending => return Poll::Pending,
-                Poll::Ready(bv) => {
-                    match bv? {
-                        BatchValue::Some { doc, .. } => {
-                            return Poll::Ready(Some(Ok(bson::from_slice(doc.as_bytes())?)))
-                        },
-                        BatchValue::Empty => continue,
-                        BatchValue::Exhausted => return Poll::Ready(None),
-                    }
-                }
-            }
-        }
+        stream_poll_next(Pin::into_inner(self), cx)
     }
 }

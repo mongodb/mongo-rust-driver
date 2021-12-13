@@ -111,10 +111,27 @@ where
             _phantom: Default::default(),
         }
     }
+}
 
-    pub(super) fn todo_name(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>>
-        where T: Unpin
-    {
+pub(crate) trait CursorStream {
+    fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>>;
+}
+
+pub(crate) enum BatchValue {
+    Some {
+        doc: RawDocumentBuf,
+        is_last: bool,
+    },
+    Empty,
+    Exhausted,
+}
+
+impl<P, T> CursorStream for GenericCursor<P, T>
+where
+    P: GetMoreProvider,
+    T: DeserializeOwned + Unpin,
+{
+    fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
         // If there is a get more in flight, check on its status.
         if let Some(future) = self.provider.executing_future() {
             match Pin::new(future).poll(cx) {
@@ -161,13 +178,26 @@ where
     }
 }
 
-pub(crate) enum BatchValue {
-    Some {
-        doc: RawDocumentBuf,
-        is_last: bool,
-    },
-    Empty,
-    Exhausted,
+// To avoid a private trait (`CursorStream`) in a public interface (`impl Stream`), this is provided as a free function rather than a blanket impl.
+pub(crate) fn stream_poll_next<S, V>(this: &mut S, cx: &mut Context<'_>) -> Poll<Option<Result<V>>>
+where
+    S: CursorStream,
+    V: for<'a> serde::Deserialize<'a>,
+{
+    loop {
+        match this.poll_next_in_batch(cx) {
+            Poll::Pending => return Poll::Pending,
+            Poll::Ready(bv) => {
+                match bv? {
+                    BatchValue::Some { doc, .. } => {
+                        return Poll::Ready(Some(Ok(bson::from_slice(doc.as_bytes())?)))
+                    },
+                    BatchValue::Empty => continue,
+                    BatchValue::Exhausted => return Poll::Ready(None),
+                }
+            }
+        }
+    }
 }
 
 impl<P, T> Stream for GenericCursor<P, T>
@@ -177,21 +207,8 @@ where
 {
     type Item = Result<T>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        loop {
-            match self.todo_name(cx) {
-                Poll::Pending => return Poll::Pending,
-                Poll::Ready(bv) => {
-                    match bv? {
-                        BatchValue::Some { doc, .. } => {
-                            return Poll::Ready(Some(Ok(bson::from_slice(doc.as_bytes())?)))
-                        },
-                        BatchValue::Empty => continue,
-                        BatchValue::Exhausted => return Poll::Ready(None),
-                    }
-                }
-            }
-        }
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        stream_poll_next(Pin::into_inner(self), cx)
     }
 }
 
