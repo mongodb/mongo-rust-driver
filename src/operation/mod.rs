@@ -350,6 +350,8 @@ pub(crate) struct CursorInfo<T = RawDocumentBuf> {
     pub(crate) ns: Namespace,
 
     pub(crate) first_batch: VecDeque<T>,
+
+    pub(crate) post_batch_resume_token: Option<RawDocumentBuf>,
 }
 
 #[derive(Debug, PartialEq)]
