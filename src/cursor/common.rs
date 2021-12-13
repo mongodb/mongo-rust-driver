@@ -200,6 +200,23 @@ where
     }
 }
 
+pub(crate) struct NextInBatchFuture<'a, T>(&'a mut T);
+
+impl<'a, T> NextInBatchFuture<'a, T>
+where T: CursorStream {
+    pub(crate) fn new(stream: &'a mut T) -> Self { Self(stream) }
+}
+
+impl<'a, T> Future for NextInBatchFuture<'a, T>
+where T: CursorStream
+{
+    type Output = Result<BatchValue>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        self.0.poll_next_in_batch(cx)
+    }
+}
+
 impl<P, T> Stream for GenericCursor<P, T>
 where
     P: GetMoreProvider,

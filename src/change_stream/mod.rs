@@ -4,6 +4,7 @@ pub(crate) mod options;
 pub mod session;
 
 use std::{
+    future::Future,
     marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
@@ -18,7 +19,7 @@ use crate::{
         event::{ChangeStreamEvent, ResumeToken},
         options::ChangeStreamOptions,
     },
-    cursor::{BatchValue, stream_poll_next, CursorStream},
+    cursor::{BatchValue, stream_poll_next, CursorStream, NextInBatchFuture},
     error::Result,
     operation::AggregateTarget,
     options::AggregateOptions,
@@ -114,6 +115,16 @@ where
             data: self.data,
             resume_token: self.resume_token,
         }
+    }
+
+    /// TODO: comment and example code
+    pub async fn next_in_batch<'a>(&'a mut self) -> Result<Option<T>> {
+        Ok(match NextInBatchFuture::new(self).await? {
+            BatchValue::Some { doc, .. } => {
+                Some(bson::from_slice(doc.as_bytes())?)
+            },
+            BatchValue::Empty | BatchValue::Exhausted => None,
+        })
     }
 }
 

@@ -20,7 +20,7 @@ use crate::{
     ClientSession, change_stream::event::ResumeToken,
 };
 use common::{kill_cursor, GenericCursor, GetMoreProvider, GetMoreProviderResult};
-pub(crate) use common::{BatchValue, CursorInformation, CursorSpecification, CursorStream, PinnedConnection, stream_poll_next};
+pub(crate) use common::{BatchValue, CursorInformation, CursorSpecification, CursorStream, NextInBatchFuture, PinnedConnection, stream_poll_next};
 
 /// A [`Cursor`] streams the result of a query. When a query is made, the returned [`Cursor`] will
 /// contain the first batch of results from the server; the individual results will then be returned
