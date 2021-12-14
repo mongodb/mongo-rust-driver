@@ -157,8 +157,33 @@ where
         self.values(session).next().await
     }
 
-    pub async fn next_in_batch<'a>(&'a mut self, session: &mut ClientSession) -> Result<Option<T>> {
-        self.values(session).next_in_batch().await
+    /// Retrieve the next result from the change stream, if any.
+    /// 
+    /// Where calling `next` will internally loop until a change document is received,
+    /// this will make at most one request and return `None` if the returned document batch is empty.  This method
+    /// should be used when storing the resume token in order to ensure the most up to date token is
+    /// received, e.g.
+    /// 
+    /// ```ignore
+    /// # use mongodb::{Client, error::Result};
+    /// # async fn func() -> Result<()> {
+    /// # let client = Client::with_uri_str("mongodb://example.com").await?;
+    /// # let coll = client.database("foo").collection("bar");
+    /// # let mut session = client.start_session(None).await?;
+    /// let mut change_stream = coll.watch_with_session(None, None, &mut session).await?;
+    /// let mut resume_token = None;
+    /// loop {
+    ///     if let Some(event) = change_stream.next_if_any(&mut session) {
+    ///         // process event
+    ///     }
+    ///     resume_token = change_stream.resume_token().cloned();
+    /// }
+    /// #
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn next_if_any<'a>(&'a mut self, session: &mut ClientSession) -> Result<Option<T>> {
+        self.values(session).next_if_any().await
     }
 }
 
@@ -184,7 +209,7 @@ where
         self.resume_token.as_ref()
     }
 
-    pub async fn next_in_batch<'a>(&'a mut self) -> Result<Option<T>> {
+    pub async fn next_if_any<'a>(&'a mut self) -> Result<Option<T>> {
         Ok(match NextInBatchFuture::new(self).await? {
             BatchValue::Some { doc, .. } => {
                 Some(bson::from_slice(doc.as_bytes())?)
