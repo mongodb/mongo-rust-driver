@@ -16,12 +16,7 @@ use crate::{
     test::{
         assert_matches,
         util::{get_default_name, FailPointGuard},
-        CommandEvent,
-        Event,
-        EventClient,
-        TestClient,
-        EVENT_TIMEOUT,
-        SERVERLESS,
+        CommandEvent, Event, EventClient, TestClient, EVENT_TIMEOUT, SERVERLESS,
     },
     RUNTIME,
 };
@@ -55,6 +50,10 @@ pub async fn run_v2_test(test_file: TestFile) {
     }
 
     for test in test_file.tests {
+        if test.description != "unpin after transient error within a transaction and commit" {
+            continue;
+        }
+
         println!("Running {}", &test.description);
 
         if test
@@ -295,6 +294,10 @@ pub async fn run_v2_test(test_file: TestFile) {
             };
 
             if let Some(error) = operation.error {
+                if test.description == "unpin after transient error within a transaction and commit"
+                {
+                    println!("expected error, got {:#?}", result);
+                }
                 assert_eq!(error, result.is_err(), "{}", &test.description);
             }
 
