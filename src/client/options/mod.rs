@@ -22,6 +22,7 @@ use rustls::{
     ServerCertVerifier,
     TLSError,
 };
+use rustls_pemfile::{read_one, Item};
 use serde::{
     de::{Error, Unexpected},
     Deserialize,
@@ -615,19 +616,23 @@ impl TlsOptions {
             };
 
             file.seek(SeekFrom::Start(0))?;
-            let key = match pemfile::rsa_private_keys(&mut file) {
-                Ok(key) => key,
-                Err(()) => {
-                    return Err(ErrorKind::ParseError {
-                        data_type: "PEM-encoded RSA key".to_string(),
-                        file_path: path,
+            let key = loop {
+                match read_one(&mut file) {
+                    Ok(Some(Item::PKCS8Key(bytes))) | Ok(Some(Item::RSAKey(bytes))) => {
+                        break rustls::PrivateKey(bytes)
                     }
-                    .into())
+                    Ok(Some(_)) => continue,
+                    Ok(None) | Err(_) => {
+                        return Err(ErrorKind::ParseError {
+                            data_type: "PEM-encoded keys".to_string(),
+                            file_path: path,
+                        }
+                        .into())
+                    }
                 }
             };
 
-            // TODO: Get rid of unwrap.
-            config.set_single_client_cert(certs, key.into_iter().next().unwrap())?;
+            config.set_single_client_cert(certs, key)?;
         }
 
         Ok(config)
