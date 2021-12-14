@@ -12,14 +12,18 @@ use serde::de::DeserializeOwned;
 #[cfg(test)]
 use tokio::sync::oneshot;
 
-use super::{common::{
-    kill_cursor,
-    CursorInformation,
-    GenericCursor,
-    GetMoreProvider,
-    GetMoreProviderResult,
-    PinnedConnection,
-}, CursorStream, BatchValue};
+use super::{
+    common::{
+        kill_cursor,
+        CursorInformation,
+        GenericCursor,
+        GetMoreProvider,
+        GetMoreProviderResult,
+        PinnedConnection,
+    },
+    BatchValue,
+    CursorStream,
+};
 use crate::{
     bson::Document,
     change_stream::event::ResumeToken,

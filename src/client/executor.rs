@@ -268,11 +268,7 @@ impl Client {
                 .await?;
             let pinned = self.pin_connection_for_session(&mut details.output, session)?;
             let resume_token = ResumeToken::initial(&options, &details.output.operation_output);
-            let cursor = SessionCursor::new(
-                self.clone(),
-                details.output.operation_output,
-                pinned,
-            );
+            let cursor = SessionCursor::new(self.clone(), details.output.operation_output, pinned);
 
             Ok(SessionChangeStream::new(
                 cursor,

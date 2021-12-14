@@ -9,9 +9,15 @@ use futures_core::Stream;
 use futures_util::StreamExt;
 use serde::de::DeserializeOwned;
 
-use crate::{error::Result, ClientSession, SessionCursor, SessionCursorStream, cursor::{CursorStream, BatchValue, NextInBatchFuture}};
+use crate::{
+    cursor::{BatchValue, CursorStream, NextInBatchFuture},
+    error::Result,
+    ClientSession,
+    SessionCursor,
+    SessionCursorStream,
+};
 
-use super::{event::ResumeToken, ChangeStreamData, stream_poll_next, get_resume_token};
+use super::{event::ResumeToken, get_resume_token, stream_poll_next, ChangeStreamData};
 
 /// A [`SessionChangeStream`] is a change stream that was created with a [`ClientSession`] that must
 /// be iterated using one. To iterate, use [`SessionChangeStream::next`] or retrieve a
@@ -53,8 +59,16 @@ impl<T> SessionChangeStream<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
-    pub(crate) fn new(cursor: SessionCursor<T>, data: ChangeStreamData, resume_token: Option<ResumeToken>) -> Self {
-        Self { cursor, data, resume_token }
+    pub(crate) fn new(
+        cursor: SessionCursor<T>,
+        data: ChangeStreamData,
+        resume_token: Option<ResumeToken>,
+    ) -> Self {
+        Self {
+            cursor,
+            data,
+            resume_token,
+        }
     }
 
     /// Returns the cached resume token that can be used to resume after the most recently returned
@@ -158,12 +172,12 @@ where
     }
 
     /// Retrieve the next result from the change stream, if any.
-    /// 
+    ///
     /// Where calling `next` will internally loop until a change document is received,
-    /// this will make at most one request and return `None` if the returned document batch is empty.  This method
-    /// should be used when storing the resume token in order to ensure the most up to date token is
-    /// received, e.g.
-    /// 
+    /// this will make at most one request and return `None` if the returned document batch is
+    /// empty.  This method should be used when storing the resume token in order to ensure the
+    /// most up to date token is received, e.g.
+    ///
     /// ```ignore
     /// # use mongodb::{Client, error::Result};
     /// # async fn func() -> Result<()> {
@@ -211,9 +225,7 @@ where
 
     pub async fn next_if_any<'a>(&'a mut self) -> Result<Option<T>> {
         Ok(match NextInBatchFuture::new(self).await? {
-            BatchValue::Some { doc, .. } => {
-                Some(bson::from_slice(doc.as_bytes())?)
-            },
+            BatchValue::Some { doc, .. } => Some(bson::from_slice(doc.as_bytes())?),
             BatchValue::Empty | BatchValue::Exhausted => None,
         })
     }

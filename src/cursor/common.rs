@@ -118,10 +118,7 @@ pub(crate) trait CursorStream {
 }
 
 pub(crate) enum BatchValue {
-    Some {
-        doc: RawDocumentBuf,
-        is_last: bool,
-    },
+    Some { doc: RawDocumentBuf, is_last: bool },
     Empty,
     Exhausted,
 }
@@ -171,14 +168,15 @@ where
             }
             None if !self.exhausted && !self.pinned_connection.is_invalid() => {
                 self.start_get_more();
-                return Poll::Ready(Ok(BatchValue::Empty))
+                return Poll::Ready(Ok(BatchValue::Empty));
             }
             None => return Poll::Ready(Ok(BatchValue::Exhausted)),
         }
     }
 }
 
-// To avoid a private trait (`CursorStream`) in a public interface (`impl Stream`), this is provided as a free function rather than a blanket impl.
+// To avoid a private trait (`CursorStream`) in a public interface (`impl Stream`), this is provided
+// as a free function rather than a blanket impl.
 pub(crate) fn stream_poll_next<S, V>(this: &mut S, cx: &mut Context<'_>) -> Poll<Option<Result<V>>>
 where
     S: CursorStream,
@@ -187,15 +185,13 @@ where
     loop {
         match this.poll_next_in_batch(cx) {
             Poll::Pending => return Poll::Pending,
-            Poll::Ready(bv) => {
-                match bv? {
-                    BatchValue::Some { doc, .. } => {
-                        return Poll::Ready(Some(Ok(bson::from_slice(doc.as_bytes())?)))
-                    },
-                    BatchValue::Empty => continue,
-                    BatchValue::Exhausted => return Poll::Ready(None),
+            Poll::Ready(bv) => match bv? {
+                BatchValue::Some { doc, .. } => {
+                    return Poll::Ready(Some(Ok(bson::from_slice(doc.as_bytes())?)))
                 }
-            }
+                BatchValue::Empty => continue,
+                BatchValue::Exhausted => return Poll::Ready(None),
+            },
         }
     }
 }
@@ -203,12 +199,17 @@ where
 pub(crate) struct NextInBatchFuture<'a, T>(&'a mut T);
 
 impl<'a, T> NextInBatchFuture<'a, T>
-where T: CursorStream {
-    pub(crate) fn new(stream: &'a mut T) -> Self { Self(stream) }
+where
+    T: CursorStream,
+{
+    pub(crate) fn new(stream: &'a mut T) -> Self {
+        Self(stream)
+    }
 }
 
 impl<'a, T> Future for NextInBatchFuture<'a, T>
-where T: CursorStream
+where
+    T: CursorStream,
 {
     type Output = Result<BatchValue>;
 

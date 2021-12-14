@@ -19,7 +19,7 @@ use crate::{
         event::{ChangeStreamEvent, ResumeToken},
         options::ChangeStreamOptions,
     },
-    cursor::{BatchValue, stream_poll_next, CursorStream, NextInBatchFuture},
+    cursor::{stream_poll_next, BatchValue, CursorStream, NextInBatchFuture},
     error::Result,
     operation::AggregateTarget,
     options::AggregateOptions,
@@ -94,8 +94,16 @@ impl<T> ChangeStream<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
-    pub(crate) fn new(cursor: Cursor<T>, data: ChangeStreamData, resume_token: Option<ResumeToken>) -> Self {
-        Self { cursor, data, resume_token }
+    pub(crate) fn new(
+        cursor: Cursor<T>,
+        data: ChangeStreamData,
+        resume_token: Option<ResumeToken>,
+    ) -> Self {
+        Self {
+            cursor,
+            data,
+            resume_token,
+        }
     }
 
     /// Returns the cached resume token that can be used to resume after the most recently returned
@@ -118,12 +126,12 @@ where
     }
 
     /// Retrieve the next result from the change stream, if any.
-    /// 
+    ///
     /// Where calling `Stream::next` will internally loop until a change document is received,
-    /// this will make at most one request and return `None` if the returned document batch is empty.  This method
-    /// should be used when storing the resume token in order to ensure the most up to date token is
-    /// received, e.g.
-    /// 
+    /// this will make at most one request and return `None` if the returned document batch is
+    /// empty.  This method should be used when storing the resume token in order to ensure the
+    /// most up to date token is received, e.g.
+    ///
     /// ```ignore
     /// # use mongodb::{Client, error::Result};
     /// # async fn func() -> Result<()> {
@@ -143,9 +151,7 @@ where
     /// ```
     pub async fn next_if_any<'a>(&'a mut self) -> Result<Option<T>> {
         Ok(match NextInBatchFuture::new(self).await? {
-            BatchValue::Some { doc, .. } => {
-                Some(bson::from_slice(doc.as_bytes())?)
-            },
+            BatchValue::Some { doc, .. } => Some(bson::from_slice(doc.as_bytes())?),
             BatchValue::Empty | BatchValue::Exhausted => None,
         })
     }
@@ -194,7 +200,10 @@ impl ChangeStreamData {
     }
 }
 
-fn get_resume_token(batch_value: &BatchValue, batch_token: Option<&ResumeToken>) -> Result<Option<ResumeToken>> {
+fn get_resume_token(
+    batch_value: &BatchValue,
+    batch_token: Option<&ResumeToken>,
+) -> Result<Option<ResumeToken>> {
     Ok(match batch_value {
         BatchValue::Some { doc, is_last } => {
             if *is_last && batch_token.is_some() {
@@ -223,7 +232,7 @@ where
             _ => {}
         }
         out
-    }  
+    }
 }
 
 impl<T> Stream for ChangeStream<T>
