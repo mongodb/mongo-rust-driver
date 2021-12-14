@@ -160,17 +160,15 @@ where
         }
 
         match self.buffer.pop_front() {
-            Some(doc) => {
-                return Poll::Ready(Ok(BatchValue::Some {
-                    doc,
-                    is_last: self.buffer.is_empty(),
-                }));
-            }
+            Some(doc) => Poll::Ready(Ok(BatchValue::Some {
+                doc,
+                is_last: self.buffer.is_empty(),
+            })),
             None if !self.exhausted && !self.pinned_connection.is_invalid() => {
                 self.start_get_more();
-                return Poll::Ready(Ok(BatchValue::Empty));
+                Poll::Ready(Ok(BatchValue::Empty))
             }
-            None => return Poll::Ready(Ok(BatchValue::Exhausted)),
+            None => Poll::Ready(Ok(BatchValue::Exhausted)),
         }
     }
 }

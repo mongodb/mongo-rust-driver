@@ -149,7 +149,7 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn next_if_any<'a>(&'a mut self) -> Result<Option<T>> {
+    pub async fn next_if_any(&mut self) -> Result<Option<T>> {
         Ok(match NextInBatchFuture::new(self).await? {
             BatchValue::Some { doc, .. } => Some(bson::from_slice(doc.as_bytes())?),
             BatchValue::Empty | BatchValue::Exhausted => None,
@@ -223,13 +223,10 @@ where
 {
     fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
         let out = self.cursor.poll_next_in_batch(cx);
-        match &out {
-            Poll::Ready(Ok(bv)) => {
-                if let Some(token) = get_resume_token(bv, self.cursor.post_batch_resume_token())? {
-                    self.resume_token = Some(token);
-                }
+        if let Poll::Ready(Ok(bv)) = &out {
+            if let Some(token) = get_resume_token(bv, self.cursor.post_batch_resume_token())? {
+                self.resume_token = Some(token);
             }
-            _ => {}
         }
         out
     }
