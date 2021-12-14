@@ -9,7 +9,7 @@ use futures_core::Stream;
 use futures_util::StreamExt;
 use serde::de::DeserializeOwned;
 
-use crate::{error::Result, ClientSession, SessionCursor, SessionCursorStream, cursor::{CursorStream, BatchValue}};
+use crate::{error::Result, ClientSession, SessionCursor, SessionCursorStream, cursor::{CursorStream, BatchValue, NextInBatchFuture}};
 
 use super::{event::ResumeToken, ChangeStreamData, stream_poll_next, get_resume_token};
 
@@ -156,6 +156,10 @@ where
     pub async fn next(&mut self, session: &mut ClientSession) -> Option<Result<T>> {
         self.values(session).next().await
     }
+
+    pub async fn next_in_batch<'a>(&'a mut self, session: &mut ClientSession) -> Result<Option<T>> {
+        self.values(session).next_in_batch().await
+    }
 }
 
 /// A type that implements [`Stream`](https://docs.rs/futures/latest/futures/stream/index.html) which can be used to
@@ -178,6 +182,15 @@ where
 {
     pub fn resume_token(&self) -> Option<&ResumeToken> {
         self.resume_token.as_ref()
+    }
+
+    pub async fn next_in_batch<'a>(&'a mut self) -> Result<Option<T>> {
+        Ok(match NextInBatchFuture::new(self).await? {
+            BatchValue::Some { doc, .. } => {
+                Some(bson::from_slice(doc.as_bytes())?)
+            },
+            BatchValue::Empty | BatchValue::Exhausted => None,
+        })
     }
 }
 
