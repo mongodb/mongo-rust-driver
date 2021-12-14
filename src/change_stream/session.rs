@@ -6,11 +6,12 @@ use std::{
 
 use bson::Document;
 use futures_core::Stream;
+use futures_util::StreamExt;
 use serde::de::DeserializeOwned;
 
-use crate::{error::Result, ClientSession, SessionCursor, SessionCursorStream};
+use crate::{error::Result, ClientSession, SessionCursor, SessionCursorStream, cursor::{CursorStream, BatchValue}};
 
-use super::{event::ResumeToken, ChangeStreamData};
+use super::{event::ResumeToken, ChangeStreamData, stream_poll_next, get_resume_token};
 
 /// A [`SessionChangeStream`] is a change stream that was created with a [`ClientSession`] that must
 /// be iterated using one. To iterate, use [`SessionChangeStream::next`] or retrieve a
@@ -122,7 +123,10 @@ where
         &mut self,
         session: &'session mut ClientSession,
     ) -> SessionChangeStreamValues<'_, 'session, T> {
-        todo!()
+        SessionChangeStreamValues {
+            stream: self.cursor.stream(session),
+            resume_token: &mut self.resume_token,
+        }
     }
 
     /// Retrieve the next result from the change stream.
@@ -150,7 +154,7 @@ where
     /// # }
     /// ```
     pub async fn next(&mut self, session: &mut ClientSession) -> Option<Result<T>> {
-        todo!()
+        self.values(session).next().await
     }
 }
 
@@ -165,6 +169,34 @@ where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
     stream: SessionCursorStream<'cursor, 'session, T>,
+    resume_token: &'cursor mut Option<ResumeToken>,
+}
+
+impl<'cursor, 'session, T> SessionChangeStreamValues<'cursor, 'session, T>
+where
+    T: DeserializeOwned + Unpin + Send + Sync,
+{
+    pub fn resume_token(&self) -> Option<&ResumeToken> {
+        self.resume_token.as_ref()
+    }
+}
+
+impl<'cursor, 'session, T> CursorStream for SessionChangeStreamValues<'cursor, 'session, T>
+where
+    T: DeserializeOwned + Unpin + Send + Sync,
+{
+    fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
+        let out = self.stream.poll_next_in_batch(cx);
+        match &out {
+            Poll::Ready(Ok(bv)) => {
+                if let Some(token) = get_resume_token(bv, self.stream.post_batch_resume_token())? {
+                    *self.resume_token = Some(token);
+                }
+            }
+            _ => {}
+        }
+        out
+    }
 }
 
 impl<'cursor, 'session, T> Stream for SessionChangeStreamValues<'cursor, 'session, T>
@@ -174,6 +206,6 @@ where
     type Item = Result<T>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        todo!()
+        stream_poll_next(Pin::into_inner(self), cx)
     }
 }

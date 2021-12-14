@@ -171,7 +171,7 @@ impl ChangeStreamData {
     }
 }
 
-fn resume_token(batch_value: &BatchValue, batch_token: Option<&ResumeToken>) -> Result<Option<ResumeToken>> {
+fn get_resume_token(batch_value: &BatchValue, batch_token: Option<&ResumeToken>) -> Result<Option<ResumeToken>> {
     Ok(match batch_value {
         BatchValue::Some { doc, is_last } => {
             if *is_last && batch_token.is_some() {
@@ -193,7 +193,7 @@ where
         let out = self.cursor.poll_next_in_batch(cx);
         match &out {
             Poll::Ready(Ok(bv)) => {
-                if let Some(token) = resume_token(bv, self.cursor.post_batch_resume_token())? {
+                if let Some(token) = get_resume_token(bv, self.cursor.post_batch_resume_token())? {
                     self.resume_token = Some(token);
                 }
             }

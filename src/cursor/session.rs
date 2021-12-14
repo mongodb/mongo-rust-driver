@@ -12,14 +12,14 @@ use serde::de::DeserializeOwned;
 #[cfg(test)]
 use tokio::sync::oneshot;
 
-use super::common::{
+use super::{common::{
     kill_cursor,
     CursorInformation,
     GenericCursor,
     GetMoreProvider,
     GetMoreProviderResult,
     PinnedConnection,
-};
+}, CursorStream, BatchValue};
 use crate::{
     bson::Document,
     change_stream::event::ResumeToken,
@@ -270,6 +270,15 @@ where
     generic_cursor: ExplicitSessionCursor<'session, T>,
 }
 
+impl<'cursor, 'session, T> SessionCursorStream<'cursor, 'session, T>
+where
+    T: DeserializeOwned + Unpin + Send + Sync,
+{
+    pub(crate) fn post_batch_resume_token(&self) -> Option<&ResumeToken> {
+        self.generic_cursor.post_batch_resume_token()
+    }
+}
+
 impl<'cursor, 'session, T> Stream for SessionCursorStream<'cursor, 'session, T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
@@ -278,6 +287,15 @@ where
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         Pin::new(&mut self.generic_cursor).poll_next(cx)
+    }
+}
+
+impl<'cursor, 'session, T> CursorStream for SessionCursorStream<'cursor, 'session, T>
+where
+    T: DeserializeOwned + Unpin + Send + Sync,
+{
+    fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
+        self.generic_cursor.poll_next_in_batch(cx)
     }
 }
 
