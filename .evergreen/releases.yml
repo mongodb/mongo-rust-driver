@@ -6,6 +6,30 @@ functions:
       type: system
       params:
         directory: "src"
+    # Make an evergreen exapanstion file with dynamic values
+    - command: shell.exec
+      params:
+        working_dir: "src"
+        script: |
+           export PROJECT_DIRECTORY="$(pwd)"
+
+           cat <<EOT > expansion.yml
+           PROJECT_DIRECTORY: "$PROJECT_DIRECTORY"
+           PREPARE_SHELL: |
+              set -o errexit
+              set -o xtrace
+              export PROJECT_DIRECTORY="$PROJECT_DIRECTORY"
+
+              export PROJECT="${project}"
+
+           EOT
+           # See what we've done
+           cat expansion.yml
+
+    # Load the expansion file to make an evergreen variable with the current unique version
+    - command: expansions.update
+      params:
+        file: src/expansion.yml
 
   "install dependencies":
     command: shell.exec
