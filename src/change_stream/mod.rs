@@ -171,34 +171,35 @@ impl ChangeStreamData {
     }
 }
 
+fn resume_token(batch_value: &BatchValue, batch_token: Option<&ResumeToken>) -> Result<Option<ResumeToken>> {
+    Ok(match batch_value {
+        BatchValue::Some { doc, is_last } => {
+            if *is_last && batch_token.is_some() {
+                batch_token.cloned()
+            } else {
+                doc.get("_id")?.map(|val| ResumeToken(val.to_raw_bson()))
+            }
+        }
+        BatchValue::Empty => batch_token.cloned(),
+        _ => None,
+    })
+}
+
 impl<T> CursorStream for ChangeStream<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
     fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
-        match self.cursor.poll_next_in_batch(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(bv) => {
-                let bv = bv?;
-                match &bv {
-                    BatchValue::Some { doc, is_last } => {
-                        let batch_token = self.cursor.post_batch_resume_token();
-                        self.resume_token = if *is_last && batch_token.is_some() {
-                            batch_token.cloned()
-                        } else {
-                            doc.get("_id")?.map(|val| ResumeToken(val.to_raw_bson()))
-                        };
-                    }
-                    BatchValue::Empty => {
-                        if let Some(token) = self.cursor.post_batch_resume_token() {
-                            self.resume_token = Some(token.clone());
-                        }
-                    }
-                    BatchValue::Exhausted => {},
+        let out = self.cursor.poll_next_in_batch(cx);
+        match &out {
+            Poll::Ready(Ok(bv)) => {
+                if let Some(token) = resume_token(bv, self.cursor.post_batch_resume_token())? {
+                    self.resume_token = Some(token);
                 }
-                Poll::Ready(Ok(bv))
             }
+            _ => {}
         }
+        out
     }  
 }
 
