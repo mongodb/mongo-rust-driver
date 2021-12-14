@@ -3,7 +3,7 @@ use std::{convert::TryInto, path::PathBuf};
 use anyhow::{bail, Result};
 use futures::stream::StreamExt;
 use mongodb::{
-    bson::{Bson, Document},
+    bson::{Bson, Document, RawDocumentBuf},
     Client,
     Collection,
     Database,
@@ -17,8 +17,9 @@ use crate::{
 
 pub struct FindManyBenchmark {
     db: Database,
-    coll: Collection<Document>,
+    coll: Collection<RawDocumentBuf>,
     uri: String,
+    raw: bool,
 }
 
 // Specifies the options to `FindManyBenchmark::setup` operation.
@@ -26,6 +27,7 @@ pub struct Options {
     pub num_iter: usize,
     pub path: PathBuf,
     pub uri: String,
+    pub raw: bool,
 }
 
 #[async_trait::async_trait]
@@ -53,15 +55,24 @@ impl Benchmark for FindManyBenchmark {
 
         Ok(FindManyBenchmark {
             db,
-            coll,
+            coll: coll.clone_with_type(),
             uri: options.uri,
+            raw: options.raw,
         })
     }
 
     async fn do_task(&self) -> Result<()> {
         let mut cursor = self.coll.find(None, None).await?;
-        while let Some(doc) = cursor.next().await {
-            doc?;
+
+        if self.raw {
+            while let Some(doc) = cursor.next().await {
+                doc?;
+            }
+        } else {
+            let mut cursor = cursor.with_type::<Document>();
+            while let Some(doc) = cursor.next().await {
+                doc?;
+            }
         }
 
         Ok(())
