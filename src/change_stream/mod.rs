@@ -125,7 +125,12 @@ where
         }
     }
 
-    /// Retrieve the next result from the change stream, if any.
+    /// Returns whether the change stream will continue to receive events.
+    pub fn is_alive(&self) -> bool {
+        !self.cursor.is_exhausted()
+    }
+
+    /// Retrieves the next result from the change stream, if any.
     ///
     /// Where calling `Stream::next` will internally loop until a change document is received,
     /// this will make at most one request and return `None` if the returned document batch is
@@ -139,7 +144,7 @@ where
     /// # let coll = client.database("foo").collection("bar");
     /// let mut change_stream = coll.watch(None, None).await?;
     /// let mut resume_token = None;
-    /// loop {
+    /// while change_stream.is_alive() {
     ///     if let Some(event) = change_stream.next_if_any() {
     ///         // process event
     ///     }

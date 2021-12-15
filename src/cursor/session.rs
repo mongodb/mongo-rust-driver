@@ -231,7 +231,7 @@ where
         self.info.id = 0;
     }
 
-    fn is_exhausted(&self) -> bool {
+    pub(crate) fn is_exhausted(&self) -> bool {
         self.info.id == 0
     }
 }
@@ -280,6 +280,10 @@ where
 {
     pub(crate) fn post_batch_resume_token(&self) -> Option<&ResumeToken> {
         self.generic_cursor.post_batch_resume_token()
+    }
+
+    pub(crate) fn is_exhausted(&self) -> bool {
+        self.generic_cursor.is_exhausted()
     }
 }
 

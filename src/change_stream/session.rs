@@ -171,6 +171,11 @@ where
         self.values(session).next().await
     }
 
+    /// Returns whether the change stream will continue to receive events.
+    pub fn is_alive(&self) -> bool {
+        !self.cursor.is_exhausted()
+    }
+
     /// Retrieve the next result from the change stream, if any.
     ///
     /// Where calling `next` will internally loop until a change document is received,
@@ -186,7 +191,7 @@ where
     /// # let mut session = client.start_session(None).await?;
     /// let mut change_stream = coll.watch_with_session(None, None, &mut session).await?;
     /// let mut resume_token = None;
-    /// loop {
+    /// while change_stream.is_alive() {
     ///     if let Some(event) = change_stream.next_if_any(&mut session) {
     ///         // process event
     ///     }
@@ -221,6 +226,10 @@ where
 {
     pub fn resume_token(&self) -> Option<&ResumeToken> {
         self.resume_token.as_ref()
+    }
+
+    pub fn is_alive(&self) -> bool {
+        !self.stream.is_exhausted()
     }
 
     pub async fn next_if_any<'a>(&'a mut self) -> Result<Option<T>> {

@@ -134,6 +134,10 @@ where
             .and_then(|c| c.post_batch_resume_token())
     }
 
+    pub(crate) fn is_exhausted(&self) -> bool {
+        self.wrapped_cursor.as_ref().unwrap().is_exhausted()
+    }
+
     /// Update the type streamed values will be parsed as.
     pub fn with_type<D>(mut self) -> Cursor<D>
     where
