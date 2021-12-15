@@ -315,6 +315,26 @@ impl Error {
     pub(crate) fn is_pool_cleared(&self) -> bool {
         matches!(self.kind.as_ref(), ErrorKind::ConnectionPoolCleared { .. })
     }
+
+    /// If this error is resumable as per the change streams spec.
+    pub(crate) fn is_resumable(&self, wire_version: Option<i32>) -> bool {
+        if !self.is_server_error() {
+            return true;
+        }
+        let code = self.code();
+        if code == Some(43) {
+            return true;
+        }
+        if wire_version.unwrap_or(0) > 9 && self.contains_label("ResumableChangeStreamError") {
+            return true;
+        }
+        if let (Some(code), true) = (code, wire_version.unwrap_or(10) < 9) {
+            if [6, 7, 89, 91, 189, 262, 9001, 10107, 11600, 11602, 13435, 13436, 63, 150, 13388, 234, 133].iter().any(|c| *c == code) {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 impl<E> From<E> for Error

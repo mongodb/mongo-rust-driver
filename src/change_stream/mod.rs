@@ -20,7 +20,7 @@ use crate::{
         options::ChangeStreamOptions,
     },
     cursor::{stream_poll_next, BatchValue, CursorStream, NextInBatchFuture},
-    error::Result,
+    error::{Error, Result},
     operation::AggregateTarget,
     options::AggregateOptions,
     selection_criteria::{ReadPreference, SelectionCriteria},
