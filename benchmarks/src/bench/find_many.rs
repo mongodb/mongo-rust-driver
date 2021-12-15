@@ -14,7 +14,7 @@ use serde_json::Value;
 use crate::{
     bench::{drop_database, Benchmark, COLL_NAME, DATABASE_NAME},
     fs::read_to_string,
-    models::tweet::{Tweet, TweetRef},
+    models::tweet::Tweet,
 };
 
 pub struct FindManyBenchmark {
@@ -36,7 +36,6 @@ pub enum Mode {
     Document,
     RawBson,
     Serde,
-    SerdeBorrowed,
 }
 
 #[async_trait::async_trait]
@@ -91,13 +90,6 @@ impl Benchmark for FindManyBenchmark {
             }
             Mode::Serde => {
                 execute::<Tweet>(self).await?;
-            }
-            Mode::SerdeBorrowed => {
-                let mut cursor = self.coll.find(None, None).await?;
-                while let Some(doc) = cursor.next().await {
-                    let doc = doc?;
-                    let _t: TweetRef = mongodb::bson::from_slice(doc.as_bytes())?;
-                }
             }
         }
 

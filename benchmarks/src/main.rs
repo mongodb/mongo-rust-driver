@@ -81,8 +81,6 @@ const FIND_ONE_BENCH: &'static str = "Find one";
 const FIND_MANY_BENCH: &'static str = "Find many and empty cursor";
 const FIND_MANY_BENCH_RAW: &'static str = "Find many and empty cursor (raw BSON)";
 const FIND_MANY_BENCH_SERDE: &'static str = "Find many and empty cursor (serde structs)";
-const FIND_MANY_BENCH_SERDE_BORROWED: &'static str =
-    "Find many and empty cursor (serde structs with borrowed fields)";
 const GRIDFS_DOWNLOAD_BENCH: &'static str = "GridFS download";
 const LDJSON_MULTI_EXPORT_BENCH: &'static str = "LDJSON multi-file export";
 const GRIDFS_MULTI_DOWNLOAD_BENCH: &'static str = "GridFS multi-file download";
@@ -114,7 +112,6 @@ enum BenchmarkId {
     BsonFullDocumentEncode,
     FindManyRawBson,
     FindManySerde,
-    FindManySerdeBorrowed,
 }
 
 impl BenchmarkId {
@@ -137,7 +134,6 @@ impl BenchmarkId {
             BenchmarkId::BsonFullDocumentEncode => FULL_BSON_ENCODING,
             BenchmarkId::FindManyRawBson => FIND_MANY_BENCH_RAW,
             BenchmarkId::FindManySerde => FIND_MANY_BENCH_SERDE,
-            BenchmarkId::FindManySerdeBorrowed => FIND_MANY_BENCH_SERDE_BORROWED,
         }
     }
 }
@@ -197,7 +193,7 @@ const WRITE_BENCHES: &[&'static str] = &[
     GRIDFS_MULTI_UPLOAD_BENCH,
 ];
 
-const MAX_ID: usize = 18;
+const MAX_ID: usize = 17;
 
 async fn run_benchmarks(
     uri: &str,
@@ -440,15 +436,11 @@ async fn run_benchmarks(
             }
 
             // Find many and empty the cursor
-            BenchmarkId::FindManyRawBson
-            | BenchmarkId::FindMany
-            | BenchmarkId::FindManySerde
-            | BenchmarkId::FindManySerdeBorrowed => {
+            BenchmarkId::FindManyRawBson | BenchmarkId::FindMany | BenchmarkId::FindManySerde => {
                 let mode = match id {
                     BenchmarkId::FindMany => bench::find_many::Mode::Document,
                     BenchmarkId::FindManyRawBson => bench::find_many::Mode::RawBson,
                     BenchmarkId::FindManySerde => bench::find_many::Mode::Serde,
-                    BenchmarkId::FindManySerdeBorrowed => bench::find_many::Mode::SerdeBorrowed,
                     _ => unreachable!(),
                 };
                 let find_many_options = bench::find_many::Options {
