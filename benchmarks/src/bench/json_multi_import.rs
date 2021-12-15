@@ -7,7 +7,7 @@ use mongodb::{options::InsertManyOptions, Client, Collection, Database};
 use crate::{
     bench::{Benchmark, COLL_NAME, DATABASE_NAME},
     fs::{BufReader, File},
-    models::json_multi::Tweet,
+    models::tweet::Tweet,
 };
 
 use super::drop_database;

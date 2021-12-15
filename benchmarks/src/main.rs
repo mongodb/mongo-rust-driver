@@ -78,9 +78,11 @@ const FULL_BSON_ENCODING: &'static str = "Full BSON Encoding";
 const FULL_BSON_DECODING: &'static str = "Full BSON Decoding";
 const RUN_COMMAND_BENCH: &'static str = "Run Command";
 const FIND_ONE_BENCH: &'static str = "Find one";
-const FIND_ONE_BENCH_RAW: &'static str = "Find one (raw BSON)";
 const FIND_MANY_BENCH: &'static str = "Find many and empty cursor";
 const FIND_MANY_BENCH_RAW: &'static str = "Find many and empty cursor (raw BSON)";
+const FIND_MANY_BENCH_SERDE: &'static str = "Find many and empty cursor (serde structs)";
+const FIND_MANY_BENCH_SERDE_BORROWED: &'static str =
+    "Find many and empty cursor (serde structs with borrowed fields)";
 const GRIDFS_DOWNLOAD_BENCH: &'static str = "GridFS download";
 const LDJSON_MULTI_EXPORT_BENCH: &'static str = "LDJSON multi-file export";
 const GRIDFS_MULTI_DOWNLOAD_BENCH: &'static str = "GridFS multi-file download";
@@ -92,7 +94,7 @@ const GRIDFS_UPLOAD_BENCH: &'static str = "GridFS upload";
 const LDJSON_MULTI_IMPORT_BENCH: &'static str = "LDJSON multi-file import";
 const GRIDFS_MULTI_UPLOAD_BENCH: &'static str = "GridFS multi-file upload";
 
-#[derive(num_enum::TryFromPrimitive, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, num_enum::TryFromPrimitive, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(u8)]
 enum BenchmarkId {
     RunCommand = 1,
@@ -110,8 +112,34 @@ enum BenchmarkId {
     BsonDeepDocumentEncode,
     BsonFullDocumentDecode,
     BsonFullDocumentEncode,
-    FindOneByIdRaw,
-    FindManyRaw,
+    FindManyRawBson,
+    FindManySerde,
+    FindManySerdeBorrowed,
+}
+
+impl BenchmarkId {
+    fn name(self) -> &'static str {
+        match self {
+            BenchmarkId::RunCommand => RUN_COMMAND_BENCH,
+            BenchmarkId::FindOneById => FIND_ONE_BENCH,
+            BenchmarkId::SmallDocInsertOne => SMALL_DOC_INSERT_ONE_BENCH,
+            BenchmarkId::LargeDocInsertOne => LARGE_DOC_INSERT_ONE_BENCH,
+            BenchmarkId::FindMany => FIND_MANY_BENCH,
+            BenchmarkId::SmallDocBulkInsert => SMALL_DOC_BULK_INSERT_BENCH,
+            BenchmarkId::LargeDocBulkInsert => LARGE_DOC_BULK_INSERT_BENCH,
+            BenchmarkId::LdJsonMultiFileImport => LDJSON_MULTI_IMPORT_BENCH,
+            BenchmarkId::LdJsonMultiFileExport => LDJSON_MULTI_EXPORT_BENCH,
+            BenchmarkId::BsonFlatDocumentDecode => FLAT_BSON_DECODING,
+            BenchmarkId::BsonFlatDocumentEncode => FLAT_BSON_ENCODING,
+            BenchmarkId::BsonDeepDocumentDecode => DEEP_BSON_DECODING,
+            BenchmarkId::BsonDeepDocumentEncode => DEEP_BSON_ENCODING,
+            BenchmarkId::BsonFullDocumentDecode => FULL_BSON_DECODING,
+            BenchmarkId::BsonFullDocumentEncode => FULL_BSON_ENCODING,
+            BenchmarkId::FindManyRawBson => FIND_MANY_BENCH_RAW,
+            BenchmarkId::FindManySerde => FIND_MANY_BENCH_SERDE,
+            BenchmarkId::FindManySerdeBorrowed => FIND_MANY_BENCH_SERDE_BORROWED,
+        }
+    }
 }
 
 /// Benchmarks included in the "BSONBench" composite.
@@ -127,7 +155,7 @@ const BSON_BENCHES: &[&'static str] = &[
 /// Benchmarkes included in the "SingleBench" composite.
 /// This consists of all the single-doc benchmarks except Run Command.
 const SINGLE_BENCHES: &[&'static str] = &[
-    FIND_ONE_BENCH_RAW,
+    FIND_MANY_BENCH_RAW,
     SMALL_DOC_INSERT_ONE_BENCH,
     LARGE_DOC_INSERT_ONE_BENCH,
 ];
@@ -151,7 +179,7 @@ const PARALLEL_BENCHES: &[&'static str] = &[
 
 /// Benchmarks included in the "ReadBench" composite.
 const READ_BENCHES: &[&'static str] = &[
-    FIND_ONE_BENCH_RAW,
+    FIND_MANY_BENCH_RAW,
     FIND_MANY_BENCH_RAW,
     GRIDFS_DOWNLOAD_BENCH,
     LDJSON_MULTI_EXPORT_BENCH,
@@ -169,18 +197,22 @@ const WRITE_BENCHES: &[&'static str] = &[
     GRIDFS_MULTI_UPLOAD_BENCH,
 ];
 
-const MAX_ID: usize = 17;
+const MAX_ID: usize = 18;
 
 async fn run_benchmarks(
     uri: &str,
     more_info: bool,
-    ids: &HashSet<BenchmarkId>,
+    ids: HashSet<BenchmarkId>,
 ) -> Result<CompositeScore> {
     let options = ClientOptions::parse(uri).await?;
 
     let mut comp_score = CompositeScore::new("All Benchmarks");
+    let mut sorted_ids: Vec<BenchmarkId> = ids.into_iter().collect();
+    sorted_ids.sort();
 
-    for id in ids {
+    for id in sorted_ids {
+        println!("Running {}...", id.name());
+
         match id {
             // Run command
             BenchmarkId::RunCommand => {
@@ -188,27 +220,10 @@ async fn run_benchmarks(
                     num_iter: 10000,
                     uri: uri.to_string(),
                 };
-                println!("Running {}...", RUN_COMMAND_BENCH);
                 let run_command =
                     bench::run_benchmark::<RunCommandBenchmark>(run_command_options).await?;
 
                 comp_score += score_test(run_command, RUN_COMMAND_BENCH, 0.16, more_info);
-            }
-
-            // Find one by ID
-            BenchmarkId::FindOneById => {
-                let find_one_options = bench::find_one::Options {
-                    num_iter: 10000,
-                    path: DATA_PATH
-                        .join("single_and_multi_document")
-                        .join("tweet.json"),
-                    uri: uri.to_string(),
-                    raw: false,
-                };
-                println!("Running {}...", FIND_ONE_BENCH);
-                let find_one = bench::run_benchmark::<FindOneBenchmark>(find_one_options).await?;
-
-                comp_score += score_test(find_one, FIND_ONE_BENCH, 16.22, more_info);
             }
 
             // Small doc insertOne
@@ -220,7 +235,6 @@ async fn run_benchmarks(
                         .join("small_doc.json"),
                     uri: uri.to_string(),
                 };
-                println!("Running {}...", SMALL_DOC_INSERT_ONE_BENCH);
                 let small_insert_one =
                     bench::run_benchmark::<InsertOneBenchmark>(small_insert_one_options).await?;
 
@@ -241,7 +255,6 @@ async fn run_benchmarks(
                         .join("large_doc.json"),
                     uri: uri.to_string(),
                 };
-                println!("Running {}...", LARGE_DOC_INSERT_ONE_BENCH);
                 let large_insert_one =
                     bench::run_benchmark::<InsertOneBenchmark>(large_insert_one_options).await?;
 
@@ -253,23 +266,6 @@ async fn run_benchmarks(
                 );
             }
 
-            // Find many and empty the cursor
-            BenchmarkId::FindMany => {
-                let find_many_options = bench::find_many::Options {
-                    num_iter: 10000,
-                    path: DATA_PATH
-                        .join("single_and_multi_document")
-                        .join("tweet.json"),
-                    uri: uri.to_string(),
-                    raw: false,
-                };
-                println!("Running {}...", FIND_MANY_BENCH);
-                let find_many =
-                    bench::run_benchmark::<FindManyBenchmark>(find_many_options).await?;
-
-                comp_score += score_test(find_many, FIND_MANY_BENCH, 16.22, more_info);
-            }
-
             // Small doc bulk insert
             BenchmarkId::SmallDocBulkInsert => {
                 let small_insert_many_options = bench::insert_many::Options {
@@ -279,7 +275,6 @@ async fn run_benchmarks(
                         .join("small_doc.json"),
                     uri: uri.to_string(),
                 };
-                println!("Running {}...", SMALL_DOC_BULK_INSERT_BENCH);
                 let small_insert_many =
                     bench::run_benchmark::<InsertManyBenchmark>(small_insert_many_options).await?;
 
@@ -300,7 +295,6 @@ async fn run_benchmarks(
                         .join("large_doc.json"),
                     uri: uri.to_string(),
                 };
-                println!("Running {}...", LARGE_DOC_BULK_INSERT_BENCH);
                 let large_insert_many =
                     bench::run_benchmark::<InsertManyBenchmark>(large_insert_many_options).await?;
 
@@ -323,7 +317,6 @@ async fn run_benchmarks(
                     path: DATA_PATH.join("parallel").join("ldjson_multi"),
                     uri: uri.to_string(),
                 };
-                println!("Running {}...", LDJSON_MULTI_IMPORT_BENCH);
                 let json_multi_import =
                     bench::run_benchmark::<JsonMultiImportBenchmark>(json_multi_import_options)
                         .await?;
@@ -348,7 +341,6 @@ async fn run_benchmarks(
                     path: DATA_PATH.join("parallel").join("ldjson_multi"),
                     uri: uri.to_string(),
                 };
-                println!("Running {}...", LDJSON_MULTI_EXPORT_BENCH);
                 let json_multi_export =
                     bench::run_benchmark::<JsonMultiExportBenchmark>(json_multi_export_options)
                         .await?;
@@ -367,7 +359,6 @@ async fn run_benchmarks(
                     num_iter: 10_000,
                     path: DATA_PATH.join("extended_bson").join("flat_bson.json"),
                 };
-                println!("Running {}...", FLAT_BSON_DECODING);
                 let bson_flat_decode =
                     bench::run_benchmark::<BsonDecodeBenchmark>(bson_flat_decode_options).await?;
 
@@ -380,7 +371,6 @@ async fn run_benchmarks(
                     num_iter: 10_000,
                     path: DATA_PATH.join("extended_bson").join("flat_bson.json"),
                 };
-                println!("Running {}...", FLAT_BSON_ENCODING);
                 let bson_flat_encode =
                     bench::run_benchmark::<BsonEncodeBenchmark>(bson_flat_encode_options).await?;
 
@@ -393,7 +383,6 @@ async fn run_benchmarks(
                     num_iter: 10_000,
                     path: DATA_PATH.join("extended_bson").join("deep_bson.json"),
                 };
-                println!("Running {}...", DEEP_BSON_DECODING);
                 let bson_deep_decode =
                     bench::run_benchmark::<BsonDecodeBenchmark>(bson_deep_decode_options).await?;
 
@@ -406,7 +395,6 @@ async fn run_benchmarks(
                     num_iter: 10_000,
                     path: DATA_PATH.join("extended_bson").join("deep_bson.json"),
                 };
-                println!("Running {}...", DEEP_BSON_ENCODING);
                 let bson_deep_encode =
                     bench::run_benchmark::<BsonEncodeBenchmark>(bson_deep_encode_options).await?;
 
@@ -419,7 +407,6 @@ async fn run_benchmarks(
                     num_iter: 10_000,
                     path: DATA_PATH.join("extended_bson").join("full_bson.json"),
                 };
-                println!("Running {}...", FULL_BSON_DECODING);
                 let bson_full_decode =
                     bench::run_benchmark::<BsonDecodeBenchmark>(bson_full_decode_options).await?;
 
@@ -432,44 +419,50 @@ async fn run_benchmarks(
                     num_iter: 10_000,
                     path: DATA_PATH.join("extended_bson").join("full_bson.json"),
                 };
-                println!("Running {}...", FULL_BSON_ENCODING);
                 let bson_full_encode =
                     bench::run_benchmark::<BsonEncodeBenchmark>(bson_full_encode_options).await?;
 
                 comp_score += score_test(bson_full_encode, FULL_BSON_ENCODING, 57.34, more_info);
             }
 
-            // Find one by ID (raw BSON)
-            BenchmarkId::FindOneByIdRaw => {
+            // Find one by ID
+            BenchmarkId::FindOneById => {
                 let find_one_options = bench::find_one::Options {
                     num_iter: 10000,
                     path: DATA_PATH
                         .join("single_and_multi_document")
                         .join("tweet.json"),
                     uri: uri.to_string(),
-                    raw: true,
                 };
-                println!("Running {}...", FIND_ONE_BENCH_RAW);
                 let find_one = bench::run_benchmark::<FindOneBenchmark>(find_one_options).await?;
 
-                comp_score += score_test(find_one, FIND_ONE_BENCH_RAW, 16.22, more_info);
+                comp_score += score_test(find_one, id.name(), 16.22, more_info);
             }
 
-            // Find many and empty the cursor (raw BSON)
-            BenchmarkId::FindManyRaw => {
+            // Find many and empty the cursor
+            BenchmarkId::FindManyRawBson
+            | BenchmarkId::FindMany
+            | BenchmarkId::FindManySerde
+            | BenchmarkId::FindManySerdeBorrowed => {
+                let mode = match id {
+                    BenchmarkId::FindMany => bench::find_many::Mode::Document,
+                    BenchmarkId::FindManyRawBson => bench::find_many::Mode::RawBson,
+                    BenchmarkId::FindManySerde => bench::find_many::Mode::Serde,
+                    BenchmarkId::FindManySerdeBorrowed => bench::find_many::Mode::SerdeBorrowed,
+                    _ => unreachable!(),
+                };
                 let find_many_options = bench::find_many::Options {
                     num_iter: 10000,
                     path: DATA_PATH
                         .join("single_and_multi_document")
                         .join("tweet.json"),
                     uri: uri.to_string(),
-                    raw: true,
+                    mode,
                 };
-                println!("Running {}...", FIND_MANY_BENCH_RAW);
                 let find_many =
                     bench::run_benchmark::<FindManyBenchmark>(find_many_options).await?;
 
-                comp_score += score_test(find_many, FIND_MANY_BENCH_RAW, 16.22, more_info);
+                comp_score += score_test(find_many, id.name(), 16.22, more_info);
             }
         }
     }
@@ -496,12 +489,12 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
 
     if matches.is_present("single") {
         ids.insert(BenchmarkId::RunCommand);
-        ids.insert(BenchmarkId::FindOneByIdRaw);
+        ids.insert(BenchmarkId::FindOneById);
         ids.insert(BenchmarkId::SmallDocInsertOne);
         ids.insert(BenchmarkId::LargeDocInsertOne);
     }
     if matches.is_present("multi") {
-        ids.insert(BenchmarkId::FindManyRaw);
+        ids.insert(BenchmarkId::FindManyRawBson);
         ids.insert(BenchmarkId::SmallDocBulkInsert);
         ids.insert(BenchmarkId::LargeDocBulkInsert);
     }
@@ -589,8 +582,9 @@ Run benchmarks by id number (comma-separated):
     13: BSON deeply nested document encode
     14: BSON full document decode
     15: BSON full document encode
-    16: Find one by ID (raw BSON)
-    17: Find many and empty the cursor (raw BSON)
+    16: Find many and empty the cursor (raw BSON)
+    17: Find many and empty the cursor (serde structs)
+    18: Find many and empty the cursor (serde structs with references)
     all: All benchmarks
                     ",
                 ),
@@ -619,7 +613,7 @@ Run benchmarks by id number (comma-separated):
     );
 
     let ids = parse_ids(matches);
-    let scores = run_benchmarks(uri, verbose, &ids).await.unwrap();
+    let scores = run_benchmarks(uri, verbose, ids).await.unwrap();
 
     let read_bench = scores.filter("ReadBench", READ_BENCHES);
     let write_bench = scores.filter("WriteBench", WRITE_BENCHES);

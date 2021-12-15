@@ -8,18 +8,20 @@ use mongodb::{
     Collection,
     Database,
 };
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::{
     bench::{drop_database, Benchmark, COLL_NAME, DATABASE_NAME},
     fs::read_to_string,
+    models::tweet::{Tweet, TweetRef},
 };
 
 pub struct FindManyBenchmark {
     db: Database,
     coll: Collection<RawDocumentBuf>,
     uri: String,
-    raw: bool,
+    mode: Mode,
 }
 
 // Specifies the options to `FindManyBenchmark::setup` operation.
@@ -27,7 +29,14 @@ pub struct Options {
     pub num_iter: usize,
     pub path: PathBuf,
     pub uri: String,
-    pub raw: bool,
+    pub mode: Mode,
+}
+
+pub enum Mode {
+    Document,
+    RawBson,
+    Serde,
+    SerdeBorrowed,
 }
 
 #[async_trait::async_trait]
@@ -57,21 +66,38 @@ impl Benchmark for FindManyBenchmark {
             db,
             coll: coll.clone_with_type(),
             uri: options.uri,
-            raw: options.raw,
+            mode: options.mode,
         })
     }
 
     async fn do_task(&self) -> Result<()> {
-        let mut cursor = self.coll.find(None, None).await?;
-
-        if self.raw {
+        async fn execute<T: DeserializeOwned + Unpin + Send + Sync + std::fmt::Debug>(
+            bench: &FindManyBenchmark,
+        ) -> Result<()> {
+            let coll = bench.coll.clone_with_type::<T>();
+            let mut cursor = coll.find(None, None).await?;
             while let Some(doc) = cursor.next().await {
                 doc?;
             }
-        } else {
-            let mut cursor = cursor.with_type::<Document>();
-            while let Some(doc) = cursor.next().await {
-                doc?;
+            Ok(())
+        }
+
+        match self.mode {
+            Mode::Document => {
+                execute::<Document>(self).await?;
+            }
+            Mode::RawBson => {
+                execute::<RawDocumentBuf>(self).await?;
+            }
+            Mode::Serde => {
+                execute::<Tweet>(self).await?;
+            }
+            Mode::SerdeBorrowed => {
+                let mut cursor = self.coll.find(None, None).await?;
+                while let Some(doc) = cursor.next().await {
+                    let doc = doc?;
+                    let _t: TweetRef = mongodb::bson::from_slice(doc.as_bytes())?;
+                }
             }
         }
 

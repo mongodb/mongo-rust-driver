@@ -12,7 +12,7 @@ use mongodb::{
 use crate::{
     bench::{parse_json_file_to_documents, Benchmark, COLL_NAME, DATABASE_NAME},
     fs::File,
-    models::json_multi::Tweet,
+    models::tweet::Tweet,
 };
 
 use super::drop_database;

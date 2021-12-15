@@ -2,7 +2,7 @@ use std::{convert::TryInto, path::PathBuf};
 
 use anyhow::{bail, Result};
 use mongodb::{
-    bson::{doc, Bson, Document, RawDocumentBuf},
+    bson::{doc, Bson, Document},
     Client,
     Collection,
     Database,
@@ -17,17 +17,15 @@ use crate::{
 pub struct FindOneBenchmark {
     db: Database,
     num_iter: usize,
-    coll: Collection<RawDocumentBuf>,
+    coll: Collection<Document>,
     uri: String,
-    raw: bool,
 }
 
-// Specifies the options to a `FindOneBenchmark::setup` operation.
+/// Specifies the options to a `FindOneBenchmark::setup` operation.
 pub struct Options {
     pub num_iter: usize,
     pub path: PathBuf,
     pub uri: String,
-    pub raw: bool,
 }
 
 #[async_trait::async_trait]
@@ -58,24 +56,16 @@ impl Benchmark for FindOneBenchmark {
         Ok(FindOneBenchmark {
             db,
             num_iter,
-            coll: coll.clone_with_type(),
+            coll,
             uri: options.uri,
-            raw: options.raw,
         })
     }
 
     async fn do_task(&self) -> Result<()> {
-        if self.raw {
-            for i in 0..self.num_iter {
-                self.coll
-                    .find_one(Some(doc! { "_id": i as i32 }), None)
-                    .await?;
-            }
-        } else {
-            let coll = self.coll.clone_with_type::<Document>();
-            for i in 0..self.num_iter {
-                coll.find_one(Some(doc! { "_id": i as i32 }), None).await?;
-            }
+        for i in 0..self.num_iter {
+            self.coll
+                .find_one(Some(doc! { "_id": i as i32 }), None)
+                .await?;
         }
 
         Ok(())
