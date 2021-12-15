@@ -12,16 +12,21 @@ use serde::de::DeserializeOwned;
 #[cfg(test)]
 use tokio::sync::oneshot;
 
-use super::common::{
-    kill_cursor,
-    CursorInformation,
-    GenericCursor,
-    GetMoreProvider,
-    GetMoreProviderResult,
-    PinnedConnection,
+use super::{
+    common::{
+        kill_cursor,
+        CursorInformation,
+        GenericCursor,
+        GetMoreProvider,
+        GetMoreProviderResult,
+        PinnedConnection,
+    },
+    BatchValue,
+    CursorStream,
 };
 use crate::{
     bson::Document,
+    change_stream::event::ResumeToken,
     cmap::conn::PinnedConnectionHandle,
     cursor::CursorSpecification,
     error::{Error, Result},
@@ -145,6 +150,7 @@ where
         let spec = CursorSpecification {
             info: self.info.clone(),
             initial_buffer: std::mem::take(&mut self.buffer),
+            post_batch_resume_token: None,
         };
         SessionCursorStream {
             generic_cursor: ExplicitSessionCursor::new(
@@ -225,7 +231,7 @@ where
         self.info.id = 0;
     }
 
-    fn is_exhausted(&self) -> bool {
+    pub(crate) fn is_exhausted(&self) -> bool {
         self.info.id == 0
     }
 }
@@ -268,6 +274,19 @@ where
     generic_cursor: ExplicitSessionCursor<'session, T>,
 }
 
+impl<'cursor, 'session, T> SessionCursorStream<'cursor, 'session, T>
+where
+    T: DeserializeOwned + Unpin + Send + Sync,
+{
+    pub(crate) fn post_batch_resume_token(&self) -> Option<&ResumeToken> {
+        self.generic_cursor.post_batch_resume_token()
+    }
+
+    pub(crate) fn is_exhausted(&self) -> bool {
+        self.generic_cursor.is_exhausted()
+    }
+}
+
 impl<'cursor, 'session, T> Stream for SessionCursorStream<'cursor, 'session, T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
@@ -276,6 +295,15 @@ where
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         Pin::new(&mut self.generic_cursor).poll_next(cx)
+    }
+}
+
+impl<'cursor, 'session, T> CursorStream for SessionCursorStream<'cursor, 'session, T>
+where
+    T: DeserializeOwned + Unpin + Send + Sync,
+{
+    fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
+        self.generic_cursor.poll_next_in_batch(cx)
     }
 }
 

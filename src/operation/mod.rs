@@ -343,13 +343,15 @@ impl CursorBody {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct CursorInfo<T = RawDocumentBuf> {
     pub(crate) id: i64,
 
     pub(crate) ns: Namespace,
 
-    #[serde(rename = "firstBatch")]
     pub(crate) first_batch: VecDeque<T>,
+
+    pub(crate) post_batch_resume_token: Option<RawDocumentBuf>,
 }
 
 #[derive(Debug, PartialEq)]

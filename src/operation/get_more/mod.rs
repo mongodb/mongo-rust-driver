@@ -8,6 +8,7 @@ use serde::Deserialize;
 
 use crate::{
     bson::doc,
+    change_stream::event::ResumeToken,
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     cursor::CursorInformation,
     error::{ErrorKind, Result},
@@ -87,6 +88,7 @@ impl<'conn> Operation for GetMore<'conn> {
         Ok(GetMoreResult {
             batch: response.cursor.next_batch,
             exhausted: response.cursor.id == 0,
+            post_batch_resume_token: ResumeToken::from_raw(response.cursor.post_batch_resume_token),
         })
     }
 
@@ -109,4 +111,5 @@ pub(crate) struct GetMoreResponseBody {
 struct NextBatchBody {
     id: i64,
     next_batch: VecDeque<RawDocumentBuf>,
+    post_batch_resume_token: Option<RawDocumentBuf>,
 }

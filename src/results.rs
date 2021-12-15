@@ -5,6 +5,7 @@ use std::collections::{HashMap, VecDeque};
 use crate::{
     bson::{Bson, Document},
     bson_util,
+    change_stream::event::ResumeToken,
     db::options::CreateCollectionOptions,
 };
 
@@ -106,6 +107,7 @@ impl CreateIndexesResult {
 pub(crate) struct GetMoreResult {
     pub(crate) batch: VecDeque<RawDocumentBuf>,
     pub(crate) exhausted: bool,
+    pub(crate) post_batch_resume_token: Option<ResumeToken>,
 }
 
 /// Describes the type of data store returned when executing

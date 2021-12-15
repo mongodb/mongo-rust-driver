@@ -4,6 +4,7 @@ pub(crate) mod options;
 pub mod session;
 
 use std::{
+    future::Future,
     marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
@@ -18,6 +19,7 @@ use crate::{
         event::{ChangeStreamEvent, ResumeToken},
         options::ChangeStreamOptions,
     },
+    cursor::{stream_poll_next, BatchValue, CursorStream, NextInBatchFuture},
     error::Result,
     operation::AggregateTarget,
     options::AggregateOptions,
@@ -83,14 +85,25 @@ where
 
     /// The information associate with this change stream.
     data: ChangeStreamData,
+
+    /// The cached resume token.
+    resume_token: Option<ResumeToken>,
 }
 
 impl<T> ChangeStream<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
-    pub(crate) fn new(cursor: Cursor<T>, data: ChangeStreamData) -> Self {
-        Self { cursor, data }
+    pub(crate) fn new(
+        cursor: Cursor<T>,
+        data: ChangeStreamData,
+        resume_token: Option<ResumeToken>,
+    ) -> Self {
+        Self {
+            cursor,
+            data,
+            resume_token,
+        }
     }
 
     /// Returns the cached resume token that can be used to resume after the most recently returned
@@ -100,7 +113,7 @@ where
     /// [here](https://docs.mongodb.com/manual/changeStreams/#change-stream-resume-token) for more
     /// information on change stream resume tokens.
     pub fn resume_token(&self) -> Option<&ResumeToken> {
-        todo!()
+        self.resume_token.as_ref()
     }
 
     /// Update the type streamed values will be parsed as.
@@ -108,7 +121,44 @@ where
         ChangeStream {
             cursor: self.cursor.with_type(),
             data: self.data,
+            resume_token: self.resume_token,
         }
+    }
+
+    /// Returns whether the change stream will continue to receive events.
+    pub fn is_alive(&self) -> bool {
+        !self.cursor.is_exhausted()
+    }
+
+    /// Retrieves the next result from the change stream, if any.
+    ///
+    /// Where calling `Stream::next` will internally loop until a change document is received,
+    /// this will make at most one request and return `None` if the returned document batch is
+    /// empty.  This method should be used when storing the resume token in order to ensure the
+    /// most up to date token is received, e.g.
+    ///
+    /// ```ignore
+    /// # use mongodb::{Client, error::Result};
+    /// # async fn func() -> Result<()> {
+    /// # let client = Client::with_uri_str("mongodb://example.com").await?;
+    /// # let coll = client.database("foo").collection("bar");
+    /// let mut change_stream = coll.watch(None, None).await?;
+    /// let mut resume_token = None;
+    /// while change_stream.is_alive() {
+    ///     if let Some(event) = change_stream.next_if_any() {
+    ///         // process event
+    ///     }
+    ///     resume_token = change_stream.resume_token().cloned();
+    /// }
+    /// #
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn next_if_any(&mut self) -> Result<Option<T>> {
+        Ok(match NextInBatchFuture::new(self).await? {
+            BatchValue::Some { doc, .. } => Some(bson::from_slice(doc.as_bytes())?),
+            BatchValue::Empty | BatchValue::Exhausted => None,
+        })
     }
 }
 
@@ -124,9 +174,6 @@ pub(crate) struct ChangeStreamData {
     /// The original target of the change stream, used for re-issuing the aggregation during
     /// an automatic resume.
     target: AggregateTarget,
-
-    /// The cached resume token.
-    resume_token: Option<ResumeToken>,
 
     /// The options provided to the initial `$changeStream` stage.
     options: Option<ChangeStreamOptions>,
@@ -151,11 +198,42 @@ impl ChangeStreamData {
             pipeline,
             client,
             target,
-            resume_token: None,
             options,
             resume_attempted: false,
             document_returned: false,
         }
+    }
+}
+
+fn get_resume_token(
+    batch_value: &BatchValue,
+    batch_token: Option<&ResumeToken>,
+) -> Result<Option<ResumeToken>> {
+    Ok(match batch_value {
+        BatchValue::Some { doc, is_last } => {
+            if *is_last && batch_token.is_some() {
+                batch_token.cloned()
+            } else {
+                doc.get("_id")?.map(|val| ResumeToken(val.to_raw_bson()))
+            }
+        }
+        BatchValue::Empty => batch_token.cloned(),
+        _ => None,
+    })
+}
+
+impl<T> CursorStream for ChangeStream<T>
+where
+    T: DeserializeOwned + Unpin + Send + Sync,
+{
+    fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
+        let out = self.cursor.poll_next_in_batch(cx);
+        if let Poll::Ready(Ok(bv)) = &out {
+            if let Some(token) = get_resume_token(bv, self.cursor.post_batch_resume_token())? {
+                self.resume_token = Some(token);
+            }
+        }
+        out
     }
 }
 
@@ -165,7 +243,7 @@ where
 {
     type Item = Result<T>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        todo!()
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        stream_poll_next(Pin::into_inner(self), cx)
     }
 }

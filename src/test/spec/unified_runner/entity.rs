@@ -24,6 +24,7 @@ use crate::{
 };
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum Entity {
     Client(ClientEntity),
     Database(Database),

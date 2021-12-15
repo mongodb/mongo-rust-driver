@@ -12,6 +12,7 @@ use serde::de::DeserializeOwned;
 use tokio::sync::oneshot;
 
 use crate::{
+    change_stream::event::ResumeToken,
     cmap::conn::PinnedConnectionHandle,
     error::{Error, Result},
     operation::GetMore,
@@ -20,7 +21,15 @@ use crate::{
     ClientSession,
 };
 use common::{kill_cursor, GenericCursor, GetMoreProvider, GetMoreProviderResult};
-pub(crate) use common::{CursorInformation, CursorSpecification, PinnedConnection};
+pub(crate) use common::{
+    stream_poll_next,
+    BatchValue,
+    CursorInformation,
+    CursorSpecification,
+    CursorStream,
+    NextInBatchFuture,
+    PinnedConnection,
+};
 
 /// A [`Cursor`] streams the result of a query. When a query is made, the returned [`Cursor`] will
 /// contain the first batch of results from the server; the individual results will then be returned
@@ -119,6 +128,16 @@ where
         }
     }
 
+    pub(crate) fn post_batch_resume_token(&self) -> Option<&ResumeToken> {
+        self.wrapped_cursor
+            .as_ref()
+            .and_then(|c| c.post_batch_resume_token())
+    }
+
+    pub(crate) fn is_exhausted(&self) -> bool {
+        self.wrapped_cursor.as_ref().unwrap().is_exhausted()
+    }
+
     /// Update the type streamed values will be parsed as.
     pub fn with_type<D>(mut self) -> Cursor<D>
     where
@@ -145,6 +164,15 @@ where
             "cursor already has a kill_watcher"
         );
         self.kill_watcher = Some(tx);
+    }
+}
+
+impl<T> CursorStream for Cursor<T>
+where
+    T: DeserializeOwned + Unpin + Send + Sync,
+{
+    fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
+        self.wrapped_cursor.as_mut().unwrap().poll_next_in_batch(cx)
     }
 }
 

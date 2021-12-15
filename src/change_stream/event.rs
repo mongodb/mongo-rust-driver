@@ -1,6 +1,14 @@
 //! Contains the types related to a `ChangeStream` event.
-use crate::coll::Namespace;
-use bson::{Bson, Document};
+use std::convert::TryInto;
+
+use crate::{
+    coll::Namespace,
+    cursor::CursorSpecification,
+    error::Result,
+    options::ChangeStreamOptions,
+};
+
+use bson::{Bson, Document, RawBson, RawDocument, RawDocumentBuf};
 use serde::{Deserialize, Serialize};
 
 /// An opaque token used for resuming an interrupted
@@ -15,7 +23,28 @@ use serde::{Deserialize, Serialize};
 /// [here](https://docs.mongodb.com/manual/changeStreams/#change-stream-resume-token) for more
 /// information on resume tokens.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ResumeToken(pub(crate) Bson);
+pub struct ResumeToken(pub(crate) RawBson);
+
+impl ResumeToken {
+    pub(crate) fn initial(
+        options: &Option<ChangeStreamOptions>,
+        spec: &CursorSpecification,
+    ) -> Option<ResumeToken> {
+        match &spec.post_batch_resume_token {
+            // Token from initial response from `aggregate`
+            Some(token) if spec.initial_buffer.is_empty() => Some(token.clone()),
+            // Token from options passed to `watch`
+            _ => options
+                .as_ref()
+                .and_then(|o| o.start_after.as_ref().or_else(|| o.resume_after.as_ref()))
+                .cloned(),
+        }
+    }
+
+    pub(crate) fn from_raw(doc: Option<RawDocumentBuf>) -> Option<ResumeToken> {
+        doc.map(|doc| ResumeToken(RawBson::Document(doc)))
+    }
+}
 
 /// A `ChangeStreamEvent` represents a
 /// [change event](https://docs.mongodb.com/manual/reference/change-events/) in the associated change stream.
