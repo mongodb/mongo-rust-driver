@@ -151,7 +151,7 @@ const BSON_BENCHES: &[&'static str] = &[
 /// Benchmarkes included in the "SingleBench" composite.
 /// This consists of all the single-doc benchmarks except Run Command.
 const SINGLE_BENCHES: &[&'static str] = &[
-    FIND_MANY_BENCH_RAW,
+    FIND_ONE_BENCH,
     SMALL_DOC_INSERT_ONE_BENCH,
     LARGE_DOC_INSERT_ONE_BENCH,
 ];
@@ -175,7 +175,7 @@ const PARALLEL_BENCHES: &[&'static str] = &[
 
 /// Benchmarks included in the "ReadBench" composite.
 const READ_BENCHES: &[&'static str] = &[
-    FIND_MANY_BENCH_RAW,
+    FIND_ONE_BENCH,
     FIND_MANY_BENCH_RAW,
     GRIDFS_DOWNLOAD_BENCH,
     LDJSON_MULTI_EXPORT_BENCH,
