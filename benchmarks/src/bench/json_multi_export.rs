@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use futures::stream::TryStreamExt;
 use mongodb::{
-    bson::{doc, Document, RawDocumentBuf},
+    bson::{doc, RawDocumentBuf},
     Client,
     Collection,
     Database,
@@ -12,7 +12,6 @@ use mongodb::{
 use crate::{
     bench::{parse_json_file_to_documents, Benchmark, COLL_NAME, DATABASE_NAME},
     fs::File,
-    models::tweet::Tweet,
 };
 
 use super::drop_database;

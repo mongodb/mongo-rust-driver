@@ -576,7 +576,6 @@ Run benchmarks by id number (comma-separated):
     15: BSON full document encode
     16: Find many and empty the cursor (raw BSON)
     17: Find many and empty the cursor (serde structs)
-    18: Find many and empty the cursor (serde structs with references)
     all: All benchmarks
                     ",
                 ),
