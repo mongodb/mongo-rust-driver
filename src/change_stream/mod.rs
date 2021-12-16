@@ -228,14 +228,13 @@ where
 {
     fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
         let out = self.cursor.poll_next_in_batch(cx);
-        let wire_version = todo!();
         match &out {
             Poll::Ready(Ok(bv)) => {
                 if let Some(token) = get_resume_token(bv, self.cursor.post_batch_resume_token())? {
                     self.resume_token = Some(token);
                 }
             }
-            Poll::Ready(Err(e)) if e.is_resumable(wire_version) => {
+            Poll::Ready(Err(e)) if e.is_resumable() => {
                 todo!()
             }
             _ => {}

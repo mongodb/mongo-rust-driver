@@ -357,6 +357,8 @@ impl Client {
                 connection: conn,
             }),
             Err(mut err) => {
+                err.wire_version = conn.stream_description()?.max_wire_version.clone();
+
                 // Retryable writes are only supported by storage engines with document-level
                 // locking, so users need to disable retryable writes if using mmapv1.
                 if let ErrorKind::Command(ref mut command_error) = *err.kind {

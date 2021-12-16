@@ -46,6 +46,7 @@ pub struct Error {
     /// The type of error that occurred.
     pub kind: Box<ErrorKind>,
     labels: HashSet<String>,
+    pub(crate) wire_version: Option<i32>,
 }
 
 impl Error {
@@ -59,6 +60,7 @@ impl Error {
         Self {
             kind: Box::new(kind),
             labels,
+            wire_version: None,
         }
     }
 
@@ -317,7 +319,7 @@ impl Error {
     }
 
     /// If this error is resumable as per the change streams spec.
-    pub(crate) fn is_resumable(&self, wire_version: Option<i32>) -> bool {
+    pub(crate) fn is_resumable(&self) -> bool {
         if !self.is_server_error() {
             return true;
         }
@@ -325,10 +327,10 @@ impl Error {
         if code == Some(43) {
             return true;
         }
-        if wire_version.unwrap_or(0) > 9 && self.contains_label("ResumableChangeStreamError") {
+        if matches!(self.wire_version, Some(v) if v > 9) && self.contains_label("ResumableChangeStreamError") {
             return true;
         }
-        if let (Some(code), true) = (code, wire_version.unwrap_or(10) < 9) {
+        if let (Some(code), true) = (code, matches!(self.wire_version, Some(v) if v < 9)) {
             if [6, 7, 89, 91, 189, 262, 9001, 10107, 11600, 11602, 13435, 13436, 63, 150, 13388, 234, 133].iter().any(|c| *c == code) {
                 return true;
             }
