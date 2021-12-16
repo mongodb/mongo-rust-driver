@@ -11,7 +11,8 @@ use std::{
 };
 
 use bson::Document;
-use futures_core::Stream;
+use derivative::Derivative;
+use futures_core::{future::BoxFuture, Stream};
 use serde::{de::DeserializeOwned, Deserialize};
 
 use crate::{
@@ -75,7 +76,8 @@ use crate::{
 ///
 /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams) for more
 /// details. Also see the documentation on [usage recommendations](https://docs.mongodb.com/manual/administration/change-streams-production-recommendations/).
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct ChangeStream<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
@@ -88,6 +90,10 @@ where
 
     /// The cached resume token.
     resume_token: Option<ResumeToken>,
+
+    /// A pending future for a resume.
+    #[derivative(Debug = "ignore")]
+    pending_resume: Option<BoxFuture<'static, Result<ChangeStream<T>>>>,
 }
 
 impl<T> ChangeStream<T>
@@ -99,10 +105,12 @@ where
         data: ChangeStreamData,
         resume_token: Option<ResumeToken>,
     ) -> Self {
+        let pending_resume: Option<BoxFuture<'static, Result<ChangeStream<T>>>> = None;
         Self {
             cursor,
             data,
             resume_token,
+            pending_resume,
         }
     }
 
@@ -122,6 +130,7 @@ where
             cursor: self.cursor.with_type(),
             data: self.data,
             resume_token: self.resume_token,
+            pending_resume: None,  // todo?
         }
     }
 
@@ -233,8 +242,19 @@ where
                 if let Some(token) = get_resume_token(bv, self.cursor.post_batch_resume_token())? {
                     self.resume_token = Some(token);
                 }
+                if matches!(bv, BatchValue::Some { .. }) {
+                    self.data.document_returned = true;
+                }
             }
-            Poll::Ready(Err(e)) if e.is_resumable() => {
+            Poll::Ready(Err(e)) if e.is_resumable() && !self.data.resume_attempted => {
+                let client = self.data.client.clone();
+                let pipeline = self.data.pipeline.clone();
+                let options = self.data.options.clone();
+                let target = self.data.target.clone();
+                self.pending_resume = Some(Box::pin(async move {
+                    let new_stream: Result<ChangeStream<ChangeStreamEvent<()>>> = client.execute_watch(pipeline, options, target).await;
+                    new_stream.map(|cs| cs.with_type::<T>())
+                }));
                 todo!()
             }
             _ => {}
