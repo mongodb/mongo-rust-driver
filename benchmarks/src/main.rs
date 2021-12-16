@@ -502,6 +502,19 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
         ids.insert(BenchmarkId::BsonFullDocumentDecode);
         ids.insert(BenchmarkId::BsonFullDocumentEncode);
     }
+    if matches.is_present("driver") {
+        ids.insert(BenchmarkId::RunCommand);
+        ids.insert(BenchmarkId::FindOneById);
+        ids.insert(BenchmarkId::SmallDocInsertOne);
+        ids.insert(BenchmarkId::LargeDocInsertOne);
+        ids.insert(BenchmarkId::FindMany);
+        ids.insert(BenchmarkId::FindManyRawBson);
+        ids.insert(BenchmarkId::FindManySerde);
+        ids.insert(BenchmarkId::SmallDocBulkInsert);
+        ids.insert(BenchmarkId::LargeDocBulkInsert);
+        ids.insert(BenchmarkId::LdJsonMultiFileImport);
+        ids.insert(BenchmarkId::LdJsonMultiFileExport);
+    }
 
     // if none were enabled, that means no arguments were provided and all should be enabled.
     if ids.is_empty() {
@@ -543,6 +556,12 @@ async fn main() {
                 .short("b")
                 .long("bson")
                 .help("Run BSON-only benchmarks"),
+        )
+        .arg(
+            Arg::with_name("driver")
+                .short("d")
+                .long("driver")
+                .help("Run driver-only benchmarks"),
         )
         .arg(
             Arg::with_name("verbose")
