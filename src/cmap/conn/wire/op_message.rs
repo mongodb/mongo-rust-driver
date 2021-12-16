@@ -176,13 +176,14 @@ pub enum MongoMsg {
     Reply(ReplyOp),
 }
 /// decode stream to header and message
-pub async fn read_msg<T: AsyncRead + Unpin + Send>(reader: &mut T) -> Result<(Header, MongoMsg)> {
-    let mut reader = BufReader::new(reader);
-    let header = Header::read_from(&mut reader).await?;
+pub async fn read_msg<T: AsyncRead + Unpin + Send>(
+    buf_reader: &mut BufReader<T>,
+) -> Result<(Header, MongoMsg)> {
+    let header = Header::read_from(buf_reader).await?;
     // TODO: RUST-616 ensure length is < maxMessageSizeBytes
     let length_remaining = header.length - Header::LENGTH as i32;
     let mut buf = vec![0u8; length_remaining as usize];
-    reader.read_exact(&mut buf).await?;
+    buf_reader.read_exact(&mut buf).await?;
     let reader = buf.as_slice();
 
     let msg = if header.op_code == OpCode::Message {
