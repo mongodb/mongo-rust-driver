@@ -1,15 +1,11 @@
-use std::{
-    convert::{TryFrom, TryInto},
-    io::{Read, Write},
-    time::Duration,
-};
+use std::{convert::TryFrom, io::Read, time::Duration};
 
-use bson::{spec::ElementType, RawBsonRef};
+use bson::RawBsonRef;
 use serde::{de::Error as SerdeDeError, ser, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
     bson::{doc, Bson, Document},
-    error::{Error, ErrorKind, Result},
+    error::{ErrorKind, Result},
     runtime::{SyncLittleEndianRead, SyncLittleEndianWrite},
 };
 
@@ -225,149 +221,6 @@ pub(crate) fn read_document_bytes<R: Read>(mut reader: R) -> Result<Vec<u8>> {
     reader.take(length as u64 - 4).read_to_end(&mut bytes)?;
 
     Ok(bytes)
-}
-
-/// Get the value for the provided key from a buffer containing a BSON document.
-/// If the key is not present, None will be returned.
-/// If the BSON is not properly formatted, an internal error would be returned.
-///
-/// TODO: RUST-924 replace this with raw document API usage.
-pub(crate) fn raw_get(doc: &[u8], key: &str) -> Result<Option<Bson>> {
-    fn read_i32(reader: &mut std::io::Cursor<&[u8]>) -> Result<i32> {
-        reader.read_i32().map_err(deserialize_error)
-    }
-
-    fn read_u8(reader: &mut std::io::Cursor<&[u8]>) -> Result<u8> {
-        reader.read_u8().map_err(deserialize_error)
-    }
-
-    fn deserialize_error<T: std::error::Error>(_e: T) -> Error {
-        deserialize_error_no_arg()
-    }
-
-    fn deserialize_error_no_arg() -> Error {
-        Error::from(ErrorKind::Internal {
-            message: "failed to read from serialized document".to_string(),
-        })
-    }
-
-    let mut reader = std::io::Cursor::new(doc);
-    let len: u64 = read_i32(&mut reader)?
-        .try_into()
-        .map_err(deserialize_error)?;
-
-    while reader.position() < len {
-        let element_start: usize = reader.position().try_into().map_err(deserialize_error)?;
-
-        // read the element type
-        let tag = read_u8(&mut reader)?;
-
-        // check if we reached the end of the document
-        if tag == 0 && reader.position() == len {
-            return Ok(None);
-        }
-
-        let element_type = ElementType::from(tag).ok_or_else(deserialize_error_no_arg)?;
-
-        // walk through the document until a null byte is encountered
-        while read_u8(&mut reader)? != 0 {
-            if reader.position() >= len {
-                return Err(deserialize_error_no_arg());
-            }
-        }
-
-        // parse the key
-        let string_end: usize = reader
-            .position()
-            .checked_sub(1) // back from null byte
-            .and_then(|u| usize::try_from(u).ok())
-            .ok_or_else(deserialize_error_no_arg)?;
-        let slice = &reader.get_ref()[(element_start + 1)..string_end];
-        let k = std::str::from_utf8(slice).map_err(deserialize_error)?;
-
-        // move to the end of the element
-        let skip_len = match element_type {
-            ElementType::Array
-            | ElementType::EmbeddedDocument
-            | ElementType::JavaScriptCodeWithScope => {
-                let l = read_i32(&mut reader)?;
-                // length includes the 4 bytes for the length, so subtrack them out
-                l.checked_sub(4).ok_or_else(deserialize_error_no_arg)?
-            }
-            ElementType::Binary => read_i32(&mut reader)?
-                .checked_add(1) // add one for subtype
-                .ok_or_else(deserialize_error_no_arg)?,
-            ElementType::Int32 => 4,
-            ElementType::Int64 => 8,
-            ElementType::String | ElementType::Symbol | ElementType::JavaScriptCode => {
-                read_i32(&mut reader)?
-            }
-            ElementType::Boolean => 1,
-            ElementType::Double => 8,
-            ElementType::Timestamp => 8,
-            ElementType::Decimal128 => 16,
-            ElementType::MinKey
-            | ElementType::MaxKey
-            | ElementType::Null
-            | ElementType::Undefined => 0,
-            ElementType::DateTime => 8,
-            ElementType::ObjectId => 12,
-            ElementType::DbPointer => read_i32(&mut reader)?
-                .checked_add(12) // add 12 for objectid
-                .ok_or_else(deserialize_error_no_arg)?,
-            ElementType::RegularExpression => {
-                // read two cstr's
-                for _i in 0..2 {
-                    while read_u8(&mut reader)? != 0 {
-                        if reader.position() >= len {
-                            return Err(deserialize_error_no_arg());
-                        }
-                    }
-                }
-
-                0 // don't need to skip anymore since we already read the whole value
-            }
-        };
-        let skip_len: u64 = skip_len.try_into().map_err(deserialize_error)?;
-        reader.set_position(
-            reader
-                .position()
-                .checked_add(skip_len)
-                .ok_or_else(deserialize_error_no_arg)?,
-        );
-
-        if k == key {
-            // if this is the element we're looking for, extract it.
-            let element_end: usize = reader.position().try_into().map_err(deserialize_error)?;
-            let element_slice = &reader.get_ref()[element_start..element_end];
-            let element_length: i32 = element_slice.len().try_into().map_err(deserialize_error)?;
-
-            // create a new temporary document which just has the element we want and grab the value
-            let mut temp_doc = Vec::new();
-
-            // write the document length
-            let temp_len: i32 = element_length
-                .checked_add(4 + 1)
-                .ok_or_else(deserialize_error_no_arg)?;
-            temp_doc
-                .write_all(&temp_len.to_le_bytes())
-                .map_err(deserialize_error)?;
-
-            // add in the element
-            temp_doc.extend(element_slice);
-
-            // write the null byte
-            temp_doc.push(0);
-
-            let d = Document::from_reader(temp_doc.as_slice()).map_err(deserialize_error)?;
-            return Ok(Some(
-                d.get("_id").ok_or_else(deserialize_error_no_arg)?.clone(),
-            ));
-        }
-    }
-
-    // read all bytes but didn't reach null byte
-    Err(deserialize_error_no_arg())
 }
 
 #[cfg(test)]
