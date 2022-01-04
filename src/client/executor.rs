@@ -32,8 +32,8 @@ use crate::{
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
     operation::{
         AbortTransaction,
-        Aggregate,
         AggregateTarget,
+        ChangeStreamAggregate,
         CommandErrorBody,
         CommitTransaction,
         Operation,
@@ -228,7 +228,7 @@ impl Client {
     {
         Box::pin(async {
             let pipeline: Vec<_> = pipeline.into_iter().collect();
-            let op = Aggregate::new_watch(&target, &pipeline, &options)?;
+            let op = ChangeStreamAggregate::new(&target, &pipeline, &options)?;
 
             let mut details = self.execute_operation_with_details(op, None).await?;
             let pinned = self.pin_connection_for_cursor(&mut details.output)?;
@@ -261,7 +261,7 @@ impl Client {
     {
         Box::pin(async {
             let pipeline: Vec<_> = pipeline.into_iter().collect();
-            let op = Aggregate::new_watch(&target, &pipeline, &options)?;
+            let op = ChangeStreamAggregate::new(&target, &pipeline, &options)?;
 
             let mut details = self
                 .execute_operation_with_details(op, &mut *session)

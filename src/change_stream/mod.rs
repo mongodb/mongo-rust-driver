@@ -130,7 +130,7 @@ where
             cursor: self.cursor.with_type(),
             data: self.data,
             resume_token: self.resume_token,
-            pending_resume: None,  // todo?
+            pending_resume: None, // todo?
         }
     }
 
@@ -236,6 +236,12 @@ where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
     fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
+        if let Some(pending) = &mut self.pending_resume {
+            match Pin::new(pending).poll(cx) {
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(new_stream) => todo!(),
+            }
+        }
         let out = self.cursor.poll_next_in_batch(cx);
         match &out {
             Poll::Ready(Ok(bv)) => {
@@ -251,11 +257,13 @@ where
                 let pipeline = self.data.pipeline.clone();
                 let options = self.data.options.clone();
                 let target = self.data.target.clone();
+                // TODO: adjust options
                 self.pending_resume = Some(Box::pin(async move {
-                    let new_stream: Result<ChangeStream<ChangeStreamEvent<()>>> = client.execute_watch(pipeline, options, target).await;
+                    let new_stream: Result<ChangeStream<ChangeStreamEvent<()>>> =
+                        client.execute_watch(pipeline, options, target).await;
                     new_stream.map(|cs| cs.with_type::<T>())
                 }));
-                todo!()
+                return Poll::Pending;
             }
             _ => {}
         }
