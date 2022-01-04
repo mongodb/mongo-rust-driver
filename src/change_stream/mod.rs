@@ -130,7 +130,7 @@ where
             cursor: self.cursor.with_type(),
             data: self.data,
             resume_token: self.resume_token,
-            pending_resume: None, // todo?
+            pending_resume: None, // TODO aegnor
         }
     }
 
@@ -236,10 +236,17 @@ where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
     fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
-        if let Some(pending) = &mut self.pending_resume {
-            match Pin::new(pending).poll(cx) {
-                Poll::Pending => return Poll::Pending,
-                Poll::Ready(new_stream) => todo!(),
+        if let Some(mut pending) = self.pending_resume.take() {
+            match Pin::new(&mut pending).poll(cx) {
+                Poll::Pending => {
+                    self.pending_resume = Some(pending);
+                    return Poll::Pending;
+                }
+                Poll::Ready(Ok(new_stream)) => {
+                    self.cursor = new_stream.cursor;
+                    return Poll::Pending;
+                },
+                Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
             }
         }
         let out = self.cursor.poll_next_in_batch(cx);
@@ -253,11 +260,12 @@ where
                 }
             }
             Poll::Ready(Err(e)) if e.is_resumable() && !self.data.resume_attempted => {
+                self.data.resume_attempted = true;
                 let client = self.data.client.clone();
                 let pipeline = self.data.pipeline.clone();
                 let options = self.data.options.clone();
                 let target = self.data.target.clone();
-                // TODO: adjust options
+                // TODO: adjust options, kill cursor
                 self.pending_resume = Some(Box::pin(async move {
                     let new_stream: Result<ChangeStream<ChangeStreamEvent<()>>> =
                         client.execute_watch(pipeline, options, target).await;
