@@ -103,7 +103,7 @@ impl<'a, T: Serialize> Operation for Insert<'a, T> {
             }
         }
 
-        if docs.as_bytes().len() == 5 {
+        if docs.is_empty() {
             return Err(ErrorKind::InvalidArgument {
                 message: "document exceeds maxBsonObjectSize".to_string(),
             }
