@@ -196,8 +196,8 @@ async fn generate_ids() {
     assert_eq!(docs[1].x, 2);
 
     // ensure the _id was prepended to the document
-    // let docs: Documents<Document> = bson::from_slice(serialized.as_slice()).unwrap();
-    // assert_eq!(docs.documents[0].iter().next().unwrap().0, "_id")
+    let docs: Documents<Document> = bson::from_slice(serialized.as_slice()).unwrap();
+    assert_eq!(docs.documents[0].iter().next().unwrap().0, "_id")
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

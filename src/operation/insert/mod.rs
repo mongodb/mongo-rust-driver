@@ -3,7 +3,7 @@ mod test;
 
 use std::{collections::HashMap, convert::TryInto};
 
-use bson::{oid::ObjectId, Bson, RawArrayBuf};
+use bson::{oid::ObjectId, Bson, RawArrayBuf, RawDocumentBuf};
 use serde::Serialize;
 
 use crate::{
@@ -69,8 +69,23 @@ impl<'a, T: Serialize> Operation for Insert<'a, T> {
             let id = match doc.get("_id")? {
                 Some(b) => b.try_into()?,
                 None => {
+                    let mut new_doc = RawDocumentBuf::new();
                     let oid = ObjectId::new();
-                    doc.append("_id", oid);
+                    new_doc.append("_id", oid);
+
+                    let mut new_bytes = new_doc.into_bytes();
+                    new_bytes.pop(); // remove trailing null byte
+
+                    let mut bytes = doc.into_bytes();
+                    let oid_slice = &new_bytes[4..];
+                    // insert oid at beginning of document
+                    bytes.splice(4..4, oid_slice.iter().cloned());
+
+                    // overwrite old length
+                    let new_length = (bytes.len() as i32).to_le_bytes();
+                    (&mut bytes[0..4]).copy_from_slice(&new_length);
+                    doc = RawDocumentBuf::from_bytes(bytes)?;
+
                     Bson::ObjectId(oid)
                 }
             };
