@@ -4,7 +4,7 @@ use crate::{
     cursor::CursorSpecification,
     error::Result,
     operation::{append_options, Operation, Retryability},
-    options::{ChangeStreamOptions, SelectionCriteria, WriteConcern}, change_stream::ChangeStreamData,
+    options::{ChangeStreamOptions, SelectionCriteria, WriteConcern}, change_stream::{ChangeStreamData, event::ResumeToken},
 };
 
 use super::{Aggregate, AggregateTarget};
@@ -66,19 +66,18 @@ impl Operation for ChangeStreamAggregate {
         let mut data = self.data.clone();
         let spec = self.inner.handle_response(response, description)?;
 
-        if let Some(ts) = op_time {
-            if self.data.options()
-                .map_or(true, |o|
-                    o.start_at_operation_time.is_none() &&
-                    o.resume_after.is_none() &&
-                    o.start_after.is_none()) &&
-                description.max_wire_version.map_or(false, |v| v >= 7) &&
-                spec.initial_buffer.is_empty() &&
-                spec.post_batch_resume_token.is_none() {
-                    data.set_initial_operation_time(ts);
-            }
+        data.set_resume_token(ResumeToken::initial(data.options(), &spec));
+        if self.data.options()
+            .map_or(true, |o|
+                o.start_at_operation_time.is_none() &&
+                o.resume_after.is_none() &&
+                o.start_after.is_none()) &&
+            description.max_wire_version.map_or(false, |v| v >= 7) &&
+            spec.initial_buffer.is_empty() &&
+            spec.post_batch_resume_token.is_none() {
+                data.set_initial_operation_time(op_time);
         }
-
+    
         Ok((spec, data))
     }
 

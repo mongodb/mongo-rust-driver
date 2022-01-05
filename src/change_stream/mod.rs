@@ -88,9 +88,6 @@ where
     /// The information associate with this change stream.
     data: ChangeStreamData,
 
-    /// The cached resume token.
-    resume_token: Option<ResumeToken>,
-
     /// A pending future for a resume.
     #[derivative(Debug = "ignore")]
     pending_resume: Option<BoxFuture<'static, Result<ChangeStream<T>>>>,
@@ -103,13 +100,11 @@ where
     pub(crate) fn new(
         cursor: Cursor<T>,
         data: ChangeStreamData,
-        resume_token: Option<ResumeToken>,
     ) -> Self {
         let pending_resume: Option<BoxFuture<'static, Result<ChangeStream<T>>>> = None;
         Self {
             cursor,
             data,
-            resume_token,
             pending_resume,
         }
     }
@@ -121,7 +116,7 @@ where
     /// [here](https://docs.mongodb.com/manual/changeStreams/#change-stream-resume-token) for more
     /// information on change stream resume tokens.
     pub fn resume_token(&self) -> Option<&ResumeToken> {
-        self.resume_token.as_ref()
+        self.data.resume_token.as_ref()
     }
 
     /// Update the type streamed values will be parsed as.
@@ -129,8 +124,7 @@ where
         ChangeStream {
             cursor: self.cursor.with_type(),
             data: self.data,
-            resume_token: self.resume_token,
-            pending_resume: None, // TODO aegnor
+            pending_resume: None,
         }
     }
 
@@ -186,6 +180,9 @@ pub(crate) struct ChangeStreamData {
     /// The `operationTime` returned by the initial `aggregate` command.
     initial_operation_time: Option<Timestamp>,
 
+    /// The cached resume token.
+    resume_token: Option<ResumeToken>,
+
     /// Whether or not the change stream has attempted a resume, used to attempt a resume only
     /// once.
     resume_attempted: bool,
@@ -206,6 +203,7 @@ impl ChangeStreamData {
             target,
             options,
             initial_operation_time: None,
+            resume_token: None,
             resume_attempted: false,
             document_returned: false,
         }
@@ -215,8 +213,12 @@ impl ChangeStreamData {
         self.options.as_ref()
     }
 
-    pub(crate) fn set_initial_operation_time(&mut self, ts: Timestamp) {
-        self.initial_operation_time = Some(ts);
+    pub(crate) fn set_initial_operation_time(&mut self, ts: Option<Timestamp>) {
+        self.initial_operation_time = ts;
+    }
+
+    pub(crate) fn set_resume_token(&mut self, token: Option<ResumeToken>) {
+        self.resume_token = token;
     }
 }
 
@@ -261,7 +263,7 @@ where
         match &out {
             Poll::Ready(Ok(bv)) => {
                 if let Some(token) = get_resume_token(bv, self.cursor.post_batch_resume_token())? {
-                    self.resume_token = Some(token);
+                    self.data.resume_token = Some(token);
                 }
                 if matches!(bv, BatchValue::Some { .. }) {
                     self.data.document_returned = true;

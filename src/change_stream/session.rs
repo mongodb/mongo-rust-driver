@@ -52,7 +52,6 @@ where
 {
     cursor: SessionCursor<T>,
     data: ChangeStreamData,
-    resume_token: Option<ResumeToken>,
 }
 
 impl<T> SessionChangeStream<T>
@@ -62,12 +61,10 @@ where
     pub(crate) fn new(
         cursor: SessionCursor<T>,
         data: ChangeStreamData,
-        resume_token: Option<ResumeToken>,
     ) -> Self {
         Self {
             cursor,
             data,
-            resume_token,
         }
     }
 
@@ -78,7 +75,7 @@ where
     /// [here](https://docs.mongodb.com/manual/changeStreams/#change-stream-resume-token) for more
     /// information on change stream resume tokens.
     pub fn resume_token(&self) -> Option<&ResumeToken> {
-        self.resume_token.as_ref()
+        self.data.resume_token.as_ref()
     }
 
     /// Update the type streamed values will be parsed as.
@@ -86,7 +83,6 @@ where
         SessionChangeStream {
             cursor: self.cursor.with_type(),
             data: self.data,
-            resume_token: self.resume_token,
         }
     }
 
@@ -139,7 +135,7 @@ where
     ) -> SessionChangeStreamValues<'_, 'session, T> {
         SessionChangeStreamValues {
             stream: self.cursor.stream(session),
-            resume_token: &mut self.resume_token,
+            data: &mut self.data,
         }
     }
 
@@ -217,7 +213,7 @@ where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
     stream: SessionCursorStream<'cursor, 'session, T>,
-    resume_token: &'cursor mut Option<ResumeToken>,
+    data: &'cursor mut ChangeStreamData,
 }
 
 impl<'cursor, 'session, T> SessionChangeStreamValues<'cursor, 'session, T>
@@ -225,7 +221,7 @@ where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
     pub fn resume_token(&self) -> Option<&ResumeToken> {
-        self.resume_token.as_ref()
+        self.data.resume_token.as_ref()
     }
 
     pub fn is_alive(&self) -> bool {
@@ -248,7 +244,7 @@ where
         let out = self.stream.poll_next_in_batch(cx);
         if let Poll::Ready(Ok(bv)) = &out {
             if let Some(token) = get_resume_token(bv, self.stream.post_batch_resume_token())? {
-                *self.resume_token = Some(token);
+                self.data.resume_token = Some(token);
             }
         }
         out

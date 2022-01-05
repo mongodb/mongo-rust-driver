@@ -8,7 +8,7 @@ use super::{session::TransactionState, Client, ClientSession};
 use crate::{
     bson::Document,
     change_stream::{
-        event::{ChangeStreamEvent, ResumeToken},
+        event::{ChangeStreamEvent},
         session::SessionChangeStream,
         ChangeStream,
     },
@@ -228,7 +228,6 @@ impl Client {
             let mut details = self.execute_operation_with_details(op, None).await?;
             let (cursor_spec, cs_data) = details.output.operation_output;
             let pinned = self.pin_connection_for_cursor(&cursor_spec, &mut details.output.connection)?;
-            let resume_token = ResumeToken::initial(&options, &cursor_spec);
             let cursor = Cursor::new(
                 self.clone(),
                 cursor_spec,
@@ -239,7 +238,6 @@ impl Client {
             Ok(ChangeStream::new(
                 cursor,
                 cs_data,
-                resume_token,
             ))
         })
         .await
@@ -264,13 +262,11 @@ impl Client {
                 .await?;
             let (cursor_spec, cs_data) = details.output.operation_output;
             let pinned = self.pin_connection_for_session(&cursor_spec, &mut details.output.connection, session)?;
-            let resume_token = ResumeToken::initial(&options, &cursor_spec);
             let cursor = SessionCursor::new(self.clone(), cursor_spec, pinned);
 
             Ok(SessionChangeStream::new(
                 cursor,
                 cs_data,
-                resume_token,
             ))
         })
         .await

@@ -27,7 +27,7 @@ pub struct ResumeToken(pub(crate) RawBson);
 
 impl ResumeToken {
     pub(crate) fn initial(
-        options: &Option<ChangeStreamOptions>,
+        options: Option<&ChangeStreamOptions>,
         spec: &CursorSpecification,
     ) -> Option<ResumeToken> {
         match &spec.post_batch_resume_token {
@@ -35,7 +35,6 @@ impl ResumeToken {
             Some(token) if spec.initial_buffer.is_empty() => Some(token.clone()),
             // Token from options passed to `watch`
             _ => options
-                .as_ref()
                 .and_then(|o| o.start_after.as_ref().or_else(|| o.resume_after.as_ref()))
                 .cloned(),
         }
