@@ -10,7 +10,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use bson::Document;
+use bson::{Document, Timestamp};
 use derivative::Derivative;
 use futures_core::{future::BoxFuture, Stream};
 use serde::{de::DeserializeOwned, Deserialize};
@@ -183,6 +183,9 @@ pub(crate) struct ChangeStreamData {
     /// The options provided to the initial `$changeStream` stage.
     options: Option<ChangeStreamOptions>,
 
+    /// The `operationTime` returned by the initial `aggregate` command.
+    initial_operation_time: Option<Timestamp>,
+
     /// Whether or not the change stream has attempted a resume, used to attempt a resume only
     /// once.
     resume_attempted: bool,
@@ -202,9 +205,18 @@ impl ChangeStreamData {
             pipeline,
             target,
             options,
+            initial_operation_time: None,
             resume_attempted: false,
             document_returned: false,
         }
+    }
+
+    pub(crate) fn options(&self) -> Option<&ChangeStreamOptions> {
+        self.options.as_ref()
+    }
+
+    pub(crate) fn set_initial_operation_time(&mut self, ts: Timestamp) {
+        self.initial_operation_time = Some(ts);
     }
 }
 

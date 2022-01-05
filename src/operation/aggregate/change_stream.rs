@@ -60,7 +60,26 @@ impl Operation for ChangeStreamAggregate {
         response: RawCommandResponse,
         description: &StreamDescription,
     ) -> Result<Self::O> {
-        Ok((self.inner.handle_response(response, description)?, self.data.clone()))
+        let op_time = response.raw_body()
+            .get("operationTime")?
+            .and_then(bson::RawBsonRef::as_timestamp);
+        let mut data = self.data.clone();
+        let spec = self.inner.handle_response(response, description)?;
+
+        if let Some(ts) = op_time {
+            if self.data.options()
+                .map_or(true, |o|
+                    o.start_at_operation_time.is_none() &&
+                    o.resume_after.is_none() &&
+                    o.start_after.is_none()) &&
+                description.max_wire_version.map_or(false, |v| v >= 7) &&
+                spec.initial_buffer.is_empty() &&
+                spec.post_batch_resume_token.is_none() {
+                    data.set_initial_operation_time(ts);
+            }
+        }
+
+        Ok((spec, data))
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
