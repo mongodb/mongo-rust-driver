@@ -223,7 +223,7 @@ impl Client {
     {
         Box::pin(async {
             let pipeline: Vec<_> = pipeline.into_iter().collect();
-            let op = ChangeStreamAggregate::new(self.clone(), &target, &pipeline, &options)?;
+            let op = ChangeStreamAggregate::new(&target, &pipeline, &options)?;
 
             let mut details = self.execute_operation_with_details(op, None).await?;
             let (cursor_spec, cs_data) = details.output.operation_output;
@@ -257,7 +257,7 @@ impl Client {
     {
         Box::pin(async {
             let pipeline: Vec<_> = pipeline.into_iter().collect();
-            let op = ChangeStreamAggregate::new(self.clone(), &target, &pipeline, &options)?;
+            let op = ChangeStreamAggregate::new(&target, &pipeline, &options)?;
 
             let mut details = self
                 .execute_operation_with_details(op, &mut *session)

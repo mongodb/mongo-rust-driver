@@ -176,10 +176,6 @@ pub(crate) struct ChangeStreamData {
     /// The pipeline of stages to append to an initial `$changeStream` stage.
     pipeline: Vec<Document>,
 
-    /// The client that was used for the initial `$changeStream` aggregation, used for server
-    /// selection during an automatic resume.
-    client: Client,
-
     /// The original target of the change stream, used for re-issuing the aggregation during
     /// an automatic resume.
     target: AggregateTarget,
@@ -199,13 +195,11 @@ pub(crate) struct ChangeStreamData {
 impl ChangeStreamData {
     pub(crate) fn new(
         pipeline: Vec<Document>,
-        client: Client,
         target: AggregateTarget,
         options: Option<ChangeStreamOptions>,
     ) -> Self {
         Self {
             pipeline,
-            client,
             target,
             options,
             resume_attempted: false,
@@ -261,7 +255,7 @@ where
             }
             Poll::Ready(Err(e)) if e.is_resumable() && !self.data.resume_attempted => {
                 self.data.resume_attempted = true;
-                let client = self.data.client.clone();
+                let client = self.cursor.client().clone();
                 let pipeline = self.data.pipeline.clone();
                 let options = self.data.options.clone();
                 let target = self.data.target.clone();

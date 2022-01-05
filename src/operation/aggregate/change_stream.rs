@@ -4,7 +4,7 @@ use crate::{
     cursor::CursorSpecification,
     error::Result,
     operation::{append_options, Operation, Retryability},
-    options::{ChangeStreamOptions, SelectionCriteria, WriteConcern}, change_stream::ChangeStreamData, Client,
+    options::{ChangeStreamOptions, SelectionCriteria, WriteConcern}, change_stream::ChangeStreamData,
 };
 
 use super::{Aggregate, AggregateTarget};
@@ -16,12 +16,11 @@ pub(crate) struct ChangeStreamAggregate {
 
 impl ChangeStreamAggregate {
     pub(crate) fn new(
-        client: Client,
         target: &AggregateTarget,
         pipeline: &[Document],
         options: &Option<ChangeStreamOptions>,
     ) -> Result<Self> {
-        let data = ChangeStreamData::new(pipeline.iter().cloned().collect(), client, target.clone(), options.clone());
+        let data = ChangeStreamData::new(pipeline.iter().cloned().collect(), target.clone(), options.clone());
 
         let mut bson_options = Document::new();
         append_options(&mut bson_options, options.as_ref())?;
