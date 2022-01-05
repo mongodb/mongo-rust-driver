@@ -85,7 +85,10 @@ where
     /// The cursor to iterate over event instances.
     cursor: Cursor<T>,
 
-    /// The information associate with this change stream.
+    /// Arguments to `watch` that created this change stream.
+    args: WatchArgs,
+
+    /// Dynamic information associate with this change stream.
     data: ChangeStreamData,
 
     /// A pending future for a resume.
@@ -99,11 +102,13 @@ where
 {
     pub(crate) fn new(
         cursor: Cursor<T>,
+        args: WatchArgs,
         data: ChangeStreamData,
     ) -> Self {
         let pending_resume: Option<BoxFuture<'static, Result<ChangeStream<T>>>> = None;
         Self {
             cursor,
+            args,
             data,
             pending_resume,
         }
@@ -123,6 +128,7 @@ where
     pub fn with_type<D: DeserializeOwned + Unpin + Send + Sync>(self) -> ChangeStream<D> {
         ChangeStream {
             cursor: self.cursor.with_type(),
+            args: self.args,
             data: self.data,
             pending_resume: None,
         }
@@ -165,18 +171,48 @@ where
     }
 }
 
+/// Arguments passed to a `watch` method, captured to allow resume.
 #[derive(Debug, Clone)]
-pub(crate) struct ChangeStreamData {
+pub(crate) struct WatchArgs {
     /// The pipeline of stages to append to an initial `$changeStream` stage.
     pipeline: Vec<Document>,
 
-    /// The original target of the change stream, used for re-issuing the aggregation during
-    /// an automatic resume.
+    /// The original target of the change stream.
     target: AggregateTarget,
 
     /// The options provided to the initial `$changeStream` stage.
     options: Option<ChangeStreamOptions>,
+}
 
+impl WatchArgs {
+    pub(crate) fn new(
+        pipeline: Vec<Document>,
+        target: AggregateTarget,
+        options: Option<ChangeStreamOptions>,
+    ) -> Self {
+        Self {
+            pipeline,
+            target,
+            options,
+        }
+    }
+
+    pub(crate) fn pipeline(&self) -> &[Document] {
+        &self.pipeline
+    }
+
+    pub(crate) fn target(&self) -> &AggregateTarget {
+        &self.target
+    }
+
+    pub(crate) fn options(&self) -> Option<&ChangeStreamOptions> {
+        self.options.as_ref()
+    }
+}
+
+/// Dynamic change stream data needed for resume.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct ChangeStreamData {
     /// The `operationTime` returned by the initial `aggregate` command.
     initial_operation_time: Option<Timestamp>,
 
@@ -193,26 +229,6 @@ pub(crate) struct ChangeStreamData {
 }
 
 impl ChangeStreamData {
-    pub(crate) fn new(
-        pipeline: Vec<Document>,
-        target: AggregateTarget,
-        options: Option<ChangeStreamOptions>,
-    ) -> Self {
-        Self {
-            pipeline,
-            target,
-            options,
-            initial_operation_time: None,
-            resume_token: None,
-            resume_attempted: false,
-            document_returned: false,
-        }
-    }
-
-    pub(crate) fn options(&self) -> Option<&ChangeStreamOptions> {
-        self.options.as_ref()
-    }
-
     pub(crate) fn set_initial_operation_time(&mut self, ts: Option<Timestamp>) {
         self.initial_operation_time = ts;
     }
@@ -272,11 +288,12 @@ where
             Poll::Ready(Err(e)) if e.is_resumable() && !self.data.resume_attempted => {
                 self.data.resume_attempted = true;
                 let client = self.cursor.client().clone();
+                let args = self.args.clone();
                 let data = self.data.clone();
                 // TODO: adjust options
                 self.pending_resume = Some(Box::pin(async move {
                     let new_stream: Result<ChangeStream<ChangeStreamEvent<()>>> =
-                        client.execute_watch(data.pipeline, data.options, data.target).await;
+                        client.execute_watch(args.pipeline, args.options, args.target, Some(data)).await;
                     new_stream.map(|cs| cs.with_type::<T>())
                 }));
                 return Poll::Pending;

@@ -824,7 +824,7 @@ impl<T> Collection<T> {
         let mut options = options.into();
         resolve_options!(self, options, [read_concern, selection_criteria]);
         let target = self.namespace().into();
-        self.client().execute_watch(pipeline, options, target).await
+        self.client().execute_watch(pipeline, options, target, None).await
     }
 
     /// Starts a new [`SessionChangeStream`] that receives events for all changes in this collection
@@ -844,7 +844,7 @@ impl<T> Collection<T> {
         resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
         let target = self.namespace().into();
         self.client()
-            .execute_watch_with_session(pipeline, options, target, session)
+            .execute_watch_with_session(pipeline, options, target, None, session)
             .await
     }
 }

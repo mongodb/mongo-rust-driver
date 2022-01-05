@@ -4,36 +4,33 @@ use crate::{
     cursor::CursorSpecification,
     error::Result,
     operation::{append_options, Operation, Retryability},
-    options::{ChangeStreamOptions, SelectionCriteria, WriteConcern}, change_stream::{ChangeStreamData, event::ResumeToken},
+    options::{ChangeStreamOptions, SelectionCriteria, WriteConcern}, change_stream::{ChangeStreamData, event::ResumeToken, WatchArgs},
 };
 
-use super::{Aggregate, AggregateTarget};
+use super::{Aggregate};
 
 pub(crate) struct ChangeStreamAggregate {
     inner: Aggregate,
-    data: ChangeStreamData,
+    options: Option<ChangeStreamOptions>,
 }
 
 impl ChangeStreamAggregate {
     pub(crate) fn new(
-        target: &AggregateTarget,
-        pipeline: &[Document],
-        options: &Option<ChangeStreamOptions>,
+        args: &WatchArgs,
+        resume_data: Option<ChangeStreamData>,
     ) -> Result<Self> {
-        let data = ChangeStreamData::new(pipeline.iter().cloned().collect(), target.clone(), options.clone());
-
         let mut bson_options = Document::new();
-        append_options(&mut bson_options, options.as_ref())?;
+        append_options(&mut bson_options, args.options())?;
 
         let mut agg_pipeline = vec![doc! { "$changeStream": bson_options }];
-        agg_pipeline.extend(pipeline.iter().cloned());
+        agg_pipeline.extend(args.pipeline().iter().cloned());
         Ok(Self {
             inner: Aggregate::new(
-                target.clone(),
+                args.target().clone(),
                 agg_pipeline,
-                options.as_ref().map(|o| o.aggregate_options()),
+                args.options().map(|o| o.aggregate_options()),
             ),
-            data,
+            options: args.options().cloned(),
         })
     }
 }
@@ -63,11 +60,12 @@ impl Operation for ChangeStreamAggregate {
         let op_time = response.raw_body()
             .get("operationTime")?
             .and_then(bson::RawBsonRef::as_timestamp);
-        let mut data = self.data.clone();
         let spec = self.inner.handle_response(response, description)?;
 
-        data.set_resume_token(ResumeToken::initial(data.options(), &spec));
-        if self.data.options()
+        let mut data = ChangeStreamData::default();
+        data.set_resume_token(ResumeToken::initial(self.options.as_ref(), &spec));
+        if self.options
+            .as_ref()
             .map_or(true, |o|
                 o.start_at_operation_time.is_none() &&
                 o.resume_after.is_none() &&

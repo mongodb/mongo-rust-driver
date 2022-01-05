@@ -10,7 +10,7 @@ use crate::{
     change_stream::{
         event::{ChangeStreamEvent},
         session::SessionChangeStream,
-        ChangeStream,
+        ChangeStream, ChangeStreamData, WatchArgs,
     },
     cmap::{
         conn::PinnedConnectionHandle,
@@ -217,13 +217,15 @@ impl Client {
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<ChangeStreamOptions>,
         target: AggregateTarget,
+        resume_data: Option<ChangeStreamData>,
     ) -> Result<ChangeStream<ChangeStreamEvent<T>>>
     where
         T: DeserializeOwned + Unpin + Send + Sync,
     {
         Box::pin(async {
             let pipeline: Vec<_> = pipeline.into_iter().collect();
-            let op = ChangeStreamAggregate::new(&target, &pipeline, &options)?;
+            let args = WatchArgs::new(pipeline, target, options);
+            let op = ChangeStreamAggregate::new(&args, resume_data)?;
 
             let mut details = self.execute_operation_with_details(op, None).await?;
             let (cursor_spec, cs_data) = details.output.operation_output;
@@ -237,6 +239,7 @@ impl Client {
 
             Ok(ChangeStream::new(
                 cursor,
+                args,
                 cs_data,
             ))
         })
@@ -248,6 +251,7 @@ impl Client {
         pipeline: impl IntoIterator<Item = Document>,
         options: Option<ChangeStreamOptions>,
         target: AggregateTarget,
+        resume_data: Option<ChangeStreamData>,
         session: &mut ClientSession,
     ) -> Result<SessionChangeStream<ChangeStreamEvent<T>>>
     where
@@ -255,7 +259,8 @@ impl Client {
     {
         Box::pin(async {
             let pipeline: Vec<_> = pipeline.into_iter().collect();
-            let op = ChangeStreamAggregate::new(&target, &pipeline, &options)?;
+            let args = WatchArgs::new(pipeline, target, options);
+            let op = ChangeStreamAggregate::new(&args, resume_data)?;
 
             let mut details = self
                 .execute_operation_with_details(op, &mut *session)

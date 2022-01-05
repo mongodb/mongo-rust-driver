@@ -294,7 +294,7 @@ impl Client {
             .get_or_insert_with(Default::default)
             .all_changes_for_cluster = Some(true);
         let target = AggregateTarget::Database("admin".to_string());
-        self.execute_watch(pipeline, options, target).await
+        self.execute_watch(pipeline, options, target, None).await
     }
 
     /// Starts a new [`SessionChangeStream`] that receives events for all changes in the cluster
@@ -313,7 +313,7 @@ impl Client {
             .get_or_insert_with(Default::default)
             .all_changes_for_cluster = Some(true);
         let target = AggregateTarget::Database("admin".to_string());
-        self.execute_watch_with_session(pipeline, options, target, session)
+        self.execute_watch_with_session(pipeline, options, target, None, session)
             .await
     }
 
