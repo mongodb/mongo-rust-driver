@@ -249,6 +249,8 @@ where
                     return Poll::Pending;
                 }
                 Poll::Ready(Ok(new_stream)) => {
+                    // TODO: kill cursor only on server selected by resume
+                    //    * this will be hard because cursor kill happens on drop
                     self.cursor = new_stream.cursor;
                     return Poll::Pending;
                 },
@@ -268,13 +270,11 @@ where
             Poll::Ready(Err(e)) if e.is_resumable() && !self.data.resume_attempted => {
                 self.data.resume_attempted = true;
                 let client = self.cursor.client().clone();
-                let pipeline = self.data.pipeline.clone();
-                let options = self.data.options.clone();
-                let target = self.data.target.clone();
-                // TODO: adjust options, kill cursor
+                let data = self.data.clone();
+                // TODO: adjust options
                 self.pending_resume = Some(Box::pin(async move {
                     let new_stream: Result<ChangeStream<ChangeStreamEvent<()>>> =
-                        client.execute_watch(pipeline, options, target).await;
+                        client.execute_watch(data.pipeline, data.options, data.target).await;
                     new_stream.map(|cs| cs.with_type::<T>())
                 }));
                 return Poll::Pending;
