@@ -11,7 +11,6 @@ use crate::{
         event::{ChangeStreamEvent, ResumeToken},
         session::SessionChangeStream,
         ChangeStream,
-        ChangeStreamData,
     },
     cmap::{
         conn::PinnedConnectionHandle,
@@ -151,7 +150,7 @@ impl Client {
     {
         Box::pin(async {
             let mut details = self.execute_operation_with_details(op, None).await?;
-            let pinned = self.pin_connection_for_cursor(&mut details.output)?;
+            let pinned = self.pin_connection_for_cursor(&details.output.operation_output, &mut details.output.connection)?;
             Ok(Cursor::new(
                 self.clone(),
                 details.output.operation_output,
@@ -175,7 +174,7 @@ impl Client {
             .execute_operation_with_details(op, &mut *session)
             .await?;
 
-        let pinned = self.pin_connection_for_session(&mut details.output, session)?;
+        let pinned = self.pin_connection_for_session(&details.output.operation_output, &mut details.output.connection, session)?;
         Ok(SessionCursor::new(
             self.clone(),
             details.output.operation_output,
@@ -187,33 +186,29 @@ impl Client {
         self.inner.options.load_balanced.unwrap_or(false)
     }
 
-    fn pin_connection_for_cursor<Op>(
+    fn pin_connection_for_cursor(
         &self,
-        details: &mut ExecutionOutput<Op>,
-    ) -> Result<Option<PinnedConnectionHandle>>
-    where
-        Op: Operation<O = CursorSpecification>,
-    {
-        if self.is_load_balanced() && details.operation_output.info.id != 0 {
-            Ok(Some(details.connection.pin()?))
+        spec: &CursorSpecification,
+        conn: &mut Connection,
+    ) -> Result<Option<PinnedConnectionHandle>> {
+        if self.is_load_balanced() && spec.info.id != 0 {
+            Ok(Some(conn.pin()?))
         } else {
             Ok(None)
         }
     }
 
-    fn pin_connection_for_session<Op>(
+    fn pin_connection_for_session(
         &self,
-        details: &mut ExecutionOutput<Op>,
+        spec: &CursorSpecification,
+        conn: &mut Connection,
         session: &mut ClientSession,
-    ) -> Result<Option<PinnedConnectionHandle>>
-    where
-        Op: Operation<O = CursorSpecification>,
-    {
+    ) -> Result<Option<PinnedConnectionHandle>> {
         if let Some(handle) = session.transaction.pinned_connection() {
             // Cursor operations on a transaction share the same pinned connection.
             Ok(Some(handle.replicate()))
         } else {
-            self.pin_connection_for_cursor(details)
+            self.pin_connection_for_cursor(spec, conn)
         }
     }
 
@@ -228,21 +223,22 @@ impl Client {
     {
         Box::pin(async {
             let pipeline: Vec<_> = pipeline.into_iter().collect();
-            let op = ChangeStreamAggregate::new(&target, &pipeline, &options)?;
+            let op = ChangeStreamAggregate::new(self.clone(), &target, &pipeline, &options)?;
 
             let mut details = self.execute_operation_with_details(op, None).await?;
-            let pinned = self.pin_connection_for_cursor(&mut details.output)?;
-            let resume_token = ResumeToken::initial(&options, &details.output.operation_output);
+            let (cursor_spec, cs_data) = details.output.operation_output;
+            let pinned = self.pin_connection_for_cursor(&cursor_spec, &mut details.output.connection)?;
+            let resume_token = ResumeToken::initial(&options, &cursor_spec);
             let cursor = Cursor::new(
                 self.clone(),
-                details.output.operation_output,
+                cursor_spec,
                 details.implicit_session,
                 pinned,
             );
 
             Ok(ChangeStream::new(
                 cursor,
-                ChangeStreamData::new(pipeline, self.clone(), target, options),
+                cs_data,
                 resume_token,
             ))
         })
@@ -261,18 +257,19 @@ impl Client {
     {
         Box::pin(async {
             let pipeline: Vec<_> = pipeline.into_iter().collect();
-            let op = ChangeStreamAggregate::new(&target, &pipeline, &options)?;
+            let op = ChangeStreamAggregate::new(self.clone(), &target, &pipeline, &options)?;
 
             let mut details = self
                 .execute_operation_with_details(op, &mut *session)
                 .await?;
-            let pinned = self.pin_connection_for_session(&mut details.output, session)?;
-            let resume_token = ResumeToken::initial(&options, &details.output.operation_output);
-            let cursor = SessionCursor::new(self.clone(), details.output.operation_output, pinned);
+            let (cursor_spec, cs_data) = details.output.operation_output;
+            let pinned = self.pin_connection_for_session(&cursor_spec, &mut details.output.connection, session)?;
+            let resume_token = ResumeToken::initial(&options, &cursor_spec);
+            let cursor = SessionCursor::new(self.clone(), cursor_spec, pinned);
 
             Ok(SessionChangeStream::new(
                 cursor,
-                ChangeStreamData::new(pipeline, self.clone(), target, options),
+                cs_data,
                 resume_token,
             ))
         })

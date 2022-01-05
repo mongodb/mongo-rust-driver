@@ -171,7 +171,7 @@ where
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct ChangeStreamData {
     /// The pipeline of stages to append to an initial `$changeStream` stage.
     pipeline: Vec<Document>,
