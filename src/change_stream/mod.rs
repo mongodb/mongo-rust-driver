@@ -175,67 +175,31 @@ where
 #[derive(Debug, Clone)]
 pub(crate) struct WatchArgs {
     /// The pipeline of stages to append to an initial `$changeStream` stage.
-    pipeline: Vec<Document>,
+    pub(crate) pipeline: Vec<Document>,
 
     /// The original target of the change stream.
-    target: AggregateTarget,
+    pub(crate) target: AggregateTarget,
 
     /// The options provided to the initial `$changeStream` stage.
-    options: Option<ChangeStreamOptions>,
-}
-
-impl WatchArgs {
-    pub(crate) fn new(
-        pipeline: Vec<Document>,
-        target: AggregateTarget,
-        options: Option<ChangeStreamOptions>,
-    ) -> Self {
-        Self {
-            pipeline,
-            target,
-            options,
-        }
-    }
-
-    pub(crate) fn pipeline(&self) -> &[Document] {
-        &self.pipeline
-    }
-
-    pub(crate) fn target(&self) -> &AggregateTarget {
-        &self.target
-    }
-
-    pub(crate) fn options(&self) -> Option<&ChangeStreamOptions> {
-        self.options.as_ref()
-    }
+    pub(crate) options: Option<ChangeStreamOptions>,
 }
 
 /// Dynamic change stream data needed for resume.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ChangeStreamData {
     /// The `operationTime` returned by the initial `aggregate` command.
-    initial_operation_time: Option<Timestamp>,
+    pub(crate) initial_operation_time: Option<Timestamp>,
 
     /// The cached resume token.
-    resume_token: Option<ResumeToken>,
+    pub(crate) resume_token: Option<ResumeToken>,
 
     /// Whether or not the change stream has attempted a resume, used to attempt a resume only
     /// once.
-    resume_attempted: bool,
+    pub(crate) resume_attempted: bool,
 
     /// Whether or not the change stream has returned a document, used to update resume token
     /// during an automatic resume.
-    document_returned: bool,
-}
-
-impl ChangeStreamData {
-    pub(crate) fn set_initial_operation_time(&mut self, ts: Option<Timestamp>) {
-        self.initial_operation_time = ts;
-    }
-
-    pub(crate) fn set_resume_token(&mut self, token: Option<ResumeToken>) {
-        self.resume_token = token;
-    }
+    pub(crate) document_returned: bool,
 }
 
 fn get_resume_token(
@@ -290,7 +254,6 @@ where
                 let client = self.cursor.client().clone();
                 let args = self.args.clone();
                 let data = self.data.clone();
-                // TODO: adjust options
                 self.pending_resume = Some(Box::pin(async move {
                     let new_stream: Result<ChangeStream<ChangeStreamEvent<()>>> =
                         client.execute_watch(args.pipeline, args.options, args.target, Some(data)).await;

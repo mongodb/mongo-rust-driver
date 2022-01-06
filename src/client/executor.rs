@@ -224,7 +224,7 @@ impl Client {
     {
         Box::pin(async {
             let pipeline: Vec<_> = pipeline.into_iter().collect();
-            let args = WatchArgs::new(pipeline, target, options);
+            let args = WatchArgs { pipeline, target, options };
             let op = ChangeStreamAggregate::new(&args, resume_data)?;
 
             let mut details = self.execute_operation_with_details(op, None).await?;
@@ -259,7 +259,7 @@ impl Client {
     {
         Box::pin(async {
             let pipeline: Vec<_> = pipeline.into_iter().collect();
-            let args = WatchArgs::new(pipeline, target, options);
+            let args = WatchArgs { pipeline, target, options };
             let op = ChangeStreamAggregate::new(&args, resume_data)?;
 
             let mut details = self

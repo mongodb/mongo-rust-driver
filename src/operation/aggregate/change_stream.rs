@@ -11,7 +11,8 @@ use super::{Aggregate};
 
 pub(crate) struct ChangeStreamAggregate {
     inner: Aggregate,
-    options: Option<ChangeStreamOptions>,
+    args: WatchArgs,
+    resume_data: Option<ChangeStreamData>,
 }
 
 impl ChangeStreamAggregate {
@@ -19,19 +20,24 @@ impl ChangeStreamAggregate {
         args: &WatchArgs,
         resume_data: Option<ChangeStreamData>,
     ) -> Result<Self> {
+        Ok(Self {
+            inner: Self::build_inner(args)?,
+            args: args.clone(),
+            resume_data,
+        })
+    }
+
+    fn build_inner(args: &WatchArgs) -> Result<Aggregate> {
         let mut bson_options = Document::new();
-        append_options(&mut bson_options, args.options())?;
+        append_options(&mut bson_options, args.options.as_ref())?;
 
         let mut agg_pipeline = vec![doc! { "$changeStream": bson_options }];
-        agg_pipeline.extend(args.pipeline().iter().cloned());
-        Ok(Self {
-            inner: Aggregate::new(
-                args.target().clone(),
-                agg_pipeline,
-                args.options().map(|o| o.aggregate_options()),
-            ),
-            options: args.options().cloned(),
-        })
+        agg_pipeline.extend(args.pipeline.iter().cloned());
+        Ok(Aggregate::new(
+            args.target.clone(),
+            agg_pipeline,
+            args.options.as_ref().map(|o| o.aggregate_options()),
+        ))
     }
 }
 
@@ -42,6 +48,29 @@ impl Operation for ChangeStreamAggregate {
     const NAME: &'static str = "aggregate";
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
+        if let Some(data) = &mut self.resume_data {
+            let mut new_opts = self.args.options.clone().unwrap_or_else(ChangeStreamOptions::default);
+            if let Some(token) = data.resume_token.take() {
+                if new_opts.start_after.is_some() && !data.document_returned {
+                    new_opts.start_after = Some(token);
+                    new_opts.start_at_operation_time = None;
+                } else {
+                    new_opts.resume_after = Some(token);
+                    new_opts.start_after = None;
+                    new_opts.start_at_operation_time = None;
+                }
+            } else {
+                let saved_time = new_opts.start_at_operation_time.as_ref().or_else(|| data.initial_operation_time.as_ref());
+                if saved_time.is_some() && description.max_wire_version.map_or(false, |v| v >= 7) {
+                    new_opts.start_at_operation_time = saved_time.cloned();
+                }
+            }
+
+            self.inner = Self::build_inner(&WatchArgs {
+                options: Some(new_opts),
+                ..self.args.clone()
+            })?;
+        }
         self.inner.build(description)
     }
 
@@ -63,8 +92,8 @@ impl Operation for ChangeStreamAggregate {
         let spec = self.inner.handle_response(response, description)?;
 
         let mut data = ChangeStreamData::default();
-        data.set_resume_token(ResumeToken::initial(self.options.as_ref(), &spec));
-        if self.options
+        data.resume_token = ResumeToken::initial(self.args.options.as_ref(), &spec);
+        if self.args.options
             .as_ref()
             .map_or(true, |o|
                 o.start_at_operation_time.is_none() &&
@@ -73,7 +102,7 @@ impl Operation for ChangeStreamAggregate {
             description.max_wire_version.map_or(false, |v| v >= 7) &&
             spec.initial_buffer.is_empty() &&
             spec.post_batch_resume_token.is_none() {
-                data.set_initial_operation_time(op_time);
+                data.initial_operation_time = op_time;
         }
     
         Ok((spec, data))
