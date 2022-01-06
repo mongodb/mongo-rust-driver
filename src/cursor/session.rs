@@ -250,6 +250,7 @@ where
             &self.info.ns,
             self.info.id,
             self.pinned_connection.replicate(),
+            None,  // TODO aegnor
             #[cfg(test)]
             self.kill_watcher.take(),
         );

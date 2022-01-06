@@ -84,6 +84,10 @@ where
         &self.info.ns
     }
 
+    pub(super) fn address(&self) -> &ServerAddress {
+        &self.info.address
+    }
+
     pub(super) fn pinned_connection(&self) -> &PinnedConnection {
         &self.pinned_connection
     }
@@ -392,6 +396,7 @@ pub(super) fn kill_cursor(
     ns: &Namespace,
     cursor_id: i64,
     pinned_conn: PinnedConnection,
+    drop_address: Option<ServerAddress>,
     #[cfg(test)] kill_watcher: Option<oneshot::Sender<()>>,
 ) {
     let coll = client
@@ -399,7 +404,7 @@ pub(super) fn kill_cursor(
         .collection::<Document>(ns.coll.as_str());
     RUNTIME.execute(async move {
         if !pinned_conn.is_invalid() {
-            let _ = coll.kill_cursor(cursor_id, pinned_conn.handle()).await;
+            let _ = coll.kill_cursor(cursor_id, pinned_conn.handle(), drop_address).await;
             #[cfg(test)]
             if let Some(tx) = kill_watcher {
                 let _ = tx.send(());

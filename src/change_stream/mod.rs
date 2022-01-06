@@ -88,7 +88,7 @@ where
     /// Arguments to `watch` that created this change stream.
     args: WatchArgs,
 
-    /// Dynamic information associate with this change stream.
+    /// Dynamic information associated with this change stream.
     data: ChangeStreamData,
 
     /// A pending future for a resume.
@@ -227,9 +227,10 @@ where
                     return Poll::Pending;
                 }
                 Poll::Ready(Ok(new_stream)) => {
-                    // TODO: kill cursor only on server selected by resume
-                    //    * this will be hard because cursor kill happens on drop
+                    // Ensure that the old cursor is killed on the server selected for the new one.
+                    self.cursor.set_drop_address(new_stream.cursor.address().clone());
                     self.cursor = new_stream.cursor;
+                    self.args = new_stream.args;
                     return Poll::Pending;
                 }
                 Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),

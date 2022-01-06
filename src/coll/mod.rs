@@ -55,7 +55,7 @@ use crate::{
     ClientSession,
     Cursor,
     Database,
-    SessionCursor,
+    SessionCursor, client::options::ServerAddress,
 };
 
 /// `Collection` is the client-side abstraction of a MongoDB Collection. It can be used to
@@ -776,6 +776,7 @@ impl<T> Collection<T> {
         &self,
         cursor_id: i64,
         pinned_connection: Option<&PinnedConnectionHandle>,
+        drop_address: Option<ServerAddress>,
     ) -> Result<()> {
         let ns = self.namespace();
 
@@ -786,7 +787,7 @@ impl<T> Collection<T> {
                     "killCursors": ns.coll.as_str(),
                     "cursors": [cursor_id]
                 },
-                None,
+                drop_address.map(SelectionCriteria::from_address),
                 None,
                 pinned_connection,
             )
