@@ -1,13 +1,14 @@
 use crate::{
     bson::{doc, Document},
+    change_stream::{event::ResumeToken, ChangeStreamData, WatchArgs},
     cmap::{Command, RawCommandResponse, StreamDescription},
     cursor::CursorSpecification,
     error::Result,
     operation::{append_options, Operation, Retryability},
-    options::{ChangeStreamOptions, SelectionCriteria, WriteConcern}, change_stream::{ChangeStreamData, event::ResumeToken, WatchArgs},
+    options::{ChangeStreamOptions, SelectionCriteria, WriteConcern},
 };
 
-use super::{Aggregate};
+use super::Aggregate;
 
 pub(crate) struct ChangeStreamAggregate {
     inner: Aggregate,
@@ -16,10 +17,7 @@ pub(crate) struct ChangeStreamAggregate {
 }
 
 impl ChangeStreamAggregate {
-    pub(crate) fn new(
-        args: &WatchArgs,
-        resume_data: Option<ChangeStreamData>,
-    ) -> Result<Self> {
+    pub(crate) fn new(args: &WatchArgs, resume_data: Option<ChangeStreamData>) -> Result<Self> {
         Ok(Self {
             inner: Self::build_inner(args)?,
             args: args.clone(),
@@ -49,7 +47,11 @@ impl Operation for ChangeStreamAggregate {
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         if let Some(data) = &mut self.resume_data {
-            let mut new_opts = self.args.options.clone().unwrap_or_else(ChangeStreamOptions::default);
+            let mut new_opts = self
+                .args
+                .options
+                .clone()
+                .unwrap_or_else(ChangeStreamOptions::default);
             if let Some(token) = data.resume_token.take() {
                 if new_opts.start_after.is_some() && !data.document_returned {
                     new_opts.start_after = Some(token);
@@ -60,7 +62,10 @@ impl Operation for ChangeStreamAggregate {
                     new_opts.start_at_operation_time = None;
                 }
             } else {
-                let saved_time = new_opts.start_at_operation_time.as_ref().or_else(|| data.initial_operation_time.as_ref());
+                let saved_time = new_opts
+                    .start_at_operation_time
+                    .as_ref()
+                    .or_else(|| data.initial_operation_time.as_ref());
                 if saved_time.is_some() && description.max_wire_version.map_or(false, |v| v >= 7) {
                     new_opts.start_at_operation_time = saved_time.cloned();
                 }
@@ -86,25 +91,25 @@ impl Operation for ChangeStreamAggregate {
         response: RawCommandResponse,
         description: &StreamDescription,
     ) -> Result<Self::O> {
-        let op_time = response.raw_body()
+        let op_time = response
+            .raw_body()
             .get("operationTime")?
             .and_then(bson::RawBsonRef::as_timestamp);
         let spec = self.inner.handle_response(response, description)?;
 
         let mut data = ChangeStreamData::default();
         data.resume_token = ResumeToken::initial(self.args.options.as_ref(), &spec);
-        if self.args.options
-            .as_ref()
-            .map_or(true, |o|
-                o.start_at_operation_time.is_none() &&
-                o.resume_after.is_none() &&
-                o.start_after.is_none()) &&
-            description.max_wire_version.map_or(false, |v| v >= 7) &&
-            spec.initial_buffer.is_empty() &&
-            spec.post_batch_resume_token.is_none() {
-                data.initial_operation_time = op_time;
+        if self.args.options.as_ref().map_or(true, |o| {
+            o.start_at_operation_time.is_none()
+                && o.resume_after.is_none()
+                && o.start_after.is_none()
+        }) && description.max_wire_version.map_or(false, |v| v >= 7)
+            && spec.initial_buffer.is_empty()
+            && spec.post_batch_resume_token.is_none()
+        {
+            data.initial_operation_time = op_time;
         }
-    
+
         Ok((spec, data))
     }
 

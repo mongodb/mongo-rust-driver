@@ -8,9 +8,11 @@ use super::{session::TransactionState, Client, ClientSession};
 use crate::{
     bson::Document,
     change_stream::{
-        event::{ChangeStreamEvent},
+        event::ChangeStreamEvent,
         session::SessionChangeStream,
-        ChangeStream, ChangeStreamData, WatchArgs,
+        ChangeStream,
+        ChangeStreamData,
+        WatchArgs,
     },
     cmap::{
         conn::PinnedConnectionHandle,
@@ -150,7 +152,10 @@ impl Client {
     {
         Box::pin(async {
             let mut details = self.execute_operation_with_details(op, None).await?;
-            let pinned = self.pin_connection_for_cursor(&details.output.operation_output, &mut details.output.connection)?;
+            let pinned = self.pin_connection_for_cursor(
+                &details.output.operation_output,
+                &mut details.output.connection,
+            )?;
             Ok(Cursor::new(
                 self.clone(),
                 details.output.operation_output,
@@ -174,7 +179,11 @@ impl Client {
             .execute_operation_with_details(op, &mut *session)
             .await?;
 
-        let pinned = self.pin_connection_for_session(&details.output.operation_output, &mut details.output.connection, session)?;
+        let pinned = self.pin_connection_for_session(
+            &details.output.operation_output,
+            &mut details.output.connection,
+            session,
+        )?;
         Ok(SessionCursor::new(
             self.clone(),
             details.output.operation_output,
@@ -224,24 +233,20 @@ impl Client {
     {
         Box::pin(async {
             let pipeline: Vec<_> = pipeline.into_iter().collect();
-            let args = WatchArgs { pipeline, target, options };
+            let args = WatchArgs {
+                pipeline,
+                target,
+                options,
+            };
             let op = ChangeStreamAggregate::new(&args, resume_data)?;
 
             let mut details = self.execute_operation_with_details(op, None).await?;
             let (cursor_spec, cs_data) = details.output.operation_output;
-            let pinned = self.pin_connection_for_cursor(&cursor_spec, &mut details.output.connection)?;
-            let cursor = Cursor::new(
-                self.clone(),
-                cursor_spec,
-                details.implicit_session,
-                pinned,
-            );
+            let pinned =
+                self.pin_connection_for_cursor(&cursor_spec, &mut details.output.connection)?;
+            let cursor = Cursor::new(self.clone(), cursor_spec, details.implicit_session, pinned);
 
-            Ok(ChangeStream::new(
-                cursor,
-                args,
-                cs_data,
-            ))
+            Ok(ChangeStream::new(cursor, args, cs_data))
         })
         .await
     }
@@ -259,20 +264,25 @@ impl Client {
     {
         Box::pin(async {
             let pipeline: Vec<_> = pipeline.into_iter().collect();
-            let args = WatchArgs { pipeline, target, options };
+            let args = WatchArgs {
+                pipeline,
+                target,
+                options,
+            };
             let op = ChangeStreamAggregate::new(&args, resume_data)?;
 
             let mut details = self
                 .execute_operation_with_details(op, &mut *session)
                 .await?;
             let (cursor_spec, cs_data) = details.output.operation_output;
-            let pinned = self.pin_connection_for_session(&cursor_spec, &mut details.output.connection, session)?;
+            let pinned = self.pin_connection_for_session(
+                &cursor_spec,
+                &mut details.output.connection,
+                session,
+            )?;
             let cursor = SessionCursor::new(self.clone(), cursor_spec, pinned);
 
-            Ok(SessionChangeStream::new(
-                cursor,
-                cs_data,
-            ))
+            Ok(SessionChangeStream::new(cursor, cs_data))
         })
         .await
     }

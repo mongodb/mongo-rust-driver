@@ -58,14 +58,8 @@ impl<T> SessionChangeStream<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
-    pub(crate) fn new(
-        cursor: SessionCursor<T>,
-        data: ChangeStreamData,
-    ) -> Self {
-        Self {
-            cursor,
-            data,
-        }
+    pub(crate) fn new(cursor: SessionCursor<T>, data: ChangeStreamData) -> Self {
+        Self { cursor, data }
     }
 
     /// Returns the cached resume token that can be used to resume after the most recently returned

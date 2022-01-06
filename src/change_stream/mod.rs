@@ -100,11 +100,7 @@ impl<T> ChangeStream<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
-    pub(crate) fn new(
-        cursor: Cursor<T>,
-        args: WatchArgs,
-        data: ChangeStreamData,
-    ) -> Self {
+    pub(crate) fn new(cursor: Cursor<T>, args: WatchArgs, data: ChangeStreamData) -> Self {
         let pending_resume: Option<BoxFuture<'static, Result<ChangeStream<T>>>> = None;
         Self {
             cursor,
@@ -235,7 +231,7 @@ where
                     //    * this will be hard because cursor kill happens on drop
                     self.cursor = new_stream.cursor;
                     return Poll::Pending;
-                },
+                }
                 Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
             }
         }
@@ -255,8 +251,9 @@ where
                 let args = self.args.clone();
                 let data = self.data.clone();
                 self.pending_resume = Some(Box::pin(async move {
-                    let new_stream: Result<ChangeStream<ChangeStreamEvent<()>>> =
-                        client.execute_watch(args.pipeline, args.options, args.target, Some(data)).await;
+                    let new_stream: Result<ChangeStream<ChangeStreamEvent<()>>> = client
+                        .execute_watch(args.pipeline, args.options, args.target, Some(data))
+                        .await;
                     new_stream.map(|cs| cs.with_type::<T>())
                 }));
                 return Poll::Pending;
