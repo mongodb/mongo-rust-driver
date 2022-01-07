@@ -1,11 +1,12 @@
 //! Types for change streams using sessions.
 use std::{
+    future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
 
 use bson::Document;
-use futures_core::Stream;
+use futures_core::{future::BoxFuture, Stream};
 use futures_util::StreamExt;
 use serde::de::DeserializeOwned;
 
@@ -17,7 +18,7 @@ use crate::{
     SessionCursorStream,
 };
 
-use super::{event::ResumeToken, get_resume_token, stream_poll_next, ChangeStreamData};
+use super::{event::{ResumeToken, ChangeStreamEvent}, get_resume_token, stream_poll_next, ChangeStreamData, WatchArgs};
 
 /// A [`SessionChangeStream`] is a change stream that was created with a [`ClientSession`] that must
 /// be iterated using one. To iterate, use [`SessionChangeStream::next`] or retrieve a
@@ -51,6 +52,7 @@ where
     T: DeserializeOwned + Unpin,
 {
     cursor: SessionCursor<T>,
+    args: WatchArgs,
     data: ChangeStreamData,
 }
 
@@ -58,8 +60,8 @@ impl<T> SessionChangeStream<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
-    pub(crate) fn new(cursor: SessionCursor<T>, data: ChangeStreamData) -> Self {
-        Self { cursor, data }
+    pub(crate) fn new(cursor: SessionCursor<T>, args: WatchArgs, data: ChangeStreamData) -> Self {
+        Self { cursor, args, data }
     }
 
     /// Returns the cached resume token that can be used to resume after the most recently returned
@@ -76,6 +78,7 @@ where
     pub fn with_type<D: DeserializeOwned + Unpin + Send + Sync>(self) -> SessionChangeStream<D> {
         SessionChangeStream {
             cursor: self.cursor.with_type(),
+            args: self.args,
             data: self.data,
         }
     }
@@ -128,8 +131,9 @@ where
         session: &'session mut ClientSession,
     ) -> SessionChangeStreamValues<'_, 'session, T> {
         SessionChangeStreamValues {
-            stream: self.cursor.stream(session),
-            data: &mut self.data,
+            stream: self,
+            session,
+            state: StreamState::Idle,
         }
     }
 
@@ -206,8 +210,19 @@ pub struct SessionChangeStreamValues<'cursor, 'session, T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
-    stream: SessionCursorStream<'cursor, 'session, T>,
-    data: &'cursor mut ChangeStreamData,
+    stream: &'cursor mut SessionChangeStream<T>,
+    session: &'session mut ClientSession,
+    state: StreamState<'cursor, 'session, T>,
+    //pending_resume: Option<BoxFuture<'static, Result<SessionChangeStream<T>>>>,
+}
+
+pub enum StreamState<'cursor, 'session, T>
+where
+    T: DeserializeOwned + Unpin + Send + Sync,
+{
+    Idle,
+    PollNext(SessionCursorStream<'cursor, 'session, T>),
+    PendingResume(Option<BoxFuture<'static, Result<SessionChangeStream<T>>>>),
 }
 
 impl<'cursor, 'session, T> SessionChangeStreamValues<'cursor, 'session, T>
@@ -215,11 +230,11 @@ where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
     pub fn resume_token(&self) -> Option<&ResumeToken> {
-        self.data.resume_token.as_ref()
+        self.stream.data.resume_token.as_ref()
     }
 
     pub fn is_alive(&self) -> bool {
-        !self.stream.is_exhausted()
+        !self.stream.cursor.is_exhausted()
     }
 
     pub async fn next_if_any<'a>(&'a mut self) -> Result<Option<T>> {
@@ -235,13 +250,65 @@ where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
     fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
-        let out = self.stream.poll_next_in_batch(cx);
-        if let Poll::Ready(Ok(bv)) = &out {
-            if let Some(token) = get_resume_token(bv, self.stream.post_batch_resume_token())? {
-                self.data.resume_token = Some(token);
+        let mut out = Poll::Pending;
+        take_mut::take(&mut self.state, |state| {
+            match state {
+                /*
+                StreamState::Idle => {
+                    StreamState::PollNext(self.stream.cursor.stream(self.session))
+                }
+                */
+                _ => todo!(),
+            }
+        });
+        out
+        /*
+        if let Some(mut pending) = self.pending_resume.take() {
+            match Pin::new(&mut pending).poll(cx) {
+                Poll::Pending => {
+                    self.pending_resume = Some(pending);
+                    return Poll::Pending;
+                }
+                Poll::Ready(Ok(new_stream)) => {
+                    // Ensure that the old cursor is killed on the server selected for the new one.
+                    todo!();
+                    /*
+                    self.stream.set_drop_address(new_values.stream.address().clone());
+                    self.stream = new_values.stream;
+                    self.args = new_values.args;
+                    return Poll::Pending;
+                    */
+                }
+                Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
             }
         }
+        let out = self.cursor_stream.poll_next_in_batch(cx);
+        match &out {
+            Poll::Ready(Ok(bv)) => {
+                if let Some(token) = get_resume_token(bv, self.cursor_stream.post_batch_resume_token())? {
+                    self.change_stream.data.resume_token = Some(token);
+                }
+                if matches!(bv, BatchValue::Some { .. }) {
+                    self.change_stream.data.document_returned = true;
+                }
+            }
+            Poll::Ready(Err(e)) if e.is_resumable() && !self.change_stream.data.resume_attempted => {
+                self.change_stream.data.resume_attempted = true;
+                let client = self.cursor_stream.client().clone();
+                let args = self.change_stream.args.clone();
+                let data = self.change_stream.data.clone();
+                self.pending_resume = Some(Box::pin(async move {
+                    let new_stream: Result<SessionChangeStream<ChangeStreamEvent<()>>> = client
+                        .execute_watch_with_session(args.pipeline, args.options, args.target, Some(data), todo!())
+                        .await;
+                    new_stream.map(|cs| cs.with_type::<T>())
+                }));
+                return Poll::Pending;
+            }
+            _ => {}
+        }
         out
+        */
     }
 }
 

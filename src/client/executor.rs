@@ -282,7 +282,7 @@ impl Client {
             )?;
             let cursor = SessionCursor::new(self.clone(), cursor_spec, pinned);
 
-            Ok(SessionChangeStream::new(cursor, cs_data))
+            Ok(SessionChangeStream::new(cursor, args, cs_data))
         })
         .await
     }

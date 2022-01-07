@@ -286,6 +286,10 @@ where
     pub(crate) fn is_exhausted(&self) -> bool {
         self.generic_cursor.is_exhausted()
     }
+
+    pub(crate) fn client(&self) -> &Client {
+        &self.session_cursor.client
+    }
 }
 
 impl<'cursor, 'session, T> Stream for SessionCursorStream<'cursor, 'session, T>
