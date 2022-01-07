@@ -47,11 +47,7 @@ impl Operation for ChangeStreamAggregate {
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command> {
         if let Some(data) = &mut self.resume_data {
-            let mut new_opts = self
-                .args
-                .options
-                .clone()
-                .unwrap_or_default();
+            let mut new_opts = self.args.options.clone().unwrap_or_default();
             if let Some(token) = data.resume_token.take() {
                 if new_opts.start_after.is_some() && !data.document_returned {
                     new_opts.start_after = Some(token);
@@ -106,7 +102,8 @@ impl Operation for ChangeStreamAggregate {
                 && o.resume_after.is_none()
                 && o.start_after.is_none()
         };
-        if self.args.options.as_ref().map_or(true, has_no_time) && description.max_wire_version.map_or(false, |v| v >= 7)
+        if self.args.options.as_ref().map_or(true, has_no_time)
+            && description.max_wire_version.map_or(false, |v| v >= 7)
             && spec.initial_buffer.is_empty()
             && spec.post_batch_resume_token.is_none()
         {
