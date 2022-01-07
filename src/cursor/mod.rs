@@ -1,6 +1,5 @@
 mod common;
 pub(crate) mod session;
-mod alt_session;
 
 use std::{
     pin::Pin,
