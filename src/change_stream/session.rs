@@ -2,12 +2,13 @@
 use std::{
     future::Future,
     pin::Pin,
-    task::{Context, Poll},
+    sync::{Arc, Mutex},
+    task::{Context, Poll}, marker::PhantomData,
 };
 
 use bson::Document;
 use futures_core::{future::BoxFuture, Stream};
-use futures_util::StreamExt;
+use futures_util::{StreamExt};
 use serde::de::DeserializeOwned;
 
 use crate::{
@@ -70,19 +71,20 @@ where
     /// See the documentation
     /// [here](https://docs.mongodb.com/manual/changeStreams/#change-stream-resume-token) for more
     /// information on change stream resume tokens.
-    pub fn resume_token(&self) -> Option<&ResumeToken> {
-        self.data.resume_token.as_ref()
+    pub fn resume_token(&self) -> Option<ResumeToken> {
+        self.data.resume_token.clone()
     }
 
     /// Update the type streamed values will be parsed as.
     pub fn with_type<D: DeserializeOwned + Unpin + Send + Sync>(self) -> SessionChangeStream<D> {
-        SessionChangeStream {
-            cursor: self.cursor.with_type(),
-            args: self.args,
-            data: self.data,
-        }
+        SessionChangeStream::new(
+            self.cursor.with_type(),
+            self.args,
+            self.data,
+        )
     }
 
+    /*
     /// Retrieves a [`SessionCursorStream`] to iterate this change stream. The session provided must
     /// be the same session used to create the cursor.
     ///
@@ -130,12 +132,15 @@ where
         &mut self,
         session: &'session mut ClientSession,
     ) -> SessionChangeStreamValues<'_, 'session, T> {
+        todo!()
+        /*
         SessionChangeStreamValues {
             stream: self,
-            session,
-            state: StreamState::Idle,
+            state: StreamState::Idle(session),
         }
+        */
     }
+    */
 
     /// Retrieve the next result from the change stream.
     /// The session provided must be the same session used to create the change stream.
@@ -153,7 +158,7 @@ where
     /// # let other_coll = coll.clone();
     /// # let mut session = client.start_session(None).await?;
     /// let mut cs = coll.watch_with_session(None, None, &mut session).await?;
-    /// while let Some(event) = cs.next(&mut session).await.transpose()? {
+    /// while let Some(event) = cs.next(&mut session).await? {
     ///     let id = bson::to_bson(&event.id)?;
     ///     other_coll.insert_one_with_session(doc! { "id": id }, None, &mut session).await?;
     /// }
@@ -161,8 +166,15 @@ where
     /// # };
     /// # }
     /// ```
-    pub async fn next(&mut self, session: &mut ClientSession) -> Option<Result<T>> {
-        self.values(session).next().await
+    pub async fn next(&mut self, session: &mut ClientSession) -> Result<Option<T>> {
+        loop {
+            let maybe_next = self.next_if_any(session).await?;
+            match maybe_next {
+                Some(t) => return Ok(Some(t)),
+                None if self.is_alive() => continue,
+                None => return Ok(None),
+            }
+        }
     }
 
     /// Returns whether the change stream will continue to receive events.
@@ -196,10 +208,45 @@ where
     /// # }
     /// ```
     pub async fn next_if_any(&mut self, session: &mut ClientSession) -> Result<Option<T>> {
-        self.values(session).next_if_any().await
+        loop {
+            let (next, post_batch_token, client) = {
+                let mut stream = self.cursor.stream(session);
+                let next = NextInBatchFuture::new(&mut stream).await;
+                let post_batch_token = stream.post_batch_resume_token().cloned();
+                let client = stream.client().clone();
+                (next, post_batch_token, client)
+            };
+            match next {
+                Ok(bv) => {
+                    if let Some(token) = get_resume_token(&bv, post_batch_token.as_ref())? {
+                        self.data.resume_token = Some(token);
+                    }
+                    match bv {
+                        BatchValue::Some { doc, .. } => {
+                            self.data.document_returned = true;
+                            return Ok(Some(bson::from_slice(doc.as_bytes())?));
+                        }
+                        BatchValue::Empty | BatchValue::Exhausted => return Ok(None),
+                    }
+                }
+                Err(e) if e.is_resumable() && !self.data.resume_attempted => {
+                    self.data.resume_attempted = true;
+                    let args = self.args.clone();
+                    let data = self.data.clone();
+                    let new_stream: SessionChangeStream<ChangeStreamEvent<()>> = client.execute_watch_with_session(args.pipeline, args.options, args.target, Some(data), session).await?;
+                    let new_stream = new_stream.with_type::<T>();
+                    self.cursor.set_drop_address(new_stream.cursor.address().clone());
+                    self.cursor = new_stream.cursor;
+                    self.args = new_stream.args;
+                    continue;
+                }
+                Err(e) => return Err(e),
+            }
+        }
     }
 }
 
+/*
 /// A type that implements [`Stream`](https://docs.rs/futures/latest/futures/stream/index.html) which can be used to
 /// stream the results of a [`SessionChangeStream`]. Returned from [`SessionChangeStream::values`].
 ///
@@ -210,9 +257,9 @@ pub struct SessionChangeStreamValues<'cursor, 'session, T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
-    stream: &'cursor mut SessionChangeStream<T>,
-    session: &'session mut ClientSession,
+    inner: Arc<Mutex<SessionChangeStreamState<T>>>,
     state: StreamState<'cursor, 'session, T>,
+    phantom: PhantomData<&'cursor mut T>,
     //pending_resume: Option<BoxFuture<'static, Result<SessionChangeStream<T>>>>,
 }
 
@@ -220,21 +267,23 @@ pub enum StreamState<'cursor, 'session, T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
-    Idle,
+    Idle(&'session mut ClientSession),
     PollNext(SessionCursorStream<'cursor, 'session, T>),
+    /*
     PendingResume(Option<BoxFuture<'static, Result<SessionChangeStream<T>>>>),
+    */
 }
 
 impl<'cursor, 'session, T> SessionChangeStreamValues<'cursor, 'session, T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
-    pub fn resume_token(&self) -> Option<&ResumeToken> {
-        self.stream.data.resume_token.as_ref()
+    pub fn resume_token(&self) -> Option<ResumeToken> {
+        self.inner.lock().unwrap().data.resume_token.clone()
     }
 
     pub fn is_alive(&self) -> bool {
-        !self.stream.cursor.is_exhausted()
+        !self.inner.lock().unwrap().cursor.is_exhausted()
     }
 
     pub async fn next_if_any<'a>(&'a mut self) -> Result<Option<T>> {
@@ -253,11 +302,6 @@ where
         let mut out = Poll::Pending;
         take_mut::take(&mut self.state, |state| {
             match state {
-                /*
-                StreamState::Idle => {
-                    StreamState::PollNext(self.stream.cursor.stream(self.session))
-                }
-                */
                 _ => todo!(),
             }
         });
@@ -322,3 +366,4 @@ where
         stream_poll_next(Pin::into_inner(self), cx)
     }
 }
+*/
