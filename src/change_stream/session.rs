@@ -1,14 +1,15 @@
 //! Types for change streams using sessions.
 use std::{
     future::Future,
+    marker::PhantomData,
     pin::Pin,
     sync::{Arc, Mutex},
-    task::{Context, Poll}, marker::PhantomData,
+    task::{Context, Poll},
 };
 
 use bson::Document;
 use futures_core::{future::BoxFuture, Stream};
-use futures_util::{StreamExt};
+use futures_util::StreamExt;
 use serde::de::DeserializeOwned;
 
 use crate::{
@@ -19,7 +20,13 @@ use crate::{
     SessionCursorStream,
 };
 
-use super::{event::{ResumeToken, ChangeStreamEvent}, get_resume_token, stream_poll_next, ChangeStreamData, WatchArgs};
+use super::{
+    event::{ChangeStreamEvent, ResumeToken},
+    get_resume_token,
+    stream_poll_next,
+    ChangeStreamData,
+    WatchArgs,
+};
 
 /// A [`SessionChangeStream`] is a change stream that was created with a [`ClientSession`] that must
 /// be iterated using one. To iterate, use [`SessionChangeStream::next`] or retrieve a
@@ -77,11 +84,7 @@ where
 
     /// Update the type streamed values will be parsed as.
     pub fn with_type<D: DeserializeOwned + Unpin + Send + Sync>(self) -> SessionChangeStream<D> {
-        SessionChangeStream::new(
-            self.cursor.with_type(),
-            self.args,
-            self.data,
-        )
+        SessionChangeStream::new(self.cursor.with_type(), self.args, self.data)
     }
 
     /// Retrieve the next result from the change stream.
@@ -171,9 +174,18 @@ where
                 Err(e) if e.is_resumable() && !self.data.resume_attempted => {
                     self.data.resume_attempted = true;
                     let args = self.args.clone();
-                    let new_stream: SessionChangeStream<ChangeStreamEvent<()>> = client.execute_watch_with_session(args.pipeline, args.options, args.target, Some(self.data.clone()), session).await?;
+                    let new_stream: SessionChangeStream<ChangeStreamEvent<()>> = client
+                        .execute_watch_with_session(
+                            args.pipeline,
+                            args.options,
+                            args.target,
+                            Some(self.data.clone()),
+                            session,
+                        )
+                        .await?;
                     let new_stream = new_stream.with_type::<T>();
-                    self.cursor.set_drop_address(new_stream.cursor.address().clone());
+                    self.cursor
+                        .set_drop_address(new_stream.cursor.address().clone());
                     self.cursor = new_stream.cursor;
                     self.args = new_stream.args;
                     continue;

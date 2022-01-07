@@ -228,7 +228,8 @@ where
                 }
                 Poll::Ready(Ok(new_stream)) => {
                     // Ensure that the old cursor is killed on the server selected for the new one.
-                    self.cursor.set_drop_address(new_stream.cursor.address().clone());
+                    self.cursor
+                        .set_drop_address(new_stream.cursor.address().clone());
                     self.cursor = new_stream.cursor;
                     self.args = new_stream.args;
                     return Poll::Pending;

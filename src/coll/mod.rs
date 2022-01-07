@@ -23,6 +23,7 @@ use crate::{
         session::SessionChangeStream,
         ChangeStream,
     },
+    client::options::ServerAddress,
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
@@ -55,7 +56,7 @@ use crate::{
     ClientSession,
     Cursor,
     Database,
-    SessionCursor, client::options::ServerAddress,
+    SessionCursor,
 };
 
 /// `Collection` is the client-side abstraction of a MongoDB Collection. It can be used to

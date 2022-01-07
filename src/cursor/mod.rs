@@ -13,12 +13,13 @@ use tokio::sync::oneshot;
 
 use crate::{
     change_stream::event::ResumeToken,
+    client::options::ServerAddress,
     cmap::conn::PinnedConnectionHandle,
     error::{Error, Result},
     operation::GetMore,
     results::GetMoreResult,
     Client,
-    ClientSession, client::options::ServerAddress,
+    ClientSession,
 };
 use common::{kill_cursor, GenericCursor, GetMoreProvider, GetMoreProviderResult};
 pub(crate) use common::{

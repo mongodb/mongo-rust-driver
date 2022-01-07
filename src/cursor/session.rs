@@ -27,13 +27,14 @@ use super::{
 use crate::{
     bson::Document,
     change_stream::event::ResumeToken,
+    client::options::ServerAddress,
     cmap::conn::PinnedConnectionHandle,
     cursor::CursorSpecification,
     error::{Error, Result},
     operation::GetMore,
     results::GetMoreResult,
     Client,
-    ClientSession, client::options::ServerAddress,
+    ClientSession,
 };
 
 /// A [`SessionCursor`] is a cursor that was created with a [`ClientSession`] that must be iterated
