@@ -21,7 +21,6 @@ use crate::{
 use super::{
     event::{ChangeStreamEvent, ResumeToken},
     get_resume_token,
-    stream_poll_next,
     ChangeStreamData,
     WatchArgs,
 };
