@@ -8,8 +8,6 @@ use std::{
 };
 
 use bson::Document;
-use futures_core::{future::BoxFuture, Stream};
-use futures_util::StreamExt;
 use serde::de::DeserializeOwned;
 
 use crate::{
