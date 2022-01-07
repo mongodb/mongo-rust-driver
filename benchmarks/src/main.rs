@@ -193,7 +193,7 @@ const WRITE_BENCHES: &[&'static str] = &[
     GRIDFS_MULTI_UPLOAD_BENCH,
 ];
 
-const MAX_ID: usize = 17;
+const MAX_ID: u8 = BenchmarkId::FindManySerde as u8;
 
 async fn run_benchmarks(
     uri: &str,
@@ -529,6 +529,12 @@ fn parse_ids(matches: ArgMatches) -> HashSet<BenchmarkId> {
 #[cfg_attr(feature = "tokio-runtime", tokio::main)]
 #[cfg_attr(feature = "async-std-runtime", async_std::main)]
 async fn main() {
+    // ensure MAX_ID is kept up to date.
+    assert!(
+        BenchmarkId::try_from(MAX_ID + 1).is_err(),
+        "MAX_ID not up to date"
+    );
+
     let matches = App::new("RustDriverBenchmark")
         .version(env!("CARGO_PKG_VERSION"))
         .about("Runs performance micro-bench")
