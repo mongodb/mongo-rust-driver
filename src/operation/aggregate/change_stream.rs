@@ -51,7 +51,7 @@ impl Operation for ChangeStreamAggregate {
                 .args
                 .options
                 .clone()
-                .unwrap_or_else(ChangeStreamOptions::default);
+                .unwrap_or_default();
             if let Some(token) = data.resume_token.take() {
                 if new_opts.start_after.is_some() && !data.document_returned {
                     new_opts.start_after = Some(token);
@@ -97,13 +97,16 @@ impl Operation for ChangeStreamAggregate {
             .and_then(bson::RawBsonRef::as_timestamp);
         let spec = self.inner.handle_response(response, description)?;
 
-        let mut data = ChangeStreamData::default();
-        data.resume_token = ResumeToken::initial(self.args.options.as_ref(), &spec);
-        if self.args.options.as_ref().map_or(true, |o| {
+        let mut data = ChangeStreamData {
+            resume_token: ResumeToken::initial(self.args.options.as_ref(), &spec),
+            ..ChangeStreamData::default()
+        };
+        let has_no_time = |o: &ChangeStreamOptions| {
             o.start_at_operation_time.is_none()
                 && o.resume_after.is_none()
                 && o.start_after.is_none()
-        }) && description.max_wire_version.map_or(false, |v| v >= 7)
+        };
+        if self.args.options.as_ref().map_or(true, has_no_time) && description.max_wire_version.map_or(false, |v| v >= 7)
             && spec.initial_buffer.is_empty()
             && spec.post_batch_resume_token.is_none()
         {

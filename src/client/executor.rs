@@ -365,7 +365,7 @@ impl Client {
                 connection: conn,
             }),
             Err(mut err) => {
-                err.wire_version = conn.stream_description()?.max_wire_version.clone();
+                err.wire_version = conn.stream_description()?.max_wire_version;
 
                 // Retryable writes are only supported by storage engines with document-level
                 // locking, so users need to disable retryable writes if using mmapv1.
