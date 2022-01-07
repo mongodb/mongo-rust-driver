@@ -74,9 +74,8 @@ async fn build() {
     let mut cmd_docs: Vec<Document> = cmd
         .body
         .documents
-        .documents
-        .iter()
-        .map(|b| Document::from_reader(b.as_slice()).unwrap())
+        .into_iter()
+        .map(|b| Document::from_reader(b.unwrap().as_document().unwrap().as_bytes()).unwrap())
         .collect();
     assert_eq!(cmd_docs.len(), fixtures.documents.len());
 

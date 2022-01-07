@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod test;
 
-use std::{collections::HashMap, io::Write};
+use std::{collections::HashMap, convert::TryInto};
 
-use bson::{oid::ObjectId, spec::ElementType, Bson};
+use bson::{oid::ObjectId, Bson, RawArrayBuf, RawDocumentBuf};
 use serde::Serialize;
 
 use crate::{
@@ -14,7 +14,6 @@ use crate::{
     operation::{remove_empty_write_concern, Operation, Retryability, WriteResponseBody},
     options::{InsertManyOptions, WriteConcern},
     results::InsertManyResult,
-    runtime::SyncLittleEndianWrite,
     Namespace,
 };
 
@@ -57,7 +56,7 @@ impl<'a, T: Serialize> Operation for Insert<'a, T> {
     const NAME: &'static str = "insert";
 
     fn build(&mut self, description: &StreamDescription) -> Result<Command<InsertCommand>> {
-        let mut docs: Vec<Vec<u8>> = Vec::new();
+        let mut docs = RawArrayBuf::new();
         let mut size = 0;
 
         for (i, d) in self
@@ -66,31 +65,32 @@ impl<'a, T: Serialize> Operation for Insert<'a, T> {
             .take(description.max_write_batch_size as usize)
             .enumerate()
         {
-            let mut doc = bson::to_vec(d)?;
-            let id = match bson_util::raw_get(doc.as_slice(), "_id")? {
-                Some(b) => b,
+            let mut doc = bson::to_raw_document_buf(d)?;
+            let id = match doc.get("_id")? {
+                Some(b) => b.try_into()?,
                 None => {
-                    // TODO: RUST-924 Use raw document API here instead.
+                    let mut new_doc = RawDocumentBuf::new();
                     let oid = ObjectId::new();
+                    new_doc.append("_id", oid);
 
-                    // write element to temporary buffer
-                    let mut new_id = Vec::new();
-                    new_id.write_u8(ElementType::ObjectId as u8)?;
-                    new_id.write_all(b"_id\0")?;
-                    new_id.extend(oid.bytes().iter());
+                    let mut new_bytes = new_doc.into_bytes();
+                    new_bytes.pop(); // remove trailing null byte
 
-                    // insert element to beginning of existing doc after length
-                    doc.splice(4..4, new_id.into_iter());
+                    let mut bytes = doc.into_bytes();
+                    let oid_slice = &new_bytes[4..];
+                    // insert oid at beginning of document
+                    bytes.splice(4..4, oid_slice.iter().cloned());
 
-                    // update length of doc
-                    let new_len = doc.len() as i32;
-                    doc.splice(0..4, new_len.to_le_bytes().iter().cloned());
+                    // overwrite old length
+                    let new_length = (bytes.len() as i32).to_le_bytes();
+                    (&mut bytes[0..4]).copy_from_slice(&new_length);
+                    doc = RawDocumentBuf::from_bytes(bytes)?;
 
                     Bson::ObjectId(oid)
                 }
             };
 
-            let doc_size = bson_util::array_entry_size_bytes(i, doc.len());
+            let doc_size = bson_util::array_entry_size_bytes(i, doc.as_bytes().len());
 
             if (size + doc_size) <= description.max_bson_object_size as u64 {
                 if self.inserted_ids.len() <= i {
@@ -115,10 +115,7 @@ impl<'a, T: Serialize> Operation for Insert<'a, T> {
 
         let body = InsertCommand {
             insert: self.ns.coll.clone(),
-            documents: DocumentArraySpec {
-                documents: docs,
-                length: size as i32,
-            },
+            documents: docs,
             options,
         };
 
@@ -126,45 +123,11 @@ impl<'a, T: Serialize> Operation for Insert<'a, T> {
     }
 
     fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
-        // TODO: RUST-924 Use raw document API here instead.
-        let mut serialized = bson::to_vec(&cmd)?;
-
-        serialized.pop(); // drop null byte
-
-        // write element type
-        serialized.push(ElementType::Array as u8);
-
-        // write key cstring
-        serialized.write_all("documents".as_bytes())?;
-        serialized.push(0);
-
-        // write length of array
-        let array_length = 4 + cmd.body.documents.length + 1; // add in 4 for length of array, 1 for null byte
-        serialized.write_all(&array_length.to_le_bytes())?;
-
-        for (i, doc) in cmd.body.documents.documents.into_iter().enumerate() {
-            // write type of document
-            serialized.push(ElementType::EmbeddedDocument as u8);
-
-            // write array index
-            serialized.write_all(i.to_string().as_bytes())?;
-            serialized.push(0);
-
-            // write document
-            serialized.extend(doc);
-        }
-
-        // write null byte for array
-        serialized.push(0);
-
-        // write null byte for containing document
-        serialized.push(0);
-
-        // update length of original doc
-        let final_length = serialized.len() as i32;
-        serialized.splice(0..4, final_length.to_le_bytes().iter().cloned());
-
-        Ok(serialized)
+        let mut doc = bson::to_raw_document_buf(&cmd)?;
+        // need to append documents separately because #[serde(flatten)] breaks the custom
+        // serialization logic. See https://github.com/serde-rs/serde/issues/2106.
+        doc.append("documents", cmd.body.documents);
+        Ok(doc.into_bytes())
     }
 
     fn handle_response(
@@ -222,22 +185,13 @@ impl<'a, T: Serialize> Operation for Insert<'a, T> {
     }
 }
 
-/// Data used for creating a BSON array.
-struct DocumentArraySpec {
-    /// The sum of the lengths of all the documents.
-    length: i32,
-
-    /// The serialized documents to be inserted.
-    documents: Vec<Vec<u8>>,
-}
-
 #[derive(Serialize)]
 pub(crate) struct InsertCommand {
     insert: String,
 
     /// will be serialized in `serialize_command`
     #[serde(skip)]
-    documents: DocumentArraySpec,
+    documents: RawArrayBuf,
 
     #[serde(flatten)]
     options: InsertManyOptions,
