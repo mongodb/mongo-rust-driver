@@ -1,4 +1,4 @@
-pub(crate) mod json_multi {
+pub(crate) mod tweet {
     use mongodb::bson::Document;
     use serde::{Deserialize, Serialize};
 

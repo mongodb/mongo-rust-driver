@@ -21,7 +21,7 @@ pub struct FindOneBenchmark {
     uri: String,
 }
 
-// Specifies the options to a `FindOneBenchmark::setup` operation.
+/// Specifies the options to a `FindOneBenchmark::setup` operation.
 pub struct Options {
     pub num_iter: usize,
     pub path: PathBuf,

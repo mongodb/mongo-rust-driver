@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use futures::stream::TryStreamExt;
 use mongodb::{
-    bson::{doc, Document},
+    bson::{doc, RawDocumentBuf},
     Client,
     Collection,
     Database,
@@ -12,7 +12,6 @@ use mongodb::{
 use crate::{
     bench::{parse_json_file_to_documents, Benchmark, COLL_NAME, DATABASE_NAME},
     fs::File,
-    models::json_multi::Tweet,
 };
 
 use super::drop_database;
@@ -22,7 +21,7 @@ const TOTAL_FILES: usize = 100;
 pub struct JsonMultiExportBenchmark {
     uri: String,
     db: Database,
-    coll: Collection<Document>,
+    coll: Collection<RawDocumentBuf>,
 }
 
 // Specifies the options to a `JsonMultiExportBenchmark::setup` operation.
@@ -71,7 +70,7 @@ impl Benchmark for JsonMultiExportBenchmark {
         Ok(JsonMultiExportBenchmark {
             uri: options.uri,
             db,
-            coll,
+            coll: coll.clone_with_type(),
         })
     }
 
@@ -79,7 +78,7 @@ impl Benchmark for JsonMultiExportBenchmark {
         let mut tasks = Vec::new();
 
         for i in 0..TOTAL_FILES {
-            let coll_ref = self.coll.clone_with_type::<Tweet>();
+            let coll_ref = self.coll.clone();
             let path = std::env::temp_dir();
 
             tasks.push(crate::spawn(async move {

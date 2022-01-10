@@ -3,22 +3,25 @@ use std::{convert::TryInto, path::PathBuf};
 use anyhow::{bail, Result};
 use futures::stream::StreamExt;
 use mongodb::{
-    bson::{Bson, Document},
+    bson::{Bson, Document, RawDocumentBuf},
     Client,
     Collection,
     Database,
 };
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::{
     bench::{drop_database, Benchmark, COLL_NAME, DATABASE_NAME},
     fs::read_to_string,
+    models::tweet::Tweet,
 };
 
 pub struct FindManyBenchmark {
     db: Database,
-    coll: Collection<Document>,
+    coll: Collection<RawDocumentBuf>,
     uri: String,
+    mode: Mode,
 }
 
 // Specifies the options to `FindManyBenchmark::setup` operation.
@@ -26,6 +29,13 @@ pub struct Options {
     pub num_iter: usize,
     pub path: PathBuf,
     pub uri: String,
+    pub mode: Mode,
+}
+
+pub enum Mode {
+    Document,
+    RawBson,
+    Serde,
 }
 
 #[async_trait::async_trait]
@@ -53,15 +63,34 @@ impl Benchmark for FindManyBenchmark {
 
         Ok(FindManyBenchmark {
             db,
-            coll,
+            coll: coll.clone_with_type(),
             uri: options.uri,
+            mode: options.mode,
         })
     }
 
     async fn do_task(&self) -> Result<()> {
-        let mut cursor = self.coll.find(None, None).await?;
-        while let Some(doc) = cursor.next().await {
-            doc?;
+        async fn execute<T: DeserializeOwned + Unpin + Send + Sync + std::fmt::Debug>(
+            bench: &FindManyBenchmark,
+        ) -> Result<()> {
+            let coll = bench.coll.clone_with_type::<T>();
+            let mut cursor = coll.find(None, None).await?;
+            while let Some(doc) = cursor.next().await {
+                doc?;
+            }
+            Ok(())
+        }
+
+        match self.mode {
+            Mode::Document => {
+                execute::<Document>(self).await?;
+            }
+            Mode::RawBson => {
+                execute::<RawDocumentBuf>(self).await?;
+            }
+            Mode::Serde => {
+                execute::<Tweet>(self).await?;
+            }
         }
 
         Ok(())

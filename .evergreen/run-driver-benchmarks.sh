@@ -20,6 +20,6 @@ cargo run \
       --release \
       --no-default-features \
       --features ${FEATURES} \
-      -- --output="../benchmark-results.json" --single --multi --parallel
+      -- --output="../benchmark-results.json" --driver
 
 cat ../benchmark-results.json
