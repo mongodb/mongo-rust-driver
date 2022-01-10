@@ -8,7 +8,7 @@ use crate::{
     options::ChangeStreamOptions,
 };
 
-use bson::{Bson, Document, RawBson, RawDocument, RawDocumentBuf};
+use bson::{Bson, Document, RawBson, RawDocument, RawDocumentBuf, Timestamp};
 use serde::{Deserialize, Serialize};
 
 /// An opaque token used for resuming an interrupted
@@ -81,6 +81,9 @@ pub struct ChangeStreamEvent<T> {
     /// A description of the fields that were updated or removed by the update operation.
     /// Only specified if `operation_type` is `OperationType::Update`.
     pub update_description: Option<UpdateDescription>,
+
+    /// The cluster time at which the change occurred.
+    pub cluster_time: Option<Timestamp>,
 
     /// The `Document` created or modified by the `insert`, `replace`, `delete`, `update`
     /// operations (i.e. CRUD operations).
