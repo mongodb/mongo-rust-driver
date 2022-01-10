@@ -2,7 +2,6 @@ mod test_file;
 
 use std::{sync::Arc, time::Duration};
 
-use bson::Bson;
 use futures::stream::TryStreamExt;
 use semver::VersionReq;
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
@@ -36,9 +35,18 @@ use crate::{
     RUNTIME,
 };
 
+use super::run_unified_format_test;
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn run_unified() {
+    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
+    run_spec_test(&["retryable-writes", "unified"], run_unified_format_test).await;
+}
+
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn run_spec_tests() {
+async fn run_legacy() {
     async fn run_test(test_file: TestFile) {
         for mut test_case in test_file.tests {
             if test_case.operation.name == "bulkWrite" {
@@ -77,14 +85,6 @@ async fn run_spec_tests() {
             }
 
             if let Some(ref mut fail_point) = test_case.fail_point {
-                // TODO: DRIVERS-1385 remove this logic for moving errorLabels to the top level.
-                if let Some(Bson::Document(data)) = fail_point.get_mut("data") {
-                    if let Some(Bson::Document(wc_error)) = data.get("writeConcernError") {
-                        if let Some(labels) = wc_error.get("errorLabels").cloned() {
-                            data.insert("errorLabels", labels);
-                        }
-                    }
-                }
                 client
                     .database("admin")
                     .run_command(fail_point.clone(), None)
@@ -185,7 +185,7 @@ async fn run_spec_tests() {
     }
 
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-    run_spec_test(&["retryable-writes"], run_test).await;
+    run_spec_test(&["retryable-writes", "legacy"], run_test).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
