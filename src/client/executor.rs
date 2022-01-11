@@ -596,7 +596,7 @@ impl Client {
 
         let should_redact = cmd.should_redact();
 
-        let cmd_name = cmd.name.clone();
+        let cmd_name = dbg!(cmd.name.clone());
         let target_db = cmd.target_db.clone();
 
         let serialized = op.serialize_command(cmd)?;
@@ -628,6 +628,7 @@ impl Client {
         let start_time = Instant::now();
         let command_result = match connection.send_raw_command(raw_cmd, request_id).await {
             Ok(response) => {
+                let _ = dbg!(response.body::<Document>());
                 async fn handle_response<T: Operation>(
                     client: &Client,
                     op: &T,

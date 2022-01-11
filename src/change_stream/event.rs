@@ -143,12 +143,10 @@ pub enum OperationType {
 
 /// Identifies the collection or database on which an event occurred.
 #[derive(Deserialize, Debug)]
-#[serde(untagged)]
-#[non_exhaustive]
-pub enum ChangeStreamEventSource {
-    /// The [`Namespace`] containing the database and collection in which the change occurred.
-    Namespace(Namespace),
+pub struct ChangeStreamEventSource {
+    /// The name of the database in which the change occurred.
+    pub db: String,
 
-    /// Contains the name of the database in which the change happened.
-    Database(String),
+    /// The name of the collection in which the change occurred.
+    pub coll: Option<String>,
 }
