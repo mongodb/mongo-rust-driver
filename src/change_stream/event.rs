@@ -43,6 +43,11 @@ impl ResumeToken {
     pub(crate) fn from_raw(doc: Option<RawDocumentBuf>) -> Option<ResumeToken> {
         doc.map(|doc| ResumeToken(RawBson::Document(doc)))
     }
+
+    #[cfg(test)]
+    pub fn parsed(self) -> std::result::Result<Bson, bson::raw::Error> {
+        self.0.try_into()
+    }
 }
 
 /// A `ChangeStreamEvent` represents a

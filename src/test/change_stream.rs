@@ -1,7 +1,9 @@
 use bson::{Document, doc};
 use tokio::sync::RwLockReadGuard;
 
-use crate::event::command::CommandSucceededEvent;
+//use crate::event::command::CommandSucceededEvent;
+
+use crate::change_stream::event::ResumeToken;
 
 use super::{LOCK, EventClient};
 
@@ -16,11 +18,13 @@ async fn track_resume_token() {
     let db = client.database("change_stream_tests");
     let coll = db.collection::<Document>("track_resume_token");
     let mut changes = client.watch(None, None).await.unwrap();
-    dbg!(changes.resume_token());
+    dbg!(client.get_command_events(&["aggregate", "getMore"]));
+    dbg!(changes.resume_token().cloned().map(ResumeToken::parsed));
     for _ in 0..3 {
         coll.insert_one(doc! {}, None).await.unwrap();
         dbg!(changes.next_if_any().await.unwrap());
-        dbg!(changes.resume_token());
+        dbg!(client.get_command_events(&["aggregate", "getMore"]));
+        dbg!(changes.resume_token().cloned().map(ResumeToken::parsed));
     }
 }
 
