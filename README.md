@@ -94,7 +94,7 @@ let client = Client::with_options(client_options)?;
 
 // List the names of the databases in that deployment.
 for db_name in client.list_database_names(None, None).await? {
-    println!("{}", db_name);
+    println!("{:?}", db_name);
 }
 ```
 #### Getting a handle to a database
