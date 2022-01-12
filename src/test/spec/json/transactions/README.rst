@@ -9,10 +9,14 @@ Transactions Tests
 Introduction
 ============
 
-The YAML and JSON files in this directory are platform-independent tests that
-drivers can use to prove their conformance to the Transactions Spec. They are
-designed with the intention of sharing some test-runner code with the CRUD Spec
-tests and the Command Monitoring Spec tests.
+The YAML and JSON files in the ``legacy`` and ``unified`` sub-directories are
+platform-independent tests that drivers can use to prove their conformance to
+the Transactions Spec. The tests in the ``legacy`` directory are designed with
+the intention of sharing some test-runner code with the CRUD Spec tests and the
+Command Monitoring Spec tests. The format for these tests and instructions for
+executing them are provided in the following sections. Tests in the
+``unified`` directory are written using the `Unified Test Format
+<../../unified-test-format/unified-test-format.rst>`_.
 
 Several prose tests, which are not easily expressed in YAML, are also presented
 in this file. Those tests will need to be manually implemented by each driver.
@@ -107,6 +111,18 @@ Each YAML file has the following keys:
     tests can be run successfully. Valid topologies are "single", "replicaset",
     and "sharded". If this field is omitted, the default is all topologies (i.e.
     ``["single", "replicaset", "sharded"]``).
+
+  - ``serverless``: Optional string. Whether or not the test should be run on
+    serverless instances imitating sharded clusters. Valid values are "require",
+    "forbid", and "allow". If "require", the test MUST only be run on serverless
+    instances. If "forbid", the test MUST NOT be run on serverless instances. If
+    omitted or "allow", this option has no effect.
+
+    The test runner MUST be informed whether or not serverless is being used in
+    order to determine if this requirement is met (e.g. through an environment
+    variable or configuration option). Since the serverless proxy imitates a
+    mongos, the runner is not capable of determining this by issuing a server
+    command such as ``buildInfo`` or ``hello``.
 
 - ``database_name`` and ``collection_name``: The database and collection to use
   for testing.
