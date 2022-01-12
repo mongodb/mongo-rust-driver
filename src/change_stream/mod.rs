@@ -26,6 +26,7 @@ use crate::{
     options::AggregateOptions,
     selection_criteria::{ReadPreference, SelectionCriteria},
     Client,
+    ClientSession,
     Collection,
     Cursor,
     Database,
@@ -181,7 +182,7 @@ pub(crate) struct WatchArgs {
 }
 
 /// Dynamic change stream data needed for resume.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub(crate) struct ChangeStreamData {
     /// The `operationTime` returned by the initial `aggregate` command.
     pub(crate) initial_operation_time: Option<Timestamp>,
@@ -196,6 +197,21 @@ pub(crate) struct ChangeStreamData {
     /// Whether or not the change stream has returned a document, used to update resume token
     /// during an automatic resume.
     pub(crate) document_returned: bool,
+
+    /// The implicit session used to create the original cursor.
+    pub(crate) implicit_session: Option<ClientSession>,
+}
+
+impl ChangeStreamData {
+    fn take(&mut self) -> Self {
+        Self {
+            initial_operation_time: self.initial_operation_time.clone(),
+            resume_token: self.resume_token.clone(),
+            resume_attempted: self.resume_attempted,
+            document_returned: self.document_returned,
+            implicit_session: self.implicit_session.take(),
+        }
+    }
 }
 
 fn get_resume_token(
@@ -251,7 +267,8 @@ where
                 self.data.resume_attempted = true;
                 let client = self.cursor.client().clone();
                 let args = self.args.clone();
-                let data = self.data.clone();
+                let mut data = self.data.take();
+                data.implicit_session = self.cursor.take_implicit_session();
                 self.pending_resume = Some(Box::pin(async move {
                     let new_stream: Result<ChangeStream<ChangeStreamEvent<()>>> = client
                         .execute_watch(args.pipeline, args.options, args.target, Some(data))

@@ -176,7 +176,7 @@ where
                             args.pipeline,
                             args.options,
                             args.target,
-                            Some(self.data.clone()),
+                            Some(self.data.take()),
                             session,
                         )
                         .await?;
