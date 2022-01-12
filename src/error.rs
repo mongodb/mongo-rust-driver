@@ -470,6 +470,10 @@ pub enum ErrorKind {
     #[error("The server does not support a database operation: {message}")]
     #[non_exhaustive]
     IncompatibleServer { message: String },
+
+    /// No resume token was present in a change stream document.
+    #[error("Cannot provide resume functionality when the resume token is missing")]
+    MissingResumeToken,
 }
 
 impl ErrorKind {

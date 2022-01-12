@@ -21,7 +21,7 @@ use crate::{
         options::ChangeStreamOptions,
     },
     cursor::{stream_poll_next, BatchValue, CursorStream, NextInBatchFuture},
-    error::{Error, Result},
+    error::{Error, Result, ErrorKind},
     operation::AggregateTarget,
     options::AggregateOptions,
     selection_criteria::{ReadPreference, SelectionCriteria},
@@ -220,10 +220,14 @@ fn get_resume_token(
 ) -> Result<Option<ResumeToken>> {
     Ok(match batch_value {
         BatchValue::Some { doc, is_last } => {
+            let doc_token = match doc.get("_id")? {
+                Some(val) => ResumeToken(val.to_raw_bson()),
+                None => return Err(ErrorKind::MissingResumeToken.into()),
+            };
             if *is_last && batch_token.is_some() {
                 batch_token.cloned()
             } else {
-                doc.get("_id")?.map(|val| ResumeToken(val.to_raw_bson()))
+                Some(doc_token)
             }
         }
         BatchValue::Empty => batch_token.cloned(),
