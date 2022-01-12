@@ -205,7 +205,7 @@ pub(crate) struct ChangeStreamData {
 impl ChangeStreamData {
     fn take(&mut self) -> Self {
         Self {
-            initial_operation_time: self.initial_operation_time.clone(),
+            initial_operation_time: self.initial_operation_time,
             resume_token: self.resume_token.clone(),
             resume_attempted: self.resume_attempted,
             document_returned: self.document_returned,

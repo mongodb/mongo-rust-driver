@@ -22,8 +22,9 @@ use crate::{
     options::ServerAddress,
     results::GetMoreResult,
     Client,
+    ClientSession,
     Namespace,
-    RUNTIME, ClientSession,
+    RUNTIME,
 };
 
 /// An internal cursor that can be used in a variety of contexts depending on its `GetMoreProvider`.
@@ -263,7 +264,8 @@ pub(super) trait GetMoreProvider: Unpin {
         pinned_connection: Option<&PinnedConnectionHandle>,
     );
 
-    /// Extract the stored implicit session, if any.  The provider cannot be started again after this call.
+    /// Extract the stored implicit session, if any.  The provider cannot be started again after
+    /// this call.
     fn take_implicit_session(&mut self) -> Option<ClientSession> {
         None
     }

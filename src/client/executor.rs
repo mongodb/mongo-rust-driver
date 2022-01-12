@@ -238,10 +238,14 @@ impl Client {
                 target,
                 options,
             };
-            let mut implicit_session = resume_data.as_mut().and_then(|rd| rd.implicit_session.take());
+            let mut implicit_session = resume_data
+                .as_mut()
+                .and_then(|rd| rd.implicit_session.take());
             let op = ChangeStreamAggregate::new(&args, resume_data)?;
 
-            let mut details = self.execute_operation_with_details(op, implicit_session.as_mut()).await?;
+            let mut details = self
+                .execute_operation_with_details(op, implicit_session.as_mut())
+                .await?;
             if let Some(session) = implicit_session {
                 details.implicit_session = Some(session);
             }
