@@ -144,7 +144,7 @@ pub struct IndexOptionDefaults {
 }
 
 /// Specifies options for creating a timeseries collection.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypedBuilder)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct TimeseriesOptions {
