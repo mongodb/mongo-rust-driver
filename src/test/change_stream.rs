@@ -1,9 +1,10 @@
 use bson::{Document, doc, Bson};
 use futures_util::StreamExt;
-use tokio::sync::RwLockReadGuard;
 
 use crate::{
-    test::CommandEvent, event::command::CommandSucceededEvent,
+    test::{CommandEvent, FailPoint, FailPointMode, FailCommandOptions},
+    event::command::CommandSucceededEvent,
+    change_stream::event::{ChangeStreamEvent, OperationType},
 };
 
 use super::{LOCK, EventClient};
@@ -13,7 +14,7 @@ use super::{LOCK, EventClient};
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn tracks_resume_token() -> Result<(), Box<dyn std::error::Error>> {
     // TODO aegnor: restrict to replica sets and sharded clusters
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+    let _guard = LOCK.run_concurrently().await;
 
     let client = EventClient::new().await;
     let db = client.database("change_stream_tests");
@@ -63,7 +64,7 @@ fn expected_token(ev: CommandSucceededEvent) -> Bson {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn errors_on_missing_token() -> Result<(), Box<dyn std::error::Error>> {
     // TODO aegnor: restrict to replica sets and sharded clusters
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+    let _guard = LOCK.run_concurrently().await;
 
     let client = EventClient::new().await;
     let db = client.database("change_stream_tests");
@@ -73,6 +74,36 @@ async fn errors_on_missing_token() -> Result<(), Box<dyn std::error::Error>> {
     ], None).await?;
     coll.insert_one(doc! {}, None).await?;
     assert!(stream.next().await.transpose().is_err());
+
+    Ok(())
+}
+
+/// Prose test 3: After receiving a resumeToken, ChangeStream will automatically resume one time on a resumable error
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn resumes_on_error() -> Result<(), Box<dyn std::error::Error>> {
+    // TODO aegnor: restrict to replica sets and sharded clusters
+    let _guard = LOCK.run_exclusively().await;
+
+    let client = EventClient::new().await;
+    let db = client.database("change_stream_tests");
+    let coll = db.collection::<Document>("resumes_on_error");
+    let mut stream = coll.watch(None, None).await?;
+    coll.insert_one(doc! { "_id": 1 }, None).await?;
+    let change = stream.next().await.transpose()?;
+    assert!(matches!(change,
+        Some(ChangeStreamEvent {
+            operation_type: OperationType::Insert,
+            document_key: Some(key),
+            ..
+        }) if key == doc! { "_id": 1 }
+    ));
+    let _guard = FailPoint::fail_command(
+        &["getMore"],
+        FailPointMode::Times(1),
+        FailCommandOptions::builder()
+            .build(),
+    ).enable(&client, None).await?;
 
     Ok(())
 }
