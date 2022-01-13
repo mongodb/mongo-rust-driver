@@ -21,11 +21,11 @@ async fn tracks_resume_token() -> Result<(), Box<dyn std::error::Error>> {
     let coll = db.collection::<Document>("track_resume_token");
     let mut stream = coll.watch(None, None).await?;
     let mut tokens = vec![];
-    tokens.push(stream.resume_token().cloned().unwrap().parsed()?);
+    tokens.push(stream.resume_token().unwrap().parsed()?);
     for _ in 0..3 {
         coll.insert_one(doc! {}, None).await?;
         stream.next().await.transpose()?;
-        tokens.push(stream.resume_token().cloned().unwrap().parsed()?);
+        tokens.push(stream.resume_token().unwrap().parsed()?);
     }
 
     let expected_tokens: Vec<_> = client.get_command_events(&["aggregate", "getMore"])
@@ -79,22 +79,20 @@ async fn errors_on_missing_token() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Prose test 3: After receiving a resumeToken, ChangeStream will automatically resume one time on a resumable error
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+// Using the multi_thread flavor of tokio is required for FailPoint.
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn resumes_on_error() -> Result<(), Box<dyn std::error::Error>> {
     // TODO aegnor: restrict to replica sets and sharded clusters
     let _guard = LOCK.run_exclusively().await;
 
-    dbg!("===> init");
     let client = EventClient::new().await;
     let db = client.database("change_stream_tests");
     let coll = db.collection::<Document>("resumes_on_error");
     coll.drop(None).await?;
     let mut stream = coll.watch(None, None).await?;
 
-    dbg!("===> first insert");
     coll.insert_one(doc! { "_id": 1 }, None).await?;
-    dbg!("===> first event");
     assert!(matches!(stream.next().await.transpose()?,
         Some(ChangeStreamEvent {
             operation_type: OperationType::Insert,
@@ -103,7 +101,6 @@ async fn resumes_on_error() -> Result<(), Box<dyn std::error::Error>> {
         }) if key == doc! { "_id": 1 }
     ));
 
-    dbg!("===> fail point");
     let _guard = FailPoint::fail_command(
         &["getMore"],
         FailPointMode::Times(1),
@@ -112,9 +109,7 @@ async fn resumes_on_error() -> Result<(), Box<dyn std::error::Error>> {
             .build(),
     ).enable(&client, None).await?;
 
-    dbg!("===> second insert");
     coll.insert_one(doc! { "_id": 2 }, None).await?;
-    dbg!("===> second event");
     assert!(matches!(stream.next().await.transpose()?,
         Some(ChangeStreamEvent {
             operation_type: OperationType::Insert,
@@ -123,6 +118,5 @@ async fn resumes_on_error() -> Result<(), Box<dyn std::error::Error>> {
         }) if key == doc! { "_id": 2 }
     ));
 
-    dbg!("===> done");
     Ok(())
 }
