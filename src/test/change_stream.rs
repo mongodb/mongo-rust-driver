@@ -79,8 +79,7 @@ async fn errors_on_missing_token() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Prose test 3: After receiving a resumeToken, ChangeStream will automatically resume one time on a resumable error
-// Using the multi_thread flavor of tokio is required for FailPoint.
-#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]  // multi_thread required for FailPoint
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn resumes_on_error() -> Result<(), Box<dyn std::error::Error>> {
     // TODO aegnor: restrict to replica sets and sharded clusters
@@ -117,6 +116,31 @@ async fn resumes_on_error() -> Result<(), Box<dyn std::error::Error>> {
             ..
         }) if key == doc! { "_id": 2 }
     ));
+
+    Ok(())
+}
+
+/// Prose test 4: ChangeStream will not attempt to resume on any error encountered while executing an aggregate command
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]  // multi_thread required for FailPoint
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn does_not_resume_aggregate() -> Result<(), Box<dyn std::error::Error>> {
+    // TODO aegnor: restrict to replica sets and sharded clusters
+    let _guard = LOCK.run_exclusively().await;
+
+    let client = EventClient::new().await;
+    let db = client.database("change_stream_tests");
+    let coll = db.collection::<Document>("does_not_resume_aggregate");
+    coll.drop(None).await?;
+
+    let _guard = FailPoint::fail_command(
+        &["aggregate"],
+        FailPointMode::Times(1),
+        FailCommandOptions::builder()
+            .error_code(43)
+            .build(),
+    ).enable(&client, None).await?;
+
+    assert!(coll.watch(None, None).await.is_err());
 
     Ok(())
 }
