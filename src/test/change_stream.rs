@@ -85,25 +85,44 @@ async fn resumes_on_error() -> Result<(), Box<dyn std::error::Error>> {
     // TODO aegnor: restrict to replica sets and sharded clusters
     let _guard = LOCK.run_exclusively().await;
 
+    dbg!("===> init");
     let client = EventClient::new().await;
     let db = client.database("change_stream_tests");
     let coll = db.collection::<Document>("resumes_on_error");
+    coll.drop(None).await?;
     let mut stream = coll.watch(None, None).await?;
+
+    dbg!("===> first insert");
     coll.insert_one(doc! { "_id": 1 }, None).await?;
-    let change = stream.next().await.transpose()?;
-    assert!(matches!(change,
+    dbg!("===> first event");
+    assert!(matches!(stream.next().await.transpose()?,
         Some(ChangeStreamEvent {
             operation_type: OperationType::Insert,
             document_key: Some(key),
             ..
         }) if key == doc! { "_id": 1 }
     ));
+
+    dbg!("===> fail point");
     let _guard = FailPoint::fail_command(
         &["getMore"],
         FailPointMode::Times(1),
         FailCommandOptions::builder()
+            .error_code(43)
             .build(),
     ).enable(&client, None).await?;
 
+    dbg!("===> second insert");
+    coll.insert_one(doc! { "_id": 2 }, None).await?;
+    dbg!("===> second event");
+    assert!(matches!(stream.next().await.transpose()?,
+        Some(ChangeStreamEvent {
+            operation_type: OperationType::Insert,
+            document_key: Some(key),
+            ..
+        }) if key == doc! { "_id": 2 }
+    ));
+
+    dbg!("===> done");
     Ok(())
 }
