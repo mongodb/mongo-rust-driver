@@ -3,7 +3,7 @@ use futures_util::StreamExt;
 
 use crate::{
     test::{CommandEvent, FailPoint, FailPointMode, FailCommandOptions},
-    event::command::CommandSucceededEvent,
+    event::command::{CommandSucceededEvent, CommandStartedEvent},
     change_stream::event::{ChangeStreamEvent, OperationType},
 };
 
@@ -141,6 +141,47 @@ async fn does_not_resume_aggregate() -> Result<(), Box<dyn std::error::Error>> {
     ).enable(&client, None).await?;
 
     assert!(coll.watch(None, None).await.is_err());
+
+    Ok(())
+}
+
+// Prose test 5: removed from spec.
+
+// TODO aegnor:
+// Prose test 6: ChangeStream will perform server selection before attempting to resume, using initial readPreference
+
+/// Prose test 7: A cursor returned from an aggregate command with a cursor id and an initial empty batch is not closed on the driver side
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn empty_batch_not_closed() -> Result<(), Box<dyn std::error::Error>> {
+    // TODO aegnor: restrict to replica sets and sharded clusters
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = EventClient::new().await;
+    let db = client.database("change_stream_tests");
+    let coll = db.collection::<Document>("empty_batch_not_closed");
+    let mut stream = coll.watch(None, None).await?;
+
+    assert!(stream.next_if_any().await?.is_none());
+
+    coll.insert_one(doc! { }, None).await?;
+    stream.next().await.transpose()?;
+
+    let events = client.get_command_events(&["aggregate", "getMore"]);
+    assert_eq!(events.len(), 4);
+    let cursor_id = match &events[1] {
+        CommandEvent::Succeeded(CommandSucceededEvent {
+            reply, ..
+        }) => reply.get_document("cursor")?.get_i64("id")?,
+        _ => panic!("unexpected event {:#?}", events[1]),
+    };
+    let get_more_id = match &events[2] {
+        CommandEvent::Started(CommandStartedEvent {
+            command, ..
+        }) => command.get_i64("getMore")?,
+        _ => panic!("unexpected event {:#?}", events[2]),
+    };
+    assert_eq!(cursor_id, get_more_id);
 
     Ok(())
 }
