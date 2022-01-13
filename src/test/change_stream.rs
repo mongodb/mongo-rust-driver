@@ -185,3 +185,53 @@ async fn empty_batch_not_closed() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+/// Prose test 8: The killCursors command sent during the "Resume Process" must not be allowed to throw an exception
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]  // multi_thread required for FailPoint
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn resume_kill_cursor_error_suppressed() -> Result<(), Box<dyn std::error::Error>> {
+    // TODO aegnor: restrict to replica sets and sharded clusters
+    let _guard = LOCK.run_exclusively().await;
+
+    let client = EventClient::new().await;
+    let db = client.database("change_stream_tests");
+    let coll = db.collection::<Document>("resume_kill_cursor_error_suppressed");
+    coll.drop(None).await?;
+    let mut stream = coll.watch(None, None).await?;
+
+    coll.insert_one(doc! { "_id": 1 }, None).await?;
+    assert!(matches!(stream.next().await.transpose()?,
+        Some(ChangeStreamEvent {
+            operation_type: OperationType::Insert,
+            document_key: Some(key),
+            ..
+        }) if key == doc! { "_id": 1 }
+    ));
+
+    let _getmore_guard = FailPoint::fail_command(
+        &["getMore"],
+        FailPointMode::Times(1),
+        FailCommandOptions::builder()
+            .error_code(43)
+            .build(),
+    ).enable(&client, None).await?;
+
+    let _killcursors_guard = FailPoint::fail_command(
+        &["killCursors"],
+        FailPointMode::Times(1),
+        FailCommandOptions::builder()
+            .error_code(43)
+            .build(),
+    ).enable(&client, None).await?;
+
+    coll.insert_one(doc! { "_id": 2 }, None).await?;
+    assert!(matches!(stream.next().await.transpose()?,
+        Some(ChangeStreamEvent {
+            operation_type: OperationType::Insert,
+            document_key: Some(key),
+            ..
+        }) if key == doc! { "_id": 2 }
+    ));
+
+    Ok(())
+}
