@@ -22,7 +22,6 @@ use crate::{
     options::ServerAddress,
     results::GetMoreResult,
     Client,
-    ClientSession,
     Namespace,
     RUNTIME,
 };
@@ -97,15 +96,15 @@ where
         self.post_batch_resume_token.as_ref()
     }
 
-    pub(super) fn take_implicit_session(&mut self) -> Option<ClientSession> {
-        self.provider.take_implicit_session()
-    }
-
     fn start_get_more(&mut self) {
         let info = self.info.clone();
         let client = self.client.clone();
         self.provider
             .start_execution(info, client, self.pinned_connection.handle());
+    }
+
+    pub(super) fn provider_mut(&mut self) -> &mut P {
+        &mut self.provider
     }
 
     pub(super) fn with_type<D: DeserializeOwned>(self) -> GenericCursor<P, D> {
@@ -263,12 +262,6 @@ pub(super) trait GetMoreProvider: Unpin {
         client: Client,
         pinned_connection: Option<&PinnedConnectionHandle>,
     );
-
-    /// Extract the stored implicit session, if any.  The provider cannot be started again after
-    /// this call.
-    fn take_implicit_session(&mut self) -> Option<ClientSession> {
-        None
-    }
 }
 
 /// Trait describing results returned from a `GetMoreProvider`.
