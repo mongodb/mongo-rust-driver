@@ -153,7 +153,7 @@ impl AsyncStream {
                 let host = options.address.host();
                 let name =
                     DNSNameRef::try_from_ascii_str(host).map_err(|e| ErrorKind::DnsResolve {
-                        message: format!("could not resolve {:?}: {}", host, e.to_string()),
+                        message: format!("could not resolve {:?}: {}", host, e),
                     })?;
                 let mut tls_config = cfg.into_rustls_config()?;
                 tls_config.enable_sni = true;

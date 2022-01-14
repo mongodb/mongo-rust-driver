@@ -68,7 +68,6 @@ fn test_snappy_compressor() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[cfg(feature = "zlib-compression")]
-#[function_name::named]
 async fn ping_server_with_zlib_compression() {
     let mut client_options = CLIENT_OPTIONS.clone();
     client_options.compressors = Some(vec![Compressor::Zlib { level: Some(4) }]);
@@ -78,7 +77,6 @@ async fn ping_server_with_zlib_compression() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[cfg(feature = "zstd-compression")]
-#[function_name::named]
 async fn ping_server_with_zstd_compression() {
     let mut client_options = CLIENT_OPTIONS.clone();
     client_options.compressors = Some(vec![Compressor::Zstd { level: None }]);
@@ -88,7 +86,6 @@ async fn ping_server_with_zstd_compression() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[cfg(feature = "snappy-compression")]
-#[function_name::named]
 async fn ping_server_with_snappy_compression() {
     let mut client_options = CLIENT_OPTIONS.clone();
     client_options.compressors = Some(vec![Compressor::Snappy]);
@@ -102,7 +99,6 @@ async fn ping_server_with_snappy_compression() {
     feature = "zlib-compression",
     feature = "snappy-compression"
 ))]
-#[function_name::named]
 async fn ping_server_with_all_compressors() {
     let mut client_options = CLIENT_OPTIONS.clone();
     client_options.compressors = Some(vec![

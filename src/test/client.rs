@@ -614,7 +614,6 @@ async fn x509_auth() {
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-#[function_name::named]
 async fn plain_auth() {
     let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
 

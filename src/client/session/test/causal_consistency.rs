@@ -297,7 +297,6 @@ async fn read_includes_after_cluster_time() {
 /// Test 5 from the causal consistency specification.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-#[function_name::named]
 async fn find_after_write_includes_after_cluster_time() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
@@ -340,7 +339,6 @@ async fn find_after_write_includes_after_cluster_time() {
 /// Test 6 from the causal consistency specification.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-#[function_name::named]
 async fn not_causally_consistent_omits_after_cluster_time() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
@@ -379,7 +377,6 @@ async fn not_causally_consistent_omits_after_cluster_time() {
 /// Test 7 from the causal consistency specification.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-#[function_name::named]
 async fn omit_after_cluster_time_standalone() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
@@ -415,7 +412,6 @@ async fn omit_after_cluster_time_standalone() {
 /// Test 8 from the causal consistency specification.
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-#[function_name::named]
 async fn omit_default_read_concern_level() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
