@@ -214,9 +214,8 @@ async fn load_balancing_test() {
 
     let mut handler = EventHandler::new();
     let mut subscriber = handler.subscribe();
-    let options = ClientOptions::builder()
-        .local_threshold(Duration::from_secs(30))
-        .build();
+    let mut options = CLIENT_OPTIONS.clone();
+    options.local_threshold = Duration::from_secs(30).into();
     let client = TestClient::with_handler(Some(Arc::new(handler.clone())), options).await;
 
     // wait for both servers to be discovered.
