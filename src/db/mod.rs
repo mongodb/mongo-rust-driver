@@ -472,7 +472,9 @@ impl Database {
         let mut options = options.into();
         resolve_options!(self, options, [read_concern, selection_criteria]);
         let target = AggregateTarget::Database(self.name().to_string());
-        self.client().execute_watch(pipeline, options, target).await
+        self.client()
+            .execute_watch(pipeline, options, target, None)
+            .await
     }
 
     /// Starts a new [`SessionChangeStream`] that receives events for all changes in this database
@@ -489,7 +491,7 @@ impl Database {
         resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
         let target = AggregateTarget::Database(self.name().to_string());
         self.client()
-            .execute_watch_with_session(pipeline, options, target, session)
+            .execute_watch_with_session(pipeline, options, target, None, session)
             .await
     }
 }

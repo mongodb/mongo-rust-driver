@@ -23,6 +23,7 @@ use crate::{
         session::SessionChangeStream,
         ChangeStream,
     },
+    client::options::ServerAddress,
     cmap::conn::PinnedConnectionHandle,
     concern::{ReadConcern, WriteConcern},
     error::{convert_bulk_errors, BulkWriteError, BulkWriteFailure, Error, ErrorKind, Result},
@@ -776,6 +777,7 @@ impl<T> Collection<T> {
         &self,
         cursor_id: i64,
         pinned_connection: Option<&PinnedConnectionHandle>,
+        drop_address: Option<ServerAddress>,
     ) -> Result<()> {
         let ns = self.namespace();
 
@@ -786,7 +788,7 @@ impl<T> Collection<T> {
                     "killCursors": ns.coll.as_str(),
                     "cursors": [cursor_id]
                 },
-                None,
+                drop_address.map(SelectionCriteria::from_address),
                 None,
                 pinned_connection,
             )
@@ -824,7 +826,9 @@ impl<T> Collection<T> {
         let mut options = options.into();
         resolve_options!(self, options, [read_concern, selection_criteria]);
         let target = self.namespace().into();
-        self.client().execute_watch(pipeline, options, target).await
+        self.client()
+            .execute_watch(pipeline, options, target, None)
+            .await
     }
 
     /// Starts a new [`SessionChangeStream`] that receives events for all changes in this collection
@@ -844,7 +848,7 @@ impl<T> Collection<T> {
         resolve_selection_criteria_with_session!(self, options, Some(&mut *session))?;
         let target = self.namespace().into();
         self.client()
-            .execute_watch_with_session(pipeline, options, target, session)
+            .execute_watch_with_session(pipeline, options, target, None, session)
             .await
     }
 }

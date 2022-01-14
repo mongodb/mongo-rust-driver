@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bson::RawDocumentBuf;
+use bson::{RawDocument, RawDocumentBuf};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::wire::Message;
@@ -215,6 +215,10 @@ impl RawCommandResponse {
                 message: format!("{}", e),
             })
         })
+    }
+
+    pub(crate) fn raw_body(&self) -> &RawDocument {
+        &self.raw
     }
 
     pub(crate) fn as_bytes(&self) -> &[u8] {

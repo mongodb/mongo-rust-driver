@@ -84,6 +84,10 @@ where
         &self.info.ns
     }
 
+    pub(super) fn address(&self) -> &ServerAddress {
+        &self.info.address
+    }
+
     pub(super) fn pinned_connection(&self) -> &PinnedConnection {
         &self.pinned_connection
     }
@@ -97,6 +101,10 @@ where
         let client = self.client.clone();
         self.provider
             .start_execution(info, client, self.pinned_connection.handle());
+    }
+
+    pub(super) fn provider_mut(&mut self) -> &mut P {
+        &mut self.provider
     }
 
     pub(super) fn with_type<D: DeserializeOwned>(self) -> GenericCursor<P, D> {
@@ -392,6 +400,7 @@ pub(super) fn kill_cursor(
     ns: &Namespace,
     cursor_id: i64,
     pinned_conn: PinnedConnection,
+    drop_address: Option<ServerAddress>,
     #[cfg(test)] kill_watcher: Option<oneshot::Sender<()>>,
 ) {
     let coll = client
@@ -399,7 +408,9 @@ pub(super) fn kill_cursor(
         .collection::<Document>(ns.coll.as_str());
     RUNTIME.execute(async move {
         if !pinned_conn.is_invalid() {
-            let _ = coll.kill_cursor(cursor_id, pinned_conn.handle()).await;
+            let _ = coll
+                .kill_cursor(cursor_id, pinned_conn.handle(), drop_address)
+                .await;
             #[cfg(test)]
             if let Some(tx) = kill_watcher {
                 let _ = tx.send(());
