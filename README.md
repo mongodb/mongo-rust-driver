@@ -185,6 +185,83 @@ while let Some(book) = cursor.try_next().await? {
 }
 ```
 
+### Updating documents in a collection
+
+Adding a bit of complexity and nesting to our previous struct so we can better ilustrate how you can update your documents.
+```rust
+#[derive(Debug, Serialize, Deserialize)]
+struct Library {
+    nane: String,
+    books: Vec<Book>,
+    alphabetical_book_list: HashMap<char, String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Book {
+    title: String,
+    author: String,
+    borowers: Option<Vec<User>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct User {
+    name: String,
+    age: u8,
+}
+```
+
+Using update_one with a [update operators](https://docs.mongodb.com/manual/reference/operator/update/).
+
+In this example, we have nested structure type, so we need to call `to_bson` on this structure in order to pass them to the `!doc` macro. [BSON doc](https://docs.rs/bson/1.1.0/bson/#modeling-bson-with-strongly-typed-data-structures), but this will work automatically with structures that have nested types themselves.
+
+Update functions will return [UpdateResult](https://docs.rs/mongodb/latest/mongodb/results/struct.UpdateResult.html).
+```rust
+    let typed_collection = db.collection::<Library>("libraries");
+    let librarie_name = "Nia Gutmann";
+    let filter = doc! { "nane": librarie_name };
+    let user = User {
+        name: "Raphael".to_string(),
+        age: 18,
+    };
+    let new_books = vec![
+        Book {
+            title: "The Rust Programming Language".to_string(),
+            author: "Steve Klabnik".to_string(),
+            borowers: None,
+        },
+        Book {
+            title: "Crust of Rust".to_string(),
+            author: "on Gjengset".to_string(),
+            borowers: Some(vec![user.clone()]),
+        },
+    ];
+
+    // Calling manually to_bson to serialize our type.
+    let new_books_serialized = to_bson(&new_books).expect("Unable to convert orders to bson");
+
+    // Update our data with the operators "$set" and "$push"
+    let update_result = typed_collection
+        .update_one(
+            filter,
+            doc! {
+              "$set": { "books": new_books_serialized },
+              "$push": {
+                "alphabetical_book_list.c": "Crust of Rust",
+                "alphabetical_book_list.t": "The Rust Programming Language",
+              },
+            },
+            None,
+        )
+        .await
+        .unwrap();
+
+    if update_result.matched_count == 0 {
+        eprintln!("Didn't find the librarie {}", librarie_name);
+    } else if update_result.modified_count == 0 {
+        eprintln!("Didn't update the library books");
+    };
+```
+
 ### Using the sync API
 The driver also provides a blocking sync API. See the [Installation](#enabling-the-sync-api) section for instructions on how to enable it.
 
