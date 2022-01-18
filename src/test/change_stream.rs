@@ -166,8 +166,8 @@ async fn does_not_resume_aggregate() -> Result<()> {
 
 // Prose test 5: removed from spec.
 
-// TODO aegnor:
-// Prose test 6: ChangeStream will perform server selection before attempting to resume, using initial readPreference
+// Prose test 6: ChangeStream will perform server selection before attempting to resume
+// The Rust driver cannot *not* perform server selection when executing an operation, including resume.
 
 /// Prose test 7: A cursor returned from an aggregate command with a cursor id and an initial empty batch is not closed on the driver side
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -334,7 +334,7 @@ async fn batch_end_resume_token() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn batch_end_resume_token_legacy() -> Result<()> {
-    let _guard = LOCK.run_exclusively().await;
+    let _guard = LOCK.run_concurrently().await;
 
     let (client, coll, mut stream) = match init_stream("batch_end_resume_token_legacy").await? {
         Some(t) => t,
@@ -371,9 +371,9 @@ async fn batch_end_resume_token_legacy() -> Result<()> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn batch_mid_resume_token() -> Result<()> {
-    let _guard = LOCK.run_exclusively().await;
+    let _guard = LOCK.run_concurrently().await;
 
-    let (_, coll, mut stream) = match init_stream("batch_end_resume_token_legacy").await? {
+    let (_, coll, mut stream) = match init_stream("batch_mid_resume_token").await? {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -383,6 +383,44 @@ async fn batch_mid_resume_token() -> Result<()> {
 
     let mid_id = stream.next().await.transpose()?.unwrap().id;
     assert_eq!(stream.resume_token(), Some(mid_id));
+
+    Ok(())
+}
+
+/// Prose test 14: Resume token with a non-empty batch for the initial `aggregate` must follow the spec.
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn aggregate_batch() -> Result<()> {
+    let _guard = LOCK.run_concurrently().await;
+
+    let (client, coll, mut stream) = match init_stream("aggregate_batch").await? {
+        Some(t) => t,
+        None => return Ok(()),
+    };
+    if client.is_sharded() {
+        println!("skipping change stream test on unsupported topology");
+        return Ok(());
+    }
+    if !VersionReq::parse(">=4.2").unwrap().matches(&client.server_version) {
+        println!("skipping change stream test on unsupported version {:?}", client.server_version);
+        return Ok(());
+    }
+
+    // Synthesize a resume token for the new stream to start at.
+    coll.insert_one(doc! {}, None).await?;
+    stream.next().await;
+    let token = stream.resume_token().unwrap();
+
+    // Populate the initial batch of the new stream.
+    coll.insert_one(doc! {}, None).await?;
+    coll.insert_one(doc! {}, None).await?;
+
+    // Case: `start_after` is given
+    let stream = coll.watch(None, ChangeStreamOptions::builder()
+        .start_after(Some(token.clone()))
+        .build()
+    ).await?;
+    assert_eq!(stream.resume_token().as_ref(), Some(&token));
 
     Ok(())
 }
