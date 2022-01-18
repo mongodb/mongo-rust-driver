@@ -422,5 +422,67 @@ async fn aggregate_batch() -> Result<()> {
     ).await?;
     assert_eq!(stream.resume_token().as_ref(), Some(&token));
 
+    // Case: `resume_after` is given
+    let stream = coll.watch(None, ChangeStreamOptions::builder()
+        .resume_after(Some(token.clone()))
+        .build()
+    ).await?;
+    assert_eq!(stream.resume_token().as_ref(), Some(&token));
+
+    Ok(())
+}
+
+// Prose test 15: removed
+// Prose test 16: removed
+
+/// Prose test 17: Resuming a change stream with no results uses `startAfter`.
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]  // multi_thread required for FailPoint
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn resume_uses_start_after() -> Result<()> {
+    let _guard = LOCK.run_exclusively().await;
+
+    let (client, coll, stream) = match init_stream("resume_uses_start_after").await? {
+        Some(t) => t,
+        None => return Ok(()),
+    };
+    if !VersionReq::parse(">=4.1.1").unwrap().matches(&client.server_version) {
+        println!("skipping change stream test on unsupported version {:?}", client.server_version);
+        return Ok(());
+    }
+
+    coll.insert_one(doc! {}, None).await?;
+    let token = stream.resume_token().unwrap();
+
+    let mut stream = coll.watch(None, ChangeStreamOptions::builder()
+        .start_after(Some(token.clone()))
+        .build()
+    ).await?;
+
+    coll.insert_one(doc! {}, None).await?;
+
+    let _guard = FailPoint::fail_command(
+        &["getMore"],
+        FailPointMode::Times(1),
+        FailCommandOptions::builder()
+            .error_code(43)
+            .build(),
+    ).enable(&client, None).await?;
+
+    stream.next().await.transpose()?;
+
+    let commands = client.get_command_events(&["aggregate"]);
+    assert_eq!(commands.len(), 4);
+    fn has_start_after(command: &Document) -> Result<bool> {
+        Ok(command.get_array("pipeline")?[0]
+            .as_document()
+            .unwrap()
+            .get_document("$changeStream")?
+            .contains_key("startAfter"))
+    }
+    assert!(matches!(&commands[2], CommandEvent::Started(CommandStartedEvent {
+        command,
+        ..
+    }) if has_start_after(command)?));
+
     Ok(())
 }
