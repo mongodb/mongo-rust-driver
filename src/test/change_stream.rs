@@ -441,7 +441,7 @@ async fn aggregate_batch() -> Result<()> {
 async fn resume_uses_start_after() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
-    let (client, coll, stream) = match init_stream("resume_uses_start_after").await? {
+    let (client, coll, mut stream) = match init_stream("resume_uses_start_after").await? {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -451,6 +451,7 @@ async fn resume_uses_start_after() -> Result<()> {
     }
 
     coll.insert_one(doc! {}, None).await?;
+    stream.next().await.transpose()?;
     let token = stream.resume_token().unwrap();
 
     let mut stream = coll.watch(None, ChangeStreamOptions::builder()
@@ -470,7 +471,7 @@ async fn resume_uses_start_after() -> Result<()> {
     stream.next().await.transpose()?;
 
     let commands = client.get_command_events(&["aggregate"]);
-    assert_eq!(commands.len(), 4);
+    assert_eq!(commands.len(), 6);
     fn has_start_after(command: &Document) -> Result<bool> {
         let stage = command.get_array("pipeline")?[0]
             .as_document()
@@ -478,7 +479,7 @@ async fn resume_uses_start_after() -> Result<()> {
             .get_document("$changeStream")?;
         Ok(stage.contains_key("startAfter") && !stage.contains_key("resumeAfter"))
     }
-    assert!(matches!(&commands[2], CommandEvent::Started(CommandStartedEvent {
+    assert!(matches!(&commands[4], CommandEvent::Started(CommandStartedEvent {
         command,
         ..
     }) if has_start_after(command)?));
@@ -492,7 +493,7 @@ async fn resume_uses_start_after() -> Result<()> {
 async fn resume_uses_resume_after() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
-    let (client, coll, stream) = match init_stream("resume_uses_resume_after").await? {
+    let (client, coll, mut stream) = match init_stream("resume_uses_resume_after").await? {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -502,6 +503,7 @@ async fn resume_uses_resume_after() -> Result<()> {
     }
 
     coll.insert_one(doc! {}, None).await?;
+    stream.next().await.transpose()?;
     let token = stream.resume_token().unwrap();
 
     let mut stream = coll.watch(None, ChangeStreamOptions::builder()
