@@ -5,7 +5,7 @@ use semver::VersionReq;
 use crate::{
     test::{CommandEvent, FailPoint, FailPointMode, FailCommandOptions},
     event::command::{CommandSucceededEvent, CommandStartedEvent},
-    change_stream::{event::{ChangeStreamEvent, OperationType}, ChangeStream},
+    change_stream::{event::{ChangeStreamEvent, OperationType}, ChangeStream, options::ChangeStreamOptions},
     Collection,
 };
 
@@ -302,13 +302,13 @@ async fn resume_start_at_operation_time() -> Result<()> {
 
 // Prose test 10: removed.
 
-/// Prose test 11: Running against a server >=4.0.7, when batch is empty getResumeToken must return the postBatchResumeToken from the current command response
+/// Prose test 11: Running against a server >=4.0.7, resume token at the end of a batch must return the postBatchResumeToken from the current command response
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn empty_batch_resume_token() -> Result<()> {
-    let _guard = LOCK.run_exclusively().await;
+async fn batch_end_resume_token() -> Result<()> {
+    let _guard = LOCK.run_concurrently().await;
 
-    let (client, _, mut stream) = match init_stream("resume_start_at_operation_time").await? {
+    let (client, _, mut stream) = match init_stream("batch_end_resume_token").await? {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -326,6 +326,43 @@ async fn empty_batch_resume_token() -> Result<()> {
             ..
         })
     ) if reply.get_document("cursor")?.get("postBatchResumeToken") == Some(&token)));
+
+    Ok(())
+}
+
+/// Prose test 12: Running against a server <4.0.7, end of batch resume token must follow the spec
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn batch_end_resume_token_legacy() -> Result<()> {
+    let _guard = LOCK.run_exclusively().await;
+
+    let (client, coll, mut stream) = match init_stream("batch_end_resume_token_legacy").await? {
+        Some(t) => t,
+        None => return Ok(()),
+    };
+    if !VersionReq::parse("<4.0.7").unwrap().matches(&client.server_version) {
+        println!("skipping change stream test due to server version {:?}", client.server_version);
+        return Ok(());
+    }
+
+    // Case: empty batch, `resume_after` not specified
+    assert_eq!(stream.next_if_any().await?, None);
+    assert_eq!(stream.resume_token(), None);
+
+    // Case: end of batch
+    coll.insert_one(doc! {}, None).await?;
+    let expected_id = stream.next_if_any().await?.unwrap().id;
+    assert_eq!(stream.next_if_any().await?, None);
+    assert_eq!(stream.resume_token().as_ref(), Some(&expected_id));
+
+    // Case: empty batch, `resume_after` specified
+    let mut stream = coll.watch(None,
+        ChangeStreamOptions::builder()
+            .resume_after(Some(expected_id.clone()))
+            .build()
+        ).await?;
+    assert_eq!(stream.next_if_any().await?, None);
+    assert_eq!(stream.resume_token(), Some(expected_id));
 
     Ok(())
 }
