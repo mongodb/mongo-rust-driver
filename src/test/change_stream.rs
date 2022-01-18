@@ -267,15 +267,6 @@ async fn resume_start_at_operation_time() -> Result<()> {
         return Ok(());
     }
 
-    coll.insert_one(doc! { "_id": 1 }, None).await?;
-    assert!(matches!(stream.next().await.transpose()?,
-        Some(ChangeStreamEvent {
-            operation_type: OperationType::Insert,
-            document_key: Some(key),
-            ..
-        }) if key == doc! { "_id": 1 }
-    ));
-
     let _guard = FailPoint::fail_command(
         &["getMore"],
         FailPointMode::Times(1),
@@ -285,12 +276,26 @@ async fn resume_start_at_operation_time() -> Result<()> {
     ).enable(&client, None).await?;
 
     coll.insert_one(doc! { "_id": 2 }, None).await?;
-    assert!(matches!(stream.next().await.transpose()?,
-        Some(ChangeStreamEvent {
-            operation_type: OperationType::Insert,
-            document_key: Some(key),
+    stream.next().await.transpose()?;
+
+    let events = client.get_command_events(&["aggregate"]);
+    assert_eq!(events.len(), 4);
+
+    fn has_saot(command: &Document) -> bool {
+        command
+            .get_array("pipeline")
+            .unwrap()[0]
+            .as_document()
+            .unwrap()
+            .get_document("$changeStream")
+            .unwrap()
+            .contains_key("startAtOperationTime")
+    }
+    assert!(matches!(&events[2],
+        CommandEvent::Started(CommandStartedEvent {
+            command,
             ..
-        }) if key == doc! { "_id": 2 }
+        }) if has_saot(&command)
     ));
 
     Ok(())
