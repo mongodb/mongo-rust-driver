@@ -13,10 +13,12 @@ use super::{LOCK, EventClient};
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn tracks_resume_token() -> Result<(), Box<dyn std::error::Error>> {
-    // TODO aegnor: restrict to replica sets and sharded clusters
     let _guard = LOCK.run_concurrently().await;
 
     let client = EventClient::new().await;
+    if !client.is_replica_set() && !client.is_sharded() {
+        println!("skipping change stream test on unsupported topology");
+    }
     let db = client.database("change_stream_tests");
     let coll = db.collection::<Document>("track_resume_token");
     let mut stream = coll.watch(None, None).await?;
@@ -63,10 +65,12 @@ fn expected_token(ev: CommandSucceededEvent) -> Bson {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn errors_on_missing_token() -> Result<(), Box<dyn std::error::Error>> {
-    // TODO aegnor: restrict to replica sets and sharded clusters
     let _guard = LOCK.run_concurrently().await;
 
     let client = EventClient::new().await;
+    if !client.is_replica_set() && !client.is_sharded() {
+        println!("skipping change stream test on unsupported topology");
+    }
     let db = client.database("change_stream_tests");
     let coll = db.collection::<Document>("errors_on_missing_token");
     let mut stream = coll.watch(vec![
@@ -82,10 +86,12 @@ async fn errors_on_missing_token() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]  // multi_thread required for FailPoint
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn resumes_on_error() -> Result<(), Box<dyn std::error::Error>> {
-    // TODO aegnor: restrict to replica sets and sharded clusters
     let _guard = LOCK.run_exclusively().await;
 
     let client = EventClient::new().await;
+    if !client.is_replica_set() && !client.is_sharded() {
+        println!("skipping change stream test on unsupported topology");
+    }
     let db = client.database("change_stream_tests");
     let coll = db.collection::<Document>("resumes_on_error");
     coll.drop(None).await?;
@@ -124,10 +130,12 @@ async fn resumes_on_error() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]  // multi_thread required for FailPoint
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn does_not_resume_aggregate() -> Result<(), Box<dyn std::error::Error>> {
-    // TODO aegnor: restrict to replica sets and sharded clusters
     let _guard = LOCK.run_exclusively().await;
 
     let client = EventClient::new().await;
+    if !client.is_replica_set() && !client.is_sharded() {
+        println!("skipping change stream test on unsupported topology");
+    }
     let db = client.database("change_stream_tests");
     let coll = db.collection::<Document>("does_not_resume_aggregate");
     coll.drop(None).await?;
@@ -154,10 +162,12 @@ async fn does_not_resume_aggregate() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn empty_batch_not_closed() -> Result<(), Box<dyn std::error::Error>> {
-    // TODO aegnor: restrict to replica sets and sharded clusters
     let _guard = LOCK.run_concurrently().await;
 
     let client = EventClient::new().await;
+    if !client.is_replica_set() && !client.is_sharded() {
+        println!("skipping change stream test on unsupported topology");
+    }
     let db = client.database("change_stream_tests");
     let coll = db.collection::<Document>("empty_batch_not_closed");
     let mut stream = coll.watch(None, None).await?;
@@ -190,10 +200,12 @@ async fn empty_batch_not_closed() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]  // multi_thread required for FailPoint
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn resume_kill_cursor_error_suppressed() -> Result<(), Box<dyn std::error::Error>> {
-    // TODO aegnor: restrict to replica sets and sharded clusters
     let _guard = LOCK.run_exclusively().await;
 
     let client = EventClient::new().await;
+    if !client.is_replica_set() && !client.is_sharded() {
+        println!("skipping change stream test on unsupported topology");
+    }
     let db = client.database("change_stream_tests");
     let coll = db.collection::<Document>("resume_kill_cursor_error_suppressed");
     coll.drop(None).await?;
