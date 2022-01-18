@@ -1,5 +1,6 @@
 use bson::{Document, doc, Bson};
 use futures_util::StreamExt;
+use semver::VersionReq;
 
 use crate::{
     test::{CommandEvent, FailPoint, FailPointMode, FailCommandOptions},
@@ -18,6 +19,7 @@ async fn tracks_resume_token() -> Result<(), Box<dyn std::error::Error>> {
     let client = EventClient::new().await;
     if !client.is_replica_set() && !client.is_sharded() {
         println!("skipping change stream test on unsupported topology");
+        return Ok(());
     }
     let db = client.database("change_stream_tests");
     let coll = db.collection::<Document>("track_resume_token");
@@ -70,6 +72,7 @@ async fn errors_on_missing_token() -> Result<(), Box<dyn std::error::Error>> {
     let client = EventClient::new().await;
     if !client.is_replica_set() && !client.is_sharded() {
         println!("skipping change stream test on unsupported topology");
+        return Ok(());
     }
     let db = client.database("change_stream_tests");
     let coll = db.collection::<Document>("errors_on_missing_token");
@@ -91,6 +94,7 @@ async fn resumes_on_error() -> Result<(), Box<dyn std::error::Error>> {
     let client = EventClient::new().await;
     if !client.is_replica_set() && !client.is_sharded() {
         println!("skipping change stream test on unsupported topology");
+        return Ok(());
     }
     let db = client.database("change_stream_tests");
     let coll = db.collection::<Document>("resumes_on_error");
@@ -135,6 +139,7 @@ async fn does_not_resume_aggregate() -> Result<(), Box<dyn std::error::Error>> {
     let client = EventClient::new().await;
     if !client.is_replica_set() && !client.is_sharded() {
         println!("skipping change stream test on unsupported topology");
+        return Ok(());
     }
     let db = client.database("change_stream_tests");
     let coll = db.collection::<Document>("does_not_resume_aggregate");
@@ -167,6 +172,7 @@ async fn empty_batch_not_closed() -> Result<(), Box<dyn std::error::Error>> {
     let client = EventClient::new().await;
     if !client.is_replica_set() && !client.is_sharded() {
         println!("skipping change stream test on unsupported topology");
+        return Ok(());
     }
     let db = client.database("change_stream_tests");
     let coll = db.collection::<Document>("empty_batch_not_closed");
@@ -205,6 +211,7 @@ async fn resume_kill_cursor_error_suppressed() -> Result<(), Box<dyn std::error:
     let client = EventClient::new().await;
     if !client.is_replica_set() && !client.is_sharded() {
         println!("skipping change stream test on unsupported topology");
+        return Ok(());
     }
     let db = client.database("change_stream_tests");
     let coll = db.collection::<Document>("resume_kill_cursor_error_suppressed");
@@ -230,6 +237,55 @@ async fn resume_kill_cursor_error_suppressed() -> Result<(), Box<dyn std::error:
 
     let _killcursors_guard = FailPoint::fail_command(
         &["killCursors"],
+        FailPointMode::Times(1),
+        FailCommandOptions::builder()
+            .error_code(43)
+            .build(),
+    ).enable(&client, None).await?;
+
+    coll.insert_one(doc! { "_id": 2 }, None).await?;
+    assert!(matches!(stream.next().await.transpose()?,
+        Some(ChangeStreamEvent {
+            operation_type: OperationType::Insert,
+            document_key: Some(key),
+            ..
+        }) if key == doc! { "_id": 2 }
+    ));
+
+    Ok(())
+}
+
+/// Prose test 9: $changeStream stage for ChangeStream against a server >=4.0 and <4.0.7 that has not received any results yet MUST include a startAtOperationTime option when resuming a change stream.
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]  // multi_thread required for FailPoint
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn resume_start_at_operation_time() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = LOCK.run_exclusively().await;
+
+    let client = EventClient::new().await;
+    if !client.is_replica_set() && !client.is_sharded() {
+        println!("skipping change stream test on unsupported topology");
+        return Ok(());
+    }
+    if !VersionReq::parse(">=4.0, <4.0.7").unwrap().matches(&client.server_version) {
+        println!("skipping change stream test due to server version");
+        return Ok(());
+    }
+    let db = client.database("change_stream_tests");
+    let coll = db.collection::<Document>("resume_start_at_operation_time");
+    coll.drop(None).await?;
+    let mut stream = coll.watch(None, None).await?;
+
+    coll.insert_one(doc! { "_id": 1 }, None).await?;
+    assert!(matches!(stream.next().await.transpose()?,
+        Some(ChangeStreamEvent {
+            operation_type: OperationType::Insert,
+            document_key: Some(key),
+            ..
+        }) if key == doc! { "_id": 1 }
+    ));
+
+    let _guard = FailPoint::fail_command(
+        &["getMore"],
         FailPointMode::Times(1),
         FailCommandOptions::builder()
             .error_code(43)
