@@ -21,7 +21,7 @@ use crate::{
         options::ChangeStreamOptions,
     },
     cursor::{stream_poll_next, BatchValue, CursorStream, NextInBatchFuture},
-    error::{Error, Result, ErrorKind},
+    error::{Error, ErrorKind, Result},
     operation::AggregateTarget,
     options::AggregateOptions,
     selection_criteria::{ReadPreference, SelectionCriteria},
@@ -248,22 +248,23 @@ where
                         return Poll::Pending;
                     }
                     Poll::Ready(Ok(new_stream)) => {
-                        // Ensure that the old cursor is killed on the server selected for the new one.
+                        // Ensure that the old cursor is killed on the server selected for the new
+                        // one.
                         self.cursor
                             .set_drop_address(new_stream.cursor.address().clone());
                         self.cursor = new_stream.cursor;
                         self.args = new_stream.args;
                         continue;
                     }
-                    Poll::Ready(Err(e)) => {
-                        return Poll::Ready(Err(e))
-                    },
+                    Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
                 }
             }
             let out = self.cursor.poll_next_in_batch(cx);
             match &out {
                 Poll::Ready(Ok(bv)) => {
-                    if let Some(token) = get_resume_token(bv, self.cursor.post_batch_resume_token())? {
+                    if let Some(token) =
+                        get_resume_token(bv, self.cursor.post_batch_resume_token())?
+                    {
                         self.data.resume_token = Some(token);
                     }
                     if matches!(bv, BatchValue::Some { .. }) {
@@ -285,7 +286,7 @@ where
                     // Iterate the loop so the new future gets polled and can register wakers.
                     continue;
                 }
-                _ => { }
+                _ => {}
             }
             return out;
         }
