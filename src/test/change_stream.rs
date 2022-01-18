@@ -5,25 +5,42 @@ use semver::VersionReq;
 use crate::{
     test::{CommandEvent, FailPoint, FailPointMode, FailCommandOptions},
     event::command::{CommandSucceededEvent, CommandStartedEvent},
-    change_stream::event::{ChangeStreamEvent, OperationType},
+    change_stream::{event::{ChangeStreamEvent, OperationType}, ChangeStream},
+    Collection,
 };
 
 use super::{LOCK, EventClient};
 
-/// Prose test 1: ChangeStream must continuously track the last seen resumeToken
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn tracks_resume_token() -> Result<(), Box<dyn std::error::Error>> {
-    let _guard = LOCK.run_concurrently().await;
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
+async fn init_stream(coll_name: &str) -> Result<Option<(EventClient, Collection<Document>, ChangeStream<ChangeStreamEvent<Document>>)>> {
     let client = EventClient::new().await;
     if !client.is_replica_set() && !client.is_sharded() {
         println!("skipping change stream test on unsupported topology");
-        return Ok(());
+        return Ok(None);
+    }
+    if !client.supports_fail_command() {
+        println!("skipping change stream test on version without fail commands");
+        return Ok(None);
     }
     let db = client.database("change_stream_tests");
-    let coll = db.collection::<Document>("track_resume_token");
-    let mut stream = coll.watch(None, None).await?;
+    let coll = db.collection::<Document>(coll_name);
+    coll.drop(None).await?;
+    let stream = coll.watch(None, None).await?;
+    Ok(Some((client, coll, stream)))
+}
+
+/// Prose test 1: ChangeStream must continuously track the last seen resumeToken
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn tracks_resume_token() -> Result<()> {
+    let _guard = LOCK.run_concurrently().await;
+
+    let (client, coll, mut stream) = match init_stream("track_resume_token").await? {
+        Some(t) => t,
+        None => return Ok(()),
+    };
+
     let mut tokens = vec![];
     tokens.push(stream.resume_token().unwrap().parsed()?);
     for _ in 0..3 {
@@ -66,16 +83,13 @@ fn expected_token(ev: CommandSucceededEvent) -> Bson {
 /// Prose test 2: ChangeStream will throw an exception if the server response is missing the resume token
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn errors_on_missing_token() -> Result<(), Box<dyn std::error::Error>> {
+async fn errors_on_missing_token() -> Result<()> {
     let _guard = LOCK.run_concurrently().await;
 
-    let client = EventClient::new().await;
-    if !client.is_replica_set() && !client.is_sharded() {
-        println!("skipping change stream test on unsupported topology");
-        return Ok(());
-    }
-    let db = client.database("change_stream_tests");
-    let coll = db.collection::<Document>("errors_on_missing_token");
+    let (_, coll, _) = match init_stream("errors_on_missing_token").await? {
+        Some(t) => t,
+        None => return Ok(()),
+    };
     let mut stream = coll.watch(vec![
         doc! { "$project": { "_id": 0 } },
     ], None).await?;
@@ -88,18 +102,13 @@ async fn errors_on_missing_token() -> Result<(), Box<dyn std::error::Error>> {
 /// Prose test 3: After receiving a resumeToken, ChangeStream will automatically resume one time on a resumable error
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]  // multi_thread required for FailPoint
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn resumes_on_error() -> Result<(), Box<dyn std::error::Error>> {
+async fn resumes_on_error() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
-    let client = EventClient::new().await;
-    if !client.is_replica_set() && !client.is_sharded() {
-        println!("skipping change stream test on unsupported topology");
-        return Ok(());
-    }
-    let db = client.database("change_stream_tests");
-    let coll = db.collection::<Document>("resumes_on_error");
-    coll.drop(None).await?;
-    let mut stream = coll.watch(None, None).await?;
+    let (client, coll, mut stream) = match init_stream("resumes_on_error").await? {
+        Some(t) => t,
+        None => return Ok(()),
+    };
 
     coll.insert_one(doc! { "_id": 1 }, None).await?;
     assert!(matches!(stream.next().await.transpose()?,
@@ -133,17 +142,13 @@ async fn resumes_on_error() -> Result<(), Box<dyn std::error::Error>> {
 /// Prose test 4: ChangeStream will not attempt to resume on any error encountered while executing an aggregate command
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]  // multi_thread required for FailPoint
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn does_not_resume_aggregate() -> Result<(), Box<dyn std::error::Error>> {
+async fn does_not_resume_aggregate() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
-    let client = EventClient::new().await;
-    if !client.is_replica_set() && !client.is_sharded() {
-        println!("skipping change stream test on unsupported topology");
-        return Ok(());
-    }
-    let db = client.database("change_stream_tests");
-    let coll = db.collection::<Document>("does_not_resume_aggregate");
-    coll.drop(None).await?;
+    let (client, coll, _) = match init_stream("does_not_resume_aggregate").await? {
+        Some(t) => t,
+        None => return Ok(()),
+    };
 
     let _guard = FailPoint::fail_command(
         &["aggregate"],
@@ -166,17 +171,13 @@ async fn does_not_resume_aggregate() -> Result<(), Box<dyn std::error::Error>> {
 /// Prose test 7: A cursor returned from an aggregate command with a cursor id and an initial empty batch is not closed on the driver side
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn empty_batch_not_closed() -> Result<(), Box<dyn std::error::Error>> {
+async fn empty_batch_not_closed() -> Result<()> {
     let _guard = LOCK.run_concurrently().await;
 
-    let client = EventClient::new().await;
-    if !client.is_replica_set() && !client.is_sharded() {
-        println!("skipping change stream test on unsupported topology");
-        return Ok(());
-    }
-    let db = client.database("change_stream_tests");
-    let coll = db.collection::<Document>("empty_batch_not_closed");
-    let mut stream = coll.watch(None, None).await?;
+    let (client, coll, mut stream) = match init_stream("empty_batch_not_closed").await? {
+        Some(t) => t,
+        None => return Ok(()),
+    };
 
     assert!(stream.next_if_any().await?.is_none());
 
@@ -205,18 +206,13 @@ async fn empty_batch_not_closed() -> Result<(), Box<dyn std::error::Error>> {
 /// Prose test 8: The killCursors command sent during the "Resume Process" must not be allowed to throw an exception
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]  // multi_thread required for FailPoint
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn resume_kill_cursor_error_suppressed() -> Result<(), Box<dyn std::error::Error>> {
+async fn resume_kill_cursor_error_suppressed() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
-    let client = EventClient::new().await;
-    if !client.is_replica_set() && !client.is_sharded() {
-        println!("skipping change stream test on unsupported topology");
-        return Ok(());
-    }
-    let db = client.database("change_stream_tests");
-    let coll = db.collection::<Document>("resume_kill_cursor_error_suppressed");
-    coll.drop(None).await?;
-    let mut stream = coll.watch(None, None).await?;
+    let (client, coll, mut stream) = match init_stream("resume_kill_cursor_error_suppressed").await? {
+        Some(t) => t,
+        None => return Ok(()),
+    };
 
     coll.insert_one(doc! { "_id": 1 }, None).await?;
     assert!(matches!(stream.next().await.transpose()?,
@@ -258,22 +254,17 @@ async fn resume_kill_cursor_error_suppressed() -> Result<(), Box<dyn std::error:
 /// Prose test 9: $changeStream stage for ChangeStream against a server >=4.0 and <4.0.7 that has not received any results yet MUST include a startAtOperationTime option when resuming a change stream.
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]  // multi_thread required for FailPoint
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn resume_start_at_operation_time() -> Result<(), Box<dyn std::error::Error>> {
+async fn resume_start_at_operation_time() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
-    let client = EventClient::new().await;
-    if !client.is_replica_set() && !client.is_sharded() {
-        println!("skipping change stream test on unsupported topology");
-        return Ok(());
-    }
+    let (client, coll, mut stream) = match init_stream("resume_start_at_operation_time").await? {
+        Some(t) => t,
+        None => return Ok(()),
+    };
     if !VersionReq::parse(">=4.0, <4.0.7").unwrap().matches(&client.server_version) {
-        println!("skipping change stream test due to server version");
+        println!("skipping change stream test due to server version {:?}", client.server_version);
         return Ok(());
     }
-    let db = client.database("change_stream_tests");
-    let coll = db.collection::<Document>("resume_start_at_operation_time");
-    coll.drop(None).await?;
-    let mut stream = coll.watch(None, None).await?;
 
     coll.insert_one(doc! { "_id": 1 }, None).await?;
     assert!(matches!(stream.next().await.transpose()?,

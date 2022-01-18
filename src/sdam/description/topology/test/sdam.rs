@@ -615,7 +615,7 @@ async fn heartbeat_events() {
         .await
         .expect("should see server heartbeat succeeded event");
 
-    if !client.supports_fail_command().await {
+    if !client.supports_fail_command() {
         return;
     }
 

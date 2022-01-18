@@ -42,7 +42,7 @@ async fn min_heartbeat_frequency() {
 
     let setup_client = TestClient::with_options(Some(setup_client_options.clone())).await;
 
-    if !setup_client.supports_fail_command().await {
+    if !setup_client.supports_fail_command() {
         println!("skipping min_heartbeat_frequency test due to server not supporting fail points");
         return;
     }
