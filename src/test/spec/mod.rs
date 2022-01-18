@@ -99,14 +99,12 @@ where
     let json: Value = serde_json::from_reader(File::open(path.as_path()).unwrap()).unwrap();
 
     // Printing the name of the test file makes it easier to debug deserialization errors.
-    println!("Running tests from {}", path.display().to_string());
+    println!("Running tests from {}", path.display());
 
     run_test_file(
         path.clone(),
-        bson::from_bson(
-            Bson::try_from(json).unwrap_or_else(|_| panic!("{}", path.display().to_string())),
-        )
-        .unwrap_or_else(|e| panic!("{}: {}", path.display().to_string(), e)),
+        bson::from_bson(Bson::try_from(json).unwrap_or_else(|_| panic!("{}", path.display())))
+            .unwrap_or_else(|e| panic!("{}: {}", path.display(), e)),
     )
     .await
 }

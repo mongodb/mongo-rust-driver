@@ -76,7 +76,6 @@ fn client() {
 }
 
 #[test]
-#[function_name::named]
 fn default_database() {
     // here we just test default database name matched, the database interactive logic
     // is tested in `database`.
