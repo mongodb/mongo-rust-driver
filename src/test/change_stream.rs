@@ -42,7 +42,9 @@ async fn tracks_resume_token() -> Result<()> {
     };
 
     let mut tokens = vec![];
-    tokens.push(stream.resume_token().unwrap().parsed()?);
+    if let Some(token) = stream.resume_token() {
+        tokens.push(token.parsed()?);
+    }
     for _ in 0..3 {
         coll.insert_one(doc! {}, None).await?;
         stream.next().await.transpose()?;
@@ -57,27 +59,26 @@ async fn tracks_resume_token() -> Result<()> {
                 _ => None,
             }
         })
-        .map(expected_token)
+        .filter_map(expected_token)
         .collect();
     assert_eq!(tokens, expected_tokens);
 
     Ok(())
 }
 
-fn expected_token(ev: CommandSucceededEvent) -> Bson {
+fn expected_token(ev: CommandSucceededEvent) -> Option<Bson> {
     let cursor = ev.reply.get_document("cursor").unwrap();
     if let Some(token) = cursor.get("postBatchResumeToken") {
-        token.clone()
-    } else {
-        cursor
-            .get_array("nextBatch")
-            .unwrap()[0]
+        return Some(token.clone())
+    }
+    if let Ok(next) = cursor.get_array("nextBatch") {
+        return next[0]
             .as_document()
             .unwrap()
             .get("_id")
-            .unwrap()
-            .clone()
+            .cloned()
     }
+    None
 }
 
 /// Prose test 2: ChangeStream will throw an exception if the server response is missing the resume token
