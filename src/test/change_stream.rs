@@ -366,3 +366,23 @@ async fn batch_end_resume_token_legacy() -> Result<()> {
 
     Ok(())
 }
+
+/// Prose test 13: Mid-batch resume token must be `_id` of last document returned.
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn batch_mid_resume_token() -> Result<()> {
+    let _guard = LOCK.run_exclusively().await;
+
+    let (_, coll, mut stream) = match init_stream("batch_end_resume_token_legacy").await? {
+        Some(t) => t,
+        None => return Ok(()),
+    };
+
+    coll.insert_one(doc! {}, None).await?;
+    coll.insert_one(doc! {}, None).await?;
+
+    let mid_id = stream.next().await.transpose()?.unwrap().id;
+    assert_eq!(stream.resume_token(), Some(mid_id));
+
+    Ok(())
+}
