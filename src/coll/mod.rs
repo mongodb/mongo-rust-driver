@@ -1354,7 +1354,7 @@ where
 }
 
 /// A struct modeling the canonical name for a collection in MongoDB.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Namespace {
     /// The name of the database associated with this namespace.
     pub db: String,

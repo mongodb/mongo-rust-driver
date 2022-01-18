@@ -281,22 +281,51 @@ async fn resume_start_at_operation_time() -> Result<()> {
     let events = client.get_command_events(&["aggregate"]);
     assert_eq!(events.len(), 4);
 
-    fn has_saot(command: &Document) -> bool {
-        command
-            .get_array("pipeline")
-            .unwrap()[0]
+    fn has_saot(command: &Document) -> Result<bool> {
+        Ok(command
+            .get_array("pipeline")?[0]
             .as_document()
             .unwrap()
-            .get_document("$changeStream")
-            .unwrap()
+            .get_document("$changeStream")?
             .contains_key("startAtOperationTime")
+        )
     }
     assert!(matches!(&events[2],
         CommandEvent::Started(CommandStartedEvent {
             command,
             ..
-        }) if has_saot(&command)
+        }) if has_saot(&command)?
     ));
+
+    Ok(())
+}
+
+// Prose test 10: removed.
+
+/// Prose test 11: Running against a server >=4.0.7, when batch is empty getResumeToken must return the postBatchResumeToken from the current command response
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn empty_batch_resume_token() -> Result<()> {
+    let _guard = LOCK.run_exclusively().await;
+
+    let (client, _, mut stream) = match init_stream("resume_start_at_operation_time").await? {
+        Some(t) => t,
+        None => return Ok(()),
+    };
+    if !VersionReq::parse(">=4.0.7").unwrap().matches(&client.server_version) {
+        println!("skipping change stream test due to server version {:?}", client.server_version);
+        return Ok(());
+    }
+
+    assert_eq!(stream.next_if_any().await?, None);
+    let token = stream.resume_token().unwrap().parsed()?;
+    let commands = client.get_command_events(&["aggregate", "getMore"]);
+    assert!(matches!(commands.last(), Some(
+        CommandEvent::Succeeded(CommandSucceededEvent {
+            reply,
+            ..
+        })
+    ) if reply.get_document("cursor")?.get("postBatchResumeToken") == Some(&token)));
 
     Ok(())
 }

@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 /// See the documentation
 /// [here](https://docs.mongodb.com/manual/changeStreams/#change-stream-resume-token) for more
 /// information on resume tokens.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct ResumeToken(pub(crate) RawBson);
 
 impl ResumeToken {
@@ -52,7 +52,7 @@ impl ResumeToken {
 
 /// A `ChangeStreamEvent` represents a
 /// [change event](https://docs.mongodb.com/manual/reference/change-events/) in the associated change stream.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ChangeStreamEvent<T> {
@@ -104,7 +104,7 @@ pub struct ChangeStreamEvent<T> {
 }
 
 /// Describes which fields have been updated or removed from a document.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct UpdateDescription {
@@ -117,7 +117,7 @@ pub struct UpdateDescription {
 }
 
 /// The operation type represented in a given change notification.
-#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum OperationType {
@@ -147,7 +147,7 @@ pub enum OperationType {
 }
 
 /// Identifies the collection or database on which an event occurred.
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, PartialEq, Eq)]
 pub struct ChangeStreamEventSource {
     /// The name of the database in which the change occurred.
     pub db: String,
