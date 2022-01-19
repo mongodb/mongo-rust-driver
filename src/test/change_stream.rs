@@ -13,7 +13,7 @@ use crate::{
     Collection,
 };
 
-use super::{EventClient, CLIENT_OPTIONS, LOCK};
+use super::{EventClient, CLIENT_OPTIONS, LOCK, TestClient};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -27,21 +27,23 @@ async fn init_stream(
         ChangeStream<ChangeStreamEvent<Document>>,
     )>,
 > {
+    let init_client = TestClient::new().await;
+    if !init_client.is_replica_set() && !init_client.is_sharded() {
+        println!("skipping change stream test on unsupported topology");
+        return Ok(None);
+    }
+    if !init_client.supports_fail_command() {
+        println!("skipping change stream test on version without fail commands");
+        return Ok(None);
+    }
+
     let mut options = CLIENT_OPTIONS.clone();
     // Direct connection is needed for reliable behavior with fail points.
-    if direct_connection {
+    if direct_connection && init_client.is_sharded() {
         options.direct_connection = Some(true);
         options.hosts.drain(1..);
     }
     let client = EventClient::with_options(options).await;
-    if !client.is_replica_set() && !client.is_sharded() {
-        println!("skipping change stream test on unsupported topology");
-        return Ok(None);
-    }
-    if !client.supports_fail_command() {
-        println!("skipping change stream test on version without fail commands");
-        return Ok(None);
-    }
     let db = client.database("change_stream_tests");
     let coll = db.collection::<Document>(coll_name);
     coll.drop(None).await?;
