@@ -148,6 +148,7 @@ pub enum OperationType {
 
 /// Identifies the collection or database on which an event occurred.
 #[derive(Deserialize, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ChangeStreamEventSource {
     /// The name of the database in which the change occurred.
     pub db: String,
