@@ -13,12 +13,13 @@ use crate::{
     Collection,
 };
 
-use super::{EventClient, LOCK};
+use super::{EventClient, CLIENT_OPTIONS, LOCK};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 async fn init_stream(
     coll_name: &str,
+    direct_connection: bool,
 ) -> Result<
     Option<(
         EventClient,
@@ -26,7 +27,13 @@ async fn init_stream(
         ChangeStream<ChangeStreamEvent<Document>>,
     )>,
 > {
-    let client = EventClient::new().await;
+    let mut options = CLIENT_OPTIONS.clone();
+    // Direct connection is needed for reliable behavior with fail points.
+    if direct_connection {
+        options.direct_connection = Some(true);
+        options.hosts.drain(1..);
+    }
+    let client = EventClient::with_options(options).await;
     if !client.is_replica_set() && !client.is_sharded() {
         println!("skipping change stream test on unsupported topology");
         return Ok(None);
@@ -48,7 +55,7 @@ async fn init_stream(
 async fn tracks_resume_token() -> Result<()> {
     let _guard = LOCK.run_concurrently().await;
 
-    let (client, coll, mut stream) = match init_stream("track_resume_token").await? {
+    let (client, coll, mut stream) = match init_stream("track_resume_token", false).await? {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -95,7 +102,7 @@ fn expected_token(ev: CommandSucceededEvent) -> Option<Bson> {
 async fn errors_on_missing_token() -> Result<()> {
     let _guard = LOCK.run_concurrently().await;
 
-    let (_, coll, _) = match init_stream("errors_on_missing_token").await? {
+    let (_, coll, _) = match init_stream("errors_on_missing_token", false).await? {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -115,7 +122,7 @@ async fn errors_on_missing_token() -> Result<()> {
 async fn resumes_on_error() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
-    let (client, coll, mut stream) = match init_stream("resumes_on_error").await? {
+    let (client, coll, mut stream) = match init_stream("resumes_on_error", true).await? {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -156,7 +163,7 @@ async fn resumes_on_error() -> Result<()> {
 async fn does_not_resume_aggregate() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
-    let (client, coll, _) = match init_stream("does_not_resume_aggregate").await? {
+    let (client, coll, _) = match init_stream("does_not_resume_aggregate", true).await? {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -187,7 +194,7 @@ async fn does_not_resume_aggregate() -> Result<()> {
 async fn empty_batch_not_closed() -> Result<()> {
     let _guard = LOCK.run_concurrently().await;
 
-    let (client, coll, mut stream) = match init_stream("empty_batch_not_closed").await? {
+    let (client, coll, mut stream) = match init_stream("empty_batch_not_closed", false).await? {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -221,7 +228,7 @@ async fn resume_kill_cursor_error_suppressed() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
     let (client, coll, mut stream) =
-        match init_stream("resume_kill_cursor_error_suppressed").await? {
+        match init_stream("resume_kill_cursor_error_suppressed", true).await? {
             Some(t) => t,
             None => return Ok(()),
         };
@@ -271,10 +278,11 @@ async fn resume_kill_cursor_error_suppressed() -> Result<()> {
 async fn resume_start_at_operation_time() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
-    let (client, coll, mut stream) = match init_stream("resume_start_at_operation_time").await? {
-        Some(t) => t,
-        None => return Ok(()),
-    };
+    let (client, coll, mut stream) =
+        match init_stream("resume_start_at_operation_time", true).await? {
+            Some(t) => t,
+            None => return Ok(()),
+        };
     if !VersionReq::parse(">=4.0, <4.0.7")
         .unwrap()
         .matches(&client.server_version)
@@ -326,7 +334,7 @@ async fn resume_start_at_operation_time() -> Result<()> {
 async fn batch_end_resume_token() -> Result<()> {
     let _guard = LOCK.run_concurrently().await;
 
-    let (client, _, mut stream) = match init_stream("batch_end_resume_token").await? {
+    let (client, _, mut stream) = match init_stream("batch_end_resume_token", false).await? {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -360,10 +368,11 @@ async fn batch_end_resume_token() -> Result<()> {
 async fn batch_end_resume_token_legacy() -> Result<()> {
     let _guard = LOCK.run_concurrently().await;
 
-    let (client, coll, mut stream) = match init_stream("batch_end_resume_token_legacy").await? {
-        Some(t) => t,
-        None => return Ok(()),
-    };
+    let (client, coll, mut stream) =
+        match init_stream("batch_end_resume_token_legacy", false).await? {
+            Some(t) => t,
+            None => return Ok(()),
+        };
     if !VersionReq::parse("<4.0.7")
         .unwrap()
         .matches(&client.server_version)
@@ -406,7 +415,7 @@ async fn batch_end_resume_token_legacy() -> Result<()> {
 async fn batch_mid_resume_token() -> Result<()> {
     let _guard = LOCK.run_concurrently().await;
 
-    let (_, coll, mut stream) = match init_stream("batch_mid_resume_token").await? {
+    let (_, coll, mut stream) = match init_stream("batch_mid_resume_token", false).await? {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -427,7 +436,7 @@ async fn batch_mid_resume_token() -> Result<()> {
 async fn aggregate_batch() -> Result<()> {
     let _guard = LOCK.run_concurrently().await;
 
-    let (client, coll, mut stream) = match init_stream("aggregate_batch").await? {
+    let (client, coll, mut stream) = match init_stream("aggregate_batch", false).await? {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -489,7 +498,7 @@ async fn aggregate_batch() -> Result<()> {
 async fn resume_uses_start_after() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
-    let (client, coll, mut stream) = match init_stream("resume_uses_start_after").await? {
+    let (client, coll, mut stream) = match init_stream("resume_uses_start_after", true).await? {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -528,8 +537,7 @@ async fn resume_uses_start_after() -> Result<()> {
     .await?;
     stream.next().await.transpose()?;
 
-    let commands = client.get_command_events(&["aggregate"]);
-    assert_eq!(commands.len(), 6);
+    let commands = client.get_command_started_events(&["aggregate"]);
     fn has_start_after(command: &Document) -> Result<bool> {
         let stage = command.get_array("pipeline")?[0]
             .as_document()
@@ -537,11 +545,14 @@ async fn resume_uses_start_after() -> Result<()> {
             .get_document("$changeStream")?;
         Ok(stage.contains_key("startAfter") && !stage.contains_key("resumeAfter"))
     }
+    let last = commands.last().unwrap();
     assert!(
-        matches!(&commands[4], CommandEvent::Started(CommandStartedEvent {
+        matches!(last, CommandStartedEvent {
         command,
         ..
-    }) if has_start_after(command)?)
+    } if has_start_after(command)?),
+        "resume mismatch: {:#?}",
+        last,
     );
 
     Ok(())
@@ -553,7 +564,7 @@ async fn resume_uses_start_after() -> Result<()> {
 async fn resume_uses_resume_after() -> Result<()> {
     let _guard = LOCK.run_exclusively().await;
 
-    let (client, coll, mut stream) = match init_stream("resume_uses_resume_after").await? {
+    let (client, coll, mut stream) = match init_stream("resume_uses_resume_after", true).await? {
         Some(t) => t,
         None => return Ok(()),
     };
@@ -596,8 +607,7 @@ async fn resume_uses_resume_after() -> Result<()> {
     .await?;
     stream.next().await.transpose()?;
 
-    let commands = client.get_command_events(&["aggregate"]);
-    assert_eq!(commands.len(), 6);
+    let commands = client.get_command_started_events(&["aggregate"]);
     fn has_resume_after(command: &Document) -> Result<bool> {
         let stage = command.get_array("pipeline")?[0]
             .as_document()
@@ -605,11 +615,14 @@ async fn resume_uses_resume_after() -> Result<()> {
             .get_document("$changeStream")?;
         Ok(!stage.contains_key("startAfter") && stage.contains_key("resumeAfter"))
     }
+    let last = commands.last().unwrap();
     assert!(
-        matches!(&commands[4], CommandEvent::Started(CommandStartedEvent {
+        matches!(last, CommandStartedEvent {
         command,
         ..
-    }) if has_resume_after(command)?)
+    } if has_resume_after(command)?),
+        "resume mismatch: {:#?}",
+        last,
     );
 
     Ok(())
