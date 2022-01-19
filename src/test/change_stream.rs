@@ -80,7 +80,11 @@ async fn tracks_resume_token() -> Result<()> {
         .collect();
     let mut expected = vec![];
     // Token from `aggregate`
-    if let Some(initial) = events[0].reply.get_document("cursor")?.get("postBatchResumeToken") {
+    if let Some(initial) = events[0]
+        .reply
+        .get_document("cursor")?
+        .get("postBatchResumeToken")
+    {
         expected.push(initial.clone());
     }
     // Tokens from `getMore`s
@@ -97,13 +101,17 @@ fn expected_tokens(events: &[CommandSucceededEvent]) -> Result<Vec<Bson>> {
         if let Ok(next) = cursor.get_array("nextBatch") {
             // Tokens from results within the batch
             if next.len() > 1 {
-                for doc in &next[0..next.len()-1] {
+                for doc in &next[0..next.len() - 1] {
                     out.push(doc.as_document().unwrap().get("_id").unwrap().clone());
                 }
             }
             // Final token, if this wasn't an empty `getMore`
             if !next.is_empty() {
-                if let Some(last) = cursor.get("postBatchResumeToken").or_else(|| next.last().unwrap().as_document().unwrap().get("_id")).cloned() {
+                if let Some(last) = cursor
+                    .get("postBatchResumeToken")
+                    .or_else(|| next.last().unwrap().as_document().unwrap().get("_id"))
+                    .cloned()
+                {
                     out.push(last);
                 }
             }
