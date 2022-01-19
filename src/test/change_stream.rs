@@ -70,29 +70,46 @@ async fn tracks_resume_token() -> Result<()> {
         tokens.push(stream.resume_token().unwrap().parsed()?);
     }
 
-    let expected_tokens: Vec<_> = client
+    let events: Vec<_> = client
         .get_command_events(&["aggregate", "getMore"])
         .into_iter()
         .filter_map(|ev| match ev {
             CommandEvent::Succeeded(s) => Some(s),
             _ => None,
         })
-        .filter_map(expected_token)
         .collect();
-    assert_eq!(tokens, expected_tokens);
+    let mut expected = vec![];
+    // Token from `aggregate`
+    if let Some(initial) = events[0].reply.get_document("cursor")?.get("postBatchResumeToken") {
+        expected.push(initial.clone());
+    }
+    // Tokens from `getMore`s
+    expected.extend(expected_tokens(&events[1..])?);
+    assert_eq!(tokens, expected);
 
     Ok(())
 }
 
-fn expected_token(ev: CommandSucceededEvent) -> Option<Bson> {
-    let cursor = ev.reply.get_document("cursor").unwrap();
-    if let Some(token) = cursor.get("postBatchResumeToken") {
-        return Some(token.clone());
+fn expected_tokens(events: &[CommandSucceededEvent]) -> Result<Vec<Bson>> {
+    let mut out = vec![];
+    for event in events {
+        let cursor = event.reply.get_document("cursor")?;
+        if let Ok(next) = cursor.get_array("nextBatch") {
+            // Tokens from results within the batch
+            if next.len() > 1 {
+                for doc in &next[0..next.len()-1] {
+                    out.push(doc.as_document().unwrap().get("_id").unwrap().clone());
+                }
+            }
+            // Final token, if this wasn't an empty `getMore`
+            if !next.is_empty() {
+                if let Some(last) = cursor.get("postBatchResumeToken").or_else(|| next.last().unwrap().as_document().unwrap().get("_id")).cloned() {
+                    out.push(last);
+                }
+            }
+        }
     }
-    if let Ok(next) = cursor.get_array("nextBatch") {
-        return next[0].as_document().unwrap().get("_id").cloned();
-    }
-    None
+    Ok(out)
 }
 
 /// Prose test 2: ChangeStream will throw an exception if the server response is missing the resume
