@@ -198,7 +198,6 @@ async fn empty_batch_not_closed() -> Result<()> {
     stream.next().await.transpose()?;
 
     let events = client.get_command_events(&["aggregate", "getMore"]);
-    assert_eq!(events.len(), 4);
     let cursor_id = match &events[1] {
         CommandEvent::Succeeded(CommandSucceededEvent { reply, .. }) => {
             reply.get_document("cursor")?.get_i64("id")?
