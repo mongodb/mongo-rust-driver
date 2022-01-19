@@ -13,7 +13,7 @@ use crate::{
     Collection,
 };
 
-use super::{EventClient, CLIENT_OPTIONS, LOCK, TestClient};
+use super::{EventClient, TestClient, CLIENT_OPTIONS, LOCK};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
