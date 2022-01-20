@@ -65,6 +65,19 @@ async fn run_test(mut test_file: TestFile) {
         return;
     }
 
+    // TODO RUST-980 unskip these tests
+    if test_file
+        .options
+        .as_ref()
+        .and_then(|o| o.load_balanced)
+        .unwrap_or(false)
+    {
+        log_uncaptured(
+            "skipping initial_dns_seedlist_discovery due to load-balanced test configuration",
+        );
+        return;
+    }
+
     // "encoded-userinfo-and-db.json" specifies a database name with a question mark which is
     // disallowed on Windows. See
     // <https://docs.mongodb.com/manual/reference/limits/#restrictions-on-db-names>
