@@ -273,16 +273,8 @@ async fn resume_kill_cursor_error_suppressed() -> Result<()> {
         }) if key == doc! { "_id": 1 }
     ));
 
-    let _getmore_guard = FailPoint::fail_command(
-        &["getMore"],
-        FailPointMode::Times(1),
-        FailCommandOptions::builder().error_code(43).build(),
-    )
-    .enable(&client, None)
-    .await?;
-
-    let _killcursors_guard = FailPoint::fail_command(
-        &["killCursors"],
+    let _guard = FailPoint::fail_command(
+        &["getMore", "killCursors"],
         FailPointMode::Times(1),
         FailCommandOptions::builder().error_code(43).build(),
     )
@@ -297,6 +289,10 @@ async fn resume_kill_cursor_error_suppressed() -> Result<()> {
             ..
         }) if key == doc! { "_id": 2 }
     ));
+
+    // Assert that two `aggregate`s were issued, i.e. that a resume happened.
+    let events = client.get_command_started_events(&["aggregate"]);
+    assert_eq!(events.len(), 2);
 
     Ok(())
 }
