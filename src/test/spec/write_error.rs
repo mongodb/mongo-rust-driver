@@ -2,7 +2,7 @@ use crate::{
     bson::{doc, Document},
     error::{ErrorKind, WriteFailure},
     options::CreateCollectionOptions,
-    test::{EventClient, LOCK},
+    test::{log_uncaptured, EventClient, LOCK},
     Collection,
 };
 
@@ -14,7 +14,7 @@ async fn details() {
 
     if client.server_version_lt(5, 0) {
         // SERVER-58399
-        println!("skipping write_error_details test due to server version");
+        log_uncaptured("skipping write_error_details test due to server version");
         return;
     }
 

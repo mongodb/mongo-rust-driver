@@ -15,7 +15,7 @@ use crate::{
         InsertManyOptions,
         WriteConcern,
     },
-    test::{util::EventClient, LOCK},
+    test::{log_uncaptured, util::EventClient, LOCK},
     Collection,
     Database,
     RUNTIME,
@@ -31,7 +31,7 @@ async fn run_test<F: Future>(
     let client = EventClient::with_additional_options(Some(options), None, None, None).await;
 
     if !client.is_replica_set() {
-        println!("skipping test due to not running on a replica set");
+        log_uncaptured("skipping test due to not running on a replica set");
         return;
     }
 
@@ -71,7 +71,7 @@ async fn get_more() {
     async fn get_more_test(client: EventClient, _db: Database, coll: Collection<Document>) {
         // This test requires server version 4.2 or higher.
         if client.server_version_lt(4, 2) {
-            println!("skipping get_more due to server version < 4.2");
+            log_uncaptured("skipping get_more due to server version < 4.2");
             return;
         }
 
@@ -124,7 +124,7 @@ async fn not_master_keep_pool() {
     ) {
         // This test requires server version 4.2 or higher.
         if client.server_version_lt(4, 2) {
-            println!("skipping not_master_keep_pool due to server version < 4.2");
+            log_uncaptured("skipping not_master_keep_pool due to server version < 4.2");
             return;
         }
 
@@ -175,7 +175,7 @@ async fn not_master_reset_pool() {
     ) {
         // This test must only run on 4.0 servers.
         if !client.server_version_eq(4, 0) {
-            println!("skipping not_master_reset_pool due to unsupported server version");
+            log_uncaptured("skipping not_master_reset_pool due to unsupported server version");
             return;
         }
 
@@ -225,7 +225,7 @@ async fn shutdown_in_progress() {
         coll: Collection<Document>,
     ) {
         if client.server_version_lt(4, 0) {
-            println!("skipping shutdown_in_progress due to server version < 4.0");
+            log_uncaptured("skipping shutdown_in_progress due to server version < 4.0");
             return;
         }
 
@@ -275,7 +275,7 @@ async fn interrupted_at_shutdown() {
         coll: Collection<Document>,
     ) {
         if client.server_version_lt(4, 0) {
-            println!("skipping interrupted_at_shutdown due to server version < 4.2");
+            log_uncaptured("skipping interrupted_at_shutdown due to server version < 4.2");
             return;
         }
 

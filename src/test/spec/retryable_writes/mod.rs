@@ -19,6 +19,7 @@ use crate::{
     runtime::AsyncJoinHandle,
     test::{
         assert_matches,
+        log_uncaptured,
         run_spec_test,
         util::get_default_name,
         CmapEvent,
@@ -68,7 +69,7 @@ async fn run_legacy() {
             if let Some(ref run_on) = test_file.run_on {
                 let can_run_on = run_on.iter().any(|run_on| run_on.can_run_on(&client));
                 if !can_run_on {
-                    println!("Skipping {}", test_case.description);
+                    log_uncaptured(format!("Skipping {}", test_case.description));
                     continue;
                 }
             }
@@ -197,7 +198,7 @@ async fn transaction_ids_excluded() {
     let client = EventClient::new().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
-        println!("skipping transaction_ids_excluded due to test topology");
+        log_uncaptured("skipping transaction_ids_excluded due to test topology");
         return;
     }
 
@@ -251,7 +252,7 @@ async fn transaction_ids_included() {
     let client = EventClient::new().await;
 
     if !(client.is_replica_set() || client.is_sharded()) {
-        println!("skipping transaction_ids_included due to test topology");
+        log_uncaptured("skipping transaction_ids_included due to test topology");
         return;
     }
 
@@ -314,7 +315,7 @@ async fn mmapv1_error_raised() {
 
     let req = semver::VersionReq::parse("<=4.0").unwrap();
     if !req.matches(&client.server_version) || !client.is_replica_set() {
-        println!("skipping mmapv1_error_raised due to test topology");
+        log_uncaptured("skipping mmapv1_error_raised due to test topology");
         return;
     }
 
@@ -331,7 +332,7 @@ async fn mmapv1_error_raised() {
         .get_str("name")
         .unwrap();
     if name != "mmapv1" {
-        println!("skipping mmapv1_error_raised due to unsupported storage engine");
+        log_uncaptured("skipping mmapv1_error_raised due to unsupported storage engine");
         return;
     }
 
@@ -376,8 +377,8 @@ async fn label_not_added(retry_reads: bool) {
     if client.is_sharded() && !sharded_req.matches(&client.server_version)
         || !req.matches(&client.server_version)
     {
-        println!(
-            "skipping label_not_added due to unsupported replica set or sharded cluster version"
+        log_uncaptured(
+            "skipping label_not_added due to unsupported replica set or sharded cluster version",
         );
         return;
     }
@@ -425,17 +426,19 @@ async fn retry_write_pool_cleared() {
 
     let client = TestClient::with_options(Some(client_options.clone())).await;
     if !client.supports_block_connection() {
-        println!("skipping retry_write_pool_cleared due to blockConnection not being supported");
+        log_uncaptured(
+            "skipping retry_write_pool_cleared due to blockConnection not being supported",
+        );
         return;
     }
 
     if client.is_standalone() {
-        println!("skipping retry_write_pool_cleared due standalone topology");
+        log_uncaptured("skipping retry_write_pool_cleared due standalone topology");
         return;
     }
 
     if client.is_load_balanced() {
-        println!("skipping retry_write_pool_cleared due to load-balanced topology");
+        log_uncaptured("skipping retry_write_pool_cleared due to load-balanced topology");
         return;
     }
 

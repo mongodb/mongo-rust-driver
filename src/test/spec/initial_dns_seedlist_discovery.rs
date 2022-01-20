@@ -7,7 +7,7 @@ use crate::{
     bson::doc,
     client::{auth::AuthMechanism, Client},
     options::{ClientOptions, ResolverConfig},
-    test::{run_spec_test, TestClient, CLIENT_OPTIONS, LOCK},
+    test::{log_uncaptured, run_spec_test, TestClient, CLIENT_OPTIONS, LOCK},
     RUNTIME,
 };
 
@@ -58,9 +58,9 @@ struct ParsedOptions {
 async fn run_test(mut test_file: TestFile) {
     // TODO DRIVERS-796: unskip this test
     if test_file.uri == "mongodb+srv://test5.test.build.10gen.cc/?authSource=otherDB" {
-        println!(
+        log_uncaptured(
             "skipping initial_dns_seedlist_discovery due to authSource being specified without \
-             credentials"
+             credentials",
         );
         return;
     }
@@ -167,7 +167,7 @@ async fn run_test(mut test_file: TestFile) {
             RUNTIME.delay_for(Duration::from_millis(500)).await;
         }
     } else {
-        println!("skipping test due to test topology");
+        log_uncaptured("skipping test due to test topology");
     }
 
     if let Some(ref mut resolved_options) = test_file.options {

@@ -11,7 +11,7 @@ use self::{event::TestEvent, operation::*};
 use crate::{
     bson::{Bson, Document},
     options::ClientOptions,
-    test::{assert_matches, util::TestClient, EventClient, CLIENT_OPTIONS, LOCK},
+    test::{assert_matches, log_uncaptured, util::TestClient, EventClient, CLIENT_OPTIONS, LOCK},
 };
 
 #[derive(Deserialize)]
@@ -52,14 +52,14 @@ async fn run_command_monitoring_test(test_file: TestFile) {
 
     for test_case in test_file.tests {
         if skipped_tests.iter().any(|st| st == &test_case.description) {
-            println!("Skipping {}", test_case.description);
+            log_uncaptured(format!("Skipping {}", test_case.description));
             continue;
         }
 
         if let Some(ref max_version) = test_case.max_version {
             let req = VersionReq::parse(&format!("<= {}", &max_version)).unwrap();
             if !req.matches(&client.server_version) {
-                println!("Skipping {}", test_case.description);
+                log_uncaptured(format!("Skipping {}", test_case.description));
                 continue;
             }
         }
@@ -67,7 +67,7 @@ async fn run_command_monitoring_test(test_file: TestFile) {
         if let Some(ref min_version) = test_case.min_version {
             let req = VersionReq::parse(&format!(">= {}", &min_version)).unwrap();
             if !req.matches(&client.server_version) {
-                println!("Skipping {}", test_case.description);
+                log_uncaptured(format!("Skipping {}", test_case.description));
                 continue;
             }
         }

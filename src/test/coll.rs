@@ -28,6 +28,7 @@ use crate::{
     },
     results::DeleteResult,
     test::{
+        log_uncaptured,
         util::{drop_collection, EventClient, TestClient},
         CLIENT_OPTIONS,
         LOCK,
@@ -47,7 +48,7 @@ async fn insert_err_details() {
         .init_db_and_coll(function_name!(), function_name!())
         .await;
     if client.server_version_lt(4, 0) || !client.is_replica_set() {
-        println!("skipping insert_err_details due to test configuration");
+        log_uncaptured("skipping insert_err_details due to test configuration");
         return;
     }
     client
@@ -402,7 +403,7 @@ lazy_static! {
 #[function_name::named]
 async fn large_insert() {
     if std::env::consts::OS != "linux" {
-        println!("skipping large_insert due to unsupported OS");
+        log_uncaptured("skipping large_insert due to unsupported OS");
         return;
     }
 
@@ -452,7 +453,7 @@ fn multibatch_documents_with_duplicate_keys() -> Vec<Document> {
 #[function_name::named]
 async fn large_insert_unordered_with_errors() {
     if std::env::consts::OS != "linux" {
-        println!("skipping large_insert_unordered_with_errors due to unsupported OS");
+        log_uncaptured("skipping large_insert_unordered_with_errors due to unsupported OS");
         return;
     }
 
@@ -493,7 +494,7 @@ async fn large_insert_unordered_with_errors() {
 #[function_name::named]
 async fn large_insert_ordered_with_errors() {
     if std::env::consts::OS != "linux" {
-        println!("skipping large_insert_ordered_with_errors due to unsupported OS");
+        log_uncaptured("skipping large_insert_ordered_with_errors due to unsupported OS");
         return;
     }
 
@@ -579,7 +580,7 @@ async fn allow_disk_use_test(options: FindOptions, expected_value: Option<bool>)
 
     let event_client = EventClient::new().await;
     if event_client.server_version_lt(4, 3) {
-        println!("skipping allow_disk_use_test due to server version < 4.3");
+        log_uncaptured("skipping allow_disk_use_test due to server version < 4.3");
         return;
     }
     let coll = event_client
@@ -658,7 +659,7 @@ async fn find_one_and_delete_hint_test(options: Option<FindOneAndDeleteOptions>,
 
     let req = VersionReq::parse(">= 4.2").unwrap();
     if options.is_some() && !req.matches(&client.server_version) {
-        println!("skipping find_one_and_delete_hint_test due to test configuration");
+        log_uncaptured("skipping find_one_and_delete_hint_test due to test configuration");
         return;
     }
 
@@ -738,7 +739,7 @@ async fn no_read_preference_to_standalone() {
     let client = EventClient::new().await;
 
     if !client.is_standalone() {
-        println!("skipping no_read_preference_to_standalone due to test topology");
+        log_uncaptured("skipping no_read_preference_to_standalone due to test topology");
         return;
     }
 
@@ -1076,7 +1077,7 @@ async fn cursor_batch_size() {
 
     // test session cursors
     if client.is_standalone() {
-        println!("skipping cursor_batch_size due to standalone topology");
+        log_uncaptured("skipping cursor_batch_size due to standalone topology");
         return;
     }
     let mut session = client.start_session(None).await.unwrap();

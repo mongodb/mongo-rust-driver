@@ -4,7 +4,7 @@ use bson::doc;
 use tokio::sync::RwLockWriteGuard;
 
 use crate::{
-    test::{CLIENT_OPTIONS, LOCK},
+    test::{log_uncaptured, CLIENT_OPTIONS, LOCK},
     Client,
 };
 
@@ -12,7 +12,7 @@ use crate::{
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
     if std::env::var_os("MONGO_OCSP_TESTS").is_none() {
-        println!("skipping test due to missing environment variable MONGO_OCSP_TESTS");
+        log_uncaptured("skipping test due to missing environment variable MONGO_OCSP_TESTS");
         return;
     }
 

@@ -9,7 +9,7 @@ use crate::{
     error::{CommandError, Error, ErrorKind},
     options::{AuthMechanism, ClientOptions, Credential, ListDatabasesOptions, ServerAddress},
     selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria},
-    test::{util::TestClient, CLIENT_OPTIONS, LOCK},
+    test::{log_uncaptured, util::TestClient, CLIENT_OPTIONS, LOCK},
     Client,
     RUNTIME,
 };
@@ -115,7 +115,7 @@ async fn server_selection_timeout_message() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     if CLIENT_OPTIONS.repl_set_name.is_none() {
-        println!("skipping server_selection_timeout_message due to missing replica set name");
+        log_uncaptured("skipping server_selection_timeout_message due to missing replica set name");
         return;
     }
 
@@ -241,7 +241,7 @@ async fn list_authorized_databases() {
 
     let client = TestClient::new().await;
     if client.server_version_lt(4, 0) || !client.auth_enabled() {
-        println!("skipping list_authorized_databases due to test configuration");
+        log_uncaptured("skipping list_authorized_databases due to test configuration");
         return;
     }
 
@@ -430,7 +430,7 @@ async fn scram_sha1() {
 
     let client = TestClient::new().await;
     if !client.auth_enabled() {
-        println!("skipping scram_sha1 due to missing authentication");
+        log_uncaptured("skipping scram_sha1 due to missing authentication");
         return;
     }
 
@@ -454,7 +454,7 @@ async fn scram_sha256() {
 
     let client = TestClient::new().await;
     if client.server_version_lt(4, 0) || !client.auth_enabled() {
-        println!("skipping scram_sha256 due to test configuration");
+        log_uncaptured("skipping scram_sha256 due to test configuration");
         return;
     }
     client
@@ -477,7 +477,7 @@ async fn scram_both() {
 
     let client = TestClient::new().await;
     if client.server_version_lt(4, 0) || !client.auth_enabled() {
-        println!("skipping scram_both due to test configuration");
+        log_uncaptured("skipping scram_both due to test configuration");
         return;
     }
     client
@@ -506,7 +506,7 @@ async fn scram_missing_user_uri() {
 
     let client = TestClient::new().await;
     if !client.auth_enabled() {
-        println!("skipping scram_missing_user_uri due to missing authentication");
+        log_uncaptured("skipping scram_missing_user_uri due to missing authentication");
         return;
     }
     auth_test_uri("adsfasdf", "ASsdfsadf", None, false).await;
@@ -519,7 +519,7 @@ async fn scram_missing_user_options() {
 
     let client = TestClient::new().await;
     if !client.auth_enabled() {
-        println!("skipping scram_missing_user_options due to missing authentication");
+        log_uncaptured("skipping scram_missing_user_options due to missing authentication");
         return;
     }
     auth_test_options("sadfasdf", "fsdadsfasdf", None, false).await;
@@ -533,7 +533,7 @@ async fn saslprep() {
     let client = TestClient::new().await;
 
     if client.server_version_lt(4, 0) || !client.auth_enabled() {
-        println!("skipping saslprep due to test configuration");
+        log_uncaptured("skipping saslprep due to test configuration");
         return;
     }
 
@@ -626,7 +626,7 @@ async fn plain_auth() {
     let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
 
     if std::env::var("MONGO_PLAIN_AUTH_TEST").is_err() {
-        println!("skipping plain_auth due to environment variable MONGO_PLAIN_AUTH_TEST");
+        log_uncaptured("skipping plain_auth due to environment variable MONGO_PLAIN_AUTH_TEST");
         return;
     }
 

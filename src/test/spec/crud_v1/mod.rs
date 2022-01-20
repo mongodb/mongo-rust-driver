@@ -18,7 +18,7 @@ use std::future::Future;
 use futures::stream::TryStreamExt;
 use serde::Deserialize;
 
-use crate::{bson::Document, Collection};
+use crate::{bson::Document, test::log_uncaptured, Collection};
 
 use super::{run_spec_test, Serverless};
 
@@ -74,7 +74,7 @@ where
     run_spec_test(spec, |t: TestFile| async {
         if let Some(ref serverless) = t.serverless {
             if !serverless.can_run() {
-                println!("skipping crud_v1_test");
+                log_uncaptured("skipping crud_v1_test");
                 return;
             }
         }

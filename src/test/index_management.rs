@@ -6,6 +6,7 @@ use crate::{
     error::ErrorKind,
     options::{CommitQuorum, CreateIndexOptions, IndexOptions},
     test::{
+        log_uncaptured,
         util::{EventClient, TestClient},
         LOCK,
     },
@@ -286,7 +287,7 @@ async fn commit_quorum_error() {
 
     let client = TestClient::new().await;
     if client.is_standalone() {
-        println!("skipping commit_quorum_error due to standalone topology");
+        log_uncaptured("skipping commit_quorum_error due to standalone topology");
         return;
     }
 

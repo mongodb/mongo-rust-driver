@@ -7,7 +7,7 @@ use crate::{
     coll::options::CollectionOptions,
     error::Result,
     options::ReadConcern,
-    test::{CommandEvent, EventClient, LOCK},
+    test::{log_uncaptured, CommandEvent, EventClient, LOCK},
     ClientSession,
     Collection,
 };
@@ -150,8 +150,8 @@ async fn new_session_operation_time_null() {
     let client = EventClient::new().await;
 
     if client.is_standalone() {
-        println!(
-            "skipping new_session_operation_time_null due to unsupported topology: standalone"
+        log_uncaptured(
+            "skipping new_session_operation_time_null due to unsupported topology: standalone",
         );
         return;
     }
@@ -169,8 +169,8 @@ async fn first_read_no_after_cluser_time() {
     let client = EventClient::new().await;
 
     if client.is_standalone() {
-        println!(
-            "skipping first_read_no_after_cluser_time due to unsupported topology: standalone"
+        log_uncaptured(
+            "skipping first_read_no_after_cluser_time due to unsupported topology: standalone",
         );
         return;
     }
@@ -208,7 +208,7 @@ async fn first_op_update_op_time() {
     let client = EventClient::new().await;
 
     if client.is_standalone() {
-        println!("skipping first_op_update_op_time due to unsupported topology: standalone");
+        log_uncaptured("skipping first_op_update_op_time due to unsupported topology: standalone");
         return;
     }
 
@@ -258,8 +258,8 @@ async fn read_includes_after_cluster_time() {
     let client = EventClient::new().await;
 
     if client.is_standalone() {
-        println!(
-            "skipping read_includes_after_cluster_time due to unsupported topology: standalone"
+        log_uncaptured(
+            "skipping read_includes_after_cluster_time due to unsupported topology: standalone",
         );
         return;
     }
@@ -303,9 +303,9 @@ async fn find_after_write_includes_after_cluster_time() {
     let client = EventClient::new().await;
 
     if client.is_standalone() {
-        println!(
+        log_uncaptured(
             "skipping find_after_write_includes_after_cluster_time due to unsupported topology: \
-             standalone"
+             standalone",
         );
         return;
     }
@@ -345,9 +345,9 @@ async fn not_causally_consistent_omits_after_cluster_time() {
     let client = EventClient::new().await;
 
     if client.is_standalone() {
-        println!(
+        log_uncaptured(
             "skipping not_causally_consistent_omits_after_cluster_time due to unsupported \
-             topology: standalone"
+             topology: standalone",
         );
         return;
     }
@@ -383,7 +383,7 @@ async fn omit_after_cluster_time_standalone() {
     let client = EventClient::new().await;
 
     if !client.is_standalone() {
-        println!("skipping omit_after_cluster_time_standalone due to unsupported topology");
+        log_uncaptured("skipping omit_after_cluster_time_standalone due to unsupported topology");
         return;
     }
 
@@ -418,8 +418,8 @@ async fn omit_default_read_concern_level() {
     let client = EventClient::new().await;
 
     if client.is_standalone() {
-        println!(
-            "skipping omit_default_read_concern_level due to unsupported topology: standalone"
+        log_uncaptured(
+            "skipping omit_default_read_concern_level due to unsupported topology: standalone",
         );
         return;
     }
@@ -458,9 +458,9 @@ async fn test_causal_consistency_read_concern_merge() {
 
     let client = EventClient::new().await;
     if client.is_standalone() {
-        println!(
+        log_uncaptured(
             "skipping test_causal_consistency_read_concern_merge due to unsupported topology: \
-             standalone"
+             standalone",
         );
         return;
     }
@@ -508,7 +508,7 @@ async fn omit_cluster_time_standalone() {
 
     let client = EventClient::new().await;
     if !client.is_standalone() {
-        println!("skipping omit_cluster_time_standalone due to unsupported topology");
+        log_uncaptured("skipping omit_cluster_time_standalone due to unsupported topology");
         return;
     }
 
@@ -530,7 +530,7 @@ async fn cluster_time_sent_in_commands() {
 
     let client = EventClient::new().await;
     if client.is_standalone() {
-        println!("skipping cluster_time_sent_in_commands due to unsupported topology");
+        log_uncaptured("skipping cluster_time_sent_in_commands due to unsupported topology");
         return;
     }
 
