@@ -180,6 +180,10 @@ async fn resumes_on_error() -> Result<()> {
         }) if key == doc! { "_id": 2 }
     ));
 
+    // Assert that two `aggregate`s were issued, i.e. that a resume happened.
+    let events = client.get_command_started_events(&["aggregate"]);
+    assert_eq!(events.len(), 2);
+
     Ok(())
 }
 
