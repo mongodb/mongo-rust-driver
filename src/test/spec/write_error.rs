@@ -12,6 +12,12 @@ async fn details() {
     let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
 
+    if client.server_version_lt(5, 0) {
+        // SERVER-58399
+        println!("skipping write_error_details test due to server version");
+        return;
+    }
+
     let db = client.database("write_error_details");
     db.drop(None).await.unwrap();
     db.create_collection(
