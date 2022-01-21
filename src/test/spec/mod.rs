@@ -1,5 +1,6 @@
 #[cfg(not(feature = "sync"))]
 mod auth;
+mod change_streams;
 mod collection_management;
 mod command_monitoring;
 mod connection_stepdown;
