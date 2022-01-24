@@ -21,7 +21,7 @@ use crate::{
     Collection,
     Cursor,
     Database,
-    SessionCursor,
+    SessionCursor, change_stream::{ChangeStream, event::ChangeStreamEvent},
 };
 
 #[derive(Debug)]
@@ -43,6 +43,12 @@ pub struct ClientEntity {
     observe_events: Option<Vec<ObserveEvent>>,
     ignore_command_names: Option<Vec<String>>,
     observe_sensitive_commands: bool,
+}
+
+impl ClientEntity {
+    pub fn client(&self) -> &Client {
+        &self.client
+    }
 }
 
 #[derive(Debug)]

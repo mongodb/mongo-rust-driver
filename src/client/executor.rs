@@ -628,6 +628,7 @@ impl Client {
         let start_time = Instant::now();
         let command_result = match connection.send_raw_command(raw_cmd, request_id).await {
             Ok(response) => {
+                //let _ = dbg!(response.body::<Document>());
                 async fn handle_response<T: Operation>(
                     client: &Client,
                     op: &T,

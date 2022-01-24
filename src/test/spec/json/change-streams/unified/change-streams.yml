@@ -3,6 +3,7 @@ schemaVersion: "1.0"
 createEntities:
   - client:
       id: &client0 client0
+      observeEvents: [ commandStartedEvent ]
   - database:
       id: &database0 database0
       client: *client0
@@ -68,5 +69,35 @@ tests:
                 "newSize": 2
               }
             ]
+          }
+        }
+  - description: "$changeStream must be the first stage in a change stream pipeline sent to the server"
+    runOnRequirements:
+      - minServerVersion: "3.6"
+        topologies: [replicaset]
+    operations:
+      - name: createChangeStream
+        object: *collection0
+        arguments:
+          pipeline: []
+        saveResultAsEntity: &changeStream0 changeStream0
+      - name: insertOne
+        object: *collection0
+        arguments:
+          document: {
+            "x": 1
+          }
+      - name: iterateUntilDocumentOrError
+        object: *changeStream0
+        expectResult: {
+          "operationType": "insert",
+          "ns": {
+            "db": "database0",
+            "coll": "collection0"
+          },
+          "fullDocument": {
+            "x": {
+              "$numberInt": "1"
+            }
           }
         }
