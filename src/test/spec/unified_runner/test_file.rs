@@ -104,7 +104,7 @@ impl RunOnRequirement {
                 &Bson::Document(actual_server_parameters.clone()),
                 false,
                 None,
-            ) {
+            ).is_ok() {
                 return false;
             }
         }

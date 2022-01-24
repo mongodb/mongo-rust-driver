@@ -13,7 +13,7 @@ pub fn results_match(
     expected: &Bson,
     returns_root_documents: bool,
     entities: Option<&EntityMap>,
-) -> bool {
+) -> Result<(), String> {
     results_match_inner(actual, expected, returns_root_documents, true, entities)
 }
 
@@ -21,29 +21,32 @@ pub fn events_match(
     actual: &Event,
     expected: &ExpectedEvent,
     entities: Option<&EntityMap>,
-) -> bool {
+) -> Result<(), String> {
     match (actual, expected) {
         (Event::Command(act), ExpectedEvent::Command(exp)) => {
             command_events_match(act, exp, entities)
         }
         (Event::Cmap(act), ExpectedEvent::Cmap(exp)) => cmap_events_match(act, exp),
-        _ => false,
+        _ => expected_err(actual, expected),
     }
 }
 
-fn match_opt<T: PartialEq>(actual: &T, expected: &Option<T>) -> bool {
-    expected.is_none() || expected.as_ref() == Some(actual)
+fn match_opt<T: PartialEq + std::fmt::Debug>(actual: &T, expected: &Option<T>) -> Result<(), String> {
+    match expected.as_ref() {
+        None => Ok(()),
+        Some(exp) => match_eq(actual, exp),
+    }
 }
 
 fn match_results_opt(
     actual: &Document,
     expected: &Option<Document>,
     entities: Option<&EntityMap>,
-) -> bool {
+) -> Result<(), String> {
     let expected_doc = if let Some(doc) = expected {
         Bson::Document(doc.clone())
     } else {
-        return true;
+        return Ok(());
     };
     let actual_doc = Some(Bson::Document(actual.clone()));
     results_match(actual_doc.as_ref(), &expected_doc, false, entities)
@@ -53,7 +56,7 @@ fn command_events_match(
     actual: &CommandEvent,
     expected: &ExpectedCommandEvent,
     entities: Option<&EntityMap>,
-) -> bool {
+) -> Result<(), String> {
     match (actual, expected) {
         (
             CommandEvent::Started(actual),
@@ -64,19 +67,11 @@ fn command_events_match(
                 has_service_id: expected_has_service_id,
             },
         ) => {
-            if !match_opt(&actual.command_name, expected_command_name) {
-                return false;
-            }
-            if !match_opt(&actual.db, expected_database_name) {
-                return false;
-            }
-            if !match_opt(&actual.service_id.is_some(), expected_has_service_id) {
-                return false;
-            }
-            if !match_results_opt(&actual.command, expected_command, entities) {
-                return false;
-            }
-            true
+            match_opt(&actual.command_name, expected_command_name)?;
+            match_opt(&actual.db, expected_database_name)?;
+            match_opt(&actual.service_id.is_some(), expected_has_service_id)?;
+            match_results_opt(&actual.command, expected_command, entities)?;
+            Ok(())
         }
         (
             CommandEvent::Succeeded(actual),
@@ -86,16 +81,10 @@ fn command_events_match(
                 has_service_id: expected_has_service_id,
             },
         ) => {
-            if !match_opt(&actual.command_name, expected_command_name) {
-                return false;
-            }
-            if !match_opt(&actual.service_id.is_some(), expected_has_service_id) {
-                return false;
-            }
-            if !match_results_opt(&actual.reply, expected_reply, None) {
-                return false;
-            }
-            true
+            match_opt(&actual.command_name, expected_command_name)?;
+            match_opt(&actual.service_id.is_some(), expected_has_service_id)?;
+            match_results_opt(&actual.reply, expected_reply, None)?;
+            Ok(())
         }
         (
             CommandEvent::Failed(actual),
@@ -104,31 +93,27 @@ fn command_events_match(
                 has_service_id: expected_has_service_id,
             },
         ) => {
-            if !match_opt(&actual.service_id.is_some(), expected_has_service_id) {
-                return false;
-            }
-            if !match_opt(&actual.command_name, expected_command_name) {
-                return false;
-            }
-            true
+            match_opt(&actual.service_id.is_some(), expected_has_service_id)?;
+            match_opt(&actual.command_name, expected_command_name)?;
+            Ok(())
         }
-        _ => false,
+        _ => expected_err(actual, expected),
     }
 }
 
-fn cmap_events_match(actual: &CmapEvent, expected: &ExpectedCmapEvent) -> bool {
+fn cmap_events_match(actual: &CmapEvent, expected: &ExpectedCmapEvent) -> Result<(), String> {
     match (actual, expected) {
-        (CmapEvent::PoolCreated(_), ExpectedCmapEvent::PoolCreated {}) => true,
-        (CmapEvent::PoolReady(_), ExpectedCmapEvent::PoolReady {}) => true,
+        (CmapEvent::PoolCreated(_), ExpectedCmapEvent::PoolCreated {}) => Ok(()),
+        (CmapEvent::PoolReady(_), ExpectedCmapEvent::PoolReady {}) => Ok(()),
         (
             CmapEvent::PoolCleared(actual),
             ExpectedCmapEvent::PoolCleared {
                 has_service_id: expected_has_service_id,
             },
         ) => match_opt(&actual.service_id.is_some(), expected_has_service_id),
-        (CmapEvent::PoolClosed(_), ExpectedCmapEvent::PoolClosed {}) => true,
-        (CmapEvent::ConnectionCreated(_), ExpectedCmapEvent::ConnectionCreated {}) => true,
-        (CmapEvent::ConnectionReady(_), ExpectedCmapEvent::ConnectionReady {}) => true,
+        (CmapEvent::PoolClosed(_), ExpectedCmapEvent::PoolClosed {}) => Ok(()),
+        (CmapEvent::ConnectionCreated(_), ExpectedCmapEvent::ConnectionCreated {}) => Ok(()),
+        (CmapEvent::ConnectionReady(_), ExpectedCmapEvent::ConnectionReady {}) => Ok(()),
         (
             CmapEvent::ConnectionClosed(actual),
             ExpectedCmapEvent::ConnectionClosed {
@@ -138,16 +123,16 @@ fn cmap_events_match(actual: &CmapEvent, expected: &ExpectedCmapEvent) -> bool {
         (
             CmapEvent::ConnectionCheckOutStarted(_),
             ExpectedCmapEvent::ConnectionCheckOutStarted {},
-        ) => true,
+        ) => Ok(()),
         (
             CmapEvent::ConnectionCheckOutFailed(actual),
             ExpectedCmapEvent::ConnectionCheckOutFailed {
                 reason: expected_reason,
             },
         ) => match_opt(&actual.reason, expected_reason),
-        (CmapEvent::ConnectionCheckedOut(_), ExpectedCmapEvent::ConnectionCheckedOut {}) => true,
-        (CmapEvent::ConnectionCheckedIn(_), ExpectedCmapEvent::ConnectionCheckedIn {}) => true,
-        _ => false,
+        (CmapEvent::ConnectionCheckedOut(_), ExpectedCmapEvent::ConnectionCheckedOut {}) => Ok(()),
+        (CmapEvent::ConnectionCheckedIn(_), ExpectedCmapEvent::ConnectionCheckedIn {}) => Ok(()),
+        _ => expected_err(actual, expected),
     }
 }
 
@@ -157,12 +142,13 @@ fn results_match_inner(
     returns_root_documents: bool,
     root: bool,
     entities: Option<&EntityMap>,
-) -> bool {
+) -> Result<(), String> {
     match expected {
         Bson::Document(expected_doc) => {
             if let Some((key, value)) = expected_doc.iter().next() {
                 if key.starts_with("$$") && expected_doc.len() == 1 {
-                    return special_operator_matches((key, value), actual, entities);
+                    return special_operator_matches((key, value), actual, entities)
+                        .map_err(|e| format!("{}: {}", key, e));
                 }
             }
 
@@ -170,73 +156,82 @@ fn results_match_inner(
                 Some(Bson::Document(actual)) => actual,
                 // The only case in which None is an acceptable value is if the expected document
                 // is a special operator; otherwise, the two documents do not match.
-                _ => return false,
+                _ => return Err(format!("expected document, found {:?}", actual)),
             };
 
             for (key, value) in expected_doc {
                 if key == "upsertedCount" {
                     continue;
                 }
-                if !results_match_inner(actual_doc.get(key), value, false, false, entities) {
-                    return false;
-                }
+                results_match_inner(actual_doc.get(key), value, false, false, entities)
+                    .map_err(|e| format!("{:?}: {}", key, e))?;
             }
 
             // Documents that are not the root-level document should not contain extra keys.
             if !root {
                 for (key, _) in actual_doc {
                     if !expected_doc.contains_key(key) {
-                        return false;
+                        return Err(format!("extra key {:?} found", key));
                     }
                 }
             }
 
-            true
+            Ok(())
         }
         Bson::Array(expected_array) => {
             let actual_array = match actual {
                 Some(Bson::Array(arr)) => arr,
-                _ => return false,
+                _ => return Err(format!("expected array, got {:?}", actual)),
             };
             if expected_array.len() != actual_array.len() {
-                return false;
+                return Err(format!("expected array len = {}, got len = {}", expected_array.len(), actual_array.len()));
             }
 
             // Some operations return an array of documents that should be treated as root
             // documents.
             for (actual, expected) in actual_array.iter().zip(expected_array) {
-                if !results_match_inner(
+                results_match_inner(
                     Some(actual),
                     expected,
                     false,
                     returns_root_documents,
                     entities,
-                ) {
-                    return false;
-                }
+                )?;
             }
 
-            true
+            Ok(())
         }
         Bson::Int32(_) | Bson::Int64(_) | Bson::Double(_) => match actual {
             Some(actual) => numbers_match(actual, expected),
-            None => false,
+            None => Err("expected number, got None".to_string()),
         },
         _ => match actual {
-            Some(actual) => actual == expected,
-            None => false,
+            Some(actual) => match_eq(actual, expected),
+            None => Err(format!("expected {:?}, got None", expected)),
         },
     }
 }
 
-fn numbers_match(actual: &Bson, expected: &Bson) -> bool {
+fn expected_err<A: std::fmt::Debug, B: std::fmt::Debug>(actual: &A, expected: &B) -> Result<(), String> {
+    Err(format!("expected {:?}, got {:?}", actual, expected))
+}
+
+fn match_eq<V: PartialEq + std::fmt::Debug>(actual: &V, expected: &V) -> Result<(), String> {
+    if actual == expected {
+        Ok(())
+    } else {
+        expected_err(actual, expected)
+    }
+}
+
+fn numbers_match(actual: &Bson, expected: &Bson) -> Result<(), String> {
     if actual.element_type() == expected.element_type() {
-        return actual == expected;
+        return match_eq(actual, expected);
     }
 
     match (get_int(actual), get_int(expected)) {
-        (Some(actual), Some(expected)) => actual == expected,
-        _ => false,
+        (Some(actual), Some(expected)) => match_eq(&actual, &expected),
+        _ => expected_err(actual, expected),
     }
 }
 
@@ -244,15 +239,15 @@ fn special_operator_matches(
     (key, value): (&String, &Bson),
     actual: Option<&Bson>,
     entities: Option<&EntityMap>,
-) -> bool {
+) -> Result<(), String> {
     match key.as_ref() {
-        "$$exists" => value.as_bool().unwrap() == actual.is_some(),
+        "$$exists" => match_eq(&value.as_bool().unwrap(), &actual.is_some()),
         "$$type" => type_matches(value, actual.unwrap()),
         "$$unsetOrMatches" => {
             if actual.is_some() {
                 results_match_inner(actual, value, false, false, entities)
             } else {
-                true
+                Ok(())
             }
         }
         "$$matchesEntity" => {
@@ -278,37 +273,46 @@ fn special_operator_matches(
     }
 }
 
-fn entity_matches(id: &str, actual: Option<&Bson>, entities: &EntityMap) -> bool {
+fn entity_matches(id: &str, actual: Option<&Bson>, entities: &EntityMap) -> Result<(), String> {
     let bson = entities.get(id).unwrap().as_bson();
     results_match_inner(actual, bson, false, false, Some(entities))
 }
 
-fn type_matches(types: &Bson, actual: &Bson) -> bool {
+fn type_matches(types: &Bson, actual: &Bson) -> Result<(), String> {
     match types {
-        Bson::Array(types) => types.iter().any(|t| type_matches(t, actual)),
-        Bson::String(str) => match str.as_ref() {
-            "double" => actual.element_type() == ElementType::Double,
-            "string" => actual.element_type() == ElementType::String,
-            "object" => actual.element_type() == ElementType::EmbeddedDocument,
-            "array" => actual.element_type() == ElementType::Array,
-            "binData" => actual.element_type() == ElementType::Binary,
-            "undefined" => actual.element_type() == ElementType::Undefined,
-            "objectId" => actual.element_type() == ElementType::ObjectId,
-            "bool" => actual.element_type() == ElementType::Boolean,
-            "date" => actual.element_type() == ElementType::DateTime,
-            "null" => actual.element_type() == ElementType::Null,
-            "regex" => actual.element_type() == ElementType::RegularExpression,
-            "dbPointer" => actual.element_type() == ElementType::DbPointer,
-            "javascript" => actual.element_type() == ElementType::JavaScriptCode,
-            "symbol" => actual.element_type() == ElementType::Symbol,
-            "javascriptWithScope" => actual.element_type() == ElementType::JavaScriptCodeWithScope,
-            "int" => actual.element_type() == ElementType::Int32,
-            "timestamp" => actual.element_type() == ElementType::Timestamp,
-            "long" => actual.element_type() == ElementType::Int64,
-            "decimal" => actual.element_type() == ElementType::Decimal128,
-            "minKey" => actual.element_type() == ElementType::MinKey,
-            "maxKey" => actual.element_type() == ElementType::MaxKey,
-            other => panic!("unrecognized type: {}", other),
+        Bson::Array(types) => {
+            if types.iter().any(|t| type_matches(t, actual).is_ok()) {
+                Ok(())
+            } else {
+                Err(format!("expected any of {:?}, got {:?}", types, actual))
+            }
+        }
+        Bson::String(str) => {
+            let expected = match str.as_ref() {
+                "double" => ElementType::Double,
+                "string" => ElementType::String,
+                "object" => ElementType::EmbeddedDocument,
+                "array" => ElementType::Array,
+                "binData" => ElementType::Binary,
+                "undefined" => ElementType::Undefined,
+                "objectId" => ElementType::ObjectId,
+                "bool" => ElementType::Boolean,
+                "date" => ElementType::DateTime,
+                "null" => ElementType::Null,
+                "regex" => ElementType::RegularExpression,
+                "dbPointer" => ElementType::DbPointer,
+                "javascript" => ElementType::JavaScriptCode,
+                "symbol" => ElementType::Symbol,
+                "javascriptWithScope" => ElementType::JavaScriptCodeWithScope,
+                "int" => ElementType::Int32,
+                "timestamp" => ElementType::Timestamp,
+                "long" => ElementType::Int64,
+                "decimal" => ElementType::Decimal128,
+                "minKey" => ElementType::MinKey,
+                "maxKey" => ElementType::MaxKey,
+                other => panic!("unrecognized type: {}", other),
+            };
+            match_eq(&actual.element_type(), &expected)
         },
         other => panic!("unrecognized type: {}", other),
     }
@@ -324,7 +328,7 @@ async fn basic_matching() {
         &Bson::Document(expected),
         false,
         None,
-    ));
+    ).is_ok());
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "x": 1, "y": 1 };
@@ -333,7 +337,7 @@ async fn basic_matching() {
         &Bson::Document(expected),
         false,
         None,
-    ));
+    ).is_ok());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -352,7 +356,7 @@ async fn array_matching() {
         &Bson::Array(expected),
         false,
         None,
-    ));
+    ).is_ok());
 
     let actual = vec![
         Bson::Document(doc! { "x": 1, "y": 1 }),
@@ -367,7 +371,7 @@ async fn array_matching() {
         &Bson::Array(expected),
         false,
         None,
-    ));
+    ).is_ok());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -380,7 +384,7 @@ async fn special_operators() {
         &Bson::Document(expected),
         false,
         None,
-    ));
+    ).is_ok());
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "x": { "$$exists": false } };
@@ -389,7 +393,7 @@ async fn special_operators() {
         &Bson::Document(expected),
         false,
         None,
-    ));
+    ).is_ok());
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "y": { "$$exists": false } };
@@ -398,7 +402,7 @@ async fn special_operators() {
         &Bson::Document(expected),
         false,
         None,
-    ));
+    ).is_ok());
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "y": { "$$exists": true } };
@@ -407,7 +411,7 @@ async fn special_operators() {
         &Bson::Document(expected),
         false,
         None,
-    ));
+    ).is_ok());
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "x": { "$$type": [ "int", "long" ] } };
@@ -416,7 +420,7 @@ async fn special_operators() {
         &Bson::Document(expected),
         false,
         None,
-    ));
+    ).is_ok());
 
     let actual = doc! {};
     let expected = doc! { "x": { "$$unsetOrMatches": 1 } };
@@ -425,7 +429,7 @@ async fn special_operators() {
         &Bson::Document(expected),
         false,
         None,
-    ));
+    ).is_ok());
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "x": { "$$unsetOrMatches": 1 } };
@@ -434,7 +438,7 @@ async fn special_operators() {
         &Bson::Document(expected),
         false,
         None,
-    ));
+    ).is_ok());
 
     let actual = doc! { "x": 2 };
     let expected = doc! { "x": { "$$unsetOrMatches": 1 } };
@@ -443,7 +447,7 @@ async fn special_operators() {
         &Bson::Document(expected),
         false,
         None,
-    ));
+    ).is_ok());
 
     let expected = doc! { "x": { "y": { "$$exists": false } } };
     let actual = doc! { "x": {} };
@@ -452,7 +456,7 @@ async fn special_operators() {
         &Bson::Document(expected),
         false,
         None,
-    ));
+    ).is_ok());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -465,7 +469,7 @@ async fn extra_fields() {
         &Bson::Document(expected),
         false,
         None,
-    ));
+    ).is_ok());
 
     let actual = doc! { "doc": { "x": 1, "y": 2 } };
     let expected = doc! { "doc": { "x": 1 } };
@@ -474,7 +478,7 @@ async fn extra_fields() {
         &Bson::Document(expected),
         false,
         None,
-    ));
+    ).is_ok());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -482,13 +486,13 @@ async fn extra_fields() {
 async fn numbers() {
     let actual = Bson::Int32(2);
     let expected = Bson::Int64(2);
-    assert!(results_match(Some(&actual), &expected, false, None));
+    assert!(results_match(Some(&actual), &expected, false, None).is_ok());
 
     let actual = Bson::Double(2.5);
     let expected = Bson::Int32(2);
-    assert!(!results_match(Some(&actual), &expected, false, None));
+    assert!(!results_match(Some(&actual), &expected, false, None).is_ok());
 
     let actual = Bson::Double(2.0);
     let expected = Bson::Int64(2);
-    assert!(results_match(Some(&actual), &expected, false, None));
+    assert!(results_match(Some(&actual), &expected, false, None).is_ok());
 }
