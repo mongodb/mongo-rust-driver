@@ -4,6 +4,9 @@ createEntities:
   - client:
       id: &client0 client0
       observeEvents: [ commandStartedEvent ]
+  - client:
+      id: &globalClient globalClient
+      useMultipleMongoses: false
   - database:
       id: &database0 database0
       client: *client0
@@ -12,6 +15,15 @@ createEntities:
       id: &collection0 collection0
       database: *database0
       collectionName: *collection0
+  - database:
+      id: &globalDatabase0 globalDatabase0
+      client: *globalClient
+      databaseName: *database0
+  - collection:
+      id: &globalCollection0 globalCollection0
+      database: *globalDatabase0
+      collectionName: *collection0
+
 initialData:
   - collectionName: *collection0
     databaseName: *database0
@@ -82,7 +94,7 @@ tests:
           pipeline: []
         saveResultAsEntity: &changeStream0 changeStream0
       - name: insertOne
-        object: *collection0
+        object: *globalCollection0
         arguments:
           document: {
             "x": 1
@@ -90,14 +102,25 @@ tests:
       - name: iterateUntilDocumentOrError
         object: *changeStream0
         expectResult: {
+          "_id": { "$$exists": true },
+          "documentKey": { "$$exists": true },
           "operationType": "insert",
           "ns": {
-            "db": "database0",
-            "coll": "collection0"
+            "db": *database0,
+            "coll": *collection0
           },
           "fullDocument": {
+            "_id": { "$$exists": true },
             "x": {
               "$numberInt": "1"
             }
           }
         }
+    expectEvents:
+      - client: *client0
+        events:
+          - commandStartedEvent:
+              command:
+                aggregate: *collection0
+                cursor: {}
+                pipeline: [$changeStream: {}]
