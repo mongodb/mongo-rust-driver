@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 /// See the documentation
 /// [here](https://docs.mongodb.com/manual/changeStreams/#change-stream-resume-token) for more
 /// information on resume tokens.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct ResumeToken(pub(crate) RawBson);
 
 impl ResumeToken {
@@ -43,11 +43,16 @@ impl ResumeToken {
     pub(crate) fn from_raw(doc: Option<RawDocumentBuf>) -> Option<ResumeToken> {
         doc.map(|doc| ResumeToken(RawBson::Document(doc)))
     }
+
+    #[cfg(test)]
+    pub fn parsed(self) -> std::result::Result<Bson, bson::raw::Error> {
+        self.0.try_into()
+    }
 }
 
 /// A `ChangeStreamEvent` represents a
 /// [change event](https://docs.mongodb.com/manual/reference/change-events/) in the associated change stream.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ChangeStreamEvent<T> {
@@ -99,7 +104,7 @@ pub struct ChangeStreamEvent<T> {
 }
 
 /// Describes which fields have been updated or removed from a document.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct UpdateDescription {
@@ -112,7 +117,7 @@ pub struct UpdateDescription {
 }
 
 /// The operation type represented in a given change notification.
-#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum OperationType {
@@ -142,13 +147,12 @@ pub enum OperationType {
 }
 
 /// Identifies the collection or database on which an event occurred.
-#[derive(Deserialize, Debug)]
-#[serde(untagged)]
+#[derive(Deserialize, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum ChangeStreamEventSource {
-    /// The [`Namespace`] containing the database and collection in which the change occurred.
-    Namespace(Namespace),
+pub struct ChangeStreamEventSource {
+    /// The name of the database in which the change occurred.
+    pub db: String,
 
-    /// Contains the name of the database in which the change happened.
-    Database(String),
+    /// The name of the collection in which the change occurred.
+    pub coll: Option<String>,
 }

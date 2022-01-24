@@ -235,7 +235,7 @@ impl TestClient {
         self.get_coll(db_name, coll_name)
     }
 
-    pub async fn supports_fail_command(&self) -> bool {
+    pub fn supports_fail_command(&self) -> bool {
         let version = if self.is_sharded() {
             VersionReq::parse(">= 4.1.5").unwrap()
         } else {

@@ -180,7 +180,7 @@ async fn connection_error_during_establishment() {
     client_options.repl_set_name = None;
 
     let client = TestClient::with_options(Some(client_options.clone())).await;
-    if !client.supports_fail_command().await {
+    if !client.supports_fail_command() {
         println!(
             "skipping {} due to failCommand not being supported",
             function_name!()
@@ -235,7 +235,7 @@ async fn connection_error_during_operation() {
     options.max_pool_size = Some(1);
 
     let client = TestClient::with_options(options.into()).await;
-    if !client.supports_fail_command().await {
+    if !client.supports_fail_command() {
         println!(
             "skipping {} due to failCommand not being supported",
             function_name!()
