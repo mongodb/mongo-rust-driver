@@ -6,5 +6,5 @@ use super::run_unified_format_test;
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn run() {
     let _guard = LOCK.run_exclusively().await;
-    run_spec_test(&["change-streams"], run_unified_format_test).await;
+    run_spec_test(&["change-streams", "unified"], run_unified_format_test).await;
 }

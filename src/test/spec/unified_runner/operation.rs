@@ -8,7 +8,7 @@ use futures::{
 use serde::{de::Deserializer, Deserialize};
 use tokio::sync::Mutex;
 
-use super::{Entity, ExpectError, FindCursor, TestRunner};
+use super::{Entity, ExpectError, TestCursor, TestRunner};
 
 use crate::{
     bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
@@ -202,6 +202,7 @@ impl<'de> Deserialize<'de> for Operation {
                 deserialize_op::<AssertNumberConnectionsCheckedOut>(definition.arguments)
             }
             "close" => deserialize_op::<Close>(definition.arguments),
+            "createChangeStream" => deserialize_op::<CreateChangeStream>(definition.arguments),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -344,7 +345,7 @@ impl Find {
         &'a self,
         id: &'a str,
         test_runner: &'a mut TestRunner,
-    ) -> Result<FindCursor> {
+    ) -> Result<TestCursor> {
         let collection = test_runner.get_collection(id).clone();
         // `FindOptions` is constructed without the use of `..Default::default()` to enforce at
         // compile-time that any new fields added there need to be considered here.
@@ -377,14 +378,14 @@ impl Find {
                 let cursor = collection
                     .find_with_session(self.filter.clone(), options, session)
                     .await?;
-                Ok(FindCursor::Session {
+                Ok(TestCursor::Session {
                     cursor,
                     session_id: session_id.clone(),
                 })
             }
             None => {
                 let cursor = collection.find(self.filter.clone(), options).await?;
-                Ok(FindCursor::Normal(Mutex::new(cursor)))
+                Ok(TestCursor::Normal(Mutex::new(cursor)))
             }
         }
     }
@@ -398,7 +399,7 @@ impl TestOperation for Find {
     ) -> BoxFuture<'a, Result<Option<Entity>>> {
         async move {
             let result = match self.get_cursor(id, test_runner).await? {
-                FindCursor::Session {
+                TestCursor::Session {
                     mut cursor,
                     session_id,
                 } => {
@@ -408,11 +409,12 @@ impl TestOperation for Find {
                         .try_collect::<Vec<Document>>()
                         .await?
                 }
-                FindCursor::Normal(cursor) => {
+                TestCursor::Normal(cursor) => {
                     let cursor = cursor.into_inner();
                     cursor.try_collect::<Vec<Document>>().await?
                 }
-                FindCursor::Closed => panic!("get_cursor returned a closed cursor"),
+                TestCursor::ChangeStream(_) => panic!("get_cursor returned a change stream"),
+                TestCursor::Closed => panic!("get_cursor returned a closed cursor"),
             };
             Ok(Some(Bson::from(result).into()))
         }
@@ -482,7 +484,7 @@ impl TestOperation for CreateFindCursor {
                 collation: self.collation.clone(),
             };
             let cursor = find.get_cursor(id, test_runner).await?;
-            Ok(Some(Entity::FindCursor(cursor)))
+            Ok(Some(Entity::Cursor(cursor)))
         }
         .boxed()
     }
@@ -1764,21 +1766,31 @@ impl TestOperation for IterateUntilDocumentOrError {
         async move {
             // A `SessionCursor` also requires a `&mut Session`, which would cause conflicting
             // borrows, so take the cursor from the map and return it after execution instead.
-            let mut cursor = test_runner.entities.remove(id).unwrap().into_find_cursor();
+            let mut cursor = test_runner.entities.remove(id).unwrap().into_cursor();
             let next = match &mut cursor {
-                FindCursor::Normal(cursor) => {
+                TestCursor::Normal(cursor) => {
                     let mut cursor = cursor.lock().await;
                     cursor.next().await
                 }
-                FindCursor::Session { cursor, session_id } => {
+                TestCursor::Session { cursor, session_id } => {
                     let session = test_runner.get_mut_session(session_id);
                     cursor.next(session).await
                 }
-                FindCursor::Closed => None,
+                TestCursor::ChangeStream(stream) => {
+                    let mut stream = stream.lock().await;
+                    stream.next().await
+                        .map(|res| {
+                            res.map(|ev| match bson::to_bson(&ev) {
+                                Ok(Bson::Document(doc)) => doc,
+                                _ => panic!("invalid serialization result"),
+                            })
+                        })
+                }
+                TestCursor::Closed => None,
             };
             test_runner
                 .entities
-                .insert(id.to_string(), Entity::FindCursor(cursor));
+                .insert(id.to_string(), Entity::Cursor(cursor));
             next.transpose()
                 .map(|opt| opt.map(|doc| Entity::Bson(Bson::Document(doc))))
         }
@@ -1799,7 +1811,7 @@ impl TestOperation for Close {
         async move {
             let cursor = test_runner.get_mut_find_cursor(id);
             let rx = cursor.make_kill_watcher().await;
-            *cursor = FindCursor::Closed;
+            *cursor = TestCursor::Closed;
             let _ = rx.await;
             Ok(None)
         }
@@ -1823,6 +1835,38 @@ impl TestOperation for AssertNumberConnectionsCheckedOut {
             let client = test_runner.get_client(&self.client);
             client.sync_workers().await;
             assert_eq!(client.connections_checked_out(), self.connections);
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct CreateChangeStream {
+    pipeline: Vec<Document>,
+}
+
+impl TestOperation for CreateChangeStream {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a mut TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let target = test_runner.entities.get(id).unwrap();
+            let stream = match target {
+                Entity::Client(ce) => {
+                    ce.client().watch(self.pipeline.clone(), None).await?
+                },
+                Entity::Database(db) => {
+                    db.watch(self.pipeline.clone(), None).await?
+                },
+                Entity::Collection(coll) => {
+                    coll.watch(self.pipeline.clone(), None).await?
+                },
+                _ => panic!("Invalid entity for createChangeStream"),
+            };
+            Ok(Some(Entity::Cursor(TestCursor::ChangeStream(Mutex::new(stream)))))
         }
         .boxed()
     }

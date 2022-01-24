@@ -194,7 +194,10 @@ fn results_match_inner(
             true
         }
         Bson::Array(expected_array) => {
-            let actual_array = actual.unwrap().as_array().unwrap();
+            let actual_array = match actual {
+                Some(Bson::Array(arr)) => arr,
+                _ => return false,
+            };
             if expected_array.len() != actual_array.len() {
                 return false;
             }

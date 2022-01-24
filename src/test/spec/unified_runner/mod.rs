@@ -19,7 +19,7 @@ use crate::{
 };
 
 pub use self::{
-    entity::{ClientEntity, Entity, FindCursor, SessionEntity},
+    entity::{ClientEntity, Entity, TestCursor, SessionEntity},
     matcher::{events_match, results_match},
     operation::{Operation, OperationObject},
     test_event::{ExpectedCmapEvent, ExpectedCommandEvent, ExpectedEvent, ObserveEvent},

@@ -27,7 +27,7 @@ use super::{
     ClientEntity,
     CollectionData,
     Entity,
-    FindCursor,
+    TestCursor,
     SessionEntity,
     TestFileEntity,
 };
@@ -225,7 +225,7 @@ impl TestRunner {
         self.entities.get_mut(id).unwrap().as_mut_session_entity()
     }
 
-    pub fn get_mut_find_cursor(&mut self, id: &str) -> &mut FindCursor {
-        self.entities.get_mut(id).unwrap().as_mut_find_cursor()
+    pub fn get_mut_find_cursor(&mut self, id: &str) -> &mut TestCursor {
+        self.entities.get_mut(id).unwrap().as_mut_cursor()
     }
 }

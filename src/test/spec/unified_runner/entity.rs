@@ -20,7 +20,7 @@ use crate::{
     Collection,
     Cursor,
     Database,
-    SessionCursor,
+    SessionCursor, change_stream::{ChangeStream, event::ChangeStreamEvent},
 };
 
 #[derive(Debug)]
@@ -30,7 +30,7 @@ pub enum Entity {
     Database(Database),
     Collection(Collection<Document>),
     Session(SessionEntity),
-    FindCursor(FindCursor),
+    Cursor(TestCursor),
     Bson(Bson),
     None,
 }
@@ -44,6 +44,12 @@ pub struct ClientEntity {
     observe_sensitive_commands: bool,
 }
 
+impl ClientEntity {
+    pub fn client(&self) -> &Client {
+        &self.client
+    }
+}
+
 #[derive(Debug)]
 pub struct SessionEntity {
     pub lsid: Document,
@@ -51,7 +57,7 @@ pub struct SessionEntity {
 }
 
 #[derive(Debug)]
-pub enum FindCursor {
+pub enum TestCursor {
     // Due to https://github.com/rust-lang/rust/issues/59245, the `Entity` type is required to be
     // `Sync`; however, `Cursor` is `!Sync` due to internally storing a `BoxFuture`, which only
     // has a `Send` bound.  Wrapping it in `Mutex` works around this.
@@ -60,10 +66,12 @@ pub enum FindCursor {
         cursor: SessionCursor<Document>,
         session_id: String,
     },
+    // `ChangeStream` has the same issue with 59245 as `Cursor`.
+    ChangeStream(Mutex<ChangeStream<ChangeStreamEvent<Document>>>),
     Closed,
 }
 
-impl FindCursor {
+impl TestCursor {
     pub async fn make_kill_watcher(&mut self) -> oneshot::Receiver<()> {
         match self {
             Self::Normal(cursor) => {
@@ -74,6 +82,11 @@ impl FindCursor {
             Self::Session { cursor, .. } => {
                 let (tx, rx) = oneshot::channel();
                 cursor.set_kill_watcher(tx);
+                rx
+            }
+            Self::ChangeStream(stream) => {
+                let (tx, rx) = oneshot::channel();
+                stream.lock().await.set_kill_watcher(tx);
                 rx
             }
             Self::Closed => panic!("cannot set a kill_watcher on a closed cursor"),
@@ -259,17 +272,17 @@ impl Entity {
         }
     }
 
-    pub fn as_mut_find_cursor(&mut self) -> &mut FindCursor {
+    pub fn as_mut_cursor(&mut self) -> &mut TestCursor {
         match self {
-            Self::FindCursor(cursor) => cursor,
-            _ => panic!("Expected find cursor, got {:?}", &self),
+            Self::Cursor(cursor) => cursor,
+            _ => panic!("Expected cursor, got {:?}", &self),
         }
     }
 
-    pub fn into_find_cursor(self) -> FindCursor {
+    pub fn into_cursor(self) -> TestCursor {
         match self {
-            Self::FindCursor(cursor) => cursor,
-            _ => panic!("Expected find cursor, got {:?}", &self),
+            Self::Cursor(cursor) => cursor,
+            _ => panic!("Expected cursor, got {:?}", &self),
         }
     }
 }
