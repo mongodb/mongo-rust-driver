@@ -31,7 +31,10 @@ pub fn events_match(
     }
 }
 
-fn match_opt<T: PartialEq + std::fmt::Debug>(actual: &T, expected: &Option<T>) -> Result<(), String> {
+fn match_opt<T: PartialEq + std::fmt::Debug>(
+    actual: &T,
+    expected: &Option<T>,
+) -> Result<(), String> {
     match expected.as_ref() {
         None => Ok(()),
         Some(exp) => match_eq(actual, exp),
@@ -184,7 +187,11 @@ fn results_match_inner(
                 _ => return Err(format!("expected array, got {:?}", actual)),
             };
             if expected_array.len() != actual_array.len() {
-                return Err(format!("expected array len = {}, got len = {}", expected_array.len(), actual_array.len()));
+                return Err(format!(
+                    "expected array len = {}, got len = {}",
+                    expected_array.len(),
+                    actual_array.len()
+                ));
             }
 
             // Some operations return an array of documents that should be treated as root
@@ -212,7 +219,10 @@ fn results_match_inner(
     }
 }
 
-fn expected_err<A: std::fmt::Debug, B: std::fmt::Debug>(actual: &A, expected: &B) -> Result<(), String> {
+fn expected_err<A: std::fmt::Debug, B: std::fmt::Debug>(
+    actual: &A,
+    expected: &B,
+) -> Result<(), String> {
     Err(format!("expected {:?}, got {:?}", actual, expected))
 }
 
@@ -313,7 +323,7 @@ fn type_matches(types: &Bson, actual: &Bson) -> Result<(), String> {
                 other => panic!("unrecognized type: {}", other),
             };
             match_eq(&actual.element_type(), &expected)
-        },
+        }
         other => panic!("unrecognized type: {}", other),
     }
 }
@@ -328,7 +338,8 @@ async fn basic_matching() {
         &Bson::Document(expected),
         false,
         None,
-    ).is_ok());
+    )
+    .is_ok());
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "x": 1, "y": 1 };
@@ -337,7 +348,8 @@ async fn basic_matching() {
         &Bson::Document(expected),
         false,
         None,
-    ).is_ok());
+    )
+    .is_ok());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -356,7 +368,8 @@ async fn array_matching() {
         &Bson::Array(expected),
         false,
         None,
-    ).is_ok());
+    )
+    .is_ok());
 
     let actual = vec![
         Bson::Document(doc! { "x": 1, "y": 1 }),
@@ -371,7 +384,8 @@ async fn array_matching() {
         &Bson::Array(expected),
         false,
         None,
-    ).is_ok());
+    )
+    .is_ok());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -384,7 +398,8 @@ async fn special_operators() {
         &Bson::Document(expected),
         false,
         None,
-    ).is_ok());
+    )
+    .is_ok());
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "x": { "$$exists": false } };
@@ -393,7 +408,8 @@ async fn special_operators() {
         &Bson::Document(expected),
         false,
         None,
-    ).is_ok());
+    )
+    .is_ok());
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "y": { "$$exists": false } };
@@ -402,7 +418,8 @@ async fn special_operators() {
         &Bson::Document(expected),
         false,
         None,
-    ).is_ok());
+    )
+    .is_ok());
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "y": { "$$exists": true } };
@@ -411,7 +428,8 @@ async fn special_operators() {
         &Bson::Document(expected),
         false,
         None,
-    ).is_ok());
+    )
+    .is_ok());
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "x": { "$$type": [ "int", "long" ] } };
@@ -420,7 +438,8 @@ async fn special_operators() {
         &Bson::Document(expected),
         false,
         None,
-    ).is_ok());
+    )
+    .is_ok());
 
     let actual = doc! {};
     let expected = doc! { "x": { "$$unsetOrMatches": 1 } };
@@ -429,7 +448,8 @@ async fn special_operators() {
         &Bson::Document(expected),
         false,
         None,
-    ).is_ok());
+    )
+    .is_ok());
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "x": { "$$unsetOrMatches": 1 } };
@@ -438,7 +458,8 @@ async fn special_operators() {
         &Bson::Document(expected),
         false,
         None,
-    ).is_ok());
+    )
+    .is_ok());
 
     let actual = doc! { "x": 2 };
     let expected = doc! { "x": { "$$unsetOrMatches": 1 } };
@@ -447,7 +468,8 @@ async fn special_operators() {
         &Bson::Document(expected),
         false,
         None,
-    ).is_ok());
+    )
+    .is_ok());
 
     let expected = doc! { "x": { "y": { "$$exists": false } } };
     let actual = doc! { "x": {} };
@@ -456,7 +478,8 @@ async fn special_operators() {
         &Bson::Document(expected),
         false,
         None,
-    ).is_ok());
+    )
+    .is_ok());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -469,7 +492,8 @@ async fn extra_fields() {
         &Bson::Document(expected),
         false,
         None,
-    ).is_ok());
+    )
+    .is_ok());
 
     let actual = doc! { "doc": { "x": 1, "y": 2 } };
     let expected = doc! { "doc": { "x": 1 } };
@@ -478,7 +502,8 @@ async fn extra_fields() {
         &Bson::Document(expected),
         false,
         None,
-    ).is_ok());
+    )
+    .is_ok());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

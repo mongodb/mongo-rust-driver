@@ -27,8 +27,8 @@ use super::{
     ClientEntity,
     CollectionData,
     Entity,
-    TestCursor,
     SessionEntity,
+    TestCursor,
     TestFileEntity,
 };
 

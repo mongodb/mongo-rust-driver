@@ -7,6 +7,7 @@ use tokio::sync::{oneshot, Mutex};
 
 use crate::{
     bson::{Bson, Document},
+    change_stream::{event::ChangeStreamEvent, ChangeStream},
     client::{HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     event::command::CommandStartedEvent,
     test::{
@@ -20,7 +21,7 @@ use crate::{
     Collection,
     Cursor,
     Database,
-    SessionCursor, change_stream::{ChangeStream, event::ChangeStreamEvent},
+    SessionCursor,
 };
 
 #[derive(Debug)]
@@ -56,6 +57,7 @@ pub struct SessionEntity {
     pub client_session: Option<Box<ClientSession>>,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum TestCursor {
     // Due to https://github.com/rust-lang/rust/issues/59245, the `Entity` type is required to be
