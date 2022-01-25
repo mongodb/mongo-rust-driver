@@ -7,6 +7,9 @@
         "id": "client0",
         "observeEvents": [
           "commandStartedEvent"
+        ],
+        "ignoreCommandMonitoringEvents": [
+          "killCursors"
         ]
       }
     },
