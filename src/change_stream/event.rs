@@ -120,7 +120,7 @@ pub struct UpdateDescription {
 }
 
 /// Describes an array that has been truncated.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct TruncatedArray {
@@ -162,7 +162,7 @@ pub enum OperationType {
 }
 
 /// Identifies the collection or database on which an event occurred.
-#[derive(Deserialize, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ChangeStreamEventSource {
     /// The name of the database in which the change occurred.
