@@ -4,10 +4,7 @@
   "createEntities": [
     {
       "client": {
-        "id": "client0",
-        "observeEvents": [
-          "commandStartedEvent"
-        ]
+        "id": "client0"
       }
     },
     {
@@ -110,52 +107,6 @@
                   "newSize": 2
                 }
               ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "description": "$changeStream must be the first stage in a change stream pipeline sent to the server",
-      "runOnRequirements": [
-        {
-          "minServerVersion": "3.6",
-          "topologies": [
-            "replicaset"
-          ]
-        }
-      ],
-      "operations": [
-        {
-          "name": "createChangeStream",
-          "object": "collection0",
-          "arguments": {
-            "pipeline": []
-          },
-          "saveResultAsEntity": "changeStream0"
-        },
-        {
-          "name": "insertOne",
-          "object": "collection0",
-          "arguments": {
-            "document": {
-              "x": 1
-            }
-          }
-        },
-        {
-          "name": "iterateUntilDocumentOrError",
-          "object": "changeStream0",
-          "expectResult": {
-            "operationType": "insert",
-            "ns": {
-              "db": "database0",
-              "coll": "collection0"
-            },
-            "fullDocument": {
-              "x": {
-                "$numberInt": "1"
-              }
             }
           }
         }
