@@ -7,7 +7,6 @@ use serde::Deserialize;
 use tokio::sync::RwLockWriteGuard;
 
 use crate::{
-    client::options::ClientOptions,
     options::ServerAddress,
     runtime::AsyncJoinHandle,
     sdam::{description::topology::server_selection, Server},
