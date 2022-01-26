@@ -34,8 +34,7 @@ use crate::{
 };
 
 /// A `ChangeStream` streams the ongoing changes of its associated collection, database or
-/// deployment. `ChangeStream` instances should be created with method `watch` or
-/// `watch_with_pipeline` against the relevant target.
+/// deployment. `ChangeStream` instances should be created with method `watch` against the relevant target.
 ///
 /// `ChangeStream`s are "resumable", meaning that they can be restarted at a given place in the
 /// stream of events. This is done automatically when the `ChangeStream` encounters certain
