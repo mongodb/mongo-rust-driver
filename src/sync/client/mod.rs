@@ -177,7 +177,7 @@ impl Client {
     /// If the pipeline alters the structure of the returned events, the parsed type will need to be
     /// changed via [`ChangeStream::with_type`].
     #[allow(unused)]
-    pub(crate) async fn watch(
+    pub(crate) fn watch(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<ChangeStreamOptions>>,
