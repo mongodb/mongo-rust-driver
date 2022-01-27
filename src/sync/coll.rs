@@ -2,9 +2,10 @@ use std::{borrow::Borrow, fmt::Debug};
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use super::{ClientSession, Cursor, SessionCursor, ChangeStream, SessionChangeStream};
+use super::{ChangeStream, ClientSession, Cursor, SessionChangeStream, SessionCursor};
 use crate::{
     bson::{Bson, Document},
+    change_stream::{event::ChangeStreamEvent, options::ChangeStreamOptions},
     error::Result,
     index::IndexModel,
     options::{
@@ -41,7 +42,7 @@ use crate::{
     },
     Collection as AsyncCollection,
     Namespace,
-    RUNTIME, change_stream::{options::ChangeStreamOptions, event::ChangeStreamEvent},
+    RUNTIME,
 };
 
 /// `Collection` is the client-side abstraction of a MongoDB Collection. It can be used to
@@ -569,7 +570,11 @@ impl<T> Collection<T> {
         T: DeserializeOwned + Unpin + Send + Sync,
     {
         RUNTIME
-            .block_on(self.async_collection.watch_with_session(pipeline, options, &mut session.async_client_session))
+            .block_on(self.async_collection.watch_with_session(
+                pipeline,
+                options,
+                &mut session.async_client_session,
+            ))
             .map(SessionChangeStream::new)
     }
 }

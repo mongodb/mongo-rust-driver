@@ -1,8 +1,9 @@
 use std::fmt::Debug;
 
-use super::{ClientSession, Collection, Cursor, SessionCursor, ChangeStream, SessionChangeStream};
+use super::{ChangeStream, ClientSession, Collection, Cursor, SessionChangeStream, SessionCursor};
 use crate::{
     bson::Document,
+    change_stream::{event::ChangeStreamEvent, options::ChangeStreamOptions},
     error::Result,
     options::{
         AggregateOptions,
@@ -16,7 +17,7 @@ use crate::{
     },
     results::CollectionSpecification,
     Database as AsyncDatabase,
-    RUNTIME, change_stream::{options::ChangeStreamOptions, event::ChangeStreamEvent},
+    RUNTIME,
 };
 
 /// `Database` is the client-side abstraction of a MongoDB database. It can be used to perform
@@ -318,7 +319,11 @@ impl Database {
         session: &mut ClientSession,
     ) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
         RUNTIME
-            .block_on(self.async_database.watch_with_session(pipeline, options, &mut session.async_client_session))
+            .block_on(self.async_database.watch_with_session(
+                pipeline,
+                options,
+                &mut session.async_client_session,
+            ))
             .map(SessionChangeStream::new)
     }
 }

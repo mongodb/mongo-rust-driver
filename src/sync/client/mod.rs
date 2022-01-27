@@ -1,8 +1,9 @@
 pub mod session;
 
-use super::{ClientSession, Database, ChangeStream, SessionChangeStream};
+use super::{ChangeStream, ClientSession, Database, SessionChangeStream};
 use crate::{
     bson::Document,
+    change_stream::{event::ChangeStreamEvent, options::ChangeStreamOptions},
     concern::{ReadConcern, WriteConcern},
     error::Result,
     options::{
@@ -14,7 +15,7 @@ use crate::{
     },
     results::DatabaseSpecification,
     Client as AsyncClient,
-    RUNTIME, change_stream::{options::ChangeStreamOptions, event::ChangeStreamEvent},
+    RUNTIME,
 };
 
 /// This is the main entry point for the synchronous API. A `Client` is used to connect to a MongoDB
@@ -197,7 +198,11 @@ impl Client {
         session: &mut ClientSession,
     ) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
         RUNTIME
-            .block_on(self.async_client.watch_with_session(pipeline, options, &mut session.async_client_session))
+            .block_on(self.async_client.watch_with_session(
+                pipeline,
+                options,
+                &mut session.async_client_session,
+            ))
             .map(SessionChangeStream::new)
     }
 }

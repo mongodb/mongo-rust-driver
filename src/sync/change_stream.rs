@@ -3,17 +3,19 @@ use serde::de::DeserializeOwned;
 
 use crate::{
     change_stream::{
-        ChangeStream as AsyncChangeStream,
         event::ResumeToken,
         session::SessionChangeStream as AsyncSessionChangeStream,
+        ChangeStream as AsyncChangeStream,
     },
-    error::Result, RUNTIME,
+    error::Result,
+    RUNTIME,
 };
 
 use super::ClientSession;
 
 /// A `ChangeStream` streams the ongoing changes of its associated collection, database or
-/// deployment. `ChangeStream` instances should be created with method `watch` against the relevant target.
+/// deployment. `ChangeStream` instances should be created with method `watch` against the relevant
+/// target.
 ///
 /// `ChangeStream`s are "resumable", meaning that they can be restarted at a given place in the
 /// stream of events. This is done automatically when the `ChangeStream` encounters certain
@@ -232,6 +234,9 @@ where
     /// # }
     /// ```
     pub fn next_if_any(&mut self, session: &mut ClientSession) -> Result<Option<T>> {
-        RUNTIME.block_on(self.async_stream.next_if_any(&mut session.async_client_session))
+        RUNTIME.block_on(
+            self.async_stream
+                .next_if_any(&mut session.async_client_session),
+        )
     }
 }
