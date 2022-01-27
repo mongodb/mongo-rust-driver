@@ -9,7 +9,7 @@ mod db;
 #[cfg(test)]
 mod test;
 
-pub use change_stream::ChangeStream;
+pub use change_stream::{ChangeStream, SessionChangeStream};
 pub use client::{session::ClientSession, Client};
 pub use coll::Collection;
 pub use cursor::{Cursor, SessionCursor, SessionCursorIter};

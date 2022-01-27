@@ -1,6 +1,6 @@
 pub mod session;
 
-use super::{ClientSession, Database, ChangeStream};
+use super::{ClientSession, Database, ChangeStream, SessionChangeStream};
 use crate::{
     bson::Document,
     concern::{ReadConcern, WriteConcern},
@@ -185,5 +185,19 @@ impl Client {
         RUNTIME
             .block_on(self.async_client.watch(pipeline, options))
             .map(ChangeStream::new)
+    }
+
+    /// Starts a new [`SessionChangeStream`] that receives events for all changes in the cluster
+    /// using the provided [`ClientSession`].  See [`Client::watch`] for more information.
+    #[allow(unused)]
+    pub(crate) fn watch_with_session(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: impl Into<Option<ChangeStreamOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
+        RUNTIME
+            .block_on(self.async_client.watch_with_session(pipeline, options, &mut session.async_client_session))
+            .map(SessionChangeStream::new)
     }
 }

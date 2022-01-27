@@ -2,7 +2,7 @@ use std::{borrow::Borrow, fmt::Debug};
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use super::{ClientSession, Cursor, SessionCursor};
+use super::{ClientSession, Cursor, SessionCursor, ChangeStream, SessionChangeStream};
 use crate::{
     bson::{Bson, Document},
     error::Result,
@@ -41,7 +41,7 @@ use crate::{
     },
     Collection as AsyncCollection,
     Namespace,
-    RUNTIME,
+    RUNTIME, change_stream::{options::ChangeStreamOptions, event::ChangeStreamEvent},
 };
 
 /// `Collection` is the client-side abstraction of a MongoDB Collection. It can be used to
@@ -522,6 +522,55 @@ impl<T> Collection<T> {
             options.into(),
             &mut session.async_client_session,
         ))
+    }
+
+    /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
+    /// for all changes in this collection. A
+    /// [`ChangeStream`](change_stream/struct.ChangeStream.html) cannot be started on system
+    /// collections.
+    ///
+    /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
+    /// streams.
+    ///
+    /// Change streams require either a "majority" read concern or no read concern. Anything else
+    /// will cause a server error.
+    ///
+    /// Also note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
+    /// fields will cause an error. The driver requires these fields to support resumability. For
+    /// more information on resumability, see the documentation for
+    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
+    ///
+    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
+    /// changed via [`ChangeStream::with_type`].
+    #[allow(unused)]
+    pub(crate) async fn watch(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: impl Into<Option<ChangeStreamOptions>>,
+    ) -> Result<ChangeStream<ChangeStreamEvent<T>>>
+    where
+        T: DeserializeOwned + Unpin + Send + Sync,
+    {
+        RUNTIME
+            .block_on(self.async_collection.watch(pipeline, options))
+            .map(ChangeStream::new)
+    }
+
+    /// Starts a new [`SessionChangeStream`] that receives events for all changes in this collection
+    /// using the provided [`ClientSession`].  See [`Client::watch`] for more information.
+    #[allow(unused)]
+    pub(crate) async fn watch_with_session(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: impl Into<Option<ChangeStreamOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<SessionChangeStream<ChangeStreamEvent<T>>>
+    where
+        T: DeserializeOwned + Unpin + Send + Sync,
+    {
+        RUNTIME
+            .block_on(self.async_collection.watch_with_session(pipeline, options, &mut session.async_client_session))
+            .map(SessionChangeStream::new)
     }
 }
 

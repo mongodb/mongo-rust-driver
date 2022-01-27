@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use super::{ClientSession, Collection, Cursor, SessionCursor};
+use super::{ClientSession, Collection, Cursor, SessionCursor, ChangeStream, SessionChangeStream};
 use crate::{
     bson::Document,
     error::Result,
@@ -16,7 +16,7 @@ use crate::{
     },
     results::CollectionSpecification,
     Database as AsyncDatabase,
-    RUNTIME,
+    RUNTIME, change_stream::{options::ChangeStreamOptions, event::ChangeStreamEvent},
 };
 
 /// `Database` is the client-side abstraction of a MongoDB database. It can be used to perform
@@ -278,5 +278,47 @@ impl Database {
                 &mut session.async_client_session,
             ))
             .map(SessionCursor::new)
+    }
+
+    /// Starts a new [`ChangeStream`](change_stream/struct.ChangeStream.html) that receives events
+    /// for all changes in this database. The stream does not observe changes from system
+    /// collections and cannot be started on "config", "local" or "admin" databases.
+    ///
+    /// See the documentation [here](https://docs.mongodb.com/manual/changeStreams/) on change
+    /// streams.
+    ///
+    /// Change streams require either a "majority" read concern or no read
+    /// concern. Anything else will cause a server error.
+    ///
+    /// Note that using a `$project` stage to remove any of the `_id`, `operationType` or `ns`
+    /// fields will cause an error. The driver requires these fields to support resumability. For
+    /// more information on resumability, see the documentation for
+    /// [`ChangeStream`](change_stream/struct.ChangeStream.html)
+    ///
+    /// If the pipeline alters the structure of the returned events, the parsed type will need to be
+    /// changed via [`ChangeStream::with_type`].
+    #[allow(unused)]
+    pub(crate) async fn watch(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: impl Into<Option<ChangeStreamOptions>>,
+    ) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
+        RUNTIME
+            .block_on(self.async_database.watch(pipeline, options))
+            .map(ChangeStream::new)
+    }
+
+    /// Starts a new [`SessionChangeStream`] that receives events for all changes in this database
+    /// using the provided [`ClientSession`].  See [`Database::watch`] for more information.
+    #[allow(unused)]
+    pub(crate) async fn watch_with_session(
+        &self,
+        pipeline: impl IntoIterator<Item = Document>,
+        options: impl Into<Option<ChangeStreamOptions>>,
+        session: &mut ClientSession,
+    ) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
+        RUNTIME
+            .block_on(self.async_database.watch_with_session(pipeline, options, &mut session.async_client_session))
+            .map(SessionChangeStream::new)
     }
 }

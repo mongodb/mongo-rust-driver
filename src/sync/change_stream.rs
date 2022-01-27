@@ -125,14 +125,6 @@ where
     }
 }
 
-// TODO aegnor: doc
-pub struct SessionChangeStream<T>
-where
-    T: DeserializeOwned + Unpin,
-{
-    async_stream: AsyncSessionChangeStream<T>,
-}
-
 /// A [`SessionChangeStream`] is a change stream that was created with a [`ClientSession`] that must
 /// be iterated using one. To iterate, use [`SessionChangeStream::next`]:
 ///
@@ -152,6 +144,13 @@ where
 /// # Ok(())
 /// # }
 /// ```
+pub struct SessionChangeStream<T>
+where
+    T: DeserializeOwned + Unpin,
+{
+    async_stream: AsyncSessionChangeStream<T>,
+}
+
 impl<T> SessionChangeStream<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
