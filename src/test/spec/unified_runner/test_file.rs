@@ -305,6 +305,7 @@ pub struct ExpectedEvents {
     pub client: String,
     pub events: Vec<ExpectedEvent>,
     pub event_type: Option<ExpectedEventType>,
+    pub event_match: Option<EventMatch>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize)]
@@ -315,6 +316,13 @@ pub enum ExpectedEventType {
     // TODO RUST-1055 Remove this when connection usage is serialized.
     #[serde(skip)]
     CmapWithoutConnectionReady,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub enum EventMatch {
+    Exact,
+    Prefix,
 }
 
 #[derive(Debug, Deserialize)]

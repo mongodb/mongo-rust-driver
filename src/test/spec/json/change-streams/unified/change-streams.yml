@@ -119,6 +119,7 @@ tests:
         }
     expectEvents:
       - client: *client0
+        eventMatch: prefix
         events:
           - commandStartedEvent:
               command:
