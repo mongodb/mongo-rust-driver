@@ -21,7 +21,7 @@ use crate::{
     Collection,
     Cursor,
     Database,
-    SessionCursor, change_stream::{ChangeStream, event::ChangeStreamEvent},
+    SessionCursor,
 };
 
 #[derive(Debug)]
