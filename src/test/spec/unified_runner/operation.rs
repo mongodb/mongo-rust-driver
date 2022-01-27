@@ -1854,7 +1854,7 @@ impl TestOperation for CreateChangeStream {
         async move {
             let target = test_runner.entities.get(id).unwrap();
             let stream = match target {
-                Entity::Client(ce) => ce.client().watch(self.pipeline.clone(), None).await?,
+                Entity::Client(ce) => ce.watch(self.pipeline.clone(), None).await?,
                 Entity::Database(db) => db.watch(self.pipeline.clone(), None).await?,
                 Entity::Collection(coll) => coll.watch(self.pipeline.clone(), None).await?,
                 _ => panic!("Invalid entity for createChangeStream"),

@@ -45,12 +45,6 @@ pub struct ClientEntity {
     observe_sensitive_commands: bool,
 }
 
-impl ClientEntity {
-    pub fn client(&self) -> &Client {
-        &self.client
-    }
-}
-
 #[derive(Debug)]
 pub struct SessionEntity {
     pub lsid: Document,
