@@ -1,5 +1,6 @@
 #[cfg(not(feature = "sync"))]
 mod auth;
+mod change_streams;
 mod collection_management;
 mod command_monitoring;
 mod connection_stepdown;
@@ -103,8 +104,10 @@ where
 
     run_test_file(
         path.clone(),
-        bson::from_bson(Bson::try_from(json).unwrap_or_else(|_| panic!("{}", path.display())))
-            .unwrap_or_else(|e| panic!("{}: {}", path.display(), e)),
+        bson::from_bson(
+            Bson::try_from(json).unwrap_or_else(|err| panic!("{}: {}", path.display(), err)),
+        )
+        .unwrap_or_else(|e| panic!("{}: {}", path.display(), e)),
     )
     .await
 }

@@ -19,7 +19,7 @@ use crate::{
 };
 
 pub use self::{
-    entity::{ClientEntity, Entity, FindCursor, SessionEntity},
+    entity::{ClientEntity, Entity, SessionEntity, TestCursor},
     matcher::{events_match, results_match},
     operation::{Operation, OperationObject},
     test_event::{ExpectedCmapEvent, ExpectedCommandEvent, ExpectedEvent, ObserveEvent},
@@ -172,17 +172,18 @@ pub async fn run_unified_format_test_filtered(
                                 });
                                 if let Some(expected_bson) = expected_value {
                                     if let Entity::Bson(actual) = &entity {
-                                        assert!(
-                                            results_match(
-                                                Some(actual),
-                                                expected_bson,
-                                                operation.returns_root_documents(),
-                                                Some(&test_runner.entities),
-                                            ),
-                                            "result mismatch, expected = {:#?}  actual = {:#?}",
+                                        if let Err(e) = results_match(
+                                            Some(actual),
                                             expected_bson,
-                                            actual,
-                                        );
+                                            operation.returns_root_documents(),
+                                            Some(&test_runner.entities),
+                                        ) {
+                                            panic!(
+                                                "result mismatch, expected = {:#?}  actual = \
+                                                 {:#?}\nmismatch detail: {}",
+                                                expected_bson, actual, e
+                                            );
+                                        }
                                     } else {
                                         panic!(
                                             "Incorrect entity type returned from {}, expected BSON",
@@ -237,15 +238,13 @@ pub async fn run_unified_format_test_filtered(
                 );
 
                 for (actual, expected) in actual_events.iter().zip(expected_events) {
-                    assert!(
-                        events_match(actual, expected, Some(&test_runner.entities)),
-                        "event mismatch: expected = {:#?}, actual = {:#?}\nall \
-                         expected:\n{:#?}\nall actual:\n{:#?}",
-                        expected,
-                        actual,
-                        expected_events,
-                        actual_events,
-                    );
+                    if let Err(e) = events_match(actual, expected, Some(&test_runner.entities)) {
+                        panic!(
+                            "event mismatch: expected = {:#?}, actual = {:#?}\nall \
+                             expected:\n{:#?}\nall actual:\n{:#?}\nmismatch detail: {}",
+                            expected, actual, expected_events, actual_events, e,
+                        );
+                    }
                 }
             }
         }

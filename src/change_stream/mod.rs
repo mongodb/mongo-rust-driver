@@ -14,6 +14,7 @@ use bson::{Document, Timestamp};
 use derivative::Derivative;
 use futures_core::{future::BoxFuture, Stream};
 use serde::{de::DeserializeOwned, Deserialize};
+use tokio::sync::oneshot;
 
 use crate::{
     change_stream::{
@@ -165,6 +166,13 @@ where
             BatchValue::Some { doc, .. } => Some(bson::from_slice(doc.as_bytes())?),
             BatchValue::Empty | BatchValue::Exhausted => None,
         })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_kill_watcher(&mut self, tx: oneshot::Sender<()>) {
+        use tokio::sync::oneshot;
+
+        self.cursor.set_kill_watcher(tx);
     }
 }
 

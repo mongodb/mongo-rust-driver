@@ -52,7 +52,7 @@ impl ResumeToken {
 
 /// A `ChangeStreamEvent` represents a
 /// [change event](https://docs.mongodb.com/manual/reference/change-events/) in the associated change stream.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ChangeStreamEvent<T> {
@@ -104,7 +104,7 @@ pub struct ChangeStreamEvent<T> {
 }
 
 /// Describes which fields have been updated or removed from a document.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct UpdateDescription {
@@ -114,10 +114,25 @@ pub struct UpdateDescription {
 
     /// An array of field names that were removed from the `Document`.
     pub removed_fields: Vec<String>,
+
+    /// Arrays that were truncated in the `Document`.
+    pub truncated_arrays: Vec<TruncatedArray>,
+}
+
+/// Describes an array that has been truncated.
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct TruncatedArray {
+    /// The field path of the array.
+    pub field: String,
+
+    /// The new size of the array.
+    pub new_size: i32,
 }
 
 /// The operation type represented in a given change notification.
-#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum OperationType {
@@ -147,7 +162,7 @@ pub enum OperationType {
 }
 
 /// Identifies the collection or database on which an event occurred.
-#[derive(Deserialize, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ChangeStreamEventSource {
     /// The name of the database in which the change occurred.
