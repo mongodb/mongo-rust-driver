@@ -1,11 +1,8 @@
-use std::time::Duration;
-
 use serde::Deserialize;
 
 use crate::{
-    bson::{Bson, Document},
-    error::Error,
-    options::{Acknowledgment, WriteConcern},
+    bson::Document,
+    options::{ReadConcern, WriteConcern},
     test::run_spec_test,
 };
 
@@ -15,10 +12,7 @@ struct TestFile {
 }
 
 #[derive(Debug, Deserialize)]
-// TODO RUST-1077: remove the #[allow(dead_code)] tag and add #[serde(deny_unknown_fields)] to
-// ensure these tests are being fully run
-#[allow(dead_code)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct TestCase {
     pub description: String,
     pub valid: bool,
@@ -26,69 +20,100 @@ struct TestCase {
     pub write_concern_document: Option<Document>,
     pub read_concern: Option<Document>,
     pub read_concern_document: Option<Document>,
+    pub is_server_default: Option<bool>,
     pub is_acknowledged: Option<bool>,
-}
-
-fn write_concern_from_document(write_concern_doc: Document) -> Option<WriteConcern> {
-    let mut write_concern = WriteConcern::default();
-
-    for (key, value) in write_concern_doc {
-        match (&key[..], value) {
-            ("w", Bson::Int32(i)) => {
-                write_concern.w = Some(Acknowledgment::from(i as u32));
-            }
-            ("w", Bson::String(s)) => {
-                write_concern.w = Some(Acknowledgment::from(s));
-            }
-            ("journal", Bson::Boolean(b)) => {
-                write_concern.journal = Some(b);
-            }
-            ("wtimeoutMS", Bson::Int32(i)) if i > 0 => {
-                write_concern.w_timeout = Some(Duration::from_millis(i as u64));
-            }
-            ("wtimeoutMS", Bson::Int32(_)) => {
-                // WriteConcern has an unsigned integer for the wtimeout field, so this is
-                // impossible to test.
-                return None;
-            }
-            _ => {}
-        };
-    }
-
-    Some(write_concern)
 }
 
 async fn run_document_test(test_file: TestFile) {
     for test_case in test_file.tests {
-        if let Some(specified_write_concern) = test_case.write_concern {
-            let wc = write_concern_from_document(specified_write_concern).map(|write_concern| {
-                write_concern.validate().map_err(Error::from).and_then(|_| {
-                    let doc = bson::to_bson(&write_concern)?;
+        let description = test_case.description.as_str();
 
-                    Ok(doc)
-                })
-            });
+        if let Some(specified_write_concern_document) = test_case.write_concern {
+            let specified_write_concern =
+                match bson::from_document::<WriteConcern>(specified_write_concern_document) {
+                    Ok(write_concern) => {
+                        let is_valid = write_concern.validate().is_ok();
+                        assert_eq!(
+                            is_valid, test_case.valid,
+                            "Write concern deserialization/validation should fail: {}",
+                            description
+                        );
+                        write_concern
+                    }
+                    Err(err) => {
+                        assert!(
+                            !test_case.valid,
+                            "Write concern deserialization should succeed but got {:?}: {}",
+                            description, err
+                        );
+                        continue;
+                    }
+                };
 
-            let actual_write_concern = match wc {
-                Some(Ok(Bson::Document(write_concern))) => {
-                    assert!(test_case.valid, "{}", &test_case.description);
-                    write_concern
-                }
-                Some(Ok(x)) => panic!("wat: {:?}", x),
-                Some(Err(_)) => {
-                    assert!(!test_case.valid, "{}", &test_case.description);
-                    continue;
-                }
-                None => {
-                    continue;
-                }
-            };
-
-            if let Some(expected_write_concern) = test_case.write_concern_document {
+            if let Some(is_server_default) = test_case.is_server_default {
                 assert_eq!(
-                    actual_write_concern, expected_write_concern,
+                    specified_write_concern.is_empty(),
+                    is_server_default,
+                    "is_server_default is {} but write concern is {:?}: {}",
+                    is_server_default,
+                    &specified_write_concern,
+                    description
+                );
+            }
+
+            if let Some(is_acknowledged) = test_case.is_acknowledged {
+                assert_eq!(
+                    specified_write_concern.is_acknowledged(),
+                    is_acknowledged,
+                    "is_acknowledged is {} but write concern is {:?}: {}",
+                    is_acknowledged,
+                    &specified_write_concern,
+                    description
+                );
+            }
+
+            let actual_write_concern_document = bson::to_document(&specified_write_concern)
+                .unwrap_or_else(|_| {
+                    panic!(
+                        "Write concern serialization should succeed: {}",
+                        description
+                    )
+                });
+
+            if let Some(expected_write_concern_document) = test_case.write_concern_document {
+                assert_eq!(
+                    actual_write_concern_document, expected_write_concern_document,
                     "{}",
-                    &test_case.description
+                    description
+                );
+            }
+        }
+
+        if let Some(specified_read_concern_document) = test_case.read_concern {
+            // It's impossible to construct an empty `ReadConcern` (i.e. the server's default) in
+            // the Rust driver so we skip this test.
+            if test_case.description == "Default" {
+                continue;
+            }
+
+            let specified_read_concern: ReadConcern =
+                bson::from_document(specified_read_concern_document).unwrap_or_else(|_| {
+                    panic!(
+                        "Read concern deserialization should succeed: {}",
+                        description
+                    )
+                });
+
+            let actual_read_concern_document = bson::to_document(&specified_read_concern)
+                .unwrap_or_else(|_| {
+                    panic!("Read concern serialization should succeed: {}", description)
+                });
+
+            if let Some(expected_read_concern_document) = test_case.read_concern_document {
+                assert_eq!(
+                    actual_read_concern_document, expected_read_concern_document,
+                    "{}",
+                    description
                 );
             }
         }
