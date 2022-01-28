@@ -192,11 +192,6 @@ async fn load_balancing_test() {
             *tallies.entry(event.connection.address.clone()).or_insert(0) += 1;
         }
 
-        if tallies.len() < 2 {
-            println!("{:#?}", tallies);
-            println!("{:#?}", client.topology_description().await);
-        }
-
         assert_eq!(tallies.len(), 2);
         let mut counts: Vec<_> = tallies.values().collect();
         counts.sort();
