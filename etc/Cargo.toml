@@ -1,8 +1,0 @@
-[package]
-name = "rust-driver-etc"
-version = "0.1.0"
-authors = ["Abraham Egnor <abraham.egnor@mongodb.com>"]
-edition = "2021"
-
-[[bin]]
-name = "change_stream_legacy"
