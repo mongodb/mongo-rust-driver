@@ -46,7 +46,7 @@ use crate::{
     Collection,
     Database,
     IndexModel,
-    RUNTIME,
+    RUNTIME, change_stream::options::ChangeStreamOptions,
 };
 
 pub trait TestOperation: Debug {
@@ -1844,6 +1844,7 @@ impl TestOperation for AssertNumberConnectionsCheckedOut {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct CreateChangeStream {
     pipeline: Vec<Document>,
+    options: Option<ChangeStreamOptions>,
 }
 
 impl TestOperation for CreateChangeStream {
@@ -1856,13 +1857,13 @@ impl TestOperation for CreateChangeStream {
             let target = test_runner.entities.get(id).unwrap();
             let stream = match target {
                 Entity::Client(ce) => {
-                    ce.client().watch(self.pipeline.clone(), None).await?
+                    ce.client().watch(self.pipeline.clone(), self.options.clone()).await?
                 },
                 Entity::Database(db) => {
-                    db.watch(self.pipeline.clone(), None).await?
+                    db.watch(self.pipeline.clone(), self.options.clone()).await?
                 },
                 Entity::Collection(coll) => {
-                    coll.watch(self.pipeline.clone(), None).await?
+                    coll.watch(self.pipeline.clone(), self.options.clone()).await?
                 },
                 _ => panic!("Invalid entity for createChangeStream"),
             };

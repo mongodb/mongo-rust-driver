@@ -126,3 +126,35 @@ tests:
                 aggregate: *collection0
                 cursor: {}
                 pipeline: [$changeStream: {}]
+  - description: The server returns change stream responses in the specified server response format
+    runOnRequirements:
+      - minServerVersion: "3.6.0"
+        topologies: [replicaset]
+    operations:
+      - name: createChangeStream
+        object: *collection0
+        arguments:
+          pipeline: []
+          options: {}
+        saveResultAsEntity: &changeStream0 changeStream0
+      - name: insertOne
+        object: *globalCollection0
+        arguments:
+          document:
+            x: 1
+      - name: iterateUntilDocumentOrError
+        object: *changeStream0
+        expectResult:
+          _id:
+            $$exists: true
+          documentKey:
+            $$exists: true
+          operationType: insert
+          ns:
+            db: *database0
+            coll: *collection0
+          fullDocument:
+            _id:
+              $$exists: true
+            x:
+              $numberInt: "1"
