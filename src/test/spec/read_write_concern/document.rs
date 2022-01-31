@@ -2,6 +2,7 @@ use serde::Deserialize;
 
 use crate::{
     bson::Document,
+    error::Error,
     options::{ReadConcern, WriteConcern},
     test::run_spec_test,
 };
@@ -30,11 +31,13 @@ async fn run_document_test(test_file: TestFile) {
 
         if let Some(specified_write_concern_document) = test_case.write_concern {
             let specified_write_concern =
-                match bson::from_document::<WriteConcern>(specified_write_concern_document) {
+                match bson::from_document::<WriteConcern>(specified_write_concern_document)
+                    .map_err(Error::from)
+                    .and_then(|wc| wc.validate().map(|_| wc))
+                {
                     Ok(write_concern) => {
-                        let is_valid = write_concern.validate().is_ok();
-                        assert_eq!(
-                            is_valid, test_case.valid,
+                        assert!(
+                            test_case.valid,
                             "Write concern deserialization/validation should fail: {}",
                             description
                         );
@@ -43,8 +46,9 @@ async fn run_document_test(test_file: TestFile) {
                     Err(err) => {
                         assert!(
                             !test_case.valid,
-                            "Write concern deserialization should succeed but got {:?}: {}",
-                            description, err
+                            "Write concern deserialization/validation should succeed but got \
+                             {:?}: {}",
+                            err, description,
                         );
                         continue;
                     }
@@ -73,10 +77,10 @@ async fn run_document_test(test_file: TestFile) {
             }
 
             let actual_write_concern_document = bson::to_document(&specified_write_concern)
-                .unwrap_or_else(|_| {
+                .unwrap_or_else(|err| {
                     panic!(
-                        "Write concern serialization should succeed: {}",
-                        description
+                        "Write concern serialization should succeed but got {:?}: {}",
+                        err, description
                     )
                 });
 
@@ -97,16 +101,19 @@ async fn run_document_test(test_file: TestFile) {
             }
 
             let specified_read_concern: ReadConcern =
-                bson::from_document(specified_read_concern_document).unwrap_or_else(|_| {
+                bson::from_document(specified_read_concern_document).unwrap_or_else(|err| {
                     panic!(
-                        "Read concern deserialization should succeed: {}",
-                        description
+                        "Read concern deserialization should succeed but got {:?}: {}",
+                        err, description,
                     )
                 });
 
             let actual_read_concern_document = bson::to_document(&specified_read_concern)
-                .unwrap_or_else(|_| {
-                    panic!("Read concern serialization should succeed: {}", description)
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "Read concern serialization should succeed but got: {:?}: {}",
+                        err, description
+                    )
                 });
 
             if let Some(expected_read_concern_document) = test_case.read_concern_document {
