@@ -79,14 +79,16 @@ mod unified {
         min_server_version: String,
         topologies: Vec<String>,
     }
-    
-    #[derive(Debug, Serialize)]
-    #[serde(rename_all = "camelCase")]    
+
+    #[serde_with::skip_serializing_none]
+    #[derive(Debug, Default, Serialize)]
+    #[serde(rename_all = "camelCase")]
     struct Operation {
         name: String,
         object: String,
         arguments: Option<serde_yaml::Mapping>,
         save_result_as_entity: Option<String>,
+        expect_result: Option<serde_yaml::Mapping>,
     }
 
     const CLIENT_NAME: &str = "client0";
@@ -102,6 +104,7 @@ mod unified {
                     topologies: old.topology,
                 },
                 operations: {
+                    // Initial createChangeStream
                     let mut out = vec![
                         Operation {
                             name: "createChangeStream".to_string(),
@@ -120,13 +123,19 @@ mod unified {
                                 out
                             }.into_iter().collect()),
                             save_result_as_entity: Some("changeStream0".to_string()),
+                            ..Operation::default()
                         },
                     ];
+                    // Test operations
                     out.extend(
                         old.operations
                             .into_iter()
                             .map(|op| parse_operation(file, op))
                     );
+                    // Test expectations
+                    if let legacy::TestResult::Success { success } = old.result {
+                        out.extend(success.into_iter().map(|exp| parse_expectation(file, exp)))
+                    }
                     out
                 },
             }
@@ -168,8 +177,70 @@ mod unified {
             name: old.name,
             object,
             arguments: old.arguments,
-            save_result_as_entity: None,
+            ..Operation::default()
         }
+    }
+
+    fn parse_expectation(file: &legacy::File, mut exp: serde_yaml::Mapping) -> Operation {
+        visit_mut(&mut exp, &|key, val| {
+            if key == "fullDocument" {
+                if let Value::Mapping(map) = val {
+                    if !map.contains_key(&ys("_id")) {
+                        map.insert(ys("_id"), exists());
+                    }
+                }
+            }
+            match val {
+                Value::Number(num) if num.as_i64() == Some(42) => *val = exists(),
+                Value::String(s) => {
+                    if s == "42" {
+                        *val = exists()
+                    } else if s == &file.database_name {
+                        *s = DB_NAME.to_string()
+                    } else if s == &file.collection_name {
+                        *s = COLL_NAME.to_string()
+                    }
+                },
+                _ => (),
+            }
+        });
+        Operation {
+            name: "iterateUntilDocumentOrError".to_string(),
+            object: "changeStream0".to_string(),
+            expect_result: Some(exp),
+            ..Operation::default()
+        }
+    }
+
+    fn exists() -> Value {
+        Value::Mapping(
+            [(ys("$$exists"), Value::Bool(true))].into_iter().collect()
+        )
+    }
+
+    fn visit_mut<F>(root: &mut serde_yaml::Mapping, visitor: &F)
+        where F: Fn(&str, &mut Value)
+    {
+        for (key, value) in root.iter_mut() {
+            visitor(key.as_str().unwrap(), value);
+            if let Value::Mapping(map) = value {
+                visit_mut(map, visitor);
+            }
+        }
+    }
+
+    pub fn postprocess(text: &mut String) {
+        *text = text
+            .replace("saveResultAsEntity: changeStream0", "saveResultAsEntity: &changeStream0 changeStream0")
+            .replace_with_ref("changeStream0")
+            .replace_with_ref(CLIENT_NAME)
+            .replace_with_ref(DB_NAME)
+            .replace_with_ref(COLL_NAME)
+            .replace_with_ref(GLOBAL_DB_NAME)
+            .replace_with_ref(GLOBAL_DB2_NAME)
+            .replace_with_ref(GLOBAL_COLL_NAME)
+            .replace_with_ref(GLOBAL_COLL2_NAME)
+            ;
     }
 
     trait StringExt {
@@ -180,19 +251,6 @@ mod unified {
         fn replace_with_ref(&self, name: &str) -> String {
             self.replace(&format!(": {}", name), &format!(": *{}", name))
         }
-    }
-
-    pub fn postprocess(text: &mut String) {
-        *text = text
-            .replace("saveResultAsEntity: changeStream0", "saveResultAsEntity: &changeStream0 changeStream0")
-            .replace_with_ref(CLIENT_NAME)
-            .replace_with_ref(DB_NAME)
-            .replace_with_ref(COLL_NAME)
-            .replace_with_ref(GLOBAL_DB_NAME)
-            .replace_with_ref(GLOBAL_DB2_NAME)
-            .replace_with_ref(GLOBAL_COLL_NAME)
-            .replace_with_ref(GLOBAL_COLL2_NAME)
-            ;
     }
 }
 
