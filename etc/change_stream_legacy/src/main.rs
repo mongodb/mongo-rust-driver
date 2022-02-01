@@ -71,6 +71,7 @@ mod unified {
         description: String,
         run_on_requirements: RunOnRequirements,
         operations: Vec<Operation>,
+        expect_events: Vec<ExpectEvents>,
     }
 
     #[derive(Debug, Serialize)]
@@ -91,12 +92,48 @@ mod unified {
         expect_result: Option<serde_yaml::Mapping>,
     }
 
+    #[derive(Debug, Default, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct ExpectEvents {
+        client: String,
+        event_match: String,
+        events: Vec<serde_yaml::Mapping>,
+    }
+
     const CLIENT_NAME: &str = "client0";
     const DB_NAME: &str = "database0";
     const COLL_NAME: &str = "collection0";
 
     impl Test {
         pub fn parse(file: &legacy::File, old: legacy::Test) -> Self {
+            let expect_events = if let Some(mut exps) = old.expectations {
+                for exp in &mut exps {
+                    if let Some(Value::Mapping(mut cse)) = exp.remove(&ys("command_started_event")) {
+                        if let Some(val) = cse.remove(&ys("command_name")) {
+                            cse.insert(ys("commandName"), val);
+                        }
+                        if let Some(mut val) = cse.remove(&ys("database_name")) {
+                            match val {
+                                Value::String(s) if s == file.database_name => {
+                                    val = Value::String(DB_NAME.to_string());
+                                }
+                                _ => ()
+                            }
+                            cse.insert(ys("databaseName"), val);
+                        }
+                        exp.insert(ys("commandStartedEvent"), Value::Mapping(cse));
+                    }
+                }
+                vec![
+                    ExpectEvents {
+                        client: CLIENT_NAME.to_string(),
+                        event_match: "prefix".to_string(),
+                        events: exps,
+                    }
+                ]
+            } else {
+                vec![]
+            };
             Self {
                 description: old.description,
                 run_on_requirements: RunOnRequirements {
@@ -138,6 +175,7 @@ mod unified {
                     }
                     out
                 },
+                expect_events,
             }
         }
     }
