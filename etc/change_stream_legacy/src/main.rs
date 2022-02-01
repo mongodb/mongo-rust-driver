@@ -132,9 +132,9 @@ mod unified {
                             .into_iter()
                             .map(|op| parse_operation(file, op))
                     );
-                    // Test expectations
+                    // Test results
                     if let legacy::TestResult::Success { success } = old.result {
-                        out.extend(success.into_iter().map(|exp| parse_expectation(file, exp)))
+                        out.extend(success.into_iter().map(|suc| parse_success(file, suc)))
                     }
                     out
                 },
@@ -181,8 +181,8 @@ mod unified {
         }
     }
 
-    fn parse_expectation(file: &legacy::File, mut exp: serde_yaml::Mapping) -> Operation {
-        visit_mut(&mut exp, &|key, val| {
+    fn parse_success(file: &legacy::File, mut suc: serde_yaml::Mapping) -> Operation {
+        visit_mut(&mut suc, &|key, val| {
             if key == "fullDocument" {
                 if let Value::Mapping(map) = val {
                     if !map.contains_key(&ys("_id")) {
@@ -207,7 +207,7 @@ mod unified {
         Operation {
             name: "iterateUntilDocumentOrError".to_string(),
             object: "changeStream0".to_string(),
-            expect_result: Some(exp),
+            expect_result: Some(suc),
             ..Operation::default()
         }
     }
