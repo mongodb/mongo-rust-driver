@@ -89,6 +89,10 @@ mod unified {
         save_result_as_entity: Option<String>,
     }
 
+    const CLIENT_NAME: &str = "client0";
+    const DB_NAME: &str = "database0";
+    const COLL_NAME: &str = "collection0";
+
     impl Test {
         pub fn parse(file: &legacy::File, old: legacy::Test) -> Self {
             Self {
@@ -102,10 +106,10 @@ mod unified {
                         Operation {
                             name: "createChangeStream".to_string(),
                             object: match old.target {
-                                legacy::Target::Collection => "collection0".to_string(),
-                                legacy::Target::Database => "database0".to_string(),
-                                legacy::Target::Client => "client0".to_string(),
-                            },
+                                legacy::Target::Collection => COLL_NAME,
+                                legacy::Target::Database => DB_NAME,
+                                legacy::Target::Client => CLIENT_NAME,
+                            }.to_string(),
                             arguments: Some({
                                 let mut out = vec![
                                     (ys("pipeline"), Value::Sequence(old.change_stream_pipeline)),
@@ -133,25 +137,26 @@ mod unified {
         Value::String(s.into())
     }
 
+    const GLOBAL_DB_NAME: &str = "globalDatabase0";
+    const GLOBAL_DB2_NAME: &str = "globalDatabase1";
+    const GLOBAL_COLL_NAME: &str = "globalCollection0";
+    const GLOBAL_COLL2_NAME: &str = "globalCollection1";
+
     fn parse_operation(file: &legacy::File, old: legacy::Operation) -> Operation {
-        const NEW_DB_NAME: &str = "globalDatabase0";
-        const NEW_DB2_NAME: &str = "globalDatabase1";
-        const NEW_COLL_NAME: &str = "globalCollection0";
-        const NEW_COLL2_NAME: &str = "globalCollection1";
         let object = {
             if let Some(coll) = old.collection {
                 if coll == file.collection_name {
-                    NEW_COLL_NAME
+                    GLOBAL_COLL_NAME
                 } else if coll == file.collection2_name {
-                    NEW_COLL2_NAME
+                    GLOBAL_COLL2_NAME
                 } else {
                     panic!("unexpected collection name {:?}", coll);
                 }
             } else if let Some(db) = old.database {
                 if db == file.database_name {
-                    NEW_DB_NAME
+                    GLOBAL_DB_NAME
                 } else if db == file.database2_name {
-                    NEW_DB2_NAME
+                    GLOBAL_DB2_NAME
                 } else {
                     panic!("unexpected db name {:?}", db);
                 }
@@ -165,6 +170,29 @@ mod unified {
             arguments: old.arguments,
             save_result_as_entity: None,
         }
+    }
+
+    trait StringExt {
+        fn replace_with_ref(&self, name: &str) -> String;
+    }
+
+    impl StringExt for String {
+        fn replace_with_ref(&self, name: &str) -> String {
+            self.replace(&format!(": {}", name), &format!(": *{}", name))
+        }
+    }
+
+    pub fn postprocess(text: &mut String) {
+        *text = text
+            .replace("saveResultAsEntity: changeStream0", "saveResultAsEntity: &changeStream0 changeStream0")
+            .replace_with_ref(CLIENT_NAME)
+            .replace_with_ref(DB_NAME)
+            .replace_with_ref(COLL_NAME)
+            .replace_with_ref(GLOBAL_DB_NAME)
+            .replace_with_ref(GLOBAL_DB2_NAME)
+            .replace_with_ref(GLOBAL_COLL_NAME)
+            .replace_with_ref(GLOBAL_COLL2_NAME)
+            ;
     }
 }
 
@@ -185,7 +213,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let test = &file.tests[args.test];
 
     let out = unified::Test::parse(&file, test.clone());
-    let text = serde_yaml::to_string(&out)?;
+    let mut text = serde_yaml::to_string(&out)?;
+    unified::postprocess(&mut text);
     println!("{}", text);
 
     Ok(())
