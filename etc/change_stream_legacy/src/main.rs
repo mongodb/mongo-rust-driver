@@ -23,6 +23,10 @@ mod legacy {
     
     #[derive(Debug, Deserialize)]
     pub struct File {
+        pub database_name: String,
+        pub collection_name: String,
+        pub database2_name: String,
+        pub collection2_name: String,
         pub tests: Vec<Test>,
     }
 
@@ -85,40 +89,82 @@ mod unified {
         save_result_as_entity: Option<String>,
     }
 
-    impl From<legacy::Test> for Test {
-        fn from(old: legacy::Test) -> Self {
+    impl Test {
+        pub fn parse(file: &legacy::File, old: legacy::Test) -> Self {
             Self {
                 description: old.description,
                 run_on_requirements: RunOnRequirements {
                     min_server_version: old.min_server_version,
                     topologies: old.topology,
                 },
-                operations: vec![
-                    Operation {
-                        name: "createChangeStream".to_string(),
-                        object: match old.target {
-                            legacy::Target::Collection => "collection0".to_string(),
-                            legacy::Target::Database => "database0".to_string(),
-                            legacy::Target::Client => "client0".to_string(),
+                operations: {
+                    let mut out = vec![
+                        Operation {
+                            name: "createChangeStream".to_string(),
+                            object: match old.target {
+                                legacy::Target::Collection => "collection0".to_string(),
+                                legacy::Target::Database => "database0".to_string(),
+                                legacy::Target::Client => "client0".to_string(),
+                            },
+                            arguments: Some({
+                                let mut out = vec![
+                                    (ys("pipeline"), Value::Sequence(old.change_stream_pipeline)),
+                                ];
+                                if let Some(options) = old.change_stream_options {
+                                    out.push((ys("options"), options));
+                                }
+                                out
+                            }.into_iter().collect()),
+                            save_result_as_entity: Some("changeStream0".to_string()),
                         },
-                        arguments: Some({
-                            let mut out = vec![
-                                (ys("pipeline"), Value::Sequence(old.change_stream_pipeline)),
-                            ];
-                            if let Some(options) = old.change_stream_options {
-                                out.push((ys("options"), options));
-                            }
-                            out
-                        }.into_iter().collect()),
-                        save_result_as_entity: Some("changeStream0".to_string()),
-                    },
-                ],
+                    ];
+                    out.extend(
+                        old.operations
+                            .into_iter()
+                            .map(|op| parse_operation(file, op))
+                    );
+                    out
+                },
             }
         }
     }
 
     fn ys<S: Into<String>>(s: S) -> Value {
         Value::String(s.into())
+    }
+
+    fn parse_operation(file: &legacy::File, old: legacy::Operation) -> Operation {
+        const NEW_DB_NAME: &str = "globalDatabase0";
+        const NEW_DB2_NAME: &str = "globalDatabase1";
+        const NEW_COLL_NAME: &str = "globalCollection0";
+        const NEW_COLL2_NAME: &str = "globalCollection1";
+        let object = {
+            if let Some(coll) = old.collection {
+                if coll == file.collection_name {
+                    NEW_COLL_NAME
+                } else if coll == file.collection2_name {
+                    NEW_COLL2_NAME
+                } else {
+                    panic!("unexpected collection name {:?}", coll);
+                }
+            } else if let Some(db) = old.database {
+                if db == file.database_name {
+                    NEW_DB_NAME
+                } else if db == file.database2_name {
+                    NEW_DB2_NAME
+                } else {
+                    panic!("unexpected db name {:?}", db);
+                }
+            } else {
+                panic!("no object given for operation {:?}", old.name);
+            }
+        }.to_string();
+        Operation {
+            name: old.name,
+            object,
+            arguments: old.arguments,
+            save_result_as_entity: None,
+        }
     }
 }
 
@@ -138,7 +184,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let file: legacy::File = serde_yaml::from_str(&input)?;
     let test = &file.tests[args.test];
 
-    let out = unified::Test::from(test.clone());
+    let out = unified::Test::parse(&file, test.clone());
     let text = serde_yaml::to_string(&out)?;
     println!("{}", text);
 
