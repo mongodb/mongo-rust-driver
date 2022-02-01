@@ -84,39 +84,39 @@ tests:
             ]
           }
         }
-  - description: "$changeStream must be the first stage in a change stream pipeline sent to the server"
+  - description: $changeStream must be the first stage in a change stream pipeline sent to the server
     runOnRequirements:
-      - minServerVersion: "3.6"
-        topologies: [replicaset]
+      - minServerVersion: 3.6.0
+        topologies:
+          - replicaset
     operations:
       - name: createChangeStream
         object: *collection0
         arguments:
           pipeline: []
+          options: {}
         saveResultAsEntity: &changeStream0 changeStream0
       - name: insertOne
         object: *globalCollection0
         arguments:
-          document: {
-            "x": 1
-          }
+          document:
+            x: 1
       - name: iterateUntilDocumentOrError
         object: *changeStream0
-        expectResult: {
-          "_id": { "$$exists": true },
-          "documentKey": { "$$exists": true },
-          "operationType": "insert",
-          "ns": {
-            "db": *database0,
-            "coll": *collection0
-          },
-          "fullDocument": {
-            "_id": { "$$exists": true },
-            "x": {
-              "$numberInt": "1"
-            }
-          }
-        }
+        expectResult:
+          _id:
+            $$exists: true
+          documentKey:
+            $$exists: true
+          operationType: insert
+          ns:
+            db: *database0
+            coll: *collection0
+          fullDocument:
+            x:
+              $numberInt: "1"
+            _id:
+              $$exists: true
     expectEvents:
       - client: *client0
         eventMatch: prefix
@@ -125,7 +125,10 @@ tests:
               command:
                 aggregate: *collection0
                 cursor: {}
-                pipeline: [$changeStream: {}]
+                pipeline:
+                  - $changeStream: {}
+              commandName: aggregate
+              databaseName: *database0
   - description: The server returns change stream responses in the specified server response format
     runOnRequirements:
       - minServerVersion: "3.6.0"

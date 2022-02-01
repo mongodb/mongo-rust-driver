@@ -142,7 +142,7 @@
       "description": "$changeStream must be the first stage in a change stream pipeline sent to the server",
       "runOnRequirements": [
         {
-          "minServerVersion": "3.6",
+          "minServerVersion": "3.6.0",
           "topologies": [
             "replicaset"
           ]
@@ -153,7 +153,8 @@
           "name": "createChangeStream",
           "object": "collection0",
           "arguments": {
-            "pipeline": []
+            "pipeline": [],
+            "options": {}
           },
           "saveResultAsEntity": "changeStream0"
         },
@@ -182,11 +183,11 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "_id": {
-                "$$exists": true
-              },
               "x": {
                 "$numberInt": "1"
+              },
+              "_id": {
+                "$$exists": true
               }
             }
           }
@@ -207,7 +208,9 @@
                       "$changeStream": {}
                     }
                   ]
-                }
+                },
+                "commandName": "aggregate",
+                "databaseName": "database0"
               }
             }
           ]

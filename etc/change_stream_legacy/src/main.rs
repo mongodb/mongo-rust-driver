@@ -69,7 +69,7 @@ mod unified {
     #[serde(rename_all = "camelCase")]
     pub struct Test {
         description: String,
-        run_on_requirements: RunOnRequirements,
+        run_on_requirements: Vec<RunOnRequirements>,
         operations: Vec<Operation>,
         expect_events: Vec<ExpectEvents>,
     }
@@ -106,40 +106,12 @@ mod unified {
 
     impl Test {
         pub fn parse(file: &legacy::File, old: legacy::Test) -> Self {
-            let expect_events = if let Some(mut exps) = old.expectations {
-                for exp in &mut exps {
-                    if let Some(Value::Mapping(mut cse)) = exp.remove(&ys("command_started_event")) {
-                        if let Some(val) = cse.remove(&ys("command_name")) {
-                            cse.insert(ys("commandName"), val);
-                        }
-                        if let Some(mut val) = cse.remove(&ys("database_name")) {
-                            match val {
-                                Value::String(s) if s == file.database_name => {
-                                    val = Value::String(DB_NAME.to_string());
-                                }
-                                _ => ()
-                            }
-                            cse.insert(ys("databaseName"), val);
-                        }
-                        exp.insert(ys("commandStartedEvent"), Value::Mapping(cse));
-                    }
-                }
-                vec![
-                    ExpectEvents {
-                        client: CLIENT_NAME.to_string(),
-                        event_match: "prefix".to_string(),
-                        events: exps,
-                    }
-                ]
-            } else {
-                vec![]
-            };
             Self {
                 description: old.description,
-                run_on_requirements: RunOnRequirements {
+                run_on_requirements: vec![RunOnRequirements {
                     min_server_version: old.min_server_version,
                     topologies: old.topology,
-                },
+                }],
                 operations: {
                     // Initial createChangeStream
                     let mut out = vec![
@@ -175,7 +147,37 @@ mod unified {
                     }
                     out
                 },
-                expect_events,
+                expect_events: {
+                    if let Some(mut exps) = old.expectations {
+                        for exp in &mut exps {
+                            if let Some(Value::Mapping(mut cse)) = exp.remove(&ys("command_started_event")) {
+                                if let Some(val) = cse.remove(&ys("command_name")) {
+                                    cse.insert(ys("commandName"), val);
+                                }
+                                if let Some(mut val) = cse.remove(&ys("database_name")) {
+                                    match val {
+                                        Value::String(s) if s == file.database_name => {
+                                            val = Value::String(DB_NAME.to_string());
+                                        }
+                                        _ => ()
+                                    }
+                                    cse.insert(ys("databaseName"), val);
+                                }
+                                exp.insert(ys("commandStartedEvent"), Value::Mapping(cse));
+                            }
+                            fix_names(file, exp);
+                        }
+                        vec![
+                            ExpectEvents {
+                                client: CLIENT_NAME.to_string(),
+                                event_match: "prefix".to_string(),
+                                events: exps,
+                            }
+                        ]
+                    } else {
+                        vec![]
+                    }
+                },
             }
         }
     }
@@ -219,6 +221,21 @@ mod unified {
         }
     }
 
+    fn fix_names(file: &legacy::File, map: &mut serde_yaml::Mapping) {
+        visit_mut(map, &|_, val| {
+            match val {
+                Value::String(s) => {
+                    if s == &file.database_name {
+                        *s = DB_NAME.to_string()
+                    } else if s == &file.collection_name {
+                        *s = COLL_NAME.to_string()
+                    }
+                },
+                _ => (),
+            }
+        });
+    }
+
     fn parse_success(file: &legacy::File, mut suc: serde_yaml::Mapping) -> Operation {
         visit_mut(&mut suc, &|key, val| {
             if key == "fullDocument" {
@@ -230,18 +247,11 @@ mod unified {
             }
             match val {
                 Value::Number(num) if num.as_i64() == Some(42) => *val = exists(),
-                Value::String(s) => {
-                    if s == "42" {
-                        *val = exists()
-                    } else if s == &file.database_name {
-                        *s = DB_NAME.to_string()
-                    } else if s == &file.collection_name {
-                        *s = COLL_NAME.to_string()
-                    }
-                },
+                Value::String(s) if s == "42" => *val = exists(),
                 _ => (),
             }
         });
+        fix_names(file, &mut suc);
         Operation {
             name: "iterateUntilDocumentOrError".to_string(),
             object: "changeStream0".to_string(),
