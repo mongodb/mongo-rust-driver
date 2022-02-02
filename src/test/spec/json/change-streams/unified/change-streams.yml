@@ -238,3 +238,118 @@ tests:
                   - $changeStream: {}
               commandName: aggregate
               databaseName: *database0
+  - description: Change Stream should allow valid aggregate pipeline stages
+    runOnRequirements:
+      - minServerVersion: 3.6.0
+        topologies:
+          - replicaset
+    operations:
+      - name: createChangeStream
+        object: *collection0
+        arguments:
+          pipeline:
+            - $match:
+                fullDocument.z: 3
+          options: {}
+        saveResultAsEntity: &changeStream0 changeStream0
+      - name: insertOne
+        object: *globalCollection0
+        arguments:
+          document:
+            y: 2
+      - name: insertOne
+        object: *globalCollection0
+        arguments:
+          document:
+            z: 3
+      - name: iterateUntilDocumentOrError
+        object: *changeStream0
+        expectResult:
+          operationType: insert
+          ns:
+            db: *database0
+            coll: *collection0
+          fullDocument:
+            z:
+              $numberInt: "3"
+            _id:
+              $$exists: true
+    expectEvents:
+      - client: *client0
+        eventMatch: prefix
+        events:
+          - commandStartedEvent:
+              command:
+                aggregate: *collection0
+                cursor: {}
+                pipeline:
+                  - $changeStream: {}
+                  - $match:
+                      fullDocument.z:
+                        $numberInt: "3"
+              commandName: aggregate
+              databaseName: *database0
+  - description: Executing a watch helper on a Database results in notifications for changes to all collections in the specified database.
+    runOnRequirements:
+      - minServerVersion: 3.8.0
+        topologies:
+          - replicaset
+    operations:
+      - name: createChangeStream
+        object: *database0
+        arguments:
+          pipeline: []
+          options: {}
+        saveResultAsEntity: &changeStream0 changeStream0
+      - name: insertOne
+        object: *globalDb0Collection1
+        arguments:
+          document:
+            x: 1
+      - name: insertOne
+        object: *globalDb1Collection0
+        arguments:
+          document:
+            y: 2
+      - name: insertOne
+        object: *globalCollection0
+        arguments:
+          document:
+            z: 3
+      - name: iterateUntilDocumentOrError
+        object: *changeStream0
+        expectResult:
+          operationType: insert
+          ns:
+            db: *database0
+            coll: *collection1
+          fullDocument:
+            x:
+              $numberInt: "1"
+            _id:
+              $$exists: true
+      - name: iterateUntilDocumentOrError
+        object: *changeStream0
+        expectResult:
+          operationType: insert
+          ns:
+            db: *database0
+            coll: *collection0
+          fullDocument:
+            z:
+              $numberInt: "3"
+            _id:
+              $$exists: true
+    expectEvents:
+      - client: *client0
+        eventMatch: prefix
+        events:
+          - commandStartedEvent:
+              command:
+                aggregate:
+                  $numberInt: "1"
+                cursor: {}
+                pipeline:
+                  - $changeStream: {}
+              commandName: aggregate
+              databaseName: *database0

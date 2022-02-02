@@ -103,8 +103,10 @@ mod unified {
     }
 
     const CLIENT_NAME: &str = "client0";
-    const DB_NAME: &str = "database0";
-    const COLL_NAME: &str = "collection0";
+    const DB1_NAME: &str = "database0";
+    const DB2_NAME: &str = "database1";
+    const COLL1_NAME: &str = "collection0";
+    const COLL2_NAME: &str = "collection1";
 
     impl Test {
         pub fn parse(file: &legacy::File, old: legacy::Test) -> Self {
@@ -123,8 +125,8 @@ mod unified {
                         Operation {
                             name: "createChangeStream".to_string(),
                             object: match old.target {
-                                legacy::Target::Collection => COLL_NAME,
-                                legacy::Target::Database => DB_NAME,
+                                legacy::Target::Collection => COLL1_NAME,
+                                legacy::Target::Database => DB1_NAME,
                                 legacy::Target::Client => CLIENT_NAME,
                             }.to_string(),
                             arguments: Some({
@@ -161,7 +163,7 @@ mod unified {
                             if let Some(mut val) = cse.remove(&ys("database_name")) {
                                 match val {
                                     Value::String(s) if s == file.database_name => {
-                                        val = Value::String(DB_NAME.to_string());
+                                        val = Value::String(DB1_NAME.to_string());
                                     }
                                     _ => ()
                                 }
@@ -231,9 +233,13 @@ mod unified {
             match val {
                 Value::String(s) => {
                     if s == &file.database_name {
-                        *s = DB_NAME.to_string()
+                        *s = DB1_NAME.to_string()
+                    } else if s == &file.database2_name {
+                        *s = DB2_NAME.to_string()
                     } else if s == &file.collection_name {
-                        *s = COLL_NAME.to_string()
+                        *s = COLL1_NAME.to_string()
+                    } else if s == &file.collection2_name {
+                        *s = COLL2_NAME.to_string()
                     }
                 },
                 _ => (),
@@ -287,8 +293,10 @@ mod unified {
             .replace("saveResultAsEntity: changeStream0", "saveResultAsEntity: &changeStream0 changeStream0")
             .replace_with_ref("changeStream0")
             .replace_with_ref(CLIENT_NAME)
-            .replace_with_ref(DB_NAME)
-            .replace_with_ref(COLL_NAME)
+            .replace_with_ref(DB1_NAME)
+            .replace_with_ref(DB2_NAME)
+            .replace_with_ref(COLL1_NAME)
+            .replace_with_ref(COLL2_NAME)
             .replace_with_ref(GLOBAL_DB1_NAME)
             .replace_with_ref(GLOBAL_DB2_NAME)
             .replace_with_ref(GLOBAL_COLL1_NAME)
