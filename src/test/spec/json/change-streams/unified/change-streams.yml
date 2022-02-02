@@ -131,8 +131,9 @@ tests:
               databaseName: *database0
   - description: The server returns change stream responses in the specified server response format
     runOnRequirements:
-      - minServerVersion: "3.6.0"
-        topologies: [replicaset]
+      - minServerVersion: 3.6.0
+        topologies:
+          - replicaset
     operations:
       - name: createChangeStream
         object: *collection0
@@ -157,7 +158,7 @@ tests:
             db: *database0
             coll: *collection0
           fullDocument:
-            _id:
-              $$exists: true
             x:
               $numberInt: "1"
+            _id:
+              $$exists: true

@@ -262,11 +262,11 @@
               "coll": "collection0"
             },
             "fullDocument": {
-              "_id": {
-                "$$exists": true
-              },
               "x": {
                 "$numberInt": "1"
+              },
+              "_id": {
+                "$$exists": true
               }
             }
           }

@@ -7,7 +7,7 @@ mod legacy {
     use serde_yaml::Value;
 
     #[derive(Debug, Deserialize, Clone)]
-    #[serde(rename_all = "camelCase")]
+    #[serde(rename_all = "camelCase", deny_unknown_fields)]
     pub struct Test {
         pub description: String,
         pub min_server_version: String,
@@ -22,6 +22,7 @@ mod legacy {
     }
     
     #[derive(Debug, Deserialize)]
+    #[serde(deny_unknown_fields)]
     pub struct File {
         pub database_name: String,
         pub collection_name: String,
@@ -31,7 +32,7 @@ mod legacy {
     }
 
     #[derive(Debug, Deserialize, Clone)]
-    #[serde(rename_all = "camelCase")]
+    #[serde(rename_all = "camelCase", deny_unknown_fields)]
     pub enum Target {
         Collection,
         Database,
@@ -39,7 +40,7 @@ mod legacy {
     }
 
     #[derive(Debug, Deserialize, Clone)]
-    #[serde(rename_all = "camelCase")]
+    #[serde(rename_all = "camelCase", deny_unknown_fields)]
     pub struct Operation {
         pub name: String,
         pub database: Option<String>,
@@ -48,7 +49,7 @@ mod legacy {
     }
 
     #[derive(Debug, Deserialize, Clone)]
-    #[serde(untagged, rename_all = "camelCase")]
+    #[serde(untagged, rename_all = "camelCase", deny_unknown_fields)]
     pub enum TestResult {
         Error {
             error: Value,
@@ -65,13 +66,14 @@ mod unified {
 
     use super::legacy;
 
+    #[serde_with::skip_serializing_none]
     #[derive(Debug, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct Test {
         description: String,
         run_on_requirements: Vec<RunOnRequirements>,
         operations: Vec<Operation>,
-        expect_events: Vec<ExpectEvents>,
+        expect_events: Option<Vec<ExpectEvents>>,
     }
 
     #[derive(Debug, Serialize)]
@@ -147,37 +149,33 @@ mod unified {
                     }
                     out
                 },
-                expect_events: {
-                    if let Some(mut exps) = old.expectations {
-                        for exp in &mut exps {
-                            if let Some(Value::Mapping(mut cse)) = exp.remove(&ys("command_started_event")) {
-                                if let Some(val) = cse.remove(&ys("command_name")) {
-                                    cse.insert(ys("commandName"), val);
-                                }
-                                if let Some(mut val) = cse.remove(&ys("database_name")) {
-                                    match val {
-                                        Value::String(s) if s == file.database_name => {
-                                            val = Value::String(DB_NAME.to_string());
-                                        }
-                                        _ => ()
+                expect_events: old.expectations.map(|mut exps| {
+                    for exp in &mut exps {
+                        if let Some(Value::Mapping(mut cse)) = exp.remove(&ys("command_started_event")) {
+                            if let Some(val) = cse.remove(&ys("command_name")) {
+                                cse.insert(ys("commandName"), val);
+                            }
+                            if let Some(mut val) = cse.remove(&ys("database_name")) {
+                                match val {
+                                    Value::String(s) if s == file.database_name => {
+                                        val = Value::String(DB_NAME.to_string());
                                     }
-                                    cse.insert(ys("databaseName"), val);
+                                    _ => ()
                                 }
-                                exp.insert(ys("commandStartedEvent"), Value::Mapping(cse));
+                                cse.insert(ys("databaseName"), val);
                             }
-                            fix_names(file, exp);
+                            exp.insert(ys("commandStartedEvent"), Value::Mapping(cse));
                         }
-                        vec![
-                            ExpectEvents {
-                                client: CLIENT_NAME.to_string(),
-                                event_match: "prefix".to_string(),
-                                events: exps,
-                            }
-                        ]
-                    } else {
-                        vec![]
+                        fix_names(file, exp);
                     }
-                },
+                    vec![
+                        ExpectEvents {
+                            client: CLIENT_NAME.to_string(),
+                            event_match: "prefix".to_string(),
+                            events: exps,
+                        }
+                    ]
+                }),
             }
         }
     }
