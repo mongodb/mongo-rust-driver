@@ -17,6 +17,14 @@ createEntities:
       database: *database0
       collectionName: *collection0
   - database:
+      id: &database1 database1
+      client: *client0
+      databaseName: *database1
+  - collection:
+      id: &collection1 collection1
+      database: *database1
+      collectionName: *collection1
+  - database:
       id: &globalDatabase0 globalDatabase0
       client: *globalClient
       databaseName: *database0
@@ -24,6 +32,23 @@ createEntities:
       id: &globalCollection0 globalCollection0
       database: *globalDatabase0
       collectionName: *collection0
+  - database:
+      id: &globalDatabase1 globalDatabase1
+      client: *globalClient
+      databaseName: *database1
+  - collection:
+      id: &globalCollection1 globalCollection1
+      database: *globalDatabase1
+      collectionName: *collection1
+  # Some tests run operations against db1.coll0 or db0.coll1
+  - collection:
+      id: &globalDb1Collection0 globalDb1Collection0
+      database: *globalDatabase1
+      collectionName: *collection0
+  - collection:
+      id: &globalDb0Collection1 globalDb0Collection1
+      database: *globalDatabase0
+      collectionName: *collection1
 
 initialData:
   - collectionName: *collection0
@@ -162,3 +187,54 @@ tests:
               $numberInt: "1"
             _id:
               $$exists: true
+  - description: Executing a watch helper on a Collection results in notifications for changes to the specified collection
+    runOnRequirements:
+      - minServerVersion: 3.6.0
+        topologies:
+          - replicaset
+    operations:
+      - name: createChangeStream
+        object: *collection0
+        arguments:
+          pipeline: []
+          options: {}
+        saveResultAsEntity: &changeStream0 changeStream0
+      - name: insertOne
+        object: *globalDb0Collection1
+        arguments:
+          document:
+            x: 1
+      - name: insertOne
+        object: *globalDb1Collection0
+        arguments:
+          document:
+            y: 2
+      - name: insertOne
+        object: *globalCollection0
+        arguments:
+          document:
+            z: 3
+      - name: iterateUntilDocumentOrError
+        object: *changeStream0
+        expectResult:
+          operationType: insert
+          ns:
+            db: *database0
+            coll: *collection0
+          fullDocument:
+            z:
+              $numberInt: "3"
+            _id:
+              $$exists: true
+    expectEvents:
+      - client: *client0
+        eventMatch: prefix
+        events:
+          - commandStartedEvent:
+              command:
+                aggregate: *collection0
+                cursor: {}
+                pipeline:
+                  - $changeStream: {}
+              commandName: aggregate
+              databaseName: *database0

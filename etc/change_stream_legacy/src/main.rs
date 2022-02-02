@@ -43,8 +43,8 @@ mod legacy {
     #[serde(rename_all = "camelCase", deny_unknown_fields)]
     pub struct Operation {
         pub name: String,
-        pub database: Option<String>,
-        pub collection: Option<String>,
+        pub database: String,
+        pub collection: String,
         pub arguments: Option<serde_yaml::Mapping>,
     }
 
@@ -108,6 +108,9 @@ mod unified {
 
     impl Test {
         pub fn parse(file: &legacy::File, old: legacy::Test) -> Self {
+            if old.fail_point.is_some() {
+                panic!("unsupported fail point");
+            }
             Self {
                 description: old.description,
                 run_on_requirements: vec![RunOnRequirements {
@@ -184,31 +187,35 @@ mod unified {
         Value::String(s.into())
     }
 
-    const GLOBAL_DB_NAME: &str = "globalDatabase0";
+    const GLOBAL_DB1_NAME: &str = "globalDatabase0";
     const GLOBAL_DB2_NAME: &str = "globalDatabase1";
-    const GLOBAL_COLL_NAME: &str = "globalCollection0";
+    const GLOBAL_COLL1_NAME: &str = "globalCollection0";
     const GLOBAL_COLL2_NAME: &str = "globalCollection1";
+    const GLOBAL_DB2_COLL1_NAME: &str = "globalDb1Collection0";
+    const GLOBAL_DB1_COLL2_NAME: &str = "globalDb0Collection1";
 
     fn parse_operation(file: &legacy::File, old: legacy::Operation) -> Operation {
         let object = {
-            if let Some(coll) = old.collection {
-                if coll == file.collection_name {
-                    GLOBAL_COLL_NAME
-                } else if coll == file.collection2_name {
-                    GLOBAL_COLL2_NAME
-                } else {
-                    panic!("unexpected collection name {:?}", coll);
-                }
-            } else if let Some(db) = old.database {
-                if db == file.database_name {
-                    GLOBAL_DB_NAME
-                } else if db == file.database2_name {
-                    GLOBAL_DB2_NAME
-                } else {
-                    panic!("unexpected db name {:?}", db);
-                }
+            let coll_num = if old.collection == file.collection_name {
+                1
+            } else if old.collection == file.collection2_name {
+                2
             } else {
-                panic!("no object given for operation {:?}", old.name);
+                panic!("unexpected collection name {:?}", old.collection);
+            };
+            let db_num = if old.database == file.database_name {
+                1
+            } else if old.database == file.database2_name {
+                2
+            } else {
+                panic!("unexpected database name {:?}", old.database);
+            };
+            match (db_num, coll_num) {
+                (1, 1) => GLOBAL_COLL1_NAME,
+                (1, 2) => GLOBAL_DB1_COLL2_NAME,
+                (2, 1) => GLOBAL_DB2_COLL1_NAME,
+                (2, 2) => GLOBAL_DB2_NAME,
+                _ => panic!("invalid target {:?}", (db_num, coll_num))
             }
         }.to_string();
         Operation {
@@ -282,10 +289,12 @@ mod unified {
             .replace_with_ref(CLIENT_NAME)
             .replace_with_ref(DB_NAME)
             .replace_with_ref(COLL_NAME)
-            .replace_with_ref(GLOBAL_DB_NAME)
+            .replace_with_ref(GLOBAL_DB1_NAME)
             .replace_with_ref(GLOBAL_DB2_NAME)
-            .replace_with_ref(GLOBAL_COLL_NAME)
+            .replace_with_ref(GLOBAL_COLL1_NAME)
             .replace_with_ref(GLOBAL_COLL2_NAME)
+            .replace_with_ref(GLOBAL_DB1_COLL2_NAME)
+            .replace_with_ref(GLOBAL_DB2_COLL1_NAME)
             ;
     }
 
