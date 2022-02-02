@@ -12,8 +12,9 @@ async fn details() {
     let _guard = LOCK.run_concurrently().await;
     let client = EventClient::new().await;
 
-    // TODO: RUST-894 unskip once SERVER-58399 is fixed.
-    if client.server_version_lt(5, 0) || client.is_sharded() {
+    if client.server_version_lt(5, 0) {
+        // SERVER-58399
+        println!("skipping write_error_details test due to server version");
         return;
     }
 
