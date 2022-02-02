@@ -26,28 +26,20 @@ use super::{
 };
 
 /// A [`SessionChangeStream`] is a change stream that was created with a [`ClientSession`] that must
-/// be iterated using one. To iterate, use [`SessionChangeStream::next`] or retrieve a
-/// [`SessionCursorStream`] using [`SessionChangeStream::stream`]:
+/// be iterated using one. To iterate, use [`SessionChangeStream::next`]:
 ///
 /// ```ignore
-/// # use mongodb::{bson::Document, Client, error::Result, ClientSession, SessionCursor};
+/// # use mongodb::{bson::Document, Client, error::Result};
 /// #
 /// # async fn do_stuff() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// # let mut session = client.start_session(None).await?;
 /// # let coll = client.database("foo").collection::<Document>("bar");
 /// #
-/// // iterate using next()
 /// let mut cs = coll.watch_with_session(None, None, &mut session).await?;
-/// while let Some(event) = cs.next(&mut session).await.transpose()? {
+/// while let Some(event) = cs.next(&mut session).await? {
 ///     println!("{:?}", event)
 /// }
-///
-/// // iterate using `Stream`:
-/// use futures::stream::TryStreamExt;
-///
-/// let mut cs = coll.watch_with_session(None, None, &mut session).await?;
-/// let results: Vec<_> = cs.values(&mut session).try_collect().await?;
 /// #
 /// # Ok(())
 /// # }

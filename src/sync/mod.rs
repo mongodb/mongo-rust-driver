@@ -1,5 +1,7 @@
 //! Contains the sync API. This is only available when the `sync` feature is enabled.
 
+#[allow(unused)]
+mod change_stream;
 mod client;
 mod coll;
 mod cursor;
@@ -8,6 +10,7 @@ mod db;
 #[cfg(test)]
 mod test;
 
+pub(crate) use change_stream::{ChangeStream, SessionChangeStream};
 pub use client::{session::ClientSession, Client};
 pub use coll::Collection;
 pub use cursor::{Cursor, SessionCursor, SessionCursorIter};
