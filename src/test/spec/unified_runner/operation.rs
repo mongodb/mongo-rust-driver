@@ -203,6 +203,7 @@ impl<'de> Deserialize<'de> for Operation {
             }
             "close" => deserialize_op::<Close>(definition.arguments),
             "createChangeStream" => deserialize_op::<CreateChangeStream>(definition.arguments),
+            "rename" => deserialize_op::<RenameCollection>(definition.arguments),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -1874,6 +1875,34 @@ impl TestOperation for CreateChangeStream {
             Ok(Some(Entity::Cursor(TestCursor::ChangeStream(Mutex::new(stream)))))
         }
         .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct RenameCollection {
+    to: String,
+}
+
+impl TestOperation for RenameCollection {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a mut TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let target = test_runner.get_collection(id);
+            let ns = target.namespace();
+            let mut to_ns = ns.clone();
+            to_ns.coll = self.to.clone();
+            let cmd = doc! {
+                "renameCollection": crate::bson::to_bson(&ns)?,
+                "to": crate::bson::to_bson(&to_ns)?,
+            };
+            let admin = test_runner.internal_client.database("admin");
+            admin.run_command(cmd, None).await?;
+            Ok(None)
+        }.boxed()
     }
 }
 

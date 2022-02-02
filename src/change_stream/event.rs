@@ -2,7 +2,10 @@
 #[cfg(test)]
 use std::convert::TryInto;
 
-use crate::{coll::Namespace, cursor::CursorSpecification, options::ChangeStreamOptions};
+use crate::{
+    cursor::CursorSpecification,
+    options::ChangeStreamOptions,
+};
 
 #[cfg(test)]
 use bson::Bson;
@@ -69,7 +72,7 @@ pub struct ChangeStreamEvent<T> {
     pub operation_type: OperationType,
 
     /// Identifies the collection or database on which the event occurred.
-    pub ns: Option<ChangeStreamEventSource>,
+    pub ns: Option<Namespace>,
 
     /// The new name for the `ns` collection.  Only included for `OperationType::Rename`.
     pub to: Option<Namespace>,
@@ -162,7 +165,7 @@ pub enum OperationType {
 /// Identifies the collection or database on which an event occurred.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub struct ChangeStreamEventSource {
+pub struct Namespace {
     /// The name of the database in which the change occurred.
     pub db: String,
 

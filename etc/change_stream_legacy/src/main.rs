@@ -220,10 +220,14 @@ mod unified {
                 _ => panic!("invalid target {:?}", (db_num, coll_num))
             }
         }.to_string();
+        let mut arguments = old.arguments;
+        if let Some(args) = &mut arguments {
+            fix_names(file, args);
+        }
         Operation {
             name: old.name,
             object,
-            arguments: old.arguments,
+            arguments,
             ..Operation::default()
         }
     }
@@ -331,6 +335,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let input = std::fs::read_to_string(&args.input)?;
     let file: legacy::File = serde_yaml::from_str(&input)?;
+    println!("Parsing test {} of {}", args.test+1, file.tests.len());
     let test = &file.tests[args.test];
 
     let out = unified::Test::parse(&file, test.clone());
