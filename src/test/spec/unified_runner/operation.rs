@@ -1796,6 +1796,10 @@ impl TestOperation for IterateUntilDocumentOrError {
         }
         .boxed()
     }
+
+    fn returns_root_documents(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Deserialize)]
