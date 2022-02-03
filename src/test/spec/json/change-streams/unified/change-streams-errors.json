@@ -175,6 +175,112 @@
           ]
         }
       ]
+    },
+    {
+      "description": "Change Stream should error when _id is projected out",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "4.1.11",
+          "topologies": [
+            "replicaset",
+            "sharded",
+            "load-balanced"
+          ]
+        }
+      ],
+      "operations": [
+        {
+          "name": "createChangeStream",
+          "object": "collection0",
+          "arguments": {
+            "pipeline": [
+              {
+                "$project": {
+                  "_id": 0
+                }
+              }
+            ],
+            "options": {}
+          },
+          "saveResultAsEntity": "changeStream0"
+        },
+        {
+          "name": "insertOne",
+          "object": "globalCollection0",
+          "arguments": {
+            "document": {
+              "z": 3
+            }
+          }
+        },
+        {
+          "name": "iterateUntilDocumentOrError",
+          "object": "changeStream0",
+          "expectError": {
+            "errorCode": 280
+          }
+        }
+      ]
+    },
+    {
+      "description": "change stream errors on ElectionInProgress",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "4.2",
+          "topologies": [
+            "replicaset",
+            "sharded",
+            "load-balanced"
+          ]
+        }
+      ],
+      "operations": [
+        {
+          "name": "failPoint",
+          "object": "testRunner",
+          "arguments": {
+            "client": "globalClient",
+            "failPoint": {
+              "configureFailPoint": "failCommand",
+              "mode": {
+                "times": 1
+              },
+              "data": {
+                "failCommands": [
+                  "getMore"
+                ],
+                "errorCode": 216,
+                "closeConnection": false
+              }
+            }
+          }
+        },
+        {
+          "name": "createChangeStream",
+          "object": "collection0",
+          "arguments": {
+            "pipeline": [],
+            "options": {}
+          },
+          "saveResultAsEntity": "changeStream0"
+        },
+        {
+          "name": "insertOne",
+          "object": "globalCollection0",
+          "arguments": {
+            "document": {
+              "z": 3
+            }
+          }
+        },
+        {
+          "name": "iterateUntilDocumentOrError",
+          "object": "changeStream0",
+          "expectError": {
+            "errorCode": 216
+          }
+        }
+      ]
     }
   ]
 }
