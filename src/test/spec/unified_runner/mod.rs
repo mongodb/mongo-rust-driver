@@ -30,12 +30,13 @@ pub use self::{
         ExpectedEventType,
         TestFile,
         TestFileEntity,
+        TestCase,
         Topology,
     },
     test_runner::{EntityMap, TestRunner},
 };
 
-use self::{operation::Expectation, test_file::TestCase};
+use self::operation::Expectation;
 
 static SPEC_VERSIONS: &[Version] = &[
     Version::new(1, 0, 0),

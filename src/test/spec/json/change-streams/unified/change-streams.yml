@@ -569,3 +569,42 @@ tests:
                   - $changeStream: {}
               commandName: aggregate
               databaseName: *database0
+  - description: Test drop and invalidate event types
+    runOnRequirements:
+      - minServerVersion: 4.0.1
+        topologies:
+          - replicaset
+    operations:
+      - name: createChangeStream
+        object: *collection0
+        arguments:
+          pipeline: []
+          options: {}
+        saveResultAsEntity: &changeStream0 changeStream0
+      - name: dropCollection
+        object: *database0
+        arguments:
+          collection: *collection0
+      - name: iterateUntilDocumentOrError
+        object: *changeStream0
+        expectResult:
+          operationType: drop
+          ns:
+            db: *database0
+            coll: *collection0
+      - name: iterateUntilDocumentOrError
+        object: *changeStream0
+        expectResult:
+          operationType: invalidate
+    expectEvents:
+      - client: *client0
+        eventMatch: prefix
+        events:
+          - commandStartedEvent:
+              command:
+                aggregate: *collection0
+                cursor: {}
+                pipeline:
+                  - $changeStream: {}
+              commandName: aggregate
+              databaseName: *database0
