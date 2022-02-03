@@ -121,6 +121,60 @@
           }
         }
       ]
+    },
+    {
+      "description": "Change Stream should error when an invalid aggregation stage is passed in",
+      "runOnRequirements": [
+        {
+          "minServerVersion": "3.6.0",
+          "topologies": [
+            "replicaset"
+          ]
+        }
+      ],
+      "operations": [
+        {
+          "name": "createChangeStream",
+          "object": "collection0",
+          "arguments": {
+            "pipeline": [
+              {
+                "$unsupported": "foo"
+              }
+            ],
+            "options": {}
+          },
+          "expectError": {
+            "errorCode": 40324
+          }
+        }
+      ],
+      "expectEvents": [
+        {
+          "client": "client0",
+          "eventMatch": "prefix",
+          "events": [
+            {
+              "commandStartedEvent": {
+                "command": {
+                  "aggregate": "collection0",
+                  "cursor": {},
+                  "pipeline": [
+                    {
+                      "$changeStream": {}
+                    },
+                    {
+                      "$unsupported": "foo"
+                    }
+                  ]
+                },
+                "commandName": "aggregate",
+                "databaseName": "database0"
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

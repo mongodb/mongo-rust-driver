@@ -132,7 +132,7 @@ pub async fn run_unified_format_test_filtered(
                     "{}: client topology not compatible with test",
                     &test_case.description
                 ));
-                return;
+                continue;
             }
         }
 
