@@ -52,11 +52,17 @@ mod legacy {
     #[serde(untagged, rename_all = "camelCase", deny_unknown_fields)]
     pub enum TestResult {
         Error {
-            error: Value,
+            error: ExpectError,
         },
         Success {
             success: Vec<serde_yaml::Mapping>,
         },
+    }
+
+    #[derive(Debug, Deserialize, Clone)]
+    #[serde(rename_all = "camelCase", deny_unknown_fields)]
+    pub struct ExpectError {
+        pub code: i32,
     }
 }
 
@@ -92,6 +98,7 @@ mod unified {
         arguments: Option<serde_yaml::Mapping>,
         save_result_as_entity: Option<String>,
         expect_result: Option<serde_yaml::Mapping>,
+        expect_error: Option<ExpectError>,
     }
 
     #[derive(Debug, Default, Serialize)]
@@ -100,6 +107,12 @@ mod unified {
         client: String,
         event_match: String,
         events: Vec<serde_yaml::Mapping>,
+    }
+
+    #[derive(Debug, Default, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct ExpectError {
+        error_code: i32,
     }
 
     const CLIENT_NAME: &str = "client0";
@@ -160,8 +173,22 @@ mod unified {
                             .map(|op| parse_operation(file, op))
                     );
                     // Test results
-                    if let legacy::TestResult::Success { success } = old.result {
-                        out.extend(success.into_iter().map(|suc| parse_success(file, suc)))
+                    match old.result {
+                        legacy::TestResult::Success { success } => {
+                            out.extend(success.into_iter().map(|suc| parse_success(file, suc)))
+                        }
+                        legacy::TestResult::Error { error } => {
+                            out.push(
+                                Operation {
+                                    name: "iterateUntilDocumentOrError".to_string(),
+                                    object: "changeStream0".to_string(),
+                                    expect_error: Some(ExpectError {
+                                        error_code: error.code,
+                                    }),
+                                    ..Operation::default()
+                                }
+                            );
+                        }
                     }
                     out
                 },
