@@ -845,7 +845,11 @@
                 }
               },
               "removedFields": [],
-              "truncatedArrays": []
+              "truncatedArrays": {
+                "$$unsetOrMatches": {
+                  "$$exists": true
+                }
+              }
             }
           }
         },

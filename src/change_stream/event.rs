@@ -117,7 +117,7 @@ pub struct UpdateDescription {
     pub removed_fields: Vec<String>,
 
     /// Arrays that were truncated in the `Document`.
-    pub truncated_arrays: Vec<TruncatedArray>,
+    pub truncated_arrays: Option<Vec<TruncatedArray>>,
 }
 
 /// Describes an array that has been truncated.

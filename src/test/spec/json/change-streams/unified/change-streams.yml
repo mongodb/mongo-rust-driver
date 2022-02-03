@@ -491,7 +491,10 @@ tests:
               x:
                 $numberInt: "2"
             removedFields: []
-            truncatedArrays: []
+            truncatedArrays:
+              $$unsetOrMatches:
+                $$exists:
+                  true
       - name: iterateUntilDocumentOrError
         object: *changeStream0
         expectResult:

@@ -133,3 +133,161 @@ tests:
                             true
               commandName: aggregate
               databaseName: *database0
+  - description: change stream resumes after HostUnreachable
+    runOnRequirements:
+      - minServerVersion: "4.2"
+        maxServerVersion: 4.2.99
+        topologies:
+          - replicaset
+          - sharded
+    operations:
+      - name: failPoint
+        object: testRunner
+        arguments:
+          client: globalClient
+          failPoint:
+            configureFailPoint: failCommand
+            mode:
+              times: 1
+            data:
+              failCommands:
+                - getMore
+              errorCode: 6
+              closeConnection: false
+      - name: createChangeStream
+        object: *collection0
+        arguments:
+          pipeline: []
+          options: {}
+        saveResultAsEntity: &changeStream0 changeStream0
+      - name: insertOne
+        object: *globalCollection0
+        arguments:
+          document:
+            x: 1
+      - name: iterateUntilDocumentOrError
+        object: *changeStream0
+        expectResult:
+          _id:
+            $$exists: true
+          documentKey:
+            $$exists: true
+          operationType: insert
+          ns:
+            db: *database0
+            coll: *collection0
+          fullDocument:
+            x:
+              $numberInt: "1"
+            _id:
+              $$exists: true
+    expectEvents:
+      - client: *client0
+        eventMatch: prefix
+        events:
+          - commandStartedEvent:
+              command:
+                aggregate: *collection0
+                cursor: {}
+                pipeline:
+                  - $changeStream: {}
+              commandName: aggregate
+              databaseName: *database0
+          - commandStartedEvent:
+              command:
+                getMore:
+                  $$exists: true
+                collection: *collection0
+              commandName: getMore
+              databaseName: *database0
+          - commandStartedEvent:
+              command:
+                aggregate: *collection0
+                cursor: {}
+                pipeline:
+                  - $changeStream:
+                      resumeAfter:
+                        $$unsetOrMatches:
+                          $$exists:
+                            true
+              commandName: aggregate
+              databaseName: *database0
+  - description: change stream resumes after HostNotFound
+    runOnRequirements:
+      - minServerVersion: "4.2"
+        maxServerVersion: 4.2.99
+        topologies:
+          - replicaset
+          - sharded
+    operations:
+      - name: failPoint
+        object: testRunner
+        arguments:
+          client: globalClient
+          failPoint:
+            configureFailPoint: failCommand
+            mode:
+              times: 1
+            data:
+              failCommands:
+                - getMore
+              errorCode: 7
+              closeConnection: false
+      - name: createChangeStream
+        object: *collection0
+        arguments:
+          pipeline: []
+          options: {}
+        saveResultAsEntity: &changeStream0 changeStream0
+      - name: insertOne
+        object: *globalCollection0
+        arguments:
+          document:
+            x: 1
+      - name: iterateUntilDocumentOrError
+        object: *changeStream0
+        expectResult:
+          _id:
+            $$exists: true
+          documentKey:
+            $$exists: true
+          operationType: insert
+          ns:
+            db: *database0
+            coll: *collection0
+          fullDocument:
+            x:
+              $numberInt: "1"
+            _id:
+              $$exists: true
+    expectEvents:
+      - client: *client0
+        eventMatch: prefix
+        events:
+          - commandStartedEvent:
+              command:
+                aggregate: *collection0
+                cursor: {}
+                pipeline:
+                  - $changeStream: {}
+              commandName: aggregate
+              databaseName: *database0
+          - commandStartedEvent:
+              command:
+                getMore:
+                  $$exists: true
+                collection: *collection0
+              commandName: getMore
+              databaseName: *database0
+          - commandStartedEvent:
+              command:
+                aggregate: *collection0
+                cursor: {}
+                pipeline:
+                  - $changeStream:
+                      resumeAfter:
+                        $$unsetOrMatches:
+                          $$exists:
+                            true
+              commandName: aggregate
+              databaseName: *database0
