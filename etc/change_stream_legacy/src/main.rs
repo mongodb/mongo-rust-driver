@@ -126,7 +126,7 @@ mod unified {
     const COLL2_NAME: &str = "collection1";
 
     impl Test {
-        pub fn parse(file: &legacy::File, old: legacy::Test) -> Self {
+        pub fn parse(args: &super::Args, file: &legacy::File, old: legacy::Test) -> Self {
             Self {
                 description: old.description,
                 run_on_requirements: vec![RunOnRequirements {
@@ -213,7 +213,10 @@ mod unified {
                                 cse.insert(ys("databaseName"), val);
                             }
                             let mut val = Value::Mapping(cse);
-                            if ix == len - 1 {
+                            // The *-resume-*.yml test files contain event expecations that are missing
+                            // the `resumeAfter` clause, so this adds a matcher that will work whether or
+                            // not that clause is present.
+                            if args.fix_resume_event && ix == len - 1 {
                                 fn singleton(key: &str, value: Value) -> Value {
                                     Value::Mapping(vec![
                                         (ys(key), value),
@@ -388,11 +391,13 @@ mod unified {
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
-struct Args {
+pub struct Args {
     #[clap(short, long)]
     input: PathBuf,
     #[clap(short, long)]
     test: usize,
+    #[clap(short, long)]
+    fix_resume_event: bool,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -403,7 +408,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Parsing test {} of {}", args.test+1, file.tests.len());
     let test = &file.tests[args.test];
 
-    let out = unified::Test::parse(&file, test.clone());
+    let out = unified::Test::parse(&args, &file, test.clone());
     let mut text = serde_yaml::to_string(&out)?;
     unified::postprocess(&mut text);
     println!("{}", text);
