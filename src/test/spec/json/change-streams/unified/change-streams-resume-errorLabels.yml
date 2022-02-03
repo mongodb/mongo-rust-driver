@@ -1,0 +1,133 @@
+description: "change-streams errors"
+schemaVersion: "1.0"
+createEntities:
+  - client:
+      id: &client0 client0
+      observeEvents: [ commandStartedEvent ]
+      ignoreCommandMonitoringEvents: [ killCursors ]
+  - client:
+      id: &globalClient globalClient
+      useMultipleMongoses: false
+  - database:
+      id: &database0 database0
+      client: *client0
+      databaseName: *database0
+  - collection:
+      id: &collection0 collection0
+      database: *database0
+      collectionName: *collection0
+  - database:
+      id: &database1 database1
+      client: *client0
+      databaseName: *database1
+  - collection:
+      id: &collection1 collection1
+      database: *database1
+      collectionName: *collection1
+  - database:
+      id: &globalDatabase0 globalDatabase0
+      client: *globalClient
+      databaseName: *database0
+  - collection:
+      id: &globalCollection0 globalCollection0
+      database: *globalDatabase0
+      collectionName: *collection0
+  - database:
+      id: &globalDatabase1 globalDatabase1
+      client: *globalClient
+      databaseName: *database1
+  - collection:
+      id: &globalCollection1 globalCollection1
+      database: *globalDatabase1
+      collectionName: *collection1
+  # Some tests run operations against db1.coll0 or db0.coll1
+  - collection:
+      id: &globalDb1Collection0 globalDb1Collection0
+      database: *globalDatabase1
+      collectionName: *collection0
+  - collection:
+      id: &globalDb0Collection1 globalDb0Collection1
+      database: *globalDatabase0
+      collectionName: *collection1
+
+initialData:
+  - collectionName: *collection0
+    databaseName: *database0
+    documents: []
+tests:
+  - description: change stream resumes after HostUnreachable
+    runOnRequirements:
+      - minServerVersion: 4.3.1
+        topologies:
+          - replicaset
+          - sharded
+          - load-balanced
+    operations:
+      - name: failPoint
+        object: testRunner
+        arguments:
+          client: globalClient
+          failPoint:
+            configureFailPoint: failGetMoreAfterCursorCheckout
+            mode:
+              times: 1
+            data:
+              errorCode: 6
+              closeConnection: false
+      - name: createChangeStream
+        object: *collection0
+        arguments:
+          pipeline: []
+          options: {}
+        saveResultAsEntity: &changeStream0 changeStream0
+      - name: insertOne
+        object: *globalCollection0
+        arguments:
+          document:
+            x: 1
+      - name: iterateUntilDocumentOrError
+        object: *changeStream0
+        expectResult:
+          _id:
+            $$exists: true
+          documentKey:
+            $$exists: true
+          operationType: insert
+          ns:
+            db: *database0
+            coll: *collection0
+          fullDocument:
+            x:
+              $numberInt: "1"
+            _id:
+              $$exists: true
+    expectEvents:
+      - client: *client0
+        eventMatch: prefix
+        events:
+          - commandStartedEvent:
+              command:
+                aggregate: *collection0
+                cursor: {}
+                pipeline:
+                  - $changeStream: {}
+              commandName: aggregate
+              databaseName: *database0
+          - commandStartedEvent:
+              command:
+                getMore:
+                  $$exists: true
+                collection: *collection0
+              commandName: getMore
+              databaseName: *database0
+          - commandStartedEvent:
+              command:
+                aggregate: *collection0
+                cursor: {}
+                pipeline:
+                  - $changeStream:
+                      resumeAfter:
+                        $$unsetOrMatches:
+                          $$exists: true
+              commandName: aggregate
+              databaseName: *database0
