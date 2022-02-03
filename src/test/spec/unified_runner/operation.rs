@@ -12,6 +12,7 @@ use super::{Entity, ExpectError, TestCursor, TestRunner};
 
 use crate::{
     bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
+    change_stream::options::ChangeStreamOptions,
     client::session::{ClientSession, TransactionState},
     coll::options::Hint,
     collation::Collation,
@@ -46,7 +47,7 @@ use crate::{
     Collection,
     Database,
     IndexModel,
-    RUNTIME, change_stream::options::ChangeStreamOptions,
+    RUNTIME,
 };
 
 pub trait TestOperation: Debug {
@@ -1779,13 +1780,12 @@ impl TestOperation for IterateUntilDocumentOrError {
                 }
                 TestCursor::ChangeStream(stream) => {
                     let mut stream = stream.lock().await;
-                    stream.next().await
-                        .map(|res| {
-                            res.map(|ev| match bson::to_bson(&ev) {
-                                Ok(Bson::Document(doc)) => doc,
-                                _ => panic!("invalid serialization result"),
-                            })
+                    stream.next().await.map(|res| {
+                        res.map(|ev| match bson::to_bson(&ev) {
+                            Ok(Bson::Document(doc)) => doc,
+                            _ => panic!("invalid serialization result"),
                         })
+                    })
                 }
                 TestCursor::Closed => None,
             };
@@ -1862,17 +1862,23 @@ impl TestOperation for CreateChangeStream {
             let target = test_runner.entities.get(id).unwrap();
             let stream = match target {
                 Entity::Client(ce) => {
-                    ce.client().watch(self.pipeline.clone(), self.options.clone()).await?
-                },
+                    ce.client()
+                        .watch(self.pipeline.clone(), self.options.clone())
+                        .await?
+                }
                 Entity::Database(db) => {
-                    db.watch(self.pipeline.clone(), self.options.clone()).await?
-                },
+                    db.watch(self.pipeline.clone(), self.options.clone())
+                        .await?
+                }
                 Entity::Collection(coll) => {
-                    coll.watch(self.pipeline.clone(), self.options.clone()).await?
-                },
+                    coll.watch(self.pipeline.clone(), self.options.clone())
+                        .await?
+                }
                 _ => panic!("Invalid entity for createChangeStream"),
             };
-            Ok(Some(Entity::Cursor(TestCursor::ChangeStream(Mutex::new(stream)))))
+            Ok(Some(Entity::Cursor(TestCursor::ChangeStream(Mutex::new(
+                stream,
+            )))))
         }
         .boxed()
     }
@@ -1902,7 +1908,8 @@ impl TestOperation for RenameCollection {
             let admin = test_runner.internal_client.database("admin");
             admin.run_command(cmd, None).await?;
             Ok(None)
-        }.boxed()
+        }
+        .boxed()
     }
 }
 

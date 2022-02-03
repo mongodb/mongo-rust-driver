@@ -21,7 +21,7 @@ mod legacy {
         pub expectations: Option<Vec<serde_yaml::Mapping>>,
         pub result: TestResult,
     }
-    
+
     #[derive(Debug, Deserialize)]
     #[serde(deny_unknown_fields)]
     pub struct File {
@@ -52,12 +52,8 @@ mod legacy {
     #[derive(Debug, Deserialize, Clone)]
     #[serde(untagged, rename_all = "camelCase", deny_unknown_fields)]
     pub enum TestResult {
-        Error {
-            error: ExpectError,
-        },
-        Success {
-            success: Vec<serde_yaml::Mapping>,
-        },
+        Error { error: ExpectError },
+        Success { success: Vec<serde_yaml::Mapping> },
     }
 
     #[derive(Debug, Deserialize, Clone)]
@@ -85,7 +81,7 @@ mod unified {
 
     #[serde_with::skip_serializing_none]
     #[derive(Debug, Serialize)]
-    #[serde(rename_all = "camelCase")]    
+    #[serde(rename_all = "camelCase")]
     struct RunOnRequirements {
         min_server_version: String,
         max_server_version: Option<String>,
@@ -141,40 +137,48 @@ mod unified {
                         out.push(Operation {
                             name: "failPoint".to_string(),
                             object: "testRunner".to_string(),
-                            arguments: Some(vec![
-                                (ys("client"), ys(GLOBAL_CLIENT_NAME)),
-                                (ys("failPoint"), Value::Mapping(fp)),
-                            ].into_iter().collect()),
+                            arguments: Some(
+                                vec![
+                                    (ys("client"), ys(GLOBAL_CLIENT_NAME)),
+                                    (ys("failPoint"), Value::Mapping(fp)),
+                                ]
+                                .into_iter()
+                                .collect(),
+                            ),
                             ..Operation::default()
                         });
                     }
                     // Initial createChangeStream
-                    out.push(
-                        Operation {
-                            name: "createChangeStream".to_string(),
-                            object: match old.target {
-                                legacy::Target::Collection => COLL1_NAME,
-                                legacy::Target::Database => DB1_NAME,
-                                legacy::Target::Client => CLIENT_NAME,
-                            }.to_string(),
-                            arguments: Some({
-                                let mut out = vec![
-                                    (ys("pipeline"), Value::Sequence(old.change_stream_pipeline)),
-                                ];
+                    out.push(Operation {
+                        name: "createChangeStream".to_string(),
+                        object: match old.target {
+                            legacy::Target::Collection => COLL1_NAME,
+                            legacy::Target::Database => DB1_NAME,
+                            legacy::Target::Client => CLIENT_NAME,
+                        }
+                        .to_string(),
+                        arguments: Some(
+                            {
+                                let mut out = vec![(
+                                    ys("pipeline"),
+                                    Value::Sequence(old.change_stream_pipeline),
+                                )];
                                 if let Some(options) = old.change_stream_options {
                                     out.push((ys("options"), options));
                                 }
                                 out
-                            }.into_iter().collect()),
-                            save_result_as_entity: Some("changeStream0".to_string()),
-                            ..Operation::default()
-                        },
-                    );
+                            }
+                            .into_iter()
+                            .collect(),
+                        ),
+                        save_result_as_entity: Some("changeStream0".to_string()),
+                        ..Operation::default()
+                    });
                     // Test operations
                     out.extend(
                         old.operations
                             .into_iter()
-                            .map(|op| parse_operation(file, op))
+                            .map(|op| parse_operation(file, op)),
                     );
                     // Test results
                     match old.result {
@@ -182,16 +186,14 @@ mod unified {
                             out.extend(success.into_iter().map(|suc| parse_success(file, suc)))
                         }
                         legacy::TestResult::Error { error } => {
-                            out.push(
-                                Operation {
-                                    name: "iterateUntilDocumentOrError".to_string(),
-                                    object: "changeStream0".to_string(),
-                                    expect_error: Some(ExpectError {
-                                        error_code: error.code,
-                                    }),
-                                    ..Operation::default()
-                                }
-                            );
+                            out.push(Operation {
+                                name: "iterateUntilDocumentOrError".to_string(),
+                                object: "changeStream0".to_string(),
+                                expect_error: Some(ExpectError {
+                                    error_code: error.code,
+                                }),
+                                ..Operation::default()
+                            });
                         }
                     }
                     out
@@ -199,7 +201,9 @@ mod unified {
                 expect_events: old.expectations.map(|mut exps| {
                     let len = exps.len();
                     for (ix, exp) in (&mut exps).into_iter().enumerate() {
-                        if let Some(Value::Mapping(mut cse)) = exp.remove(&ys("command_started_event")) {
+                        if let Some(Value::Mapping(mut cse)) =
+                            exp.remove(&ys("command_started_event"))
+                        {
                             if let Some(val) = cse.remove(&ys("command_name")) {
                                 cse.insert(ys("commandName"), val);
                             }
@@ -208,25 +212,24 @@ mod unified {
                                     Value::String(s) if s == file.database_name => {
                                         val = Value::String(DB1_NAME.to_string());
                                     }
-                                    _ => ()
+                                    _ => (),
                                 }
                                 cse.insert(ys("databaseName"), val);
                             }
                             let mut val = Value::Mapping(cse);
-                            // The *-resume-*.yml test files contain event expecations that are missing
-                            // the `resumeAfter` clause, so this adds a matcher that will work whether or
+                            // The *-resume-*.yml test files contain event expecations that are
+                            // missing the `resumeAfter` clause, so this
+                            // adds a matcher that will work whether or
                             // not that clause is present.
                             if args.fix_resume_event && ix == len - 1 {
                                 fn singleton(key: &str, value: Value) -> Value {
-                                    Value::Mapping(vec![
-                                        (ys(key), value),
-                                    ].into_iter().collect())
+                                    Value::Mapping(vec![(ys(key), value)].into_iter().collect())
                                 }
                                 val["command"]["pipeline"][0]["$changeStream"] = singleton(
-                                    "resumeAfter", singleton(
-                                        "$$unsetOrMatches", singleton(
-                                            "$$exists", Value::Bool(true),
-                                        ),
+                                    "resumeAfter",
+                                    singleton(
+                                        "$$unsetOrMatches",
+                                        singleton("$$exists", Value::Bool(true)),
                                     ),
                                 );
                             }
@@ -235,13 +238,11 @@ mod unified {
                         fix_names(file, exp);
                         fix_placeholders(exp);
                     }
-                    vec![
-                        ExpectEvents {
-                            client: CLIENT_NAME.to_string(),
-                            event_match: "prefix".to_string(),
-                            events: exps,
-                        }
-                    ]
+                    vec![ExpectEvents {
+                        client: CLIENT_NAME.to_string(),
+                        event_match: "prefix".to_string(),
+                        events: exps,
+                    }]
                 }),
             }
         }
@@ -279,9 +280,10 @@ mod unified {
                 (1, 2) => GLOBAL_DB1_COLL2_NAME,
                 (2, 1) => GLOBAL_DB2_COLL1_NAME,
                 (2, 2) => GLOBAL_DB2_NAME,
-                _ => panic!("invalid target {:?}", (db_num, coll_num))
+                _ => panic!("invalid target {:?}", (db_num, coll_num)),
             }
-        }.to_string();
+        }
+        .to_string();
         let mut arguments = old.arguments;
         if let Some(args) = &mut arguments {
             fix_names(file, args);
@@ -295,31 +297,27 @@ mod unified {
     }
 
     fn fix_names(file: &legacy::File, map: &mut serde_yaml::Mapping) {
-        visit_mut(map, &|_, val| {
-            match val {
-                Value::String(s) => {
-                    if s == &file.database_name {
-                        *s = DB1_NAME.to_string()
-                    } else if Some(&*s) == file.database2_name.as_ref() {
-                        *s = DB2_NAME.to_string()
-                    } else if s == &file.collection_name {
-                        *s = COLL1_NAME.to_string()
-                    } else if Some(&*s) == file.collection2_name.as_ref() {
-                        *s = COLL2_NAME.to_string()
-                    }
-                },
-                _ => (),
+        visit_mut(map, &|_, val| match val {
+            Value::String(s) => {
+                if s == &file.database_name {
+                    *s = DB1_NAME.to_string()
+                } else if Some(&*s) == file.database2_name.as_ref() {
+                    *s = DB2_NAME.to_string()
+                } else if s == &file.collection_name {
+                    *s = COLL1_NAME.to_string()
+                } else if Some(&*s) == file.collection2_name.as_ref() {
+                    *s = COLL2_NAME.to_string()
+                }
             }
+            _ => (),
         });
     }
 
     fn fix_placeholders(map: &mut serde_yaml::Mapping) {
-        visit_mut(map, &|_, val| {
-            match val {
-                Value::Number(num) if num.as_i64() == Some(42) => *val = exists(),
-                Value::String(s) if s == "42" => *val = exists(),
-                _ => (),
-            }
+        visit_mut(map, &|_, val| match val {
+            Value::Number(num) if num.as_i64() == Some(42) => *val = exists(),
+            Value::String(s) if s == "42" => *val = exists(),
+            _ => (),
         });
     }
 
@@ -344,13 +342,12 @@ mod unified {
     }
 
     fn exists() -> Value {
-        Value::Mapping(
-            [(ys("$$exists"), Value::Bool(true))].into_iter().collect()
-        )
+        Value::Mapping([(ys("$$exists"), Value::Bool(true))].into_iter().collect())
     }
 
     fn visit_mut<F>(root: &mut serde_yaml::Mapping, visitor: &F)
-        where F: Fn(&str, &mut Value)
+    where
+        F: Fn(&str, &mut Value),
     {
         for (key, value) in root.iter_mut() {
             visitor(key.as_str().unwrap(), value);
@@ -362,7 +359,10 @@ mod unified {
 
     pub fn postprocess(text: &mut String) {
         *text = text
-            .replace("saveResultAsEntity: changeStream0", "saveResultAsEntity: &changeStream0 changeStream0")
+            .replace(
+                "saveResultAsEntity: changeStream0",
+                "saveResultAsEntity: &changeStream0 changeStream0",
+            )
             .replace_with_ref("changeStream0")
             .replace_with_ref(CLIENT_NAME)
             .replace_with_ref(DB1_NAME)
@@ -374,8 +374,7 @@ mod unified {
             .replace_with_ref(GLOBAL_COLL1_NAME)
             .replace_with_ref(GLOBAL_COLL2_NAME)
             .replace_with_ref(GLOBAL_DB1_COLL2_NAME)
-            .replace_with_ref(GLOBAL_DB2_COLL1_NAME)
-            ;
+            .replace_with_ref(GLOBAL_DB2_COLL1_NAME);
     }
 
     trait StringExt {
@@ -405,7 +404,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let input = std::fs::read_to_string(&args.input)?;
     let file: legacy::File = serde_yaml::from_str(&input)?;
-    println!("Parsing test {} of {}", args.test+1, file.tests.len());
+    println!("Parsing test {} of {}", args.test + 1, file.tests.len());
     let test = &file.tests[args.test];
 
     let out = unified::Test::parse(&args, &file, test.clone());

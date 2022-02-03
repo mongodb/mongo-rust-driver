@@ -28,9 +28,9 @@ pub use self::{
         CollectionData,
         ExpectError,
         ExpectedEventType,
+        TestCase,
         TestFile,
         TestFileEntity,
-        TestCase,
         Topology,
     },
     test_runner::{EntityMap, TestRunner},
@@ -248,7 +248,7 @@ pub async fn run_unified_format_test_filtered(
                         expected_events
                     ),
                 }
-                
+
                 for (actual, expected) in actual_events.iter().zip(expected_events) {
                     if let Err(e) = events_match(actual, expected, Some(&test_runner.entities)) {
                         panic!(
