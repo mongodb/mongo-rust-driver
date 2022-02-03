@@ -13,6 +13,6 @@ async fn run() {
     run_spec_test(&["change-streams", "unified"], |t| run_unified_format_test_filtered(t, test_filter)).await;
 }
 
-fn test_filter(test: &TestCase) -> bool {
-    test.description == "Test drop and invalidate event types"
+fn test_filter(_test: &TestCase) -> bool {
+    true
 }

@@ -103,6 +103,7 @@ mod unified {
     }
 
     const CLIENT_NAME: &str = "client0";
+    const GLOBAL_CLIENT_NAME: &str = "globalClient";
     const DB1_NAME: &str = "database0";
     const DB2_NAME: &str = "database1";
     const COLL1_NAME: &str = "collection0";
@@ -110,9 +111,6 @@ mod unified {
 
     impl Test {
         pub fn parse(file: &legacy::File, old: legacy::Test) -> Self {
-            if old.fail_point.is_some() {
-                panic!("unsupported fail point");
-            }
             Self {
                 description: old.description,
                 run_on_requirements: vec![RunOnRequirements {
@@ -120,8 +118,21 @@ mod unified {
                     topologies: old.topology,
                 }],
                 operations: {
+                    let mut out = vec![];
+                    // Fail point
+                    if let Some(fp) = old.fail_point {
+                        out.push(Operation {
+                            name: "failPoint".to_string(),
+                            object: "testRunner".to_string(),
+                            arguments: Some(vec![
+                                (ys("client"), ys(GLOBAL_CLIENT_NAME)),
+                                (ys("failPoint"), Value::Mapping(fp)),
+                            ].into_iter().collect()),
+                            ..Operation::default()
+                        });
+                    }
                     // Initial createChangeStream
-                    let mut out = vec![
+                    out.push(
                         Operation {
                             name: "createChangeStream".to_string(),
                             object: match old.target {
@@ -141,7 +152,7 @@ mod unified {
                             save_result_as_entity: Some("changeStream0".to_string()),
                             ..Operation::default()
                         },
-                    ];
+                    );
                     // Test operations
                     out.extend(
                         old.operations

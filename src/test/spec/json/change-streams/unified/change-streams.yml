@@ -608,3 +608,92 @@ tests:
                   - $changeStream: {}
               commandName: aggregate
               databaseName: *database0
+  - description: Test consecutive resume
+    runOnRequirements:
+      - minServerVersion: 4.1.7
+        topologies:
+          - replicaset
+    operations:
+      - name: failPoint
+        object: testRunner
+        arguments:
+          client: globalClient
+          failPoint:
+            configureFailPoint: failCommand
+            mode:
+              times: 2
+            data:
+              failCommands:
+                - getMore
+              closeConnection: true
+      - name: createChangeStream
+        object: *collection0
+        arguments:
+          pipeline: []
+          options:
+            batchSize: 1
+        saveResultAsEntity: &changeStream0 changeStream0
+      - name: insertOne
+        object: *globalCollection0
+        arguments:
+          document:
+            x: 1
+      - name: insertOne
+        object: *globalCollection0
+        arguments:
+          document:
+            x: 2
+      - name: insertOne
+        object: *globalCollection0
+        arguments:
+          document:
+            x: 3
+      - name: iterateUntilDocumentOrError
+        object: *changeStream0
+        expectResult:
+          operationType: insert
+          ns:
+            db: *database0
+            coll: *collection0
+          fullDocument:
+            x:
+              $numberInt: "1"
+            _id:
+              $$exists: true
+      - name: iterateUntilDocumentOrError
+        object: *changeStream0
+        expectResult:
+          operationType: insert
+          ns:
+            db: *database0
+            coll: *collection0
+          fullDocument:
+            x:
+              $numberInt: "2"
+            _id:
+              $$exists: true
+      - name: iterateUntilDocumentOrError
+        object: *changeStream0
+        expectResult:
+          operationType: insert
+          ns:
+            db: *database0
+            coll: *collection0
+          fullDocument:
+            x:
+              $numberInt: "3"
+            _id:
+              $$exists: true
+    expectEvents:
+      - client: *client0
+        eventMatch: prefix
+        events:
+          - commandStartedEvent:
+              command:
+                aggregate: *collection0
+                cursor:
+                  batchSize: 1
+                pipeline:
+                  - $changeStream: {}
+              commandName: aggregate
+              databaseName: *database0
