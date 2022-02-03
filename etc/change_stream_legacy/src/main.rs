@@ -197,7 +197,8 @@ mod unified {
                     out
                 },
                 expect_events: old.expectations.map(|mut exps| {
-                    for exp in &mut exps {
+                    let len = exps.len();
+                    for (ix, exp) in (&mut exps).into_iter().enumerate() {
                         if let Some(Value::Mapping(mut cse)) = exp.remove(&ys("command_started_event")) {
                             if let Some(val) = cse.remove(&ys("command_name")) {
                                 cse.insert(ys("commandName"), val);
@@ -211,7 +212,22 @@ mod unified {
                                 }
                                 cse.insert(ys("databaseName"), val);
                             }
-                            exp.insert(ys("commandStartedEvent"), Value::Mapping(cse));
+                            let mut val = Value::Mapping(cse);
+                            if ix == len - 1 {
+                                fn singleton(key: &str, value: Value) -> Value {
+                                    Value::Mapping(vec![
+                                        (ys(key), value),
+                                    ].into_iter().collect())
+                                }
+                                val["command"]["pipeline"][0]["$changeStream"] = singleton(
+                                    "resumeAfter", singleton(
+                                        "$$unsetOrMatches", singleton(
+                                            "$$exists", Value::Bool(true),
+                                        ),
+                                    ),
+                                );
+                            }
+                            exp.insert(ys("commandStartedEvent"), val);
                         }
                         fix_names(file, exp);
                         fix_placeholders(exp);
