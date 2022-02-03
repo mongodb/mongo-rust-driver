@@ -11,6 +11,7 @@ mod legacy {
     pub struct Test {
         pub description: String,
         pub min_server_version: String,
+        pub max_server_version: Option<String>,
         pub fail_point: Option<serde_yaml::Mapping>,
         pub target: Target,
         pub topology: Vec<String>,
@@ -26,8 +27,8 @@ mod legacy {
     pub struct File {
         pub database_name: String,
         pub collection_name: String,
-        pub database2_name: String,
-        pub collection2_name: String,
+        pub database2_name: Option<String>,
+        pub collection2_name: Option<String>,
         pub tests: Vec<Test>,
     }
 
@@ -82,10 +83,12 @@ mod unified {
         expect_events: Option<Vec<ExpectEvents>>,
     }
 
+    #[serde_with::skip_serializing_none]
     #[derive(Debug, Serialize)]
     #[serde(rename_all = "camelCase")]    
     struct RunOnRequirements {
         min_server_version: String,
+        max_server_version: Option<String>,
         topologies: Vec<String>,
     }
 
@@ -128,6 +131,7 @@ mod unified {
                 description: old.description,
                 run_on_requirements: vec![RunOnRequirements {
                     min_server_version: old.min_server_version,
+                    max_server_version: old.max_server_version,
                     topologies: old.topology,
                 }],
                 operations: {
@@ -210,6 +214,7 @@ mod unified {
                             exp.insert(ys("commandStartedEvent"), Value::Mapping(cse));
                         }
                         fix_names(file, exp);
+                        fix_placeholders(exp);
                     }
                     vec![
                         ExpectEvents {
@@ -238,14 +243,14 @@ mod unified {
         let object = {
             let coll_num = if old.collection == file.collection_name {
                 1
-            } else if old.collection == file.collection2_name {
+            } else if Some(&old.collection) == file.collection2_name.as_ref() {
                 2
             } else {
                 panic!("unexpected collection name {:?}", old.collection);
             };
             let db_num = if old.database == file.database_name {
                 1
-            } else if old.database == file.database2_name {
+            } else if Some(&old.database) == file.database2_name.as_ref() {
                 2
             } else {
                 panic!("unexpected database name {:?}", old.database);
@@ -276,14 +281,24 @@ mod unified {
                 Value::String(s) => {
                     if s == &file.database_name {
                         *s = DB1_NAME.to_string()
-                    } else if s == &file.database2_name {
+                    } else if Some(&*s) == file.database2_name.as_ref() {
                         *s = DB2_NAME.to_string()
                     } else if s == &file.collection_name {
                         *s = COLL1_NAME.to_string()
-                    } else if s == &file.collection2_name {
+                    } else if Some(&*s) == file.collection2_name.as_ref() {
                         *s = COLL2_NAME.to_string()
                     }
                 },
+                _ => (),
+            }
+        });
+    }
+
+    fn fix_placeholders(map: &mut serde_yaml::Mapping) {
+        visit_mut(map, &|_, val| {
+            match val {
+                Value::Number(num) if num.as_i64() == Some(42) => *val = exists(),
+                Value::String(s) if s == "42" => *val = exists(),
                 _ => (),
             }
         });
@@ -298,13 +313,9 @@ mod unified {
                     }
                 }
             }
-            match val {
-                Value::Number(num) if num.as_i64() == Some(42) => *val = exists(),
-                Value::String(s) if s == "42" => *val = exists(),
-                _ => (),
-            }
         });
         fix_names(file, &mut suc);
+        fix_placeholders(&mut suc);
         Operation {
             name: "iterateUntilDocumentOrError".to_string(),
             object: "changeStream0".to_string(),
