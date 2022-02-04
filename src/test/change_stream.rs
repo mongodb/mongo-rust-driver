@@ -13,7 +13,7 @@ use crate::{
     Collection,
 };
 
-use super::{EventClient, TestClient, CLIENT_OPTIONS, LOCK};
+use super::{log_uncaptured, EventClient, TestClient, CLIENT_OPTIONS, LOCK};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -29,11 +29,11 @@ async fn init_stream(
 > {
     let init_client = TestClient::new().await;
     if !init_client.is_replica_set() && !init_client.is_sharded() {
-        println!("skipping change stream test on unsupported topology");
+        log_uncaptured("skipping change stream test on unsupported topology");
         return Ok(None);
     }
     if !init_client.supports_fail_command() {
-        println!("skipping change stream test on version without fail commands");
+        log_uncaptured("skipping change stream test on version without fail commands");
         return Ok(None);
     }
 
@@ -468,17 +468,17 @@ async fn aggregate_batch() -> Result<()> {
         None => return Ok(()),
     };
     if client.is_sharded() {
-        println!("skipping change stream test on unsupported topology");
+        log_uncaptured("skipping change stream test on unsupported topology");
         return Ok(());
     }
     if !VersionReq::parse(">=4.2")
         .unwrap()
         .matches(&client.server_version)
     {
-        println!(
+        log_uncaptured(format!(
             "skipping change stream test on unsupported version {:?}",
             client.server_version
-        );
+        ));
         return Ok(());
     }
 
