@@ -327,7 +327,7 @@ impl Error {
         if code == Some(43) {
             return true;
         }
-        if matches!(self.wire_version, Some(v) if v > 9)
+        if matches!(self.wire_version, Some(v) if v >= 9)
             && self.contains_label("ResumableChangeStreamError")
         {
             return true;
