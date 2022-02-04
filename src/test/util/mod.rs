@@ -61,7 +61,7 @@ impl TestClient {
         Self::with_handler(None, options).await
     }
 
-    async fn with_handler(
+    pub async fn with_handler(
         event_handler: Option<Arc<EventHandler>>,
         options: impl Into<Option<ClientOptions>>,
     ) -> Self {
