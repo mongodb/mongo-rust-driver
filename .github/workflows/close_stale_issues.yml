@@ -11,9 +11,9 @@ jobs:
     steps:
       - uses: actions/stale@v4
         with:
-          stale-issue-message: 'There has not been any recent activity on this ticket, so we are marking it as stale. Please comment if you have any additional questions.'
-          days-before-issue-stale: 14
+          stale-issue-message: 'There has not been any recent activity on this ticket, so we are marking it as stale. If we do not hear anything further from you, this issue will be automatically closed in one week.'
+          days-before-issue-stale: 7
           days-before-pr-stale: -1
-          days-before-close: 1
-          close-issue-message: 'There has not been any recent activity on this ticket, so we are resolving it. Thanks for reaching out!'
+          days-before-close: 7
+          close-issue-message: 'There has not been any recent activity on this ticket, so we are resolving it. Thanks for reaching out and please feel free to file a new issue if you have further questions.'
           only-issue-labels: 'waiting-for-reporter'
