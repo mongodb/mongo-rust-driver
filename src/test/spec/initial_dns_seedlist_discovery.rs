@@ -122,10 +122,21 @@ async fn run_test(mut test_file: TestFile) {
         None => true,
     };
     let client = TestClient::new().await;
-    if requires_tls == client.options.tls_options().is_some()
-        && client.is_replica_set()
-        && client.options.repl_set_name.as_deref() == Some("repl0")
-    {
+    let skip = if !client.is_replica_set() {
+        Some("not replica set")
+    } else if client.options.repl_set_name.as_deref() != Some("repl0") {
+        Some("repl_set_name != repl0")
+    } else if requires_tls != client.options.tls_options().is_some() {
+        Some("tls requirement mismatch")
+    } else {
+        None
+    };
+    if let Some(skip) = skip {
+        log_uncaptured(format!(
+            "skipping initial_dns_seedlist_discovery due to topology ({})",
+            skip
+        ))
+    } else {
         // If the connection URI provides authentication information, manually create the user
         // before connecting.
         if let Some(ParsedOptions {
@@ -179,8 +190,6 @@ async fn run_test(mut test_file: TestFile) {
 
             RUNTIME.delay_for(Duration::from_millis(500)).await;
         }
-    } else {
-        log_uncaptured("skipping test due to test topology");
     }
 
     if let Some(ref mut resolved_options) = test_file.options {

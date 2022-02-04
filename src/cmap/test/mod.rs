@@ -432,7 +432,10 @@ async fn cmap_spec_tests() {
 
         let mut options = CLIENT_OPTIONS.clone();
         if options.load_balanced.unwrap_or(false) {
-            log_uncaptured("skipping due to load balanced topology");
+            log_uncaptured(format!(
+                "skipping {:?} due to load balanced topology",
+                test_file.description
+            ));
             return;
         }
         options.hosts.drain(1..);

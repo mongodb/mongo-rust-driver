@@ -31,7 +31,10 @@ async fn run_test<F: Future>(
     let client = EventClient::with_additional_options(Some(options), None, None, None).await;
 
     if !client.is_replica_set() {
-        log_uncaptured("skipping test due to not running on a replica set");
+        log_uncaptured(format!(
+            "skipping test {:?} due to not running on a replica set",
+            name
+        ));
         return;
     }
 

@@ -644,7 +644,7 @@ async fn direct_connection() {
 
     let test_client = TestClient::new().await;
     if !test_client.is_replica_set() {
-        log_uncaptured("Skipping due to non-replica set topology");
+        log_uncaptured("Skipping direct_connection test due to non-replica set topology");
         return;
     }
 
