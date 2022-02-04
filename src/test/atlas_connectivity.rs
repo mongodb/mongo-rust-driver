@@ -1,8 +1,14 @@
 use crate::{bson::doc, client::options::ResolverConfig, options::ClientOptions, Client};
 use bson::Document;
 
+use super::log_uncaptured;
+
 async fn run_test(uri_env_var: &str, resolver_config: Option<ResolverConfig>) {
     if std::env::var_os("MONGO_ATLAS_TESTS").is_none() {
+        log_uncaptured(
+            "skipping atlas_connectivity test due to undefined environment variable \
+             MONGO_ATLAS_TESTS",
+        );
         return;
     }
 

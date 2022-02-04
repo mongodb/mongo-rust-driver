@@ -4,7 +4,7 @@ use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 use crate::{
     bson::{doc, serde_helpers::serialize_u64_as_i32, Document},
     client::session::TransactionState,
-    test::{run_spec_test, TestClient, LOCK},
+    test::{log_uncaptured, run_spec_test, TestClient, LOCK},
     Collection,
 };
 
@@ -43,6 +43,7 @@ async fn client_errors() {
 
     let client = TestClient::new().await;
     if !client.is_replica_set() || client.server_version_lt(4, 0) {
+        log_uncaptured("skipping client_errors due to test topology");
         return;
     }
 
@@ -105,6 +106,7 @@ async fn deserialize_recovery_token() {
 
     let client = TestClient::new().await;
     if !client.is_sharded() || client.server_version_lt(4, 2) {
+        log_uncaptured("skipping deserialize_recovery_token due to test topology");
         return;
     }
 

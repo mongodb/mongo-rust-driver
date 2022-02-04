@@ -24,6 +24,8 @@ use crate::{
     Database,
 };
 
+use super::log_uncaptured;
+
 #[derive(Deserialize)]
 struct IsMasterReply {
     ismaster: bool,
@@ -266,6 +268,7 @@ async fn db_aggregate() {
     let client = TestClient::new().await;
 
     if client.server_version_lt(4, 0) {
+        log_uncaptured("skipping db_aggregate due to server version < 4.0");
         return;
     }
 
@@ -310,6 +313,7 @@ async fn db_aggregate_disk_use() {
     let client = TestClient::new().await;
 
     if client.server_version_lt(4, 0) {
+        log_uncaptured("skipping db_aggregate_disk_use due to server version < 4.0");
         return;
     }
 

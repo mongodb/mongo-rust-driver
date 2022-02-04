@@ -1376,18 +1376,18 @@ type GenericResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 async fn versioned_api_examples() -> GenericResult<()> {
     let setup_client = TestClient::new().await;
     if setup_client.server_version_lt(4, 9) {
-        println!("skipping versioned API examples due to unsupported server version");
+        log_uncaptured("skipping versioned API examples due to unsupported server version");
         return Ok(());
     }
     if setup_client.is_sharded() && setup_client.server_version <= Version::new(5, 0, 2) {
         // See SERVER-58794.
-        println!(
-            "skipping versioned API examples due to unsupported server version on sharded topology"
+        log_uncaptured(
+            "skipping versioned API examples due to unsupported server version on sharded topology",
         );
         return Ok(());
     }
     if setup_client.is_load_balanced() {
-        println!("skipping versioned API examples due to load-balanced topology");
+        log_uncaptured("skipping versioned API examples due to load-balanced topology");
         return Ok(());
     }
 
@@ -1440,6 +1440,8 @@ async fn versioned_api_examples() -> GenericResult<()> {
     db.collection::<Document>("sales").drop(None).await?;
 
     use std::{error::Error, result::Result};
+
+    use crate::test::log_uncaptured;
     // Start Versioned API Example 5
     // With the `bson-chrono-0_4` feature enabled, this function can be dropped in favor of using
     // `chrono::DateTime` values directly.

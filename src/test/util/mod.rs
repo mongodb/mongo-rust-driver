@@ -450,3 +450,12 @@ pub fn get_default_name(description: &str) -> String {
     db_name.truncate(37);
     db_name
 }
+
+/// Log a message on stderr that won't be captured by `cargo test`.  Panics if the write fails.
+pub fn log_uncaptured<S: AsRef<str>>(text: S) {
+    use std::io::Write;
+
+    let mut stderr = std::io::stderr();
+    stderr.write_all(text.as_ref().as_bytes()).unwrap();
+    stderr.write_all(b"\n").unwrap();
+}

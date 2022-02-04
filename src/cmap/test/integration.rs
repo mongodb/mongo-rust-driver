@@ -12,7 +12,15 @@ use crate::{
     operation::CommandResponse,
     sdam::ServerUpdateSender,
     selection_criteria::ReadPreference,
-    test::{FailCommandOptions, FailPoint, FailPointMode, TestClient, CLIENT_OPTIONS, LOCK},
+    test::{
+        log_uncaptured,
+        FailCommandOptions,
+        FailPoint,
+        FailPointMode,
+        TestClient,
+        CLIENT_OPTIONS,
+        LOCK,
+    },
     RUNTIME,
 };
 use semver::VersionReq;
@@ -79,7 +87,7 @@ async fn concurrent_connections() {
 
     let mut options = CLIENT_OPTIONS.clone();
     if options.load_balanced.unwrap_or(false) {
-        println!("skipping concurrent_connections test due to load-balanced topology");
+        log_uncaptured("skipping concurrent_connections test due to load-balanced topology");
         return;
     }
     options.direct_connection = Some(true);
@@ -89,8 +97,8 @@ async fn concurrent_connections() {
     let version = VersionReq::parse(">= 4.2.9").unwrap();
     // blockConnection failpoint option only supported in 4.2.9+.
     if !version.matches(&client.server_version) {
-        println!(
-            "skipping concurrent_connections test due to server not supporting failpoint option"
+        log_uncaptured(
+            "skipping concurrent_connections test due to server not supporting failpoint option",
         );
         return;
     }
@@ -169,8 +177,8 @@ async fn connection_error_during_establishment() {
 
     let mut client_options = CLIENT_OPTIONS.clone();
     if client_options.load_balanced.unwrap_or(false) {
-        println!(
-            "skipping connection_error_during_establishment test due to load-balanced topology"
+        log_uncaptured(
+            "skipping connection_error_during_establishment test due to load-balanced topology",
         );
         return;
     }
@@ -181,10 +189,10 @@ async fn connection_error_during_establishment() {
 
     let client = TestClient::with_options(Some(client_options.clone())).await;
     if !client.supports_fail_command() {
-        println!(
+        log_uncaptured(format!(
             "skipping {} due to failCommand not being supported",
             function_name!()
-        );
+        ));
         return;
     }
 
@@ -236,10 +244,10 @@ async fn connection_error_during_operation() {
 
     let client = TestClient::with_options(options.into()).await;
     if !client.supports_fail_command() {
-        println!(
+        log_uncaptured(format!(
             "skipping {} due to failCommand not being supported",
             function_name!()
-        );
+        ));
         return;
     }
 

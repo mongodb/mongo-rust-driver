@@ -11,6 +11,7 @@ use crate::{
     error::ErrorKind,
     sdam::ServerType,
     test::{
+        log_uncaptured,
         CmapEvent,
         Event,
         EventClient,
@@ -34,7 +35,7 @@ async fn min_heartbeat_frequency() {
 
     let mut setup_client_options = CLIENT_OPTIONS.clone();
     if setup_client_options.load_balanced.unwrap_or(false) {
-        println!("skipping min_heartbeat_frequency test due to load-balanced topology");
+        log_uncaptured("skipping min_heartbeat_frequency test due to load-balanced topology");
         return;
     }
     setup_client_options.hosts.drain(1..);
@@ -43,12 +44,16 @@ async fn min_heartbeat_frequency() {
     let setup_client = TestClient::with_options(Some(setup_client_options.clone())).await;
 
     if !setup_client.supports_fail_command() {
-        println!("skipping min_heartbeat_frequency test due to server not supporting fail points");
+        log_uncaptured(
+            "skipping min_heartbeat_frequency test due to server not supporting fail points",
+        );
         return;
     }
 
     if setup_client.server_version_lt(4, 9) {
-        println!("skipping min_heartbeat_frequency test due to server version being less than 4.9");
+        log_uncaptured(
+            "skipping min_heartbeat_frequency test due to server version being less than 4.9",
+        );
         return;
     }
 
@@ -96,7 +101,7 @@ async fn sdam_pool_management() {
 
     let mut options = CLIENT_OPTIONS.clone();
     if options.load_balanced.unwrap_or(false) {
-        println!("skipping sdam_pool_management test due to load-balanced topology");
+        log_uncaptured("skipping sdam_pool_management test due to load-balanced topology");
         return;
     }
     options.hosts.drain(1..);
@@ -119,8 +124,8 @@ async fn sdam_pool_management() {
         .unwrap()
         .matches(&client.server_version)
     {
-        println!(
-            "skipping sdam_pool_management test due to server not supporting appName failCommand"
+        log_uncaptured(
+            "skipping sdam_pool_management test due to server not supporting appName failCommand",
         );
         return;
     }
@@ -189,7 +194,7 @@ async fn sdam_min_pool_size_error() {
 
     let mut setup_client_options = CLIENT_OPTIONS.clone();
     if setup_client_options.load_balanced.unwrap_or(false) {
-        println!("skipping sdam_min_pool_size_error test due to load-balanced topology");
+        log_uncaptured("skipping sdam_min_pool_size_error test due to load-balanced topology");
         return;
     }
     setup_client_options.hosts.drain(1..);
@@ -201,8 +206,8 @@ async fn sdam_min_pool_size_error() {
         .unwrap()
         .matches(&setup_client.server_version)
     {
-        println!(
-            "skipping sdam_pool_management test due to server not supporting appName failCommand"
+        log_uncaptured(
+            "skipping sdam_pool_management test due to server not supporting appName failCommand",
         );
         return;
     }
@@ -284,12 +289,12 @@ async fn auth_error() {
         .unwrap()
         .matches(&setup_client.server_version)
     {
-        println!("skipping auth_error test due to server not supporting appName failCommand");
+        log_uncaptured("skipping auth_error test due to server not supporting appName failCommand");
         return;
     }
 
     if !setup_client.auth_enabled() {
-        println!("skipping auth_error test due to auth not being enabled");
+        log_uncaptured("skipping auth_error test due to auth not being enabled");
         return;
     }
 

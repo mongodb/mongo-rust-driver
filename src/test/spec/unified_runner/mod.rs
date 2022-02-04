@@ -14,7 +14,7 @@ use tokio::sync::RwLockWriteGuard;
 use crate::{
     bson::{doc, Document},
     options::{CollectionOptions, FindOptions, ReadConcern, ReadPreference, SelectionCriteria},
-    test::{run_single_test, run_spec_test, LOCK},
+    test::{log_uncaptured, run_single_test, run_spec_test, LOCK},
     RUNTIME,
 };
 
@@ -89,14 +89,17 @@ pub async fn run_unified_format_test_filtered(
             }
         }
         if !can_run_on {
-            println!("Client topology not compatible with test");
+            log_uncaptured("Client topology not compatible with test");
             return;
         }
     }
 
     for test_case in test_file.tests {
         if let Some(skip_reason) = test_case.skip_reason {
-            println!("Skipping {}: {}", &test_case.description, skip_reason);
+            log_uncaptured(format!(
+                "Skipping {}: {}",
+                &test_case.description, skip_reason
+            ));
             continue;
         }
 
@@ -105,16 +108,16 @@ pub async fn run_unified_format_test_filtered(
             .iter()
             .any(|op| SKIPPED_OPERATIONS.contains(&op.name.as_str()))
         {
-            println!("Skipping {}", &test_case.description);
+            log_uncaptured(format!("Skipping {}", &test_case.description));
             continue;
         }
 
         if !pred(&test_case) {
-            println!("Skipping {}", test_case.description);
+            log_uncaptured(format!("Skipping {}", test_case.description));
             continue;
         }
 
-        println!("Running {}", &test_case.description);
+        log_uncaptured(format!("Running {}", &test_case.description));
 
         if let Some(requirements) = test_case.run_on_requirements {
             let mut can_run_on = false;
@@ -124,10 +127,10 @@ pub async fn run_unified_format_test_filtered(
                 }
             }
             if !can_run_on {
-                println!(
+                log_uncaptured(format!(
                     "{}: client topology not compatible with test",
                     &test_case.description
-                );
+                ));
                 return;
             }
         }
@@ -373,7 +376,7 @@ async fn invalid() {
             .iter()
             .any(|skip| *skip == test_file_str)
         {
-            println!("Skipping {}", test_file_str);
+            log_uncaptured(format!("Skipping {}", test_file_str));
             continue;
         }
         let path = path.join(&test_file_path);

@@ -12,6 +12,7 @@ use crate::{
     sdam::{description::topology::server_selection, Server},
     selection_criteria::ReadPreference,
     test::{
+        log_uncaptured,
         run_spec_test,
         Event,
         EventHandler,
@@ -118,12 +119,12 @@ async fn load_balancing_test() {
     let mut setup_client_options = CLIENT_OPTIONS.clone();
 
     if setup_client_options.load_balanced.unwrap_or(false) {
-        println!("skipping load_balancing_test test due to load-balanced topology");
+        log_uncaptured("skipping load_balancing_test test due to load-balanced topology");
         return;
     }
 
     if setup_client_options.credential.is_some() {
-        println!("skipping load_balancing_test test due to auth being enabled");
+        log_uncaptured("skipping load_balancing_test test due to auth being enabled");
         return;
     }
 
@@ -134,19 +135,19 @@ async fn load_balancing_test() {
     let version = VersionReq::parse(">= 4.2.9").unwrap();
     // blockConnection failpoint option only supported in 4.2.9+.
     if !version.matches(&setup_client.server_version) {
-        println!(
-            "skipping load_balancing_test test due to server not supporting blockConnection option"
+        log_uncaptured(
+            "skipping load_balancing_test test due to server not supporting blockConnection option",
         );
         return;
     }
 
     if !setup_client.is_sharded() {
-        println!("skipping load_balancing_test test due to topology not being sharded");
+        log_uncaptured("skipping load_balancing_test test due to topology not being sharded");
         return;
     }
 
     if CLIENT_OPTIONS.hosts.len() != 2 {
-        println!("skipping load_balancing_test test due to topology not having 2 mongoses");
+        log_uncaptured("skipping load_balancing_test test due to topology not having 2 mongoses");
         return;
     }
 

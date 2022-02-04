@@ -13,7 +13,7 @@ use crate::{
     options::{Acknowledgment, FindOptions, ReadConcern, ReadPreference, WriteConcern},
     sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
-    test::{EventClient, TestClient, CLIENT_OPTIONS, LOCK},
+    test::{log_uncaptured, EventClient, TestClient, CLIENT_OPTIONS, LOCK},
     Collection,
     RUNTIME,
 };
@@ -452,7 +452,9 @@ async fn find_and_getmore_share_session() {
 
     let client = EventClient::new().await;
     if client.is_standalone() {
-        println!("skipping find_and_getmore_share_session due to unsupported topology: Standalone");
+        log_uncaptured(
+            "skipping find_and_getmore_share_session due to unsupported topology: Standalone",
+        );
         return;
     }
 

@@ -7,7 +7,7 @@ use crate::{
     bson::doc,
     client::{auth::AuthMechanism, Client},
     options::{ClientOptions, ResolverConfig},
-    test::{run_spec_test, TestClient, CLIENT_OPTIONS, LOCK},
+    test::{log_uncaptured, run_spec_test, TestClient, CLIENT_OPTIONS, LOCK},
     RUNTIME,
 };
 
@@ -58,6 +58,10 @@ struct ParsedOptions {
 async fn run_test(mut test_file: TestFile) {
     // TODO DRIVERS-796: unskip this test
     if test_file.uri == "mongodb+srv://test5.test.build.10gen.cc/?authSource=otherDB" {
+        log_uncaptured(
+            "skipping initial_dns_seedlist_discovery due to authSource being specified without \
+             credentials",
+        );
         return;
     }
 
@@ -68,6 +72,9 @@ async fn run_test(mut test_file: TestFile) {
         .and_then(|o| o.load_balanced)
         .unwrap_or(false)
     {
+        log_uncaptured(
+            "skipping initial_dns_seedlist_discovery due to load-balanced test configuration",
+        );
         return;
     }
 
@@ -115,11 +122,21 @@ async fn run_test(mut test_file: TestFile) {
         None => true,
     };
     let client = TestClient::new().await;
-    // TODO RUST-395: log this test skip
-    if requires_tls == client.options.tls_options().is_some()
-        && client.is_replica_set()
-        && client.options.repl_set_name.as_deref() == Some("repl0")
-    {
+    let skip = if !client.is_replica_set() {
+        Some("not replica set")
+    } else if client.options.repl_set_name.as_deref() != Some("repl0") {
+        Some("repl_set_name != repl0")
+    } else if requires_tls != client.options.tls_options().is_some() {
+        Some("tls requirement mismatch")
+    } else {
+        None
+    };
+    if let Some(skip) = skip {
+        log_uncaptured(format!(
+            "skipping initial_dns_seedlist_discovery due to topology ({})",
+            skip
+        ))
+    } else {
         // If the connection URI provides authentication information, manually create the user
         // before connecting.
         if let Some(ParsedOptions {

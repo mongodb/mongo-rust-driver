@@ -17,6 +17,7 @@ pub(crate) use self::{
     util::{
         assert_matches,
         eq_matches,
+        log_uncaptured,
         CmapEvent,
         CommandEvent,
         Event,

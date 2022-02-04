@@ -11,6 +11,7 @@ use crate::{
     },
     runtime::AsyncJoinHandle,
     test::{
+        log_uncaptured,
         run_spec_test,
         CmapEvent,
         Event,
@@ -48,7 +49,7 @@ async fn retry_releases_connection() {
 
     let client = TestClient::with_options(Some(client_options)).await;
     if !client.supports_fail_command() {
-        println!("skipping retry_releases_connection due to failCommand not being supported");
+        log_uncaptured("skipping retry_releases_connection due to failCommand not being supported");
         return;
     }
 
@@ -88,11 +89,13 @@ async fn retry_read_pool_cleared() {
 
     let client = TestClient::with_options(Some(client_options.clone())).await;
     if !client.supports_block_connection() {
-        println!("skipping retry_read_pool_cleared due to blockConnection not being supported");
+        log_uncaptured(
+            "skipping retry_read_pool_cleared due to blockConnection not being supported",
+        );
         return;
     }
     if client.is_load_balanced() {
-        println!("skipping retry_read_pool_cleared due to load-balanced topology");
+        log_uncaptured("skipping retry_read_pool_cleared due to load-balanced topology");
         return;
     }
 

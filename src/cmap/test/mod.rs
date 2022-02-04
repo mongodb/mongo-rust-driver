@@ -21,6 +21,7 @@ use crate::{
     test::{
         assert_matches,
         eq_matches,
+        log_uncaptured,
         run_spec_test,
         EventClient,
         MatchErrExt,
@@ -431,7 +432,10 @@ async fn cmap_spec_tests() {
 
         let mut options = CLIENT_OPTIONS.clone();
         if options.load_balanced.unwrap_or(false) {
-            println!("skipping due to load balanced topology");
+            log_uncaptured(format!(
+                "skipping {:?} due to load balanced topology",
+                test_file.description
+            ));
             return;
         }
         options.hosts.drain(1..);
@@ -440,7 +444,7 @@ async fn cmap_spec_tests() {
         if let Some(ref run_on) = test_file.run_on {
             let can_run_on = run_on.iter().any(|run_on| run_on.can_run_on(&client));
             if !can_run_on {
-                println!("skipping due to runOn requirements");
+                log_uncaptured("skipping due to runOn requirements");
                 return;
             }
         }

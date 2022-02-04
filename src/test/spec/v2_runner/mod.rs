@@ -15,6 +15,7 @@ use crate::{
     selection_criteria::SelectionCriteria,
     test::{
         assert_matches,
+        log_uncaptured,
         util::{get_default_name, FailPointGuard},
         EventClient,
         TestClient,
@@ -46,7 +47,7 @@ pub async fn run_v2_test(test_file: TestFile) {
             .iter()
             .any(|run_on| run_on.can_run_on(&internal_client));
         if !can_run_on {
-            println!("Client topology not compatible with test");
+            log_uncaptured("Client topology not compatible with test");
             return;
         }
     }
@@ -63,7 +64,7 @@ pub async fn run_v2_test(test_file: TestFile) {
         }
 
         if let Some(skip_reason) = test.skip_reason {
-            println!("skipping {}: {}", test.description, skip_reason);
+            log_uncaptured(format!("skipping {}: {}", test.description, skip_reason));
             continue;
         }
 

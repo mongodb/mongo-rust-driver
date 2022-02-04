@@ -24,6 +24,7 @@ use crate::{
     },
     selection_criteria::TagSet,
     test::{
+        log_uncaptured,
         run_spec_test,
         Event,
         EventClient,
@@ -240,7 +241,7 @@ async fn run_test(test_file: TestFile) {
 
     // TODO: RUST-360 unskip tests that rely on topology version
     if test_description.contains("topologyVersion") {
-        println!("Skipping {} (RUST-360)", test_description);
+        log_uncaptured(format!("Skipping {} (RUST-360)", test_description));
         return;
     }
 
@@ -597,7 +598,7 @@ async fn heartbeat_events() {
     .await;
 
     if client.is_load_balanced() {
-        println!("skipping heartbeat_events tests due to load-balanced topology");
+        log_uncaptured("skipping heartbeat_events tests due to load-balanced topology");
         return;
     }
 
@@ -643,7 +644,7 @@ async fn direct_connection() {
 
     let test_client = TestClient::new().await;
     if !test_client.is_replica_set() {
-        println!("Skipping due to non-replica set topology");
+        log_uncaptured("Skipping direct_connection test due to non-replica set topology");
         return;
     }
 
