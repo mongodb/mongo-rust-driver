@@ -69,10 +69,10 @@ pub struct ChangeStreamEvent<T> {
     pub operation_type: OperationType,
 
     /// Identifies the collection or database on which the event occurred.
-    pub ns: Option<Namespace>,
+    pub ns: Option<ChangeNamespace>,
 
     /// The new name for the `ns` collection.  Only included for `OperationType::Rename`.
-    pub to: Option<Namespace>,
+    pub to: Option<ChangeNamespace>,
 
     /// A `Document` that contains the `_id` of the document created or modified by the `insert`,
     /// `replace`, `delete`, `update` operations (i.e. CRUD operations). For sharded collections,
@@ -162,7 +162,7 @@ pub enum OperationType {
 /// Identifies the collection or database on which an event occurred.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub struct Namespace {
+pub struct ChangeNamespace {
     /// The name of the database in which the change occurred.
     pub db: String,
 
