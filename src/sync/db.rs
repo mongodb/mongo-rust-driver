@@ -298,7 +298,7 @@ impl Database {
     ///
     /// If the pipeline alters the structure of the returned events, the parsed type will need to be
     /// changed via [`ChangeStream::with_type`].
-    pub async fn watch(
+    pub fn watch(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<ChangeStreamOptions>>,
@@ -310,7 +310,7 @@ impl Database {
 
     /// Starts a new [`SessionChangeStream`] that receives events for all changes in this database
     /// using the provided [`ClientSession`].  See [`Database::watch`] for more information.
-    pub async fn watch_with_session(
+    pub fn watch_with_session(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<ChangeStreamOptions>>,

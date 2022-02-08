@@ -95,17 +95,17 @@ where
     /// most up to date token is received, e.g.
     ///
     /// ```
-    /// # use mongodb::{sync::Client, error::Result};
+    /// # use mongodb::{bson::Document, sync::{Client, Collection}, error::Result};
     /// # fn func() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com")?;
-    /// # let coll = client.database("foo").collection("bar");
+    /// # let coll: Collection<Document> = client.database("foo").collection("bar");
     /// let mut change_stream = coll.watch(None, None)?;
     /// let mut resume_token = None;
     /// while change_stream.is_alive() {
-    ///     if let Some(event) = change_stream.next_if_any() {
+    ///     if let Some(event) = change_stream.next_if_any()? {
     ///         // process event
     ///     }
-    ///     resume_token = change_stream.resume_token().cloned();
+    ///     resume_token = change_stream.resume_token();
     /// }
     /// #
     /// # Ok(())
@@ -216,15 +216,15 @@ where
     /// most up to date token is received, e.g.
     ///
     /// ```
-    /// # use mongodb::{sync::Client, error::Result};
+    /// # use mongodb::{bson::Document, sync::{Client, Collection}, error::Result};
     /// # async fn func() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com")?;
-    /// # let coll = client.database("foo").collection("bar");
+    /// # let coll: Collection<Document> = client.database("foo").collection("bar");
     /// # let mut session = client.start_session(None)?;
     /// let mut change_stream = coll.watch_with_session(None, None, &mut session)?;
     /// let mut resume_token = None;
     /// while change_stream.is_alive() {
-    ///     if let Some(event) = change_stream.next_if_any(&mut session) {
+    ///     if let Some(event) = change_stream.next_if_any(&mut session)? {
     ///         // process event
     ///     }
     ///     resume_token = change_stream.resume_token();
