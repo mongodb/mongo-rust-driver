@@ -1,14 +1,12 @@
 //! Contains the types related to a `ChangeStream` event.
+#[cfg(test)]
 use std::convert::TryInto;
 
-use crate::{
-    coll::Namespace,
-    cursor::CursorSpecification,
-    error::Result,
-    options::ChangeStreamOptions,
-};
+use crate::{coll::Namespace, cursor::CursorSpecification, options::ChangeStreamOptions};
 
-use bson::{Bson, Document, RawBson, RawDocument, RawDocumentBuf, Timestamp};
+#[cfg(test)]
+use bson::Bson;
+use bson::{Document, RawBson, RawDocumentBuf, Timestamp};
 use serde::{Deserialize, Serialize};
 
 /// An opaque token used for resuming an interrupted

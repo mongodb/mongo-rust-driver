@@ -310,8 +310,7 @@ pub mod options;
 pub use ::bson;
 
 mod bson_util;
-#[allow(unused)]
-pub(crate) mod change_stream;
+pub mod change_stream;
 mod client;
 mod cmap;
 mod coll;

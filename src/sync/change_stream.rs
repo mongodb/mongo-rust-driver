@@ -22,14 +22,14 @@ use super::ClientSession;
 /// ["resumable"](https://github.com/mongodb/specifications/blob/master/source/change-streams/change-streams.rst#resumable-error)
 /// errors, such as transient network failures. It can also be done manually by passing
 /// a [`ResumeToken`] retrieved from a past event into either the
-/// [`resume_after`](ChangeStreamOptions::resume_after) or
-/// [`start_after`](ChangeStreamOptions::start_after) (4.2+) options used to create the
-/// `ChangeStream`. Issuing a raw change stream aggregation is discouraged unless users wish to
+/// [`resume_after`](crate::options::ChangeStreamOptions::resume_after) or
+/// [`start_after`](crate::options::ChangeStreamOptions::start_after) (4.2+) options used to create
+/// the `ChangeStream`. Issuing a raw change stream aggregation is discouraged unless users wish to
 /// explicitly opt out of resumability.
 ///
 /// A `ChangeStream` can be iterated like any other [`Iterator`]:
 ///
-/// ```ignore
+/// ```
 /// # use mongodb::{sync::Client, error::Result, bson::doc,
 /// # change_stream::event::ChangeStreamEvent};
 /// #
@@ -94,7 +94,7 @@ where
     /// empty.  This method should be used when storing the resume token in order to ensure the
     /// most up to date token is received, e.g.
     ///
-    /// ```ignore
+    /// ```
     /// # use mongodb::{sync::Client, error::Result};
     /// # fn func() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com")?;
@@ -130,7 +130,7 @@ where
 /// A [`SessionChangeStream`] is a change stream that was created with a [`ClientSession`] that must
 /// be iterated using one. To iterate, use [`SessionChangeStream::next`]:
 ///
-/// ```ignore
+/// ```
 /// # use mongodb::{bson::Document, sync::Client, error::Result};
 /// #
 /// # async fn do_stuff() -> Result<()> {
@@ -181,7 +181,7 @@ where
     /// Retrieve the next result from the change stream.
     /// The session provided must be the same session used to create the change stream.
     ///
-    /// ```ignore
+    /// ```
     /// # use bson::{doc, Document};
     /// # use mongodb::sync::Client;
     /// # fn main() {
@@ -215,7 +215,7 @@ where
     /// empty.  This method should be used when storing the resume token in order to ensure the
     /// most up to date token is received, e.g.
     ///
-    /// ```ignore
+    /// ```
     /// # use mongodb::{sync::Client, error::Result};
     /// # async fn func() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com")?;

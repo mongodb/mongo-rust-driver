@@ -1,21 +1,11 @@
 //! Types for change streams using sessions.
-use std::{
-    future::Future,
-    marker::PhantomData,
-    pin::Pin,
-    sync::{Arc, Mutex},
-    task::{Context, Poll},
-};
-
-use bson::Document;
 use serde::de::DeserializeOwned;
 
 use crate::{
-    cursor::{BatchValue, CursorStream, NextInBatchFuture},
+    cursor::{BatchValue, NextInBatchFuture},
     error::Result,
     ClientSession,
     SessionCursor,
-    SessionCursorStream,
 };
 
 use super::{
@@ -25,10 +15,10 @@ use super::{
     WatchArgs,
 };
 
-/// A [`SessionChangeStream`] is a change stream that was created with a [`ClientSession`] that must
+/// A [`SessionChangeStream`] is a change stream that was created with a ClientSession that must
 /// be iterated using one. To iterate, use [`SessionChangeStream::next`]:
 ///
-/// ```ignore
+/// ```
 /// # use mongodb::{bson::Document, Client, error::Result};
 /// #
 /// # async fn do_stuff() -> Result<()> {
@@ -79,7 +69,7 @@ where
     /// Retrieve the next result from the change stream.
     /// The session provided must be the same session used to create the change stream.
     ///
-    /// ```ignore
+    /// ```
     /// # use bson::{doc, Document};
     /// # use mongodb::Client;
     /// # fn main() {
@@ -120,16 +110,16 @@ where
     /// empty.  This method should be used when storing the resume token in order to ensure the
     /// most up to date token is received, e.g.
     ///
-    /// ```ignore
-    /// # use mongodb::{Client, error::Result};
+    /// ```
+    /// # use mongodb::{Client, Collection, bson::Document, error::Result};
     /// # async fn func() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com").await?;
-    /// # let coll = client.database("foo").collection("bar");
+    /// # let coll: Collection<Document> = client.database("foo").collection("bar");
     /// # let mut session = client.start_session(None).await?;
     /// let mut change_stream = coll.watch_with_session(None, None, &mut session).await?;
     /// let mut resume_token = None;
     /// while change_stream.is_alive() {
-    ///     if let Some(event) = change_stream.next_if_any(&mut session) {
+    ///     if let Some(event) = change_stream.next_if_any(&mut session).await? {
     ///         // process event
     ///     }
     ///     resume_token = change_stream.resume_token();
