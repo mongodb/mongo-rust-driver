@@ -2,10 +2,12 @@ mod common;
 pub(crate) mod session;
 
 use std::{
+    future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
 
+use bson::RawDocument;
 use futures_core::{future::BoxFuture, Stream};
 use serde::de::DeserializeOwned;
 #[cfg(test)]
@@ -154,6 +156,19 @@ where
             kill_watcher: self.kill_watcher.take(),
             _phantom: Default::default(),
         }
+    }
+
+    pub async fn advance(&mut self) -> Result<()> {
+        // // self.wrapped_cursor
+        // //     .as_mut()
+        // //     .unwrap()
+        // //     .advance(ExplicitSessionGetMoreProvider::new(&mut self.implicit_session)).await
+        // todo!()
+        self.wrapped_cursor.as_mut().unwrap().advance().await
+    }
+
+    pub fn current(&self) -> Option<&RawDocument> {
+        self.wrapped_cursor.as_ref().unwrap().current()
     }
 
     pub(crate) fn client(&self) -> &Client {
@@ -327,5 +342,24 @@ impl GetMoreProvider for ImplicitSessionGetMoreProvider {
             }
             Self::Executing(_) | Self::Done => self_,
         })
+    }
+
+    fn execute<'a>(
+        &'a mut self,
+        info: CursorInformation,
+        client: Client,
+        pinned_connection: PinnedConnection,
+    ) -> BoxFuture<'a, Result<GetMoreResult>> {
+        if let Self::Idle(ref mut session) = self {
+            // let pinned_connection = pinned_connection.map(|c| c.replicate());
+            return Box::pin(async move {
+                let get_more = GetMore::new(info, None);
+                let get_more_result = client
+                    .execute_operation(get_more, session.as_mut().map(|b| b.as_mut()))
+                    .await;
+                get_more_result
+            });
+        }
+        panic!("")
     }
 }

@@ -3,7 +3,7 @@ mod test;
 
 use std::{collections::VecDeque, time::Duration};
 
-use bson::{Document, RawDocumentBuf};
+use bson::{Document, RawArrayBuf, RawDocumentBuf};
 use serde::Deserialize;
 
 use crate::{
@@ -110,6 +110,6 @@ pub(crate) struct GetMoreResponseBody {
 #[serde(rename_all = "camelCase")]
 struct NextBatchBody {
     id: i64,
-    next_batch: VecDeque<RawDocumentBuf>,
+    next_batch: RawArrayBuf,
     post_batch_resume_token: Option<RawDocumentBuf>,
 }

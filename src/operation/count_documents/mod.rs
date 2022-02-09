@@ -94,35 +94,36 @@ impl Operation for CountDocuments {
         response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
-        let mut response: CursorBody<&RawDocument> = response.body()?;
+        todo!()
+        // let mut response: CursorBody<&RawDocument> = response.body()?;
 
-        let result_doc = match response.cursor.first_batch.pop_front() {
-            Some(doc) => doc,
-            None => return Ok(0),
-        };
+        // let result_doc = match response.cursor.first_batch.pop_front() {
+        //     Some(doc) => doc,
+        //     None => return Ok(0),
+        // };
 
-        let n = match result_doc.get("n")? {
-            Some(n) => n,
-            None => {
-                return Err(ErrorKind::InvalidResponse {
-                    message: "server response to count_documents aggregate did not contain the \
-                              'n' field"
-                        .into(),
-                }
-                .into())
-            }
-        };
+        // let n = match result_doc.get("n")? {
+        //     Some(n) => n,
+        //     None => {
+        //         return Err(ErrorKind::InvalidResponse {
+        //             message: "server response to count_documents aggregate did not contain the \
+        //                       'n' field"
+        //                 .into(),
+        //         }
+        //         .into())
+        //     }
+        // };
 
-        bson_util::get_u64_raw(n).ok_or_else(|| {
-            ErrorKind::InvalidResponse {
-                message: format!(
-                    "server response to count_documents aggregate should have contained integer \
-                     'n', but instead had {:?}",
-                    n
-                ),
-            }
-            .into()
-        })
+        // bson_util::get_u64_raw(n).ok_or_else(|| {
+        //     ErrorKind::InvalidResponse {
+        //         message: format!(
+        //             "server response to count_documents aggregate should have contained integer \
+        //              'n', but instead had {:?}",
+        //             n
+        //         ),
+        //     }
+        //     .into()
+        // })
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {

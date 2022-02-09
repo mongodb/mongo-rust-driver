@@ -6,9 +6,9 @@ use std::{
     time::Duration,
 };
 
-use bson::RawDocumentBuf;
+use bson::{RawArrayBuf, RawBsonRef, RawDocument, RawDocumentBuf};
 use derivative::Derivative;
-use futures_core::{Future, Stream};
+use futures_core::{future::BoxFuture, Future, Stream};
 use serde::de::DeserializeOwned;
 #[cfg(test)]
 use tokio::sync::oneshot;
@@ -18,7 +18,7 @@ use crate::{
     change_stream::event::ResumeToken,
     cmap::conn::PinnedConnectionHandle,
     error::{Error, ErrorKind, Result},
-    operation,
+    operation::{self, GetMore},
     options::ServerAddress,
     results::GetMoreResult,
     Client,
@@ -37,7 +37,8 @@ where
     provider: P,
     client: Client,
     info: CursorInformation,
-    buffer: VecDeque<RawDocumentBuf>,
+    buffer: RawArrayBuf,
+    offset: usize,
     post_batch_resume_token: Option<ResumeToken>,
     exhausted: bool,
     pinned_connection: PinnedConnection,
@@ -47,7 +48,6 @@ where
 impl<P, T> GenericCursor<P, T>
 where
     P: GetMoreProvider,
-    T: DeserializeOwned,
 {
     pub(super) fn new(
         client: Client,
@@ -61,6 +61,7 @@ where
             client,
             provider: get_more_provider,
             buffer: spec.initial_buffer,
+            offset: 4,
             post_batch_resume_token: None,
             info: spec.info,
             pinned_connection,
@@ -68,8 +69,51 @@ where
         }
     }
 
-    pub(super) fn take_buffer(&mut self) -> VecDeque<RawDocumentBuf> {
-        std::mem::take(&mut self.buffer)
+    pub(super) fn current(&self) -> Option<&RawDocument> {
+        self.buffer
+            .iter_at(self.offset)
+            .next()
+            .and_then(|d| d.ok())
+            .and_then(|d| d.as_document())
+        // .map(|d| bson::from_slice(d.as_bytes()))
+    }
+
+    fn next_in_batch(&mut self) -> Option<RawDocumentBuf> {
+        let mut iter = self.buffer.iter_at(self.offset);
+        let out = iter.next();
+        self.offset = iter.offset();
+
+        out.and_then(|d| d.ok())
+            .and_then(|d| d.as_document())
+            .map(|d| d.to_owned())
+    }
+
+    pub(super) async fn advance(&mut self) -> Result<()> {
+        let mut iter = self.buffer.iter_at(self.offset);
+        iter.next();
+        self.offset = iter.offset();
+
+        // if moving the offset puts us at the end of the buffer, perform another
+        // getMore if the cursor is still alive.
+        if iter.next().is_none() {
+            if self.exhausted {
+                return Ok(());
+            }
+
+            let client = self.client.clone();
+            let spec = self.info.clone();
+            let pin = self.pinned_connection.replicate();
+
+            let result = self.provider.execute(spec, client, pin).await;
+            self.handle_get_more_result(result)?;
+        }
+
+        Ok(())
+    }
+
+    pub(super) fn take_buffer(&mut self) -> RawArrayBuf {
+        // std::mem::take(&mut self.buffer)
+        todo!()
     }
 
     pub(super) fn is_exhausted(&self) -> bool {
@@ -96,11 +140,34 @@ where
         self.post_batch_resume_token.as_ref()
     }
 
-    fn start_get_more(&mut self) {
-        let info = self.info.clone();
-        let client = self.client.clone();
-        self.provider
-            .start_execution(info, client, self.pinned_connection.handle());
+    fn handle_get_more_result(&mut self, get_more_result: Result<GetMoreResult>) -> Result<()> {
+        self.exhausted = get_more_result
+            .as_ref()
+            .map(|r| r.exhausted)
+            .unwrap_or(true);
+        if self.exhausted {
+            self.pinned_connection = PinnedConnection::Unpinned;
+        }
+
+        match get_more_result {
+            Ok(get_more) => {
+                self.buffer = get_more.batch;
+                self.offset = 4;
+                self.post_batch_resume_token = get_more.post_batch_resume_token;
+
+                Ok(())
+            }
+            Err(e) => {
+                if e.is_network_error() {
+                    // Flag the connection as invalid, preventing a killCursors command,
+                    // but leave the connection pinned.
+                    self.pinned_connection.invalidate();
+                }
+                self.offset = self.buffer.as_bytes().len();
+
+                Err(e.into())
+            }
+        }
     }
 
     pub(super) fn provider_mut(&mut self) -> &mut P {
@@ -117,6 +184,7 @@ where
             info: self.info,
             pinned_connection: self.pinned_connection,
             _phantom: Default::default(),
+            offset: self.offset,
         }
     }
 }
@@ -142,38 +210,28 @@ where
             match Pin::new(future).poll(cx) {
                 // If a result is ready, retrieve the buffer and update the exhausted status.
                 Poll::Ready(get_more_result) => {
-                    let exhausted = get_more_result.exhausted();
                     let (result, session) = get_more_result.into_parts();
-                    if exhausted {
-                        // If the cursor is exhausted, the driver must return the pinned
-                        // connection to the pool.
-                        self.pinned_connection = PinnedConnection::Unpinned;
-                    }
-                    if let Err(e) = &result {
-                        if e.is_network_error() {
-                            // Flag the connection as invalid, preventing a killCursors command,
-                            // but leave the connection pinned.
-                            self.pinned_connection.invalidate();
-                        }
-                    }
-
-                    self.exhausted = exhausted;
-                    self.provider.clear_execution(session, exhausted);
-                    let result = result?;
-                    self.buffer = result.batch;
-                    self.post_batch_resume_token = result.post_batch_resume_token;
+                    let output = self.handle_get_more_result(result);
+                    self.provider.clear_execution(session, self.exhausted);
+                    output?;
                 }
                 Poll::Pending => return Poll::Pending,
             }
         }
 
-        match self.buffer.pop_front() {
-            Some(doc) => Poll::Ready(Ok(BatchValue::Some {
-                doc,
-                is_last: self.buffer.is_empty(),
-            })),
+        match self.next_in_batch() {
+            Some(doc) => {
+                let mut iter = self.buffer.iter_at(self.offset);
+                iter.next();
+                let is_last = iter.next().is_none();
+
+                Poll::Ready(Ok(BatchValue::Some { doc, is_last }))
+            }
             None if !self.exhausted && !self.pinned_connection.is_invalid() => {
-                self.start_get_more();
+                let info = self.info.clone();
+                let client = self.client.clone();
+                self.provider
+                    .start_execution(info, client, self.pinned_connection.handle());
                 Poll::Ready(Ok(BatchValue::Empty))
             }
             None => Poll::Ready(Ok(BatchValue::Exhausted)),
@@ -213,9 +271,9 @@ where
     }
 }
 
-impl<'a, T> Future for NextInBatchFuture<'a, T>
+impl<'a, C> Future for NextInBatchFuture<'a, C>
 where
-    T: CursorStream,
+    C: CursorStream,
 {
     type Output = Result<BatchValue>;
 
@@ -262,6 +320,15 @@ pub(super) trait GetMoreProvider: Unpin {
         client: Client,
         pinned_connection: Option<&PinnedConnectionHandle>,
     );
+
+    fn execute<'a>(
+        &'a mut self,
+        _spec: CursorInformation,
+        _client: Client,
+        _pinned_conn: PinnedConnection,
+    ) -> BoxFuture<'a, Result<GetMoreResult>> {
+        todo!()
+    }
 }
 
 /// Trait describing results returned from a `GetMoreProvider`.
@@ -271,6 +338,13 @@ pub(crate) trait GetMoreProviderResult {
     fn as_ref(&self) -> std::result::Result<&GetMoreResult, &Error>;
 
     fn into_parts(self) -> (Result<GetMoreResult>, Self::Session);
+
+    fn into_result(self) -> Result<GetMoreResult>
+    where
+        Self: Sized,
+    {
+        self.into_parts().0
+    }
 
     /// Whether the response from the server indicated the cursor was exhausted or not.
     fn exhausted(&self) -> bool {
@@ -287,7 +361,7 @@ pub(crate) trait GetMoreProviderResult {
 #[derive(Debug, Clone)]
 pub(crate) struct CursorSpecification {
     pub(crate) info: CursorInformation,
-    pub(crate) initial_buffer: VecDeque<RawDocumentBuf>,
+    pub(crate) initial_buffer: RawArrayBuf,
     pub(crate) post_batch_resume_token: Option<ResumeToken>,
 }
 

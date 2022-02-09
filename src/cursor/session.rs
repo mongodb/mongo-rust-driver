@@ -5,7 +5,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use bson::RawDocumentBuf;
+use bson::{RawArrayBuf, RawDocumentBuf};
 use futures_core::{future::BoxFuture, Stream};
 use futures_util::StreamExt;
 use serde::de::DeserializeOwned;
@@ -71,7 +71,7 @@ where
 {
     client: Client,
     info: CursorInformation,
-    buffer: VecDeque<RawDocumentBuf>,
+    buffer: RawArrayBuf,
     pinned_connection: PinnedConnection,
     drop_address: Option<ServerAddress>,
     _phantom: PhantomData<T>,
@@ -393,6 +393,61 @@ impl<'session> GetMoreProvider for ExplicitSessionGetMoreProvider<'session> {
             self_
         });
     }
+
+    fn execute<'a>(
+        &'a mut self,
+        info: CursorInformation,
+        client: Client,
+        _pinned_conn: PinnedConnection,
+    ) -> BoxFuture<'a, Result<GetMoreResult>> {
+        if let ExplicitSessionGetMoreProvider::Idle(ref mut session) = self {
+            return Box::pin(async move {
+                let get_more = GetMore::new(info, None);
+                client
+                    .execute_operation(get_more, Some(&mut *session.reference))
+                    .await
+            });
+        }
+        panic!("")
+    }
+
+    // fn execute(
+    //     &mut self,
+    //     info: CursorInformation,
+    //     client: Client,
+    //     pinned_connection: PinnedConnection,
+    // ) -> Self::GetMoreFuture {
+    //     // take_mut::take(self, |self_| {
+    //     //     if let ExplicitSessionGetMoreProvider::Idle(session) = self_ {
+    //     //         let pinned_connection = pinned_connection.map(|c| c.replicate());
+    //     //         let future = Box::pin(async move {
+    //     //             let get_more = GetMore::new(info, pinned_connection.as_ref());
+    //     //             let get_more_result = client
+    //     //                 .execute_operation(get_more, Some(&mut *session.reference))
+    //     //                 .await;
+    //     //             ExecutionResult {
+    //     //                 get_more_result,
+    //     //                 session: session.reference,
+    //     //             }
+    //     //         });
+    //     //         return ExplicitSessionGetMoreProvider::Executing(future);
+    //     //     }
+    //     //     self_
+    //     // });
+    //     // if let ExplicitSessionGetMoreProvider::Idle(session) = self {
+    //     //     return Box::pin(async move {
+    //     //         let get_more = GetMore::new(info, None);
+    //     //         let get_more_result = client
+    //     //             .execute_operation(get_more, Some(&mut *session.reference))
+    //     //             .await;
+    //     //         ExecutionResult {
+    //     //             get_more_result,
+    //     //             session: session.reference,
+    //     //         }
+    //     //     });
+    //     // }
+    //     panic!("not idle")
+    // }
 }
 
 /// Struct returned from awaiting on a `GetMoreFuture` containing the result of the getMore as

@@ -25,7 +25,7 @@ mod test;
 
 use std::{collections::VecDeque, fmt::Debug, ops::Deref};
 
-use bson::{RawBsonRef, RawDocument, RawDocumentBuf, Timestamp};
+use bson::{RawArrayBuf, RawBsonRef, RawDocument, RawDocumentBuf, Timestamp};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
@@ -323,8 +323,8 @@ impl<T> Deref for WriteResponseBody<T> {
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct CursorBody<T = RawDocumentBuf> {
-    cursor: CursorInfo<T>,
+pub(crate) struct CursorBody {
+    cursor: CursorInfo,
 
     #[serde(flatten)]
     write_concern_info: WriteConcernOnlyBody,
@@ -344,12 +344,12 @@ impl CursorBody {
 
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct CursorInfo<T = RawDocumentBuf> {
+pub(crate) struct CursorInfo {
     pub(crate) id: i64,
 
     pub(crate) ns: Namespace,
 
-    pub(crate) first_batch: VecDeque<T>,
+    pub(crate) first_batch: RawArrayBuf,
 
     pub(crate) post_batch_resume_token: Option<RawDocumentBuf>,
 }

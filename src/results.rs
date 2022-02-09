@@ -9,7 +9,7 @@ use crate::{
     db::options::CreateCollectionOptions,
 };
 
-use bson::{Binary, RawDocumentBuf};
+use bson::{Binary, RawArrayBuf, RawDocumentBuf};
 use serde::{Deserialize, Serialize};
 
 /// The result of a [`Collection::insert_one`](../struct.Collection.html#method.insert_one)
@@ -105,7 +105,7 @@ impl CreateIndexesResult {
 
 #[derive(Debug, Clone)]
 pub(crate) struct GetMoreResult {
-    pub(crate) batch: VecDeque<RawDocumentBuf>,
+    pub(crate) batch: RawArrayBuf,
     pub(crate) exhausted: bool,
     pub(crate) post_batch_resume_token: Option<ResumeToken>,
 }
