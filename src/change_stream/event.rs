@@ -2,7 +2,7 @@
 #[cfg(test)]
 use std::convert::TryInto;
 
-use crate::{coll::Namespace, cursor::CursorSpecification, options::ChangeStreamOptions};
+use crate::{cursor::CursorSpecification, options::ChangeStreamOptions};
 
 #[cfg(test)]
 use bson::Bson;
@@ -69,10 +69,10 @@ pub struct ChangeStreamEvent<T> {
     pub operation_type: OperationType,
 
     /// Identifies the collection or database on which the event occurred.
-    pub ns: Option<ChangeStreamEventSource>,
+    pub ns: Option<ChangeNamespace>,
 
     /// The new name for the `ns` collection.  Only included for `OperationType::Rename`.
-    pub to: Option<Namespace>,
+    pub to: Option<ChangeNamespace>,
 
     /// A `Document` that contains the `_id` of the document created or modified by the `insert`,
     /// `replace`, `delete`, `update` operations (i.e. CRUD operations). For sharded collections,
@@ -114,7 +114,7 @@ pub struct UpdateDescription {
     pub removed_fields: Vec<String>,
 
     /// Arrays that were truncated in the `Document`.
-    pub truncated_arrays: Vec<TruncatedArray>,
+    pub truncated_arrays: Option<Vec<TruncatedArray>>,
 }
 
 /// Describes an array that has been truncated.
@@ -162,7 +162,7 @@ pub enum OperationType {
 /// Identifies the collection or database on which an event occurred.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub struct ChangeStreamEventSource {
+pub struct ChangeNamespace {
     /// The name of the database in which the change occurred.
     pub db: String,
 

@@ -167,6 +167,8 @@ where
                         .set_drop_address(new_stream.cursor.address().clone());
                     self.cursor = new_stream.cursor;
                     self.args = new_stream.args;
+                    // After a successful resume, another resume must be allowed.
+                    self.data.resume_attempted = false;
                     continue;
                 }
                 Err(e) => return Err(e),

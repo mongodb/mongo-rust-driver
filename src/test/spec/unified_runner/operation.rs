@@ -12,6 +12,7 @@ use super::{Entity, ExpectError, TestCursor, TestRunner};
 
 use crate::{
     bson::{doc, to_bson, Bson, Deserializer as BsonDeserializer, Document},
+    change_stream::options::ChangeStreamOptions,
     client::session::{ClientSession, TransactionState},
     coll::options::Hint,
     collation::Collation,
@@ -203,6 +204,7 @@ impl<'de> Deserialize<'de> for Operation {
             }
             "close" => deserialize_op::<Close>(definition.arguments),
             "createChangeStream" => deserialize_op::<CreateChangeStream>(definition.arguments),
+            "rename" => deserialize_op::<RenameCollection>(definition.arguments),
             _ => Ok(Box::new(UnimplementedOperation) as Box<dyn TestOperation>),
         }
         .map_err(|e| serde::de::Error::custom(format!("{}", e)))?;
@@ -1795,6 +1797,10 @@ impl TestOperation for IterateUntilDocumentOrError {
         }
         .boxed()
     }
+
+    fn returns_root_documents(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -1843,6 +1849,7 @@ impl TestOperation for AssertNumberConnectionsCheckedOut {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct CreateChangeStream {
     pipeline: Vec<Document>,
+    options: Option<ChangeStreamOptions>,
 }
 
 impl TestOperation for CreateChangeStream {
@@ -1854,14 +1861,52 @@ impl TestOperation for CreateChangeStream {
         async move {
             let target = test_runner.entities.get(id).unwrap();
             let stream = match target {
-                Entity::Client(ce) => ce.watch(self.pipeline.clone(), None).await?,
-                Entity::Database(db) => db.watch(self.pipeline.clone(), None).await?,
-                Entity::Collection(coll) => coll.watch(self.pipeline.clone(), None).await?,
+                Entity::Client(ce) => {
+                    ce.watch(self.pipeline.clone(), self.options.clone())
+                        .await?
+                }
+                Entity::Database(db) => {
+                    db.watch(self.pipeline.clone(), self.options.clone())
+                        .await?
+                }
+                Entity::Collection(coll) => {
+                    coll.watch(self.pipeline.clone(), self.options.clone())
+                        .await?
+                }
                 _ => panic!("Invalid entity for createChangeStream"),
             };
             Ok(Some(Entity::Cursor(TestCursor::ChangeStream(Mutex::new(
                 stream,
             )))))
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct RenameCollection {
+    to: String,
+}
+
+impl TestOperation for RenameCollection {
+    fn execute_entity_operation<'a>(
+        &'a self,
+        id: &'a str,
+        test_runner: &'a mut TestRunner,
+    ) -> BoxFuture<'a, Result<Option<Entity>>> {
+        async move {
+            let target = test_runner.get_collection(id);
+            let ns = target.namespace();
+            let mut to_ns = ns.clone();
+            to_ns.coll = self.to.clone();
+            let cmd = doc! {
+                "renameCollection": crate::bson::to_bson(&ns)?,
+                "to": crate::bson::to_bson(&to_ns)?,
+            };
+            let admin = test_runner.internal_client.database("admin");
+            admin.run_command(cmd, None).await?;
+            Ok(None)
         }
         .boxed()
     }
