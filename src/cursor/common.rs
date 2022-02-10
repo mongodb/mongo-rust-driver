@@ -1,12 +1,13 @@
 use std::{
-    collections::VecDeque,
     marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
 };
 
-use bson::{RawArrayBuf, RawBsonRef, RawDocument, RawDocumentBuf};
+use bson::{
+    raw::RawArrayBufIntoIter, RawArrayBuf, RawBson, RawBsonRef, RawDocument, RawDocumentBuf,
+};
 use derivative::Derivative;
 use futures_core::{future::BoxFuture, Future, Stream};
 use serde::{de::DeserializeOwned, Deserialize};
@@ -111,13 +112,13 @@ where
         Ok(())
     }
 
-    pub(super) fn into_state(self) -> CursorState {
+    pub(super) fn take_state(&mut self) -> CursorState {
         CursorState {
-            buffer: self.buffer,
+            buffer: std::mem::take(&mut self.buffer),
             exhausted: self.exhausted,
-            error: self.error,
-            post_batch_resume_token: self.post_batch_resume_token,
-            pinned_connection: self.pinned_connection,
+            error: self.error.take(),
+            post_batch_resume_token: self.post_batch_resume_token.take(),
+            pinned_connection: self.pinned_connection.take(),
         }
     }
 
@@ -327,14 +328,16 @@ pub(super) trait GetMoreProvider: Unpin {
         pinned_connection: Option<&PinnedConnectionHandle>,
     );
 
+    /// Return a future that will execute the getMore when polled.
+    /// This is useful in async functions that can await the entire getMore process.
+    /// `start_execution` and `clear_execution` should be used for contexts where the futures
+    /// need to be polled manually.
     fn execute<'a>(
         &'a mut self,
         _spec: CursorInformation,
         _client: Client,
         _pinned_conn: PinnedConnection,
-    ) -> BoxFuture<'a, Result<GetMoreResult>> {
-        todo!()
-    }
+    ) -> BoxFuture<'a, Result<GetMoreResult>>;
 }
 
 /// Trait describing results returned from a `GetMoreProvider`.
@@ -510,42 +513,34 @@ pub(crate) struct CursorState {
 
 #[derive(Debug, Clone)]
 pub(crate) struct CursorBuffer {
-    buffer: RawArrayBuf,
-    offset: usize,
+    iter: RawArrayBufIntoIter,
 }
 
 impl CursorBuffer {
     pub(crate) fn new(initial_buffer: RawArrayBuf) -> Self {
         Self {
-            buffer: initial_buffer,
-            offset: 4, // skip the first four bytes containing the length
+            iter: initial_buffer.into_iter(),
         }
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.buffer.iter_at(self.offset).next().is_none()
+        self.iter.current().is_none()
     }
 
     pub(crate) fn next(&mut self) -> Option<RawDocumentBuf> {
-        let mut iter = self.buffer.iter_at(self.offset);
-        let out = iter.next();
-        self.offset = iter.offset();
-
-        out.and_then(|d| d.ok())
-            .and_then(|d| d.as_document())
-            .map(|d| d.to_owned())
+        match self.iter.next() {
+            Some(Ok(RawBson::Document(d))) => Some(d),
+            _ => None,
+        }
     }
 
     pub(crate) fn advance(&mut self) {
-        let mut iter = self.buffer.iter_at(self.offset);
-        iter.next();
-        self.offset = iter.offset();
+        self.iter.advance()
     }
 
     pub(crate) fn current(&self) -> Option<&RawDocument> {
-        self.buffer
-            .iter_at(self.offset)
-            .next()
+        self.iter
+            .current()
             .and_then(|d| d.ok())
             .and_then(|d| d.as_document())
     }
@@ -554,8 +549,7 @@ impl CursorBuffer {
 impl Default for CursorBuffer {
     fn default() -> Self {
         Self {
-            buffer: Default::default(),
-            offset: 4,
+            iter: RawArrayBuf::new().into_iter(),
         }
     }
 }

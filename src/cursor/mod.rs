@@ -2,7 +2,6 @@ mod common;
 pub(crate) mod session;
 
 use std::{
-    future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -158,15 +157,14 @@ where
         }
     }
 
+    /// Move the cursor forward, potentially triggering a request to the database
+    /// if the internal buffer has been exhausted.
     pub async fn advance(&mut self) -> Result<()> {
-        // // self.wrapped_cursor
-        // //     .as_mut()
-        // //     .unwrap()
-        // //     .advance(ExplicitSessionGetMoreProvider::new(&mut self.implicit_session)).await
-        // todo!()
         self.wrapped_cursor.as_mut().unwrap().advance().await
     }
 
+    /// Returns a reference to the current result in the cursor, if any.
+    /// [`Cursor::advance`] will move the cursor forward to get the next document.
     pub fn current(&self) -> Option<&RawDocument> {
         self.wrapped_cursor.as_ref().unwrap().current()
     }

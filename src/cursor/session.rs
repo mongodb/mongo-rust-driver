@@ -5,7 +5,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use bson::{RawArrayBuf, RawDocumentBuf};
+use bson::{RawArrayBuf, RawDocument, RawDocumentBuf};
 use futures_core::{future::BoxFuture, Stream};
 use futures_util::{FutureExt, StreamExt};
 use serde::de::DeserializeOwned;
@@ -75,6 +75,8 @@ where
         spec: CursorSpecification,
         pinned: Option<PinnedConnectionHandle>,
     ) -> Self {
+        let exhausted = spec.info.id == 0;
+
         Self {
             client,
             info: spec.info,
@@ -85,7 +87,7 @@ where
             state: CursorState {
                 buffer: CursorBuffer::new(spec.initial_buffer),
                 error: None,
-                exhausted: spec.info.id == 0,
+                exhausted,
                 post_batch_resume_token: None,
                 pinned_connection: PinnedConnection::new(pinned),
             }
@@ -188,6 +190,17 @@ where
     /// ```
     pub async fn next(&mut self, session: &mut ClientSession) -> Option<Result<T>> {
         self.stream(session).next().await
+    }
+
+    /// Get a reference to the current result in the cursor.
+    pub fn current(&self) -> Option<&RawDocument> {
+        self.state.buffer.current()
+    }
+
+    /// Move the cursor forward, potentially triggering a request to the database for more results
+    /// if the local buffer has been exhausted.
+    pub async fn advance(&mut self, session: &mut ClientSession) -> Result<()> {
+        self.stream(session).generic_cursor.advance().await
     }
 
     /// Update the type streamed values will be parsed as.
@@ -342,7 +355,7 @@ where
 {
     fn drop(&mut self) {
         // Update the parent cursor's state based on any iteration performed on this handle.
-        self.session_cursor.state = self.generic_cursor.into_state();
+        self.session_cursor.state = self.generic_cursor.take_state();
         if self.generic_cursor.is_exhausted() {
             self.session_cursor.mark_exhausted();
         }
