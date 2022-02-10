@@ -5,7 +5,6 @@ pub mod session;
 
 use std::{
     future::Future,
-    marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -13,7 +12,8 @@ use std::{
 use bson::{Document, Timestamp};
 use derivative::Derivative;
 use futures_core::{future::BoxFuture, Stream};
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::de::DeserializeOwned;
+#[cfg(test)]
 use tokio::sync::oneshot;
 
 use crate::{
@@ -22,15 +22,10 @@ use crate::{
         options::ChangeStreamOptions,
     },
     cursor::{stream_poll_next, BatchValue, CursorStream, NextInBatchFuture},
-    error::{Error, ErrorKind, Result},
+    error::{ErrorKind, Result},
     operation::AggregateTarget,
-    options::AggregateOptions,
-    selection_criteria::{ReadPreference, SelectionCriteria},
-    Client,
     ClientSession,
-    Collection,
     Cursor,
-    Database,
 };
 
 /// A `ChangeStream` streams the ongoing changes of its associated collection, database or
@@ -49,7 +44,7 @@ use crate::{
 ///
 /// A `ChangeStream` can be iterated like any other [`Stream`]:
 ///
-/// ```ignore
+/// ```
 /// # #[cfg(not(feature = "sync"))]
 /// # use futures::stream::StreamExt;
 /// # use mongodb::{Client, error::Result, bson::doc,
@@ -144,18 +139,18 @@ where
     /// empty.  This method should be used when storing the resume token in order to ensure the
     /// most up to date token is received, e.g.
     ///
-    /// ```ignore
-    /// # use mongodb::{Client, error::Result};
+    /// ```
+    /// # use mongodb::{Client, Collection, bson::Document, error::Result};
     /// # async fn func() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://example.com").await?;
-    /// # let coll = client.database("foo").collection("bar");
+    /// # let coll: Collection<Document> = client.database("foo").collection("bar");
     /// let mut change_stream = coll.watch(None, None).await?;
     /// let mut resume_token = None;
     /// while change_stream.is_alive() {
-    ///     if let Some(event) = change_stream.next_if_any() {
+    ///     if let Some(event) = change_stream.next_if_any().await? {
     ///         // process event
     ///     }
-    ///     resume_token = change_stream.resume_token().cloned();
+    ///     resume_token = change_stream.resume_token();
     /// }
     /// #
     /// # Ok(())
@@ -170,8 +165,6 @@ where
 
     #[cfg(test)]
     pub(crate) fn set_kill_watcher(&mut self, tx: oneshot::Sender<()>) {
-        use tokio::sync::oneshot;
-
         self.cursor.set_kill_watcher(tx);
     }
 }
@@ -307,7 +300,7 @@ where
 {
     type Item = Result<T>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         stream_poll_next(Pin::into_inner(self), cx)
     }
 }

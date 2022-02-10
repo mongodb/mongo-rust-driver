@@ -543,8 +543,7 @@ impl<T> Collection<T> {
     ///
     /// If the pipeline alters the structure of the returned events, the parsed type will need to be
     /// changed via [`ChangeStream::with_type`].
-    #[allow(unused)]
-    pub(crate) async fn watch(
+    pub fn watch(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<ChangeStreamOptions>>,
@@ -558,9 +557,9 @@ impl<T> Collection<T> {
     }
 
     /// Starts a new [`SessionChangeStream`] that receives events for all changes in this collection
-    /// using the provided [`ClientSession`].  See [`Client::watch`] for more information.
-    #[allow(unused)]
-    pub(crate) async fn watch_with_session(
+    /// using the provided [`ClientSession`].  See [`Client::watch`](crate::sync::Client::watch) for
+    /// more information.
+    pub fn watch_with_session(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<ChangeStreamOptions>>,

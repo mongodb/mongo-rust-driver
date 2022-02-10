@@ -16,6 +16,7 @@
 //! ```
 
 pub use crate::{
+    change_stream::options::*,
     client::{auth::*, options::*},
     coll::options::*,
     collation::*,
@@ -25,9 +26,6 @@ pub use crate::{
     index::options::*,
     selection_criteria::*,
 };
-
-#[allow(unused)]
-pub(crate) use crate::change_stream::options::*;
 
 /// Updates an options struct with the read preference/read concern/write concern of a
 /// client/database/collection.

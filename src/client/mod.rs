@@ -282,8 +282,7 @@ impl Client {
     ///
     /// If the pipeline alters the structure of the returned events, the parsed type will need to be
     /// changed via [`ChangeStream::with_type`].
-    #[allow(unused)]
-    pub(crate) async fn watch(
+    pub async fn watch(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<ChangeStreamOptions>>,
@@ -299,8 +298,7 @@ impl Client {
 
     /// Starts a new [`SessionChangeStream`] that receives events for all changes in the cluster
     /// using the provided [`ClientSession`].  See [`Client::watch`] for more information.
-    #[allow(unused)]
-    pub(crate) async fn watch_with_session(
+    pub async fn watch_with_session(
         &self,
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<ChangeStreamOptions>>,
