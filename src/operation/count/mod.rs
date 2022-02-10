@@ -13,7 +13,7 @@ use crate::{
     selection_criteria::SelectionCriteria,
 };
 
-use super::SERVER_4_9_0_WIRE_VERSION;
+use super::{SingleCursorResult, SERVER_4_9_0_WIRE_VERSION};
 
 pub(crate) struct Count {
     ns: Namespace,
@@ -88,25 +88,24 @@ impl Operation for Count {
     ) -> Result<Self::O> {
         let response: Response = response.body()?;
 
-        // let response_body: ResponseBody = match (description.max_wire_version, response) {
-        //     (Some(v), Response::Aggregate(mut cursor_body)) if v >= SERVER_4_9_0_WIRE_VERSION =>
-        // {         cursor_body.cursor.first_batch.pop_front().ok_or_else(|| {
-        //             Error::from(ErrorKind::InvalidResponse {
-        //                 message: "invalid server response to count operation".into(),
-        //             })
-        //         })?
-        //     }
-        //     (_, Response::Count(body)) => body,
-        //     _ => {
-        //         return Err(ErrorKind::InvalidResponse {
-        //             message: "response from server did not match count command".to_string(),
-        //         }
-        //         .into())
-        //     }
-        // };
-        todo!()
+        let response_body: ResponseBody = match (description.max_wire_version, response) {
+            (Some(v), Response::Aggregate(cursor_body)) if v >= SERVER_4_9_0_WIRE_VERSION => {
+                cursor_body.0.ok_or_else(|| {
+                    Error::from(ErrorKind::InvalidResponse {
+                        message: "invalid server response to count operation".into(),
+                    })
+                })?
+            }
+            (_, Response::Count(body)) => body,
+            _ => {
+                return Err(ErrorKind::InvalidResponse {
+                    message: "response from server did not match count command".to_string(),
+                }
+                .into())
+            }
+        };
 
-        // Ok(response_body.n)
+        Ok(response_body.n)
     }
 
     fn handle_error(&self, error: Error) -> Result<Self::O> {
@@ -136,7 +135,7 @@ impl Operation for Count {
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub(crate) enum Response {
-    Aggregate(Box<CursorBody>),
+    Aggregate(SingleCursorResult<ResponseBody>),
     Count(ResponseBody),
 }
 

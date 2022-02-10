@@ -6,7 +6,12 @@ use std::{
 };
 
 use bson::{
-    raw::RawArrayBufIntoIter, RawArrayBuf, RawBson, RawBsonRef, RawDocument, RawDocumentBuf,
+    raw::RawArrayBufIntoIter,
+    RawArrayBuf,
+    RawBson,
+    RawBsonRef,
+    RawDocument,
+    RawDocumentBuf,
 };
 use derivative::Derivative;
 use futures_core::{future::BoxFuture, Future, Stream};
@@ -22,7 +27,9 @@ use crate::{
     operation::{self, GetMore},
     options::ServerAddress,
     results::GetMoreResult,
-    Client, Namespace, RUNTIME,
+    Client,
+    Namespace,
+    RUNTIME,
 };
 
 /// An internal cursor that can be used in a variety of contexts depending on its `GetMoreProvider`.
@@ -120,10 +127,6 @@ where
             post_batch_resume_token: self.post_batch_resume_token.take(),
             pinned_connection: self.pinned_connection.take(),
         }
-    }
-
-    pub(super) fn take_buffer(&mut self) -> CursorBuffer {
-        std::mem::take(&mut self.buffer)
     }
 
     pub(super) fn is_exhausted(&self) -> bool {

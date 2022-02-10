@@ -12,7 +12,20 @@ use serde::de::DeserializeOwned;
 #[cfg(test)]
 use tokio::sync::oneshot;
 
-use super::{BatchValue, CursorStream, common::{CursorBuffer, CursorInformation, CursorState, GenericCursor, GetMoreProvider, GetMoreProviderResult, PinnedConnection, kill_cursor}};
+use super::{
+    common::{
+        kill_cursor,
+        CursorBuffer,
+        CursorInformation,
+        CursorState,
+        GenericCursor,
+        GetMoreProvider,
+        GetMoreProviderResult,
+        PinnedConnection,
+    },
+    BatchValue,
+    CursorStream,
+};
 use crate::{
     bson::Document,
     change_stream::event::ResumeToken,
@@ -22,7 +35,8 @@ use crate::{
     error::{Error, Result},
     operation::GetMore,
     results::GetMoreResult,
-    Client, ClientSession,
+    Client,
+    ClientSession,
 };
 
 /// A [`SessionCursor`] is a cursor that was created with a [`ClientSession`] that must be iterated
@@ -90,7 +104,7 @@ where
                 exhausted,
                 post_batch_resume_token: None,
                 pinned_connection: PinnedConnection::new(pinned),
-            }
+            },
         }
     }
 
@@ -149,7 +163,7 @@ where
                 self.take_state(),
                 self.client.clone(),
                 self.info.clone(),
-                get_more_provider
+                get_more_provider,
             ),
             session_cursor: self,
         }
@@ -283,26 +297,6 @@ where
 type ExplicitSessionCursor<'session, T> =
     GenericCursor<ExplicitSessionGetMoreProvider<'session>, T>;
 
-// impl<'session, T> ExplicitSessionCursor<'session, T> {
-//     fn from_buffer(
-//         buffer: CursorBuffer,
-//         exhausted: bool,
-//         info: CursorInformation,
-//         client: Client,
-//         pinned_connection: PinnedConnection,
-//         provider: ExplicitSessionGetMoreProvider,
-//     ) -> Self {
-//         Self {
-//             provider,
-//             client,
-//             info,
-//             buffer,
-//             exhausted,
-            
-//         }
-//     }
-// }
-
 /// A type that implements [`Stream`](https://docs.rs/futures/latest/futures/stream/index.html) which can be used to
 /// stream the results of a [`SessionCursor`]. Returned from [`SessionCursor::stream`].
 ///
@@ -356,9 +350,6 @@ where
     fn drop(&mut self) {
         // Update the parent cursor's state based on any iteration performed on this handle.
         self.session_cursor.state = self.generic_cursor.take_state();
-        if self.generic_cursor.is_exhausted() {
-            self.session_cursor.mark_exhausted();
-        }
     }
 }
 

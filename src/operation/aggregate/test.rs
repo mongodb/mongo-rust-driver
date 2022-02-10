@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, time::Duration};
 
-use bson::RawDocumentBuf;
+use bson::{rawbson, RawDocumentBuf};
 
 use super::AggregateTarget;
 use crate::{
@@ -186,59 +186,6 @@ async fn op_selection_criteria() {
         };
         Aggregate::new("".to_string(), Vec::new(), Some(options))
     });
-}
-
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_success() {
-    let ns = Namespace {
-        db: "test_db".to_string(),
-        coll: "test_coll".to_string(),
-    };
-
-    let address = ServerAddress::Tcp {
-        host: "localhost".to_string(),
-        port: None,
-    };
-
-    let aggregate = Aggregate::new(ns.clone(), Vec::new(), None);
-
-    let first_batch = VecDeque::from(vec![
-        RawDocumentBuf::from_document(&doc! {"_id": 1}).unwrap(),
-        RawDocumentBuf::from_document(&doc! {"_id": 2}).unwrap(),
-    ]);
-    let response = doc! {
-        "ok": 1.0,
-        "cursor": {
-            "id": 123,
-            "ns": "test_db.test_coll",
-            "firstBatch": bson::to_bson(&first_batch).unwrap(),
-        }
-    };
-
-    let cursor_spec = handle_response_test(&aggregate, response.clone()).unwrap();
-    assert_eq!(cursor_spec.address(), &address);
-    assert_eq!(cursor_spec.id(), 123);
-    assert_eq!(cursor_spec.batch_size(), None);
-    assert_eq!(cursor_spec.initial_buffer, first_batch);
-
-    let aggregate = Aggregate::new(
-        ns,
-        Vec::new(),
-        Some(
-            AggregateOptions::builder()
-                .batch_size(123)
-                .max_await_time(Duration::from_millis(5))
-                .build(),
-        ),
-    );
-
-    let cursor_spec = handle_response_test(&aggregate, response).unwrap();
-    assert_eq!(cursor_spec.address(), &address);
-    assert_eq!(cursor_spec.id(), 123);
-    assert_eq!(cursor_spec.batch_size(), Some(123));
-    assert_eq!(cursor_spec.max_time(), Some(Duration::from_millis(5)));
-    assert_eq!(cursor_spec.initial_buffer, first_batch);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

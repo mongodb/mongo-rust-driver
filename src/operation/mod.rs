@@ -325,9 +325,6 @@ impl<T> Deref for WriteResponseBody<T> {
 #[derive(Debug, Deserialize)]
 pub(crate) struct CursorBody {
     cursor: CursorInfo,
-
-    #[serde(flatten)]
-    write_concern_info: WriteConcernOnlyBody,
 }
 
 impl CursorBody {
@@ -352,6 +349,34 @@ pub(crate) struct CursorInfo {
     pub(crate) first_batch: RawArrayBuf,
 
     pub(crate) post_batch_resume_token: Option<RawDocumentBuf>,
+}
+
+/// Type used to deserialize just the first result from a cursor, if any.
+#[derive(Debug, Clone)]
+pub(crate) struct SingleCursorResult<T>(Option<T>);
+
+impl<'de, T> Deserialize<'de> for SingleCursorResult<T>
+where
+    T: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct FullCursorBody<T> {
+            cursor: InteriorBody<T>,
+        }
+
+        #[derive(Deserialize)]
+        struct InteriorBody<T> {
+            #[serde(rename = "firstBatch")]
+            first_batch: Vec<T>,
+        }
+
+        let mut full_body = FullCursorBody::deserialize(deserializer)?;
+        Ok(SingleCursorResult(full_body.cursor.first_batch.pop()))
+    }
 }
 
 #[derive(Debug, PartialEq)]

@@ -187,7 +187,6 @@ where
 
 /// The size in bytes of the provided document's entry in a BSON array at the given index.
 pub(crate) fn array_entry_size_bytes(index: usize, doc_len: usize) -> u64 {
-    // 
     //   * type (1 byte)
     //   * number of decimal digits in key
     //   * null terminator for the key (1 byte)
