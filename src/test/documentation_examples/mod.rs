@@ -1756,7 +1756,6 @@ async fn index_examples() -> Result<()> {
 
 async fn change_streams_examples() -> Result<()> {
     use crate::{change_stream::options::FullDocumentType, options::ChangeStreamOptions, RUNTIME};
-    use futures::stream::StreamExt;
     use std::time::Duration;
 
     let client = TestClient::new().await;
@@ -1788,29 +1787,39 @@ async fn change_streams_examples() -> Result<()> {
         })
         .unwrap();
 
-    #[allow(unused_variables)]
+    #[allow(unused_variables, unused_imports)]
     {
-        // Start Changestream Example 1
-        let mut stream = inventory.watch(None, None).await?;
-        let next = stream.next().await.transpose()?;
-        // End Changestream Example 1
+        {
+            // Start Changestream Example 1
+            use futures::stream::TryStreamExt;
+            let mut stream = inventory.watch(None, None).await?;
+            let next = stream.try_next().await?;
+            // End Changestream Example 1
+        }
 
-        // Start Changestream Example 2
-        let options = ChangeStreamOptions::builder()
-            .full_document(Some(FullDocumentType::UpdateLookup))
-            .build();
-        let mut stream = inventory.watch(None, options).await?;
-        let next = stream.next().await.transpose()?;
-        // End Changestream Example 2
+        {
+            // Start Changestream Example 2
+            use futures::stream::TryStreamExt;
+            let options = ChangeStreamOptions::builder()
+                .full_document(Some(FullDocumentType::UpdateLookup))
+                .build();
+            let mut stream = inventory.watch(None, options).await?;
+            let next = stream.try_next().await?;
+            // End Changestream Example 2
+        }
 
-        // Start Changestream Example 3
-        let resume_token = stream.resume_token();
-        let options = ChangeStreamOptions::builder()
-            .resume_after(resume_token)
-            .build();
-        let mut stream = inventory.watch(None, options).await?;
-        stream.next().await;
-        // End Changestream Example 3
+        {
+            let stream = inventory.watch(None, None).await?;
+            // Start Changestream Example 3
+            use futures::stream::TryStreamExt;
+            let resume_token = stream.resume_token();
+            let options = ChangeStreamOptions::builder()
+                .resume_after(resume_token)
+                .build();
+            let mut stream = inventory.watch(None, options).await?;
+            stream.try_next().await?;
+            // End Changestream Example 3
+        }
     }
 
     // Shut down the writer thread.
