@@ -350,16 +350,24 @@ impl GetMoreProvider for ImplicitSessionGetMoreProvider {
         client: Client,
         pinned_connection: PinnedConnection,
     ) -> BoxFuture<'a, Result<GetMoreResult>> {
-        if let Self::Idle(ref mut session) = self {
-            // let pinned_connection = pinned_connection.map(|c| c.replicate());
-            return Box::pin(async move {
-                let get_more = GetMore::new(info, None);
+        match self {
+            Self::Idle(ref mut session) => Box::pin(async move {
+                let get_more = GetMore::new(info, pinned_connection.handle());
                 let get_more_result = client
                     .execute_operation(get_more, session.as_mut().map(|b| b.as_mut()))
                     .await;
                 get_more_result
-            });
+            }),
+            Self::Executing(_fut) => Box::pin(async {
+                Err(Error::internal(
+                    "streaming the cursor was cancelled while a request was in progress and must \
+                     be continued before iterating manually",
+                ))
+            }),
+            Self::Done => {
+                // this should never happen
+                Box::pin(async { Err(Error::internal("cursor iterated after already exhausted")) })
+            }
         }
-        panic!("")
     }
 }

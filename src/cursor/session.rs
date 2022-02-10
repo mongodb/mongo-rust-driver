@@ -7,23 +7,12 @@ use std::{
 
 use bson::{RawArrayBuf, RawDocumentBuf};
 use futures_core::{future::BoxFuture, Stream};
-use futures_util::StreamExt;
+use futures_util::{FutureExt, StreamExt};
 use serde::de::DeserializeOwned;
 #[cfg(test)]
 use tokio::sync::oneshot;
 
-use super::{
-    common::{
-        kill_cursor,
-        CursorInformation,
-        GenericCursor,
-        GetMoreProvider,
-        GetMoreProviderResult,
-        PinnedConnection,
-    },
-    BatchValue,
-    CursorStream,
-};
+use super::{BatchValue, CursorStream, common::{CursorBuffer, CursorInformation, CursorState, GenericCursor, GetMoreProvider, GetMoreProviderResult, PinnedConnection, kill_cursor}};
 use crate::{
     bson::Document,
     change_stream::event::ResumeToken,
@@ -33,8 +22,7 @@ use crate::{
     error::{Error, Result},
     operation::GetMore,
     results::GetMoreResult,
-    Client,
-    ClientSession,
+    Client, ClientSession,
 };
 
 /// A [`SessionCursor`] is a cursor that was created with a [`ClientSession`] that must be iterated
@@ -71,8 +59,7 @@ where
 {
     client: Client,
     info: CursorInformation,
-    buffer: RawArrayBuf,
-    pinned_connection: PinnedConnection,
+    state: CursorState,
     drop_address: Option<ServerAddress>,
     _phantom: PhantomData<T>,
     #[cfg(test)]
@@ -91,12 +78,17 @@ where
         Self {
             client,
             info: spec.info,
-            buffer: spec.initial_buffer,
-            pinned_connection: PinnedConnection::new(pinned),
             drop_address: None,
             _phantom: Default::default(),
             #[cfg(test)]
             kill_watcher: None,
+            state: CursorState {
+                buffer: CursorBuffer::new(spec.initial_buffer),
+                error: None,
+                exhausted: spec.info.id == 0,
+                post_batch_resume_token: None,
+                pinned_connection: PinnedConnection::new(pinned),
+            }
         }
     }
 
@@ -148,21 +140,26 @@ where
     ) -> SessionCursorStream<'_, 'session, T> {
         let get_more_provider = ExplicitSessionGetMoreProvider::new(session);
 
-        // Pass the buffer into this cursor handle for iteration.
+        // Pass the state into this cursor handle for iteration.
         // It will be returned in the handle's `Drop` implementation.
-        let spec = CursorSpecification {
-            info: self.info.clone(),
-            initial_buffer: std::mem::take(&mut self.buffer),
-            post_batch_resume_token: None,
-        };
         SessionCursorStream {
-            generic_cursor: ExplicitSessionCursor::new(
+            generic_cursor: ExplicitSessionCursor::from_state(
+                self.take_state(),
                 self.client.clone(),
-                spec,
-                self.pinned_connection.replicate(),
-                get_more_provider,
+                self.info.clone(),
+                get_more_provider
             ),
             session_cursor: self,
+        }
+    }
+
+    fn take_state(&mut self) -> CursorState {
+        CursorState {
+            buffer: std::mem::take(&mut self.state.buffer),
+            error: self.state.error.clone(),
+            exhausted: self.state.exhausted,
+            post_batch_resume_token: self.state.post_batch_resume_token.clone(),
+            pinned_connection: self.state.pinned_connection.replicate(),
         }
     }
 
@@ -201,8 +198,7 @@ where
         let out = SessionCursor {
             client: self.client.clone(),
             info: self.info.clone(),
-            buffer: std::mem::take(&mut self.buffer),
-            pinned_connection: self.pinned_connection.take(),
+            state: self.take_state(),
             drop_address: self.drop_address.take(),
             _phantom: Default::default(),
             #[cfg(test)]
@@ -261,7 +257,7 @@ where
             self.client.clone(),
             &self.info.ns,
             self.info.id,
-            self.pinned_connection.replicate(),
+            self.state.pinned_connection.replicate(),
             self.drop_address.take(),
             #[cfg(test)]
             self.kill_watcher.take(),
@@ -273,6 +269,26 @@ where
 /// This is to be used with cursors associated with explicit sessions borrowed from the user.
 type ExplicitSessionCursor<'session, T> =
     GenericCursor<ExplicitSessionGetMoreProvider<'session>, T>;
+
+// impl<'session, T> ExplicitSessionCursor<'session, T> {
+//     fn from_buffer(
+//         buffer: CursorBuffer,
+//         exhausted: bool,
+//         info: CursorInformation,
+//         client: Client,
+//         pinned_connection: PinnedConnection,
+//         provider: ExplicitSessionGetMoreProvider,
+//     ) -> Self {
+//         Self {
+//             provider,
+//             client,
+//             info,
+//             buffer,
+//             exhausted,
+            
+//         }
+//     }
+// }
 
 /// A type that implements [`Stream`](https://docs.rs/futures/latest/futures/stream/index.html) which can be used to
 /// stream the results of a [`SessionCursor`]. Returned from [`SessionCursor::stream`].
@@ -326,7 +342,7 @@ where
 {
     fn drop(&mut self) {
         // Update the parent cursor's state based on any iteration performed on this handle.
-        self.session_cursor.buffer = self.generic_cursor.take_buffer();
+        self.session_cursor.state = self.generic_cursor.into_state();
         if self.generic_cursor.is_exhausted() {
             self.session_cursor.mark_exhausted();
         }
@@ -398,56 +414,23 @@ impl<'session> GetMoreProvider for ExplicitSessionGetMoreProvider<'session> {
         &'a mut self,
         info: CursorInformation,
         client: Client,
-        _pinned_conn: PinnedConnection,
+        pinned_connection: PinnedConnection,
     ) -> BoxFuture<'a, Result<GetMoreResult>> {
-        if let ExplicitSessionGetMoreProvider::Idle(ref mut session) = self {
-            return Box::pin(async move {
-                let get_more = GetMore::new(info, None);
+        match self {
+            Self::Idle(ref mut session) => Box::pin(async move {
+                let get_more = GetMore::new(info, pinned_connection.handle());
                 client
                     .execute_operation(get_more, Some(&mut *session.reference))
                     .await
-            });
+            }),
+            Self::Executing(_fut) => Box::pin(async {
+                Err(Error::internal(
+                    "streaming the cursor was cancelled while a request was in progress and must \
+                     be continued before iterating manually",
+                ))
+            }),
         }
-        panic!("")
     }
-
-    // fn execute(
-    //     &mut self,
-    //     info: CursorInformation,
-    //     client: Client,
-    //     pinned_connection: PinnedConnection,
-    // ) -> Self::GetMoreFuture {
-    //     // take_mut::take(self, |self_| {
-    //     //     if let ExplicitSessionGetMoreProvider::Idle(session) = self_ {
-    //     //         let pinned_connection = pinned_connection.map(|c| c.replicate());
-    //     //         let future = Box::pin(async move {
-    //     //             let get_more = GetMore::new(info, pinned_connection.as_ref());
-    //     //             let get_more_result = client
-    //     //                 .execute_operation(get_more, Some(&mut *session.reference))
-    //     //                 .await;
-    //     //             ExecutionResult {
-    //     //                 get_more_result,
-    //     //                 session: session.reference,
-    //     //             }
-    //     //         });
-    //     //         return ExplicitSessionGetMoreProvider::Executing(future);
-    //     //     }
-    //     //     self_
-    //     // });
-    //     // if let ExplicitSessionGetMoreProvider::Idle(session) = self {
-    //     //     return Box::pin(async move {
-    //     //         let get_more = GetMore::new(info, None);
-    //     //         let get_more_result = client
-    //     //             .execute_operation(get_more, Some(&mut *session.reference))
-    //     //             .await;
-    //     //         ExecutionResult {
-    //     //             get_more_result,
-    //     //             session: session.reference,
-    //     //         }
-    //     //     });
-    //     // }
-    //     panic!("not idle")
-    // }
 }
 
 /// Struct returned from awaiting on a `GetMoreFuture` containing the result of the getMore as

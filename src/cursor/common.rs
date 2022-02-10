@@ -9,7 +9,7 @@ use std::{
 use bson::{RawArrayBuf, RawBsonRef, RawDocument, RawDocumentBuf};
 use derivative::Derivative;
 use futures_core::{future::BoxFuture, Future, Stream};
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Deserialize};
 #[cfg(test)]
 use tokio::sync::oneshot;
 
@@ -21,9 +21,7 @@ use crate::{
     operation::{self, GetMore},
     options::ServerAddress,
     results::GetMoreResult,
-    Client,
-    Namespace,
-    RUNTIME,
+    Client, Namespace, RUNTIME,
 };
 
 /// An internal cursor that can be used in a variety of contexts depending on its `GetMoreProvider`.
@@ -37,10 +35,10 @@ where
     provider: P,
     client: Client,
     info: CursorInformation,
-    buffer: RawArrayBuf,
-    offset: usize,
+    buffer: CursorBuffer,
     post_batch_resume_token: Option<ResumeToken>,
     exhausted: bool,
+    error: Option<Error>,
     pinned_connection: PinnedConnection,
     _phantom: PhantomData<T>,
 }
@@ -60,42 +58,44 @@ where
             exhausted,
             client,
             provider: get_more_provider,
-            buffer: spec.initial_buffer,
-            offset: 4,
+            buffer: CursorBuffer::new(spec.initial_buffer),
             post_batch_resume_token: None,
             info: spec.info,
             pinned_connection,
+            _phantom: Default::default(),
+            error: None,
+        }
+    }
+
+    pub(super) fn from_state(
+        state: CursorState,
+        client: Client,
+        info: CursorInformation,
+        provider: P,
+    ) -> Self {
+        Self {
+            provider,
+            client,
+            info,
+            buffer: state.buffer,
+            post_batch_resume_token: state.post_batch_resume_token,
+            exhausted: state.exhausted,
+            error: state.error,
+            pinned_connection: state.pinned_connection,
             _phantom: Default::default(),
         }
     }
 
     pub(super) fn current(&self) -> Option<&RawDocument> {
-        self.buffer
-            .iter_at(self.offset)
-            .next()
-            .and_then(|d| d.ok())
-            .and_then(|d| d.as_document())
-        // .map(|d| bson::from_slice(d.as_bytes()))
-    }
-
-    fn next_in_batch(&mut self) -> Option<RawDocumentBuf> {
-        let mut iter = self.buffer.iter_at(self.offset);
-        let out = iter.next();
-        self.offset = iter.offset();
-
-        out.and_then(|d| d.ok())
-            .and_then(|d| d.as_document())
-            .map(|d| d.to_owned())
+        self.buffer.current()
     }
 
     pub(super) async fn advance(&mut self) -> Result<()> {
-        let mut iter = self.buffer.iter_at(self.offset);
-        iter.next();
-        self.offset = iter.offset();
+        self.buffer.advance();
 
         // if moving the offset puts us at the end of the buffer, perform another
         // getMore if the cursor is still alive.
-        if iter.next().is_none() {
+        if self.buffer.is_empty() {
             if self.exhausted {
                 return Ok(());
             }
@@ -111,9 +111,18 @@ where
         Ok(())
     }
 
-    pub(super) fn take_buffer(&mut self) -> RawArrayBuf {
-        // std::mem::take(&mut self.buffer)
-        todo!()
+    pub(super) fn into_state(self) -> CursorState {
+        CursorState {
+            buffer: self.buffer,
+            exhausted: self.exhausted,
+            error: self.error,
+            post_batch_resume_token: self.post_batch_resume_token,
+            pinned_connection: self.pinned_connection,
+        }
+    }
+
+    pub(super) fn take_buffer(&mut self) -> CursorBuffer {
+        std::mem::take(&mut self.buffer)
     }
 
     pub(super) fn is_exhausted(&self) -> bool {
@@ -151,8 +160,7 @@ where
 
         match get_more_result {
             Ok(get_more) => {
-                self.buffer = get_more.batch;
-                self.offset = 4;
+                self.buffer = CursorBuffer::new(get_more.batch);
                 self.post_batch_resume_token = get_more.post_batch_resume_token;
 
                 Ok(())
@@ -163,9 +171,9 @@ where
                     // but leave the connection pinned.
                     self.pinned_connection.invalidate();
                 }
-                self.offset = self.buffer.as_bytes().len();
+                self.error = Some(e.clone());
 
-                Err(e.into())
+                Err(e)
             }
         }
     }
@@ -184,7 +192,7 @@ where
             info: self.info,
             pinned_connection: self.pinned_connection,
             _phantom: Default::default(),
-            offset: self.offset,
+            error: self.error,
         }
     }
 }
@@ -219,11 +227,9 @@ where
             }
         }
 
-        match self.next_in_batch() {
+        match self.buffer.next() {
             Some(doc) => {
-                let mut iter = self.buffer.iter_at(self.offset);
-                iter.next();
-                let is_last = iter.next().is_none();
+                let is_last = self.buffer.is_empty();
 
                 Poll::Ready(Ok(BatchValue::Some { doc, is_last }))
             }
@@ -447,7 +453,7 @@ impl PinnedConnection {
         out
     }
 
-    fn handle(&self) -> Option<&PinnedConnectionHandle> {
+    pub(crate) fn handle(&self) -> Option<&PinnedConnectionHandle> {
         match self {
             Self::Valid(h) | Self::Invalid(h) => Some(h),
             Self::Unpinned => None,
@@ -491,4 +497,75 @@ pub(super) fn kill_cursor(
             }
         }
     });
+}
+
+#[derive(Debug)]
+pub(crate) struct CursorState {
+    pub(crate) buffer: CursorBuffer,
+    pub(crate) error: Option<Error>,
+    pub(crate) exhausted: bool,
+    pub(crate) post_batch_resume_token: Option<ResumeToken>,
+    pub(crate) pinned_connection: PinnedConnection,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct CursorBuffer {
+    buffer: RawArrayBuf,
+    offset: usize,
+}
+
+impl CursorBuffer {
+    pub(crate) fn new(initial_buffer: RawArrayBuf) -> Self {
+        Self {
+            buffer: initial_buffer,
+            offset: 4, // skip the first four bytes containing the length
+        }
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.buffer.iter_at(self.offset).next().is_none()
+    }
+
+    pub(crate) fn next(&mut self) -> Option<RawDocumentBuf> {
+        let mut iter = self.buffer.iter_at(self.offset);
+        let out = iter.next();
+        self.offset = iter.offset();
+
+        out.and_then(|d| d.ok())
+            .and_then(|d| d.as_document())
+            .map(|d| d.to_owned())
+    }
+
+    pub(crate) fn advance(&mut self) {
+        let mut iter = self.buffer.iter_at(self.offset);
+        iter.next();
+        self.offset = iter.offset();
+    }
+
+    pub(crate) fn current(&self) -> Option<&RawDocument> {
+        self.buffer
+            .iter_at(self.offset)
+            .next()
+            .and_then(|d| d.ok())
+            .and_then(|d| d.as_document())
+    }
+}
+
+impl Default for CursorBuffer {
+    fn default() -> Self {
+        Self {
+            buffer: Default::default(),
+            offset: 4,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for CursorBuffer {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let buffer = RawArrayBuf::deserialize(deserializer)?;
+        Ok(Self::new(buffer))
+    }
 }
