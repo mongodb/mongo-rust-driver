@@ -1767,6 +1767,8 @@ async fn change_streams_examples() -> Result<()> {
     let db = client.database("change_streams_examples");
     db.drop(None).await?;
     let inventory = db.collection::<Document>("inventory");
+    // Populate an item so the collection exists for the change stream to watch.
+    inventory.insert_one(doc! {}, None).await?;
 
     // Background writer thread so that the `stream.next()` calls return something.
     let (tx, mut rx) = tokio::sync::oneshot::channel();
