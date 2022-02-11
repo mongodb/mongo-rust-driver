@@ -15,7 +15,7 @@ use crate::{
         InsertManyOptions,
         WriteConcern,
     },
-    test::{log_uncaptured, util::EventClient, LOCK},
+    test::{log_uncaptured, util::EventClient, CLIENT_OPTIONS, LOCK},
     Collection,
     Database,
     RUNTIME,
@@ -27,7 +27,10 @@ async fn run_test<F: Future>(
 ) {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
 
-    let options = ClientOptions::builder().retry_writes(false).build();
+    let options = ClientOptions::builder()
+        .hosts(CLIENT_OPTIONS.hosts.clone())
+        .retry_writes(false)
+        .build();
     let client = EventClient::with_additional_options(Some(options), None, None, None).await;
 
     if !client.is_replica_set() {
