@@ -73,13 +73,6 @@ impl TestClient {
             options.sdam_event_handler = Some(handler);
         }
 
-        if LOAD_BALANCED_SINGLE_URI
-            .as_ref()
-            .map_or(false, |uri| !uri.is_empty())
-        {
-            options.test_options_mut().mock_service_id = true;
-        }
-
         let client = Client::with_options(options.clone()).unwrap();
 
         // To avoid populating the session pool with leftover implicit sessions, we check out a

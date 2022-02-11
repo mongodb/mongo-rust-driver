@@ -583,9 +583,6 @@ pub(crate) struct TestOptions {
 
     /// Mock response for `SrvPollingMonitor::lookup_hosts`.
     pub(crate) mock_lookup_hosts: Option<Result<LookupHosts>>,
-
-    /// Mock the `serviceId` response for a load-balanced hello.
-    pub(crate) mock_service_id: bool,
 }
 
 fn default_hosts() -> Vec<ServerAddress> {

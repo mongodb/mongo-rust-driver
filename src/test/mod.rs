@@ -90,12 +90,6 @@ pub(crate) fn update_options_for_testing(options: &mut ClientOptions) {
     if options.server_api.is_none() {
         options.server_api = SERVER_API.clone();
     }
-    if LOAD_BALANCED_SINGLE_URI
-        .as_ref()
-        .map_or(false, |uri| !uri.is_empty())
-    {
-        options.test_options_mut().mock_service_id = true;
-    }
     if options.compressors.is_none() {
         options.compressors = get_compressors();
     }

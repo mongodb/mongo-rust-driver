@@ -144,8 +144,6 @@ pub(crate) struct Handshaker {
     /// given the same pool options, so it can be created at the time the Handshaker is created.
     command: Command,
     credential: Option<Credential>,
-    #[cfg(test)]
-    mock_service_id: bool,
     // This field is not read without a compression feature flag turned on.
     #[allow(dead_code)]
     compressors: Option<Vec<Compressor>>,
@@ -161,9 +159,6 @@ impl Handshaker {
 
         let mut command =
             is_master_command(options.as_ref().and_then(|opts| opts.server_api.as_ref()));
-
-        #[cfg(test)]
-        let mut mock_service_id = false;
 
         if let Some(options) = options {
             if let Some(app_name) = options.app_name {
@@ -196,10 +191,7 @@ impl Handshaker {
             if options.load_balanced {
                 command.body.insert("loadBalanced", true);
             }
-            #[cfg(test)]
-            {
-                mock_service_id = options.mock_service_id;
-            }
+
             // Add compressors to handshake.
             // See https://github.com/mongodb/specifications/blob/master/source/compression/OP_COMPRESSED.rst
             if let Some(ref compressors) = options.compressors {
@@ -219,8 +211,6 @@ impl Handshaker {
         Self {
             command,
             credential,
-            #[cfg(test)]
-            mock_service_id,
             compressors,
         }
     }
@@ -237,24 +227,7 @@ impl Handshaker {
         let client_first = set_speculative_auth_info(&mut command.body, self.credential.as_ref())?;
 
         let mut is_master_reply = run_is_master(conn, command, topology, handler).await?;
-        // TODO PM-2369 Remove serviceId mocking when it's returned by the server.
-        #[cfg(test)]
-        {
-            if self.command.body.contains_key("loadBalanced")
-                && is_master_reply.command_response.service_id.is_none()
-                && self.mock_service_id
-            {
-                is_master_reply.command_response.service_id = Some(
-                    is_master_reply
-                        .command_response
-                        .topology_version
-                        .as_ref()
-                        .unwrap()
-                        .get_object_id("processId")
-                        .unwrap(),
-                );
-            }
-        }
+
         if self.command.body.contains_key("loadBalanced")
             && is_master_reply.command_response.service_id.is_none()
         {
@@ -326,8 +299,6 @@ pub(crate) struct HandshakerOptions {
     driver_info: Option<DriverInfo>,
     server_api: Option<ServerApi>,
     load_balanced: bool,
-    #[cfg(test)]
-    mock_service_id: bool,
 }
 
 impl From<ConnectionPoolOptions> for HandshakerOptions {
@@ -339,8 +310,6 @@ impl From<ConnectionPoolOptions> for HandshakerOptions {
             driver_info: options.driver_info,
             server_api: options.server_api,
             load_balanced: options.load_balanced.unwrap_or(false),
-            #[cfg(test)]
-            mock_service_id: options.mock_service_id,
         }
     }
 }
@@ -354,8 +323,6 @@ impl From<ClientOptions> for HandshakerOptions {
             driver_info: options.driver_info,
             server_api: options.server_api,
             load_balanced: options.load_balanced.unwrap_or(false),
-            #[cfg(test)]
-            mock_service_id: options.test_options.map_or(false, |to| to.mock_service_id),
         }
     }
 }
