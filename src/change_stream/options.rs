@@ -114,6 +114,7 @@ pub enum FullDocumentType {
     /// The
     /// [`ChangeStreamEvent::full_document`](crate::change_stream::event::ChangeStreamEvent::full_document)
     /// field will be populated with a copy of the entire document that was updated.
+    #[serde(rename = "updateLookup")]
     UpdateLookup,
 
     /// User-defined other types for forward compatibility.
