@@ -660,6 +660,7 @@ functions:
       params:
         file: src/results.xml
 
+pre_error_fails_task: true
 pre:
   - func: "fetch source"
   - func: "prepare resources"
