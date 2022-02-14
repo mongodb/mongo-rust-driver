@@ -349,6 +349,7 @@ functions:
             AUTH=${AUTH} \
             SSL=${SSL} \
             REQUIRE_API_VERSION=${REQUIRE_API_VERSION} \
+            LOAD_BALANCER=${LOAD_BALANCER} \
             sh ${DRIVERS_TOOLS}/.evergreen/run-orchestration.sh
     # run-orchestration generates expansion file with the MONGODB_URI for the cluster
     - command: expansions.update
@@ -883,6 +884,7 @@ tasks:
         vars:
           MONGODB_VERSION: "latest"
           TOPOLOGY: "sharded_cluster"
+          LOAD_BALANCER: "true"
       - func: "start load balancer"
       - func: "run tests"
 

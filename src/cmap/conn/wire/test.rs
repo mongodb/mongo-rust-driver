@@ -6,13 +6,14 @@ use crate::{
     bson::{doc, Bson},
     cmap::options::StreamOptions,
     runtime::AsyncStream,
-    test::{CLIENT_OPTIONS, LOCK},
+    test::{log_uncaptured, CLIENT_OPTIONS, LOCK},
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn basic() {
-    if CLIENT_OPTIONS.tls_options().is_some() {
+    if CLIENT_OPTIONS.tls_options().is_some() || CLIENT_OPTIONS.load_balanced.unwrap_or(false) {
+        log_uncaptured("skipping conn::wire:basic test due to TLS and/or load balanced topology");
         return;
     }
 
