@@ -1,30 +1,22 @@
 use std::{
-    collections::VecDeque,
     marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
 };
 
-use bson::{RawArrayBuf, RawDocument, RawDocumentBuf};
+use bson::RawDocument;
 use futures_core::{future::BoxFuture, Stream};
-use futures_util::{FutureExt, StreamExt};
+use futures_util::StreamExt;
 use serde::de::DeserializeOwned;
 #[cfg(test)]
 use tokio::sync::oneshot;
 
 use super::{
     common::{
-        kill_cursor,
-        CursorBuffer,
-        CursorInformation,
-        CursorState,
-        GenericCursor,
-        GetMoreProvider,
-        GetMoreProviderResult,
-        PinnedConnection,
+        kill_cursor, CursorBuffer, CursorInformation, CursorState, GenericCursor, GetMoreProvider,
+        GetMoreProviderResult, PinnedConnection,
     },
-    BatchValue,
-    CursorStream,
+    BatchValue, CursorStream,
 };
 use crate::{
     bson::Document,
@@ -35,8 +27,7 @@ use crate::{
     error::{Error, Result},
     operation::GetMore,
     results::GetMoreResult,
-    Client,
-    ClientSession,
+    Client, ClientSession,
 };
 
 /// A [`SessionCursor`] is a cursor that was created with a [`ClientSession`] that must be iterated
@@ -73,7 +64,7 @@ where
 {
     client: Client,
     info: CursorInformation,
-    state: CursorState,
+    state: Option<CursorState>,
     drop_address: Option<ServerAddress>,
     _phantom: PhantomData<T>,
     #[cfg(test)]
@@ -104,7 +95,8 @@ where
                 exhausted,
                 post_batch_resume_token: None,
                 pinned_connection: PinnedConnection::new(pinned),
-            },
+            }
+            .into(),
         }
     }
 
@@ -170,13 +162,7 @@ where
     }
 
     fn take_state(&mut self) -> CursorState {
-        CursorState {
-            buffer: std::mem::take(&mut self.state.buffer),
-            error: self.state.error.clone(),
-            exhausted: self.state.exhausted,
-            post_batch_resume_token: self.state.post_batch_resume_token.clone(),
-            pinned_connection: self.state.pinned_connection.replicate(),
-        }
+        self.state.take().unwrap()
     }
 
     /// Retrieve the next result from the cursor.
@@ -208,7 +194,7 @@ where
 
     /// Get a reference to the current result in the cursor.
     pub fn current(&self) -> Option<&RawDocument> {
-        self.state.buffer.current()
+        self.state.as_ref().unwrap().buffer.current()
     }
 
     /// Move the cursor forward, potentially triggering a request to the database for more results
@@ -225,7 +211,7 @@ where
         let out = SessionCursor {
             client: self.client.clone(),
             info: self.info.clone(),
-            state: self.take_state(),
+            state: Some(self.take_state()),
             drop_address: self.drop_address.take(),
             _phantom: Default::default(),
             #[cfg(test)]
@@ -284,7 +270,7 @@ where
             self.client.clone(),
             &self.info.ns,
             self.info.id,
-            self.state.pinned_connection.replicate(),
+            self.state.as_ref().unwrap().pinned_connection.replicate(),
             self.drop_address.take(),
             #[cfg(test)]
             self.kill_watcher.take(),
@@ -349,7 +335,7 @@ where
 {
     fn drop(&mut self) {
         // Update the parent cursor's state based on any iteration performed on this handle.
-        self.session_cursor.state = self.generic_cursor.take_state();
+        self.session_cursor.state = Some(self.generic_cursor.take_state());
     }
 }
 

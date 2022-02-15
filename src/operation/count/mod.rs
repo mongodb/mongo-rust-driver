@@ -9,7 +9,7 @@ use crate::{
     cmap::{Command, RawCommandResponse, StreamDescription},
     coll::{options::EstimatedDocumentCountOptions, Namespace},
     error::{Error, ErrorKind, Result},
-    operation::{append_options, CursorBody, Operation, Retryability},
+    operation::{append_options, Operation, Retryability},
     selection_criteria::SelectionCriteria,
 };
 

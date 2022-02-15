@@ -9,7 +9,6 @@ use bson::{
     raw::RawArrayBufIntoIter,
     RawArrayBuf,
     RawBson,
-    RawBsonRef,
     RawDocument,
     RawDocumentBuf,
 };
@@ -24,7 +23,7 @@ use crate::{
     change_stream::event::ResumeToken,
     cmap::conn::PinnedConnectionHandle,
     error::{Error, ErrorKind, Result},
-    operation::{self, GetMore},
+    operation,
     options::ServerAddress,
     results::GetMoreResult,
     Client,
@@ -43,11 +42,7 @@ where
     provider: P,
     client: Client,
     info: CursorInformation,
-    buffer: CursorBuffer,
-    post_batch_resume_token: Option<ResumeToken>,
-    exhausted: bool,
-    error: Option<Error>,
-    pinned_connection: PinnedConnection,
+    state: Option<CursorState>,
     _phantom: PhantomData<T>,
 }
 
@@ -63,15 +58,17 @@ where
     ) -> Self {
         let exhausted = spec.id() == 0;
         Self {
-            exhausted,
             client,
             provider: get_more_provider,
-            buffer: CursorBuffer::new(spec.initial_buffer),
-            post_batch_resume_token: None,
             info: spec.info,
-            pinned_connection,
+            state: Some(CursorState {
+                buffer: CursorBuffer::new(spec.initial_buffer),
+                error: None,
+                exhausted,
+                post_batch_resume_token: None,
+                pinned_connection,
+            }),
             _phantom: Default::default(),
-            error: None,
         }
     }
 
@@ -85,32 +82,29 @@ where
             provider,
             client,
             info,
-            buffer: state.buffer,
-            post_batch_resume_token: state.post_batch_resume_token,
-            exhausted: state.exhausted,
-            error: state.error,
-            pinned_connection: state.pinned_connection,
             _phantom: Default::default(),
+            state: state.into(),
         }
     }
 
     pub(super) fn current(&self) -> Option<&RawDocument> {
-        self.buffer.current()
+        self.state.as_ref().unwrap().buffer.current()
     }
 
     pub(super) async fn advance(&mut self) -> Result<()> {
-        self.buffer.advance();
+        let mut state = self.state.as_mut().unwrap();
+        state.buffer.advance();
 
         // if moving the offset puts us at the end of the buffer, perform another
         // getMore if the cursor is still alive.
-        if self.buffer.is_empty() {
-            if self.exhausted {
+        if state.buffer.is_empty() {
+            if state.exhausted {
                 return Ok(());
             }
 
             let client = self.client.clone();
             let spec = self.info.clone();
-            let pin = self.pinned_connection.replicate();
+            let pin = state.pinned_connection.replicate();
 
             let result = self.provider.execute(spec, client, pin).await;
             self.handle_get_more_result(result)?;
@@ -120,17 +114,11 @@ where
     }
 
     pub(super) fn take_state(&mut self) -> CursorState {
-        CursorState {
-            buffer: std::mem::take(&mut self.buffer),
-            exhausted: self.exhausted,
-            error: self.error.take(),
-            post_batch_resume_token: self.post_batch_resume_token.take(),
-            pinned_connection: self.pinned_connection.take(),
-        }
+        self.state.take().unwrap()
     }
 
     pub(super) fn is_exhausted(&self) -> bool {
-        self.exhausted
+        self.state.as_ref().unwrap().exhausted
     }
 
     pub(super) fn id(&self) -> i64 {
@@ -146,26 +134,28 @@ where
     }
 
     pub(super) fn pinned_connection(&self) -> &PinnedConnection {
-        &self.pinned_connection
+        &self.state.as_ref().unwrap().pinned_connection
     }
 
     pub(super) fn post_batch_resume_token(&self) -> Option<&ResumeToken> {
-        self.post_batch_resume_token.as_ref()
+        self.state.as_ref().unwrap().post_batch_resume_token.as_ref()
     }
 
     fn handle_get_more_result(&mut self, get_more_result: Result<GetMoreResult>) -> Result<()> {
-        self.exhausted = get_more_result
+        let mut state = self.state.as_mut().unwrap();
+
+        state.exhausted = get_more_result
             .as_ref()
             .map(|r| r.exhausted)
             .unwrap_or(true);
-        if self.exhausted {
-            self.pinned_connection = PinnedConnection::Unpinned;
+        if state.exhausted {
+            state.pinned_connection = PinnedConnection::Unpinned;
         }
 
         match get_more_result {
             Ok(get_more) => {
-                self.buffer = CursorBuffer::new(get_more.batch);
-                self.post_batch_resume_token = get_more.post_batch_resume_token;
+                state.buffer = CursorBuffer::new(get_more.batch);
+                state.post_batch_resume_token = get_more.post_batch_resume_token;
 
                 Ok(())
             }
@@ -173,9 +163,9 @@ where
                 if e.is_network_error() {
                     // Flag the connection as invalid, preventing a killCursors command,
                     // but leave the connection pinned.
-                    self.pinned_connection.invalidate();
+                    state.pinned_connection.invalidate();
                 }
-                self.error = Some(e.clone());
+                state.error = Some(e.clone());
 
                 Err(e)
             }
@@ -188,15 +178,11 @@ where
 
     pub(super) fn with_type<D: DeserializeOwned>(self) -> GenericCursor<P, D> {
         GenericCursor {
-            exhausted: self.exhausted,
             client: self.client,
             provider: self.provider,
-            buffer: self.buffer,
-            post_batch_resume_token: self.post_batch_resume_token,
             info: self.info,
-            pinned_connection: self.pinned_connection,
+            state: self.state,
             _phantom: Default::default(),
-            error: self.error,
         }
     }
 }
@@ -217,6 +203,8 @@ where
     T: DeserializeOwned + Unpin,
 {
     fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
+        let mut state = self.state.as_mut().unwrap();
+
         // If there is a get more in flight, check on its status.
         if let Some(future) = self.provider.executing_future() {
             match Pin::new(future).poll(cx) {
@@ -224,24 +212,24 @@ where
                 Poll::Ready(get_more_result) => {
                     let (result, session) = get_more_result.into_parts();
                     let output = self.handle_get_more_result(result);
-                    self.provider.clear_execution(session, self.exhausted);
+                    self.provider.clear_execution(session, self.state.as_ref().unwrap().exhausted);
                     output?;
                 }
                 Poll::Pending => return Poll::Pending,
             }
         }
 
-        match self.buffer.next() {
+        match state.buffer.next() {
             Some(doc) => {
-                let is_last = self.buffer.is_empty();
+                let is_last = state.buffer.is_empty();
 
                 Poll::Ready(Ok(BatchValue::Some { doc, is_last }))
             }
-            None if !self.exhausted && !self.pinned_connection.is_invalid() => {
+            None if !state.exhausted && !state.pinned_connection.is_invalid() => {
                 let info = self.info.clone();
                 let client = self.client.clone();
                 self.provider
-                    .start_execution(info, client, self.pinned_connection.handle());
+                    .start_execution(info, client, state.pinned_connection.handle());
                 Poll::Ready(Ok(BatchValue::Empty))
             }
             None => Poll::Ready(Ok(BatchValue::Exhausted)),
@@ -350,13 +338,6 @@ pub(crate) trait GetMoreProviderResult {
     fn as_ref(&self) -> std::result::Result<&GetMoreResult, &Error>;
 
     fn into_parts(self) -> (Result<GetMoreResult>, Self::Session);
-
-    fn into_result(self) -> Result<GetMoreResult>
-    where
-        Self: Sized,
-    {
-        self.into_parts().0
-    }
 
     /// Whether the response from the server indicated the cursor was exhausted or not.
     fn exhausted(&self) -> bool {

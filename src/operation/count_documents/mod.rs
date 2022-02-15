@@ -5,9 +5,8 @@ use std::convert::TryInto;
 
 use serde::Deserialize;
 
-use super::{CursorBody, Operation, Retryability, SingleCursorResult};
+use super::{Operation, Retryability, SingleCursorResult};
 use crate::{
-    bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, ErrorKind, Result},
     operation::aggregate::Aggregate,
@@ -15,7 +14,7 @@ use crate::{
     selection_criteria::SelectionCriteria,
     Namespace,
 };
-use bson::{doc, Document, RawBsonRef, RawDocument};
+use bson::{doc, Document, RawDocument};
 
 pub(crate) struct CountDocuments {
     aggregate: Aggregate,
