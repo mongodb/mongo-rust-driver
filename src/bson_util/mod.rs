@@ -42,15 +42,6 @@ pub(crate) fn get_u64(val: &Bson) -> Option<u64> {
     }
 }
 
-pub(crate) fn get_u64_raw(val: RawBsonRef<'_>) -> Option<u64> {
-    match val {
-        RawBsonRef::Int32(i) => get_u64(&Bson::Int32(i)),
-        RawBsonRef::Int64(i) => get_u64(&Bson::Int64(i)),
-        RawBsonRef::Double(i) => get_u64(&Bson::Double(i)),
-        _ => None,
-    }
-}
-
 pub(crate) fn to_bson_array(docs: &[Document]) -> Bson {
     Bson::Array(docs.iter().map(|doc| Bson::Document(doc.clone())).collect())
 }
@@ -187,6 +178,7 @@ where
 
 /// The size in bytes of the provided document's entry in a BSON array at the given index.
 pub(crate) fn array_entry_size_bytes(index: usize, doc_len: usize) -> u64 {
+    // 
     //   * type (1 byte)
     //   * number of decimal digits in key
     //   * null terminator for the key (1 byte)

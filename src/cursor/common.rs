@@ -5,13 +5,7 @@ use std::{
     time::Duration,
 };
 
-use bson::{
-    raw::RawArrayBufIntoIter,
-    RawArrayBuf,
-    RawBson,
-    RawDocument,
-    RawDocumentBuf,
-};
+use bson::{raw::RawArrayBufCopyingIter, RawArrayBuf, RawBson, RawDocument, RawDocumentBuf};
 use derivative::Derivative;
 use futures_core::{future::BoxFuture, Future, Stream};
 use serde::{de::DeserializeOwned, Deserialize};
@@ -42,6 +36,8 @@ where
     provider: P,
     client: Client,
     info: CursorInformation,
+    /// This is an `Option` to allow it to be "taken" when the cursor is no longer needed
+    /// but may be resumed in the future for `SessionCursor`.
     state: Option<CursorState>,
     _phantom: PhantomData<T>,
 }
@@ -92,7 +88,7 @@ where
     }
 
     pub(super) async fn advance(&mut self) -> Result<()> {
-        let mut state = self.state.as_mut().unwrap();
+        let state = self.state.as_mut().unwrap();
         state.buffer.advance();
 
         // if moving the offset puts us at the end of the buffer, perform another
@@ -138,7 +134,11 @@ where
     }
 
     pub(super) fn post_batch_resume_token(&self) -> Option<&ResumeToken> {
-        self.state.as_ref().unwrap().post_batch_resume_token.as_ref()
+        self.state
+            .as_ref()
+            .unwrap()
+            .post_batch_resume_token
+            .as_ref()
     }
 
     fn handle_get_more_result(&mut self, get_more_result: Result<GetMoreResult>) -> Result<()> {
@@ -203,8 +203,6 @@ where
     T: DeserializeOwned + Unpin,
 {
     fn poll_next_in_batch(&mut self, cx: &mut Context<'_>) -> Poll<Result<BatchValue>> {
-        let mut state = self.state.as_mut().unwrap();
-
         // If there is a get more in flight, check on its status.
         if let Some(future) = self.provider.executing_future() {
             match Pin::new(future).poll(cx) {
@@ -212,13 +210,15 @@ where
                 Poll::Ready(get_more_result) => {
                     let (result, session) = get_more_result.into_parts();
                     let output = self.handle_get_more_result(result);
-                    self.provider.clear_execution(session, self.state.as_ref().unwrap().exhausted);
+                    self.provider
+                        .clear_execution(session, self.state.as_ref().unwrap().exhausted);
                     output?;
                 }
                 Poll::Pending => return Poll::Pending,
             }
         }
 
+        let state = self.state.as_mut().unwrap();
         match state.buffer.next() {
             Some(doc) => {
                 let is_last = state.buffer.is_empty();
@@ -434,12 +434,6 @@ impl PinnedConnection {
         }
     }
 
-    pub(crate) fn take(&mut self) -> PinnedConnection {
-        let out = self.replicate();
-        *self = Self::Unpinned;
-        out
-    }
-
     pub(crate) fn handle(&self) -> Option<&PinnedConnectionHandle> {
         match self {
             Self::Valid(h) | Self::Invalid(h) => Some(h),
@@ -497,13 +491,13 @@ pub(crate) struct CursorState {
 
 #[derive(Debug, Clone)]
 pub(crate) struct CursorBuffer {
-    iter: RawArrayBufIntoIter,
+    iter: RawArrayBufCopyingIter,
 }
 
 impl CursorBuffer {
     pub(crate) fn new(initial_buffer: RawArrayBuf) -> Self {
         Self {
-            iter: initial_buffer.into_iter(),
+            iter: initial_buffer.into_copying_iter(),
         }
     }
 
@@ -533,7 +527,7 @@ impl CursorBuffer {
 impl Default for CursorBuffer {
     fn default() -> Self {
         Self {
-            iter: RawArrayBuf::new().into_iter(),
+            iter: RawArrayBuf::new().into_copying_iter(),
         }
     }
 }

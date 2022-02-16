@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test;
 
-use std::{collections::VecDeque, time::Duration};
+use std::time::Duration;
 
 use bson::{Document, RawArrayBuf, RawDocumentBuf};
 use serde::Deserialize;

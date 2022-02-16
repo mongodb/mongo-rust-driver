@@ -13,10 +13,17 @@ use tokio::sync::oneshot;
 
 use super::{
     common::{
-        kill_cursor, CursorBuffer, CursorInformation, CursorState, GenericCursor, GetMoreProvider,
-        GetMoreProviderResult, PinnedConnection,
+        kill_cursor,
+        CursorBuffer,
+        CursorInformation,
+        CursorState,
+        GenericCursor,
+        GetMoreProvider,
+        GetMoreProviderResult,
+        PinnedConnection,
     },
-    BatchValue, CursorStream,
+    BatchValue,
+    CursorStream,
 };
 use crate::{
     bson::Document,
@@ -27,7 +34,8 @@ use crate::{
     error::{Error, Result},
     operation::GetMore,
     results::GetMoreResult,
-    Client, ClientSession,
+    Client,
+    ClientSession,
 };
 
 /// A [`SessionCursor`] is a cursor that was created with a [`ClientSession`] that must be iterated

@@ -1,6 +1,6 @@
 //! Contains the types of results returned by CRUD operations.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 use crate::{
     bson::{Bson, Document},
@@ -9,7 +9,7 @@ use crate::{
     db::options::CreateCollectionOptions,
 };
 
-use bson::{Binary, RawArrayBuf, RawDocumentBuf};
+use bson::{Binary, RawArrayBuf};
 use serde::{Deserialize, Serialize};
 
 /// The result of a [`Collection::insert_one`](../struct.Collection.html#method.insert_one)

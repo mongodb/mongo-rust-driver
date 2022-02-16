@@ -23,7 +23,7 @@ mod update;
 #[cfg(test)]
 mod test;
 
-use std::{collections::VecDeque, fmt::Debug, ops::Deref};
+use std::{fmt::Debug, ops::Deref};
 
 use bson::{RawArrayBuf, RawBsonRef, RawDocument, RawDocumentBuf, Timestamp};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
