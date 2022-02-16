@@ -20,9 +20,7 @@ use crate::{
     operation,
     options::ServerAddress,
     results::GetMoreResult,
-    Client,
-    Namespace,
-    RUNTIME,
+    Client, Namespace, RUNTIME,
 };
 
 /// An internal cursor that can be used in a variety of contexts depending on its `GetMoreProvider`.
@@ -87,26 +85,41 @@ where
         self.state.as_ref().unwrap().buffer.current()
     }
 
-    pub(super) async fn advance(&mut self) -> Result<()> {
-        let state = self.state.as_mut().unwrap();
-        state.buffer.advance();
+    fn state_mut(&mut self) -> &mut CursorState {
+        self.state.as_mut().unwrap()
+    }
 
-        // if moving the offset puts us at the end of the buffer, perform another
-        // getMore if the cursor is still alive.
-        if state.buffer.is_empty() {
-            if state.exhausted {
-                return Ok(());
+    fn state(&self) -> &CursorState {
+        self.state.as_ref().unwrap()
+    }
+
+    /// Advance the cursor forward to the next document.
+    /// If there are no documents cached locally, perform getMores until
+    /// the cursor is exhausted or a result/error has been received.
+    pub(super) async fn advance(&mut self) -> Result<bool> {
+        loop {
+            self.state_mut().buffer.advance();
+
+            if !self.state().buffer.is_empty() {
+                break;
+            }
+
+            // if moving the offset puts us at the end of the buffer, perform another
+            // getMore if the cursor is still alive.
+
+            if self.state().exhausted {
+                return Ok(false);
             }
 
             let client = self.client.clone();
             let spec = self.info.clone();
-            let pin = state.pinned_connection.replicate();
+            let pin = self.state().pinned_connection.replicate();
 
             let result = self.provider.execute(spec, client, pin).await;
             self.handle_get_more_result(result)?;
         }
 
-        Ok(())
+        Ok(true)
     }
 
     pub(super) fn take_state(&mut self) -> CursorState {
@@ -142,20 +155,18 @@ where
     }
 
     fn handle_get_more_result(&mut self, get_more_result: Result<GetMoreResult>) -> Result<()> {
-        let mut state = self.state.as_mut().unwrap();
-
-        state.exhausted = get_more_result
+        self.state_mut().exhausted = get_more_result
             .as_ref()
             .map(|r| r.exhausted)
             .unwrap_or(true);
-        if state.exhausted {
-            state.pinned_connection = PinnedConnection::Unpinned;
+        if self.state().exhausted {
+            self.state_mut().pinned_connection = PinnedConnection::Unpinned;
         }
 
         match get_more_result {
             Ok(get_more) => {
-                state.buffer = CursorBuffer::new(get_more.batch);
-                state.post_batch_resume_token = get_more.post_batch_resume_token;
+                self.state_mut().buffer = CursorBuffer::new(get_more.batch);
+                self.state_mut().post_batch_resume_token = get_more.post_batch_resume_token;
 
                 Ok(())
             }
@@ -163,9 +174,9 @@ where
                 if e.is_network_error() {
                     // Flag the connection as invalid, preventing a killCursors command,
                     // but leave the connection pinned.
-                    state.pinned_connection.invalidate();
+                    self.state_mut().pinned_connection.invalidate();
                 }
-                state.error = Some(e.clone());
+                self.state_mut().error = Some(e.clone());
 
                 Err(e)
             }
@@ -176,7 +187,10 @@ where
         &mut self.provider
     }
 
-    pub(super) fn with_type<D: DeserializeOwned>(self) -> GenericCursor<P, D> {
+    pub(super) fn with_type<'a, D>(self) -> GenericCursor<P, D>
+    where
+        D: Deserialize<'a>,
+    {
         GenericCursor {
             client: self.client,
             provider: self.provider,
@@ -218,16 +232,16 @@ where
             }
         }
 
-        let state = self.state.as_mut().unwrap();
-        match state.buffer.next() {
+        match self.state_mut().buffer.next() {
             Some(doc) => {
-                let is_last = state.buffer.is_empty();
+                let is_last = self.state().buffer.is_empty();
 
                 Poll::Ready(Ok(BatchValue::Some { doc, is_last }))
             }
-            None if !state.exhausted && !state.pinned_connection.is_invalid() => {
+            None if !self.state().exhausted && !self.state().pinned_connection.is_invalid() => {
                 let info = self.info.clone();
                 let client = self.client.clone();
+                let state = self.state.as_mut().unwrap();
                 self.provider
                     .start_execution(info, client, state.pinned_connection.handle());
                 Poll::Ready(Ok(BatchValue::Empty))
@@ -492,12 +506,15 @@ pub(crate) struct CursorState {
 #[derive(Debug, Clone)]
 pub(crate) struct CursorBuffer {
     iter: RawArrayBufCopyingIter,
+    /// whether the buffer is at the front or not
+    fresh: bool,
 }
 
 impl CursorBuffer {
     pub(crate) fn new(initial_buffer: RawArrayBuf) -> Self {
         Self {
             iter: initial_buffer.into_copying_iter(),
+            fresh: true,
         }
     }
 
@@ -513,6 +530,12 @@ impl CursorBuffer {
     }
 
     pub(crate) fn advance(&mut self) {
+        // if at the front of the buffer, don't move forward as the first document
+        // hasn't been consumed yet.
+        if self.fresh {
+            self.fresh = false;
+            return;
+        }
         self.iter.advance()
     }
 
@@ -521,23 +544,5 @@ impl CursorBuffer {
             .current()
             .and_then(|d| d.ok())
             .and_then(|d| d.as_document())
-    }
-}
-
-impl Default for CursorBuffer {
-    fn default() -> Self {
-        Self {
-            iter: RawArrayBuf::new().into_copying_iter(),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for CursorBuffer {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let buffer = RawArrayBuf::deserialize(deserializer)?;
-        Ok(Self::new(buffer))
     }
 }

@@ -8,7 +8,7 @@ use std::{
 
 use bson::RawDocument;
 use futures_core::{future::BoxFuture, Stream};
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Deserialize};
 #[cfg(test)]
 use tokio::sync::oneshot;
 
@@ -19,18 +19,12 @@ use crate::{
     error::{Error, Result},
     operation::GetMore,
     results::GetMoreResult,
-    Client,
-    ClientSession,
+    Client, ClientSession,
 };
 use common::{kill_cursor, GenericCursor, GetMoreProvider, GetMoreProviderResult};
 pub(crate) use common::{
-    stream_poll_next,
-    BatchValue,
-    CursorInformation,
-    CursorSpecification,
-    CursorStream,
-    NextInBatchFuture,
-    PinnedConnection,
+    stream_poll_next, BatchValue, CursorInformation, CursorSpecification, CursorStream,
+    NextInBatchFuture, PinnedConnection,
 };
 
 /// A [`Cursor`] streams the result of a query. When a query is made, the returned [`Cursor`] will
@@ -91,10 +85,7 @@ pub(crate) use common::{
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Cursor<T>
-where
-    T: DeserializeOwned + Unpin + Send + Sync,
-{
+pub struct Cursor<T> {
     client: Client,
     // `wrapped_cursor` is an `Option` so that it can be `None` for the `drop` impl for a cursor
     // that's had `with_type` called; in all other circumstances it will be `Some`.
@@ -105,10 +96,7 @@ where
     _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T> Cursor<T>
-where
-    T: DeserializeOwned + Unpin + Send + Sync,
-{
+impl<T> Cursor<T> {
     pub(crate) fn new(
         client: Client,
         spec: CursorSpecification,
@@ -142,33 +130,6 @@ where
         self.wrapped_cursor.as_ref().unwrap().is_exhausted()
     }
 
-    /// Update the type streamed values will be parsed as.
-    pub fn with_type<D>(mut self) -> Cursor<D>
-    where
-        D: DeserializeOwned + Unpin + Send + Sync,
-    {
-        Cursor {
-            client: self.client.clone(),
-            wrapped_cursor: self.wrapped_cursor.take().map(|c| c.with_type()),
-            drop_address: self.drop_address.take(),
-            #[cfg(test)]
-            kill_watcher: self.kill_watcher.take(),
-            _phantom: Default::default(),
-        }
-    }
-
-    /// Move the cursor forward, potentially triggering a request to the database
-    /// if the internal buffer has been exhausted.
-    pub async fn advance(&mut self) -> Result<()> {
-        self.wrapped_cursor.as_mut().unwrap().advance().await
-    }
-
-    /// Returns a reference to the current result in the cursor, if any.
-    /// [`Cursor::advance`] will move the cursor forward to get the next document.
-    pub fn current(&self) -> Option<&RawDocument> {
-        self.wrapped_cursor.as_ref().unwrap().current()
-    }
-
     pub(crate) fn client(&self) -> &Client {
         &self.client
     }
@@ -185,6 +146,77 @@ where
         self.wrapped_cursor
             .as_mut()
             .and_then(|c| c.provider_mut().take_implicit_session())
+    }
+
+    /// Move the cursor forward, potentially triggering requests to the database for more results
+    /// if the local buffer has been exhausted.
+    ///
+    /// This will keep requesting data from the server until either the cursor is exhausted
+    /// or batch with results in it has been received.
+    ///
+    /// ```
+    /// let mut cursor = coll.find(None, None).await?;
+    /// while cursor.advance().await? {
+    ///     println!("{:?}", cursor.current());
+    /// }
+    /// ```
+    pub async fn advance(&mut self) -> Result<bool> {
+        self.wrapped_cursor.as_mut().unwrap().advance().await
+    }
+
+    /// Returns a reference to the current result in the cursor, if any.
+    /// [`Cursor::advance`] will move the cursor forward to get the next document.
+    ///
+    /// # Panics
+    /// This method may panic if [`Cursor::advance`] did not return true before
+    /// it was invoked.
+    ///
+    /// ```
+    /// let mut cursor = coll.find(None, None).await?;
+    /// while cursor.advance().await? {
+    ///     println!("{:?}", cursor.current());
+    /// }
+    /// ```
+    pub fn current(&self) -> &RawDocument {
+        self.wrapped_cursor.as_ref().unwrap().current().unwrap()
+    }
+
+    /// Deserialize the current result, if any, to the generic type associated with this cursor.
+    ///
+    /// ```
+    /// use serde::Deserialize;
+    ///
+    /// #[derive(Debug, Deserialize)]
+    /// struct Cat<'a> {
+    ///     #[serde(borrow)]
+    ///     name: &'a str
+    /// }
+    ///
+    /// let coll = db.collection::<Cat>("cat");
+    /// let mut cursor = coll.find(None, None).await?;
+    /// while cursor.advance().await? {
+    ///     println!("{:?}", cursor.deserialize_current()?);
+    /// }
+    pub fn deserialize_current<'a>(&'a self) -> Result<T>
+    where
+        T: Deserialize<'a>,
+    {
+        bson::from_slice(self.current().as_bytes()).map_err(Error::from)
+    }
+
+    /// Update the type streamed values will be parsed as.
+    pub fn with_type<'a, D>(mut self) -> Cursor<D>
+    where
+        D: Deserialize<'a>,
+    {
+        Cursor {
+            client: self.client.clone(),
+            wrapped_cursor: self.wrapped_cursor.take().map(|c| c.with_type()),
+            drop_address: self.drop_address.take(),
+            #[cfg(test)]
+            kill_watcher: self.kill_watcher.take(),
+            _phantom: Default::default(),
+        }
     }
 
     /// Some tests need to be able to observe the events generated by `killCommand` execution;
@@ -223,10 +255,7 @@ where
     }
 }
 
-impl<T> Drop for Cursor<T>
-where
-    T: DeserializeOwned + Unpin + Send + Sync,
-{
+impl<T> Drop for Cursor<T> {
     fn drop(&mut self) {
         let wrapped_cursor = match &self.wrapped_cursor {
             None => return,

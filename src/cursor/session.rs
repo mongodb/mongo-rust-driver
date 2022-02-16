@@ -205,9 +205,12 @@ where
         self.state.as_ref().unwrap().buffer.current()
     }
 
-    /// Move the cursor forward, potentially triggering a request to the database for more results
+    /// Move the cursor forward, potentially triggering requests to the database for more results
     /// if the local buffer has been exhausted.
-    pub async fn advance(&mut self, session: &mut ClientSession) -> Result<()> {
+    ///
+    /// This will keep requesting data from the server until either the cursor is exhausted
+    /// or batch with results in it has been received.
+    pub async fn advance(&mut self, session: &mut ClientSession) -> Result<bool> {
         self.stream(session).generic_cursor.advance().await
     }
 
