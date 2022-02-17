@@ -20,7 +20,9 @@ use crate::{
     operation,
     options::ServerAddress,
     results::GetMoreResult,
-    Client, Namespace, RUNTIME,
+    Client,
+    Namespace,
+    RUNTIME,
 };
 
 /// An internal cursor that can be used in a variety of contexts depending on its `GetMoreProvider`.

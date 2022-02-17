@@ -148,7 +148,6 @@ impl Client {
     pub(crate) async fn execute_cursor_operation<Op, T>(&self, op: Op) -> Result<Cursor<T>>
     where
         Op: Operation<O = CursorSpecification>,
-        T: DeserializeOwned + Unpin + Send + Sync,
     {
         Box::pin(async {
             let mut details = self.execute_operation_with_details(op, None).await?;
@@ -173,7 +172,6 @@ impl Client {
     ) -> Result<SessionCursor<T>>
     where
         Op: Operation<O = CursorSpecification>,
-        T: DeserializeOwned + Unpin + Send + Sync,
     {
         let mut details = self
             .execute_operation_with_details(op, &mut *session)

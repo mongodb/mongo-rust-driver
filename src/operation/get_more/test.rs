@@ -1,13 +1,11 @@
 use std::time::Duration;
 
-use bson::RawDocumentBuf;
-
 use crate::{
     bson::{doc, Document},
     bson_util,
     cmap::StreamDescription,
     cursor::CursorInformation,
-    operation::{test::handle_response_test, GetMore, Operation},
+    operation::{GetMore, Operation},
     options::ServerAddress,
     sdam::{ServerDescription, ServerInfo, ServerType},
     Namespace,

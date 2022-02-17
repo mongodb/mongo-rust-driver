@@ -7,7 +7,7 @@ use std::{
 use bson::RawDocument;
 use futures_core::{future::BoxFuture, Stream};
 use futures_util::StreamExt;
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Deserialize};
 #[cfg(test)]
 use tokio::sync::oneshot;
 
@@ -66,10 +66,7 @@ use crate::{
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct SessionCursor<T>
-where
-    T: DeserializeOwned + Unpin,
-{
+pub struct SessionCursor<T> {
     client: Client,
     info: CursorInformation,
     state: Option<CursorState>,
@@ -79,10 +76,7 @@ where
     kill_watcher: Option<oneshot::Sender<()>>,
 }
 
-impl<T> SessionCursor<T>
-where
-    T: DeserializeOwned + Unpin + Send + Sync,
-{
+impl<T> SessionCursor<T> {
     pub(crate) fn new(
         client: Client,
         spec: CursorSpecification,
@@ -107,7 +101,12 @@ where
             .into(),
         }
     }
+}
 
+impl<T> SessionCursor<T>
+where
+    T: DeserializeOwned + Unpin + Send + Sync,
+{
     /// Retrieves a [`SessionCursorStream`] to iterate this cursor. The session provided must be the
     /// same session used to create the cursor.
     ///
@@ -154,23 +153,7 @@ where
         &mut self,
         session: &'session mut ClientSession,
     ) -> SessionCursorStream<'_, 'session, T> {
-        let get_more_provider = ExplicitSessionGetMoreProvider::new(session);
-
-        // Pass the state into this cursor handle for iteration.
-        // It will be returned in the handle's `Drop` implementation.
-        SessionCursorStream {
-            generic_cursor: ExplicitSessionCursor::from_state(
-                self.take_state(),
-                self.client.clone(),
-                self.info.clone(),
-                get_more_provider,
-            ),
-            session_cursor: self,
-        }
-    }
-
-    fn take_state(&mut self) -> CursorState {
-        self.state.take().unwrap()
+        self.make_stream(session)
     }
 
     /// Retrieve the next result from the cursor.
@@ -199,10 +182,30 @@ where
     pub async fn next(&mut self, session: &mut ClientSession) -> Option<Result<T>> {
         self.stream(session).next().await
     }
+}
 
-    /// Get a reference to the current result in the cursor.
-    pub fn current(&self) -> Option<&RawDocument> {
-        self.state.as_ref().unwrap().buffer.current()
+impl<T> SessionCursor<T> {
+    fn make_stream<'session>(
+        &mut self,
+        session: &'session mut ClientSession,
+    ) -> SessionCursorStream<'_, 'session, T> {
+        let get_more_provider = ExplicitSessionGetMoreProvider::new(session);
+
+        // Pass the state into this cursor handle for iteration.
+        // It will be returned in the handle's `Drop` implementation.
+        SessionCursorStream {
+            generic_cursor: ExplicitSessionCursor::from_state(
+                self.take_state(),
+                self.client.clone(),
+                self.info.clone(),
+                get_more_provider,
+            ),
+            session_cursor: self,
+        }
+    }
+
+    fn take_state(&mut self) -> CursorState {
+        self.state.take().unwrap()
     }
 
     /// Move the cursor forward, potentially triggering requests to the database for more results
@@ -210,14 +213,87 @@ where
     ///
     /// This will keep requesting data from the server until either the cursor is exhausted
     /// or batch with results in it has been received.
+    ///
+    /// ```
+    /// # use mongodb::{Client, bson::Document, error::Result};
+    /// # async fn foo() -> Result<()> {
+    /// # let client = Client::with_uri_str("mongodb://localhost:27017").await?;
+    /// # let mut session = client.start_session(None).await?;
+    /// # let coll = client.database("stuff").collection::<Document>("stuff");
+    /// let mut cursor = coll.find_with_session(None, None, &mut session).await?;
+    /// while cursor.advance(&mut session).await? {
+    ///     println!("{:?}", cursor.current());
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn advance(&mut self, session: &mut ClientSession) -> Result<bool> {
-        self.stream(session).generic_cursor.advance().await
+        self.make_stream(session).generic_cursor.advance().await
+    }
+
+    /// Returns a reference to the current result in the cursor.
+    /// [`Cursor::advance`] will move the cursor forward to get the next document.
+    ///
+    /// # Panics
+    /// This method may panic if [`Cursor::advance`] did not return true before
+    /// it was invoked.
+    ///
+    /// ```
+    /// # use mongodb::{Client, bson::Document, error::Result};
+    /// # async fn foo() -> Result<()> {
+    /// # let client = Client::with_uri_str("mongodb://localhost:27017").await?;
+    /// # let mut session = client.start_session(None).await?;
+    /// # let coll = client.database("stuff").collection::<Document>("stuff");
+    /// let mut cursor = coll.find_with_session(None, None, &mut session).await?;
+    /// while cursor.advance(&mut session).await? {
+    ///     println!("{:?}", cursor.current());
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn current(&self) -> &RawDocument {
+        self.state.as_ref().unwrap().buffer.current().unwrap()
+    }
+
+    /// Deserialize the current result to the generic type associated with this cursor.
+    ///
+    /// # Panics
+    /// This method may panic if [`Cursor::advance`] did not return true before
+    /// it was invoked.
+    ///
+    /// ```
+    /// # use mongodb::{Client, error::Result};
+    /// # async fn foo() -> Result<()> {
+    /// # let client = Client::with_uri_str("mongodb://localhost:27017").await?;
+    /// # let mut session = client.start_session(None).await?;
+    /// # let db = client.database("foo");
+    /// use serde::Deserialize;
+    ///
+    /// #[derive(Debug, Deserialize)]
+    /// struct Cat<'a> {
+    ///     #[serde(borrow)]
+    ///     name: &'a str
+    /// }
+    ///
+    /// let coll = db.collection::<Cat>("cat");
+    /// let mut cursor = coll.find_with_session(None, None, &mut session).await?;
+    /// while cursor.advance(&mut session).await? {
+    ///     println!("{:?}", cursor.deserialize_current()?);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn deserialize_current<'a>(&'a self) -> Result<T>
+    where
+        T: Deserialize<'a>,
+    {
+        bson::from_slice(self.current().as_bytes()).map_err(Error::from)
     }
 
     /// Update the type streamed values will be parsed as.
-    pub fn with_type<D>(mut self) -> SessionCursor<D>
+    pub fn with_type<'a, D>(mut self) -> SessionCursor<D>
     where
-        D: DeserializeOwned + Unpin + Send + Sync,
+        D: Deserialize<'a>,
     {
         let out = SessionCursor {
             client: self.client.clone(),
@@ -255,10 +331,7 @@ where
     }
 }
 
-impl<T> SessionCursor<T>
-where
-    T: DeserializeOwned + Unpin,
-{
+impl<T> SessionCursor<T> {
     fn mark_exhausted(&mut self) {
         self.info.id = 0;
     }
@@ -268,10 +341,7 @@ where
     }
 }
 
-impl<T> Drop for SessionCursor<T>
-where
-    T: DeserializeOwned + Unpin,
-{
+impl<T> Drop for SessionCursor<T> {
     fn drop(&mut self) {
         if self.is_exhausted() {
             return;
@@ -299,10 +369,7 @@ type ExplicitSessionCursor<'session, T> =
 ///
 /// This updates the buffer of the parent [`SessionCursor`] when dropped. [`SessionCursor::next`] or
 /// any further streams created from [`SessionCursor::stream`] will pick up where this one left off.
-pub struct SessionCursorStream<'cursor, 'session, T = Document>
-where
-    T: DeserializeOwned + Unpin + Send + Sync,
-{
+pub struct SessionCursorStream<'cursor, 'session, T = Document> {
     session_cursor: &'cursor mut SessionCursor<T>,
     generic_cursor: ExplicitSessionCursor<'session, T>,
 }
@@ -340,10 +407,7 @@ where
     }
 }
 
-impl<'cursor, 'session, T> Drop for SessionCursorStream<'cursor, 'session, T>
-where
-    T: DeserializeOwned + Unpin + Send + Sync,
-{
+impl<'cursor, 'session, T> Drop for SessionCursorStream<'cursor, 'session, T> {
     fn drop(&mut self) {
         // Update the parent cursor's state based on any iteration performed on this handle.
         self.session_cursor.state = Some(self.generic_cursor.take_state());

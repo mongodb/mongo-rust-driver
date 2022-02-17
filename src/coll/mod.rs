@@ -849,12 +849,7 @@ impl<T> Collection<T> {
             .execute_watch_with_session(pipeline, options, target, None, session)
             .await
     }
-}
 
-impl<T> Collection<T>
-where
-    T: DeserializeOwned + Unpin + Send + Sync,
-{
     /// Finds the documents in the collection matching `filter`.
     pub async fn find(
         &self,
@@ -886,7 +881,12 @@ where
 
         client.execute_session_cursor_operation(find, session).await
     }
+}
 
+impl<T> Collection<T>
+where
+    T: DeserializeOwned + Unpin + Send + Sync,
+{
     /// Finds a single document in the collection matching `filter`.
     pub async fn find_one(
         &self,

@@ -1,12 +1,9 @@
-use std::convert::TryInto;
-
 use crate::{
     bson::{doc, Document},
     bson_util,
     cmap::StreamDescription,
     operation::{test::handle_response_test, ListCollections, Operation},
-    options::{ListCollectionsOptions, ServerAddress},
-    Namespace,
+    options::ListCollectionsOptions,
 };
 
 fn build_test(db_name: &str, mut list_collections: ListCollections, mut expected_body: Document) {

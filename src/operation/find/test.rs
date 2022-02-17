@@ -1,4 +1,4 @@
-use std::{convert::TryInto, time::Duration};
+use std::time::Duration;
 
 use crate::{
     bson::{doc, Document},
@@ -9,7 +9,7 @@ use crate::{
         Find,
         Operation,
     },
-    options::{CursorType, FindOptions, Hint, ReadConcern, ReadConcernLevel, ServerAddress},
+    options::{CursorType, FindOptions, Hint, ReadConcern, ReadConcernLevel},
     Namespace,
 };
 

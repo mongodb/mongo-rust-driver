@@ -19,12 +19,18 @@ use crate::{
     error::{Error, Result},
     operation::GetMore,
     results::GetMoreResult,
-    Client, ClientSession,
+    Client,
+    ClientSession,
 };
 use common::{kill_cursor, GenericCursor, GetMoreProvider, GetMoreProviderResult};
 pub(crate) use common::{
-    stream_poll_next, BatchValue, CursorInformation, CursorSpecification, CursorStream,
-    NextInBatchFuture, PinnedConnection,
+    stream_poll_next,
+    BatchValue,
+    CursorInformation,
+    CursorSpecification,
+    CursorStream,
+    NextInBatchFuture,
+    PinnedConnection,
 };
 
 /// A [`Cursor`] streams the result of a query. When a query is made, the returned [`Cursor`] will
@@ -155,16 +161,22 @@ impl<T> Cursor<T> {
     /// or batch with results in it has been received.
     ///
     /// ```
+    /// # use mongodb::{Client, bson::Document, error::Result};
+    /// # async fn foo() -> Result<()> {
+    /// # let client = Client::with_uri_str("mongodb://localhost:27017").await?;
+    /// # let coll = client.database("stuff").collection::<Document>("stuff");
     /// let mut cursor = coll.find(None, None).await?;
     /// while cursor.advance().await? {
     ///     println!("{:?}", cursor.current());
     /// }
+    /// # Ok(())
+    /// # }
     /// ```
     pub async fn advance(&mut self) -> Result<bool> {
         self.wrapped_cursor.as_mut().unwrap().advance().await
     }
 
-    /// Returns a reference to the current result in the cursor, if any.
+    /// Returns a reference to the current result in the cursor.
     /// [`Cursor::advance`] will move the cursor forward to get the next document.
     ///
     /// # Panics
@@ -172,18 +184,28 @@ impl<T> Cursor<T> {
     /// it was invoked.
     ///
     /// ```
+    /// # use mongodb::{Client, bson::Document, error::Result};
+    /// # async fn foo() -> Result<()> {
+    /// # let client = Client::with_uri_str("mongodb://localhost:27017").await?;
+    /// # let coll = client.database("stuff").collection::<Document>("stuff");
     /// let mut cursor = coll.find(None, None).await?;
     /// while cursor.advance().await? {
     ///     println!("{:?}", cursor.current());
     /// }
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn current(&self) -> &RawDocument {
         self.wrapped_cursor.as_ref().unwrap().current().unwrap()
     }
 
-    /// Deserialize the current result, if any, to the generic type associated with this cursor.
+    /// Deserialize the current result to the generic type associated with this cursor.
     ///
     /// ```
+    /// # use mongodb::{Client, error::Result};
+    /// # async fn foo() -> Result<()> {
+    /// # let client = Client::with_uri_str("mongodb://localhost:27017").await?;
+    /// # let db = client.database("foo");
     /// use serde::Deserialize;
     ///
     /// #[derive(Debug, Deserialize)]
@@ -197,6 +219,9 @@ impl<T> Cursor<T> {
     /// while cursor.advance().await? {
     ///     println!("{:?}", cursor.deserialize_current()?);
     /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn deserialize_current<'a>(&'a self) -> Result<T>
     where
         T: Deserialize<'a>,

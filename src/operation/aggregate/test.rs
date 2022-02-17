@@ -1,6 +1,4 @@
-use std::{collections::VecDeque, time::Duration};
-
-use bson::{rawbson, RawDocumentBuf};
+use std::time::Duration;
 
 use super::AggregateTarget;
 use crate::{
@@ -14,7 +12,7 @@ use crate::{
         Aggregate,
         Operation,
     },
-    options::{AggregateOptions, Hint, ServerAddress},
+    options::{AggregateOptions, Hint},
     Namespace,
 };
 
