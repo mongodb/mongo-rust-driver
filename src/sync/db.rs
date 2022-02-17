@@ -16,8 +16,8 @@ use crate::{
         WriteConcern,
     },
     results::CollectionSpecification,
+    sync::TOKIO_RUNTIME,
     Database as AsyncDatabase,
-    RUNTIME,
 };
 
 /// `Database` is the client-side abstraction of a MongoDB database. It can be used to perform
@@ -108,7 +108,7 @@ impl Database {
 
     /// Drops the database, deleting all data, collections, users, and indexes stored in it.
     pub fn drop(&self, options: impl Into<Option<DropDatabaseOptions>>) -> Result<()> {
-        RUNTIME.block_on(self.async_database.drop(options.into()))
+        TOKIO_RUNTIME.block_on(self.async_database.drop(options.into()))
     }
 
     /// Drops the database, deleting all data, collections, users, and indexes stored in it using
@@ -118,7 +118,7 @@ impl Database {
         options: impl Into<Option<DropDatabaseOptions>>,
         session: &mut ClientSession,
     ) -> Result<()> {
-        RUNTIME.block_on(
+        TOKIO_RUNTIME.block_on(
             self.async_database
                 .drop_with_session(options.into(), &mut session.async_client_session),
         )
@@ -131,7 +131,7 @@ impl Database {
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<ListCollectionsOptions>>,
     ) -> Result<Cursor<CollectionSpecification>> {
-        RUNTIME
+        TOKIO_RUNTIME
             .block_on(
                 self.async_database
                     .list_collections(filter.into(), options.into()),
@@ -148,7 +148,7 @@ impl Database {
         options: impl Into<Option<ListCollectionsOptions>>,
         session: &mut ClientSession,
     ) -> Result<SessionCursor<CollectionSpecification>> {
-        RUNTIME
+        TOKIO_RUNTIME
             .block_on(self.async_database.list_collections_with_session(
                 filter.into(),
                 options.into(),
@@ -162,7 +162,7 @@ impl Database {
         &self,
         filter: impl Into<Option<Document>>,
     ) -> Result<Vec<String>> {
-        RUNTIME.block_on(self.async_database.list_collection_names(filter.into()))
+        TOKIO_RUNTIME.block_on(self.async_database.list_collection_names(filter.into()))
     }
 
     /// Gets the names of the collections in the database using the provided `ClientSession`.
@@ -171,7 +171,7 @@ impl Database {
         filter: impl Into<Option<Document>>,
         session: &mut ClientSession,
     ) -> Result<Vec<String>> {
-        RUNTIME.block_on(
+        TOKIO_RUNTIME.block_on(
             self.async_database.list_collection_names_with_session(
                 filter.into(),
                 &mut session.async_client_session,
@@ -188,7 +188,7 @@ impl Database {
         name: impl AsRef<str>,
         options: impl Into<Option<CreateCollectionOptions>>,
     ) -> Result<()> {
-        RUNTIME.block_on(
+        TOKIO_RUNTIME.block_on(
             self.async_database
                 .create_collection(name.as_ref(), options.into()),
         )
@@ -205,7 +205,7 @@ impl Database {
         options: impl Into<Option<CreateCollectionOptions>>,
         session: &mut ClientSession,
     ) -> Result<()> {
-        RUNTIME.block_on(self.async_database.create_collection_with_session(
+        TOKIO_RUNTIME.block_on(self.async_database.create_collection_with_session(
             name.as_ref(),
             options.into(),
             &mut session.async_client_session,
@@ -222,7 +222,7 @@ impl Database {
         command: Document,
         selection_criteria: impl Into<Option<SelectionCriteria>>,
     ) -> Result<Document> {
-        RUNTIME.block_on(
+        TOKIO_RUNTIME.block_on(
             self.async_database
                 .run_command(command, selection_criteria.into()),
         )
@@ -239,7 +239,7 @@ impl Database {
         selection_criteria: impl Into<Option<SelectionCriteria>>,
         session: &mut ClientSession,
     ) -> Result<Document> {
-        RUNTIME.block_on(self.async_database.run_command_with_session(
+        TOKIO_RUNTIME.block_on(self.async_database.run_command_with_session(
             command,
             selection_criteria.into(),
             &mut session.async_client_session,
@@ -256,7 +256,7 @@ impl Database {
         options: impl Into<Option<AggregateOptions>>,
     ) -> Result<Cursor<Document>> {
         let pipeline: Vec<Document> = pipeline.into_iter().collect();
-        RUNTIME
+        TOKIO_RUNTIME
             .block_on(self.async_database.aggregate(pipeline, options.into()))
             .map(Cursor::new)
     }
@@ -272,7 +272,7 @@ impl Database {
         session: &mut ClientSession,
     ) -> Result<SessionCursor<Document>> {
         let pipeline: Vec<Document> = pipeline.into_iter().collect();
-        RUNTIME
+        TOKIO_RUNTIME
             .block_on(self.async_database.aggregate_with_session(
                 pipeline,
                 options.into(),
@@ -303,7 +303,7 @@ impl Database {
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<ChangeStreamOptions>>,
     ) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
-        RUNTIME
+        TOKIO_RUNTIME
             .block_on(self.async_database.watch(pipeline, options))
             .map(ChangeStream::new)
     }
@@ -316,7 +316,7 @@ impl Database {
         options: impl Into<Option<ChangeStreamOptions>>,
         session: &mut ClientSession,
     ) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
-        RUNTIME
+        TOKIO_RUNTIME
             .block_on(self.async_database.watch_with_session(
                 pipeline,
                 options,

@@ -14,8 +14,8 @@ use crate::{
         SessionOptions,
     },
     results::DatabaseSpecification,
+    sync::TOKIO_RUNTIME,
     Client as AsyncClient,
-    RUNTIME,
 };
 
 /// This is the main entry point for the synchronous API. A `Client` is used to connect to a MongoDB
@@ -75,7 +75,7 @@ impl Client {
     /// [`ClientOptions::parse`](../options/struct.ClientOptions.html#method.parse) for more
     /// details.
     pub fn with_uri_str(uri: impl AsRef<str>) -> Result<Self> {
-        let async_client = RUNTIME.block_on(AsyncClient::with_uri_str(uri.as_ref()))?;
+        let async_client = TOKIO_RUNTIME.block_on(AsyncClient::with_uri_str(uri.as_ref()))?;
         Ok(Self { async_client })
     }
 
@@ -134,7 +134,7 @@ impl Client {
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<ListDatabasesOptions>>,
     ) -> Result<Vec<DatabaseSpecification>> {
-        RUNTIME.block_on(
+        TOKIO_RUNTIME.block_on(
             self.async_client
                 .list_databases(filter.into(), options.into()),
         )
@@ -146,7 +146,7 @@ impl Client {
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<ListDatabasesOptions>>,
     ) -> Result<Vec<String>> {
-        RUNTIME.block_on(
+        TOKIO_RUNTIME.block_on(
             self.async_client
                 .list_database_names(filter.into(), options.into()),
         )
@@ -154,7 +154,7 @@ impl Client {
 
     /// Starts a new `ClientSession`.
     pub fn start_session(&self, options: Option<SessionOptions>) -> Result<ClientSession> {
-        RUNTIME
+        TOKIO_RUNTIME
             .block_on(self.async_client.start_session(options))
             .map(Into::into)
     }
@@ -182,7 +182,7 @@ impl Client {
         pipeline: impl IntoIterator<Item = Document>,
         options: impl Into<Option<ChangeStreamOptions>>,
     ) -> Result<ChangeStream<ChangeStreamEvent<Document>>> {
-        RUNTIME
+        TOKIO_RUNTIME
             .block_on(self.async_client.watch(pipeline, options))
             .map(ChangeStream::new)
     }
@@ -195,7 +195,7 @@ impl Client {
         options: impl Into<Option<ChangeStreamOptions>>,
         session: &mut ClientSession,
     ) -> Result<SessionChangeStream<ChangeStreamEvent<Document>>> {
-        RUNTIME
+        TOKIO_RUNTIME
             .block_on(self.async_client.watch_with_session(
                 pipeline,
                 options,

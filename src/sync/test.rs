@@ -16,9 +16,8 @@ use crate::{
         ServerAddress,
         WriteConcern,
     },
-    sync::{Client, Collection},
+    sync::{Client, Collection, TOKIO_RUNTIME},
     test::{TestClient as AsyncTestClient, CLIENT_OPTIONS, LOCK},
-    RUNTIME,
 };
 
 fn init_db_and_coll(client: &Client, db_name: &str, coll_name: &str) -> Collection<Document> {
@@ -35,7 +34,8 @@ fn init_db_and_typed_coll<T>(client: &Client, db_name: &str, coll_name: &str) ->
 
 #[test]
 fn client_options() {
-    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
+    let _guard: RwLockReadGuard<()> =
+        TOKIO_RUNTIME.block_on(async { LOCK.run_concurrently().await });
 
     let mut options = ClientOptions::parse("mongodb://localhost:27017/").unwrap();
 
@@ -55,7 +55,8 @@ fn client_options() {
 #[test]
 #[function_name::named]
 fn client() {
-    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
+    let _guard: RwLockReadGuard<()> =
+        TOKIO_RUNTIME.block_on(async { LOCK.run_concurrently().await });
 
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
@@ -76,7 +77,8 @@ fn client() {
 fn default_database() {
     // here we just test default database name matched, the database interactive logic
     // is tested in `database`.
-    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
+    let _guard: RwLockReadGuard<()> =
+        TOKIO_RUNTIME.block_on(async { LOCK.run_concurrently().await });
 
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
@@ -104,7 +106,8 @@ fn default_database() {
 #[test]
 #[function_name::named]
 fn database() {
-    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
+    let _guard: RwLockReadGuard<()> =
+        TOKIO_RUNTIME.block_on(async { LOCK.run_concurrently().await });
 
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
@@ -149,7 +152,8 @@ fn database() {
 #[test]
 #[function_name::named]
 fn collection() {
-    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
+    let _guard: RwLockReadGuard<()> =
+        TOKIO_RUNTIME.block_on(async { LOCK.run_concurrently().await });
 
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
@@ -202,7 +206,8 @@ fn collection() {
 #[test]
 #[function_name::named]
 fn typed_collection() {
-    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
+    let _guard: RwLockReadGuard<()> =
+        TOKIO_RUNTIME.block_on(async { LOCK.run_concurrently().await });
 
     let options = CLIENT_OPTIONS.clone();
     let client = Client::with_options(options).expect("client creation should succeed");
@@ -224,9 +229,10 @@ fn typed_collection() {
 #[test]
 #[function_name::named]
 fn transactions() {
-    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
+    let _guard: RwLockReadGuard<()> =
+        TOKIO_RUNTIME.block_on(async { LOCK.run_concurrently().await });
 
-    let should_skip = RUNTIME.block_on(async {
+    let should_skip = TOKIO_RUNTIME.block_on(async {
         let test_client = AsyncTestClient::new().await;
         !test_client.supports_transactions()
     });
@@ -268,7 +274,8 @@ fn transactions() {
 #[test]
 #[function_name::named]
 fn collection_generic_bounds() {
-    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
+    let _guard: RwLockReadGuard<()> =
+        TOKIO_RUNTIME.block_on(async { LOCK.run_concurrently().await });
 
     #[derive(Deserialize)]
     struct Foo;

@@ -4,7 +4,7 @@
 
 extern crate mongodb;
 
-#[cfg(feature = "tokio-runtime")]
+#[cfg(all(feature = "tokio-runtime", not(feature = "sync")))]
 mod async_scram {
     // ASYNC SCRAM CONNECTION EXAMPLE STARTS HERE
     use mongodb::{options::ClientOptions, Client};
@@ -24,7 +24,7 @@ mod async_scram {
     // CONNECTION EXAMPLE ENDS HERE
 }
 
-#[cfg(feature = "tokio-runtime")]
+#[cfg(all(feature = "tokio-runtime", not(feature = "sync")))]
 mod async_x509 {
     // ASYNC X509 CONNECTION EXAMPLE STARTS HERE
     use mongodb::{

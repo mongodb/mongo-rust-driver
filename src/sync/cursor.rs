@@ -5,10 +5,10 @@ use super::ClientSession;
 use crate::{
     bson::{Document, RawDocument},
     error::Result,
+    sync::TOKIO_RUNTIME,
     Cursor as AsyncCursor,
     SessionCursor as AsyncSessionCursor,
     SessionCursorStream,
-    RUNTIME,
 };
 
 /// A `Cursor` streams the result of a query. When a query is made, a `Cursor` will be returned with
@@ -174,7 +174,7 @@ where
     type Item = Result<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        RUNTIME.block_on(self.async_cursor.next())
+        TOKIO_RUNTIME.block_on(self.async_cursor.next())
     }
 }
 
@@ -357,6 +357,6 @@ where
     type Item = Result<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        RUNTIME.block_on(self.async_stream.next())
+        TOKIO_RUNTIME.block_on(self.async_stream.next())
     }
 }

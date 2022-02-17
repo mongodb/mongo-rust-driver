@@ -1048,7 +1048,7 @@ impl ClientOptions {
     #[cfg(any(feature = "sync", docsrs))]
     #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
     pub fn parse(s: impl AsRef<str>) -> Result<Self> {
-        crate::RUNTIME.block_on(Self::parse_uri(s.as_ref(), None))
+        crate::sync::TOKIO_RUNTIME.block_on(Self::parse_uri(s.as_ref(), None))
     }
 
     /// Parses a MongoDB connection string into a `ClientOptions` struct.
@@ -1078,7 +1078,7 @@ impl ClientOptions {
     #[cfg(any(feature = "sync", docsrs))]
     #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
     pub fn parse_with_resolver_config(uri: &str, resolver_config: ResolverConfig) -> Result<Self> {
-        crate::RUNTIME.block_on(Self::parse_uri(uri, Some(resolver_config)))
+        crate::sync::TOKIO_RUNTIME.block_on(Self::parse_uri(uri, Some(resolver_config)))
     }
 
     /// Populate this `ClientOptions` from the given URI, optionally using the resolver config for

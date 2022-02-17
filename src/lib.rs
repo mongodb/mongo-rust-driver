@@ -368,10 +368,9 @@ compile_error!(
      `async-std-runtime` or set `default-features = false` in your Cargo.toml"
 );
 
-#[cfg(all(feature = "tokio-runtime", feature = "sync"))]
+#[cfg(all(feature = "async-std-runtime", feature = "sync"))]
 compile_error!(
-    "`tokio-runtime` and `sync` can't both be enabled; either disable `sync` or set \
-     `default-features = false` in your Cargo.toml"
+    "`async-std-runtime` and `sync` can't both be enabled"
 );
 
 #[cfg(all(not(feature = "tokio-runtime"), not(feature = "async-std-runtime")))]

@@ -40,9 +40,9 @@ use crate::{
         InsertOneResult,
         UpdateResult,
     },
+    sync::TOKIO_RUNTIME,
     Collection as AsyncCollection,
     Namespace,
-    RUNTIME,
 };
 
 /// `Collection` is the client-side abstraction of a MongoDB Collection. It can be used to
@@ -128,7 +128,7 @@ impl<T> Collection<T> {
 
     /// Drops the collection, deleting all data, users, and indexes stored in it.
     pub fn drop(&self, options: impl Into<Option<DropCollectionOptions>>) -> Result<()> {
-        RUNTIME.block_on(self.async_collection.drop(options.into()))
+        TOKIO_RUNTIME.block_on(self.async_collection.drop(options.into()))
     }
 
     /// Drops the collection, deleting all data, users, and indexes stored in it using the provided
@@ -138,7 +138,7 @@ impl<T> Collection<T> {
         options: impl Into<Option<DropCollectionOptions>>,
         session: &mut ClientSession,
     ) -> Result<()> {
-        RUNTIME.block_on(
+        TOKIO_RUNTIME.block_on(
             self.async_collection
                 .drop_with_session(options.into(), &mut session.async_client_session),
         )
@@ -154,7 +154,7 @@ impl<T> Collection<T> {
         options: impl Into<Option<AggregateOptions>>,
     ) -> Result<Cursor<Document>> {
         let pipeline: Vec<Document> = pipeline.into_iter().collect();
-        RUNTIME
+        TOKIO_RUNTIME
             .block_on(self.async_collection.aggregate(pipeline, options.into()))
             .map(Cursor::new)
     }
@@ -170,7 +170,7 @@ impl<T> Collection<T> {
         session: &mut ClientSession,
     ) -> Result<SessionCursor<Document>> {
         let pipeline: Vec<Document> = pipeline.into_iter().collect();
-        RUNTIME
+        TOKIO_RUNTIME
             .block_on(self.async_collection.aggregate_with_session(
                 pipeline,
                 options.into(),
@@ -184,7 +184,7 @@ impl<T> Collection<T> {
         &self,
         options: impl Into<Option<EstimatedDocumentCountOptions>>,
     ) -> Result<u64> {
-        RUNTIME.block_on(
+        TOKIO_RUNTIME.block_on(
             self.async_collection
                 .estimated_document_count(options.into()),
         )
@@ -199,7 +199,7 @@ impl<T> Collection<T> {
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<CountOptions>>,
     ) -> Result<u64> {
-        RUNTIME.block_on(
+        TOKIO_RUNTIME.block_on(
             self.async_collection
                 .count_documents(filter.into(), options.into()),
         )
@@ -215,7 +215,7 @@ impl<T> Collection<T> {
         options: impl Into<Option<CountOptions>>,
         session: &mut ClientSession,
     ) -> Result<u64> {
-        RUNTIME.block_on(self.async_collection.count_documents_with_session(
+        TOKIO_RUNTIME.block_on(self.async_collection.count_documents_with_session(
             filter.into(),
             options.into(),
             &mut session.async_client_session,
@@ -228,7 +228,7 @@ impl<T> Collection<T> {
         index: IndexModel,
         options: impl Into<Option<CreateIndexOptions>>,
     ) -> Result<CreateIndexResult> {
-        RUNTIME.block_on(self.async_collection.create_index(index, options))
+        TOKIO_RUNTIME.block_on(self.async_collection.create_index(index, options))
     }
 
     /// Creates the given index on this collection using the provided `ClientSession`.
@@ -238,7 +238,7 @@ impl<T> Collection<T> {
         options: impl Into<Option<CreateIndexOptions>>,
         session: &mut ClientSession,
     ) -> Result<CreateIndexResult> {
-        RUNTIME.block_on(self.async_collection.create_index_with_session(
+        TOKIO_RUNTIME.block_on(self.async_collection.create_index_with_session(
             index,
             options,
             &mut session.async_client_session,
@@ -251,7 +251,7 @@ impl<T> Collection<T> {
         indexes: impl IntoIterator<Item = IndexModel>,
         options: impl Into<Option<CreateIndexOptions>>,
     ) -> Result<CreateIndexesResult> {
-        RUNTIME.block_on(self.async_collection.create_indexes(indexes, options))
+        TOKIO_RUNTIME.block_on(self.async_collection.create_indexes(indexes, options))
     }
 
     /// Creates the given indexes on this collection using the provided `ClientSession`.
@@ -261,7 +261,7 @@ impl<T> Collection<T> {
         options: impl Into<Option<CreateIndexOptions>>,
         session: &mut ClientSession,
     ) -> Result<CreateIndexesResult> {
-        RUNTIME.block_on(self.async_collection.create_indexes_with_session(
+        TOKIO_RUNTIME.block_on(self.async_collection.create_indexes_with_session(
             indexes,
             options,
             &mut session.async_client_session,
@@ -274,7 +274,7 @@ impl<T> Collection<T> {
         query: Document,
         options: impl Into<Option<DeleteOptions>>,
     ) -> Result<DeleteResult> {
-        RUNTIME.block_on(self.async_collection.delete_many(query, options.into()))
+        TOKIO_RUNTIME.block_on(self.async_collection.delete_many(query, options.into()))
     }
 
     /// Deletes all documents stored in the collection matching `query` using the provided
@@ -285,7 +285,7 @@ impl<T> Collection<T> {
         options: impl Into<Option<DeleteOptions>>,
         session: &mut ClientSession,
     ) -> Result<DeleteResult> {
-        RUNTIME.block_on(self.async_collection.delete_many_with_session(
+        TOKIO_RUNTIME.block_on(self.async_collection.delete_many_with_session(
             query,
             options.into(),
             &mut session.async_client_session,
@@ -303,7 +303,7 @@ impl<T> Collection<T> {
         query: Document,
         options: impl Into<Option<DeleteOptions>>,
     ) -> Result<DeleteResult> {
-        RUNTIME.block_on(self.async_collection.delete_one(query, options.into()))
+        TOKIO_RUNTIME.block_on(self.async_collection.delete_one(query, options.into()))
     }
 
     /// Deletes up to one document found matching `query` using the provided `ClientSession`.
@@ -318,7 +318,7 @@ impl<T> Collection<T> {
         options: impl Into<Option<DeleteOptions>>,
         session: &mut ClientSession,
     ) -> Result<DeleteResult> {
-        RUNTIME.block_on(self.async_collection.delete_one_with_session(
+        TOKIO_RUNTIME.block_on(self.async_collection.delete_one_with_session(
             query,
             options.into(),
             &mut session.async_client_session,
@@ -332,7 +332,7 @@ impl<T> Collection<T> {
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<DistinctOptions>>,
     ) -> Result<Vec<Bson>> {
-        RUNTIME.block_on(self.async_collection.distinct(
+        TOKIO_RUNTIME.block_on(self.async_collection.distinct(
             field_name.as_ref(),
             filter.into(),
             options.into(),
@@ -348,7 +348,7 @@ impl<T> Collection<T> {
         options: impl Into<Option<DistinctOptions>>,
         session: &mut ClientSession,
     ) -> Result<Vec<Bson>> {
-        RUNTIME.block_on(self.async_collection.distinct_with_session(
+        TOKIO_RUNTIME.block_on(self.async_collection.distinct_with_session(
             field_name.as_ref(),
             filter.into(),
             options.into(),
@@ -368,10 +368,11 @@ impl<T> Collection<T> {
         update: impl Into<UpdateModifications>,
         options: impl Into<Option<UpdateOptions>>,
     ) -> Result<UpdateResult> {
-        RUNTIME.block_on(
-            self.async_collection
-                .update_many(query, update.into(), options.into()),
-        )
+        TOKIO_RUNTIME.block_on(self.async_collection.update_many(
+            query,
+            update.into(),
+            options.into(),
+        ))
     }
 
     /// Drops the index specified by `name` from this collection.
@@ -380,7 +381,7 @@ impl<T> Collection<T> {
         name: impl AsRef<str>,
         options: impl Into<Option<DropIndexOptions>>,
     ) -> Result<()> {
-        RUNTIME.block_on(self.async_collection.drop_index(name, options))
+        TOKIO_RUNTIME.block_on(self.async_collection.drop_index(name, options))
     }
 
     /// Drops the index specified by `name` from this collection using the provided `ClientSession`.
@@ -390,7 +391,7 @@ impl<T> Collection<T> {
         options: impl Into<Option<DropIndexOptions>>,
         session: &mut ClientSession,
     ) -> Result<()> {
-        RUNTIME.block_on(self.async_collection.drop_index_with_session(
+        TOKIO_RUNTIME.block_on(self.async_collection.drop_index_with_session(
             name,
             options,
             &mut session.async_client_session,
@@ -399,7 +400,7 @@ impl<T> Collection<T> {
 
     /// Drops all indexes associated with this collection.
     pub fn drop_indexes(&self, options: impl Into<Option<DropIndexOptions>>) -> Result<()> {
-        RUNTIME.block_on(self.async_collection.drop_indexes(options))
+        TOKIO_RUNTIME.block_on(self.async_collection.drop_indexes(options))
     }
 
     /// Drops all indexes associated with this collection using the provided `ClientSession`.
@@ -408,7 +409,7 @@ impl<T> Collection<T> {
         options: impl Into<Option<DropIndexOptions>>,
         session: &mut ClientSession,
     ) -> Result<()> {
-        RUNTIME.block_on(
+        TOKIO_RUNTIME.block_on(
             self.async_collection
                 .drop_indexes_with_session(options, &mut session.async_client_session),
         )
@@ -419,7 +420,7 @@ impl<T> Collection<T> {
         &self,
         options: impl Into<Option<ListIndexesOptions>>,
     ) -> Result<Cursor<IndexModel>> {
-        RUNTIME
+        TOKIO_RUNTIME
             .block_on(self.async_collection.list_indexes(options))
             .map(Cursor::new)
     }
@@ -430,7 +431,7 @@ impl<T> Collection<T> {
         options: impl Into<Option<ListIndexesOptions>>,
         session: &mut ClientSession,
     ) -> Result<SessionCursor<IndexModel>> {
-        RUNTIME
+        TOKIO_RUNTIME
             .block_on(
                 self.async_collection
                     .list_indexes_with_session(options, &mut session.async_client_session),
@@ -440,7 +441,7 @@ impl<T> Collection<T> {
 
     /// Gets the names of all indexes on the collection.
     pub fn list_index_names(&self) -> Result<Vec<String>> {
-        RUNTIME.block_on(self.async_collection.list_index_names())
+        TOKIO_RUNTIME.block_on(self.async_collection.list_index_names())
     }
 
     /// Gets the names of all indexes on the collection using the provided `ClientSession`.
@@ -448,7 +449,7 @@ impl<T> Collection<T> {
         &self,
         session: &mut ClientSession,
     ) -> Result<Vec<String>> {
-        RUNTIME.block_on(
+        TOKIO_RUNTIME.block_on(
             self.async_collection
                 .list_index_names_with_session(&mut session.async_client_session),
         )
@@ -467,7 +468,7 @@ impl<T> Collection<T> {
         options: impl Into<Option<UpdateOptions>>,
         session: &mut ClientSession,
     ) -> Result<UpdateResult> {
-        RUNTIME.block_on(self.async_collection.update_many_with_session(
+        TOKIO_RUNTIME.block_on(self.async_collection.update_many_with_session(
             query,
             update.into(),
             options.into(),
@@ -492,10 +493,11 @@ impl<T> Collection<T> {
         update: impl Into<UpdateModifications>,
         options: impl Into<Option<UpdateOptions>>,
     ) -> Result<UpdateResult> {
-        RUNTIME.block_on(
-            self.async_collection
-                .update_one(query, update.into(), options.into()),
-        )
+        TOKIO_RUNTIME.block_on(self.async_collection.update_one(
+            query,
+            update.into(),
+            options.into(),
+        ))
     }
 
     /// Updates up to one document matching `query` in the collection using the provided
@@ -517,7 +519,7 @@ impl<T> Collection<T> {
         options: impl Into<Option<UpdateOptions>>,
         session: &mut ClientSession,
     ) -> Result<UpdateResult> {
-        RUNTIME.block_on(self.async_collection.update_one_with_session(
+        TOKIO_RUNTIME.block_on(self.async_collection.update_one_with_session(
             query,
             update.into(),
             options.into(),
@@ -551,7 +553,7 @@ impl<T> Collection<T> {
     where
         T: DeserializeOwned + Unpin + Send + Sync,
     {
-        RUNTIME
+        TOKIO_RUNTIME
             .block_on(self.async_collection.watch(pipeline, options))
             .map(ChangeStream::new)
     }
@@ -568,7 +570,7 @@ impl<T> Collection<T> {
     where
         T: DeserializeOwned + Unpin + Send + Sync,
     {
-        RUNTIME
+        TOKIO_RUNTIME
             .block_on(self.async_collection.watch_with_session(
                 pipeline,
                 options,
@@ -583,7 +585,7 @@ impl<T> Collection<T> {
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<FindOptions>>,
     ) -> Result<Cursor<T>> {
-        RUNTIME
+        TOKIO_RUNTIME
             .block_on(self.async_collection.find(filter.into(), options.into()))
             .map(Cursor::new)
     }
@@ -595,7 +597,7 @@ impl<T> Collection<T> {
         options: impl Into<Option<FindOptions>>,
         session: &mut ClientSession,
     ) -> Result<SessionCursor<T>> {
-        RUNTIME
+        TOKIO_RUNTIME
             .block_on(self.async_collection.find_with_session(
                 filter.into(),
                 options.into(),
@@ -615,7 +617,7 @@ where
         filter: impl Into<Option<Document>>,
         options: impl Into<Option<FindOneOptions>>,
     ) -> Result<Option<T>> {
-        RUNTIME.block_on(
+        TOKIO_RUNTIME.block_on(
             self.async_collection
                 .find_one(filter.into(), options.into()),
         )
@@ -629,7 +631,7 @@ where
         options: impl Into<Option<FindOneOptions>>,
         session: &mut ClientSession,
     ) -> Result<Option<T>> {
-        RUNTIME.block_on(self.async_collection.find_one_with_session(
+        TOKIO_RUNTIME.block_on(self.async_collection.find_one_with_session(
             filter.into(),
             options.into(),
             &mut session.async_client_session,
@@ -652,7 +654,7 @@ where
         filter: Document,
         options: impl Into<Option<FindOneAndDeleteOptions>>,
     ) -> Result<Option<T>> {
-        RUNTIME.block_on(
+        TOKIO_RUNTIME.block_on(
             self.async_collection
                 .find_one_and_delete(filter, options.into()),
         )
@@ -671,7 +673,7 @@ where
         options: impl Into<Option<FindOneAndDeleteOptions>>,
         session: &mut ClientSession,
     ) -> Result<Option<T>> {
-        RUNTIME.block_on(self.async_collection.find_one_and_delete_with_session(
+        TOKIO_RUNTIME.block_on(self.async_collection.find_one_and_delete_with_session(
             filter,
             options.into(),
             &mut session.async_client_session,
@@ -693,7 +695,7 @@ where
         update: impl Into<UpdateModifications>,
         options: impl Into<Option<FindOneAndUpdateOptions>>,
     ) -> Result<Option<T>> {
-        RUNTIME.block_on(self.async_collection.find_one_and_update(
+        TOKIO_RUNTIME.block_on(self.async_collection.find_one_and_update(
             filter,
             update.into(),
             options.into(),
@@ -716,7 +718,7 @@ where
         options: impl Into<Option<FindOneAndUpdateOptions>>,
         session: &mut ClientSession,
     ) -> Result<Option<T>> {
-        RUNTIME.block_on(self.async_collection.find_one_and_update_with_session(
+        TOKIO_RUNTIME.block_on(self.async_collection.find_one_and_update_with_session(
             filter,
             update.into(),
             options.into(),
@@ -742,7 +744,7 @@ where
         replacement: T,
         options: impl Into<Option<FindOneAndReplaceOptions>>,
     ) -> Result<Option<T>> {
-        RUNTIME.block_on(self.async_collection.find_one_and_replace(
+        TOKIO_RUNTIME.block_on(self.async_collection.find_one_and_replace(
             filter,
             replacement,
             options.into(),
@@ -763,7 +765,7 @@ where
         options: impl Into<Option<FindOneAndReplaceOptions>>,
         session: &mut ClientSession,
     ) -> Result<Option<T>> {
-        RUNTIME.block_on(self.async_collection.find_one_and_replace_with_session(
+        TOKIO_RUNTIME.block_on(self.async_collection.find_one_and_replace_with_session(
             filter,
             replacement,
             options.into(),
@@ -787,7 +789,7 @@ where
         docs: impl IntoIterator<Item = impl Borrow<T>>,
         options: impl Into<Option<InsertManyOptions>>,
     ) -> Result<InsertManyResult> {
-        RUNTIME.block_on(self.async_collection.insert_many(docs, options.into()))
+        TOKIO_RUNTIME.block_on(self.async_collection.insert_many(docs, options.into()))
     }
 
     /// Inserts the documents in `docs` into the collection using the provided `ClientSession`.
@@ -802,7 +804,7 @@ where
         options: impl Into<Option<InsertManyOptions>>,
         session: &mut ClientSession,
     ) -> Result<InsertManyResult> {
-        RUNTIME.block_on(self.async_collection.insert_many_with_session(
+        TOKIO_RUNTIME.block_on(self.async_collection.insert_many_with_session(
             docs,
             options.into(),
             &mut session.async_client_session,
@@ -820,7 +822,7 @@ where
         doc: impl Borrow<T>,
         options: impl Into<Option<InsertOneOptions>>,
     ) -> Result<InsertOneResult> {
-        RUNTIME.block_on(
+        TOKIO_RUNTIME.block_on(
             self.async_collection
                 .insert_one(doc.borrow(), options.into()),
         )
@@ -838,7 +840,7 @@ where
         options: impl Into<Option<InsertOneOptions>>,
         session: &mut ClientSession,
     ) -> Result<InsertOneResult> {
-        RUNTIME.block_on(self.async_collection.insert_one_with_session(
+        TOKIO_RUNTIME.block_on(self.async_collection.insert_one_with_session(
             doc.borrow(),
             options.into(),
             &mut session.async_client_session,
@@ -857,7 +859,7 @@ where
         replacement: impl Borrow<T>,
         options: impl Into<Option<ReplaceOptions>>,
     ) -> Result<UpdateResult> {
-        RUNTIME.block_on(self.async_collection.replace_one(
+        TOKIO_RUNTIME.block_on(self.async_collection.replace_one(
             query,
             replacement.borrow(),
             options.into(),
@@ -878,7 +880,7 @@ where
         options: impl Into<Option<ReplaceOptions>>,
         session: &mut ClientSession,
     ) -> Result<UpdateResult> {
-        RUNTIME.block_on(self.async_collection.replace_one_with_session(
+        TOKIO_RUNTIME.block_on(self.async_collection.replace_one_with_session(
             query,
             replacement.borrow(),
             options.into(),

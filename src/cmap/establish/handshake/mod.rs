@@ -18,14 +18,14 @@ use crate::{
     sdam::Topology,
 };
 
-#[cfg(feature = "tokio-runtime")]
+#[cfg(all(feature = "tokio-runtime", not(feature = "sync")))]
 const RUNTIME_NAME: &str = "tokio";
 
-#[cfg(all(feature = "async-std-runtime", not(feature = "sync")))]
+#[cfg(feature = "async-std-runtime")]
 const RUNTIME_NAME: &str = "async-std";
 
 #[cfg(feature = "sync")]
-const RUNTIME_NAME: &str = "sync (with async-std)";
+const RUNTIME_NAME: &str = "sync (with tokio)";
 
 #[derive(Clone, Debug)]
 struct ClientMetadata {

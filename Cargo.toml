@@ -23,7 +23,7 @@ exclude = [
 default = ["tokio-runtime"]
 tokio-runtime = ["tokio/macros", "tokio/net", "tokio/rt", "tokio/time", "serde_bytes"]
 async-std-runtime = ["async-std", "async-std/attributes", "async-std-resolver", "tokio-util/compat"]
-sync = ["async-std-runtime"]
+sync = ["tokio-runtime"]
 
 # Enable support for v0.4 of the chrono crate in the public API of the BSON library.
 bson-chrono-0_4 = ["bson/chrono-0_4"]
@@ -50,6 +50,7 @@ bson = { git = "https://github.com/mongodb/bson-rust", branch = "master" }
 chrono = "0.4.7"
 derivative = "2.1.1"
 flate2 = { version = "1.0", optional = true }
+futures = "0.3"
 futures-core = "0.3.14"
 futures-io = "0.3.14"
 futures-util = { version = "0.3.14", features = ["io"] }
@@ -129,7 +130,6 @@ features = ["v4"]
 approx = "0.4.0"
 derive_more = "0.99.13"
 function_name = "0.2.0"
-futures = "0.3"
 home = "0.5"
 pretty_assertions = "0.7.1"
 serde_json = "1.0.64"
