@@ -10,7 +10,8 @@
         ],
         "ignoreCommandMonitoringEvents": [
           "killCursors"
-        ]
+        ],
+        "useMultipleMongoses": false
       }
     },
     {

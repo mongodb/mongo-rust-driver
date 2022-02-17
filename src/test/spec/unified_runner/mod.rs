@@ -201,8 +201,10 @@ pub async fn run_unified_format_test_filtered(
                             }
                         }
                         Expectation::Error(expect_error) => {
-                            let error = result
-                                .expect_err(&format!("{} should return an error", operation.name));
+                            let error = result.expect_err(&format!(
+                                "{}: {} should return an error",
+                                test_case.description, operation.name
+                            ));
                             expect_error.verify_result(error);
                         }
                         Expectation::Ignore => (),

@@ -5,6 +5,7 @@ createEntities:
       id: &client0 client0
       observeEvents: [ commandStartedEvent ]
       ignoreCommandMonitoringEvents: [ killCursors ]
+      useMultipleMongoses: false
   - client:
       id: &globalClient globalClient
       useMultipleMongoses: false
