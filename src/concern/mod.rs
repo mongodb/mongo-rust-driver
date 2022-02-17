@@ -208,14 +208,14 @@ pub struct WriteConcern {
     /// Note that an error being returned due to a write concern error does not imply that the
     /// write would not have finished propagating if allowed more time to finish, and the
     /// server will not roll back the writes that occurred before the timeout was reached.
-    #[serde(rename = "wtimeout")]
+    #[serde(rename = "wtimeout", alias = "wtimeoutMS")]
     #[serde(serialize_with = "bson_util::serialize_duration_option_as_int_millis")]
     #[serde(deserialize_with = "bson_util::deserialize_duration_option_from_u64_millis")]
     #[serde(default)]
     pub w_timeout: Option<Duration>,
 
     /// Requests acknowledgement that the operation has propagated to the on-disk journal.
-    #[serde(rename = "j")]
+    #[serde(rename = "j", alias = "journal")]
     pub journal: Option<bool>,
 }
 
@@ -285,11 +285,12 @@ impl From<String> for Acknowledgment {
 }
 
 impl WriteConcern {
-    #[allow(dead_code)]
     pub(crate) fn is_acknowledged(&self) -> bool {
         self.w != Some(Acknowledgment::Nodes(0)) || self.journal == Some(true)
     }
 
+    /// Whether the write concern was created with no values specified. If true, the write concern
+    /// should be considered the server's default.
     pub(crate) fn is_empty(&self) -> bool {
         self.w == None && self.w_timeout == None && self.journal == None
     }
