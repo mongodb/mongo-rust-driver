@@ -52,12 +52,7 @@ impl AsyncRuntime {
         match self {
             #[cfg(feature = "tokio-runtime")]
             Self::Tokio => {
-                #[cfg(feature = "sync")]
-                let handle = crate::sync::TOKIO_RUNTIME.handle();
-
-                #[cfg(not(feature = "sync"))]
                 let handle = tokio::runtime::Handle::current();
-
                 Some(AsyncJoinHandle::Tokio(handle.spawn(fut)))
             }
 
@@ -75,6 +70,20 @@ impl AsyncRuntime {
         O: Send + 'static,
     {
         self.spawn(fut);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn block_on<F, T>(self, fut: F) -> T
+    where
+        F: Future<Output = T>,
+    {
+        match self {
+            #[cfg(feature = "tokio-runtime")]
+            Self::Tokio => tokio::task::block_in_place(|| futures::executor::block_on(fut)),
+
+            #[cfg(feature = "async-std-runtime")]
+            Self::AsyncStd => async_std::task::block_on(fut),
+        }
     }
 
     /// Run a future in the foreground, blocking on it completing.

@@ -72,7 +72,7 @@ impl Drop for FailPointGuard {
         let client = self.client.clone();
         let name = self.failpoint_name.clone();
 
-        let result = RUNTIME.block_in_place(async move {
+        let result = RUNTIME.block_on(async move {
             client
                 .database("admin")
                 .run_command(
