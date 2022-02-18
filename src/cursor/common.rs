@@ -521,7 +521,9 @@ impl CursorBuffer {
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.iter.current().is_none()
+        // self.iter.current().is_none()
+        // self.iter.is_ex
+        self.iter.is_exhausted()
     }
 
     pub(crate) fn next(&mut self) -> Option<RawDocumentBuf> {
