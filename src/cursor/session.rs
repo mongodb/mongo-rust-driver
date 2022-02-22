@@ -214,6 +214,14 @@ impl<T> SessionCursor<T> {
     /// This will keep requesting data from the server until either the cursor is exhausted
     /// or batch with results in it has been received.
     ///
+    /// The return value indicates whether new results were successfully returned (true) or if
+    /// the cursor has been closed (false).
+    ///
+    /// Note: [`SessionCursor::current`] and [`SessionCursor::deserialize_current`] must only be
+    /// called after [`SessionCursor::advance`] returned `Ok(true)`. It is an error to call
+    /// either of them without calling [`SessionCursor::advance`] first or after
+    /// [`SessionCursor::advance`] returns an error / false.
+    ///
     /// ```
     /// # use mongodb::{Client, bson::Document, error::Result};
     /// # async fn foo() -> Result<()> {
@@ -232,11 +240,11 @@ impl<T> SessionCursor<T> {
     }
 
     /// Returns a reference to the current result in the cursor.
-    /// [`Cursor::advance`] will move the cursor forward to get the next document.
     ///
     /// # Panics
-    /// This method may panic if [`Cursor::advance`] did not return true before
-    /// it was invoked.
+    /// [`SessionCursor::advance`] must return `Ok(true)` before [`SessionCursor::current`] can be
+    /// invoked. Calling [`SessionCursor::current`] after [`SessionCursor::advance`] does not return
+    /// true or without calling [`SessionCursor::advance`] at all may result in a panic.
     ///
     /// ```
     /// # use mongodb::{Client, bson::Document, error::Result};
@@ -258,8 +266,10 @@ impl<T> SessionCursor<T> {
     /// Deserialize the current result to the generic type associated with this cursor.
     ///
     /// # Panics
-    /// This method may panic if [`Cursor::advance`] did not return true before
-    /// it was invoked.
+    /// [`SessionCursor::advance`] must return `Ok(true)` before
+    /// [`SessionCursor::deserialize_current`] can be invoked. Calling
+    /// [`SessionCursor::deserialize_current`] after [`SessionCursor::advance`] does not return
+    /// true or without calling [`SessionCursor::advance`] at all may result in a panic.
     ///
     /// ```
     /// # use mongodb::{Client, error::Result};

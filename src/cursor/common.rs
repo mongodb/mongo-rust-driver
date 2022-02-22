@@ -21,7 +21,9 @@ use crate::{
     operation,
     options::ServerAddress,
     results::GetMoreResult,
-    Client, Namespace, RUNTIME,
+    Client,
+    Namespace,
+    RUNTIME,
 };
 
 /// An internal cursor that can be used in a variety of contexts depending on its `GetMoreProvider`.
@@ -506,41 +508,25 @@ pub(crate) struct CursorState {
 
 #[derive(Debug, Clone)]
 pub(crate) struct CursorBuffer {
-    // iter: RawArrayBufCopyingIter,
-    // /// whether the buffer is at the front or not
-    // fresh: bool,
     docs: VecDeque<RawDocumentBuf>,
+    /// whether the buffer is at the front or not
     fresh: bool,
 }
 
 impl CursorBuffer {
     pub(crate) fn new(initial_buffer: VecDeque<RawDocumentBuf>) -> Self {
-        // Self {
-        //     iter: initial_buffer.into_copying_iter(),
-        //     fresh: true,
-        // }
-        // Self {
-        //     docs: initial_buffer
-        //         .iter()
-        //         .map(|r| r.unwrap().as_document().unwrap().to_owned())
-        //         .collect(),
-        //     fresh: true,
-        // }
-        Self { docs: initial_buffer, fresh: true }
+        Self {
+            docs: initial_buffer,
+            fresh: true,
+        }
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        // self.iter.current().is_none()
-        // self.iter.is_ex
-        // self.iter.is_exhausted()
         self.docs.is_empty()
     }
 
     pub(crate) fn next(&mut self) -> Option<RawDocumentBuf> {
-        // match self.iter.next() {
-        //     Some(Ok(RawBson::Document(d))) => Some(d),
-        //     _ => None,
-        // }
+        self.fresh = false;
         self.docs.pop_front()
     }
 
@@ -551,15 +537,10 @@ impl CursorBuffer {
             self.fresh = false;
             return;
         }
-        // self.iter.advance()
-        self.docs.pop_front();
+        self.next();
     }
 
     pub(crate) fn current(&self) -> Option<&RawDocument> {
-        // self.iter
-        //     .current()
-        //     .and_then(|d| d.ok())
-        //     .and_then(|d| d.as_document())
         self.docs.front().map(|d| d.as_ref())
     }
 }
