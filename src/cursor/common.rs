@@ -1,11 +1,12 @@
 use std::{
+    collections::VecDeque,
     marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
 };
 
-use bson::{raw::RawArrayBufCopyingIter, RawArrayBuf, RawBson, RawDocument, RawDocumentBuf};
+use bson::{RawDocument, RawDocumentBuf};
 use derivative::Derivative;
 use futures_core::{future::BoxFuture, Future, Stream};
 use serde::{de::DeserializeOwned, Deserialize};
@@ -20,9 +21,7 @@ use crate::{
     operation,
     options::ServerAddress,
     results::GetMoreResult,
-    Client,
-    Namespace,
-    RUNTIME,
+    Client, Namespace, RUNTIME,
 };
 
 /// An internal cursor that can be used in a variety of contexts depending on its `GetMoreProvider`.
@@ -370,7 +369,7 @@ pub(crate) trait GetMoreProviderResult {
 #[derive(Debug, Clone)]
 pub(crate) struct CursorSpecification {
     pub(crate) info: CursorInformation,
-    pub(crate) initial_buffer: RawArrayBuf,
+    pub(crate) initial_buffer: VecDeque<RawDocumentBuf>,
     pub(crate) post_batch_resume_token: Option<ResumeToken>,
 }
 
@@ -507,30 +506,42 @@ pub(crate) struct CursorState {
 
 #[derive(Debug, Clone)]
 pub(crate) struct CursorBuffer {
-    iter: RawArrayBufCopyingIter,
-    /// whether the buffer is at the front or not
+    // iter: RawArrayBufCopyingIter,
+    // /// whether the buffer is at the front or not
+    // fresh: bool,
+    docs: VecDeque<RawDocumentBuf>,
     fresh: bool,
 }
 
 impl CursorBuffer {
-    pub(crate) fn new(initial_buffer: RawArrayBuf) -> Self {
-        Self {
-            iter: initial_buffer.into_copying_iter(),
-            fresh: true,
-        }
+    pub(crate) fn new(initial_buffer: VecDeque<RawDocumentBuf>) -> Self {
+        // Self {
+        //     iter: initial_buffer.into_copying_iter(),
+        //     fresh: true,
+        // }
+        // Self {
+        //     docs: initial_buffer
+        //         .iter()
+        //         .map(|r| r.unwrap().as_document().unwrap().to_owned())
+        //         .collect(),
+        //     fresh: true,
+        // }
+        Self { docs: initial_buffer, fresh: true }
     }
 
     pub(crate) fn is_empty(&self) -> bool {
         // self.iter.current().is_none()
         // self.iter.is_ex
-        self.iter.is_exhausted()
+        // self.iter.is_exhausted()
+        self.docs.is_empty()
     }
 
     pub(crate) fn next(&mut self) -> Option<RawDocumentBuf> {
-        match self.iter.next() {
-            Some(Ok(RawBson::Document(d))) => Some(d),
-            _ => None,
-        }
+        // match self.iter.next() {
+        //     Some(Ok(RawBson::Document(d))) => Some(d),
+        //     _ => None,
+        // }
+        self.docs.pop_front()
     }
 
     pub(crate) fn advance(&mut self) {
@@ -540,13 +551,15 @@ impl CursorBuffer {
             self.fresh = false;
             return;
         }
-        self.iter.advance()
+        // self.iter.advance()
+        self.docs.pop_front();
     }
 
     pub(crate) fn current(&self) -> Option<&RawDocument> {
-        self.iter
-            .current()
-            .and_then(|d| d.ok())
-            .and_then(|d| d.as_document())
+        // self.iter
+        //     .current()
+        //     .and_then(|d| d.ok())
+        //     .and_then(|d| d.as_document())
+        self.docs.front().map(|d| d.as_ref())
     }
 }

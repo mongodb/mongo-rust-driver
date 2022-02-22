@@ -1,6 +1,6 @@
 //! Contains the types of results returned by CRUD operations.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use crate::{
     bson::{Bson, Document},
@@ -9,7 +9,7 @@ use crate::{
     db::options::CreateCollectionOptions,
 };
 
-use bson::{Binary, RawArrayBuf};
+use bson::{Binary, RawDocumentBuf};
 use serde::{Deserialize, Serialize};
 
 /// The result of a [`Collection::insert_one`](../struct.Collection.html#method.insert_one)
@@ -105,7 +105,7 @@ impl CreateIndexesResult {
 
 #[derive(Debug, Clone)]
 pub(crate) struct GetMoreResult {
-    pub(crate) batch: RawArrayBuf,
+    pub(crate) batch: VecDeque<RawDocumentBuf>,
     pub(crate) exhausted: bool,
     pub(crate) post_batch_resume_token: Option<ResumeToken>,
 }

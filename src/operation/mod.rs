@@ -23,9 +23,9 @@ mod update;
 #[cfg(test)]
 mod test;
 
-use std::{fmt::Debug, ops::Deref};
+use std::{collections::VecDeque, fmt::Debug, ops::Deref};
 
-use bson::{RawArrayBuf, RawBsonRef, RawDocument, RawDocumentBuf, Timestamp};
+use bson::{RawBsonRef, RawDocument, RawDocumentBuf, Timestamp};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
@@ -346,7 +346,7 @@ pub(crate) struct CursorInfo {
 
     pub(crate) ns: Namespace,
 
-    pub(crate) first_batch: RawArrayBuf,
+    pub(crate) first_batch: VecDeque<RawDocumentBuf>,
 
     pub(crate) post_batch_resume_token: Option<RawDocumentBuf>,
 }
