@@ -93,7 +93,6 @@ impl<T> SessionCursor<T> {
             kill_watcher: None,
             state: CursorState {
                 buffer: CursorBuffer::new(spec.initial_buffer),
-                error: None,
                 exhausted,
                 post_batch_resume_token: None,
                 pinned_connection: PinnedConnection::new(pinned),

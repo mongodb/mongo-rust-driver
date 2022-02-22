@@ -60,7 +60,6 @@ where
             info: spec.info,
             state: Some(CursorState {
                 buffer: CursorBuffer::new(spec.initial_buffer),
-                error: None,
                 exhausted,
                 post_batch_resume_token: None,
                 pinned_connection,
@@ -157,29 +156,37 @@ where
             .as_ref()
     }
 
+    fn mark_exhausted(&mut self) {
+        self.state_mut().exhausted = true;
+        self.state_mut().pinned_connection = PinnedConnection::Unpinned;
+    }
+
     fn handle_get_more_result(&mut self, get_more_result: Result<GetMoreResult>) -> Result<()> {
         self.state_mut().exhausted = get_more_result
             .as_ref()
             .map(|r| r.exhausted)
             .unwrap_or(true);
-        if self.state().exhausted {
-            self.state_mut().pinned_connection = PinnedConnection::Unpinned;
-        }
 
         match get_more_result {
             Ok(get_more) => {
+                if get_more.exhausted {
+                    self.mark_exhausted();
+                }
                 self.state_mut().buffer = CursorBuffer::new(get_more.batch);
                 self.state_mut().post_batch_resume_token = get_more.post_batch_resume_token;
 
                 Ok(())
             }
             Err(e) => {
+                if matches!(*e.kind, ErrorKind::Command(ref e) if e.code == 43 || e.code == 237) {
+                    self.mark_exhausted();
+                }
+
                 if e.is_network_error() {
                     // Flag the connection as invalid, preventing a killCursors command,
                     // but leave the connection pinned.
                     self.state_mut().pinned_connection.invalidate();
                 }
-                self.state_mut().error = Some(e.clone());
 
                 Err(e)
             }
@@ -355,16 +362,6 @@ pub(crate) trait GetMoreProviderResult {
     fn as_ref(&self) -> std::result::Result<&GetMoreResult, &Error>;
 
     fn into_parts(self) -> (Result<GetMoreResult>, Self::Session);
-
-    /// Whether the response from the server indicated the cursor was exhausted or not.
-    fn exhausted(&self) -> bool {
-        match self.as_ref() {
-            Ok(res) => res.exhausted,
-            Err(e) => {
-                matches!(*e.kind, ErrorKind::Command(ref e) if e.code == 43 || e.code == 237)
-            }
-        }
-    }
 }
 
 /// Specification used to create a new cursor.
@@ -500,7 +497,6 @@ pub(super) fn kill_cursor(
 #[derive(Debug)]
 pub(crate) struct CursorState {
     pub(crate) buffer: CursorBuffer,
-    pub(crate) error: Option<Error>,
     pub(crate) exhausted: bool,
     pub(crate) post_batch_resume_token: Option<ResumeToken>,
     pub(crate) pinned_connection: PinnedConnection,
