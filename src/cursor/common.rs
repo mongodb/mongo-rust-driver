@@ -340,12 +340,12 @@ pub(super) trait GetMoreProvider: Unpin {
     /// This is useful in async functions that can await the entire getMore process.
     /// `start_execution` and `clear_execution` should be used for contexts where the futures
     /// need to be polled manually.
-    fn execute<'a>(
-        &'a mut self,
+    fn execute(
+        &mut self,
         _spec: CursorInformation,
         _client: Client,
         _pinned_conn: PinnedConnection,
-    ) -> BoxFuture<'a, Result<GetMoreResult>>;
+    ) -> BoxFuture<'_, Result<GetMoreResult>>;
 }
 
 /// Trait describing results returned from a `GetMoreProvider`.

@@ -408,12 +408,12 @@ impl GetMoreProvider for ImplicitSessionGetMoreProvider {
         })
     }
 
-    fn execute<'a>(
-        &'a mut self,
+    fn execute(
+        &mut self,
         info: CursorInformation,
         client: Client,
         pinned_connection: PinnedConnection,
-    ) -> BoxFuture<'a, Result<GetMoreResult>> {
+    ) -> BoxFuture<'_, Result<GetMoreResult>> {
         match self {
             Self::Idle(ref mut session) => Box::pin(async move {
                 let get_more = GetMore::new(info, pinned_connection.handle());
