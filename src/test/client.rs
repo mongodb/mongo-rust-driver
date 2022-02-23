@@ -386,7 +386,7 @@ async fn auth_test_uri(
     }
 
     if let Some(true) = CLIENT_OPTIONS.load_balanced {
-        uri.push_str(("&loadBalanced=true"));
+        uri.push_str("&loadBalanced=true");
     }
 
     auth_test(
