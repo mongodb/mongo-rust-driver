@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use pretty_assertions::assert_eq;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use tokio::sync::RwLockReadGuard;
 
 use crate::{
@@ -27,10 +27,7 @@ fn init_db_and_coll(client: &Client, db_name: &str, coll_name: &str) -> Collecti
     coll
 }
 
-fn init_db_and_typed_coll<T>(client: &Client, db_name: &str, coll_name: &str) -> Collection<T>
-where
-    T: Serialize + DeserializeOwned + Unpin + Debug,
-{
+fn init_db_and_typed_coll<T>(client: &Client, db_name: &str, coll_name: &str) -> Collection<T> {
     let coll = client.database(db_name).collection(coll_name);
     coll.drop(None).unwrap();
     coll
@@ -293,4 +290,75 @@ fn collection_generic_bounds() {
         .database(function_name!())
         .collection(function_name!());
     let _result = coll.insert_one(Bar {}, None);
+}
+
+#[test]
+fn borrowed_deserialization() {
+    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
+
+    let client =
+        Client::with_options(CLIENT_OPTIONS.clone()).expect("client creation should succeed");
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct Doc<'a> {
+        #[serde(rename = "_id")]
+        id: i32,
+
+        #[serde(borrow)]
+        foo: &'a str,
+    }
+
+    let coll = init_db_and_typed_coll::<Doc>(
+        &client,
+        "sync_cursor_borrowed_db",
+        "sync_cursor_borrowed_coll",
+    );
+
+    let docs = vec![
+        Doc {
+            id: 0,
+            foo: "a string",
+        },
+        Doc {
+            id: 1,
+            foo: "another string",
+        },
+        Doc {
+            id: 2,
+            foo: "more strings",
+        },
+        Doc {
+            id: 3,
+            foo: "striiiiiing",
+        },
+        Doc { id: 4, foo: "s" },
+        Doc { id: 5, foo: "1" },
+    ];
+
+    coll.insert_many(&docs, None).unwrap();
+    let options = FindOptions::builder()
+        .batch_size(2)
+        .sort(doc! { "_id": 1 })
+        .build();
+
+    let mut cursor = coll.find(None, options.clone()).unwrap();
+
+    let mut i = 0;
+    while cursor.advance().unwrap() {
+        let de = cursor.deserialize_current().unwrap();
+        assert_eq!(de, docs[i]);
+        i += 1;
+    }
+
+    let mut session = client.start_session(None).unwrap();
+    let mut cursor = coll
+        .find_with_session(None, options.clone(), &mut session)
+        .unwrap();
+
+    let mut i = 0;
+    while cursor.advance(&mut session).unwrap() {
+        let de = cursor.deserialize_current().unwrap();
+        assert_eq!(de, docs[i]);
+        i += 1;
+    }
 }

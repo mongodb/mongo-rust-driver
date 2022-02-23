@@ -576,12 +576,7 @@ impl<T> Collection<T> {
             ))
             .map(SessionChangeStream::new)
     }
-}
 
-impl<T> Collection<T>
-where
-    T: DeserializeOwned + Unpin + Send + Sync,
-{
     /// Finds the documents in the collection matching `filter`.
     pub fn find(
         &self,
@@ -608,7 +603,12 @@ where
             ))
             .map(SessionCursor::new)
     }
+}
 
+impl<T> Collection<T>
+where
+    T: DeserializeOwned + Unpin + Send + Sync,
+{
     /// Finds a single document in the collection matching `filter`.
     pub fn find_one(
         &self,

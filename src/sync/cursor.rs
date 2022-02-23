@@ -1,9 +1,9 @@
 use futures_util::stream::StreamExt;
-use serde::de::DeserializeOwned;
+use serde::de::{Deserialize, DeserializeOwned};
 
 use super::ClientSession;
 use crate::{
-    bson::Document,
+    bson::{Document, RawDocument},
     error::Result,
     Cursor as AsyncCursor,
     SessionCursor as AsyncSessionCursor,
@@ -28,8 +28,8 @@ use crate::{
 /// results from the server; both of these factors should be taken into account when choosing the
 /// optimal batch size.
 ///
-/// A cursor can be used like any other [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html). The simplest way is just to iterate over the
-/// documents it yields:
+/// A cursor can be used like any other [`Iterator`]. The simplest way is just to iterate over the
+/// documents it yields using a for loop:
 ///
 /// ```rust
 /// # use mongodb::{bson::Document, sync::Client, error::Result};
@@ -47,8 +47,7 @@ use crate::{
 /// # }
 /// ```
 ///
-/// Additionally, all the other methods that an [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html) has are available on `Cursor` as well.
-/// This includes all of the functionality provided by [`StreamExt`](https://docs.rs/futures/0.3.4/futures/stream/trait.StreamExt.html), which provides similar functionality to the standard library `Iterator` trait.
+/// Additionally, all the other methods that an [`Iterator`] has are available on `Cursor` as well.
 /// For instance, if the number of results from a query is known to be small, it might make sense
 /// to collect them into a vector:
 ///
@@ -69,19 +68,102 @@ use crate::{
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Cursor<T>
-where
-    T: DeserializeOwned + Unpin + Send + Sync,
-{
+pub struct Cursor<T> {
     async_cursor: AsyncCursor<T>,
 }
 
-impl<T> Cursor<T>
-where
-    T: DeserializeOwned + Unpin + Send + Sync,
-{
+impl<T> Cursor<T> {
     pub(crate) fn new(async_cursor: AsyncCursor<T>) -> Self {
         Self { async_cursor }
+    }
+}
+
+impl<T> Cursor<T> {
+    /// Move the cursor forward, potentially triggering requests to the database for more results
+    /// if the local buffer has been exhausted.
+    ///
+    /// This will keep requesting data from the server until either the cursor is exhausted
+    /// or batch with results in it has been received.
+    ///
+    /// The return value indicates whether new results were successfully returned (true) or if
+    /// the cursor has been closed (false).
+    ///
+    /// Note: [`Cursor::current`] and [`Cursor::deserialize_current`] must only be called after
+    /// [`Cursor::advance`] returned `Ok(true)`. It is an error to call either of them without
+    /// calling [`Cursor::advance`] first or after [`Cursor::advance`] returns an error / false.
+    ///
+    /// ```
+    /// # use mongodb::{sync::Client, bson::Document, error::Result};
+    /// # fn foo() -> Result<()> {
+    /// # let client = Client::with_uri_str("mongodb://localhost:27017")?;
+    /// # let coll = client.database("stuff").collection::<Document>("stuff");
+    /// let mut cursor = coll.find(None, None)?;
+    /// while cursor.advance()? {
+    ///     println!("{:?}", cursor.deserialize_current()?);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn advance(&mut self) -> Result<bool> {
+        RUNTIME.block_on(self.async_cursor.advance())
+    }
+
+    /// Returns a reference to the current result in the cursor.
+    ///
+    /// # Panics
+    /// [`Cursor::advance`] must return `Ok(true)` before [`Cursor::current`] can be
+    /// invoked. Calling [`Cursor::current`] after [`Cursor::advance`] does not return true
+    /// or without calling [`Cursor::advance`] at all may result in a panic.
+    ///
+    /// ```
+    /// # use mongodb::{sync::Client, bson::Document, error::Result};
+    /// # fn foo() -> Result<()> {
+    /// # let client = Client::with_uri_str("mongodb://localhost:27017")?;
+    /// # let coll = client.database("stuff").collection::<Document>("stuff");
+    /// let mut cursor = coll.find(None, None)?;
+    /// while cursor.advance()? {
+    ///     println!("{:?}", cursor.current());
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn current(&self) -> &RawDocument {
+        self.async_cursor.current()
+    }
+
+    /// Deserialize the current result to the generic type associated with this cursor.
+    ///
+    /// # Panics
+    /// [`Cursor::advance`] must return `Ok(true)` before [`Cursor::deserialize_current`] can be
+    /// invoked. Calling [`Cursor::deserialize_current`] after [`Cursor::advance`] does not return
+    /// true or without calling [`Cursor::advance`] at all may result in a panic.
+    ///
+    /// ```
+    /// # use mongodb::{Client, error::Result};
+    /// # fn foo() -> Result<()> {
+    /// # let client = Client::with_uri_str("mongodb://localhost:27017")?;
+    /// # let db = client.database("foo");
+    /// use serde::Deserialize;
+    ///
+    /// #[derive(Debug, Deserialize)]
+    /// struct Cat<'a> {
+    ///     #[serde(borrow)]
+    ///     name: &'a str
+    /// }
+    ///
+    /// let coll = db.collection::<Cat>("cat");
+    /// let mut cursor = coll.find(None, None)?;
+    /// while cursor.advance()? {
+    ///     println!("{:?}", cursor.deserialize_current()?);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn deserialize_current<'a>(&'a self) -> Result<T>
+    where
+        T: Deserialize<'a>,
+    {
+        self.async_cursor.deserialize_current()
     }
 }
 
@@ -116,21 +198,110 @@ where
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct SessionCursor<T>
-where
-    T: DeserializeOwned + Unpin,
-{
+pub struct SessionCursor<T> {
     async_cursor: AsyncSessionCursor<T>,
+}
+
+impl<T> SessionCursor<T> {
+    pub(crate) fn new(async_cursor: AsyncSessionCursor<T>) -> Self {
+        Self { async_cursor }
+    }
+
+    /// Move the cursor forward, potentially triggering requests to the database for more results
+    /// if the local buffer has been exhausted.
+    ///
+    /// This will keep requesting data from the server until either the cursor is exhausted
+    /// or batch with results in it has been received.
+    ///
+    /// The return value indicates whether new results were successfully returned (true) or if
+    /// the cursor has been closed (false).
+    ///
+    /// Note: [`Cursor::current`] and [`Cursor::deserialize_current`] must only be called after
+    /// [`Cursor::advance`] returned `Ok(true)`. It is an error to call either of them without
+    /// calling [`Cursor::advance`] first or after [`Cursor::advance`] returns an error / false.
+    ///
+    /// ```
+    /// # use mongodb::{sync::Client, bson::Document, error::Result};
+    /// # fn foo() -> Result<()> {
+    /// # let client = Client::with_uri_str("mongodb://localhost:27017")?;
+    /// # let mut session = client.start_session(None)?;
+    /// # let coll = client.database("stuff").collection::<Document>("stuff");
+    /// let mut cursor = coll.find_with_session(None, None, &mut session)?;
+    /// while cursor.advance(&mut session)? {
+    ///     println!("{:?}", cursor.deserialize_current()?);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn advance<'session>(&mut self, session: &'session mut ClientSession) -> Result<bool> {
+        RUNTIME.block_on(self.async_cursor.advance(&mut session.async_client_session))
+    }
+
+    /// Returns a reference to the current result in the cursor.
+    ///
+    /// # Panics
+    /// [`Cursor::advance`] must return `Ok(true)` before [`Cursor::current`] can be
+    /// invoked. Calling [`Cursor::current`] after [`Cursor::advance`] does not return true
+    /// or without calling [`Cursor::advance`] at all may result in a panic.
+    ///
+    /// ```
+    /// # use mongodb::{sync::Client, bson::Document, error::Result};
+    /// # fn foo() -> Result<()> {
+    /// # let client = Client::with_uri_str("mongodb://localhost:27017")?;
+    /// # let mut session = client.start_session(None)?;
+    /// # let coll = client.database("stuff").collection::<Document>("stuff");
+    /// let mut cursor = coll.find_with_session(None, None, &mut session)?;
+    /// while cursor.advance(&mut session)? {
+    ///     println!("{:?}", cursor.current()?);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn current(&self) -> &RawDocument {
+        self.async_cursor.current()
+    }
+
+    /// Deserialize the current result to the generic type associated with this cursor.
+    ///
+    /// # Panics
+    /// [`Cursor::advance`] must return `Ok(true)` before [`Cursor::deserialize_current`] can be
+    /// invoked. Calling [`Cursor::deserialize_current`] after [`Cursor::advance`] does not return
+    /// true or without calling [`Cursor::advance`] at all may result in a panic.
+    ///
+    /// ```
+    /// # use mongodb::{Client, error::Result};
+    /// # fn foo() -> Result<()> {
+    /// # let client = Client::with_uri_str("mongodb://localhost:27017")?;
+    /// # let mut session = Client.start_session(None)?;
+    /// # let db = client.database("foo");
+    /// use serde::Deserialize;
+    ///
+    /// #[derive(Debug, Deserialize)]
+    /// struct Cat<'a> {
+    ///     #[serde(borrow)]
+    ///     name: &'a str
+    /// }
+    ///
+    /// let coll = db.collection::<Cat>("cat");
+    /// let mut cursor = coll.find_with_session(None, None, &mut session)?;
+    /// while cursor.advance(&mut session)? {
+    ///     println!("{:?}", cursor.deserialize_current()?);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn deserialize_current<'a>(&'a self) -> Result<T>
+    where
+        T: Deserialize<'a>,
+    {
+        self.async_cursor.deserialize_current()
+    }
 }
 
 impl<T> SessionCursor<T>
 where
     T: DeserializeOwned + Unpin + Send + Sync,
 {
-    pub(crate) fn new(async_cursor: AsyncSessionCursor<T>) -> Self {
-        Self { async_cursor }
-    }
-
     /// Retrieves a [`SessionCursorIter`] to iterate this cursor. The session provided must be
     /// the same session used to create the cursor.
     pub fn iter<'session>(
