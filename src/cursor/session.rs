@@ -342,11 +342,11 @@ impl<T> SessionCursor<T> {
 
 impl<T> SessionCursor<T> {
     fn mark_exhausted(&mut self) {
-        self.info.id = 0;
+        self.state.as_mut().unwrap().exhausted = true;
     }
 
     pub(crate) fn is_exhausted(&self) -> bool {
-        self.info.id == 0
+        self.state.as_ref().unwrap().exhausted
     }
 }
 
