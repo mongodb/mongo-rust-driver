@@ -201,19 +201,28 @@ async fn borrowed_deserialization() {
 
     coll.insert_many(&docs, None).await.unwrap();
 
+    let options = FindOptions::builder()
+        .batch_size(2)
+        .sort(doc! { "_id": 1 })
+        .build();
+
+    let mut cursor = coll.find(None, options.clone()).await.unwrap();
+
+    let mut i = 0;
+    while cursor.advance().await.unwrap() {
+        let de = cursor.deserialize_current().unwrap();
+        assert_eq!(de, docs[i]);
+        i += 1;
+    }
+
+    let mut session = client.start_session(None).await.unwrap();
     let mut cursor = coll
-        .find(
-            None,
-            FindOptions::builder()
-                .batch_size(2)
-                .sort(doc! { "_id": 1 })
-                .build(),
-        )
+        .find_with_session(None, options.clone(), &mut session)
         .await
         .unwrap();
 
     let mut i = 0;
-    while cursor.advance().await.unwrap() {
+    while cursor.advance(&mut session).await.unwrap() {
         let de = cursor.deserialize_current().unwrap();
         assert_eq!(de, docs[i]);
         i += 1;
