@@ -352,7 +352,7 @@ fn borrowed_deserialization() {
 
     let mut session = client.start_session(None).unwrap();
     let mut cursor = coll
-        .find_with_session(None, options.clone(), &mut session)
+        .find_with_session(None, options, &mut session)
         .unwrap();
 
     let mut i = 0;

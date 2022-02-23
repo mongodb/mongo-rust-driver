@@ -233,7 +233,7 @@ impl<T> SessionCursor<T> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn advance<'session>(&mut self, session: &'session mut ClientSession) -> Result<bool> {
+    pub fn advance(&mut self, session: &mut ClientSession) -> Result<bool> {
         RUNTIME.block_on(self.async_cursor.advance(&mut session.async_client_session))
     }
 
