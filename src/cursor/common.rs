@@ -162,11 +162,6 @@ where
     }
 
     fn handle_get_more_result(&mut self, get_more_result: Result<GetMoreResult>) -> Result<()> {
-        self.state_mut().exhausted = get_more_result
-            .as_ref()
-            .map(|r| r.exhausted)
-            .unwrap_or(true);
-
         match get_more_result {
             Ok(get_more) => {
                 if get_more.exhausted {
