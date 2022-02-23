@@ -28,6 +28,9 @@ sync = ["async-std-runtime"]
 # Enable support for v0.4 of the chrono crate in the public API of the BSON library.
 bson-chrono-0_4 = ["bson/chrono-0_4"]
 
+# Enable support for the serde_with crate in the BSON library.
+bson-serde_with = ["bson/serde_with"]
+
 # Enable support for v0.8 of the uuid crate in the public API of the BSON library.
 bson-uuid-0_8 = ["bson/uuid-0_8"]
 
