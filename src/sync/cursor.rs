@@ -139,7 +139,7 @@ impl<T> Cursor<T> {
     /// true or without calling [`Cursor::advance`] at all may result in a panic.
     ///
     /// ```
-    /// # use mongodb::{Client, error::Result};
+    /// # use mongodb::{sync::Client, error::Result};
     /// # fn foo() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://localhost:27017")?;
     /// # let db = client.database("foo");
@@ -252,7 +252,7 @@ impl<T> SessionCursor<T> {
     /// # let coll = client.database("stuff").collection::<Document>("stuff");
     /// let mut cursor = coll.find_with_session(None, None, &mut session)?;
     /// while cursor.advance(&mut session)? {
-    ///     println!("{:?}", cursor.current()?);
+    ///     println!("{:?}", cursor.current());
     /// }
     /// # Ok(())
     /// # }
@@ -269,10 +269,10 @@ impl<T> SessionCursor<T> {
     /// true or without calling [`Cursor::advance`] at all may result in a panic.
     ///
     /// ```
-    /// # use mongodb::{Client, error::Result};
+    /// # use mongodb::{sync::Client, error::Result};
     /// # fn foo() -> Result<()> {
     /// # let client = Client::with_uri_str("mongodb://localhost:27017")?;
-    /// # let mut session = Client.start_session(None)?;
+    /// # let mut session = client.start_session(None)?;
     /// # let db = client.database("foo");
     /// use serde::Deserialize;
     ///
