@@ -316,17 +316,15 @@ async fn auth_test_options(
     mechanism: Option<AuthMechanism>,
     success: bool,
 ) {
-    let mut options = ClientOptions::builder()
-        .hosts(CLIENT_OPTIONS.hosts.clone())
-        .max_pool_size(1)
-        .credential(Credential {
-            username: Some(user.to_string()),
-            password: Some(password.to_string()),
-            mechanism,
-            ..Default::default()
-        })
-        .build();
-    options.tls = CLIENT_OPTIONS.tls.clone();
+    let mut options = CLIENT_OPTIONS.clone();
+    options.max_pool_size = Some(1);
+    options.credential = Credential {
+        username: Some(user.to_string()),
+        password: Some(password.to_string()),
+        mechanism,
+        ..Default::default()
+    }
+    .into();
 
     auth_test(Client::with_options(options).unwrap(), success).await;
 }
@@ -385,6 +383,10 @@ async fn auth_test_uri(
                 .to_string(),
             );
         }
+    }
+
+    if let Some(true) = CLIENT_OPTIONS.load_balanced {
+        uri.push_str(("&loadBalanced=true"));
     }
 
     auth_test(
