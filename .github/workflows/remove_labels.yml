@@ -1,0 +1,17 @@
+---
+
+name: Remove Labels
+on:
+  issue_comment:
+    types: [created, edited]
+jobs:
+  remove-labels:
+    if: ${{ github.actor != 'bajanam' &&  github.actor != 'patrickfreed'
+        && github.actor != 'abr-egn' && github.actor != 'isabelatkinson'
+        && github.actor !='kmahar'}}
+    runs-on: ubuntu-latest
+    steps:
+      - name: initial labeling
+        uses: andymckay/labeler@master
+        with:
+          remove-labels: "waiting-for-reporter"
