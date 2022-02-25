@@ -1,9 +1,9 @@
-name: Issue assignment
+---
 
+name: Issue assignment
 on:
     issues:
         types: [opened]
-
 jobs:
     auto-assign:
         runs-on: ubuntu-latest
