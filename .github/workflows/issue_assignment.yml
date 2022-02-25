@@ -9,7 +9,14 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: 'Auto-assign issue'
-              uses: pozil/auto-assign-issue@v1.1.0
+              uses: pozil/auto-assign-issue@v1
               with:
                   assignees: patrickfreed,abr-egn,isabelatkinson
                   numOfAssignee: 1
+    add-labels:
+        runs-on: ubuntu-latest
+        steps:
+            - name: initial labeling
+              uses: andymckay/labeler@master
+              with:
+                  add-labels: "triage"
