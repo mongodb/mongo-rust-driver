@@ -11,6 +11,7 @@ use crate::{
     coll::options::{DistinctOptions, DropCollectionOptions},
     concern::{Acknowledgment, WriteConcern},
     options::{ClientOptions, CreateCollectionOptions, InsertManyOptions},
+    runtime,
     sdam::ServerInfo,
     selection_criteria::SelectionCriteria,
     test::{
@@ -21,7 +22,6 @@ use crate::{
         TestClient,
         SERVERLESS,
     },
-    RUNTIME,
 };
 
 use operation::{OperationObject, OperationResult};
@@ -196,7 +196,7 @@ pub async fn run_v2_test(test_file: TestFile) {
                     // implicit session used in the first operation is returned to the pool before
                     // the second operation is executed.
                     if test.description == "Server supports implicit sessions" {
-                        RUNTIME.delay_for(Duration::from_secs(1)).await;
+                        runtime::delay_for(Duration::from_secs(1)).await;
                     }
                     result
                 }
@@ -208,7 +208,7 @@ pub async fn run_v2_test(test_file: TestFile) {
                     if operation.name == "endSession" {
                         let session = session0.take();
                         drop(session);
-                        RUNTIME.delay_for(Duration::from_secs(1)).await;
+                        runtime::delay_for(Duration::from_secs(1)).await;
                         continue;
                     } else {
                         operation
@@ -220,7 +220,7 @@ pub async fn run_v2_test(test_file: TestFile) {
                     if operation.name == "endSession" {
                         let session = session1.take();
                         drop(session);
-                        RUNTIME.delay_for(Duration::from_secs(1)).await;
+                        runtime::delay_for(Duration::from_secs(1)).await;
                         continue;
                     } else {
                         operation
@@ -336,7 +336,7 @@ pub async fn run_v2_test(test_file: TestFile) {
 
         // wait for the transaction in progress to be aborted implicitly when the session is dropped
         if test.description.as_str() == "implicit abort" {
-            RUNTIME.delay_for(Duration::from_secs(1)).await;
+            runtime::delay_for(Duration::from_secs(1)).await;
         }
 
         if let Some(expectations) = test.expectations {

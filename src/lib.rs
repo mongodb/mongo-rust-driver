@@ -378,9 +378,3 @@ compile_error!(
     "one of `tokio-runtime`, `async-std-runtime`, or `sync` must be enabled; either enable \
      `default-features`, or enable one of those features specifically in your Cargo.toml"
 );
-
-#[cfg(all(feature = "tokio-runtime", not(feature = "async-std-runtime")))]
-pub(crate) static RUNTIME: runtime::AsyncRuntime = runtime::AsyncRuntime::Tokio;
-
-#[cfg(all(not(feature = "tokio-runtime"), feature = "async-std-runtime"))]
-pub(crate) static RUNTIME: runtime::AsyncRuntime = runtime::AsyncRuntime::AsyncStd;

@@ -36,6 +36,7 @@ use crate::{
         TopologyOpeningEvent,
     },
     options::{ClientOptions, SelectionCriteria, ServerAddress},
+    runtime,
     runtime::HttpClient,
     sdam::{
         description::{
@@ -45,7 +46,6 @@ use crate::{
         srv_polling::SrvPollingMonitor,
         TopologyMessageManager,
     },
-    RUNTIME,
 };
 
 /// A strong reference to the topology, which includes the current state as well as the client
@@ -119,7 +119,7 @@ impl Topology {
 
         // we can block in place here because we're the only ones with access to the lock, so it
         // should be acquired immediately.
-        let mut topology_state = RUNTIME.block_in_place(topology.state.write());
+        let mut topology_state = runtime::block_in_place(topology.state.write());
         for address in &options.hosts {
             topology_state.add_new_server(address.clone(), options.clone(), &topology.downgrade());
         }

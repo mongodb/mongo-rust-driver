@@ -42,12 +42,12 @@ use crate::{
         UpdateModifications,
         UpdateOptions,
     },
+    runtime,
     selection_criteria::ReadPreference,
     test::FailPoint,
     Collection,
     Database,
     IndexModel,
-    RUNTIME,
 };
 
 pub trait TestOperation: Debug {
@@ -1375,7 +1375,7 @@ impl TestOperation for EndSession {
         async move {
             let session = test_runner.get_mut_session(id).client_session.take();
             drop(session);
-            RUNTIME.delay_for(Duration::from_secs(1)).await;
+            runtime::delay_for(Duration::from_secs(1)).await;
             Ok(None)
         }
         .boxed()

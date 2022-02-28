@@ -14,8 +14,8 @@ use tokio::sync::RwLockWriteGuard;
 use crate::{
     bson::{doc, Document},
     options::{CollectionOptions, FindOptions, ReadConcern, ReadPreference, SelectionCriteria},
+    runtime,
     test::{log_uncaptured, run_single_test, run_spec_test, LOCK},
-    RUNTIME,
 };
 
 pub use self::{
@@ -217,7 +217,7 @@ pub async fn run_unified_format_test_filtered(
             // implicit session used in the first operation is returned to the pool before
             // the second operation is executed.
             if test_case.description == "Server supports implicit sessions" {
-                RUNTIME.delay_for(Duration::from_secs(1)).await;
+                runtime::delay_for(Duration::from_secs(1)).await;
             }
         }
 

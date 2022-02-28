@@ -11,8 +11,8 @@ use super::{
 use crate::{
     error::{Error, Result},
     options::ClientOptions,
+    runtime,
     srv::{LookupHosts, SrvResolver},
-    RUNTIME,
 };
 
 const MIN_RESCAN_SRV_INTERVAL: Duration = Duration::from_secs(60);
@@ -47,7 +47,7 @@ impl SrvPollingMonitor {
     /// set of mongos in the cluster have changed. A weak reference is used to ensure that the
     /// monitoring task doesn't keep the topology alive after the client has been dropped.
     pub(super) fn start(topology: WeakTopology) {
-        RUNTIME.execute(async move {
+        runtime::execute(async move {
             if let Some(mut monitor) = Self::new(topology) {
                 monitor.execute().await;
             }
@@ -64,7 +64,7 @@ impl SrvPollingMonitor {
         }
 
         while self.topology.is_alive() {
-            RUNTIME.delay_for(self.rescan_interval()).await;
+            runtime::delay_for(self.rescan_interval()).await;
 
             let topology = match self.topology.upgrade() {
                 Some(topology) => topology,

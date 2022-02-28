@@ -25,141 +25,124 @@ use interval::Interval;
 #[cfg(feature = "tokio-runtime")]
 use tokio::time::Interval;
 
-/// An abstract handle to the async runtime.
-#[derive(Clone, Copy, Debug)]
-pub(crate) enum AsyncRuntime {
-    /// Represents the `tokio` runtime.
+/// Spawn a task in the background to run a future.
+///
+/// If the runtime is still running, this will return a handle to the background task.
+/// Otherwise, it will return `None`. As a result, this must be called from an async block
+/// or function running on a runtime.
+#[allow(clippy::unnecessary_wraps)]
+pub(crate) fn spawn<F, O>(fut: F) -> AsyncJoinHandle<O>
+where
+    F: Future<Output = O> + Send + 'static,
+    O: Send + 'static,
+{
     #[cfg(feature = "tokio-runtime")]
-    Tokio,
+    {
+        let handle = tokio::runtime::Handle::current();
+        AsyncJoinHandle::Tokio(handle.spawn(fut))
+    }
 
-    /// Represents the `async-std` runtime.
     #[cfg(feature = "async-std-runtime")]
-    AsyncStd,
+    {
+        AsyncJoinHandle::AsyncStd(async_std::task::spawn(fut))
+    }
 }
 
-impl AsyncRuntime {
-    /// Spawn a task in the background to run a future.
-    ///
-    /// If the runtime is still running, this will return a handle to the background task.
-    /// Otherwise, it will return `None`. As a result, this must be called from an async block
-    /// or function running on a runtime.
-    #[allow(clippy::unnecessary_wraps)]
-    pub(crate) fn spawn<F, O>(self, fut: F) -> Option<AsyncJoinHandle<O>>
-    where
-        F: Future<Output = O> + Send + 'static,
-        O: Send + 'static,
+/// Spawn a task in the background to run a future.
+///
+/// Note: this must only be called from an async block or function running on a runtime.
+pub(crate) fn execute<F, O>(fut: F)
+where
+    F: Future<Output = O> + Send + 'static,
+    O: Send + 'static,
+{
+    spawn(fut);
+}
+
+#[cfg(test)]
+pub(crate) fn block_on<F, T>(fut: F) -> T
+where
+    F: Future<Output = T>,
+{
+    #[cfg(feature = "tokio-runtime")]
     {
-        match self {
-            #[cfg(feature = "tokio-runtime")]
-            Self::Tokio => {
-                let handle = tokio::runtime::Handle::current();
-                Some(AsyncJoinHandle::Tokio(handle.spawn(fut)))
-            }
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd => Some(AsyncJoinHandle::AsyncStd(async_std::task::spawn(fut))),
-        }
+        tokio::task::block_in_place(|| futures::executor::block_on(fut))
     }
 
-    /// Spawn a task in the background to run a future.
-    ///
-    /// Note: this must only be called from an async block or function running on a runtime.
-    pub(crate) fn execute<F, O>(self, fut: F)
-    where
-        F: Future<Output = O> + Send + 'static,
-        O: Send + 'static,
+    #[cfg(feature = "async-std-runtime")]
     {
-        self.spawn(fut);
+        async_std::task::block_on(fut)
     }
+}
 
-    #[cfg(test)]
-    pub(crate) fn block_on<F, T>(self, fut: F) -> T
-    where
-        F: Future<Output = T>,
+/// Run a future in the foreground, blocking on it completing.
+/// This does not notify the runtime that it will be blocking and should only be used for
+/// operations that will immediately (or quickly) succeed.
+pub(crate) fn block_in_place<F, T>(fut: F) -> T
+where
+    F: Future<Output = T> + Send,
+    T: Send,
+{
+    futures_executor::block_on(fut)
+}
+
+/// Delay for the specified duration.
+pub(crate) async fn delay_for(delay: Duration) {
+    #[cfg(feature = "tokio-runtime")]
     {
-        match self {
-            #[cfg(feature = "tokio-runtime")]
-            Self::Tokio => tokio::task::block_in_place(|| futures::executor::block_on(fut)),
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd => async_std::task::block_on(fut),
-        }
+        tokio::time::sleep(delay).await
     }
 
-    /// Run a future in the foreground, blocking on it completing.
-    /// This does not notify the runtime that it will be blocking and should only be used for
-    /// operations that will immediately (or quickly) succeed.
-    pub(crate) fn block_in_place<F, T>(self, fut: F) -> T
-    where
-        F: Future<Output = T> + Send,
-        T: Send,
+    #[cfg(feature = "async-std-runtime")]
     {
-        futures_executor::block_on(fut)
+        async_std::task::sleep(delay).await
+    }
+}
+
+/// Await on a future for a maximum amount of time before returning an error.
+pub(crate) async fn timeout<F: Future>(timeout: Duration, future: F) -> Result<F::Output> {
+    #[cfg(feature = "tokio-runtime")]
+    {
+        tokio::time::timeout(timeout, future)
+            .await
+            .map_err(|_| std::io::ErrorKind::TimedOut.into())
     }
 
-    /// Delay for the specified duration.
-    pub(crate) async fn delay_for(self, delay: Duration) {
-        #[cfg(feature = "tokio-runtime")]
-        {
-            tokio::time::sleep(delay).await
-        }
+    #[cfg(feature = "async-std-runtime")]
+    {
+        async_std::future::timeout(timeout, future)
+            .await
+            .map_err(|_| std::io::ErrorKind::TimedOut.into())
+    }
+}
 
-        #[cfg(feature = "async-std-runtime")]
-        {
-            async_std::task::sleep(delay).await
-        }
+/// Create a new `Interval` that yields with interval of `duration`.
+/// See: <https://docs.rs/tokio/latest/tokio/time/fn.interval.html>
+pub(crate) fn interval(duration: Duration) -> Interval {
+    #[cfg(feature = "tokio-runtime")]
+    {
+        tokio::time::interval(duration)
     }
 
-    /// Await on a future for a maximum amount of time before returning an error.
-    pub(crate) async fn timeout<F: Future>(
-        self,
-        timeout: Duration,
-        future: F,
-    ) -> Result<F::Output> {
-        #[cfg(feature = "tokio-runtime")]
-        {
-            tokio::time::timeout(timeout, future)
-                .await
-                .map_err(|_| std::io::ErrorKind::TimedOut.into())
-        }
+    #[cfg(feature = "async-std-runtime")]
+    {
+        Interval::new(duration)
+    }
+}
 
-        #[cfg(feature = "async-std-runtime")]
-        {
-            async_std::future::timeout(timeout, future)
-                .await
-                .map_err(|_| std::io::ErrorKind::TimedOut.into())
-        }
+pub(crate) async fn resolve_address(
+    address: &ServerAddress,
+) -> Result<impl Iterator<Item = SocketAddr>> {
+    #[cfg(feature = "tokio-runtime")]
+    {
+        let socket_addrs = tokio::net::lookup_host(format!("{}", address)).await?;
+        Ok(socket_addrs)
     }
 
-    /// Create a new `Interval` that yields with interval of `duration`.
-    /// See: <https://docs.rs/tokio/latest/tokio/time/fn.interval.html>
-    pub(crate) fn interval(self, duration: Duration) -> Interval {
-        match self {
-            #[cfg(feature = "tokio-runtime")]
-            Self::Tokio => tokio::time::interval(duration),
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd => Interval::new(duration),
-        }
-    }
-
-    pub(crate) async fn resolve_address(
-        self,
-        address: &ServerAddress,
-    ) -> Result<impl Iterator<Item = SocketAddr>> {
-        match self {
-            #[cfg(feature = "tokio-runtime")]
-            Self::Tokio => {
-                let socket_addrs = tokio::net::lookup_host(format!("{}", address)).await?;
-                Ok(socket_addrs)
-            }
-
-            #[cfg(feature = "async-std-runtime")]
-            Self::AsyncStd => {
-                let host = (address.host(), address.port().unwrap_or(27017));
-                let socket_addrs = async_std::net::ToSocketAddrs::to_socket_addrs(&host).await?;
-                Ok(socket_addrs)
-            }
-        }
+    #[cfg(feature = "async-std-runtime")]
+    {
+        let host = (address.host(), address.port().unwrap_or(27017));
+        let socket_addrs = async_std::net::ToSocketAddrs::to_socket_addrs(&host).await?;
+        Ok(socket_addrs)
     }
 }

@@ -15,10 +15,10 @@ use crate::{
         InsertManyOptions,
         WriteConcern,
     },
+    runtime,
     test::{log_uncaptured, util::EventClient, CLIENT_OPTIONS, LOCK},
     Collection,
     Database,
-    RUNTIME,
 };
 
 async fn run_test<F: Future>(
@@ -112,7 +112,7 @@ async fn get_more() {
                 .expect("cursor iteration should have succeeded");
         }
 
-        RUNTIME.delay_for(Duration::from_millis(250)).await;
+        runtime::delay_for(Duration::from_millis(250)).await;
         assert_eq!(client.count_pool_cleared_events(), 0);
     }
 
@@ -163,7 +163,7 @@ async fn not_master_keep_pool() {
             .await
             .expect("insert should have succeeded");
 
-        RUNTIME.delay_for(Duration::from_millis(250)).await;
+        runtime::delay_for(Duration::from_millis(250)).await;
         assert_eq!(client.count_pool_cleared_events(), 0);
     }
 
@@ -210,7 +210,7 @@ async fn not_master_reset_pool() {
             "insert should have failed"
         );
 
-        RUNTIME.delay_for(Duration::from_millis(250)).await;
+        runtime::delay_for(Duration::from_millis(250)).await;
         assert_eq!(client.count_pool_cleared_events(), 1);
 
         coll.insert_one(doc! { "test": 1 }, None)
@@ -260,7 +260,7 @@ async fn shutdown_in_progress() {
             "insert should have failed"
         );
 
-        RUNTIME.delay_for(Duration::from_millis(250)).await;
+        runtime::delay_for(Duration::from_millis(250)).await;
         assert_eq!(client.count_pool_cleared_events(), 1);
 
         coll.insert_one(doc! { "test": 1 }, None)
@@ -310,14 +310,14 @@ async fn interrupted_at_shutdown() {
             "insert should have failed"
         );
 
-        RUNTIME.delay_for(Duration::from_millis(250)).await;
+        runtime::delay_for(Duration::from_millis(250)).await;
         assert_eq!(client.count_pool_cleared_events(), 1);
 
         coll.insert_one(doc! { "test": 1 }, None)
             .await
             .expect("insert should have succeeded");
 
-        RUNTIME.delay_for(Duration::from_millis(250)).await;
+        runtime::delay_for(Duration::from_millis(250)).await;
     }
 
     run_test(function_name!(), interrupted_at_shutdown_test).await;

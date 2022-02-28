@@ -7,8 +7,8 @@ use crate::{
     bson::doc,
     client::{auth::AuthMechanism, Client},
     options::{ClientOptions, ResolverConfig},
+    runtime,
     test::{log_uncaptured, run_spec_test, TestClient, CLIENT_OPTIONS, LOCK},
-    RUNTIME,
 };
 
 #[derive(Debug, Deserialize)]
@@ -188,7 +188,7 @@ async fn run_test(mut test_file: TestFile) {
                 )
             }
 
-            RUNTIME.delay_for(Duration::from_millis(500)).await;
+            runtime::delay_for(Duration::from_millis(500)).await;
         }
     }
 

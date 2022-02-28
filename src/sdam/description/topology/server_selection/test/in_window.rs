@@ -8,6 +8,7 @@ use tokio::sync::RwLockWriteGuard;
 
 use crate::{
     options::ServerAddress,
+    runtime,
     runtime::AsyncJoinHandle,
     sdam::{description::topology::server_selection, Server},
     selection_criteria::ReadPreference,
@@ -25,7 +26,6 @@ use crate::{
         LOCK,
     },
     ServerType,
-    RUNTIME,
 };
 
 use super::TestTopologyDescription;
@@ -175,15 +175,11 @@ async fn load_balancing_test() {
             let collection = client
                 .database("load_balancing_test")
                 .collection::<Document>("load_balancing_test");
-            handles.push(
-                RUNTIME
-                    .spawn(async move {
-                        for _ in 0..iterations {
-                            let _ = collection.find_one(None, None).await;
-                        }
-                    })
-                    .unwrap(),
-            )
+            handles.push(runtime::spawn(async move {
+                for _ in 0..iterations {
+                    let _ = collection.find_one(None, None).await;
+                }
+            }))
         }
 
         futures::future::join_all(handles).await;

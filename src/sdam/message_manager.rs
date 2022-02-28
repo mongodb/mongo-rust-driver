@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use tokio::sync::broadcast::{self, Receiver, Sender};
 
-use crate::RUNTIME;
+use crate::runtime;
 
 /// Provides functionality for message passing between server selection operations and SDAM
 /// background tasks.
@@ -57,6 +57,8 @@ impl TopologyMessageSubscriber {
     /// Waits for either `timeout` to elapse or a message to be received.
     /// Returns true if a message was received, false for a timeout.
     pub(crate) async fn wait_for_message(&mut self, timeout: Duration) -> bool {
-        RUNTIME.timeout(timeout, self.receiver.recv()).await.is_ok()
+        runtime::timeout(timeout, self.receiver.recv())
+            .await
+            .is_ok()
     }
 }

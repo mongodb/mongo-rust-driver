@@ -7,8 +7,8 @@ use tokio::sync::RwLockReadGuard;
 use crate::{
     bson::doc,
     options::{CreateCollectionOptions, CursorType, FindOptions},
+    runtime,
     test::{util::EventClient, TestClient, LOCK},
-    RUNTIME,
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -54,7 +54,7 @@ async fn tailable_cursor() {
         );
     }
 
-    let delay = RUNTIME.delay_for(await_time);
+    let delay = runtime::delay_for(await_time);
     let next_doc = cursor.next();
 
     let next_doc = match futures::future::select(Box::pin(delay), Box::pin(next_doc)).await {
@@ -66,11 +66,11 @@ async fn tailable_cursor() {
         ),
     };
 
-    RUNTIME.execute(async move {
+    runtime::execute(async move {
         coll.insert_one(doc! { "_id": 5 }, None).await.unwrap();
     });
 
-    let delay = RUNTIME.delay_for(await_time);
+    let delay = runtime::delay_for(await_time);
 
     match futures::future::select(Box::pin(delay), Box::pin(next_doc)).await {
         Either::Left((..)) => panic!("should have gotten next document, but instead timed"),

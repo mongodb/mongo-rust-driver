@@ -47,8 +47,8 @@ use crate::{
         },
     },
     options::ClientOptions,
+    runtime,
     test::{spec::ExpectedEventType, LOCK},
-    RUNTIME,
 };
 
 pub type EventQueue<T> = Arc<RwLock<VecDeque<T>>>;
@@ -393,21 +393,20 @@ impl EventSubscriber<'_> {
     where
         F: Fn(&Event) -> bool,
     {
-        RUNTIME
-            .timeout(timeout, async {
-                loop {
-                    match self.receiver.recv().await {
-                        Ok(event) if filter(&event) => return event.into(),
-                        // the channel hit capacity and the channel will skip a few to catch up.
-                        Err(RecvError::Lagged(_)) => continue,
-                        Err(_) => return None,
-                        _ => continue,
-                    }
+        runtime::timeout(timeout, async {
+            loop {
+                match self.receiver.recv().await {
+                    Ok(event) if filter(&event) => return event.into(),
+                    // the channel hit capacity and the channel will skip a few to catch up.
+                    Err(RecvError::Lagged(_)) => continue,
+                    Err(_) => return None,
+                    _ => continue,
                 }
-            })
-            .await
-            .ok()
-            .flatten()
+            }
+        })
+        .await
+        .ok()
+        .flatten()
     }
 }
 

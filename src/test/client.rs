@@ -8,10 +8,10 @@ use crate::{
     bson::{doc, Bson},
     error::{CommandError, Error, ErrorKind},
     options::{AuthMechanism, ClientOptions, Credential, ListDatabasesOptions, ServerAddress},
+    runtime,
     selection_criteria::{ReadPreference, ReadPreferenceOptions, SelectionCriteria},
     test::{log_uncaptured, util::TestClient, CLIENT_OPTIONS, LOCK},
     Client,
-    RUNTIME,
 };
 
 #[derive(Debug, Deserialize)]
@@ -83,22 +83,21 @@ async fn connection_drop_during_read() {
         .await
         .unwrap();
 
-    let _: Result<_, _> = RUNTIME
-        .timeout(
-            Duration::from_millis(50),
-            db.run_command(
-                doc! {
-                    "count": function_name!(),
-                    "query": {
-                        "$where": "sleep(100) && true"
-                    }
-                },
-                None,
-            ),
-        )
-        .await;
+    let _: Result<_, _> = runtime::timeout(
+        Duration::from_millis(50),
+        db.run_command(
+            doc! {
+                "count": function_name!(),
+                "query": {
+                    "$where": "sleep(100) && true"
+                }
+            },
+            None,
+        ),
+    )
+    .await;
 
-    RUNTIME.delay_for(Duration::from_millis(200)).await;
+    runtime::delay_for(Duration::from_millis(200)).await;
 
     let is_master_response = db.run_command(doc! { "isMaster": 1 }, None).await;
 

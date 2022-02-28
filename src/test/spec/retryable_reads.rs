@@ -9,6 +9,7 @@ use crate::{
         cmap::{CmapEventHandler, ConnectionCheckoutFailedReason},
         command::CommandEventHandler,
     },
+    runtime,
     runtime::AsyncJoinHandle,
     test::{
         log_uncaptured,
@@ -23,7 +24,6 @@ use crate::{
         CLIENT_OPTIONS,
         LOCK,
     },
-    RUNTIME,
 };
 
 use super::run_v2_test;
@@ -62,8 +62,7 @@ async fn retry_releases_connection() {
     let failpoint = FailPoint::fail_command(&["find"], FailPointMode::Times(1), Some(options));
     let _fp_guard = client.enable_failpoint(failpoint, None).await.unwrap();
 
-    RUNTIME
-        .timeout(Duration::from_secs(1), collection.find_one(doc! {}, None))
+    runtime::timeout(Duration::from_secs(1), collection.find_one(doc! {}, None))
         .await
         .expect("operation should not time out")
         .expect("find should succeed");
@@ -116,9 +115,7 @@ async fn retry_read_pool_cleared() {
     let mut tasks: Vec<AsyncJoinHandle<_>> = Vec::new();
     for _ in 0..2 {
         let coll = collection.clone();
-        let task = RUNTIME
-            .spawn(async move { coll.find_one(doc! {}, None).await })
-            .unwrap();
+        let task = runtime::spawn(async move { coll.find_one(doc! {}, None).await });
         tasks.push(task);
     }
 

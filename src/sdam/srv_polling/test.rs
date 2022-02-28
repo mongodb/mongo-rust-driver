@@ -6,8 +6,8 @@ use super::{LookupHosts, SrvPollingMonitor};
 use crate::{
     error::Result,
     options::{ClientOptions, ServerAddress},
+    runtime,
     sdam::Topology,
-    RUNTIME,
 };
 
 fn localhost_test_build_10gen(port: u16) -> ServerAddress {
@@ -120,7 +120,7 @@ async fn load_balanced_no_srv_polling() {
         localhost_test_build_10gen(27018),
     ]));
     let topology = Topology::new(options).unwrap();
-    RUNTIME.delay_for(rescan_interval * 2).await;
+    runtime::delay_for(rescan_interval * 2).await;
     assert_eq!(
         hosts.into_iter().collect::<HashSet<_>>(),
         topology.servers().await
