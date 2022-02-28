@@ -1,12 +1,9 @@
-use std::convert::TryInto;
-
 use crate::{
     bson::{doc, Document},
     bson_util,
     cmap::StreamDescription,
     operation::{test::handle_response_test, ListCollections, Operation},
-    options::{ListCollectionsOptions, ServerAddress},
-    Namespace,
+    options::ListCollectionsOptions,
 };
 
 fn build_test(db_name: &str, mut list_collections: ListCollections, mut expected_body: Document) {
@@ -130,123 +127,6 @@ async fn op_selection_criteria() {
         .selection_criteria()
         .expect("should have criteria")
         .is_read_pref_primary());
-}
-
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_success() {
-    let ns = Namespace {
-        db: "test_db".to_string(),
-        coll: "test_coll".to_string(),
-    };
-
-    let list_collections = ListCollections::new("test_db".to_string(), None, false, None);
-
-    let first_batch = vec![doc! {
-        "name" : "test",
-        "type" : "collection",
-        "options" : {
-
-        },
-        "info" : {
-            "readOnly" : false,
-            "uuid" : "c977f2fc-9573-4a05-b219-5a39dbca14c8"
-        },
-        "idIndex" : {
-            "v" : 2,
-            "key" : {
-                "_id" : 1
-            },
-            "name" : "_id_",
-            "ns" : "test.test"
-        }
-    }];
-
-    let response = doc! {
-        "cursor": {
-            "id": 123,
-            "ns": format!("{}.{}", ns.db, ns.coll),
-            "firstBatch": bson_util::to_bson_array(&first_batch),
-        },
-        "ok": 1.0
-    };
-
-    let cursor_spec =
-        handle_response_test(&list_collections, response.clone()).expect("handle should succeed");
-    assert_eq!(cursor_spec.address(), &ServerAddress::default());
-    assert_eq!(cursor_spec.id(), 123);
-    assert_eq!(cursor_spec.batch_size(), None);
-    assert_eq!(cursor_spec.max_time(), None);
-    assert_eq!(
-        cursor_spec
-            .initial_buffer
-            .into_iter()
-            .map(|d| d.try_into().unwrap())
-            .collect::<Vec<Document>>(),
-        first_batch
-    );
-
-    let list_collections = ListCollections::new(
-        "test_db".to_string(),
-        None,
-        false,
-        Some(ListCollectionsOptions::builder().batch_size(123).build()),
-    );
-
-    let cursor_spec =
-        handle_response_test(&list_collections, response).expect("handle should succeed");
-    assert_eq!(cursor_spec.address(), &ServerAddress::default());
-    assert_eq!(cursor_spec.id(), 123);
-    assert_eq!(cursor_spec.batch_size(), Some(123));
-    assert_eq!(cursor_spec.max_time(), None);
-    assert_eq!(
-        cursor_spec
-            .initial_buffer
-            .into_iter()
-            .map(|d| d.try_into().unwrap())
-            .collect::<Vec<Document>>(),
-        first_batch
-    );
-}
-
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_success_name_only() {
-    let ns = Namespace {
-        db: "test_db".to_string(),
-        coll: "test_coll".to_string(),
-    };
-
-    let list_collections = ListCollections::new("test_db".to_string(), None, false, None);
-
-    let first_batch = vec![doc! {
-        "name" : "test",
-        "type" : "collection",
-    }];
-
-    let response = doc! {
-        "cursor": {
-            "id": 123,
-            "ns": format!("{}.{}", ns.db, ns.coll),
-            "firstBatch": bson_util::to_bson_array(&first_batch),
-        },
-        "ok": 1.0
-    };
-
-    let cursor_spec =
-        handle_response_test(&list_collections, response).expect("handle should succeed");
-    assert_eq!(cursor_spec.address(), &ServerAddress::default());
-    assert_eq!(cursor_spec.id(), 123);
-    assert_eq!(cursor_spec.batch_size(), None);
-    assert_eq!(cursor_spec.max_time(), None);
-    assert_eq!(
-        cursor_spec
-            .initial_buffer
-            .into_iter()
-            .map(|d| d.try_into().unwrap())
-            .collect::<Vec<Document>>(),
-        first_batch
-    );
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

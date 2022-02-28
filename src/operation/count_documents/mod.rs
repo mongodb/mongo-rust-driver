@@ -3,11 +3,10 @@ mod test;
 
 use std::convert::TryInto;
 
-use bson::{doc, Document, RawDocument};
+use serde::Deserialize;
 
-use super::{CursorBody, Operation, Retryability};
+use super::{Operation, Retryability, SingleCursorResult};
 use crate::{
-    bson_util,
     cmap::{Command, RawCommandResponse, StreamDescription},
     error::{Error, ErrorKind, Result},
     operation::aggregate::Aggregate,
@@ -15,6 +14,7 @@ use crate::{
     selection_criteria::SelectionCriteria,
     Namespace,
 };
+use bson::{doc, Document, RawDocument};
 
 pub(crate) struct CountDocuments {
     aggregate: Aggregate,
@@ -94,35 +94,8 @@ impl Operation for CountDocuments {
         response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
-        let mut response: CursorBody<&RawDocument> = response.body()?;
-
-        let result_doc = match response.cursor.first_batch.pop_front() {
-            Some(doc) => doc,
-            None => return Ok(0),
-        };
-
-        let n = match result_doc.get("n")? {
-            Some(n) => n,
-            None => {
-                return Err(ErrorKind::InvalidResponse {
-                    message: "server response to count_documents aggregate did not contain the \
-                              'n' field"
-                        .into(),
-                }
-                .into())
-            }
-        };
-
-        bson_util::get_u64_raw(n).ok_or_else(|| {
-            ErrorKind::InvalidResponse {
-                message: format!(
-                    "server response to count_documents aggregate should have contained integer \
-                     'n', but instead had {:?}",
-                    n
-                ),
-            }
-            .into()
-        })
+        let response: SingleCursorResult<Body> = response.body()?;
+        Ok(response.0.map(|r| r.n).unwrap_or(0))
     }
 
     fn selection_criteria(&self) -> Option<&SelectionCriteria> {
@@ -136,4 +109,9 @@ impl Operation for CountDocuments {
     fn supports_read_concern(&self, description: &StreamDescription) -> bool {
         self.aggregate.supports_read_concern(description)
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct Body {
+    n: u64,
 }

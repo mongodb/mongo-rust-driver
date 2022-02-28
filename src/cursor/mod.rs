@@ -6,8 +6,9 @@ use std::{
     task::{Context, Poll},
 };
 
+use bson::RawDocument;
 use futures_core::{future::BoxFuture, Stream};
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Deserialize};
 #[cfg(test)]
 use tokio::sync::oneshot;
 
@@ -90,10 +91,7 @@ pub(crate) use common::{
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Cursor<T>
-where
-    T: DeserializeOwned + Unpin + Send + Sync,
-{
+pub struct Cursor<T> {
     client: Client,
     // `wrapped_cursor` is an `Option` so that it can be `None` for the `drop` impl for a cursor
     // that's had `with_type` called; in all other circumstances it will be `Some`.
@@ -104,10 +102,7 @@ where
     _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T> Cursor<T>
-where
-    T: DeserializeOwned + Unpin + Send + Sync,
-{
+impl<T> Cursor<T> {
     pub(crate) fn new(
         client: Client,
         spec: CursorSpecification,
@@ -141,21 +136,6 @@ where
         self.wrapped_cursor.as_ref().unwrap().is_exhausted()
     }
 
-    /// Update the type streamed values will be parsed as.
-    pub fn with_type<D>(mut self) -> Cursor<D>
-    where
-        D: DeserializeOwned + Unpin + Send + Sync,
-    {
-        Cursor {
-            client: self.client.clone(),
-            wrapped_cursor: self.wrapped_cursor.take().map(|c| c.with_type()),
-            drop_address: self.drop_address.take(),
-            #[cfg(test)]
-            kill_watcher: self.kill_watcher.take(),
-            _phantom: Default::default(),
-        }
-    }
-
     pub(crate) fn client(&self) -> &Client {
         &self.client
     }
@@ -172,6 +152,108 @@ where
         self.wrapped_cursor
             .as_mut()
             .and_then(|c| c.provider_mut().take_implicit_session())
+    }
+
+    /// Move the cursor forward, potentially triggering requests to the database for more results
+    /// if the local buffer has been exhausted.
+    ///
+    /// This will keep requesting data from the server until either the cursor is exhausted
+    /// or batch with results in it has been received.
+    ///
+    /// The return value indicates whether new results were successfully returned (true) or if
+    /// the cursor has been closed (false).
+    ///
+    /// Note: [`Cursor::current`] and [`Cursor::deserialize_current`] must only be called after
+    /// [`Cursor::advance`] returned `Ok(true)`. It is an error to call either of them without
+    /// calling [`Cursor::advance`] first or after [`Cursor::advance`] returns an error / false.
+    ///
+    /// ```
+    /// # use mongodb::{Client, bson::Document, error::Result};
+    /// # async fn foo() -> Result<()> {
+    /// # let client = Client::with_uri_str("mongodb://localhost:27017").await?;
+    /// # let coll = client.database("stuff").collection::<Document>("stuff");
+    /// let mut cursor = coll.find(None, None).await?;
+    /// while cursor.advance().await? {
+    ///     println!("{:?}", cursor.current());
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn advance(&mut self) -> Result<bool> {
+        self.wrapped_cursor.as_mut().unwrap().advance().await
+    }
+
+    /// Returns a reference to the current result in the cursor.
+    ///
+    /// # Panics
+    /// [`Cursor::advance`] must return `Ok(true)` before [`Cursor::current`] can be
+    /// invoked. Calling [`Cursor::current`] after [`Cursor::advance`] does not return true
+    /// or without calling [`Cursor::advance`] at all may result in a panic.
+    ///
+    /// ```
+    /// # use mongodb::{Client, bson::Document, error::Result};
+    /// # async fn foo() -> Result<()> {
+    /// # let client = Client::with_uri_str("mongodb://localhost:27017").await?;
+    /// # let coll = client.database("stuff").collection::<Document>("stuff");
+    /// let mut cursor = coll.find(None, None).await?;
+    /// while cursor.advance().await? {
+    ///     println!("{:?}", cursor.current());
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn current(&self) -> &RawDocument {
+        self.wrapped_cursor.as_ref().unwrap().current().unwrap()
+    }
+
+    /// Deserialize the current result to the generic type associated with this cursor.
+    ///
+    /// # Panics
+    /// [`Cursor::advance`] must return `Ok(true)` before [`Cursor::deserialize_current`] can be
+    /// invoked. Calling [`Cursor::deserialize_current`] after [`Cursor::advance`] does not return
+    /// true or without calling [`Cursor::advance`] at all may result in a panic.
+    ///
+    /// ```
+    /// # use mongodb::{Client, error::Result};
+    /// # async fn foo() -> Result<()> {
+    /// # let client = Client::with_uri_str("mongodb://localhost:27017").await?;
+    /// # let db = client.database("foo");
+    /// use serde::Deserialize;
+    ///
+    /// #[derive(Debug, Deserialize)]
+    /// struct Cat<'a> {
+    ///     #[serde(borrow)]
+    ///     name: &'a str
+    /// }
+    ///
+    /// let coll = db.collection::<Cat>("cat");
+    /// let mut cursor = coll.find(None, None).await?;
+    /// while cursor.advance().await? {
+    ///     println!("{:?}", cursor.deserialize_current()?);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn deserialize_current<'a>(&'a self) -> Result<T>
+    where
+        T: Deserialize<'a>,
+    {
+        bson::from_slice(self.current().as_bytes()).map_err(Error::from)
+    }
+
+    /// Update the type streamed values will be parsed as.
+    pub fn with_type<'a, D>(mut self) -> Cursor<D>
+    where
+        D: Deserialize<'a>,
+    {
+        Cursor {
+            client: self.client.clone(),
+            wrapped_cursor: self.wrapped_cursor.take().map(|c| c.with_type()),
+            drop_address: self.drop_address.take(),
+            #[cfg(test)]
+            kill_watcher: self.kill_watcher.take(),
+            _phantom: Default::default(),
+        }
     }
 
     /// Some tests need to be able to observe the events generated by `killCommand` execution;
@@ -210,10 +292,7 @@ where
     }
 }
 
-impl<T> Drop for Cursor<T>
-where
-    T: DeserializeOwned + Unpin + Send + Sync,
-{
+impl<T> Drop for Cursor<T> {
     fn drop(&mut self) {
         let wrapped_cursor = match &self.wrapped_cursor {
             None => return,
@@ -327,5 +406,32 @@ impl GetMoreProvider for ImplicitSessionGetMoreProvider {
             }
             Self::Executing(_) | Self::Done => self_,
         })
+    }
+
+    fn execute(
+        &mut self,
+        info: CursorInformation,
+        client: Client,
+        pinned_connection: PinnedConnection,
+    ) -> BoxFuture<'_, Result<GetMoreResult>> {
+        match self {
+            Self::Idle(ref mut session) => Box::pin(async move {
+                let get_more = GetMore::new(info, pinned_connection.handle());
+                let get_more_result = client
+                    .execute_operation(get_more, session.as_mut().map(|b| b.as_mut()))
+                    .await;
+                get_more_result
+            }),
+            Self::Executing(_fut) => Box::pin(async {
+                Err(Error::internal(
+                    "streaming the cursor was cancelled while a request was in progress and must \
+                     be continued before iterating manually",
+                ))
+            }),
+            Self::Done => {
+                // this should never happen
+                Box::pin(async { Err(Error::internal("cursor iterated after already exhausted")) })
+            }
+        }
     }
 }

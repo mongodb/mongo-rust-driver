@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use futures::{future::Either, StreamExt, TryStreamExt};
+use serde::{Deserialize, Serialize};
 use tokio::sync::RwLockReadGuard;
 
 use crate::{
@@ -155,4 +156,75 @@ async fn batch_exhaustion() {
     let cursor = last.get_document("cursor").unwrap();
     let id = cursor.get_i64("id").unwrap();
     assert_eq!(0, id);
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn borrowed_deserialization() {
+    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+    let client = EventClient::new().await;
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct Doc<'a> {
+        #[serde(rename = "_id")]
+        id: i32,
+
+        #[serde(borrow)]
+        foo: &'a str,
+    }
+
+    let coll = client
+        .create_fresh_collection("cursor_borrowed_db", "cursor_borrowed_coll", None)
+        .await
+        .clone_with_type::<Doc>();
+
+    let docs = vec![
+        Doc {
+            id: 0,
+            foo: "a string",
+        },
+        Doc {
+            id: 1,
+            foo: "another string",
+        },
+        Doc {
+            id: 2,
+            foo: "more strings",
+        },
+        Doc {
+            id: 3,
+            foo: "striiiiiing",
+        },
+        Doc { id: 4, foo: "s" },
+        Doc { id: 5, foo: "1" },
+    ];
+
+    coll.insert_many(&docs, None).await.unwrap();
+
+    let options = FindOptions::builder()
+        .batch_size(2)
+        .sort(doc! { "_id": 1 })
+        .build();
+
+    let mut cursor = coll.find(None, options.clone()).await.unwrap();
+
+    let mut i = 0;
+    while cursor.advance().await.unwrap() {
+        let de = cursor.deserialize_current().unwrap();
+        assert_eq!(de, docs[i]);
+        i += 1;
+    }
+
+    let mut session = client.start_session(None).await.unwrap();
+    let mut cursor = coll
+        .find_with_session(None, options.clone(), &mut session)
+        .await
+        .unwrap();
+
+    let mut i = 0;
+    while cursor.advance(&mut session).await.unwrap() {
+        let de = cursor.deserialize_current().unwrap();
+        assert_eq!(de, docs[i]);
+        i += 1;
+    }
 }

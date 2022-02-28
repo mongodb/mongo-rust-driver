@@ -1,4 +1,4 @@
-use std::{convert::TryInto, time::Duration};
+use std::time::Duration;
 
 use crate::{
     bson::{doc, Document},
@@ -9,7 +9,7 @@ use crate::{
         Find,
         Operation,
     },
-    options::{CursorType, FindOptions, Hint, ReadConcern, ReadConcernLevel, ServerAddress},
+    options::{CursorType, FindOptions, Hint, ReadConcern, ReadConcernLevel},
     Namespace,
 };
 
@@ -205,64 +205,6 @@ async fn op_selection_criteria() {
         };
         Find::new(Namespace::empty(), None, Some(options))
     });
-}
-
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_success() {
-    let ns = Namespace {
-        db: "test_db".to_string(),
-        coll: "test_coll".to_string(),
-    };
-
-    let address = ServerAddress::Tcp {
-        host: "localhost".to_string(),
-        port: None,
-    };
-
-    let find = Find::empty();
-
-    let first_batch = vec![doc! {"_id": 1}, doc! {"_id": 2}];
-
-    let response = doc! {
-        "cursor": {
-            "id": 123,
-            "ns": format!("{}.{}", ns.db, ns.coll),
-            "firstBatch": bson_util::to_bson_array(&first_batch),
-        },
-        "ok": 1.0
-    };
-
-    let cursor_spec = handle_response_test(&find, response.clone()).unwrap();
-    assert_eq!(cursor_spec.address(), &address);
-    assert_eq!(cursor_spec.id(), 123);
-    assert_eq!(cursor_spec.batch_size(), None);
-    assert_eq!(
-        cursor_spec
-            .initial_buffer
-            .into_iter()
-            .map(|d| d.try_into().unwrap())
-            .collect::<Vec<Document>>(),
-        first_batch
-    );
-
-    let find = Find::new(
-        ns,
-        None,
-        Some(FindOptions::builder().batch_size(123).build()),
-    );
-    let cursor_spec = handle_response_test(&find, response).unwrap();
-    assert_eq!(cursor_spec.address(), &address);
-    assert_eq!(cursor_spec.id(), 123);
-    assert_eq!(cursor_spec.batch_size(), Some(123));
-    assert_eq!(
-        cursor_spec
-            .initial_buffer
-            .into_iter()
-            .map(|d| d.try_into().unwrap())
-            .collect::<Vec<Document>>(),
-        first_batch
-    );
 }
 
 fn verify_max_await_time(max_await_time: Option<Duration>, cursor_type: Option<CursorType>) {

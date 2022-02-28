@@ -14,7 +14,7 @@ use crate::{
     Namespace,
 };
 
-use super::{CursorBody, SERVER_4_2_0_WIRE_VERSION};
+use super::{CursorBody, WriteConcernOnlyBody, SERVER_4_2_0_WIRE_VERSION};
 
 pub(crate) use change_stream::ChangeStreamAggregate;
 
@@ -88,14 +88,15 @@ impl Operation for Aggregate {
         response: RawCommandResponse,
         description: &StreamDescription,
     ) -> Result<Self::O> {
-        let response: CursorBody = response.body()?;
+        let cursor_response: CursorBody = response.body()?;
 
         if self.is_out_or_merge() {
-            response.write_concern_info.validate()?;
+            let wc_error_info = response.body::<WriteConcernOnlyBody>()?;
+            wc_error_info.validate()?;
         };
 
         Ok(CursorSpecification::new(
-            response.cursor,
+            cursor_response.cursor,
             description.server_address.clone(),
             self.options.as_ref().and_then(|opts| opts.batch_size),
             self.options.as_ref().and_then(|opts| opts.max_await_time),

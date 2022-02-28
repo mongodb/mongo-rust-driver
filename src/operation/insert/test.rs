@@ -74,6 +74,7 @@ async fn build() {
     let mut cmd_docs: Vec<Document> = cmd
         .body
         .documents
+        .as_ref()
         .into_iter()
         .map(|b| Document::from_reader(b.unwrap().as_document().unwrap().as_bytes()).unwrap())
         .collect();
