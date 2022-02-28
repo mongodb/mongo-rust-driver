@@ -3,6 +3,7 @@ use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 use crate::{
     bson::doc,
     error::ErrorKind,
+    options::SessionOptions,
     test::{run_spec_test, TestClient, LOCK},
 };
 
@@ -13,6 +14,15 @@ use super::run_unified_format_test;
 async fn run_unified() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
     run_spec_test(&["sessions"], run_unified_format_test).await;
+}
+
+// Sessions prose test 1
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn snapshot_and_causal_consistency_are_mutually_exclusive() {
+    let options = SessionOptions::builder().snapshot(true).causal_consistency(true).build();
+    let client = TestClient::new().await;
+    assert!(client.start_session(options).await.is_err());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
@@ -49,3 +59,5 @@ async fn explicit_session_created_on_same_client() {
         other => panic!("expected InvalidArgument error, got {:?}", other),
     }
 }
+
+
