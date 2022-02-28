@@ -84,7 +84,7 @@ where
     }
 
     pub(super) fn current(&self) -> Option<&RawDocument> {
-        self.state.as_ref().unwrap().buffer.current()
+        self.state().buffer.current()
     }
 
     fn state_mut(&mut self) -> &mut CursorState {
@@ -129,7 +129,7 @@ where
     }
 
     pub(super) fn is_exhausted(&self) -> bool {
-        self.state.as_ref().unwrap().exhausted
+        self.state().exhausted
     }
 
     pub(super) fn id(&self) -> i64 {
@@ -145,15 +145,11 @@ where
     }
 
     pub(super) fn pinned_connection(&self) -> &PinnedConnection {
-        &self.state.as_ref().unwrap().pinned_connection
+        &self.state().pinned_connection
     }
 
     pub(super) fn post_batch_resume_token(&self) -> Option<&ResumeToken> {
-        self.state
-            .as_ref()
-            .unwrap()
-            .post_batch_resume_token
-            .as_ref()
+        self.state().post_batch_resume_token.as_ref()
     }
 
     fn mark_exhausted(&mut self) {
@@ -230,7 +226,7 @@ where
                     let (result, session) = get_more_result.into_parts();
                     let output = self.handle_get_more_result(result);
                     self.provider
-                        .clear_execution(session, self.state.as_ref().unwrap().exhausted);
+                        .clear_execution(session, self.state().exhausted);
                     output?;
                 }
                 Poll::Pending => return Poll::Pending,
