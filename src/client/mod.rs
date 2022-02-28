@@ -250,7 +250,10 @@ impl Client {
     }
 
     /// Starts a new `ClientSession`.
-    pub async fn start_session(&self, options: impl Into<Option<SessionOptions>>) -> Result<ClientSession> {
+    pub async fn start_session(
+        &self,
+        options: impl Into<Option<SessionOptions>>,
+    ) -> Result<ClientSession> {
         let options = options.into();
         if let Some(ref options) = options {
             options.validate()?;
