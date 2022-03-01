@@ -29,7 +29,7 @@ This repository contains the officially supported MongoDB Rust driver, a client 
 
 ## Installation
 ### Requirements
-- Rust 1.48+
+- Rust 1.49+
 - MongoDB 3.6+
 
 ### Importing
@@ -357,7 +357,7 @@ Commits to master are run automatically on [evergreen](https://evergreen.mongodb
 
 ## Minimum supported Rust version (MSRV)
 
-The MSRV for this crate is currently 1.48.0. This will be rarely be increased, and if it ever is,
+The MSRV for this crate is currently 1.49.0. This will be rarely be increased, and if it ever is,
 it will only happen in a minor or major version release.
 
 ## License
