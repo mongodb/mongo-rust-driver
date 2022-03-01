@@ -322,8 +322,8 @@ impl<'de> Deserialize<'de> for ServerApiVersion {
     }
 }
 
-/// Options used to declare a versioned server API.  For more information, see the [Versioned API](
-/// https://docs.mongodb.com/v5.0/reference/versioned-api/) manual page.
+/// Options used to declare a stable server API.  For more information, see the [Stable API](
+/// https://docs.mongodb.com/v5.0/reference/stable-api/) manual page.
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, TypedBuilder)]
 #[builder(field_defaults(setter(into)))]
@@ -506,13 +506,13 @@ pub struct ClientOptions {
     /// The declared API version is applied to all commands run through the client, including those
     /// sent through any handle derived from the client.
     ///
-    /// Specifying versioned API options in the command document passed to `run_command` AND
+    /// Specifying stable API options in the command document passed to `run_command` AND
     /// declaring an API version on the client is not supported and is considered undefined
     /// behaviour. To run any command with a different API version or without declaring one, create
     /// a separate client that declares the appropriate API version.
     ///
-    /// For more information, see the [Versioned API](
-    /// https://docs.mongodb.com/v5.0/reference/versioned-api/) manual page.
+    /// For more information, see the [Stable API](
+    /// https://docs.mongodb.com/v5.0/reference/stable-api/) manual page.
     #[builder(default)]
     pub server_api: Option<ServerApi>,
 

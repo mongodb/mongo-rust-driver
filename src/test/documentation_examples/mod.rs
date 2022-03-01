@@ -1373,33 +1373,33 @@ type GenericResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[allow(unused_variables)]
 #[cfg(not(feature = "sync"))]
-async fn versioned_api_examples() -> GenericResult<()> {
+async fn stable_api_examples() -> GenericResult<()> {
     let setup_client = TestClient::new().await;
     if setup_client.server_version_lt(4, 9) {
-        log_uncaptured("skipping versioned API examples due to unsupported server version");
+        log_uncaptured("skipping stable API examples due to unsupported server version");
         return Ok(());
     }
     if setup_client.is_sharded() && setup_client.server_version <= Version::new(5, 0, 2) {
         // See SERVER-58794.
         log_uncaptured(
-            "skipping versioned API examples due to unsupported server version on sharded topology",
+            "skipping stable API examples due to unsupported server version on sharded topology",
         );
         return Ok(());
     }
     if setup_client.is_load_balanced() {
-        log_uncaptured("skipping versioned API examples due to load-balanced topology");
+        log_uncaptured("skipping stable API examples due to load-balanced topology");
         return Ok(());
     }
 
     let uri = DEFAULT_URI.clone();
-    // Start Versioned API Example 1
+    // Start Stable API Example 1
     let mut options = ClientOptions::parse(&uri).await?;
     let server_api = ServerApi::builder().version(ServerApiVersion::V1).build();
     options.server_api = Some(server_api);
     let client = Client::with_options(options)?;
-    // End Versioned API Example 1
+    // End Stable API Example 1
 
-    // Start Versioned API Example 2
+    // Start Stable API Example 2
     let mut options = ClientOptions::parse(&uri).await?;
     let server_api = ServerApi::builder()
         .version(ServerApiVersion::V1)
@@ -1407,9 +1407,9 @@ async fn versioned_api_examples() -> GenericResult<()> {
         .build();
     options.server_api = Some(server_api);
     let client = Client::with_options(options)?;
-    // End Versioned API Example 2
+    // End Stable API Example 2
 
-    // Start Versioned API Example 3
+    // Start Stable API Example 3
     let mut options = ClientOptions::parse(&uri).await?;
     let server_api = ServerApi::builder()
         .version(ServerApiVersion::V1)
@@ -1417,9 +1417,9 @@ async fn versioned_api_examples() -> GenericResult<()> {
         .build();
     options.server_api = Some(server_api);
     let client = Client::with_options(options)?;
-    // End Versioned API Example 3
+    // End Stable API Example 3
 
-    // Start Versioned API Example 4
+    // Start Stable API Example 4
     let mut options = ClientOptions::parse(&uri).await?;
     let server_api = ServerApi::builder()
         .version(ServerApiVersion::V1)
@@ -1427,7 +1427,7 @@ async fn versioned_api_examples() -> GenericResult<()> {
         .build();
     options.server_api = Some(server_api);
     let client = Client::with_options(options)?;
-    // End Versioned API Example 4
+    // End Stable API Example 4
 
     let mut options = ClientOptions::parse(&uri).await?;
     let server_api = ServerApi::builder()
@@ -1436,12 +1436,12 @@ async fn versioned_api_examples() -> GenericResult<()> {
         .build();
     options.server_api = Some(server_api);
     let client = Client::with_options(options)?;
-    let db = client.database("versioned-api-migration-examples");
+    let db = client.database("stable-api-migration-examples");
     db.collection::<Document>("sales").drop(None).await?;
 
     use std::{error::Error, result::Result};
 
-    // Start Versioned API Example 5
+    // Start Stable API Example 5
     // With the `bson-chrono-0_4` feature enabled, this function can be dropped in favor of using
     // `chrono::DateTime` values directly.
     fn iso_date(text: &str) -> Result<bson::DateTime, Box<dyn Error>> {
@@ -1458,9 +1458,9 @@ async fn versioned_api_examples() -> GenericResult<()> {
         doc! { "_id" : 7, "item" : "xyz", "price" : 5, "quantity" : 10, "date" : iso_date("2021-02-15T14:12:12Z")? },
         doc! { "_id" : 8, "item" : "abc", "price" : 10, "quantity" : 5, "date" : iso_date("2021-03-16T20:20:13Z")? }
     ], None).await?;
-    // End Versioned API Example 5
+    // End Stable API Example 5
 
-    // Start Versioned API Example 6
+    // Start Stable API Example 6
     let result = db
         .run_command(
             doc! {
@@ -1476,11 +1476,11 @@ async fn versioned_api_examples() -> GenericResult<()> {
         //     CommandError {
         //         code: 323,
         //         code_name: "APIStrictError",
-        //         message: "Provided apiStrict:true, but the command count is not in API Version 1. Information on supported commands and migrations in API Version 1 can be found at https://dochub.mongodb.org/core/manual-versioned-api",
+        //         message: "Provided apiStrict:true, but the command count is not in API Version 1. Information on supported commands and migrations in API Version 1 can be found at https://docs.mongodb.com/v5.0/reference/stable-api/",
         //     },
         // )
     }
-    // End Versioned API Example 6
+    // End Stable API Example 6
     if let ErrorKind::Command(ref err) = *result.as_ref().unwrap_err().kind {
         assert_eq!(err.code, 323);
         assert_eq!(err.code_name, "APIStrictError".to_string());
@@ -1488,16 +1488,16 @@ async fn versioned_api_examples() -> GenericResult<()> {
         panic!("invalid result {:?}", result);
     };
 
-    // Start Versioned API Example 7
+    // Start Stable API Example 7
     let count = db
         .collection::<Document>("sales")
         .count_documents(None, None)
         .await?;
-    // End Versioned API Example 7
+    // End Stable API Example 7
 
-    // Start Versioned API Example 8
+    // Start Stable API Example 8
     assert_eq!(count, 8);
-    // End Versioned API Example 8
+    // End Stable API Example 8
 
     Ok(())
 }
@@ -1850,7 +1850,7 @@ async fn test() {
     projection_examples(&coll).await.unwrap();
     update_examples(&coll).await.unwrap();
     delete_examples(&coll).await.unwrap();
-    versioned_api_examples().await.unwrap();
+    stable_api_examples().await.unwrap();
     aggregation_examples().await.unwrap();
     run_command_examples().await.unwrap();
     index_examples().await.unwrap();
