@@ -33,7 +33,7 @@ impl ResumeToken {
             Some(token) if spec.initial_buffer.is_empty() => Some(token.clone()),
             // Token from options passed to `watch`
             _ => options
-                .and_then(|o| o.start_after.as_ref().or_else(|| o.resume_after.as_ref()))
+                .and_then(|o| o.start_after.as_ref().or(o.resume_after.as_ref()))
                 .cloned(),
         }
     }
