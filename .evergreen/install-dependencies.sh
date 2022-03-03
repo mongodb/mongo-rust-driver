@@ -24,6 +24,9 @@ source ~/.cargo/env
 # Install nightly rustfmt
 rustup toolchain install nightly -c rustfmt
 
+# Pin clippy version to the latest Rust version. This should be updated with each new Rust release.
+rustup toolchain install 1.59.0 -c clippy
+
 # Install tool for converting cargo test output to junit
 cargo install cargo2junit
 
