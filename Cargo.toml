@@ -20,11 +20,12 @@ exclude = [
 ]
 
 [features]
-default = ["tokio-runtime"]
+default = ["tokio-runtime", "rustls-tls"]
 tokio-runtime = ["tokio/macros", "tokio/net", "tokio/rt", "tokio/time", "serde_bytes"]
 async-std-runtime = ["async-std", "async-std/attributes", "async-std-resolver", "tokio-util/compat"]
 sync = ["async-std-runtime"]
 tokio-sync = ["tokio-runtime"]
+rustls-tls = ["rustls", "rustls-pemfile", "tokio-rustls", "webpki", "webpki-roots"]
 
 # Enable support for v0.4 of the chrono crate in the public API of the BSON library.
 bson-chrono-0_4 = ["bson/chrono-0_4"]
@@ -62,7 +63,7 @@ md-5 = "0.9.1"
 os_info = { version = "3.0.1", default-features = false }
 percent-encoding = "2.0.0"
 rand = { version = "0.8.3", features = ["small_rng"] }
-rustls-pemfile = "0.2.1"
+rustls-pemfile =  { version = "0.2.1", optional = true }
 serde_with = "1.3.1"
 sha-1 = "0.9.4"
 sha2 = "0.9.3"
@@ -101,6 +102,7 @@ features = ["json", "rustls-tls"]
 [dependencies.rustls]
 version = "0.19.0"
 features = ["dangerous_configuration"]
+optional = true
 
 [dependencies.serde]
 version = "1.0.125"
@@ -117,6 +119,7 @@ features = ["io-util", "sync", "macros"]
 [dependencies.tokio-rustls]
 version = "0.22.0"
 features = ["dangerous_configuration"]
+optional = true
 
 [dependencies.tokio-util]
 version = "0.6.5"

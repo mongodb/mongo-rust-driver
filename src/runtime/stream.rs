@@ -2,15 +2,12 @@ use std::{
     net::SocketAddr,
     ops::DerefMut,
     pin::Pin,
-    sync::Arc,
     task::{Context, Poll},
     time::Duration,
 };
 
 use futures_io::{AsyncRead, AsyncWrite};
 use tokio::io::{AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite, ReadBuf};
-use tokio_rustls::TlsConnector;
-use webpki::DNSNameRef;
 
 use crate::{
     cmap::options::StreamOptions,
@@ -18,6 +15,8 @@ use crate::{
     options::ServerAddress,
     runtime,
 };
+
+use super::tls::AsyncTlsStream;
 
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const KEEPALIVE_TIME: Duration = Duration::from_secs(120);
@@ -32,7 +31,7 @@ pub(crate) enum AsyncStream {
     Tcp(AsyncTcpStream),
 
     /// A TLS connection over TCP.
-    Tls(tokio_rustls::client::TlsStream<AsyncTcpStream>),
+    Tls(AsyncTlsStream),
 }
 
 /// A runtime-agnostic async stream.
@@ -151,17 +150,16 @@ impl AsyncStream {
         match options.tls_options {
             Some(cfg) => {
                 let host = options.address.host();
-                let name =
-                    DNSNameRef::try_from_ascii_str(host).map_err(|e| ErrorKind::DnsResolve {
-                        message: format!("could not resolve {:?}: {}", host, e),
-                    })?;
-                let mut tls_config = cfg.into_rustls_config()?;
-                tls_config.enable_sni = true;
+                Ok(Self::Tls(AsyncTlsStream::connect(host, inner, cfg).await?))
 
-                let connector: TlsConnector = Arc::new(tls_config).into();
-                let session = connector.connect(name, inner).await?;
-
-                Ok(Self::Tls(session))
+                /*
+                let connector = SslConnector::builder()?
+                    ...
+                    .build();
+                let ssl = connector.configure()?.into_ssl(host)?;
+                let stream = tokio_openssl::SslStream::new(ssl, inner)?;
+                stream.connect().await?;
+                */
             }
             None => Ok(Self::Tcp(inner)),
         }
@@ -177,9 +175,7 @@ impl AsyncRead for AsyncStream {
         match self.deref_mut() {
             Self::Null => Poll::Ready(Ok(0)),
             Self::Tcp(ref mut inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
-            Self::Tls(ref mut inner) => {
-                tokio_util::io::poll_read_buf(Pin::new(inner), cx, &mut buf)
-            }
+            Self::Tls(ref mut inner) => Pin::new(inner).poll_read(cx, &mut buf),
         }
     }
 }
@@ -209,7 +205,7 @@ impl AsyncWrite for AsyncStream {
         match self.deref_mut() {
             Self::Null => Poll::Ready(Ok(())),
             Self::Tcp(ref mut inner) => Pin::new(inner).poll_close(cx),
-            Self::Tls(ref mut inner) => Pin::new(inner).poll_shutdown(cx),
+            Self::Tls(ref mut inner) => Pin::new(inner).poll_close(cx),
         }
     }
 }

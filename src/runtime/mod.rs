@@ -7,6 +7,8 @@ mod interval;
 mod join_handle;
 mod resolver;
 mod stream;
+#[cfg(feature = "rustls-tls")]
+mod tls_rustls;
 
 use std::{future::Future, net::SocketAddr, time::Duration};
 
@@ -24,6 +26,8 @@ pub(crate) use http::HttpClient;
 use interval::Interval;
 #[cfg(feature = "tokio-runtime")]
 use tokio::time::Interval;
+#[cfg(feature = "rustls-tls")]
+use tls_rustls as tls;
 
 /// Spawn a task in the background to run a future.
 ///

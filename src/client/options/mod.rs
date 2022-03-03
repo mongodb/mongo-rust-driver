@@ -7,9 +7,7 @@ use std::{
     collections::HashSet,
     convert::TryFrom,
     fmt::{self, Display, Formatter},
-    fs::File,
     hash::{Hash, Hasher},
-    io::{BufReader, Seek, SeekFrom},
     path::PathBuf,
     str::FromStr,
     sync::Arc,
@@ -18,15 +16,6 @@ use std::{
 
 use derivative::Derivative;
 use lazy_static::lazy_static;
-use rustls::{
-    internal::pemfile,
-    Certificate,
-    RootCertStore,
-    ServerCertVerified,
-    ServerCertVerifier,
-    TLSError,
-};
-use rustls_pemfile::{read_one, Item};
 use serde::{
     de::{Error, Unexpected},
     Deserialize,
@@ -36,7 +25,6 @@ use serde::{
 use serde_with::skip_serializing_none;
 use strsim::jaro_winkler;
 use typed_builder::TypedBuilder;
-use webpki_roots::TLS_SERVER_ROOTS;
 
 #[cfg(test)]
 use crate::srv::LookupHosts;
@@ -790,97 +778,7 @@ pub struct TlsOptions {
     pub cert_key_file_path: Option<PathBuf>,
 }
 
-struct NoCertVerifier {}
-
-impl ServerCertVerifier for NoCertVerifier {
-    fn verify_server_cert(
-        &self,
-        _: &RootCertStore,
-        _: &[Certificate],
-        _: webpki::DNSNameRef,
-        _: &[u8],
-    ) -> std::result::Result<ServerCertVerified, TLSError> {
-        Ok(ServerCertVerified::assertion())
-    }
-}
-
 impl TlsOptions {
-    /// Converts `TlsOptions` into a rustls::ClientConfig.
-    pub(crate) fn into_rustls_config(self) -> Result<rustls::ClientConfig> {
-        let mut config = rustls::ClientConfig::new();
-
-        if let Some(true) = self.allow_invalid_certificates {
-            config
-                .dangerous()
-                .set_certificate_verifier(Arc::new(NoCertVerifier {}));
-        }
-
-        let mut store = RootCertStore::empty();
-        if let Some(path) = self.ca_file_path {
-            store
-                .add_pem_file(&mut BufReader::new(File::open(&path)?))
-                .map_err(|_| ErrorKind::InvalidTlsConfig {
-                    message: format!(
-                        "Unable to parse PEM-encoded root certificate from {}",
-                        path.display()
-                    ),
-                })?;
-        } else {
-            store.add_server_trust_anchors(&TLS_SERVER_ROOTS);
-        }
-
-        config.root_store = store;
-
-        if let Some(path) = self.cert_key_file_path {
-            let mut file = BufReader::new(File::open(&path)?);
-            let certs = match pemfile::certs(&mut file) {
-                Ok(certs) => certs,
-                Err(()) => {
-                    return Err(ErrorKind::InvalidTlsConfig {
-                        message: format!(
-                            "Unable to parse PEM-encoded client certificate from {}",
-                            path.display()
-                        ),
-                    }
-                    .into())
-                }
-            };
-
-            file.seek(SeekFrom::Start(0))?;
-            let key = loop {
-                match read_one(&mut file) {
-                    Ok(Some(Item::PKCS8Key(bytes))) | Ok(Some(Item::RSAKey(bytes))) => {
-                        break rustls::PrivateKey(bytes)
-                    }
-                    Ok(Some(_)) => continue,
-                    Ok(None) => {
-                        return Err(ErrorKind::InvalidTlsConfig {
-                            message: format!("No PEM-encoded keys in {}", path.display()),
-                        }
-                        .into())
-                    }
-                    Err(_) => {
-                        return Err(ErrorKind::InvalidTlsConfig {
-                            message: format!(
-                                "Unable to parse PEM-encoded item from {}",
-                                path.display()
-                            ),
-                        }
-                        .into())
-                    }
-                }
-            };
-
-            config
-                .set_single_client_cert(certs, key)
-                .map_err(|e| ErrorKind::InvalidTlsConfig {
-                    message: e.to_string(),
-                })?;
-        }
-
-        Ok(config)
-    }
-
     #[cfg(test)]
     pub(crate) fn serialize_for_client_options<S>(
         tls_options: &TlsOptions,
