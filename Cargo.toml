@@ -26,6 +26,7 @@ async-std-runtime = ["async-std", "async-std/attributes", "async-std-resolver", 
 sync = ["async-std-runtime"]
 tokio-sync = ["tokio-runtime"]
 rustls-tls = ["rustls", "rustls-pemfile", "tokio-rustls", "webpki", "webpki-roots"]
+openssl-tls = ["openssl", "tokio-openssl"]
 
 # Enable support for v0.4 of the chrono crate in the public API of the BSON library.
 bson-chrono-0_4 = ["bson/chrono-0_4"]
@@ -60,6 +61,7 @@ hex = "0.4.0"
 hmac = "0.11"
 lazy_static = "1.4.0"
 md-5 = "0.9.1"
+openssl = { version = "0.10.38", optional = true }
 os_info = { version = "3.0.1", default-features = false }
 percent-encoding = "2.0.0"
 rand = { version = "0.8.3", features = ["small_rng"] }
@@ -73,6 +75,7 @@ stringprep = "0.1.2"
 strsim = "0.10.0"
 take_mut = "0.2.2"
 thiserror = "1.0.24"
+tokio-openssl = { version = "0.6.3", optional = true }
 trust-dns-proto = "0.20.0"
 trust-dns-resolver = "0.20.0"
 typed-builder = "0.9.0"

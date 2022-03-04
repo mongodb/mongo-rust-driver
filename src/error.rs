@@ -388,6 +388,20 @@ impl From<std::io::ErrorKind> for ErrorKind {
     }
 }
 
+#[cfg(feature = "openssl-tls")]
+impl From<openssl::error::ErrorStack> for ErrorKind {
+    fn from(err: openssl::error::ErrorStack) -> Self {
+        Self::OpenSSL(err.into())
+    }
+}
+
+#[cfg(feature = "openssl-tls")]
+impl From<openssl::ssl::Error> for ErrorKind {
+    fn from(err: openssl::ssl::Error) -> Self {
+        Self::OpenSSL(err)
+    }
+}
+
 /// The types of errors that can occur.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Error)]
@@ -474,6 +488,11 @@ pub enum ErrorKind {
     /// No resume token was present in a change stream document.
     #[error("Cannot provide resume functionality when the resume token is missing")]
     MissingResumeToken,
+
+    /// Wrapper around [`openssl::ssl::Error`].
+    #[cfg(feature = "openssl-tls")]
+    #[error("{0}")]
+    OpenSSL(openssl::ssl::Error)
 }
 
 impl ErrorKind {

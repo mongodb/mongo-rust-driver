@@ -151,15 +151,6 @@ impl AsyncStream {
             Some(cfg) => {
                 let host = options.address.host();
                 Ok(Self::Tls(AsyncTlsStream::connect(host, inner, cfg).await?))
-
-                /*
-                let connector = SslConnector::builder()?
-                    ...
-                    .build();
-                let ssl = connector.configure()?.into_ssl(host)?;
-                let stream = tokio_openssl::SslStream::new(ssl, inner)?;
-                stream.connect().await?;
-                */
             }
             None => Ok(Self::Tcp(inner)),
         }

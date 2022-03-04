@@ -9,6 +9,8 @@ mod resolver;
 mod stream;
 #[cfg(feature = "rustls-tls")]
 mod tls_rustls;
+#[cfg(feature = "openssl-tls")]
+mod tls_openssl;
 
 use std::{future::Future, net::SocketAddr, time::Duration};
 
@@ -28,6 +30,8 @@ use interval::Interval;
 use tokio::time::Interval;
 #[cfg(feature = "rustls-tls")]
 use tls_rustls as tls;
+#[cfg(feature = "openssl-tls")]
+use tls_openssl as tls;
 
 /// Spawn a task in the background to run a future.
 ///
