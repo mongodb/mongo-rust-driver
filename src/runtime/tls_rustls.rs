@@ -72,7 +72,6 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
     let mut config = rustls::ClientConfig::new();
 
     if let Some(true) = cfg.allow_invalid_certificates {
-        // ? SslContextBuilder::set_verify(SslVerifyMode::NONE)
         config
             .dangerous()
             .set_certificate_verifier(Arc::new(NoCertVerifier {}));
@@ -80,7 +79,6 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
 
     let mut store = RootCertStore::empty();
     if let Some(path) = cfg.ca_file_path {
-        // SslContextBuilder::set_ca_file(path)
         store
             .add_pem_file(&mut BufReader::new(File::open(&path)?))
             .map_err(|_| ErrorKind::InvalidTlsConfig {
@@ -90,14 +88,12 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
                 ),
             })?;
     } else {
-        // ???
         store.add_server_trust_anchors(&TLS_SERVER_ROOTS);
     }
 
     config.root_store = store;
 
     if let Some(path) = cfg.cert_key_file_path {
-        // ? SslContextBuilder::set_certificate[_chain]_file(path, SslFiletype::PEM)
         let mut file = BufReader::new(File::open(&path)?);
         let certs = match pemfile::certs(&mut file) {
             Ok(certs) => certs,
@@ -112,7 +108,6 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
             }
         };
 
-        // ? SslContextBuilder::set_private_key_file(path, SslFiletype::PEM)
         file.seek(SeekFrom::Start(0))?;
         let key = loop {
             match read_one(&mut file) {

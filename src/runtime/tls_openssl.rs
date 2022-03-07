@@ -1,4 +1,5 @@
 use std::pin::Pin;
+use std::sync::Once;
 use std::task::{Context, Poll};
 
 use futures_io::{AsyncRead, AsyncWrite};
@@ -18,8 +19,13 @@ pub(crate) struct AsyncTlsStream {
 
 impl AsyncTlsStream {
     pub(crate) async fn connect(host: &str, tcp_stream: AsyncTcpStream, cfg: TlsOptions) -> Result<Self> {
+        init_trust();
+
         let connector = make_openssl_connector(cfg)?;
-        let ssl = connector.configure()?.into_ssl(host)?;
+        let ssl = connector.configure()?
+            .use_server_name_indication(true)
+            .verify_hostname(false)
+            .into_ssl(host)?;
         let mut stream = SslStream::new(ssl, tcp_stream)?;
         Pin::new(&mut stream).connect().await?;
         Ok(AsyncTlsStream {
@@ -59,19 +65,27 @@ impl AsyncWrite for AsyncTlsStream {
 fn make_openssl_connector(cfg: TlsOptions) -> Result<SslConnector> {
     let mut builder = SslConnector::builder(SslMethod::tls_client())?;
 
-    if let Some(true) = cfg.allow_invalid_certificates {
+    let TlsOptions {
+        allow_invalid_certificates,
+        ca_file_path,
+        cert_key_file_path,
+    } = cfg;
+
+    if let Some(true) = allow_invalid_certificates {
         builder.set_verify(SslVerifyMode::NONE);
     }
-    if let Some(path) = cfg.ca_file_path {
+    if let Some(path) = ca_file_path {
         builder.set_ca_file(path);
-    } else {
-        // TODO(aegnor): validate this
-        builder.set_default_verify_paths();
     }
-    if let Some(path) = cfg.cert_key_file_path {
-        builder.set_certificate_chain_file(path);
+    if let Some(path) = cert_key_file_path {
+        builder.set_certificate_file(path, SslFiletype::PEM);
         builder.set_private_key_file(path, SslFiletype::PEM);
     }
 
     Ok(builder.build())
+}
+
+fn init_trust() {
+    static ONCE: Once = Once::new();
+    ONCE.call_once(openssl_probe::init_ssl_cert_env_vars);
 }
