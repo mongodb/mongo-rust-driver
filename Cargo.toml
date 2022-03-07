@@ -23,7 +23,8 @@ exclude = [
 default = ["tokio-runtime"]
 tokio-runtime = ["tokio/macros", "tokio/net", "tokio/rt", "tokio/time", "serde_bytes"]
 async-std-runtime = ["async-std", "async-std/attributes", "async-std-resolver", "tokio-util/compat"]
-sync = ["tokio-runtime"]
+sync = ["async-std-runtime"]
+tokio-sync = ["tokio-runtime"]
 
 # Enable support for v0.4 of the chrono crate in the public API of the BSON library.
 bson-chrono-0_4 = ["bson/chrono-0_4"]

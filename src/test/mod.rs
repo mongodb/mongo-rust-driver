@@ -1,4 +1,4 @@
-#[cfg(not(feature = "sync"))]
+#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod atlas_connectivity;
 mod auth_aws;
 mod change_stream;
@@ -6,7 +6,7 @@ mod client;
 mod coll;
 mod cursor;
 mod db;
-#[cfg(not(feature = "sync"))]
+#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod documentation_examples;
 mod index_management;
 mod spec;

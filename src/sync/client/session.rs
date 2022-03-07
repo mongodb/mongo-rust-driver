@@ -4,7 +4,7 @@ use crate::{
     client::session::ClusterTime,
     error::Result,
     options::{SessionOptions, TransactionOptions},
-    sync::TOKIO_RUNTIME,
+    runtime,
     ClientSession as AsyncClientSession,
 };
 
@@ -76,7 +76,7 @@ impl ClientSession {
         &mut self,
         options: impl Into<Option<TransactionOptions>>,
     ) -> Result<()> {
-        TOKIO_RUNTIME.block_on(self.async_client_session.start_transaction(options))
+        runtime::block_on(self.async_client_session.start_transaction(options))
     }
 
     /// Commits the transaction that is currently active on this session.
@@ -100,7 +100,7 @@ impl ClientSession {
     /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub fn commit_transaction(&mut self) -> Result<()> {
-        TOKIO_RUNTIME.block_on(self.async_client_session.commit_transaction())
+        runtime::block_on(self.async_client_session.commit_transaction())
     }
 
     /// Aborts the transaction that is currently active on this session. Any open transaction will
@@ -133,6 +133,6 @@ impl ClientSession {
     /// [here](https://docs.mongodb.com/manual/core/retryable-writes/) for more information on
     /// retryable writes.
     pub fn abort_transaction(&mut self) -> Result<()> {
-        TOKIO_RUNTIME.block_on(self.async_client_session.abort_transaction())
+        runtime::block_on(self.async_client_session.abort_transaction())
     }
 }

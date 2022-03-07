@@ -352,7 +352,7 @@ pub struct Credential {
 }
 
 impl Credential {
-    #[cfg(all(test, not(feature = "sync")))]
+    #[cfg(all(test, not(feature = "sync"), not(feature = "tokio-sync")))]
     pub(crate) fn into_document(mut self) -> Document {
         use crate::bson::Bson;
 

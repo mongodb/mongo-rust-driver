@@ -1,4 +1,4 @@
-#[cfg(all(test, not(feature = "sync")))]
+#[cfg(all(test, not(feature = "sync"), not(feature = "tokio-sync")))]
 mod test;
 
 mod resolver_config;
@@ -53,6 +53,9 @@ use crate::{
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
     srv::{OriginalSrvInfo, SrvResolver},
 };
+
+#[cfg(any(feature = "sync", feature = "tokio-sync"))]
+use crate::runtime;
 
 pub use resolver_config::ResolverConfig;
 
@@ -244,7 +247,7 @@ impl ServerAddress {
         })
     }
 
-    #[cfg(all(test, not(feature = "sync")))]
+    #[cfg(all(test, not(feature = "sync"), not(feature = "tokio-sync")))]
     pub(crate) fn into_document(self) -> Document {
         match self {
             Self::Tcp { host, port } => {
@@ -1038,17 +1041,17 @@ impl ClientOptions {
     ///
     /// Note: if the `sync` feature is enabled, then this method will be replaced with [the sync
     /// version](#method.parse-1).
-    #[cfg(not(feature = "sync"))]
+    #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
     pub async fn parse(s: impl AsRef<str>) -> Result<Self> {
         Self::parse_uri(s, None).await
     }
 
     /// This method will be present if the `sync` feature is enabled. It's otherwise identical to
     /// [the async version](#method.parse)
-    #[cfg(any(feature = "sync", docsrs))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+    #[cfg(any(feature = "sync", feature = "tokio-sync", docsrs))]
+    #[cfg_attr(docsrs, doc(cfg(any(feature = "sync", feature = "tokio-sync"))))]
     pub fn parse(s: impl AsRef<str>) -> Result<Self> {
-        crate::sync::TOKIO_RUNTIME.block_on(Self::parse_uri(s.as_ref(), None))
+        runtime::block_on(Self::parse_uri(s.as_ref(), None))
     }
 
     /// Parses a MongoDB connection string into a `ClientOptions` struct.
@@ -1065,7 +1068,7 @@ impl ClientOptions {
     ///
     /// Note: if the `sync` feature is enabled, then this method will be replaced with [the sync
     /// version](#method.parse_with_resolver_config-1).
-    #[cfg(not(feature = "sync"))]
+    #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
     pub async fn parse_with_resolver_config(
         uri: impl AsRef<str>,
         resolver_config: ResolverConfig,
@@ -1075,10 +1078,10 @@ impl ClientOptions {
 
     /// This method will be present if the `sync` feature is enabled. It's otherwise identical to
     /// [the async version](#method.parse_with_resolver_config)
-    #[cfg(any(feature = "sync", docsrs))]
-    #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+    #[cfg(any(feature = "sync", feature = "tokio-sync", docsrs))]
+    #[cfg_attr(docsrs, doc(cfg(any(feature = "sync", feature = "tokio-sync"))))]
     pub fn parse_with_resolver_config(uri: &str, resolver_config: ResolverConfig) -> Result<Self> {
-        crate::sync::TOKIO_RUNTIME.block_on(Self::parse_uri(uri, Some(resolver_config)))
+        runtime::block_on(Self::parse_uri(uri, Some(resolver_config)))
     }
 
     /// Populate this `ClientOptions` from the given URI, optionally using the resolver config for
@@ -2015,7 +2018,7 @@ impl ClientOptionsParser {
     }
 }
 
-#[cfg(all(test, not(feature = "sync")))]
+#[cfg(all(test, not(feature = "sync"), not(feature = "tokio-sync")))]
 mod tests {
     use std::time::Duration;
 

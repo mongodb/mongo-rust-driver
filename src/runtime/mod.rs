@@ -64,7 +64,12 @@ pub(crate) fn block_on<F, T>(fut: F) -> T
 where
     F: Future<Output = T>,
 {
-    #[cfg(feature = "tokio-runtime")]
+    #[cfg(feature = "tokio-sync")]
+    {
+        crate::sync::TOKIO_RUNTIME.block_on(fut)
+    }
+
+    #[cfg(all(feature = "tokio-runtime", not(feature = "tokio-sync")))]
     {
         tokio::task::block_in_place(|| futures::executor::block_on(fut))
     }

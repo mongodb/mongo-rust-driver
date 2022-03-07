@@ -5,7 +5,7 @@ use super::ClientSession;
 use crate::{
     bson::{Document, RawDocument},
     error::Result,
-    sync::TOKIO_RUNTIME,
+    runtime,
     Cursor as AsyncCursor,
     SessionCursor as AsyncSessionCursor,
     SessionCursorStream,
@@ -174,7 +174,7 @@ where
     type Item = Result<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        TOKIO_RUNTIME.block_on(self.async_cursor.next())
+        runtime::block_on(self.async_cursor.next())
     }
 }
 
@@ -357,6 +357,6 @@ where
     type Item = Result<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        TOKIO_RUNTIME.block_on(self.async_stream.next())
+        runtime::block_on(self.async_stream.next())
     }
 }

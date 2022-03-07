@@ -46,7 +46,7 @@ use crate::{
 ///
 /// ```rust
 /// 
-/// # #[cfg(not(feature = "sync"))]
+/// # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync"))]
 /// # use mongodb::{bson::Document, Client, error::Result};
 /// # #[cfg(feature = "async-std-runtime")]
 /// # use async_std::task;
@@ -54,7 +54,7 @@ use crate::{
 /// # use tokio::task;
 /// #
 /// #
-/// # #[cfg(not(feature = "sync"))]
+/// # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 /// # async fn start_workers() -> Result<()> {
 /// # let client = Client::with_uri_str("mongodb://example.com").await?;
 /// let db = client.database("items");

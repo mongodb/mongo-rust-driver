@@ -201,7 +201,7 @@
 //! crate's top level like in the async API. The sync API calls through to the async API internally
 //! though, so it looks and behaves similarly to it.
 //! ```no_run
-//! # #[cfg(feature = "sync")]
+//! # #[cfg(any(feature = "sync", feature = "tokio-sync"))]
 //! # {
 //! use mongodb::{
 //!     bson::doc,
@@ -266,7 +266,7 @@
 //! #     bson::doc,
 //! # };
 //! #
-//! # #[cfg(all(not(feature = "sync"), feature = "tokio-runtime"))]
+//! # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync"), feature = "tokio-runtime"))]
 //! # async fn foo() -> std::result::Result<(), Box<dyn std::error::Error>> {
 //! #
 //! # let client = Client::with_uri_str("mongodb://example.com").await?;
@@ -330,8 +330,8 @@ pub(crate) mod runtime;
 mod sdam;
 mod selection_criteria;
 mod srv;
-#[cfg(any(feature = "sync", docsrs))]
-#[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+#[cfg(any(feature = "sync", feature = "tokio-sync", docsrs))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "sync", feature = "tokio-sync"))))]
 pub mod sync;
 #[cfg(test)]
 mod test;
@@ -340,7 +340,7 @@ mod test;
 #[macro_use]
 extern crate derive_more;
 
-#[cfg(not(feature = "sync"))]
+#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 pub use crate::{
     client::{Client, session::ClientSession},
     coll::Collection,
@@ -348,7 +348,7 @@ pub use crate::{
     db::Database,
 };
 
-#[cfg(feature = "sync")]
+#[cfg(any(feature = "sync", feature = "tokio-sync"))]
 pub(crate) use crate::{
     client::{Client, session::ClientSession},
     coll::Collection,
@@ -358,23 +358,35 @@ pub(crate) use crate::{
 
 pub use {coll::Namespace, index::IndexModel, client::session::ClusterTime, sdam::public::*};
 
+// isabeltodo
 #[cfg(all(
     feature = "tokio-runtime",
     feature = "async-std-runtime",
-    not(feature = "sync")
+    not(feature = "sync"),
+    not(feature = "tokio-sync"),
 ))]
 compile_error!(
     "`tokio-runtime` and `async-std-runtime` can't both be enabled; either disable \
      `async-std-runtime` or set `default-features = false` in your Cargo.toml"
 );
 
-#[cfg(all(feature = "async-std-runtime", feature = "sync"))]
+#[cfg(all(feature = "tokio-runtime", feature = "sync"))]
 compile_error!(
-    "`async-std-runtime` and `sync` can't both be enabled"
+    "`tokio-runtime` and `sync` can't both be enabled; either disable `sync` and enable \
+     `tokio-sync` to use the sync API with tokio, or set `default-features = false` in \
+     your Cargo.toml to use the sync API with async-std"
+);
+
+#[cfg(all(feature = "async-std-runtime", feature = "tokio-sync"))]
+compile_error!(
+    "`async-std-runtime` and `tokio-sync` can't both be enabled; either disable `tokio-sync` \
+     and enable `sync` to use the sync API with async-std, or disable `async-std-runtime` to \
+     use the sync API with tokio"
 );
 
 #[cfg(all(not(feature = "tokio-runtime"), not(feature = "async-std-runtime")))]
 compile_error!(
-    "one of `tokio-runtime`, `async-std-runtime`, or `sync` must be enabled; either enable \
-     `default-features`, or enable one of those features specifically in your Cargo.toml"
+    "one of `tokio-runtime`, `async-std-runtime`, `sync`, or `tokio-sync` must be enabled; \
+     either enable `default-features`, or enable one of those features specifically in your \
+     Cargo.toml"
 );

@@ -1372,7 +1372,7 @@ async fn delete_examples(collection: &Collection<Document>) -> Result<()> {
 type GenericResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[allow(unused_variables)]
-#[cfg(not(feature = "sync"))]
+#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 async fn stable_api_examples() -> GenericResult<()> {
     let setup_client = TestClient::new().await;
     if setup_client.server_version_lt(4, 9) {

@@ -146,9 +146,9 @@ pub struct ServerHeartbeatFailedEvent {
 /// #     },
 /// #     options::ClientOptions,
 /// # };
-/// # #[cfg(feature = "sync")]
+/// # #[cfg(any(feature = "sync", feature = "tokio-sync"))]
 /// # use mongodb::sync::Client;
-/// # #[cfg(not(feature = "sync"))]
+/// # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 /// # use mongodb::Client;
 /// #
 /// struct FailedHeartbeatLogger;
