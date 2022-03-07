@@ -46,7 +46,7 @@ use crate::{
 ///
 /// ```rust
 /// 
-/// # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync"))]
+/// # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 /// # use mongodb::{bson::Document, Client, error::Result};
 /// # #[cfg(feature = "async-std-runtime")]
 /// # use async_std::task;

@@ -36,9 +36,15 @@ where
     F: Future<Output = O> + Send + 'static,
     O: Send + 'static,
 {
-    #[cfg(feature = "tokio-runtime")]
+    #[cfg(all(feature = "tokio-runtime", not(feature = "tokio-sync")))]
     {
         let handle = tokio::runtime::Handle::current();
+        AsyncJoinHandle::Tokio(handle.spawn(fut))
+    }
+
+    #[cfg(feature = "tokio-sync")]
+    {
+        let handle = crate::sync::TOKIO_RUNTIME.handle();
         AsyncJoinHandle::Tokio(handle.spawn(fut))
     }
 
@@ -59,19 +65,19 @@ where
     spawn(fut);
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "sync", feature = "tokio-sync"))]
 pub(crate) fn block_on<F, T>(fut: F) -> T
 where
     F: Future<Output = T>,
 {
-    #[cfg(feature = "tokio-sync")]
-    {
-        crate::sync::TOKIO_RUNTIME.block_on(fut)
-    }
-
     #[cfg(all(feature = "tokio-runtime", not(feature = "tokio-sync")))]
     {
         tokio::task::block_in_place(|| futures::executor::block_on(fut))
+    }
+
+    #[cfg(feature = "tokio-sync")]
+    {
+        crate::sync::TOKIO_RUNTIME.block_on(fut)
     }
 
     #[cfg(feature = "async-std-runtime")]

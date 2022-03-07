@@ -59,7 +59,7 @@ const DEFAULT_SERVER_SELECTION_TIMEOUT: Duration = Duration::from_secs(30);
 /// # #[cfg(feature = "tokio-runtime")]
 /// # use tokio::task;
 /// #
-/// # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync"))]
+/// # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 /// # async fn start_workers() -> Result<()> {
 /// let client = Client::with_uri_str("mongodb://example.com").await?;
 ///

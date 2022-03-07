@@ -358,7 +358,6 @@ pub(crate) use crate::{
 
 pub use {coll::Namespace, index::IndexModel, client::session::ClusterTime, sdam::public::*};
 
-// isabeltodo
 #[cfg(all(
     feature = "tokio-runtime",
     feature = "async-std-runtime",

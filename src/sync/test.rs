@@ -273,8 +273,11 @@ fn collection_generic_bounds() {
     #[derive(Deserialize)]
     struct Foo;
 
+    println!("1");
     let options = CLIENT_OPTIONS.clone();
+    println!("2");
     let client = Client::with_options(options).expect("client creation should succeed");
+    println!("3");
 
     // ensure this code successfully compiles
     let coll: Collection<Foo> = client
