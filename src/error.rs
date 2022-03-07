@@ -391,14 +391,14 @@ impl From<std::io::ErrorKind> for ErrorKind {
 #[cfg(feature = "openssl-tls")]
 impl From<openssl::error::ErrorStack> for ErrorKind {
     fn from(err: openssl::error::ErrorStack) -> Self {
-        Self::OpenSSL(err.into())
+        Self::OpenSSL(Arc::new(err.into()))
     }
 }
 
 #[cfg(feature = "openssl-tls")]
 impl From<openssl::ssl::Error> for ErrorKind {
     fn from(err: openssl::ssl::Error) -> Self {
-        Self::OpenSSL(err)
+        Self::OpenSSL(Arc::new(err))
     }
 }
 
@@ -492,7 +492,7 @@ pub enum ErrorKind {
     /// Wrapper around [`openssl::ssl::Error`].
     #[cfg(feature = "openssl-tls")]
     #[error("{0}")]
-    OpenSSL(openssl::ssl::Error)
+    OpenSSL(Arc<openssl::ssl::Error>)
 }
 
 impl ErrorKind {

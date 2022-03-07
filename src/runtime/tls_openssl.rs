@@ -75,11 +75,11 @@ fn make_openssl_connector(cfg: TlsOptions) -> Result<SslConnector> {
         builder.set_verify(SslVerifyMode::NONE);
     }
     if let Some(path) = ca_file_path {
-        builder.set_ca_file(path);
+        builder.set_ca_file(path)?;
     }
     if let Some(path) = cert_key_file_path {
-        builder.set_certificate_file(path, SslFiletype::PEM);
-        builder.set_private_key_file(path, SslFiletype::PEM);
+        builder.set_certificate_file(path.clone(), SslFiletype::PEM)?;
+        builder.set_private_key_file(path, SslFiletype::PEM)?;
     }
 
     Ok(builder.build())
