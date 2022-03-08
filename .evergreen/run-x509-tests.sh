@@ -13,4 +13,16 @@ export SUBJECT=${SUBJECT#"subject="}
 # Remove any leading or trailing whitespace
 export SUBJECT=`echo "$SUBJECT" | awk '{$1=$1;print}'`
 
-RUST_BACKTRACE=1 MONGO_X509_USER="$SUBJECT" cargo test x509
+if [ "$ASYNC_RUNTIME" = "tokio" ]; then
+    RUNTIME_FEATURE="tokio-runtime"
+elif [ "$ASYNC_RUNTIME" = "async-std" ]; then
+    RUNTIME_FEATURE="async-std-runtime"
+else
+    echo "invalid async runtime: ${ASYNC_RUNTIME}" >&2
+    exit 1
+fi
+
+OPTIONS="--no-default-features --features ${RUNTIME_FEATURE},${TLS_FEATURE} -- -Z unstable-options --format json --report-time"
+
+RUST_BACKTRACE=1 MONGO_X509_USER="$SUBJECT" cargo test x509 $OPTIONS | tee results.json
+cat results.json | cargo2junit > results.xml

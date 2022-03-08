@@ -297,7 +297,9 @@ functions:
 
           export CERT_PATH=$DRIVERS_TOOLS/.evergreen/x509gen/client.pem
 
-          .evergreen/run-x509-tests.sh
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} \
+            TLS_FEATURE=${TLS_FEATURE} \
+            .evergreen/run-x509-tests.sh
 
   "run plain tests":
     - command: shell.exec
@@ -1360,6 +1362,18 @@ axes:
            AUTH: "noauth"
            SSL: "nossl"
 
+  - id: "tls-crate"
+    display_name: TLS crate
+    values:
+      - id: "tls-rustls"
+        display_name: "Rustls"
+        variables:
+           TLS_FEATURE: "rustls-tls"
+      - id: "tls-openssl"
+        display_name: "OpenSSL"
+        variables:
+          TLS_FEATURE: "openssl-tls"
+
   - id: "compressor"
     display_name: "Compressor"
     values:
@@ -1540,8 +1554,9 @@ buildvariants:
       - macos-10.14
       - windows-64-vs2017
     auth-and-tls: "auth-and-tls"
+    tls-crate: "*"
     async-runtime: "*"
-  display_name: "${os} X.509 auth with ${async-runtime}"
+  display_name: "${os} X.509 auth (${tls-crate}) with ${async-runtime}"
   tasks:
     - "test-x509-auth"
 
