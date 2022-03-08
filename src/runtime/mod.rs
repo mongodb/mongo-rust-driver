@@ -7,7 +7,7 @@ mod interval;
 mod join_handle;
 mod resolver;
 mod stream;
-#[cfg(feature = "rustls-tls")]
+#[cfg_attr(feature = "openssl-tls", allow(unused))]
 mod tls_rustls;
 #[cfg(feature = "openssl-tls")]
 mod tls_openssl;
@@ -28,7 +28,7 @@ pub(crate) use http::HttpClient;
 use interval::Interval;
 #[cfg(feature = "tokio-runtime")]
 use tokio::time::Interval;
-#[cfg(feature = "rustls-tls")]
+#[cfg(not(feature = "openssl-tls"))]
 use tls_rustls as tls;
 #[cfg(feature = "openssl-tls")]
 use tls_openssl as tls;
