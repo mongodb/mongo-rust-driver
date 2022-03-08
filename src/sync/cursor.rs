@@ -105,7 +105,7 @@ impl<T> Cursor<T> {
     /// # }
     /// ```
     pub fn advance(&mut self) -> Result<bool> {
-        RUNTIME.block_on(self.async_cursor.advance())
+        runtime::block_on(self.async_cursor.advance())
     }
 
     /// Returns a reference to the current result in the cursor.
@@ -234,7 +234,7 @@ impl<T> SessionCursor<T> {
     /// # }
     /// ```
     pub fn advance(&mut self, session: &mut ClientSession) -> Result<bool> {
-        RUNTIME.block_on(self.async_cursor.advance(&mut session.async_client_session))
+        runtime::block_on(self.async_cursor.advance(&mut session.async_client_session))
     }
 
     /// Returns a reference to the current result in the cursor.

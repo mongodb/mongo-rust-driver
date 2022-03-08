@@ -297,7 +297,7 @@ fn collection_generic_bounds() {
 
 #[test]
 fn borrowed_deserialization() {
-    let _guard: RwLockReadGuard<()> = RUNTIME.block_on(async { LOCK.run_concurrently().await });
+    let _guard: RwLockReadGuard<()> = runtime::block_on(async { LOCK.run_concurrently().await });
 
     let client =
         Client::with_options(CLIENT_OPTIONS.clone()).expect("client creation should succeed");
