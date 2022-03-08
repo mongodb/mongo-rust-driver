@@ -61,7 +61,7 @@ impl Operation for ChangeStreamAggregate {
                 let saved_time = new_opts
                     .start_at_operation_time
                     .as_ref()
-                    .or_else(|| data.initial_operation_time.as_ref());
+                    .or(data.initial_operation_time.as_ref());
                 if saved_time.is_some() && description.max_wire_version.map_or(false, |v| v >= 7) {
                     new_opts.start_at_operation_time = saved_time.cloned();
                 }

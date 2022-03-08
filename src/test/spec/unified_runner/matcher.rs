@@ -343,13 +343,13 @@ async fn basic_matching() {
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "x": 1, "y": 1 };
-    assert!(!results_match(
+    assert!(results_match(
         Some(&Bson::Document(actual)),
         &Bson::Document(expected),
         false,
         None,
     )
-    .is_ok());
+    .is_err());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -363,13 +363,13 @@ async fn array_matching() {
     for i in 1..3 {
         expected.push(Bson::Int32(i));
     }
-    assert!(!results_match(
+    assert!(results_match(
         Some(&Bson::Array(actual)),
         &Bson::Array(expected),
         false,
         None,
     )
-    .is_ok());
+    .is_err());
 
     let actual = vec![
         Bson::Document(doc! { "x": 1, "y": 1 }),
@@ -379,13 +379,13 @@ async fn array_matching() {
         Bson::Document(doc! { "x": 1 }),
         Bson::Document(doc! { "x": 2 }),
     ];
-    assert!(!results_match(
+    assert!(results_match(
         Some(&Bson::Array(actual)),
         &Bson::Array(expected),
         false,
         None,
     )
-    .is_ok());
+    .is_err());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -403,13 +403,13 @@ async fn special_operators() {
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "x": { "$$exists": false } };
-    assert!(!results_match(
+    assert!(results_match(
         Some(&Bson::Document(actual)),
         &Bson::Document(expected),
         false,
         None,
     )
-    .is_ok());
+    .is_err());
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "y": { "$$exists": false } };
@@ -423,13 +423,13 @@ async fn special_operators() {
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "y": { "$$exists": true } };
-    assert!(!results_match(
+    assert!(results_match(
         Some(&Bson::Document(actual)),
         &Bson::Document(expected),
         false,
         None,
     )
-    .is_ok());
+    .is_err());
 
     let actual = doc! { "x": 1 };
     let expected = doc! { "x": { "$$type": [ "int", "long" ] } };
@@ -463,13 +463,13 @@ async fn special_operators() {
 
     let actual = doc! { "x": 2 };
     let expected = doc! { "x": { "$$unsetOrMatches": 1 } };
-    assert!(!results_match(
+    assert!(results_match(
         Some(&Bson::Document(actual)),
         &Bson::Document(expected),
         false,
         None,
     )
-    .is_ok());
+    .is_err());
 
     let expected = doc! { "x": { "y": { "$$exists": false } } };
     let actual = doc! { "x": {} };
@@ -497,13 +497,13 @@ async fn extra_fields() {
 
     let actual = doc! { "doc": { "x": 1, "y": 2 } };
     let expected = doc! { "doc": { "x": 1 } };
-    assert!(!results_match(
+    assert!(results_match(
         Some(&Bson::Document(actual)),
         &Bson::Document(expected),
         false,
         None,
     )
-    .is_ok());
+    .is_err());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -515,7 +515,7 @@ async fn numbers() {
 
     let actual = Bson::Double(2.5);
     let expected = Bson::Int32(2);
-    assert!(!results_match(Some(&actual), &expected, false, None).is_ok());
+    assert!(results_match(Some(&actual), &expected, false, None).is_err());
 
     let actual = Bson::Double(2.0);
     let expected = Bson::Int64(2);
