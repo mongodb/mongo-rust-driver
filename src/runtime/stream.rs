@@ -161,12 +161,12 @@ impl AsyncRead for AsyncStream {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        mut buf: &mut [u8],
+        buf: &mut [u8],
     ) -> Poll<std::io::Result<usize>> {
         match self.deref_mut() {
             Self::Null => Poll::Ready(Ok(0)),
             Self::Tcp(ref mut inner) => AsyncRead::poll_read(Pin::new(inner), cx, buf),
-            Self::Tls(ref mut inner) => Pin::new(inner).poll_read(cx, &mut buf),
+            Self::Tls(ref mut inner) => Pin::new(inner).poll_read(cx, buf),
         }
     }
 }

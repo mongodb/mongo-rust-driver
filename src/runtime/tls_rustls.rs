@@ -1,20 +1,30 @@
-use std::fs::File;
-use std::io::{BufReader, Seek, SeekFrom};
-use std::pin::Pin;
-use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::{
+    fs::File,
+    io::{BufReader, Seek, SeekFrom},
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 use futures_io::{AsyncRead, AsyncWrite};
-use rustls::internal::pemfile;
-use rustls::{RootCertStore, ServerCertVerifier, Certificate, ServerCertVerified, TLSError};
+use rustls::{
+    internal::pemfile,
+    Certificate,
+    RootCertStore,
+    ServerCertVerified,
+    ServerCertVerifier,
+    TLSError,
+};
 use rustls_pemfile::{read_one, Item};
-use tokio::io::{AsyncWrite as TokioAsyncWrite};
+use tokio::io::AsyncWrite as TokioAsyncWrite;
 use tokio_rustls::TlsConnector;
 use webpki::DNSNameRef;
 use webpki_roots::TLS_SERVER_ROOTS;
 
-use crate::client::options::TlsOptions;
-use crate::error::{Result, ErrorKind};
+use crate::{
+    client::options::TlsOptions,
+    error::{ErrorKind, Result},
+};
 
 use super::stream::AsyncTcpStream;
 
@@ -24,11 +34,14 @@ pub(crate) struct AsyncTlsStream {
 }
 
 impl AsyncTlsStream {
-    pub(crate) async fn connect(host: &str, tcp_stream: AsyncTcpStream, cfg: TlsOptions) -> Result<Self> {
-        let name =
-            DNSNameRef::try_from_ascii_str(host).map_err(|e| ErrorKind::DnsResolve {
-                message: format!("could not resolve {:?}: {}", host, e),
-            })?;
+    pub(crate) async fn connect(
+        host: &str,
+        tcp_stream: AsyncTcpStream,
+        cfg: TlsOptions,
+    ) -> Result<Self> {
+        let name = DNSNameRef::try_from_ascii_str(host).map_err(|e| ErrorKind::DnsResolve {
+            message: format!("could not resolve {:?}: {}", host, e),
+        })?;
         let mut tls_config = make_rustls_config(cfg)?;
         tls_config.enable_sni = true;
 

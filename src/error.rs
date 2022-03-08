@@ -492,7 +492,7 @@ pub enum ErrorKind {
     /// Wrapper around [`openssl::ssl::Error`].
     #[cfg(feature = "openssl-tls")]
     #[error("{0}")]
-    OpenSSL(Arc<openssl::ssl::Error>)
+    OpenSSL(Arc<openssl::ssl::Error>),
 }
 
 impl ErrorKind {

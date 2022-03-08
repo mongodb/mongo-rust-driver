@@ -7,10 +7,10 @@ mod interval;
 mod join_handle;
 mod resolver;
 mod stream;
-#[cfg_attr(feature = "openssl-tls", allow(unused))]
-mod tls_rustls;
 #[cfg(feature = "openssl-tls")]
 mod tls_openssl;
+#[cfg_attr(feature = "openssl-tls", allow(unused))]
+mod tls_rustls;
 
 use std::{future::Future, net::SocketAddr, time::Duration};
 
@@ -26,12 +26,12 @@ use crate::{error::Result, options::ServerAddress};
 pub(crate) use http::HttpClient;
 #[cfg(feature = "async-std-runtime")]
 use interval::Interval;
-#[cfg(feature = "tokio-runtime")]
-use tokio::time::Interval;
-#[cfg(not(feature = "openssl-tls"))]
-use tls_rustls as tls;
 #[cfg(feature = "openssl-tls")]
 use tls_openssl as tls;
+#[cfg(not(feature = "openssl-tls"))]
+use tls_rustls as tls;
+#[cfg(feature = "tokio-runtime")]
+use tokio::time::Interval;
 
 /// Spawn a task in the background to run a future.
 ///

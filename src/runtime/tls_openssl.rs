@@ -1,14 +1,15 @@
-use std::pin::Pin;
-use std::sync::Once;
-use std::task::{Context, Poll};
+use std::{
+    pin::Pin,
+    sync::Once,
+    task::{Context, Poll},
+};
 
 use futures_io::{AsyncRead, AsyncWrite};
-use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode, SslFiletype};
-use tokio::io::{AsyncWrite as TokioAsyncWrite};
+use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
+use tokio::io::AsyncWrite as TokioAsyncWrite;
 use tokio_openssl::SslStream;
 
-use crate::client::options::TlsOptions;
-use crate::error::Result;
+use crate::{client::options::TlsOptions, error::Result};
 
 use super::stream::AsyncTcpStream;
 
@@ -18,19 +19,22 @@ pub(crate) struct AsyncTlsStream {
 }
 
 impl AsyncTlsStream {
-    pub(crate) async fn connect(host: &str, tcp_stream: AsyncTcpStream, cfg: TlsOptions) -> Result<Self> {
+    pub(crate) async fn connect(
+        host: &str,
+        tcp_stream: AsyncTcpStream,
+        cfg: TlsOptions,
+    ) -> Result<Self> {
         init_trust();
 
         let connector = make_openssl_connector(cfg)?;
-        let ssl = connector.configure()?
+        let ssl = connector
+            .configure()?
             .use_server_name_indication(true)
             .verify_hostname(false)
             .into_ssl(host)?;
         let mut stream = SslStream::new(ssl, tcp_stream)?;
         Pin::new(&mut stream).connect().await?;
-        Ok(AsyncTlsStream {
-            inner: stream,
-        })
+        Ok(AsyncTlsStream { inner: stream })
     }
 }
 
