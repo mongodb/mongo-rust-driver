@@ -5,7 +5,7 @@ use std::{
 
 use serde::{de::Unexpected, Deserialize, Deserializer};
 
-use crate::{event::cmap::*, options::ServerAddress, RUNTIME};
+use crate::{event::cmap::*, options::ServerAddress, runtime};
 use tokio::sync::broadcast::error::{RecvError, SendError};
 
 #[derive(Clone, Debug)]
@@ -98,21 +98,20 @@ impl EventSubscriber<'_> {
     where
         F: Fn(&Event) -> bool,
     {
-        RUNTIME
-            .timeout(timeout, async {
-                loop {
-                    match self.receiver.recv().await {
-                        Ok(event) if filter(&event) => return event.into(),
-                        // the channel hit capacity and the channnel will skip a few to catch up.
-                        Err(RecvError::Lagged(_)) => continue,
-                        Err(_) => return None,
-                        _ => continue,
-                    }
+        runtime::timeout(timeout, async {
+            loop {
+                match self.receiver.recv().await {
+                    Ok(event) if filter(&event) => return event.into(),
+                    // the channel hit capacity and the channnel will skip a few to catch up.
+                    Err(RecvError::Lagged(_)) => continue,
+                    Err(_) => return None,
+                    _ => continue,
                 }
-            })
-            .await
-            .ok()
-            .flatten()
+            }
+        })
+        .await
+        .ok()
+        .flatten()
     }
 
     /// Returns the received events without waiting for any more.

@@ -16,7 +16,7 @@ use crate::{
     cmap::options::StreamOptions,
     error::{ErrorKind, Result},
     options::ServerAddress,
-    RUNTIME,
+    runtime,
 };
 
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -71,7 +71,7 @@ impl AsyncTcpStream {
         let stream = if connect_timeout == Duration::from_secs(0) {
             stream_future.await?
         } else {
-            RUNTIME.timeout(connect_timeout, stream_future).await??
+            runtime::timeout(connect_timeout, stream_future).await??
         };
 
         stream.set_nodelay(true)?;
@@ -111,7 +111,7 @@ impl AsyncTcpStream {
     async fn connect(address: &ServerAddress, connect_timeout: Option<Duration>) -> Result<Self> {
         let timeout = connect_timeout.unwrap_or(DEFAULT_CONNECT_TIMEOUT);
 
-        let mut socket_addrs: Vec<_> = RUNTIME.resolve_address(address).await?.collect();
+        let mut socket_addrs: Vec<_> = runtime::resolve_address(address).await?.collect();
 
         if socket_addrs.is_empty() {
             return Err(ErrorKind::DnsResolve {

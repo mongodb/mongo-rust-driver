@@ -6,9 +6,9 @@ use typed_builder::TypedBuilder;
 use crate::{
     error::Result,
     operation::append_options,
+    runtime,
     selection_criteria::SelectionCriteria,
     Client,
-    RUNTIME,
 };
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -72,7 +72,7 @@ impl Drop for FailPointGuard {
         let client = self.client.clone();
         let name = self.failpoint_name.clone();
 
-        let result = RUNTIME.block_on(async move {
+        let result = runtime::block_on(async move {
             client
                 .database("admin")
                 .run_command(

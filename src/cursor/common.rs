@@ -21,9 +21,9 @@ use crate::{
     operation,
     options::ServerAddress,
     results::GetMoreResult,
+    runtime,
     Client,
     Namespace,
-    RUNTIME,
 };
 
 /// An internal cursor that can be used in a variety of contexts depending on its `GetMoreProvider`.
@@ -472,7 +472,7 @@ pub(super) fn kill_cursor(
     let coll = client
         .database(ns.db.as_str())
         .collection::<Document>(ns.coll.as_str());
-    RUNTIME.execute(async move {
+    runtime::execute(async move {
         if !pinned_conn.is_invalid() {
             let _ = coll
                 .kill_cursor(cursor_id, pinned_conn.handle(), drop_address)

@@ -5,10 +5,10 @@ use super::ClientSession;
 use crate::{
     bson::{Document, RawDocument},
     error::Result,
+    runtime,
     Cursor as AsyncCursor,
     SessionCursor as AsyncSessionCursor,
     SessionCursorStream,
-    RUNTIME,
 };
 
 /// A `Cursor` streams the result of a query. When a query is made, a `Cursor` will be returned with
@@ -105,7 +105,7 @@ impl<T> Cursor<T> {
     /// # }
     /// ```
     pub fn advance(&mut self) -> Result<bool> {
-        RUNTIME.block_on(self.async_cursor.advance())
+        runtime::block_on(self.async_cursor.advance())
     }
 
     /// Returns a reference to the current result in the cursor.
@@ -174,7 +174,7 @@ where
     type Item = Result<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        RUNTIME.block_on(self.async_cursor.next())
+        runtime::block_on(self.async_cursor.next())
     }
 }
 
@@ -234,7 +234,7 @@ impl<T> SessionCursor<T> {
     /// # }
     /// ```
     pub fn advance(&mut self, session: &mut ClientSession) -> Result<bool> {
-        RUNTIME.block_on(self.async_cursor.advance(&mut session.async_client_session))
+        runtime::block_on(self.async_cursor.advance(&mut session.async_client_session))
     }
 
     /// Returns a reference to the current result in the cursor.
@@ -357,6 +357,6 @@ where
     type Item = Result<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        RUNTIME.block_on(self.async_stream.next())
+        runtime::block_on(self.async_stream.next())
     }
 }

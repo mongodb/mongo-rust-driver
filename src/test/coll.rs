@@ -27,6 +27,7 @@ use crate::{
         WriteConcern,
     },
     results::DeleteResult,
+    runtime,
     test::{
         log_uncaptured,
         util::{drop_collection, EventClient, TestClient},
@@ -34,7 +35,6 @@ use crate::{
         LOCK,
     },
     Collection,
-    RUNTIME,
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -305,7 +305,7 @@ async fn kill_cursors_on_drop() {
     // The `Drop` implementation for `Cursor' spawns a back tasks that emits certain events. If the
     // task hasn't been scheduled yet, we may not see the event here. To account for this, we wait
     // for a small amount of time before checking.
-    RUNTIME.delay_for(Duration::from_millis(250)).await;
+    runtime::delay_for(Duration::from_millis(250)).await;
 
     assert!(kill_cursors_sent(&event_client));
 }
@@ -341,7 +341,7 @@ async fn no_kill_cursors_on_exhausted() {
     std::mem::drop(cursor);
 
     // wait for any tasks to get spawned from `Cursor`'s `Drop`.
-    RUNTIME.delay_for(Duration::from_millis(250)).await;
+    runtime::delay_for(Duration::from_millis(250)).await;
     assert!(!kill_cursors_sent(&event_client));
 }
 

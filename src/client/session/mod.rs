@@ -18,10 +18,10 @@ use crate::{
     error::{ErrorKind, Result},
     operation::{AbortTransaction, CommitTransaction, Operation},
     options::{SessionOptions, TransactionOptions},
+    runtime,
     sdam::{ServerInfo, TransactionSupportStatus},
     selection_criteria::SelectionCriteria,
     Client,
-    RUNTIME,
 };
 pub use cluster_time::ClusterTime;
 pub(super) use pool::ServerSessionPool;
@@ -607,14 +607,14 @@ impl Drop for ClientSession {
                 snapshot_time: self.snapshot_time,
                 operation_time: self.operation_time,
             };
-            RUNTIME.execute(async move {
+            runtime::execute(async move {
                 let mut session: ClientSession = dropped_session.into();
                 let _result = session.abort_transaction().await;
             });
         } else {
             let client = self.client.clone();
             let server_session = self.server_session.clone();
-            RUNTIME.execute(async move {
+            runtime::execute(async move {
                 client.check_in_server_session(server_session).await;
             });
         }

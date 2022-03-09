@@ -15,4 +15,10 @@ FEATURE_FLAGS="zstd-compression,snappy-compression,zlib-compression"
 echo "cargo test options: --features $FEATURE_FLAGS ${OPTIONS}"
 
 RUST_BACKTRACE=1 cargo test --features $FEATURE_FLAGS $OPTIONS | tee results.json
-cat results.json | cargo2junit > results.xml
+cat results.json | cargo2junit > async-tests.xml
+RUST_BACKTRACE=1 cargo test sync --features tokio-sync,$FEATURE_FLAGS $OPTIONS | tee sync-tests.json
+cat sync-tests.json | cargo2junit > sync-tests.xml
+RUST_BACKTRACE=1 cargo test --doc sync --features tokio-sync,$FEATURE_FLAGS $OPTIONS | tee sync-doc-tests.json
+cat sync-doc-tests.json | cargo2junit > sync-doc-tests.xml
+
+junit-report-merger results.xml async-tests.xml sync-tests.xml sync-doc-tests.xml

@@ -10,6 +10,7 @@ use crate::{
     cmap::{options::ConnectionPoolOptions, Command, ConnectionPool},
     event::cmap::{CmapEventHandler, ConnectionClosedReason},
     operation::CommandResponse,
+    runtime,
     sdam::ServerUpdateSender,
     selection_criteria::ReadPreference,
     test::{
@@ -21,7 +22,6 @@ use crate::{
         CLIENT_OPTIONS,
         LOCK,
     },
-    RUNTIME,
 };
 use semver::VersionReq;
 use std::{sync::Arc, time::Duration};
@@ -130,11 +130,9 @@ async fn concurrent_connections() {
 
     let tasks = (0..2).map(|_| {
         let pool_clone = pool.clone();
-        RUNTIME
-            .spawn(async move {
-                pool_clone.check_out().await.unwrap();
-            })
-            .unwrap()
+        runtime::spawn(async move {
+            pool_clone.check_out().await.unwrap();
+        })
     });
     futures::future::join_all(tasks).await;
 

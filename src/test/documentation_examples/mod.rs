@@ -1372,7 +1372,7 @@ async fn delete_examples(collection: &Collection<Document>) -> Result<()> {
 type GenericResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[allow(unused_variables)]
-#[cfg(not(feature = "sync"))]
+#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 async fn stable_api_examples() -> GenericResult<()> {
     let setup_client = TestClient::new().await;
     if setup_client.server_version_lt(4, 9) {
@@ -1755,7 +1755,7 @@ async fn index_examples() -> Result<()> {
 }
 
 async fn change_streams_examples() -> Result<()> {
-    use crate::{change_stream::options::FullDocumentType, options::ChangeStreamOptions, RUNTIME};
+    use crate::{change_stream::options::FullDocumentType, options::ChangeStreamOptions, runtime};
     use std::time::Duration;
 
     let client = TestClient::new().await;
@@ -1772,20 +1772,18 @@ async fn change_streams_examples() -> Result<()> {
     // Background writer thread so that the `stream.next()` calls return something.
     let (tx, mut rx) = tokio::sync::oneshot::channel();
     let writer_inventory = inventory.clone();
-    let handle = RUNTIME
-        .spawn(async move {
-            let mut interval = RUNTIME.interval(Duration::from_millis(100));
-            loop {
-                tokio::select! {
-                    _ = interval.tick() => {
-                        writer_inventory.insert_one(doc! {}, None).await?;
-                    }
-                    _ = &mut rx => break,
+    let handle = runtime::spawn(async move {
+        let mut interval = runtime::interval(Duration::from_millis(100));
+        loop {
+            tokio::select! {
+                _ = interval.tick() => {
+                    writer_inventory.insert_one(doc! {}, None).await?;
                 }
+                _ = &mut rx => break,
             }
-            Result::Ok(())
-        })
-        .unwrap();
+        }
+        Result::Ok(())
+    });
 
     #[allow(unused_variables, unused_imports)]
     {

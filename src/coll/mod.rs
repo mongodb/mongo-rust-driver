@@ -88,7 +88,7 @@ use crate::{
 /// # #[cfg(feature = "tokio-runtime")]
 /// # use tokio::task;
 /// #
-/// # #[cfg(not(feature = "sync"))]
+/// # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 /// # async fn start_workers() -> Result<()> {
 /// # use mongodb::Client;
 /// #

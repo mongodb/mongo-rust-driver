@@ -32,9 +32,8 @@ use crate::{
         PoolReadyEvent,
     },
     options::ServerAddress,
-    runtime::HttpClient,
+    runtime,
     sdam::ServerUpdateSender,
-    RUNTIME,
 };
 
 use std::{
@@ -143,7 +142,7 @@ impl ConnectionPoolWorker {
     /// and close the pool.
     pub(super) fn start(
         address: ServerAddress,
-        http_client: HttpClient,
+        http_client: runtime::HttpClient,
         server_updater: ServerUpdateSender,
         options: Option<ConnectionPoolOptions>,
     ) -> (PoolManager, ConnectionRequester, PoolGenerationSubscriber) {
@@ -241,7 +240,7 @@ impl ConnectionPoolWorker {
             server_updater,
         };
 
-        RUNTIME.execute(async move {
+        runtime::execute(async move {
             worker.execute().await;
         });
 
@@ -252,7 +251,7 @@ impl ConnectionPoolWorker {
     /// dropped. Once all handles are dropped, the pool will close any available connections and
     /// emit a pool closed event.
     async fn execute(mut self) {
-        let mut maintenance_interval = RUNTIME.interval(self.maintenance_frequency);
+        let mut maintenance_interval = runtime::interval(self.maintenance_frequency);
 
         loop {
             let task = tokio::select! {
@@ -391,7 +390,7 @@ impl ConnectionPoolWorker {
             let manager = self.manager.clone();
             let mut server_updater = self.server_updater.clone();
 
-            let handle = RUNTIME.spawn(async move {
+            let handle = runtime::spawn(async move {
                 let mut establish_result = establish_connection(
                     &establisher,
                     pending_connection,
@@ -410,16 +409,6 @@ impl ConnectionPoolWorker {
 
                 establish_result
             });
-
-            let handle = match handle {
-                Some(h) => h,
-
-                // The async runtime was dropped which means nothing will be waiting
-                // on the request, so we can just exit.
-                None => {
-                    return;
-                }
-            };
 
             // this only fails if the other end stopped listening (e.g. due to timeout), in
             // which case we just let the connection establish in the background.
@@ -613,7 +602,7 @@ impl ConnectionPoolWorker {
                 let manager = self.manager.clone();
                 let establisher = self.establisher.clone();
                 let mut updater = self.server_updater.clone();
-                RUNTIME.execute(async move {
+                runtime::execute(async move {
                     let connection = establish_connection(
                         &establisher,
                         pending_connection,

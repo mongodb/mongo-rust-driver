@@ -1,4 +1,4 @@
-#[cfg(not(feature = "sync"))]
+#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod auth;
 mod change_streams;
 mod collection_management;
@@ -6,11 +6,11 @@ mod command_monitoring;
 mod connection_stepdown;
 mod crud;
 mod crud_v1;
-#[cfg(not(feature = "sync"))]
+#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod initial_dns_seedlist_discovery;
 mod load_balancers;
 mod ocsp;
-#[cfg(not(feature = "sync"))]
+#[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod read_write_concern;
 mod retryable_reads;
 mod retryable_writes;

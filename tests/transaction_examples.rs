@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-#![cfg(not(feature = "sync"))]
+#![cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 
 // START TRANSACTIONS EXAMPLE
 use mongodb::{

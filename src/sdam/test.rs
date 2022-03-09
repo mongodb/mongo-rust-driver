@@ -9,6 +9,7 @@ use tokio::sync::RwLockWriteGuard;
 
 use crate::{
     error::ErrorKind,
+    runtime,
     sdam::ServerType,
     test::{
         log_uncaptured,
@@ -25,7 +26,6 @@ use crate::{
         LOCK,
     },
     Client,
-    RUNTIME,
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
@@ -245,7 +245,7 @@ async fn sdam_min_pool_size_error() {
     // Wait a little while for the server to be marked as Unknown.
     // Once we have SDAM monitoring, this wait can be removed and be replaced
     // with another event waiting.
-    RUNTIME.delay_for(Duration::from_millis(750)).await;
+    runtime::delay_for(Duration::from_millis(750)).await;
 
     let ping_err = client
         .database("admin")

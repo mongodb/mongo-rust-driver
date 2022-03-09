@@ -14,7 +14,7 @@ use crate::{
     error::{Error, Result},
     is_master::{is_master_command, run_is_master, IsMasterReply},
     options::{ClientOptions, ServerAddress},
-    RUNTIME,
+    runtime,
 };
 
 pub(super) const DEFAULT_HEARTBEAT_FREQUENCY: Duration = Duration::from_secs(10);
@@ -61,7 +61,7 @@ impl Monitor {
                 self.topology.clone(),
                 self.client_options,
             );
-            RUNTIME.execute(async move {
+            runtime::execute(async move {
                 heartbeat_monitor.execute().await;
             });
         }
@@ -71,7 +71,7 @@ impl Monitor {
             topology: self.topology,
             update_receiver: self.update_receiver,
         };
-        RUNTIME.execute(async move {
+        runtime::execute(async move {
             update_monitor.execute().await;
         });
     }
@@ -147,7 +147,7 @@ impl HeartbeatMonitor {
             #[cfg(not(test))]
             let min_frequency = MIN_HEARTBEAT_FREQUENCY;
 
-            RUNTIME.delay_for(min_frequency).await;
+            runtime::delay_for(min_frequency).await;
             topology_check_requests_subscriber
                 .wait_for_message(heartbeat_frequency - min_frequency)
                 .await;

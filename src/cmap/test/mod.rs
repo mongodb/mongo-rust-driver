@@ -16,6 +16,7 @@ use crate::{
     error::{Error, ErrorKind, Result},
     event::cmap::ConnectionPoolOptions as EventOptions,
     options::TlsOptions,
+    runtime,
     runtime::AsyncJoinHandle,
     sdam::{ServerUpdate, ServerUpdateSender},
     test::{
@@ -30,7 +31,6 @@ use crate::{
         LOCK,
         SERVER_API,
     },
-    RUNTIME,
 };
 use bson::doc;
 
@@ -101,14 +101,12 @@ struct CmapThread {
 impl CmapThread {
     fn start(state: Arc<State>) -> Self {
         let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel::<Operation>();
-        let handle = RUNTIME
-            .spawn(async move {
-                while let Some(operation) = receiver.recv().await {
-                    operation.execute(state.clone()).await?;
-                }
-                Ok(())
-            })
-            .unwrap();
+        let handle = runtime::spawn(async move {
+            while let Some(operation) = receiver.recv().await {
+                operation.execute(state.clone()).await?;
+            }
+            Ok(())
+        });
 
         Self {
             dispatcher: sender,
@@ -166,7 +164,7 @@ impl Executor {
 
         // Mock a monitoring task responding to errors reported by the pool.
         let manager = pool.manager.clone();
-        RUNTIME.execute(async move {
+        runtime::execute(async move {
             while let Some(update) = update_receiver.recv().await {
                 match update.message() {
                     ServerUpdate::Error { error, .. } => {
@@ -226,7 +224,7 @@ impl Operation {
     /// Execute this operation.
     async fn execute(self, state: Arc<State>) -> Result<()> {
         match self {
-            Operation::Wait { ms } => RUNTIME.delay_for(Duration::from_millis(ms)).await,
+            Operation::Wait { ms } => runtime::delay_for(Duration::from_millis(ms)).await,
             Operation::WaitForThread { target } => {
                 state
                     .threads
@@ -245,11 +243,10 @@ impl Operation {
                 let event_name = event.clone();
                 let task = async move {
                     while state.count_events(&event) < count {
-                        RUNTIME.delay_for(Duration::from_millis(100)).await;
+                        runtime::delay_for(Duration::from_millis(100)).await;
                     }
                 };
-                RUNTIME
-                    .timeout(timeout.unwrap_or(EVENT_TIMEOUT), task)
+                runtime::timeout(timeout.unwrap_or(EVENT_TIMEOUT), task)
                     .await
                     .unwrap_or_else(|_| {
                         panic!("waiting for {} {} event(s) timed out", count, event_name)

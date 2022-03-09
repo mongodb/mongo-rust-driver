@@ -13,3 +13,4 @@ if [[ $RUST_VERSION == "nightly" ]]; then
 fi
 
 rustup run $RUST_VERSION cargo build --features $FEATURE_FLAGS
+rustup run $RUST_VERSION cargo build --features tokio-sync,$FEATURE_FLAGS

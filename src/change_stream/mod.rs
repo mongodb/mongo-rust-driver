@@ -45,7 +45,7 @@ use crate::{
 /// A `ChangeStream` can be iterated like any other [`Stream`]:
 ///
 /// ```
-/// # #[cfg(not(feature = "sync"))]
+/// # #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 /// # use futures::stream::StreamExt;
 /// # use mongodb::{Client, error::Result, bson::doc,
 /// # change_stream::event::ChangeStreamEvent};
