@@ -2,8 +2,9 @@
 
 set -o errexit
 set -o xtrace 
+set -o pipefail
 
-. ~/.cargo/env
+source ./.evergreen/env.sh
 
 export SUBJECT=`openssl x509 -subject -nameopt RFC2253 -noout -inform PEM -in $CERT_PATH`
 
@@ -24,5 +25,8 @@ fi
 
 OPTIONS="--no-default-features --features ${RUNTIME_FEATURE},${TLS_FEATURE} -- -Z unstable-options --format json --report-time"
 
+set +o errexit
 RUST_BACKTRACE=1 MONGO_X509_USER="$SUBJECT" cargo test x509 $OPTIONS | tee results.json
+CARGO_EXIT=$?
 cat results.json | cargo2junit > results.xml
+exit $CARGO_EXIT
