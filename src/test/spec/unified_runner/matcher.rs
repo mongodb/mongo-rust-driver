@@ -328,9 +328,8 @@ fn type_matches(types: &Bson, actual: &Bson) -> Result<(), String> {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn basic_matching() {
+#[test]
+fn basic_matching() {
     let actual = doc! { "x": 1, "y": 1 };
     let expected = doc! { "x": 1 };
     assert!(results_match(
@@ -352,9 +351,8 @@ async fn basic_matching() {
     .is_err());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn array_matching() {
+#[test]
+fn array_matching() {
     let mut actual: Vec<Bson> = Vec::new();
     for i in 1..4 {
         actual.push(Bson::Int32(i));
@@ -388,9 +386,8 @@ async fn array_matching() {
     .is_err());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn special_operators() {
+#[test]
+fn special_operators() {
     let actual = doc! { "x": 1 };
     let expected = doc! { "x": { "$$exists": true } };
     assert!(results_match(
@@ -482,9 +479,8 @@ async fn special_operators() {
     .is_ok());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn extra_fields() {
+#[test]
+fn extra_fields() {
     let actual = doc! { "x": 1, "y": 2 };
     let expected = doc! { "x": 1 };
     assert!(results_match(
@@ -506,9 +502,8 @@ async fn extra_fields() {
     .is_err());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn numbers() {
+#[test]
+fn numbers() {
     let actual = Bson::Int32(2);
     let expected = Bson::Int64(2);
     assert!(results_match(Some(&actual), &expected, false, None).is_ok());

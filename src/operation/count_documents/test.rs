@@ -13,9 +13,8 @@ use crate::{
 
 use super::CountDocuments;
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build() {
+#[test]
+fn build() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -41,9 +40,8 @@ async fn build() {
     assert_eq!(count_command.target_db, "test_db");
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build_with_options() {
+#[test]
+fn build_with_options() {
     let skip = 2;
     let limit = 5;
     let options = CountOptions::builder()
@@ -84,9 +82,8 @@ async fn build_with_options() {
     assert_eq!(cmd_doc, expected_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn op_selection_criteria() {
+#[test]
+fn op_selection_criteria() {
     test::op_selection_criteria(|selection_criteria| {
         let options = CountOptions {
             selection_criteria,
@@ -96,9 +93,8 @@ async fn op_selection_criteria() {
     });
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_success() {
+#[test]
+fn handle_success() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),

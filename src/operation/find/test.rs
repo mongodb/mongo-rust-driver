@@ -35,9 +35,8 @@ fn build_test(
     assert_eq!(cmd_doc, expected_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build() {
+#[test]
+fn build() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -75,9 +74,8 @@ async fn build() {
     build_test(ns, Some(filter), Some(options), expected_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build_cursor_type() {
+#[test]
+fn build_cursor_type() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -125,9 +123,8 @@ async fn build_cursor_type() {
     build_test(ns, None, Some(tailable_await_options), tailable_await_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build_max_await_time() {
+#[test]
+fn build_max_await_time() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -147,9 +144,8 @@ async fn build_max_await_time() {
     build_test(ns, None, Some(options), body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build_limit() {
+#[test]
+fn build_limit() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -177,9 +173,8 @@ async fn build_limit() {
     build_test(ns, None, Some(negative_options), negative_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build_batch_size() {
+#[test]
+fn build_batch_size() {
     let options = FindOptions::builder().batch_size(1).build();
     let body = doc! {
         "find": "",
@@ -195,9 +190,8 @@ async fn build_batch_size() {
     assert!(op.build(&StreamDescription::new_testing()).is_err())
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn op_selection_criteria() {
+#[test]
+fn op_selection_criteria() {
     test::op_selection_criteria(|selection_criteria| {
         let options = FindOptions {
             selection_criteria,
@@ -234,9 +228,8 @@ fn verify_max_await_time(max_await_time: Option<Duration>, cursor_type: Option<C
     assert_eq!(spec.max_time(), max_await_time);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_max_await_time() {
+#[test]
+fn handle_max_await_time() {
     verify_max_await_time(None, None);
     verify_max_await_time(Some(Duration::from_millis(5)), None);
     verify_max_await_time(
@@ -250,9 +243,8 @@ async fn handle_max_await_time() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_invalid_response() {
+#[test]
+fn handle_invalid_response() {
     let find = Find::empty();
 
     let garbled = doc! { "asdfasf": "ASdfasdf" };

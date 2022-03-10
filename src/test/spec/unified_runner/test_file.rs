@@ -397,9 +397,8 @@ async fn merged_uri_options() {
     assert_eq!(options.read_concern.unwrap(), read_concern);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn deserialize_selection_criteria() {
+#[test]
+fn deserialize_selection_criteria() {
     let read_preference = doc! {
         "mode": "SecondaryPreferred",
         "maxStalenessSeconds": 100,
@@ -420,9 +419,8 @@ async fn deserialize_selection_criteria() {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn deserialize_read_concern() {
+#[test]
+fn deserialize_read_concern() {
     let read_concern = doc! {
         "level": "local",
     };
