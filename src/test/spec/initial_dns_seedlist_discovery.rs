@@ -112,7 +112,7 @@ async fn run_test(mut test_file: TestFile) {
     };
     let client = TestClient::new().await;
     if requires_tls != client.options.tls_options().is_some() {
-        log_uncaptured("skipping initial_dns_seedlist_discovery due to TLS requirement mismatch")
+        log_uncaptured("skipping test case due to TLS requirement mismatch")
     } else {
         // If the connection URI provides authentication information, manually create the user
         // before connecting.
