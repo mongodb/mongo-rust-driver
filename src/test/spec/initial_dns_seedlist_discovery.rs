@@ -57,7 +57,7 @@ struct ParsedOptions {
 }
 
 async fn run_test(mut test_file: TestFile) {
-    // TODO RUST-933: Remove this skip once we support the optgion.
+    // TODO RUST-933: Remove this skip once we support the option.
     if let Some(ref options) = test_file.options {
         if options.srv_max_hosts.is_some() {
             log_uncaptured(
