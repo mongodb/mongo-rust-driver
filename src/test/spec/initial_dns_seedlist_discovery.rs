@@ -211,9 +211,10 @@ async fn replica_set() {
              requirement ({})",
             skip
         ));
-    } else {
-        run_spec_test(&["initial-dns-seedlist-discovery", "replica-set"], run_test).await;
+        return;
     }
+
+    run_spec_test(&["initial-dns-seedlist-discovery", "replica-set"], run_test).await;
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
@@ -228,7 +229,6 @@ async fn load_balanced() {
         );
         return;
     }
-
     run_spec_test(
         &["initial-dns-seedlist-discovery", "load-balanced"],
         run_test,
