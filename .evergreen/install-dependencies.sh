@@ -33,5 +33,16 @@ cargo install cargo2junit
 source ./.evergreen/env.sh
 
 # Install tool for merging different junit reports into a single one
-npm install -g junit-report-merger
+set +o errexit
+set -o pipefail
 
+npm install -g junit-report-merger --cache $(mktemp -d) 2>&1 | tee npm-install-output
+RESULT=$?
+MATCH=$(grep -o '/\S*-debug.log' npm-install-output)
+if [[ $MATCH != "" ]]; then
+    echo ===== BEGIN NPM LOG =====
+    cat $MATCH
+    echo ===== END NPM LOG =====
+fi
+
+exit $RESULT
