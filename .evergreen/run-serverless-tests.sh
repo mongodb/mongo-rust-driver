@@ -22,6 +22,8 @@ if [ "$SINGLE_THREAD" = true ]; then
 	OPTIONS="$OPTIONS --test-threads=1"
 fi
 
+FEATURE_FLAGS=${FEATURE_FLAGS},${TLS_FEATURE}
+
 echo "cargo test options: ${DEFAULT_FEATURES} --features $FEATURE_FLAGS ${OPTIONS}"
 
 CARGO_RESULT=0

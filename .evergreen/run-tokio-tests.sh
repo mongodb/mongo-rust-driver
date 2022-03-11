@@ -11,7 +11,7 @@ if [ "$SINGLE_THREAD" = true ]; then
 	OPTIONS="$OPTIONS --test-threads=1"
 fi
 
-FEATURE_FLAGS="zstd-compression,snappy-compression,zlib-compression"
+FEATURE_FLAGS="zstd-compression,snappy-compression,zlib-compression,${TLS_FEATURE}"
 
 echo "cargo test options: --features $FEATURE_FLAGS ${OPTIONS}"
 
