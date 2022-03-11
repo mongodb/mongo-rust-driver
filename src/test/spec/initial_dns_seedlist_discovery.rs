@@ -61,7 +61,7 @@ async fn run_test(mut test_file: TestFile) {
     if let Some(ref options) = test_file.options {
         if options.srv_max_hosts.is_some() {
             log_uncaptured(
-                "skipping test case due to unsupported connection string option srvMaxHosts"
+                "skipping test case due to unsupported connection string option srvMaxHosts",
             );
             return;
         }
@@ -112,9 +112,7 @@ async fn run_test(mut test_file: TestFile) {
     };
     let client = TestClient::new().await;
     if requires_tls != client.options.tls_options().is_some() {
-        log_uncaptured(
-            "skipping initial_dns_seedlist_discovery due to TLS requirement mismatch"
-        )
+        log_uncaptured("skipping initial_dns_seedlist_discovery due to TLS requirement mismatch")
     } else {
         // If the connection URI provides authentication information, manually create the user
         // before connecting.
@@ -199,16 +197,18 @@ async fn run_test(mut test_file: TestFile) {
 async fn replica_set() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
     let client = TestClient::new().await;
-    let skip = if client.is_replica_set() && client.options.repl_set_name.as_deref() != Some("repl0") {
-        Some("repl_set_name != repl0")
-    } else if !client.is_replica_set() {
-        Some("not a replica set")
-    } else {
-        None
-    };
+    let skip =
+        if client.is_replica_set() && client.options.repl_set_name.as_deref() != Some("repl0") {
+            Some("repl_set_name != repl0")
+        } else if !client.is_replica_set() {
+            Some("not a replica set")
+        } else {
+            None
+        };
     if let Some(skip) = skip {
         log_uncaptured(format!(
-            "skipping initial_dns_seedlist_discovery::replica_set due to unmet topology requirement ({})",
+            "skipping initial_dns_seedlist_discovery::replica_set due to unmet topology \
+             requirement ({})",
             skip
         ));
     } else {
@@ -223,7 +223,8 @@ async fn load_balanced() {
     let client = TestClient::new().await;
     if !client.is_load_balanced() {
         log_uncaptured(
-            "skipping initial_dns_seedlist_discovery::load_balanced due to unmet topology requirement (not a load balanced cluster)"
+            "skipping initial_dns_seedlist_discovery::load_balanced due to unmet topology \
+             requirement (not a load balanced cluster)",
         );
         return;
     }
