@@ -15,9 +15,8 @@ use crate::{
     options::ReadConcernLevel,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build() {
+#[test]
+fn build() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -35,9 +34,8 @@ async fn build() {
     assert_eq!(count_command.target_db, "test_db");
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build_with_options() {
+#[test]
+fn build_with_options() {
     let read_concern: ReadConcern = ReadConcernLevel::Local.into();
     let max_time = Duration::from_millis(2_u64);
     let options: EstimatedDocumentCountOptions = EstimatedDocumentCountOptions::builder()
@@ -71,9 +69,8 @@ async fn build_with_options() {
     assert_eq!(cmd_doc, expected_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn op_selection_criteria() {
+#[test]
+fn op_selection_criteria() {
     test::op_selection_criteria(|selection_criteria| {
         let options = EstimatedDocumentCountOptions {
             selection_criteria,
@@ -83,9 +80,8 @@ async fn op_selection_criteria() {
     });
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_success() {
+#[test]
+fn handle_success() {
     let count_op = Count::empty();
 
     let n = 26;
@@ -95,9 +91,8 @@ async fn handle_success() {
     assert_eq!(actual_values, n);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_success_agg() {
+#[test]
+fn handle_success_agg() {
     let count_op = Count::empty();
 
     let n = 26;
@@ -116,9 +111,8 @@ async fn handle_success_agg() {
     assert_eq!(actual_values, n);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_response_no_n() {
+#[test]
+fn handle_response_no_n() {
     let count_op = Count::empty();
     handle_response_test(&count_op, doc! { "ok": 1.0 }).unwrap_err();
 }

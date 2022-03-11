@@ -8,9 +8,8 @@ use crate::{
     operation::{test::handle_response_test, DropIndexes, Operation},
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build() {
+#[test]
+fn build() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -36,9 +35,8 @@ async fn build() {
     )
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_success() {
+#[test]
+fn handle_success() {
     let op = DropIndexes::empty();
     let response = doc! { "ok": 1 };
     handle_response_test(&op, response).unwrap();

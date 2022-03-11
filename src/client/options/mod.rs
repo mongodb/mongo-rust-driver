@@ -2336,10 +2336,6 @@ mod tests {
 
     #[cfg_attr(feature = "tokio-runtime", tokio::test)]
     #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-    async fn with_invalid_read_preference_mode() {}
-
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
     async fn with_mixed_options() {
         let uri = "mongodb://localhost,localhost:27018/?w=majority&readConcernLevel=majority&\
                    journal=false&wtimeoutMS=27&replicaSet=foo&heartbeatFrequencyMS=1000&\

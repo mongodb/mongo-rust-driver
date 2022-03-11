@@ -58,9 +58,8 @@ fn fixtures(opts: Option<InsertManyOptions>) -> TestFixtures {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build() {
+#[test]
+fn build() {
     let mut fixtures = fixtures(None);
 
     let description = StreamDescription::new_testing();
@@ -114,9 +113,8 @@ async fn build() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build_ordered() {
+#[test]
+fn build_ordered() {
     let docs = vec![Document::new()];
     let mut insert = Insert::new(Namespace::empty(), docs.iter().collect(), None);
     let cmd = insert
@@ -168,9 +166,8 @@ struct Documents<D> {
     documents: Vec<D>,
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn generate_ids() {
+#[test]
+fn generate_ids() {
     let docs = vec![doc! { "x": 1 }, doc! { "_id": 1_i32, "x": 2 }];
 
     let mut insert = Insert::new(Namespace::empty(), docs.iter().collect(), None);
@@ -201,9 +198,8 @@ async fn generate_ids() {
     assert_eq!(docs.documents[0].iter().next().unwrap().0, "_id")
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn serialize_all_types() {
+#[test]
+fn serialize_all_types() {
     let binary = Binary {
         bytes: vec![36, 36, 36],
         subtype: BinarySubtype::Generic,
@@ -265,9 +261,8 @@ async fn serialize_all_types() {
     assert_eq!(cmd.documents, docs);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_success() {
+#[test]
+fn handle_success() {
     let mut fixtures = fixtures(None);
 
     // populate _id for documents that don't provide it
@@ -284,16 +279,14 @@ async fn handle_success() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_invalid_response() {
+#[test]
+fn handle_invalid_response() {
     let fixtures = fixtures(None);
     handle_response_test(&fixtures.op, doc! { "ok": 1.0, "asdfadsf": 123123 }).unwrap_err();
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_write_failure() {
+#[test]
+fn handle_write_failure() {
     let mut fixtures = fixtures(None);
 
     // generate _id for operations missing it.

@@ -40,9 +40,8 @@ where
     assert_eq!(op.selection_criteria(), Some(&read_pref));
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn response_success() {
+#[test]
+fn response_success() {
     let cluster_timestamp = Timestamp {
         time: 123,
         increment: 345,
@@ -99,9 +98,8 @@ async fn response_success() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn response_failure() {
+#[test]
+fn response_failure() {
     let cluster_timestamp = Timestamp {
         time: 123,
         increment: 345,

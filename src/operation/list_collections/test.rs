@@ -19,9 +19,8 @@ fn build_test(db_name: &str, mut list_collections: ListCollections, mut expected
     assert_eq!(cmd.body, expected_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build() {
+#[test]
+fn build() {
     let list_collections = ListCollections::new("test_db".to_string(), None, false, None);
     let expected_body = doc! {
         "listCollections": 1,
@@ -40,9 +39,8 @@ async fn build() {
     build_test("test_db", list_collections, expected_body);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build_name_only() {
+#[test]
+fn build_name_only() {
     let list_collections = ListCollections::new("test_db".to_string(), None, true, None);
     build_test(
         "test_db",
@@ -92,9 +90,8 @@ async fn build_name_only() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build_batch_size() {
+#[test]
+fn build_batch_size() {
     let list_collections = ListCollections::new("test_db".to_string(), None, true, None);
     build_test(
         "test_db",
@@ -120,18 +117,16 @@ async fn build_batch_size() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn op_selection_criteria() {
+#[test]
+fn op_selection_criteria() {
     assert!(ListCollections::empty()
         .selection_criteria()
         .expect("should have criteria")
         .is_read_pref_primary());
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_invalid_response() {
+#[test]
+fn handle_invalid_response() {
     let list_collections = ListCollections::empty();
 
     let garbled = doc! { "asdfasf": "ASdfasdf" };

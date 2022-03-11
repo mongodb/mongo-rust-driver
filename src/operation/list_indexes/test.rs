@@ -10,9 +10,8 @@ use crate::{
     Namespace,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build() {
+#[test]
+fn build() {
     let ns = Namespace {
         db: "test_db".to_string(),
         coll: "test_coll".to_string(),
@@ -40,9 +39,8 @@ async fn build() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_success() {
+#[test]
+fn handle_success() {
     let op = ListIndexes::empty();
 
     let first_batch = vec![

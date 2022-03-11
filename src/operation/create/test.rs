@@ -8,9 +8,8 @@ use crate::{
     Namespace,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build() {
+#[test]
+fn build() {
     let mut op = Create::new(
         Namespace {
             db: "test_db".to_string(),
@@ -43,9 +42,8 @@ async fn build() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build_validator() {
+#[test]
+fn build_validator() {
     let query = doc! { "x": { "$gt": 1 } };
     let mut op = Create::new(
         Namespace {
@@ -72,16 +70,14 @@ async fn build_validator() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_success() {
+#[test]
+fn handle_success() {
     let op = Create::empty();
     handle_response_test(&op, doc! { "ok": 1.0 }).unwrap();
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_write_concern_error() {
+#[test]
+fn handle_write_concern_error() {
     let op = Create::empty();
 
     let response = doc! {

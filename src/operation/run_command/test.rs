@@ -7,9 +7,8 @@ use crate::{
     operation::{test::handle_response_test, Operation},
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build() {
+#[test]
+fn build() {
     let mut op = RunCommand::new("foo".into(), doc! { "isMaster": 1 }, None, None).unwrap();
     assert!(op.selection_criteria().is_none());
 
@@ -26,9 +25,8 @@ async fn build() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_success() {
+#[test]
+fn handle_success() {
     let op = RunCommand::new("foo".into(), doc! { "hello": 1 }, None, None).unwrap();
 
     let doc = doc! {

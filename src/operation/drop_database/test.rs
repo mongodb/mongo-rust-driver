@@ -7,9 +7,8 @@ use crate::{
     options::DropDatabaseOptions,
 };
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn build() {
+#[test]
+fn build() {
     let mut op = DropDatabase {
         target_db: "test_db".to_string(),
         options: Some(DropDatabaseOptions {
@@ -48,9 +47,8 @@ async fn build() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_success() {
+#[test]
+fn handle_success() {
     let op = DropDatabase::empty();
 
     let ok_response = doc! { "ok": 1.0 };
@@ -59,9 +57,8 @@ async fn handle_success() {
     handle_response_test(&op, ok_extra).unwrap();
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn handle_write_concern_error() {
+#[test]
+fn handle_write_concern_error() {
     let op = DropDatabase::empty();
 
     let response = doc! {

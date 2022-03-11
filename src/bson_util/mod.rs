@@ -217,9 +217,8 @@ pub(crate) fn read_document_bytes<R: Read>(mut reader: R) -> Result<Vec<u8>> {
 mod test {
     use crate::bson_util::num_decimal_digits;
 
-    #[cfg_attr(feature = "tokio-runtime", tokio::test)]
-    #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-    async fn num_digits() {
+    #[test]
+    fn num_digits() {
         assert_eq!(num_decimal_digits(0), 1);
         assert_eq!(num_decimal_digits(1), 1);
         assert_eq!(num_decimal_digits(10), 2);

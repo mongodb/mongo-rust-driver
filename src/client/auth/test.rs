@@ -11,9 +11,8 @@ lazy_static! {
     ];
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn negotiate_both_scram() {
+#[test]
+fn negotiate_both_scram() {
     let description_both = StreamDescription {
         sasl_supported_mechs: Some(MECHS.to_vec()),
         ..Default::default()
@@ -24,9 +23,8 @@ async fn negotiate_both_scram() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn negotiate_sha1_only() {
+#[test]
+fn negotiate_sha1_only() {
     let description_sha1 = StreamDescription {
         sasl_supported_mechs: Some(MECHS[0..=0].to_vec()),
         ..Default::default()
@@ -37,9 +35,8 @@ async fn negotiate_sha1_only() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn negotiate_sha256_only() {
+#[test]
+fn negotiate_sha256_only() {
     let description_sha256 = StreamDescription {
         sasl_supported_mechs: Some(MECHS[1..=1].to_vec()),
         ..Default::default()
@@ -50,9 +47,8 @@ async fn negotiate_sha256_only() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn negotiate_none() {
+#[test]
+fn negotiate_none() {
     let description_none: StreamDescription = Default::default();
     assert_eq!(
         AuthMechanism::from_stream_description(&description_none),
@@ -60,9 +56,8 @@ async fn negotiate_none() {
     );
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn negotiate_mangled() {
+#[test]
+fn negotiate_mangled() {
     let description_mangled = StreamDescription {
         sasl_supported_mechs: Some(["NOT A MECHANISM".to_string(), "OTHER".to_string()].to_vec()),
         ..Default::default()
@@ -89,16 +84,14 @@ fn scram_sasl_first_options(mechanism: AuthMechanism) {
     }
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn sasl_first_options_specified() {
+#[test]
+fn sasl_first_options_specified() {
     scram_sasl_first_options(AuthMechanism::ScramSha1);
     scram_sasl_first_options(AuthMechanism::ScramSha256);
 }
 
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn sasl_first_options_not_specified() {
+#[test]
+fn sasl_first_options_not_specified() {
     let sasl_first = SaslStart::new(String::new(), AuthMechanism::MongoDbX509, Vec::new(), None);
     let command = sasl_first.into_command();
     assert!(
