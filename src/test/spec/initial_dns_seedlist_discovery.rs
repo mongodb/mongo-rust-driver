@@ -31,6 +31,7 @@ struct ResolvedOptions {
     ssl: bool,
     load_balanced: Option<bool>,
     direct_connection: Option<bool>,
+    srv_max_hosts: Option<u32>,
 }
 
 impl ResolvedOptions {
@@ -56,26 +57,14 @@ struct ParsedOptions {
 }
 
 async fn run_test(mut test_file: TestFile) {
-    // TODO DRIVERS-796: unskip this test
-    if test_file.uri == "mongodb+srv://test5.test.build.10gen.cc/?authSource=otherDB" {
-        log_uncaptured(
-            "skipping initial_dns_seedlist_discovery due to authSource being specified without \
-             credentials",
-        );
-        return;
-    }
-
-    // TODO RUST-980 unskip these tests
-    if test_file
-        .options
-        .as_ref()
-        .and_then(|o| o.load_balanced)
-        .unwrap_or(false)
-    {
-        log_uncaptured(
-            "skipping initial_dns_seedlist_discovery due to load-balanced test configuration",
-        );
-        return;
+    // TODO RUST-933: Remove this skip once we support the optgion.
+    if let Some(ref options) = test_file.options {
+        if options.srv_max_hosts.is_some() {
+            log_uncaptured(
+                "skipping test case due to unsupported connection string option srvMaxHosts"
+            );
+            return;
+        }
     }
 
     // "encoded-userinfo-and-db.json" specifies a database name with a question mark which is
@@ -122,20 +111,10 @@ async fn run_test(mut test_file: TestFile) {
         None => true,
     };
     let client = TestClient::new().await;
-    let skip = if !client.is_replica_set() {
-        Some("not replica set")
-    } else if client.options.repl_set_name.as_deref() != Some("repl0") {
-        Some("repl_set_name != repl0")
-    } else if requires_tls != client.options.tls_options().is_some() {
-        Some("tls requirement mismatch")
-    } else {
-        None
-    };
-    if let Some(skip) = skip {
-        log_uncaptured(format!(
-            "skipping initial_dns_seedlist_discovery due to topology ({})",
-            skip
-        ))
+    if requires_tls != client.options.tls_options().is_some() {
+        log_uncaptured(
+            "skipping initial_dns_seedlist_discovery due to TLS requirement mismatch"
+        )
     } else {
         // If the connection URI provides authentication information, manually create the user
         // before connecting.
@@ -219,13 +198,36 @@ async fn run_test(mut test_file: TestFile) {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn replica_set() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-    run_spec_test(&["initial-dns-seedlist-discovery", "replica-set"], run_test).await;
+    let client = TestClient::new().await;
+    let skip = if client.is_replica_set() && client.options.repl_set_name.as_deref() != Some("repl0") {
+        Some("repl_set_name != repl0")
+    } else if !client.is_replica_set() {
+        Some("not a replica set")
+    } else {
+        None
+    };
+    if let Some(skip) = skip {
+        log_uncaptured(format!(
+            "skipping initial_dns_seedlist_discovery::replica_set due to unmet topology requirement ({})",
+            skip
+        ));
+    } else {
+        run_spec_test(&["initial-dns-seedlist-discovery", "replica-set"], run_test).await;
+    }
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn load_balanced() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
+    let client = TestClient::new().await;
+    if !client.is_load_balanced() {
+        log_uncaptured(
+            "skipping initial_dns_seedlist_discovery::load_balanced due to unmet topology requirement (not a load balanced cluster)"
+        );
+        return;
+    }
+
     run_spec_test(
         &["initial-dns-seedlist-discovery", "load-balanced"],
         run_test,
