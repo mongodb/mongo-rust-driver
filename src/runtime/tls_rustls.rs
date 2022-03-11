@@ -155,6 +155,7 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
 
     Ok(config)
 }
+
 struct NoCertVerifier {}
 
 impl ServerCertVerifier for NoCertVerifier {

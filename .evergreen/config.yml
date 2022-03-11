@@ -1372,18 +1372,6 @@ axes:
            SSL: "nossl"
            TLS_FEATURE: ""
 
-  - id: "tls-crate"
-    display_name: TLS crate
-    values:
-      - id: "tls-rustls"
-        display_name: "Rustls"
-        variables:
-           TLS_FEATURE: ""
-      - id: "tls-openssl"
-        display_name: "OpenSSL"
-        variables:
-          TLS_FEATURE: "openssl-tls"
-
   - id: "compressor"
     display_name: "Compressor"
     values:
