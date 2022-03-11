@@ -32,6 +32,7 @@ struct ResolvedOptions {
     load_balanced: Option<bool>,
     direct_connection: Option<bool>,
     srv_max_hosts: Option<u32>,
+    srv_service_name: Option<String>,
 }
 
 impl ResolvedOptions {
@@ -57,12 +58,22 @@ struct ParsedOptions {
 }
 
 async fn run_test(mut test_file: TestFile) {
-    // TODO RUST-933: Remove this skip once we support the option.
     if let Some(ref options) = test_file.options {
-        if options.srv_max_hosts.is_some() {
-            log_uncaptured(
-                "skipping test case due to unsupported connection string option srvMaxHosts",
-            );
+        // TODO RUST-933: Remove this skip.
+        let skip = if options.srv_max_hosts.is_some() {
+            Some("srvMaxHosts")
+        // TODO-RUST-911: Remove this skip.
+        } else if options.srv_service_name.is_some() {
+            Some("srvServiceName")
+        } else {
+            None
+        };
+
+        if let Some(skip) = skip {
+            log_uncaptured(format!(
+                "skipping test case due to unsupported connection string option {}",
+                skip,
+            ));
             return;
         }
     }
