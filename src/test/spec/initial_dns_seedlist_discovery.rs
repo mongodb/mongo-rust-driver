@@ -108,7 +108,7 @@ async fn run_test(mut test_file: TestFile) {
 
     let options = result.unwrap();
 
-    if let Some(mut expected_seeds) = test_file.seeds {
+    if let Some(ref mut expected_seeds) = test_file.seeds {
         let mut actual_seeds = options
             .hosts
             .iter()
@@ -118,7 +118,7 @@ async fn run_test(mut test_file: TestFile) {
         expected_seeds.sort();
         actual_seeds.sort();
 
-        assert_eq!(expected_seeds, actual_seeds,);
+        assert_eq!(*expected_seeds, actual_seeds,);
         if let Some(expected_seed_count) = test_file.num_seeds {
             assert_eq!(actual_seeds.len(), expected_seed_count,)
         }
