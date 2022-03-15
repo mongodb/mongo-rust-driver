@@ -388,24 +388,6 @@ impl From<std::io::ErrorKind> for ErrorKind {
     }
 }
 
-#[cfg(feature = "openssl-tls")]
-impl From<openssl::error::ErrorStack> for ErrorKind {
-    fn from(err: openssl::error::ErrorStack) -> Self {
-        Self::Authentication {
-            message: err.to_string(),
-        }
-    }
-}
-
-#[cfg(feature = "openssl-tls")]
-impl From<openssl::ssl::Error> for ErrorKind {
-    fn from(err: openssl::ssl::Error) -> Self {
-        Self::Authentication {
-            message: err.to_string(),
-        }
-    }
-}
-
 /// The types of errors that can occur.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Error)]

@@ -776,6 +776,14 @@ pub struct TlsOptions {
     /// [`Client`](../struct.Client.html) will not attempt to verify its identity to the
     /// server.
     pub cert_key_file_path: Option<PathBuf>,
+
+    /// Whether or not the [`Client`](../struct.Client.html) should return an error if the hostname
+    /// is invalid.
+    ///
+    /// The default value is to error on invalid hostnames.
+    #[cfg(any(feature = "openssl-tls", docsrs))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "openssl-tls")))]
+    pub allow_invalid_hostnames: Option<bool>,
 }
 
 impl TlsOptions {

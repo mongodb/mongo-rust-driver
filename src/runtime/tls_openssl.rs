@@ -5,11 +5,17 @@ use std::{
 };
 
 use futures_io::{AsyncRead, AsyncWrite};
-use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
+use openssl::{
+    error::ErrorStack,
+    ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode},
+};
 use tokio::io::AsyncWrite as TokioAsyncWrite;
 use tokio_openssl::SslStream;
 
-use crate::{client::options::TlsOptions, error::Result};
+use crate::{
+    client::options::TlsOptions,
+    error::{Error, ErrorKind, Result},
+};
 
 use super::stream::AsyncTcpStream;
 
@@ -26,14 +32,18 @@ impl AsyncTlsStream {
     ) -> Result<Self> {
         init_trust();
 
-        let connector = make_openssl_connector(cfg)?;
-        let ssl = connector
-            .configure()?
-            .use_server_name_indication(true)
-            .verify_hostname(false)
-            .into_ssl(host)?;
-        let mut stream = SslStream::new(ssl, tcp_stream)?;
-        Pin::new(&mut stream).connect().await?;
+        let mut stream = make_ssl_stream(host, tcp_stream, cfg).map_err(|err| {
+            Error::from(ErrorKind::InvalidTlsConfig {
+                message: err.to_string(),
+            })
+        })?;
+        Pin::new(&mut stream).connect().await.map_err(|err| {
+            use std::io;
+            match err.into_io_error() {
+                Ok(err) => err,
+                Err(err) => io::Error::new(io::ErrorKind::Other, err),
+            }
+        })?;
         Ok(AsyncTlsStream { inner: stream })
     }
 }
@@ -66,13 +76,14 @@ impl AsyncWrite for AsyncTlsStream {
     }
 }
 
-fn make_openssl_connector(cfg: TlsOptions) -> Result<SslConnector> {
+fn make_openssl_connector(cfg: TlsOptions) -> std::result::Result<SslConnector, ErrorStack> {
     let mut builder = SslConnector::builder(SslMethod::tls_client())?;
 
     let TlsOptions {
         allow_invalid_certificates,
         ca_file_path,
         cert_key_file_path,
+        allow_invalid_hostnames: _,
     } = cfg;
 
     if let Some(true) = allow_invalid_certificates {
@@ -92,4 +103,19 @@ fn make_openssl_connector(cfg: TlsOptions) -> Result<SslConnector> {
 fn init_trust() {
     static ONCE: Once = Once::new();
     ONCE.call_once(openssl_probe::init_ssl_cert_env_vars);
+}
+
+fn make_ssl_stream(
+    host: &str,
+    tcp_stream: AsyncTcpStream,
+    cfg: TlsOptions,
+) -> std::result::Result<SslStream<AsyncTcpStream>, ErrorStack> {
+    let verify_hostname = !cfg.allow_invalid_hostnames.unwrap_or(false);
+    let connector = make_openssl_connector(cfg)?;
+    let ssl = connector
+        .configure()?
+        .use_server_name_indication(true)
+        .verify_hostname(verify_hostname)
+        .into_ssl(host)?;
+    SslStream::new(ssl, tcp_stream)
 }
