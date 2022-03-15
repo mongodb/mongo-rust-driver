@@ -6,7 +6,11 @@ use std::{
     str,
 };
 
-use hmac::{digest::Digest, Hmac, Mac, NewMac};
+use hmac::{
+    digest::{Digest, FixedOutput, KeyInit},
+    Hmac,
+    Mac,
+};
 use lazy_static::lazy_static;
 use md5::Md5;
 use sha1::Sha1;
@@ -352,11 +356,11 @@ fn xor(lhs: &[u8], rhs: &[u8]) -> Vec<u8> {
         .collect()
 }
 
-fn mac_verify<M: Mac + NewMac>(key: &[u8], input: &[u8], signature: &[u8]) -> Result<()> {
-    let mut mac =
-        M::new_from_slice(key).map_err(|_| Error::unknown_authentication_error("SCRAM"))?;
+fn mac_verify<M: Mac + KeyInit>(key: &[u8], input: &[u8], signature: &[u8]) -> Result<()> {
+    let mut mac = <M as Mac>::new_from_slice(key)
+        .map_err(|_| Error::unknown_authentication_error("SCRAM"))?;
     mac.update(input);
-    match mac.verify(signature) {
+    match mac.verify_slice(signature) {
         Ok(_) => Ok(()),
         Err(_) => Err(Error::authentication_error(
             "SCRAM",
@@ -371,7 +375,7 @@ fn hash<D: Digest>(val: &[u8]) -> Vec<u8> {
     hash.finalize().to_vec()
 }
 
-fn h_i<M: Mac + NewMac + Sync>(
+fn h_i<M: KeyInit + FixedOutput + Mac + Sync + Clone>(
     str: &str,
     salt: &[u8],
     iterations: u32,

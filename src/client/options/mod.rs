@@ -11,11 +11,18 @@ use std::{
     path::PathBuf,
     str::FromStr,
     sync::Arc,
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 use derivative::Derivative;
 use lazy_static::lazy_static;
+use rustls::{
+    client::{ClientConfig, ServerCertVerified, ServerCertVerifier, ServerName},
+    Certificate,
+    OwnedTrustAnchor,
+    RootCertStore,
+};
+use rustls_pemfile::{certs, read_one, Item};
 use serde::{
     de::{Error, Unexpected},
     Deserialize,
