@@ -7,7 +7,7 @@ use tokio::sync::RwLockReadGuard;
 
 use crate::{
     bson::{doc, Bson},
-    error::{ErrorKind, Result},
+    error::Result,
     options::{ClientOptions, FindOptions, ServerApi, ServerApiVersion},
     test::{log_uncaptured, TestClient, DEFAULT_URI, LOCK},
     Client,
