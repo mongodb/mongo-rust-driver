@@ -81,7 +81,7 @@ impl SrvResolver {
 
         for record in srv_lookup.as_lookup().record_iter() {
             let srv = match record.data() {
-                RData::SRV(s) => s,
+                Some(RData::SRV(s)) => s,
                 _ => continue,
             };
 
