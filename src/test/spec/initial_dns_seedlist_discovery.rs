@@ -118,9 +118,9 @@ async fn run_test(mut test_file: TestFile) {
         expected_seeds.sort();
         actual_seeds.sort();
 
-        assert_eq!(*expected_seeds, actual_seeds,);
+        assert_eq!(*expected_seeds, actual_seeds);
         if let Some(expected_seed_count) = test_file.num_seeds {
-            assert_eq!(actual_seeds.len(), expected_seed_count,)
+            assert_eq!(actual_seeds.len(), expected_seed_count)
         }
     }
 
