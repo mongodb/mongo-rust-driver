@@ -333,7 +333,7 @@ impl Client {
             Err(mut err) => {
                 err.add_labels_and_update_pin(None, &mut session, None)?;
 
-                if err.is_network_error() {
+                if err.is_network_error() || err.is_auth_error() {
                     return self.execute_retry(&mut op, &mut session, None, err).await;
                 } else {
                     return Err(err);
