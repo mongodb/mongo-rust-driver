@@ -1,5 +1,5 @@
 {
-  "uri": "mongodb+srv://test24.test.build.10gen.cc/?directConnection=false",
+  "uri": "mongodb+srv://test23.test.build.10gen.cc/?loadBalanced=true&srvMaxHosts=0",
   "seeds": [
     "localhost.test.build.10gen.cc:8000"
   ],
@@ -8,7 +8,7 @@
   ],
   "options": {
     "loadBalanced": true,
-    "ssl": true,
-    "directConnection": false
+    "srvMaxHosts": 0,
+    "ssl": true
   }
 }
