@@ -314,10 +314,6 @@ impl Error {
             .unwrap_or(false)
     }
 
-    pub(crate) fn is_pool_cleared(&self) -> bool {
-        matches!(self.kind.as_ref(), ErrorKind::ConnectionPoolCleared { .. })
-    }
-
     /// If this error is resumable as per the change streams spec.
     pub(crate) fn is_resumable(&self) -> bool {
         if !self.is_server_error() {
