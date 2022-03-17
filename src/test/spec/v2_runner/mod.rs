@@ -53,7 +53,7 @@ pub async fn run_v2_test(test_file: TestFile) {
     }
 
     for test in test_file.tests {
-        println!("Running {}", &test.description);
+        log_uncaptured(format!("Running {}", &test.description));
 
         if test
             .operations

@@ -26,13 +26,20 @@ use crate::{
     },
 };
 
-use super::run_v2_test;
+use super::{run_unified_format_test, run_v2_test};
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn run() {
+async fn run_legacy() {
     let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
-    run_spec_test(&["retryable-reads"], run_v2_test).await;
+    run_spec_test(&["retryable-reads", "legacy"], run_v2_test).await;
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn run_unified() {
+    let _guard: RwLockWriteGuard<()> = LOCK.run_exclusively().await;
+    run_spec_test(&["retryable-reads", "unified"], run_unified_format_test).await;
 }
 
 /// Test ensures that the connection used in the first attempt of a retry is released back into the
