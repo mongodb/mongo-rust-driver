@@ -14,6 +14,9 @@ if [[ "$OS" == "Windows_NT" ]]; then
     export NVM_SYMLINK
     NVM_ARTIFACTS_PATH=$(cygpath -w "$NODE_ARTIFACTS_PATH/bin")
     export NVM_ARTIFACTS_PATH
+    export OPENSSL_DIR="C:\\openssl"
+    OPENSSL_LIB_PATH=$(cygpath $OPENSSL_DIR/lib)
+    ls $OPENSSL_LIB_PATH
     PATH=$(cygpath $NVM_SYMLINK):$(cygpath $NVM_HOME):$PATH
     export PATH
     echo "updated path on windows PATH=$PATH"

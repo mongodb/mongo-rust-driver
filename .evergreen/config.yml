@@ -297,7 +297,9 @@ functions:
 
           export CERT_PATH=$DRIVERS_TOOLS/.evergreen/x509gen/client.pem
 
-          .evergreen/run-x509-tests.sh
+          ASYNC_RUNTIME=${ASYNC_RUNTIME} \
+            TLS_FEATURE=${TLS_FEATURE} \
+            .evergreen/run-x509-tests.sh
 
   "run plain tests":
     - command: shell.exec
@@ -376,6 +378,7 @@ functions:
           SINGLE_THREAD=${SINGLE_THREAD} \
             ASYNC_RUNTIME=${ASYNC_RUNTIME} \
             MONGODB_API_VERSION=${MONGODB_API_VERSION} \
+            TLS_FEATURE=${TLS_FEATURE} \
             .evergreen/run-tests.sh
 
   "run serverless tests":
@@ -403,6 +406,7 @@ functions:
           SINGLE_THREAD=${SINGLE_THREAD} \
             ASYNC_RUNTIME=${ASYNC_RUNTIME} \
             MONGODB_API_VERSION=${MONGODB_API_VERSION} \
+            TLS_FEATURE=${TLS_FEATURE} \
             .evergreen/run-serverless-tests.sh
 
   "run atlas tests":
@@ -1350,15 +1354,23 @@ axes:
     display_name: Authentication and TLS
     values:
       - id: "auth-and-tls"
-        display_name: Auth TLS
+        display_name: Auth TLS (Default)
         variables:
            AUTH: "auth"
            SSL: "ssl"
+           TLS_FEATURE: ""
+      - id: "openssl-auth-and-tls"
+        display_name: Auth TLS (OpenSSL)
+        variables:
+           AUTH: "auth"
+           SSL: "ssl"
+           TLS_FEATURE: "openssl-tls"
       - id: "noauth-and-notls"
         display_name: NoAuth NoTLS
         variables:
            AUTH: "noauth"
            SSL: "nossl"
+           TLS_FEATURE: ""
 
   - id: "compressor"
     display_name: "Compressor"
@@ -1539,9 +1551,11 @@ buildvariants:
       - ubuntu-18.04-arm64
       - macos-10.14
       - windows-64-vs2017
-    auth-and-tls: "auth-and-tls"
+    auth-and-tls:
+      - auth-and-tls
+      - openssl-auth-and-tls
     async-runtime: "*"
-  display_name: "${os} X.509 auth with ${async-runtime}"
+  display_name: "${os} X.509 ${auth-and-tls} with ${async-runtime}"
   tasks:
     - "test-x509-auth"
 
