@@ -383,6 +383,12 @@ async fn hello_ok_true() {
 
     let mut setup_client_options = CLIENT_OPTIONS.clone();
     setup_client_options.hosts.drain(1..);
+
+    if setup_client_options.server_api.is_some() {
+        log_uncaptured("skipping hello_ok_true test due to ServerApi being configured");
+        return;
+    }
+
     let setup_client = TestClient::with_options(Some(setup_client_options.clone())).await;
     if !VersionReq::parse(">= 4.4.5")
         .unwrap()
