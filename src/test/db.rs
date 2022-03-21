@@ -1,12 +1,10 @@
 use std::cmp::Ord;
 
-use approx::assert_ulps_eq;
 use futures::stream::TryStreamExt;
-use serde::Deserialize;
 use tokio::sync::RwLockReadGuard;
 
 use crate::{
-    bson::{doc, Bson, Document},
+    bson::{doc, Document},
     error::Result,
     options::{
         AggregateOptions,
@@ -25,12 +23,6 @@ use crate::{
 };
 
 use super::log_uncaptured;
-
-#[derive(Deserialize)]
-struct IsMasterReply {
-    ismaster: bool,
-    ok: f64,
-}
 
 async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<CollectionSpecification> {
     let mut colls: Vec<CollectionSpecification> = db
