@@ -1,5 +1,4 @@
 use std::{
-    convert::TryFrom,
     net::SocketAddr,
     ops::DerefMut,
     pin::Pin,
@@ -8,9 +7,7 @@ use std::{
 };
 
 use futures_io::{AsyncRead, AsyncWrite};
-use rustls::client::ServerName;
 use tokio::io::{AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite, ReadBuf};
-use tokio_rustls::TlsConnector;
 
 use crate::{
     cmap::options::StreamOptions,
