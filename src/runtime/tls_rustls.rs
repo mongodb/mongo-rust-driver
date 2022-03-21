@@ -113,7 +113,7 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
                     message: format!(
                         "Unable to parse PEM-encoded client certificate from {}: {}",
                         path.display(),
-                        error.to_string(),
+                        error,
                     ),
                 }
                 .into())
