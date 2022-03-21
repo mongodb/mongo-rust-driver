@@ -5,7 +5,7 @@ use serde::Deserialize;
 use crate::{
     bson::{oid::ObjectId, DateTime},
     client::ClusterTime,
-    is_master::IsMasterReply,
+    hello::HelloReply,
     options::ServerAddress,
     selection_criteria::TagSet,
 };
@@ -106,7 +106,7 @@ pub(crate) struct ServerDescription {
     // allows us to ensure that only valid states are possible (e.g. preventing that both an error
     // and a reply are present) while still making it easy to define helper methods on
     // ServerDescription for information we need from the isMaster reply by propagating with `?`.
-    pub(crate) reply: Result<Option<IsMasterReply>, String>,
+    pub(crate) reply: Result<Option<HelloReply>, String>,
 }
 
 impl PartialEq for ServerDescription {
@@ -130,7 +130,7 @@ impl PartialEq for ServerDescription {
 impl ServerDescription {
     pub(crate) fn new(
         mut address: ServerAddress,
-        is_master_reply: Option<Result<IsMasterReply, String>>,
+        hello_reply: Option<Result<HelloReply, String>>,
     ) -> Self {
         address = ServerAddress::Tcp {
             host: address.host().to_lowercase(),
@@ -141,7 +141,7 @@ impl ServerDescription {
             address,
             server_type: Default::default(),
             last_update_time: None,
-            reply: is_master_reply.transpose(),
+            reply: hello_reply.transpose(),
             average_round_trip_time: None,
         };
 
@@ -203,24 +203,24 @@ impl ServerDescription {
 
     pub(crate) fn compatibility_error_message(&self) -> Option<String> {
         if let Ok(Some(ref reply)) = self.reply {
-            let is_master_min_wire_version = reply.command_response.min_wire_version.unwrap_or(0);
+            let hello_min_wire_version = reply.command_response.min_wire_version.unwrap_or(0);
 
-            if is_master_min_wire_version > DRIVER_MAX_WIRE_VERSION {
+            if hello_min_wire_version > DRIVER_MAX_WIRE_VERSION {
                 return Some(format!(
                     "Server at {} requires wire version {}, but this version of the MongoDB Rust \
                      driver only supports up to {}",
-                    self.address, is_master_min_wire_version, DRIVER_MAX_WIRE_VERSION,
+                    self.address, hello_min_wire_version, DRIVER_MAX_WIRE_VERSION,
                 ));
             }
 
-            let is_master_max_wire_version = reply.command_response.max_wire_version.unwrap_or(0);
+            let hello_max_wire_version = reply.command_response.max_wire_version.unwrap_or(0);
 
-            if is_master_max_wire_version < DRIVER_MIN_WIRE_VERSION {
+            if hello_max_wire_version < DRIVER_MIN_WIRE_VERSION {
                 return Some(format!(
                     "Server at {} reports wire version {}, but this version of the MongoDB Rust \
                      driver requires at least {} (MongoDB {}).",
                     self.address,
-                    is_master_max_wire_version,
+                    hello_max_wire_version,
                     DRIVER_MIN_WIRE_VERSION,
                     DRIVER_MIN_DB_VERSION
                 ));

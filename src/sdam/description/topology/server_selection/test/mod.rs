@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use crate::{
     bson::{doc, DateTime},
-    is_master::{IsMasterCommandResponse, IsMasterReply, LastWrite},
+    hello::{HelloCommandResponse, HelloReply, LastWrite},
     options::ServerAddress,
     sdam::{
         description::topology::{test::f64_ms_as_duration, TopologyType},
@@ -83,12 +83,12 @@ impl TestServerDescription {
         let tags = self.tags;
         let last_write = self.last_write;
         let avg_rtt_ms = self.avg_rtt_ms;
-        let reply = is_master_response_from_server_type(server_type).map(|mut command_response| {
+        let reply = hello_response_from_server_type(server_type).map(|mut command_response| {
             command_response.tags = tags;
             command_response.last_write = last_write.map(|last_write| LastWrite {
                 last_write_date: DateTime::from_millis(last_write.last_write_date),
             });
-            Ok(IsMasterReply {
+            Ok(HelloReply {
                 server_address: server_address.clone(),
                 command_response,
                 round_trip_time: avg_rtt_ms
@@ -149,8 +149,8 @@ impl TestServerType {
     }
 }
 
-fn is_master_response_from_server_type(server_type: ServerType) -> Option<IsMasterCommandResponse> {
-    let mut response = IsMasterCommandResponse::default();
+fn hello_response_from_server_type(server_type: ServerType) -> Option<HelloCommandResponse> {
+    let mut response = HelloCommandResponse::default();
 
     match server_type {
         ServerType::Unknown => {

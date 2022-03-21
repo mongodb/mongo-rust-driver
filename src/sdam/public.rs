@@ -3,7 +3,7 @@ use std::{borrow::Cow, fmt, time::Duration};
 pub use crate::sdam::description::{server::ServerType, topology::TopologyType};
 use crate::{
     bson::DateTime,
-    is_master::IsMasterCommandResponse,
+    hello::HelloCommandResponse,
     options::ServerAddress,
     sdam::ServerDescription,
     selection_criteria::TagSet,
@@ -31,7 +31,7 @@ impl<'a> ServerInfo<'a> {
 
     fn command_response_getter<T>(
         &'a self,
-        f: impl Fn(&'a IsMasterCommandResponse) -> Option<T>,
+        f: impl Fn(&'a HelloCommandResponse) -> Option<T>,
     ) -> Option<T> {
         self.description
             .reply

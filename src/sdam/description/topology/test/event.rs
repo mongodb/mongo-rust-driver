@@ -64,15 +64,15 @@ pub struct TestServerDescription {
 impl PartialEq<TestServerDescription> for ServerDescription {
     fn eq(&self, other: &TestServerDescription) -> bool {
         match &self.reply.as_ref().unwrap().as_ref() {
-            Some(is_master_reply) => {
-                let is_master = &is_master_reply.command_response;
+            Some(hello_reply) => {
+                let hello = &hello_reply.command_response;
                 self.address == other.address
-                    && lists_eq(&is_master.arbiters, &other.arbiters)
-                    && lists_eq(&is_master.hosts, &other.hosts)
-                    && lists_eq(&is_master.passives, &other.passives)
-                    && is_master.set_name == other.set_name
-                    && is_master.primary == other.primary
-                    && is_master.server_type() == other.server_type
+                    && lists_eq(&hello.arbiters, &other.arbiters)
+                    && lists_eq(&hello.hosts, &other.hosts)
+                    && lists_eq(&hello.passives, &other.passives)
+                    && hello.set_name == other.set_name
+                    && hello.primary == other.primary
+                    && hello.server_type() == other.server_type
             }
             None => {
                 self.address == other.address

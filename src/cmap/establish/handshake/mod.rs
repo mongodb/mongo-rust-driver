@@ -13,7 +13,7 @@ use crate::{
     compression::Compressor,
     error::{ErrorKind, Result},
     event::sdam::SdamEventHandler,
-    is_master::{is_master_command, run_is_master, IsMasterReply},
+    hello::{hello_command, run_hello, HelloReply},
     options::{AuthMechanism, ClientOptions, Credential, DriverInfo, ServerApi},
     sdam::Topology,
 };
@@ -143,10 +143,12 @@ lazy_static! {
 /// Contains the logic needed to handshake a connection.
 #[derive(Clone, Debug)]
 pub(crate) struct Handshaker {
-    /// The `isMaster` command to send when handshaking. This will always be identical
+    /// The hello or legacy hello command to send when handshaking. This will always be identical
     /// given the same pool options, so it can be created at the time the Handshaker is created.
     command: Command,
+
     credential: Option<Credential>,
+
     // This field is not read without a compression feature flag turned on.
     #[allow(dead_code)]
     compressors: Option<Vec<Compressor>>,
@@ -160,8 +162,10 @@ impl Handshaker {
 
         let mut compressors = None;
 
-        let mut command =
-            is_master_command(options.as_ref().and_then(|opts| opts.server_api.as_ref()));
+        let mut command = hello_command(
+            options.as_ref().and_then(|opts| opts.server_api.as_ref()),
+            None,
+        );
 
         if let Some(options) = options {
             if let Some(app_name) = options.app_name {
@@ -229,10 +233,10 @@ impl Handshaker {
 
         let client_first = set_speculative_auth_info(&mut command.body, self.credential.as_ref())?;
 
-        let mut is_master_reply = run_is_master(conn, command, topology, handler).await?;
+        let mut hello_reply = run_hello(conn, command, topology, handler).await?;
 
         if self.command.body.contains_key("loadBalanced")
-            && is_master_reply.command_response.service_id.is_none()
+            && hello_reply.command_response.service_id.is_none()
         {
             return Err(ErrorKind::IncompatibleServer {
                 message: "Driver attempted to initialize in load balancing mode, but the server \
@@ -241,12 +245,12 @@ impl Handshaker {
             }
             .into());
         }
-        conn.stream_description = Some(StreamDescription::from_is_master(is_master_reply.clone()));
+        conn.stream_description = Some(StreamDescription::from_hello_reply(&hello_reply));
 
         // Record the client's message and the server's response from speculative authentication if
         // the server did send a response.
         let first_round = client_first.and_then(|client_first| {
-            is_master_reply
+            hello_reply
                 .command_response
                 .speculative_authenticate
                 .take()
@@ -255,7 +259,7 @@ impl Handshaker {
 
         // Check that master reply has a compressor list and unpack it
         if let (Some(server_compressors), Some(client_compressors)) = (
-            is_master_reply.command_response.compressors.as_ref(),
+            hello_reply.command_response.compressors.as_ref(),
             self.compressors.as_ref(),
         ) {
             // Use the Client's first compressor choice that the server supports (comparing only on
@@ -275,7 +279,7 @@ impl Handshaker {
         }
 
         Ok(HandshakeResult {
-            is_master_reply,
+            hello_reply,
             first_round,
         })
     }
@@ -288,7 +292,7 @@ impl Handshaker {
 #[derive(Debug)]
 pub(crate) struct HandshakeResult {
     /// The response from the server.
-    pub(crate) is_master_reply: IsMasterReply,
+    pub(crate) hello_reply: HelloReply,
 
     /// The first round of speculative authentication, if applicable.
     pub(crate) first_round: Option<FirstRound>,

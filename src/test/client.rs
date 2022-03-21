@@ -99,13 +99,10 @@ async fn connection_drop_during_read() {
 
     runtime::delay_for(Duration::from_millis(200)).await;
 
-    let is_master_response = db.run_command(doc! { "isMaster": 1 }, None).await;
+    let build_info_response = db.run_command(doc! { "buildInfo": 1 }, None).await.unwrap();
 
-    // Ensure that the response to `isMaster` is read, not the response to `count`.
-    assert!(is_master_response
-        .ok()
-        .and_then(|value| value.get("ismaster").and_then(|value| value.as_bool()))
-        .is_some());
+    // Ensure that the response to `buildInfo` is read, not the response to `count`.
+    assert!(build_info_response.get("version").is_some());
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

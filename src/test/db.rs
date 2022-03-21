@@ -47,20 +47,6 @@ async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<Collectio
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn is_master() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
-    let client = TestClient::new().await;
-    let db = client.database("test");
-    let doc = db.run_command(doc! { "ismaster": 1 }, None).await.unwrap();
-    let is_master_reply: IsMasterReply = bson::from_bson(Bson::Document(doc)).unwrap();
-
-    assert!(is_master_reply.ismaster);
-    assert_ulps_eq!(is_master_reply.ok, 1.0);
-}
-
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn list_collections() {
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;

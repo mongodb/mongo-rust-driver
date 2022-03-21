@@ -82,14 +82,10 @@ impl TestClient {
             .await;
         session.mark_dirty();
 
-        let is_master =
-            RunCommand::new("admin".into(), doc! { "isMaster":  1 }, None, None).unwrap();
+        let hello = RunCommand::new("admin".into(), doc! { "isMaster":  1 }, None, None).unwrap();
 
         let server_info = bson::from_bson(Bson::Document(
-            client
-                .execute_operation(is_master, &mut session)
-                .await
-                .unwrap(),
+            client.execute_operation(hello, &mut session).await.unwrap(),
         ))
         .unwrap();
 

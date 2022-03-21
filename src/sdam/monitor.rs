@@ -12,7 +12,7 @@ use super::{
 use crate::{
     cmap::{Connection, Handshaker},
     error::{Error, Result},
-    is_master::{is_master_command, run_is_master, IsMasterReply},
+    hello::{hello_command, run_hello, HelloReply},
     options::{ClientOptions, ServerAddress},
     runtime,
 };
@@ -154,13 +154,13 @@ impl HeartbeatMonitor {
         }
     }
 
-    /// Checks the the server by running an `isMaster` command. If an I/O error occurs, the
+    /// Checks the the server by running a hello command. If an I/O error occurs, the
     /// connection will replaced with a new one.
     ///
     /// Returns true if the topology has changed and false otherwise.
     async fn check_server(&mut self, topology: &Topology, server: &Server) -> bool {
         let mut retried = false;
-        let check_result = match self.perform_is_master(topology).await {
+        let check_result = match self.perform_hello(topology).await {
             Ok(reply) => Ok(reply),
             Err(e) => {
                 let previous_description = topology.get_server_description(&server.address).await;
@@ -171,7 +171,7 @@ impl HeartbeatMonitor {
                 {
                     self.handle_error(e, topology, server).await;
                     retried = true;
-                    self.perform_is_master(topology).await
+                    self.perform_hello(topology).await
                 } else {
                     Err(e)
                 }
@@ -188,11 +188,14 @@ impl HeartbeatMonitor {
         }
     }
 
-    async fn perform_is_master(&mut self, topology: &Topology) -> Result<IsMasterReply> {
+    async fn perform_hello(&mut self, topology: &Topology) -> Result<HelloReply> {
         let result = match self.connection {
             Some(ref mut conn) => {
-                let command = is_master_command(self.client_options.server_api.as_ref());
-                run_is_master(
+                let command = hello_command(
+                    self.client_options.server_api.as_ref(),
+                    Some(conn.stream_description()?.hello_ok),
+                );
+                run_hello(
                     conn,
                     command,
                     Some(topology),
@@ -216,7 +219,7 @@ impl HeartbeatMonitor {
                         &self.client_options.sdam_event_handler,
                     )
                     .await
-                    .map(|r| r.is_master_reply);
+                    .map(|r| r.hello_reply);
                 self.connection = Some(connection);
                 res
             }
