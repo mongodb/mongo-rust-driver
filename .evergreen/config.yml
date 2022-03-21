@@ -1283,9 +1283,9 @@ axes:
   - id: "extra-rust-versions"
     values:
       - id: "min"
-        display_name: "1.49 (minimum supported version)"
+        display_name: "1.51 (minimum supported version)"
         variables:
-          RUST_VERSION: "1.49.0"
+          RUST_VERSION: "1.51.0"
       - id: "nightly"
         display_name: "nightly"
         variables:

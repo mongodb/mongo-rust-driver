@@ -1,24 +1,24 @@
 use std::{
+    convert::TryFrom,
     fs::File,
     io::{BufReader, Seek, SeekFrom},
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
+    time::SystemTime,
 };
 
 use futures_io::{AsyncRead, AsyncWrite};
 use rustls::{
-    internal::pemfile,
+    client::{ClientConfig, ServerCertVerified, ServerCertVerifier, ServerName},
     Certificate,
+    Error as TlsError,
+    OwnedTrustAnchor,
     RootCertStore,
-    ServerCertVerified,
-    ServerCertVerifier,
-    TLSError,
 };
-use rustls_pemfile::{read_one, Item};
+use rustls_pemfile::{certs, read_one, Item};
 use tokio::io::AsyncWrite as TokioAsyncWrite;
 use tokio_rustls::TlsConnector;
-use webpki::DNSNameRef;
 use webpki_roots::TLS_SERVER_ROOTS;
 
 use crate::{
@@ -39,7 +39,7 @@ impl AsyncTlsStream {
         tcp_stream: AsyncTcpStream,
         cfg: TlsOptions,
     ) -> Result<Self> {
-        let name = DNSNameRef::try_from_ascii_str(host).map_err(|e| ErrorKind::DnsResolve {
+        let name = ServerName::try_from(host).map_err(|e| ErrorKind::DnsResolve {
             message: format!("could not resolve {:?}: {}", host, e),
         })?;
         let mut tls_config = make_rustls_config(cfg)?;
@@ -82,39 +82,38 @@ impl AsyncWrite for AsyncTlsStream {
 
 /// Converts `TlsOptions` into a rustls::ClientConfig.
 fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
-    let mut config = rustls::ClientConfig::new();
-
-    if let Some(true) = cfg.allow_invalid_certificates {
-        config
-            .dangerous()
-            .set_certificate_verifier(Arc::new(NoCertVerifier {}));
-    }
-
     let mut store = RootCertStore::empty();
     if let Some(path) = cfg.ca_file_path {
-        store
-            .add_pem_file(&mut BufReader::new(File::open(&path)?))
-            .map_err(|_| ErrorKind::InvalidTlsConfig {
+        let ders = certs(&mut BufReader::new(File::open(&path)?)).map_err(|_| {
+            ErrorKind::InvalidTlsConfig {
                 message: format!(
                     "Unable to parse PEM-encoded root certificate from {}",
                     path.display()
                 ),
-            })?;
+            }
+        })?;
+        store.add_parsable_certificates(&ders);
     } else {
-        store.add_server_trust_anchors(&TLS_SERVER_ROOTS);
+        let trust_anchors = TLS_SERVER_ROOTS.0.iter().map(|ta| {
+            OwnedTrustAnchor::from_subject_spki_name_constraints(
+                ta.subject,
+                ta.spki,
+                ta.name_constraints,
+            )
+        });
+        store.add_server_trust_anchors(trust_anchors);
     }
 
-    config.root_store = store;
-
-    if let Some(path) = cfg.cert_key_file_path {
+    let mut config = if let Some(path) = cfg.cert_key_file_path {
         let mut file = BufReader::new(File::open(&path)?);
-        let certs = match pemfile::certs(&mut file) {
-            Ok(certs) => certs,
-            Err(()) => {
+        let certs = match certs(&mut file) {
+            Ok(certs) => certs.into_iter().map(Certificate).collect(),
+            Err(error) => {
                 return Err(ErrorKind::InvalidTlsConfig {
                     message: format!(
-                        "Unable to parse PEM-encoded client certificate from {}",
-                        path.display()
+                        "Unable to parse PEM-encoded client certificate from {}: {}",
+                        path.display(),
+                        error,
                     ),
                 }
                 .into())
@@ -146,11 +145,24 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
             }
         };
 
+        ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(store)
+            .with_single_cert(certs, key)
+            .map_err(|error| ErrorKind::InvalidTlsConfig {
+                message: error.to_string(),
+            })?
+    } else {
+        ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(store)
+            .with_no_client_auth()
+    };
+
+    if let Some(true) = cfg.allow_invalid_certificates {
         config
-            .set_single_client_cert(certs, key)
-            .map_err(|e| ErrorKind::InvalidTlsConfig {
-                message: e.to_string(),
-            })?;
+            .dangerous()
+            .set_certificate_verifier(Arc::new(NoCertVerifier {}));
     }
 
     Ok(config)
@@ -161,11 +173,13 @@ struct NoCertVerifier {}
 impl ServerCertVerifier for NoCertVerifier {
     fn verify_server_cert(
         &self,
-        _: &RootCertStore,
+        _: &Certificate,
         _: &[Certificate],
-        _: webpki::DNSNameRef,
+        _: &ServerName,
+        _: &mut dyn Iterator<Item = &[u8]>,
         _: &[u8],
-    ) -> std::result::Result<ServerCertVerified, TLSError> {
+        _: SystemTime,
+    ) -> std::result::Result<ServerCertVerified, TlsError> {
         Ok(ServerCertVerified::assertion())
     }
 }

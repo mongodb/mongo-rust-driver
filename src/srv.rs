@@ -80,8 +80,8 @@ impl SrvResolver {
         let mut min_ttl = u32::MAX;
 
         for record in srv_lookup.as_lookup().record_iter() {
-            let srv = match record.rdata() {
-                RData::SRV(s) => s,
+            let srv = match record.data() {
+                Some(RData::SRV(s)) => s,
                 _ => continue,
             };
 

@@ -12,7 +12,7 @@ mod x509;
 
 use std::{borrow::Cow, fmt::Debug, str::FromStr};
 
-use hmac::{Mac, NewMac};
+use hmac::{digest::KeyInit, Mac};
 use rand::Rng;
 use serde::Deserialize;
 use typed_builder::TypedBuilder;
@@ -515,13 +515,13 @@ pub(crate) fn generate_nonce() -> String {
     base64::encode(&result)
 }
 
-fn mac<M: Mac + NewMac>(
+fn mac<M: Mac + KeyInit>(
     key: &[u8],
     input: &[u8],
     auth_mechanism: &str,
 ) -> Result<impl AsRef<[u8]>> {
-    let mut mac =
-        M::new_from_slice(key).map_err(|_| Error::unknown_authentication_error(auth_mechanism))?;
+    let mut mac = <M as Mac>::new_from_slice(key)
+        .map_err(|_| Error::unknown_authentication_error(auth_mechanism))?;
     mac.update(input);
     Ok(mac.finalize().into_bytes())
 }
