@@ -389,6 +389,11 @@ async fn hello_ok_true() {
         return;
     }
 
+    if setup_client_options.load_balanced == Some(true) {
+        log_uncaptured("skipping hello_ok_true test due to load balanced topology");
+        return;
+    }
+
     let setup_client = TestClient::with_options(Some(setup_client_options.clone())).await;
     if !VersionReq::parse(">= 4.4.5")
         .unwrap()
