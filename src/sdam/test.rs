@@ -403,21 +403,14 @@ async fn hello_ok_true() {
 
     let mut options = setup_client_options.clone();
     options.sdam_event_handler = Some(handler.clone());
+    options.direct_connection = Some(true);
     options.heartbeat_freq = Some(Duration::from_millis(500));
-
-    // for simplicity, just look at the events for one of the hosts.
-    let observed_address = options.hosts[0].clone();
-
     let _client = Client::with_options(options).expect("client creation should succeed");
 
     // first heartbeat should be ismaster but contain helloOk
     subscriber
         .wait_for_event(Duration::from_millis(2000), |event| {
             if let Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(e)) = event {
-                if e.server_address != observed_address {
-                    return false;
-                }
-
                 assert_eq!(e.reply.get_bool("helloOk"), Ok(true));
                 assert!(e.reply.get("ismaster").is_some());
                 assert!(e.reply.get("isWritablePrimary").is_none());
@@ -433,9 +426,6 @@ async fn hello_ok_true() {
         subscriber
             .wait_for_event(Duration::from_millis(2000), |event| {
                 if let Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(e)) = event {
-                    if e.server_address != observed_address {
-                        return false;
-                    }
                     assert!(e.reply.get("isWritablePrimary").is_some());
                     assert!(e.reply.get("ismaster").is_none());
                     return true;
