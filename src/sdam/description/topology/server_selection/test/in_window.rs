@@ -15,6 +15,7 @@ use crate::{
     test::{
         log_uncaptured,
         run_spec_test,
+        CmapEvent,
         Event,
         EventHandler,
         FailCommandOptions,
@@ -211,7 +212,10 @@ async fn load_balancing_test() {
     let mut handler = EventHandler::new();
     let mut subscriber = handler.subscribe();
     let mut options = CLIENT_OPTIONS.clone();
+    let max_pool_size = 10;
     options.local_threshold = Duration::from_secs(30).into();
+    options.max_pool_size = Some(max_pool_size);
+    options.min_pool_size = Some(max_pool_size);
     let client = TestClient::with_handler(Some(Arc::new(handler.clone())), options).await;
 
     // wait for both servers to be discovered.
@@ -231,10 +235,19 @@ async fn load_balancing_test() {
         })
         .await
         .expect("timed out waiting for both mongoses to be discovered");
-    drop(subscriber);
 
-    // saturate pools
-    do_test(&client, &mut handler, 0.0, 0.50, 100).await;
+    // wait for both servers pools to be saturated.
+    let mut conns = 0;
+    while conns < max_pool_size * 2 {
+        subscriber
+            .wait_for_event(Duration::from_secs(30), |event| {
+                matches!(event, Event::Cmap(CmapEvent::ConnectionReady(_)))
+            })
+            .await
+            .expect("timed out waiting for both mongoses to be discovered");
+        conns += 1;
+    }
+    drop(subscriber);
 
     // enable a failpoint on one of the mongoses to slow it down
     let options = FailCommandOptions::builder()
