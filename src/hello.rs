@@ -31,12 +31,19 @@ pub(crate) const LEGACY_HELLO_COMMAND_NAME_LOWERCASE: &str = "ismaster";
 
 /// Construct a hello or legacy hello command, depending on the circumstances.
 ///
-/// If an API version is provided, `hello` will be used.
+/// If an API version is provided or `load_balanced` is true, `hello` will be used.
 /// If the server indicated `helloOk: true`, then `hello` will also be used.
 /// Otherwise, legacy hello will be used, and if it's unknown whether the server supports hello,
 /// the command also will contain `helloOk: true`.
-pub(crate) fn hello_command(api: Option<&ServerApi>, hello_ok: Option<bool>) -> Command {
-    let (command, command_name) = if api.is_some() || matches!(hello_ok, Some(true)) {
+pub(crate) fn hello_command(
+    server_api: Option<&ServerApi>,
+    load_balanced: Option<bool>,
+    hello_ok: Option<bool>,
+) -> Command {
+    let (command, command_name) = if server_api.is_some()
+        || matches!(load_balanced, Some(true))
+        || matches!(hello_ok, Some(true))
+    {
         (doc! { "hello": 1 }, "hello")
     } else {
         let mut cmd = doc! { LEGACY_HELLO_COMMAND_NAME: 1 };
@@ -46,7 +53,7 @@ pub(crate) fn hello_command(api: Option<&ServerApi>, hello_ok: Option<bool>) -> 
         (cmd, LEGACY_HELLO_COMMAND_NAME)
     };
     let mut command = Command::new(command_name.into(), "admin".into(), command);
-    if let Some(server_api) = api {
+    if let Some(server_api) = server_api {
         command.set_server_api(server_api);
     }
     command

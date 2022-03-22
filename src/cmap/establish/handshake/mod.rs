@@ -164,6 +164,7 @@ impl Handshaker {
 
         let mut command = hello_command(
             options.as_ref().and_then(|opts| opts.server_api.as_ref()),
+            options.as_ref().and_then(|opts| opts.load_balanced.into()),
             None,
         );
 
