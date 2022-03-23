@@ -348,7 +348,7 @@ impl Topology {
     ) -> bool {
         let server_type = server_description.server_type;
         // TODO RUST-580: Theoretically, `TopologyDescription::update` can return an error. However,
-        // this can only happen if we try to access a field from the isMaster response when an error
+        // this can only happen if we try to access a field from the hello response when an error
         // occurred during the check. In practice, this can't happen, because the SDAM algorithm
         // doesn't check the fields of an Unknown server, and we only return Unknown server
         // descriptions when errors occur. Once we implement logging, we can properly inform users

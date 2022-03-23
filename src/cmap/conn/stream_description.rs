@@ -38,7 +38,7 @@ pub(crate) struct StreamDescription {
 }
 
 impl StreamDescription {
-    /// Constructs a new StreamDescription from an IsMasterReply.
+    /// Constructs a new StreamDescription from a `HelloReply`.
     pub(crate) fn from_hello_reply(reply: &HelloReply) -> Self {
         Self {
             server_address: reply.server_address.clone(),

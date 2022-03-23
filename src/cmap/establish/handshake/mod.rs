@@ -104,7 +104,7 @@ impl From<OsMetadata> for Bson {
 lazy_static! {
     /// Contains the basic handshake information that can be statically determined. This document
     /// (potentially with additional fields added) can be cloned and put in the `client` field of
-    /// the `isMaster` command.
+    /// the `hello` or legacy hello command.
     static ref BASE_CLIENT_METADATA: ClientMetadata = {
         let mut metadata = ClientMetadata {
             application: None,

@@ -412,7 +412,7 @@ async fn hello_ok_true() {
     options.heartbeat_freq = Some(Duration::from_millis(500));
     let _client = Client::with_options(options).expect("client creation should succeed");
 
-    // first heartbeat should be ismaster but contain helloOk
+    // first heartbeat should be legacy hello but contain helloOk
     subscriber
         .wait_for_event(Duration::from_millis(2000), |event| {
             if let Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(e)) = event {

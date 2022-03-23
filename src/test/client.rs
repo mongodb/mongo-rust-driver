@@ -131,7 +131,7 @@ async fn server_selection_timeout_message() {
     let db = client.database("test");
     let error = db
         .run_command(
-            doc! { "isMaster": 1 },
+            doc! { "ping": 1 },
             SelectionCriteria::ReadPreference(unsatisfiable_read_preference),
         )
         .await

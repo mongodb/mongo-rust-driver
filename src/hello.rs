@@ -23,7 +23,12 @@ use crate::{
     selection_criteria::TagSet,
 };
 
-/// Construct an isMaster command.
+/// Construct a hello or legacy hello command, depending on the circumstances.
+///
+/// If an API version is provided, `hello` will be used.
+/// If the server indicated `helloOk: true`, then `hello` will also be used.
+/// Otherwise, legacy hello will be used, and if it's unknown whether the server supports hello,
+/// the command also will contain `helloOk: true`.
 pub(crate) fn hello_command(api: Option<&ServerApi>, hello_ok: Option<bool>) -> Command {
     let (command, command_name) = if api.is_some() || matches!(hello_ok, Some(true)) {
         (doc! { "hello": 1 }, "hello")
@@ -74,7 +79,7 @@ pub(crate) async fn run_hello(
                 let mut reply = raw_response
                     .body::<Document>()
                     .unwrap_or_else(|e| doc! { "deserialization error": e.to_string() });
-                // if this isMaster call is part of a handshake, remove speculative authentication
+                // if this hello call is part of a handshake, remove speculative authentication
                 // information before publishing an event
                 reply.remove("speculativeAuthenticate");
                 let event = ServerHeartbeatSucceededEvent {
@@ -149,7 +154,7 @@ pub(crate) struct HelloCommandResponse {
     /// An optional message. This contains the value "isdbgrid" when returned from a mongos.
     pub msg: Option<String>,
 
-    /// The address of the server that returned this `IsMasterCommandResponse`.
+    /// The address of the server that returned this `HelloCommandResponse`.
     pub me: Option<String>,
 
     #[serde(rename = "compression")]

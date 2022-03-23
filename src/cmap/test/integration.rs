@@ -107,7 +107,7 @@ async fn concurrent_connections() {
     let failpoint = doc! {
         "configureFailPoint": "failCommand",
         "mode": "alwaysOn",
-        "data": { "failCommands": [ "isMaster" ], "blockConnection": true, "blockTimeMS": 1000 }
+        "data": { "failCommands": [ "isMaster", "hello" ], "blockConnection": true, "blockTimeMS": 1000 }
     };
     client
         .database("admin")

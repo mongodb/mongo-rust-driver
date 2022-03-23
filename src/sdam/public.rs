@@ -45,7 +45,7 @@ impl<'a> ServerInfo<'a> {
         &self.description.address
     }
 
-    /// Gets the weighted average of the time it has taken for an isMaster command to round-trip
+    /// Gets the weighted average of the time it has taken for a server check to round-trip
     /// from the driver to the server.
     ///
     /// This is the value that the driver uses internally to determine the latency window as part of

@@ -733,7 +733,7 @@ async fn pool_cleared_error_does_not_mark_unknown() {
 
     let heartbeat_response: HelloCommandResponse = bson::from_document(doc! {
         "ok": 1,
-        "ismaster": true,
+        "isWritablePrimary": true,
         "minWireVersion": 0,
         "maxWireVersion": 6,
         "maxBsonObjectSize": 16_000,

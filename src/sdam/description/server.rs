@@ -96,16 +96,16 @@ pub(crate) struct ServerDescription {
     pub(crate) average_round_trip_time: Option<Duration>,
 
     // The SDAM spec indicates that a ServerDescription needs to contain an error message if an
-    // error occurred when trying to send an isMaster for the server's heartbeat. Additionally,
-    // we need to be able to create a server description that doesn't contain either an isMaster
+    // error occurred when trying to send an hello for the server's heartbeat. Additionally,
+    // we need to be able to create a server description that doesn't contain either an hello
     // reply or an error, since there's a gap between when a server is newly added to the topology
     // and when the first heartbeat occurs.
     //
     // In order to represent all these states, we store a Result directly in the ServerDescription,
-    // which either contains the aforementioned error message or an Option<IsMasterReply>. This
+    // which either contains the aforementioned error message or an Option<HelloReply>. This
     // allows us to ensure that only valid states are possible (e.g. preventing that both an error
     // and a reply are present) while still making it easy to define helper methods on
-    // ServerDescription for information we need from the isMaster reply by propagating with `?`.
+    // ServerDescription for information we need from the hello reply by propagating with `?`.
     pub(crate) reply: Result<Option<HelloReply>, String>,
 }
 
@@ -152,7 +152,7 @@ impl ServerDescription {
         };
 
         if let Ok(Some(ref mut reply)) = description.reply {
-            // Infer the server type from the isMaster response.
+            // Infer the server type from the hello response.
             description.server_type = reply.command_response.server_type();
 
             // Initialize the average round trip time. If a previous value is present for the
