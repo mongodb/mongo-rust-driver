@@ -14,6 +14,7 @@ use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
 
 use crate::{
     bson::{doc, oid::ObjectId, Bson},
+    hello::hello_command,
     selection_criteria::SelectionCriteria,
 };
 use bson::Document;
@@ -82,7 +83,8 @@ impl TestClient {
             .await;
         session.mark_dirty();
 
-        let hello = RunCommand::new("admin".into(), doc! { "isMaster":  1 }, None, None).unwrap();
+        let hello_cmd = hello_command(options.server_api.as_ref(), None);
+        let hello = RunCommand::new("admin".into(), hello_cmd.body, None, None).unwrap();
 
         let server_info = bson::from_bson(Bson::Document(
             client.execute_operation(hello, &mut session).await.unwrap(),
