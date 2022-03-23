@@ -118,7 +118,7 @@ impl Operation for Update {
         raw_response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
-        let response: WriteResponseBody<UpdateBody> = raw_response.body()?;
+        let response: WriteResponseBody<UpdateBody> = raw_response.body_utf8_lossy()?;
         response.validate().map_err(convert_bulk_errors)?;
 
         let modified_count = response.n_modified;

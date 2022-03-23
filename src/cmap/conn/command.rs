@@ -217,6 +217,16 @@ impl RawCommandResponse {
         })
     }
 
+    /// Used to handle decoding responses where the server may return invalid UTF-8 in error
+    /// messages.
+    pub(crate) fn body_utf8_lossy<'a, T: Deserialize<'a>>(&'a self) -> Result<T> {
+        bson::from_slice_utf8_lossy(self.raw.as_bytes()).map_err(|e| {
+            Error::from(ErrorKind::InvalidResponse {
+                message: format!("{}", e),
+            })
+        })
+    }
+
     pub(crate) fn raw_body(&self) -> &RawDocument {
         &self.raw
     }
