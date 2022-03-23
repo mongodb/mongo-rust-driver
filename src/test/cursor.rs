@@ -8,13 +8,20 @@ use crate::{
     bson::doc,
     options::{CreateCollectionOptions, CursorType, FindOptions},
     runtime,
-    test::{util::EventClient, TestClient, LOCK},
+    test::{log_uncaptured, util::EventClient, TestClient, LOCK, SERVERLESS},
 };
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn tailable_cursor() {
+    if *SERVERLESS {
+        log_uncaptured(
+            "skipping cursor::tailable_cursor; serverless does not support capped collections",
+        );
+        return;
+    }
+
     let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
 
     let client = TestClient::new().await;
