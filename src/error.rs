@@ -47,6 +47,8 @@ pub struct Error {
     pub kind: Box<ErrorKind>,
     labels: HashSet<String>,
     pub(crate) wire_version: Option<i32>,
+    #[source]
+    pub(crate) source: Option<Box<Error>>,
 }
 
 impl Error {
@@ -61,6 +63,7 @@ impl Error {
             kind: Box::new(kind),
             labels,
             wire_version: None,
+            source: None,
         }
     }
 
@@ -237,6 +240,7 @@ impl Error {
             ErrorKind::Write(WriteFailure::WriteConcernError(wc_error)) => Some(wc_error.code),
             _ => None,
         }
+        .or_else(|| self.source.as_ref().and_then(|s| s.code()))
     }
 
     /// Gets the message for this error, if applicable, for use in testing.
@@ -314,6 +318,10 @@ impl Error {
             .unwrap_or(false)
     }
 
+    pub(crate) fn is_pool_cleared(&self) -> bool {
+        matches!(self.kind.as_ref(), ErrorKind::ConnectionPoolCleared { .. })
+    }
+
     /// If this error is resumable as per the change streams spec.
     pub(crate) fn is_resumable(&self) -> bool {
         if !self.is_server_error() {
@@ -340,6 +348,11 @@ impl Error {
             }
         }
         false
+    }
+
+    pub(crate) fn with_source<E: Into<Option<Error>>>(mut self, source: E) -> Self {
+        self.source = source.into().map(Box::new);
+        self
     }
 }
 

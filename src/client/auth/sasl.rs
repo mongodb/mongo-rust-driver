@@ -4,6 +4,7 @@ use crate::{
     client::{auth::AuthMechanism, options::ServerApi},
     cmap::Command,
     error::{Error, Result},
+    operation::{CommandErrorBody, CommandResponse},
 };
 
 /// Encapsulates the command building of a `saslStart` command.
@@ -98,12 +99,20 @@ fn validate_command_success(auth_mechanism: &str, response: &Document) -> Result
 
     match bson_util::get_int(ok) {
         Some(1) => Ok(()),
-        Some(_) => Err(Error::authentication_error(
-            auth_mechanism,
-            response
-                .get_str("errmsg")
-                .unwrap_or("Authentication failure"),
-        )),
+        Some(_) => {
+            let source = bson::from_bson::<CommandResponse<CommandErrorBody>>(Bson::Document(
+                response.clone(),
+            ))
+            .map(|cmd_resp| cmd_resp.body.into())
+            .ok();
+            Err(Error::authentication_error(
+                auth_mechanism,
+                response
+                    .get_str("errmsg")
+                    .unwrap_or("Authentication failure"),
+            )
+            .with_source(source))
+        }
         _ => Err(Error::invalid_authentication_response(auth_mechanism)),
     }
 }
