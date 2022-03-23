@@ -135,7 +135,7 @@ impl<'a, T: Serialize> Operation for Insert<'a, T> {
         raw_response: RawCommandResponse,
         _description: &StreamDescription,
     ) -> Result<Self::O> {
-        let response: WriteResponseBody = raw_response.body()?;
+        let response: WriteResponseBody = raw_response.body_utf8_lossy()?;
 
         let mut map = HashMap::new();
         if self.is_ordered() {
