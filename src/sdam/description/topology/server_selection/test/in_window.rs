@@ -7,11 +7,13 @@ use serde::Deserialize;
 use tokio::sync::RwLockWriteGuard;
 
 use crate::{
+    coll::options::FindOptions,
+    error::Result,
     options::ServerAddress,
     runtime,
     runtime::AsyncJoinHandle,
     sdam::{description::topology::server_selection, Server},
-    selection_criteria::ReadPreference,
+    selection_criteria::{ReadPreference, SelectionCriteria},
     test::{
         log_uncaptured,
         run_spec_test,
@@ -26,6 +28,7 @@ use crate::{
         CLIENT_OPTIONS,
         LOCK,
     },
+    ServerInfo,
     ServerType,
 };
 
@@ -171,19 +174,22 @@ async fn load_balancing_test() {
     ) {
         handler.clear_cached_events();
 
-        let mut handles: Vec<AsyncJoinHandle<()>> = Vec::new();
+        let mut handles: Vec<AsyncJoinHandle<Result<()>>> = Vec::new();
         for _ in 0..10 {
             let collection = client
                 .database("load_balancing_test")
                 .collection::<Document>("load_balancing_test");
             handles.push(runtime::spawn(async move {
                 for _ in 0..iterations {
-                    let _ = collection.find_one(None, None).await;
+                    collection.find_one(None, None).await?;
                 }
+                Ok(())
             }))
         }
 
-        futures::future::join_all(handles).await;
+        for handle in handles {
+            handle.await.unwrap();
+        }
 
         let mut tallies: HashMap<ServerAddress, u32> = HashMap::new();
         for event in handler.get_command_started_events(&["find"]) {
@@ -213,6 +219,7 @@ async fn load_balancing_test() {
     let mut subscriber = handler.subscribe();
     let mut options = CLIENT_OPTIONS.clone();
     let max_pool_size = 10;
+    let hosts = options.hosts.clone();
     options.local_threshold = Duration::from_secs(30).into();
     options.max_pool_size = Some(max_pool_size);
     options.min_pool_size = Some(max_pool_size);
@@ -237,6 +244,24 @@ async fn load_balancing_test() {
         .expect("timed out waiting for both mongoses to be discovered");
 
     // wait for both servers pools to be saturated.
+    for address in hosts {
+        let selector = Arc::new(move |sd: &ServerInfo| sd.address() == &address);
+        for _ in 0..max_pool_size {
+            let client = client.clone();
+            let selector = selector.clone();
+            runtime::execute(async move {
+                let options = FindOptions::builder()
+                    .selection_criteria(SelectionCriteria::Predicate(selector))
+                    .build();
+                client
+                    .database("load_balancing_test")
+                    .collection::<Document>("load_balancing_test")
+                    .find(doc! { "$where": "sleep(500) && true" }, options)
+                    .await
+                    .unwrap();
+            });
+        }
+    }
     let mut conns = 0;
     while conns < max_pool_size * 2 {
         subscriber
@@ -244,7 +269,7 @@ async fn load_balancing_test() {
                 matches!(event, Event::Cmap(CmapEvent::ConnectionReady(_)))
             })
             .await
-            .expect("timed out waiting for both mongoses to be discovered");
+            .expect("timed out waiting for both pools to be saturated");
         conns += 1;
     }
     drop(subscriber);
@@ -255,8 +280,11 @@ async fn load_balancing_test() {
         .build();
     let failpoint = FailPoint::fail_command(&["find"], FailPointMode::AlwaysOn, options);
 
+    let slow_host = CLIENT_OPTIONS.hosts[0].clone();
+    println!("slow host: {}", slow_host);
+    let criteria = SelectionCriteria::Predicate(Arc::new(move |si| si.address() == &slow_host));
     let fp_guard = setup_client
-        .enable_failpoint(failpoint, None)
+        .enable_failpoint(failpoint, criteria)
         .await
         .expect("enabling failpoint should succeed");
 
