@@ -27,6 +27,7 @@ use crate::{
 /// To limit usages of the legacy name in the codebase, this constant should be used
 /// wherever possible.
 pub(crate) const LEGACY_HELLO_COMMAND_NAME: &'static str = "isMaster";
+pub(crate) const LEGACY_HELLO_COMMAND_NAME_LOWERCASE: &'static str = "ismaster";
 
 /// Construct a hello or legacy hello command, depending on the circumstances.
 ///

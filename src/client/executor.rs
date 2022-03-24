@@ -31,6 +31,7 @@ use crate::{
         UNKNOWN_TRANSACTION_COMMIT_RESULT,
     },
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
+    hello::{LEGACY_HELLO_COMMAND_NAME, LEGACY_HELLO_COMMAND_NAME_LOWERCASE},
     operation::{
         AbortTransaction,
         AggregateTarget,
@@ -70,7 +71,7 @@ lazy_static! {
     pub(crate) static ref HELLO_COMMAND_NAMES: HashSet<&'static str> = {
         let mut hash_set = HashSet::new();
         hash_set.insert("hello");
-        hash_set.insert("ismaster");
+        hash_set.insert(LEGACY_HELLO_COMMAND_NAME_LOWERCASE);
         hash_set
     };
 }

@@ -9,7 +9,7 @@ use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
     error::ErrorKind,
-    hello::LEGACY_HELLO_COMMAND_NAME,
+    hello::{LEGACY_HELLO_COMMAND_NAME, LEGACY_HELLO_COMMAND_NAME_LOWERCASE},
     runtime,
     sdam::ServerType,
     test::{
@@ -427,7 +427,7 @@ async fn hello_ok_true() {
         .wait_for_event(Duration::from_millis(2000), |event| {
             if let Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(e)) = event {
                 assert_eq!(e.reply.get_bool("helloOk"), Ok(true));
-                assert!(e.reply.get("ismaster").is_some());
+                assert!(e.reply.get(LEGACY_HELLO_COMMAND_NAME_LOWERCASE).is_some());
                 assert!(e.reply.get("isWritablePrimary").is_none());
                 return true;
             }
@@ -442,7 +442,7 @@ async fn hello_ok_true() {
             .wait_for_event(Duration::from_millis(2000), |event| {
                 if let Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(e)) = event {
                     assert!(e.reply.get("isWritablePrimary").is_some());
-                    assert!(e.reply.get("ismaster").is_none());
+                    assert!(e.reply.get(LEGACY_HELLO_COMMAND_NAME_LOWERCASE).is_none());
                     return true;
                 }
                 false
