@@ -256,7 +256,7 @@ async fn load_balancing_test() {
                 client
                     .database("load_balancing_test")
                     .collection::<Document>("load_balancing_test")
-                    .find(doc! { "$where": "sleep(500) && true" }, options)
+                    .find(doc! { "$where": "sleep(1000) && true" }, options)
                     .await
                     .unwrap();
             });
@@ -271,6 +271,7 @@ async fn load_balancing_test() {
             .await
             .expect("timed out waiting for both pools to be saturated");
         conns += 1;
+        println!("conns: {}", conns);
     }
     drop(subscriber);
 
