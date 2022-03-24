@@ -26,8 +26,8 @@ use crate::{
 /// The legacy version of the `hello` command which was deprecated in 5.0.
 /// To limit usages of the legacy name in the codebase, this constant should be used
 /// wherever possible.
-pub(crate) const LEGACY_HELLO_COMMAND_NAME: &'static str = "isMaster";
-pub(crate) const LEGACY_HELLO_COMMAND_NAME_LOWERCASE: &'static str = "ismaster";
+pub(crate) const LEGACY_HELLO_COMMAND_NAME: &str = "isMaster";
+pub(crate) const LEGACY_HELLO_COMMAND_NAME_LOWERCASE: &str = "ismaster";
 
 /// Construct a hello or legacy hello command, depending on the circumstances.
 ///

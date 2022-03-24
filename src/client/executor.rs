@@ -31,7 +31,7 @@ use crate::{
         UNKNOWN_TRANSACTION_COMMIT_RESULT,
     },
     event::command::{CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent},
-    hello::{LEGACY_HELLO_COMMAND_NAME, LEGACY_HELLO_COMMAND_NAME_LOWERCASE},
+    hello::LEGACY_HELLO_COMMAND_NAME_LOWERCASE,
     operation::{
         AbortTransaction,
         AggregateTarget,
