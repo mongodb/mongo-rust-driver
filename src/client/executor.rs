@@ -332,7 +332,7 @@ impl Client {
             Ok(c) => c,
             Err(mut err) => {
                 err.add_labels_and_update_pin(None, &mut session, None)?;
-                if err.is_read_retryable() {
+                if err.is_read_retryable() && self.inner.options.retry_writes != Some(false) {
                     err.add_label(RETRYABLE_WRITE_ERROR);
                 }
 
