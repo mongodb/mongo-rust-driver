@@ -383,7 +383,7 @@ impl Credential {
     }
 
     /// If the mechanism is missing, append the appropriate mechanism negotiation key-value-pair to
-    /// the provided isMaster command document.
+    /// the provided hello or legacy hello command document.
     pub(crate) fn append_needed_mechanism_negotiation(&self, command: &mut Document) {
         if let (Some(username), None) = (self.username.as_ref(), self.mechanism.as_ref()) {
             command.insert(

@@ -10,10 +10,11 @@ pub use self::{
     matchable::{assert_matches, eq_matches, MatchErrExt, Matchable},
 };
 
-use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
+use std::{fmt::Debug, sync::Arc, time::Duration};
 
 use crate::{
-    bson::{doc, oid::ObjectId, Bson},
+    bson::{doc, Bson},
+    hello::{hello_command, HelloCommandResponse},
     selection_criteria::SelectionCriteria,
 };
 use bson::Document;
@@ -39,7 +40,7 @@ use crate::{
 pub struct TestClient {
     client: Client,
     pub options: ClientOptions,
-    pub server_info: IsMasterCommandResponse,
+    pub(crate) server_info: HelloCommandResponse,
     pub server_version: Version,
     pub server_parameters: Document,
 }
@@ -82,14 +83,11 @@ impl TestClient {
             .await;
         session.mark_dirty();
 
-        let is_master =
-            RunCommand::new("admin".into(), doc! { "isMaster":  1 }, None, None).unwrap();
+        let hello_cmd = hello_command(options.server_api.as_ref(), None);
+        let hello = RunCommand::new("admin".into(), hello_cmd.body, None, None).unwrap();
 
         let server_info = bson::from_bson(Bson::Document(
-            client
-                .execute_operation(is_master, &mut session)
-                .await
-                .unwrap(),
+            client.execute_operation(hello, &mut session).await.unwrap(),
         ))
         .unwrap();
 
@@ -405,33 +403,6 @@ where
 #[derive(Debug, Deserialize)]
 struct BuildInfo {
     version: String,
-}
-
-// Copy of the internal isMaster struct; fix this later.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct IsMasterCommandResponse {
-    #[serde(rename = "ismaster")]
-    pub is_master: Option<bool>,
-    pub ok: Option<f32>,
-    pub hosts: Option<Vec<String>>,
-    pub passives: Option<Vec<String>>,
-    pub arbiters: Option<Vec<String>>,
-    pub msg: Option<String>,
-    pub me: Option<String>,
-    pub set_version: Option<i32>,
-    pub set_name: Option<String>,
-    pub hidden: Option<bool>,
-    pub secondary: Option<bool>,
-    pub arbiter_only: Option<bool>,
-    #[serde(rename = "isreplicaset")]
-    pub is_replica_set: Option<bool>,
-    pub logical_session_timeout_minutes: Option<i64>,
-    pub min_wire_version: Option<i32>,
-    pub max_wire_version: Option<i32>,
-    pub tags: Option<HashMap<String, String>>,
-    pub election_id: Option<ObjectId>,
-    pub primary: Option<String>,
 }
 
 pub fn get_default_name(description: &str) -> String {

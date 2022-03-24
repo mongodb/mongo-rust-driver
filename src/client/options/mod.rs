@@ -410,8 +410,7 @@ pub struct ClientOptions {
     #[builder(default)]
     pub driver_info: Option<DriverInfo>,
 
-    /// The amount of time each monitoring thread should wait between sending an isMaster command
-    /// to its respective server.
+    /// The amount of time each monitoring thread should wait between performing server checks.
     ///
     /// The default value is 10 seconds.
     #[builder(default)]

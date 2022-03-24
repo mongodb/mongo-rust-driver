@@ -19,7 +19,7 @@ pub struct CommandStartedEvent {
     /// The name of the database the command is being run against.
     pub db: String,
 
-    /// The type of command being run, e.g. "find" or "isMaster".
+    /// The type of command being run, e.g. "find" or "hello".
     pub command_name: String,
 
     /// The driver-generated identifier for the request. Applications can use this to identify the
@@ -45,7 +45,7 @@ pub struct CommandSucceededEvent {
     /// The server's reply to the command.
     pub reply: Document,
 
-    /// The type of command that was run, e.g. "find" or "isMaster".
+    /// The type of command that was run, e.g. "find" or "hello".
     pub command_name: String,
 
     /// The driver-generated identifier for the request. Applications can use this to identify the
@@ -67,7 +67,7 @@ pub struct CommandFailedEvent {
     /// The total execution time of the command (including the network round-trip).
     pub duration: Duration,
 
-    /// The type of command that was run, e.g. "find" or "isMaster".
+    /// The type of command that was run, e.g. "find" or "hello".
     pub command_name: String,
 
     /// The error that the driver returned due to the event failing.

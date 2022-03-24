@@ -8,7 +8,7 @@ use crate::{
     bson::Document,
     client::{options::ServerApi, ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     error::{Error, ErrorKind, Result},
-    is_master::{IsMasterCommandResponse, IsMasterReply},
+    hello::{HelloCommandResponse, HelloReply},
     operation::{CommandErrorBody, CommandResponse},
     options::{ReadConcern, ReadConcernInternal, ReadConcernLevel, ServerAddress},
     selection_criteria::ReadPreference,
@@ -244,12 +244,12 @@ impl RawCommandResponse {
             .map_err(|_| Error::invalid_authentication_response(mechanism_name))
     }
 
-    pub(crate) fn to_is_master_response(&self, round_trip_time: Duration) -> Result<IsMasterReply> {
-        match self.body::<CommandResponse<IsMasterCommandResponse>>() {
+    pub(crate) fn to_hello_reply(&self, round_trip_time: Duration) -> Result<HelloReply> {
+        match self.body::<CommandResponse<HelloCommandResponse>>() {
             Ok(response) if response.is_success() => {
                 let server_address = self.source_address().clone();
                 let cluster_time = response.cluster_time().cloned();
-                Ok(IsMasterReply {
+                Ok(HelloReply {
                     server_address,
                     command_response: response.body,
                     round_trip_time,

@@ -29,9 +29,9 @@ async fn run_test(uri_env_var: &str, resolver_config: Option<ResolverConfig>) {
     let client = Client::with_options(options).expect("option validation should succeed");
 
     let db = client.database("test");
-    db.run_command(doc! { "isMaster": 1 }, None)
+    db.run_command(doc! { "hello": 1 }, None)
         .await
-        .expect("isMaster should succeed");
+        .expect("hello should succeed");
 
     let coll = db.collection::<Document>("test");
     coll.find_one(None, None)

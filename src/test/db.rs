@@ -1,12 +1,10 @@
 use std::cmp::Ord;
 
-use approx::assert_ulps_eq;
 use futures::stream::TryStreamExt;
-use serde::Deserialize;
 use tokio::sync::RwLockReadGuard;
 
 use crate::{
-    bson::{doc, Bson, Document},
+    bson::{doc, Document},
     error::Result,
     options::{
         AggregateOptions,
@@ -26,12 +24,6 @@ use crate::{
 
 use super::log_uncaptured;
 
-#[derive(Deserialize)]
-struct IsMasterReply {
-    ismaster: bool,
-    ok: f64,
-}
-
 async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<CollectionSpecification> {
     let mut colls: Vec<CollectionSpecification> = db
         .list_collections(filter, None)
@@ -43,20 +35,6 @@ async fn get_coll_info(db: &Database, filter: Option<Document>) -> Vec<Collectio
     colls.sort_by(|c1, c2| c1.name.cmp(&c2.name));
 
     colls
-}
-
-#[cfg_attr(feature = "tokio-runtime", tokio::test)]
-#[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn is_master() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
-    let client = TestClient::new().await;
-    let db = client.database("test");
-    let doc = db.run_command(doc! { "ismaster": 1 }, None).await.unwrap();
-    let is_master_reply: IsMasterReply = bson::from_bson(Bson::Document(doc)).unwrap();
-
-    assert!(is_master_reply.ismaster);
-    assert_ulps_eq!(is_master_reply.ok, 1.0);
 }
 
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]

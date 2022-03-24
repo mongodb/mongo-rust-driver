@@ -31,7 +31,7 @@ impl Benchmark for RunCommandBenchmark {
         Ok(RunCommandBenchmark {
             db,
             num_iter: options.num_iter,
-            cmd: doc! { "ismaster": true },
+            cmd: doc! { "hello": true },
             uri: options.uri,
         })
     }

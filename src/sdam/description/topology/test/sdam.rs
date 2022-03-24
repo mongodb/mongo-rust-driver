@@ -11,7 +11,7 @@ use crate::{
     client::Client,
     cmap::{conn::ConnectionGeneration, PoolGeneration},
     error::{BulkWriteFailure, CommandError, Error, ErrorKind},
-    is_master::{IsMasterCommandResponse, IsMasterReply, LastWrite},
+    hello::{HelloCommandResponse, HelloReply, LastWrite, LEGACY_HELLO_COMMAND_NAME},
     options::{ClientOptions, ReadPreference, SelectionCriteria, ServerAddress},
     sdam::{
         description::{
@@ -58,14 +58,15 @@ pub struct Phase {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Response(String, TestIsMasterCommandResponse);
+pub struct Response(String, TestHelloCommandResponse);
 
 #[derive(Debug, Clone, Default, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct TestIsMasterCommandResponse {
+pub(crate) struct TestHelloCommandResponse {
     pub is_writable_primary: Option<bool>,
     #[serde(rename = "ismaster")]
     pub is_master: Option<bool>,
+    pub hello_ok: Option<bool>,
     pub ok: Option<f32>,
     pub hosts: Option<Vec<String>>,
     pub passives: Option<Vec<String>>,
@@ -93,9 +94,9 @@ pub(crate) struct TestIsMasterCommandResponse {
     pub service_id: Option<ObjectId>,
 }
 
-impl From<TestIsMasterCommandResponse> for IsMasterCommandResponse {
-    fn from(test: TestIsMasterCommandResponse) -> Self {
-        IsMasterCommandResponse {
+impl From<TestHelloCommandResponse> for HelloCommandResponse {
+    fn from(test: TestHelloCommandResponse) -> Self {
+        HelloCommandResponse {
             is_writable_primary: test.is_writable_primary,
             is_master: test.is_master,
             hosts: test.hosts,
@@ -123,6 +124,7 @@ impl From<TestIsMasterCommandResponse> for IsMasterCommandResponse {
             service_id: test.service_id,
             topology_version: None,
             compressors: None,
+            hello_ok: test.hello_ok,
         }
     }
 }
@@ -240,9 +242,25 @@ async fn run_test(test_file: TestFile) {
     let test_description = &test_file.description;
 
     // TODO: RUST-360 unskip tests that rely on topology version
-    if test_description.contains("topologyVersion") {
-        log_uncaptured(format!("Skipping {} (RUST-360)", test_description));
-        return;
+    // TODO: RUST-358 unskip tests
+    // TODO: RUST-1081 unskip tests
+    let skip_keywords = doc! {
+        "topologyVersion": "(RUST-360)",
+        "wrong set name": "(RUST-358)",
+        "election Id": "(RUST-1081)",
+        "electionId": "(RUST-1081)",
+        "ElectionId": "(RUST-1081)"
+    };
+
+    for (keyword, skip_reason) in skip_keywords {
+        if test_description.contains(keyword.as_str()) {
+            log_uncaptured(format!(
+                "Skipping {}: {}",
+                test_description,
+                skip_reason.as_str().unwrap()
+            ));
+            return;
+        }
     }
 
     let mut options = ClientOptions::parse_uri(&test_file.uri, None)
@@ -266,7 +284,7 @@ async fn run_test(test_file: TestFile) {
                 )
             });
 
-            let is_master_reply = if command_response.ok != Some(1.0) {
+            let hello_reply = if command_response.ok != Some(1.0) {
                 Err(Error::from(ErrorKind::Command(CommandError {
                     code: 1234,
                     code_name: "dummy error".to_string(),
@@ -277,7 +295,7 @@ async fn run_test(test_file: TestFile) {
                     std::io::ErrorKind::BrokenPipe.into(),
                 ))))
             } else {
-                Ok(IsMasterReply {
+                Ok(HelloReply {
                     server_address: address.clone(),
                     command_response: command_response.into(),
                     round_trip_time: Duration::from_millis(1234), // Doesn't matter for tests.
@@ -287,7 +305,7 @@ async fn run_test(test_file: TestFile) {
 
             // only update server if we have strong reference to it like the monitors do
             if let Some(server) = servers.get(&address).and_then(|s| s.upgrade()) {
-                match is_master_reply {
+                match hello_reply {
                     Ok(reply) => {
                         let new_sd = ServerDescription::new(address.clone(), Some(Ok(reply)));
                         if topology.update(&server, new_sd).await {
@@ -621,8 +639,11 @@ async fn heartbeat_events() {
     }
 
     let options = FailCommandOptions::builder().error_code(1234).build();
-    let failpoint =
-        FailPoint::fail_command(&["isMaster", "hello"], FailPointMode::Times(1), options);
+    let failpoint = FailPoint::fail_command(
+        &[LEGACY_HELLO_COMMAND_NAME, "hello"],
+        FailPointMode::Times(1),
+        options,
+    );
     let _fp_guard = client
         .enable_failpoint(failpoint, None)
         .await
@@ -713,9 +734,9 @@ async fn pool_cleared_error_does_not_mark_unknown() {
         .upgrade()
         .unwrap();
 
-    let heartbeat_response: IsMasterCommandResponse = bson::from_document(doc! {
+    let heartbeat_response: HelloCommandResponse = bson::from_document(doc! {
         "ok": 1,
-        "ismaster": true,
+        "isWritablePrimary": true,
         "minWireVersion": 0,
         "maxWireVersion": 6,
         "maxBsonObjectSize": 16_000,
@@ -729,7 +750,7 @@ async fn pool_cleared_error_does_not_mark_unknown() {
             &server,
             ServerDescription::new(
                 address.clone(),
-                Some(Ok(IsMasterReply {
+                Some(Ok(HelloReply {
                     server_address: address.clone(),
                     command_response: heartbeat_response,
                     round_trip_time: Duration::from_secs(1),

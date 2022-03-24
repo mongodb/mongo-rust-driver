@@ -324,7 +324,7 @@ mod db;
 pub mod error;
 pub mod event;
 mod index;
-mod is_master;
+mod hello;
 mod operation;
 pub mod results;
 pub(crate) mod runtime;

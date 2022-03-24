@@ -138,7 +138,7 @@ pub async fn drop_database(uri: &str, database: &str) -> Result<()> {
 
     let hello = client
         .database("admin")
-        .run_command(doc! { "ismaster": true }, None)
+        .run_command(doc! { "hello": true }, None)
         .await?;
 
     client.database(&database).drop(None).await?;

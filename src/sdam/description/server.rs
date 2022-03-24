@@ -5,7 +5,7 @@ use serde::Deserialize;
 use crate::{
     bson::{oid::ObjectId, DateTime},
     client::ClusterTime,
-    is_master::IsMasterReply,
+    hello::HelloReply,
     options::ServerAddress,
     selection_criteria::TagSet,
 };
@@ -96,17 +96,17 @@ pub(crate) struct ServerDescription {
     pub(crate) average_round_trip_time: Option<Duration>,
 
     // The SDAM spec indicates that a ServerDescription needs to contain an error message if an
-    // error occurred when trying to send an isMaster for the server's heartbeat. Additionally,
-    // we need to be able to create a server description that doesn't contain either an isMaster
+    // error occurred when trying to send an hello for the server's heartbeat. Additionally,
+    // we need to be able to create a server description that doesn't contain either an hello
     // reply or an error, since there's a gap between when a server is newly added to the topology
     // and when the first heartbeat occurs.
     //
     // In order to represent all these states, we store a Result directly in the ServerDescription,
-    // which either contains the aforementioned error message or an Option<IsMasterReply>. This
+    // which either contains the aforementioned error message or an Option<HelloReply>. This
     // allows us to ensure that only valid states are possible (e.g. preventing that both an error
     // and a reply are present) while still making it easy to define helper methods on
-    // ServerDescription for information we need from the isMaster reply by propagating with `?`.
-    pub(crate) reply: Result<Option<IsMasterReply>, String>,
+    // ServerDescription for information we need from the hello reply by propagating with `?`.
+    pub(crate) reply: Result<Option<HelloReply>, String>,
 }
 
 impl PartialEq for ServerDescription {
@@ -130,7 +130,7 @@ impl PartialEq for ServerDescription {
 impl ServerDescription {
     pub(crate) fn new(
         mut address: ServerAddress,
-        is_master_reply: Option<Result<IsMasterReply, String>>,
+        hello_reply: Option<Result<HelloReply, String>>,
     ) -> Self {
         address = ServerAddress::Tcp {
             host: address.host().to_lowercase(),
@@ -141,7 +141,7 @@ impl ServerDescription {
             address,
             server_type: Default::default(),
             last_update_time: None,
-            reply: is_master_reply.transpose(),
+            reply: hello_reply.transpose(),
             average_round_trip_time: None,
         };
 
@@ -152,7 +152,7 @@ impl ServerDescription {
         };
 
         if let Ok(Some(ref mut reply)) = description.reply {
-            // Infer the server type from the isMaster response.
+            // Infer the server type from the hello response.
             description.server_type = reply.command_response.server_type();
 
             // Initialize the average round trip time. If a previous value is present for the
@@ -203,24 +203,24 @@ impl ServerDescription {
 
     pub(crate) fn compatibility_error_message(&self) -> Option<String> {
         if let Ok(Some(ref reply)) = self.reply {
-            let is_master_min_wire_version = reply.command_response.min_wire_version.unwrap_or(0);
+            let hello_min_wire_version = reply.command_response.min_wire_version.unwrap_or(0);
 
-            if is_master_min_wire_version > DRIVER_MAX_WIRE_VERSION {
+            if hello_min_wire_version > DRIVER_MAX_WIRE_VERSION {
                 return Some(format!(
                     "Server at {} requires wire version {}, but this version of the MongoDB Rust \
                      driver only supports up to {}",
-                    self.address, is_master_min_wire_version, DRIVER_MAX_WIRE_VERSION,
+                    self.address, hello_min_wire_version, DRIVER_MAX_WIRE_VERSION,
                 ));
             }
 
-            let is_master_max_wire_version = reply.command_response.max_wire_version.unwrap_or(0);
+            let hello_max_wire_version = reply.command_response.max_wire_version.unwrap_or(0);
 
-            if is_master_max_wire_version < DRIVER_MIN_WIRE_VERSION {
+            if hello_max_wire_version < DRIVER_MIN_WIRE_VERSION {
                 return Some(format!(
                     "Server at {} reports wire version {}, but this version of the MongoDB Rust \
                      driver requires at least {} (MongoDB {}).",
                     self.address,
-                    is_master_max_wire_version,
+                    hello_max_wire_version,
                     DRIVER_MIN_WIRE_VERSION,
                     DRIVER_MIN_DB_VERSION
                 ));

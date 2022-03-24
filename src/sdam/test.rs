@@ -5,10 +5,11 @@ use std::{
 
 use bson::{bson, doc};
 use semver::VersionReq;
-use tokio::sync::RwLockWriteGuard;
+use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
     error::ErrorKind,
+    hello::{LEGACY_HELLO_COMMAND_NAME, LEGACY_HELLO_COMMAND_NAME_LOWERCASE},
     runtime,
     sdam::ServerType,
     test::{
@@ -61,8 +62,11 @@ async fn min_heartbeat_frequency() {
         .app_name("SDAMMinHeartbeatFrequencyTest".to_string())
         .error_code(1234)
         .build();
-    let failpoint =
-        FailPoint::fail_command(&["isMaster", "hello"], FailPointMode::Times(5), fp_options);
+    let failpoint = FailPoint::fail_command(
+        &[LEGACY_HELLO_COMMAND_NAME, "hello"],
+        FailPointMode::Times(5),
+        fp_options,
+    );
 
     let _fp_guard = setup_client
         .enable_failpoint(failpoint, None)
@@ -148,8 +152,11 @@ async fn sdam_pool_management() {
         .app_name("SDAMPoolManagementTest".to_string())
         .error_code(1234)
         .build();
-    let failpoint =
-        FailPoint::fail_command(&["isMaster", "hello"], FailPointMode::Times(1), fp_options);
+    let failpoint = FailPoint::fail_command(
+        &[LEGACY_HELLO_COMMAND_NAME, "hello"],
+        FailPointMode::Times(1),
+        fp_options,
+    );
 
     let _fp_guard = client
         .enable_failpoint(failpoint, None)
@@ -216,8 +223,11 @@ async fn sdam_min_pool_size_error() {
         .app_name("SDAMMinPoolSizeErrorTest".to_string())
         .error_code(1234)
         .build();
-    let failpoint =
-        FailPoint::fail_command(&["isMaster", "hello"], FailPointMode::Skip(3), fp_options);
+    let failpoint = FailPoint::fail_command(
+        &[LEGACY_HELLO_COMMAND_NAME, "hello"],
+        FailPointMode::Skip(3),
+        fp_options,
+    );
 
     let _fp_guard = setup_client
         .enable_failpoint(failpoint, None)
@@ -374,4 +384,70 @@ async fn auth_error() {
         command_events[0].command.get_array("documents").unwrap(),
         &vec![bson!({ "_id": 5 }), bson!({ "_id": 6 })]
     );
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn hello_ok_true() {
+    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
+
+    let mut setup_client_options = CLIENT_OPTIONS.clone();
+    setup_client_options.hosts.drain(1..);
+
+    if setup_client_options.server_api.is_some() {
+        log_uncaptured("skipping hello_ok_true test due to ServerApi being configured");
+        return;
+    }
+
+    if setup_client_options.load_balanced == Some(true) {
+        log_uncaptured("skipping hello_ok_true test due to load balanced topology");
+        return;
+    }
+
+    let setup_client = TestClient::with_options(Some(setup_client_options.clone())).await;
+    if !VersionReq::parse(">= 4.4.5")
+        .unwrap()
+        .matches(&setup_client.server_version)
+    {
+        log_uncaptured("skipping hello_ok_true test due to server not supporting hello");
+        return;
+    }
+
+    let handler = Arc::new(EventHandler::new());
+    let mut subscriber = handler.subscribe();
+
+    let mut options = setup_client_options.clone();
+    options.sdam_event_handler = Some(handler.clone());
+    options.direct_connection = Some(true);
+    options.heartbeat_freq = Some(Duration::from_millis(500));
+    let _client = Client::with_options(options).expect("client creation should succeed");
+
+    // first heartbeat should be legacy hello but contain helloOk
+    subscriber
+        .wait_for_event(Duration::from_millis(2000), |event| {
+            if let Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(e)) = event {
+                assert_eq!(e.reply.get_bool("helloOk"), Ok(true));
+                assert!(e.reply.get(LEGACY_HELLO_COMMAND_NAME_LOWERCASE).is_some());
+                assert!(e.reply.get("isWritablePrimary").is_none());
+                return true;
+            }
+            false
+        })
+        .await
+        .expect("first heartbeat reply should contain helloOk: true");
+
+    // subsequent heartbeats should just be hello
+    for _ in 0..3 {
+        subscriber
+            .wait_for_event(Duration::from_millis(2000), |event| {
+                if let Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(e)) = event {
+                    assert!(e.reply.get("isWritablePrimary").is_some());
+                    assert!(e.reply.get(LEGACY_HELLO_COMMAND_NAME_LOWERCASE).is_none());
+                    return true;
+                }
+                false
+            })
+            .await
+            .expect("subsequent heartbeats should use hello");
+    }
 }

@@ -9,7 +9,8 @@ phases: [
         responses: [
             ["a:27017", {
                 ok: 1,
-                ismaster: true,
+                helloOk: true,
+                isWritablePrimary: true,
                 hosts: ["a:27017", "b:27017", "c:27017"],
                 setVersion: 1,
                 setName: "rs",
@@ -49,7 +50,8 @@ phases: [
         responses: [
             ["b:27017", {
                 ok: 1,
-                ismaster: true,
+                helloOk: true,
+                isWritablePrimary: true,
                 hosts: ["a:27017", "b:27017", "c:27017"],
                 setName: "rs",
                 setVersion: 1,
@@ -86,12 +88,13 @@ phases: [
         }
     },
 
-    # A still claims to be primary, no electionId, we have to trust it.
+    # A still claims to be primary, no electionId, we don't trust it.
     {
         responses: [
             ["a:27017", {
                 ok: 1,
-                ismaster: true,
+                helloOk: true,
+                isWritablePrimary: true,
                 hosts: ["a:27017", "b:27017", "c:27017"],
                 setVersion: 1,
                 setName: "rs",
@@ -101,16 +104,18 @@ phases: [
         ],
         outcome: {
             servers: {
+                # A ignored for missing electionId
                 "a:27017": {
-                    type: "RSPrimary",
-                    setName: "rs",
-                    setVersion: 1,
+                    type: "Unknown",
+                    setName: ,
+                    setVersion: ,
                     electionId:
                 },
                 "b:27017": {
-                    type: "Unknown",
-                    setName: ,
-                    electionId:
+                    type: "RSPrimary",
+                    setName: "rs",
+                    setVersion: 1,
+                    electionId: { "$oid": "000000000000000000000002" }
                 },
                 "c:27017": {
                     type: "Unknown",
@@ -132,7 +137,8 @@ phases: [
         responses: [
             ["c:27017", {
                 ok: 1,
-                ismaster: true,
+                helloOk: true,
+                isWritablePrimary: true,
                 hosts: ["a:27017", "b:27017", "c:27017"],
                 setName: "rs",
                 setVersion: 1,
@@ -143,17 +149,17 @@ phases: [
         ],
         outcome: {
             servers: {
-                # Still primary.
                 "a:27017": {
-                    type: "RSPrimary",
-                    setName: "rs",
-                    setVersion: 1,
+                    type: "Unknown",
+                    setName: ,
+                    setVersion: ,
                     electionId:
                 },
                 "b:27017": {
-                    type: "Unknown",
-                    setName: ,
-                    electionId:
+                    type: "RSPrimary",
+                    setName: "rs",
+                    setVersion: 1,
+                    electionId: { "$oid": "000000000000000000000002" }
                 },
                 "c:27017": {
                     type: "Unknown",

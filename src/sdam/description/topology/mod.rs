@@ -100,7 +100,7 @@ pub(crate) struct TopologyDescription {
     /// acceptable for a read operation.
     pub(crate) local_threshold: Option<Duration>,
 
-    /// The maximum amount of time to wait before checking a given server by sending an isMaster.
+    /// The maximum amount of time to wait before checking a given server by sending server check.
     pub(crate) heartbeat_freq: Option<Duration>,
 
     /// The server descriptions of each member of the topology.
@@ -695,7 +695,7 @@ impl TopologyDescription {
         let addresses: Vec<_> = self.servers.keys().cloned().collect();
 
         // If any other servers are RSPrimary, replace them with an unknown server decscription,
-        // which will cause them to be updated by a new isMaster.
+        // which will cause them to be updated by a new server check.
         for address in addresses.clone() {
             if address == server_description.address {
                 continue;
