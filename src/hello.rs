@@ -23,6 +23,11 @@ use crate::{
     selection_criteria::TagSet,
 };
 
+/// The legacy version of the `hello` command which was deprecated in 5.0.
+/// To limit usages of the legacy name in the codebase, this constant should be used
+/// wherever possible.
+pub(crate) const LEGACY_HELLO_COMMAND_NAME: &'static str = "isMaster";
+
 /// Construct a hello or legacy hello command, depending on the circumstances.
 ///
 /// If an API version is provided, `hello` will be used.
@@ -33,11 +38,11 @@ pub(crate) fn hello_command(api: Option<&ServerApi>, hello_ok: Option<bool>) -> 
     let (command, command_name) = if api.is_some() || matches!(hello_ok, Some(true)) {
         (doc! { "hello": 1 }, "hello")
     } else {
-        let mut cmd = doc! { "isMaster": 1 };
+        let mut cmd = doc! { LEGACY_HELLO_COMMAND_NAME: 1 };
         if hello_ok.is_none() {
             cmd.insert("helloOk", true);
         }
-        (cmd, "isMaster")
+        (cmd, LEGACY_HELLO_COMMAND_NAME)
     };
     let mut command = Command::new(command_name.into(), "admin".into(), command);
     if let Some(server_api) = api {

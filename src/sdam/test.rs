@@ -9,6 +9,7 @@ use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
     error::ErrorKind,
+    hello::LEGACY_HELLO_COMMAND_NAME,
     runtime,
     sdam::ServerType,
     test::{
@@ -61,8 +62,11 @@ async fn min_heartbeat_frequency() {
         .app_name("SDAMMinHeartbeatFrequencyTest".to_string())
         .error_code(1234)
         .build();
-    let failpoint =
-        FailPoint::fail_command(&["isMaster", "hello"], FailPointMode::Times(5), fp_options);
+    let failpoint = FailPoint::fail_command(
+        &[LEGACY_HELLO_COMMAND_NAME, "hello"],
+        FailPointMode::Times(5),
+        fp_options,
+    );
 
     let _fp_guard = setup_client
         .enable_failpoint(failpoint, None)
@@ -148,8 +152,11 @@ async fn sdam_pool_management() {
         .app_name("SDAMPoolManagementTest".to_string())
         .error_code(1234)
         .build();
-    let failpoint =
-        FailPoint::fail_command(&["isMaster", "hello"], FailPointMode::Times(1), fp_options);
+    let failpoint = FailPoint::fail_command(
+        &[LEGACY_HELLO_COMMAND_NAME, "hello"],
+        FailPointMode::Times(1),
+        fp_options,
+    );
 
     let _fp_guard = client
         .enable_failpoint(failpoint, None)
@@ -216,8 +223,11 @@ async fn sdam_min_pool_size_error() {
         .app_name("SDAMMinPoolSizeErrorTest".to_string())
         .error_code(1234)
         .build();
-    let failpoint =
-        FailPoint::fail_command(&["isMaster", "hello"], FailPointMode::Skip(3), fp_options);
+    let failpoint = FailPoint::fail_command(
+        &[LEGACY_HELLO_COMMAND_NAME, "hello"],
+        FailPointMode::Skip(3),
+        fp_options,
+    );
 
     let _fp_guard = setup_client
         .enable_failpoint(failpoint, None)

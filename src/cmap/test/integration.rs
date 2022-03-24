@@ -9,6 +9,7 @@ use crate::{
     bson::{doc, Document},
     cmap::{options::ConnectionPoolOptions, Command, ConnectionPool},
     event::cmap::{CmapEventHandler, ConnectionClosedReason},
+    hello::LEGACY_HELLO_COMMAND_NAME,
     operation::CommandResponse,
     runtime,
     sdam::ServerUpdateSender,
@@ -107,7 +108,7 @@ async fn concurrent_connections() {
     let failpoint = doc! {
         "configureFailPoint": "failCommand",
         "mode": "alwaysOn",
-        "data": { "failCommands": [ "isMaster", "hello" ], "blockConnection": true, "blockTimeMS": 1000 }
+        "data": { "failCommands": [LEGACY_HELLO_COMMAND_NAME, "hello"], "blockConnection": true, "blockTimeMS": 1000 }
     };
     client
         .database("admin")
@@ -196,7 +197,7 @@ async fn connection_error_during_establishment() {
 
     let options = FailCommandOptions::builder().error_code(1234).build();
     let failpoint = FailPoint::fail_command(
-        &["isMaster", "hello"],
+        &[LEGACY_HELLO_COMMAND_NAME, "hello"],
         FailPointMode::Times(10),
         Some(options),
     );

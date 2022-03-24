@@ -11,7 +11,7 @@ use crate::{
     client::Client,
     cmap::{conn::ConnectionGeneration, PoolGeneration},
     error::{BulkWriteFailure, CommandError, Error, ErrorKind},
-    hello::{HelloCommandResponse, HelloReply, LastWrite},
+    hello::{HelloCommandResponse, HelloReply, LastWrite, LEGACY_HELLO_COMMAND_NAME},
     options::{ClientOptions, ReadPreference, SelectionCriteria, ServerAddress},
     sdam::{
         description::{
@@ -639,8 +639,11 @@ async fn heartbeat_events() {
     }
 
     let options = FailCommandOptions::builder().error_code(1234).build();
-    let failpoint =
-        FailPoint::fail_command(&["isMaster", "hello"], FailPointMode::Times(1), options);
+    let failpoint = FailPoint::fail_command(
+        &[LEGACY_HELLO_COMMAND_NAME, "hello"],
+        FailPointMode::Times(1),
+        options,
+    );
     let _fp_guard = client
         .enable_failpoint(failpoint, None)
         .await
