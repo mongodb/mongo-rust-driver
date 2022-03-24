@@ -219,7 +219,7 @@ async fn run_benchmarks(
                 let run_command =
                     bench::run_benchmark::<RunCommandBenchmark>(run_command_options).await?;
 
-                comp_score += score_test(run_command, RUN_COMMAND_BENCH, 0.16, more_info);
+                comp_score += score_test(run_command, RUN_COMMAND_BENCH, 0.13, more_info);
             }
 
             // Small doc insertOne
