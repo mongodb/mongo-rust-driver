@@ -332,8 +332,16 @@ impl Client {
             Ok(c) => c,
             Err(mut err) => {
                 err.add_labels_and_update_pin(None, &mut session, None)?;
+                if err.is_read_retryable() && self.inner.options.retry_writes != Some(false) {
+                    err.add_label(RETRYABLE_WRITE_ERROR);
+                }
 
-                if err.is_pool_cleared() {
+                let op_retry = match self.get_op_retryability(&op, &session) {
+                    Retryability::Read => err.is_read_retryable(),
+                    Retryability::Write => err.is_write_retryable(),
+                    _ => false,
+                };
+                if err.is_pool_cleared() || op_retry {
                     return self.execute_retry(&mut op, &mut session, None, err).await;
                 } else {
                     return Err(err);
@@ -341,7 +349,7 @@ impl Client {
             }
         };
 
-        let retryability = self.get_retryability(&conn, &op, &session).await?;
+        let retryability = self.get_retryability(&conn, &op, &session)?;
 
         let txn_number = match session {
             Some(ref mut session) => {
@@ -433,7 +441,7 @@ impl Client {
             Err(_) => return Err(first_error),
         };
 
-        let retryability = self.get_retryability(&conn, op, session).await?;
+        let retryability = self.get_retryability(&conn, op, session)?;
         if retryability == Retryability::None {
             return Err(first_error);
         }
@@ -825,35 +833,49 @@ impl Client {
     }
 
     /// Returns the retryability level for the execution of this operation.
-    async fn get_retryability<T: Operation>(
+    fn get_op_retryability<T: Operation>(
+        &self,
+        op: &T,
+        session: &Option<&mut ClientSession>,
+    ) -> Retryability {
+        if session
+            .as_ref()
+            .map(|session| session.in_transaction())
+            .unwrap_or(false)
+        {
+            return Retryability::None;
+        }
+        match op.retryability() {
+            Retryability::Read if self.inner.options.retry_reads != Some(false) => {
+                Retryability::Read
+            }
+            // commitTransaction and abortTransaction should be retried regardless of the
+            // value for retry_writes set on the Client
+            Retryability::Write
+                if op.name() == CommitTransaction::NAME
+                    || op.name() == AbortTransaction::NAME
+                    || self.inner.options.retry_writes != Some(false) =>
+            {
+                Retryability::Write
+            }
+            _ => Retryability::None,
+        }
+    }
+
+    /// Returns the retryability level for the execution of this operation on this connection.
+    fn get_retryability<T: Operation>(
         &self,
         conn: &Connection,
         op: &T,
         session: &Option<&mut ClientSession>,
     ) -> Result<Retryability> {
-        if !session
-            .as_ref()
-            .map(|session| session.in_transaction())
-            .unwrap_or(false)
-        {
-            match op.retryability() {
-                Retryability::Read if self.inner.options.retry_reads != Some(false) => {
-                    return Ok(Retryability::Read);
-                }
-                Retryability::Write if conn.stream_description()?.supports_retryable_writes() => {
-                    // commitTransaction and abortTransaction should be retried regardless of the
-                    // value for retry_writes set on the Client
-                    if op.name() == CommitTransaction::NAME
-                        || op.name() == AbortTransaction::NAME
-                        || self.inner.options.retry_writes != Some(false)
-                    {
-                        return Ok(Retryability::Write);
-                    }
-                }
-                _ => {}
+        match self.get_op_retryability(op, session) {
+            Retryability::Read => Ok(Retryability::Read),
+            Retryability::Write if conn.stream_description()?.supports_retryable_writes() => {
+                Ok(Retryability::Write)
             }
+            _ => Ok(Retryability::None),
         }
-        Ok(Retryability::None)
     }
 
     async fn update_cluster_time(
