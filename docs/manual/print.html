@@ -82,7 +82,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded affix "><li class="part-title">Basic Usage</li><li class="chapter-item expanded "><a href="basic/installation.html"><strong aria-hidden="true">2.</strong> Installation</a></li><li class="chapter-item expanded "><a href="basic/feature_choices.html"><strong aria-hidden="true">3.</strong> Feature Choices</a></li><li class="chapter-item expanded "><a href="basic/connection_and_operation.html"><strong aria-hidden="true">4.</strong> Connection and Operation</a></li><li class="chapter-item expanded affix "><li class="part-title">Advanced</li><li class="chapter-item expanded "><a href="advanced/performance.html"><strong aria-hidden="true">5.</strong> Performance</a></li><li class="chapter-item expanded "><a href="advanced/serde_integration.html"><strong aria-hidden="true">6.</strong> Serde Integration</a></li><li class="chapter-item expanded affix "><li class="part-title">Development</li><li class="chapter-item expanded "><a href="dev/writing_tests.html"><strong aria-hidden="true">7.</strong> Writing Tests</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.</strong> Installation</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">3.</strong> Feature Choices</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">4.</strong> Connection</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.</strong> Reading From the Database</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.</strong> Writing To the Database</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">7.</strong> Performance</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">8.</strong> Serde Integration</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">9.</strong> Sessions and Transactions</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">10.</strong> Change Streams</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">11.</strong> Monitoring</div></li><li class="chapter-item expanded affix "><li class="part-title">Development</li><li class="chapter-item expanded "><div><strong aria-hidden="true">12.</strong> Writing Tests</div></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -144,12 +144,6 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="installation"><a class="header" href="#installation">Installation</a></h1>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="feature-choices"><a class="header" href="#feature-choices">Feature Choices</a></h1>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="connection-and-operation"><a class="header" href="#connection-and-operation">Connection and Operation</a></h1>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="performance"><a class="header" href="#performance">Performance</a></h1>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="serde-integration"><a class="header" href="#serde-integration">Serde Integration</a></h1>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="writing-tests"><a class="header" href="#writing-tests">Writing Tests</a></h1>
 
                     </main>
 
@@ -168,6 +162,20 @@
 
         </div>
 
+        <!-- Livereload script (if served using the cli tool) -->
+        <script type="text/javascript">
+            var socket = new WebSocket("ws://localhost:3000/__livereload");
+            socket.onmessage = function (event) {
+                if (event.data === "reload") {
+                    socket.close();
+                    location.reload();
+                }
+            };
+
+            window.onbeforeunload = function() {
+                socket.close();
+            }
+        </script>
 
 
 

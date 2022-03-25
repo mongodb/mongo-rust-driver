@@ -1,18 +1,17 @@
 # Summary
 
 - [Introduction](README.md)
-
-# Basic Usage
-
-- [Installation](basic/installation.md)
-- [Feature Choices](basic/feature_choices.md)
-- [Connection and Operation](./basic/connection_and_operation.md)
-
-# Advanced
-
-- [Performance](./advanced/performance.md)
-- [Serde Integration](./advanced/serde_integration.md)
+- [Installation]()
+- [Feature Choices]()
+- [Connection]()
+- [Reading From the Database]()
+- [Writing To the Database]()
+- [Performance]()
+- [Serde Integration]()
+- [Sessions and Transactions]()
+- [Change Streams]()
+- [Monitoring]()
 
 # Development
 
-- [Writing Tests](./dev/writing_tests.md)
+- [Writing Tests]()
