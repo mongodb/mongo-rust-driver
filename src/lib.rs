@@ -16,7 +16,7 @@
 //! your application, simply add it to your project's `Cargo.toml`.
 //! ```toml
 //! [dependencies]
-//! mongodb = "2.0.0"
+//! mongodb = "2.2.0-beta"
 //! ```
 //!
 //! ### Configuring the async runtime
@@ -30,7 +30,7 @@
 //! add the following to your `Cargo.toml`:
 //! ```toml
 //! [dependencies.mongodb]
-//! version = "2.0.0"
+//! version = "2.2.0-beta"
 //! default-features = false
 //! features = ["async-std-runtime"]
 //! ```
@@ -40,7 +40,7 @@
 //! `Cargo.toml`:
 //! ```toml
 //! [dependencies.mongodb]
-//! version = "2.0.0"
+//! version = "2.2.0-beta"
 //! default-features = false
 //! features = ["sync"]
 //! ```
@@ -301,7 +301,7 @@
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(test, type_length_limit = "80000000")]
-#![doc(html_root_url = "https://docs.rs/mongodb/2.0.0")]
+#![doc(html_root_url = "https://docs.rs/mongodb/2.2.0-beta")]
 
 #[cfg(all(feature = "aws-auth", feature = "async-std-runtime"))]
 compile_error!("The `aws-auth` feature flag is only supported on the tokio runtime.");
