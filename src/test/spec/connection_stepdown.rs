@@ -219,7 +219,11 @@ async fn notwritableprimary_reset_pool() {
             .expect("insert should have succeeded");
     }
 
-    run_test("notwritableprimary_reset_pool", notwritableprimary_reset_pool_test).await;
+    run_test(
+        "notwritableprimary_reset_pool",
+        notwritableprimary_reset_pool_test,
+    )
+    .await;
 }
 
 #[function_name::named]
