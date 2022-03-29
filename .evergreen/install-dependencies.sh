@@ -27,6 +27,9 @@ rustup toolchain install nightly -c rustfmt
 # Install tool for converting cargo test output to junit
 cargo install cargo2junit
 
+# Install the manual rendering tool
+cargo install mdbook
+
 # install npm/node
 ./.evergreen/install-node.sh
 

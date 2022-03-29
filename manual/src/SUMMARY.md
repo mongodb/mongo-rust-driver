@@ -1,9 +1,8 @@
 # Summary
 
 - [Introduction](README.md)
-- [Installation]()
-- [Feature Choices]()
-- [Connection]()
+- [Installation and Features](installation_features.md)
+- [Connecting to the Database](connecting.md)
 - [Reading From the Database]()
 - [Writing To the Database]()
 - [Performance]()
