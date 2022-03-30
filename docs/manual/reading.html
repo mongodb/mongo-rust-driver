@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Introduction - MongoDB Rust Driver</title>
+        <title>Reading From the Database - MongoDB Rust Driver</title>
 
 
         <!-- Custom HTML head -->
@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html" class="active"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="installation_features.html"><strong aria-hidden="true">2.</strong> Installation and Features</a></li><li class="chapter-item expanded "><a href="connecting.html"><strong aria-hidden="true">3.</strong> Connecting to the Database</a></li><li class="chapter-item expanded "><a href="reading.html"><strong aria-hidden="true">4.</strong> Reading From the Database</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.</strong> Writing To the Database</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.</strong> Performance</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">7.</strong> Serde Integration</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">8.</strong> Sessions and Transactions</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">9.</strong> Change Streams</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">10.</strong> Monitoring</div></li><li class="chapter-item expanded affix "><li class="part-title">Development</li><li class="chapter-item expanded "><div><strong aria-hidden="true">11.</strong> Writing Tests</div></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="installation_features.html"><strong aria-hidden="true">2.</strong> Installation and Features</a></li><li class="chapter-item expanded "><a href="connecting.html"><strong aria-hidden="true">3.</strong> Connecting to the Database</a></li><li class="chapter-item expanded "><a href="reading.html" class="active"><strong aria-hidden="true">4.</strong> Reading From the Database</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.</strong> Writing To the Database</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.</strong> Performance</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">7.</strong> Serde Integration</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">8.</strong> Sessions and Transactions</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">9.</strong> Change Streams</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">10.</strong> Monitoring</div></li><li class="chapter-item expanded affix "><li class="part-title">Development</li><li class="chapter-item expanded "><div><strong aria-hidden="true">11.</strong> Writing Tests</div></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -142,48 +142,18 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
-<p><a href="https://crates.io/crates/mongodb"><img src="https://img.shields.io/crates/v/mongodb.svg" alt="Crates.io" /></a> <a href="https://docs.rs/mongodb"><img src="https://docs.rs/mongodb/badge.svg" alt="docs.rs" /></a> <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License" /></a></p>
-<p>This is the manual for the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the <a href="https://docs.rs/bson/latest"><code>bson</code></a> crate for BSON support. The driver contains a fully async API that supports either <a href="https://crates.io/crates/tokio"><code>tokio</code></a> (default) or <a href="https://crates.io/crates/async-std"><code>async-std</code></a>, depending on the feature flags set. The driver also has a sync API that may be enabled via feature flag.</p>
-<h2 id="warning-about-timeouts--cancellation"><a class="header" href="#warning-about-timeouts--cancellation">Warning about timeouts / cancellation</a></h2>
-<p>In async Rust, it is common to implement cancellation and timeouts by dropping a future after a certain period of time instead of polling it to completion. This is how <a href="https://docs.rs/tokio/1.10.1/tokio/time/fn.timeout.html"><code>tokio::time::timeout</code></a> works, for example. However, doing this with futures returned by the driver can leave the driver's internals in an inconsistent state, which may lead to unpredictable or incorrect behavior (see RUST-937 for more details). As such, it is <strong><em>highly</em></strong> recommended to poll all futures returned from the driver to completion. In order to still use timeout mechanisms like <code>tokio::time::timeout</code> with the driver, one option is to spawn tasks and time out on their <a href="https://docs.rs/tokio/1.10.1/tokio/task/struct.JoinHandle.html"><code>JoinHandle</code></a> futures instead of on the driver's futures directly. This will ensure the driver's futures will always be completely polled while also allowing the application to continue in the event of a timeout.</p>
-<p>e.g.</p>
-<pre><pre class="playground"><code class="language-rust no_run edition2021">
-<span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span><span class="boring">extern crate mongodb;
-</span><span class="boring">extern crate tokio;
-</span><span class="boring">use std::time::Duration;
-</span><span class="boring">use mongodb::{
-</span><span class="boring">    Client,
-</span><span class="boring">    bson::doc,
-</span><span class="boring">};
-</span><span class="boring">
-</span><span class="boring">async fn foo() -&gt; std::result::Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
-</span><span class="boring">
-</span><span class="boring">let client = Client::with_uri_str(&quot;mongodb://example.com&quot;).await?;
-</span>let collection = client.database(&quot;foo&quot;).collection(&quot;bar&quot;);
-let handle = tokio::task::spawn(async move {
-    collection.insert_one(doc! { &quot;x&quot;: 1 }, None).await
-});
-
-tokio::time::timeout(Duration::from_secs(5), handle).await???;
-<span class="boring">Ok(())
-</span><span class="boring">}
-</span><span class="boring">}
-</span></code></pre></pre>
-<h2 id="minimum-supported-rust-version-msrv"><a class="header" href="#minimum-supported-rust-version-msrv">Minimum supported Rust version (MSRV)</a></h2>
-<p>The MSRV for this crate is currently 1.51.0. This will be rarely be increased, and if it ever is,
-it will only happen in a minor or major version release.</p>
+                        <h1 id="reading-from-the-database"><a class="header" href="#reading-from-the-database">Reading From the Database</a></h1>
+<h2 id="database-and-collection-handles"><a class="header" href="#database-and-collection-handles">Database and Collection Handles</a></h2>
+<p>Once you have a <code>Client</code>, you can </p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-
-                            <a rel="next" href="installation_features.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                                <i class="fa fa-angle-right"></i>
+                            <a rel="prev" href="connecting.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
                             </a>
+
 
                         <div style="clear: both"></div>
                     </nav>
@@ -191,10 +161,10 @@ it will only happen in a minor or major version release.</p>
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-
-                    <a rel="next" href="installation_features.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                        <i class="fa fa-angle-right"></i>
+                    <a rel="prev" href="connecting.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
                     </a>
+
             </nav>
 
         </div>
