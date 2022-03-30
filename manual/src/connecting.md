@@ -9,7 +9,7 @@ At its simplest this can just specify the host and port, e.g.
 ```uri
 mongodb://mongodb0.example.com:27017
 ```
-For the full range of options supported by the Rust driver, see the documentation for the [`ClientOptions::parse`](https://docs.rs/mongodb/latest/mongodb/options/struct.ClientOptions.html#method.parse) method.  That method will return a `ClientOptions` struct, allowing for directly querying or setting any of the options supported by the Rust driver:
+For the full range of options supported by the Rust driver, see the documentation for the [`ClientOptions::parse`](https://docs.rs/mongodb/latest/mongodb/options/struct.ClientOptions.html#method.parse) method.  That method will return a [`ClientOptions`](https://docs.rs/mongodb/latest/mongodb/options/struct.ClientOptions.html) struct, allowing for directly querying or setting any of the options supported by the Rust driver:
 ```rust,no_run
 # extern crate mongodb;
 # use mongodb::options::ClientOptions;
@@ -21,7 +21,7 @@ options.app_name = Some("My App".to_string());
 ```
 
 ## Creating a `Client`
-The `Client` struct is the main entry point for the driver.  You can create one from a `ClientOptions` struct:
+The [`Client`](https://docs.rs/mongodb/latest/mongodb/struct.Client.html) struct is the main entry point for the driver.  You can create one from a `ClientOptions` struct:
 ```rust,no_run
 # extern crate mongodb;
 # use mongodb::{Client, options::ClientOptions};

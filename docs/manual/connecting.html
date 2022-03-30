@@ -150,7 +150,7 @@
 <p>At its simplest this can just specify the host and port, e.g.</p>
 <pre><code class="language-uri">mongodb://mongodb0.example.com:27017
 </code></pre>
-<p>For the full range of options supported by the Rust driver, see the documentation for the <a href="https://docs.rs/mongodb/latest/mongodb/options/struct.ClientOptions.html#method.parse"><code>ClientOptions::parse</code></a> method.  That method will return a <code>ClientOptions</code> struct, allowing for directly querying or setting any of the options supported by the Rust driver:</p>
+<p>For the full range of options supported by the Rust driver, see the documentation for the <a href="https://docs.rs/mongodb/latest/mongodb/options/struct.ClientOptions.html#method.parse"><code>ClientOptions::parse</code></a> method.  That method will return a <a href="https://docs.rs/mongodb/latest/mongodb/options/struct.ClientOptions.html"><code>ClientOptions</code></a> struct, allowing for directly querying or setting any of the options supported by the Rust driver:</p>
 <pre><pre class="playground"><code class="language-rust no_run edition2021">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -164,7 +164,7 @@ options.app_name = Some(&quot;My App&quot;.to_string());
 </span><span class="boring">}
 </span></code></pre></pre>
 <h2 id="creating-a-client"><a class="header" href="#creating-a-client">Creating a <code>Client</code></a></h2>
-<p>The <code>Client</code> struct is the main entry point for the driver.  You can create one from a <code>ClientOptions</code> struct:</p>
+<p>The <a href="https://docs.rs/mongodb/latest/mongodb/struct.Client.html"><code>Client</code></a> struct is the main entry point for the driver.  You can create one from a <code>ClientOptions</code> struct:</p>
 <pre><pre class="playground"><code class="language-rust no_run edition2021">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {

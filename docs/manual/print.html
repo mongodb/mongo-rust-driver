@@ -220,7 +220,7 @@ features = [&quot;sync&quot;]
 <p>At its simplest this can just specify the host and port, e.g.</p>
 <pre><code class="language-uri">mongodb://mongodb0.example.com:27017
 </code></pre>
-<p>For the full range of options supported by the Rust driver, see the documentation for the <a href="https://docs.rs/mongodb/latest/mongodb/options/struct.ClientOptions.html#method.parse"><code>ClientOptions::parse</code></a> method.  That method will return a <code>ClientOptions</code> struct, allowing for directly querying or setting any of the options supported by the Rust driver:</p>
+<p>For the full range of options supported by the Rust driver, see the documentation for the <a href="https://docs.rs/mongodb/latest/mongodb/options/struct.ClientOptions.html#method.parse"><code>ClientOptions::parse</code></a> method.  That method will return a <a href="https://docs.rs/mongodb/latest/mongodb/options/struct.ClientOptions.html"><code>ClientOptions</code></a> struct, allowing for directly querying or setting any of the options supported by the Rust driver:</p>
 <pre><pre class="playground"><code class="language-rust no_run edition2021">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -234,7 +234,7 @@ options.app_name = Some(&quot;My App&quot;.to_string());
 </span><span class="boring">}
 </span></code></pre></pre>
 <h2 id="creating-a-client"><a class="header" href="#creating-a-client">Creating a <code>Client</code></a></h2>
-<p>The <code>Client</code> struct is the main entry point for the driver.  You can create one from a <code>ClientOptions</code> struct:</p>
+<p>The <a href="https://docs.rs/mongodb/latest/mongodb/struct.Client.html"><code>Client</code></a> struct is the main entry point for the driver.  You can create one from a <code>ClientOptions</code> struct:</p>
 <pre><pre class="playground"><code class="language-rust no_run edition2021">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -288,7 +288,108 @@ for i in 0..5 {
 <p>For more information on the client and parallel operation, see the <a href="performance.html">Performance</a> chapter.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="reading-from-the-database"><a class="header" href="#reading-from-the-database">Reading From the Database</a></h1>
 <h2 id="database-and-collection-handles"><a class="header" href="#database-and-collection-handles">Database and Collection Handles</a></h2>
-<p>Once you have a <code>Client</code>, you can </p>
+<p>Once you have a <code>Client</code>, you can call <a href="https://docs.rs/mongodb/latest/mongodb/struct.Client.html#method.database"><code>Client::database</code></a> to create a handle to a particular databse on the server, and <a href="https://docs.rs/mongodb/latest/mongodb/struct.Database.html#method.collection"><code>Database::collection</code></a> to create a handle to a particular collection in that database.  <a href="https://docs.rs/mongodb/latest/mongodb/struct.Database.html"><code>Database</code></a> and <a href="https://docs.rs/mongodb/latest/mongodb/struct.Collection.html"><code>Collection</code></a> handles are lightweight - creating them requires no IO, <code>clone</code>ing them is cheap, and they can be safely shared across threads or async tasks.  For example:</p>
+<pre><pre class="playground"><code class="language-rust no_run edition2021">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">extern crate mongodb;
+</span><span class="boring">extern crate tokio;
+</span><span class="boring">use mongodb::{bson::Document, Client, error::Result};
+</span><span class="boring">use tokio::task;
+</span><span class="boring">
+</span><span class="boring">async fn start_workers() -&gt; Result&lt;()&gt; {
+</span><span class="boring">let client = Client::with_uri_str(&quot;mongodb://example.com&quot;).await?;
+</span>let db = client.database(&quot;items&quot;);
+
+for i in 0..5 {
+    let db_ref = db.clone();
+
+    task::spawn(async move {
+        let collection = db_ref.collection::&lt;Document&gt;(&amp;format!(&quot;coll{}&quot;, i));
+
+        // Do something with the collection
+    });
+}
+<span class="boring">
+</span><span class="boring">Ok(())
+</span><span class="boring">}
+</span><span class="boring">}
+</span></code></pre></pre>
+<p>A <code>Collection</code> can be parameterized with any type that implements the <code>Serialize</code> and <code>Deserialize</code> traits from the <a href="https://serde.rs/"><code>serde</code></a> crate. This includes but is not limited to just <code>Document</code>. The various methods that accept or return instances of the documents in the collection will accept/return instances of the generic parameter (e.g. <a href="https://docs.rs/mongodb/latest/mongodb/struct.Collection.html#method.insert_one"><code>Collection::insert_one</code></a> accepts it as an argument, <a href="https://docs.rs/mongodb/latest/mongodb/struct.Collection.html#method.find_one"><code>Collection::find_one</code></a> returns an <code>Option</code> of it). It is recommended to define types that model your data which you can parameterize your <code>Collection</code>s with instead of <code>Document</code>, since doing so eliminates a lot of boilerplate deserialization code and is often more performant.</p>
+<pre><pre class="playground"><code class="language-rust no_run edition2021">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">extern crate mongodb;
+</span><span class="boring">extern crate tokio;
+</span><span class="boring">extern crate serde;
+</span><span class="boring">use mongodb::{
+</span><span class="boring">    bson::doc,
+</span><span class="boring">    error::Result,
+</span><span class="boring">};
+</span><span class="boring">use tokio::task;
+</span><span class="boring">
+</span><span class="boring">async fn start_workers() -&gt; Result&lt;()&gt; {
+</span><span class="boring">use mongodb::Client;
+</span><span class="boring">
+</span><span class="boring">let client = Client::with_uri_str(&quot;mongodb://example.com&quot;).await?;
+</span>use serde::{Deserialize, Serialize};
+
+// Define a type that models our data.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct Item {
+    id: u32,
+}
+
+// Parameterize our collection with the model.
+let coll = client.database(&quot;items&quot;).collection::&lt;Item&gt;(&quot;in_stock&quot;);
+
+for i in 0..5 {
+    let coll_ref = coll.clone();
+
+    // Spawn several tasks that operate on the same collection concurrently.
+    task::spawn(async move {
+        // Perform operations with `coll_ref` that work with directly our model.
+        coll_ref.insert_one(Item { id: i }, None).await;
+    });
+}
+<span class="boring">
+</span><span class="boring">Ok(())
+</span><span class="boring">}
+</span><span class="boring">}
+</span></code></pre></pre>
+<p>For more information, see the <a href="serde_integration.html">Serde Integration</a> section.</p>
+<h2 id="cursors"><a class="header" href="#cursors">Cursors</a></h2>
+<p>Results from queries are generally returned via <a href="https://docs.rs/mongodb/latest/mongodb/struct.Cursor.html"><code>Cursor</code></a>, a struct which streams the results back from the server as requested. The <code>Cursor</code> type implements the <a href="https://docs.rs/futures/latest/futures/stream/trait.Stream.html"><code>Stream</code></a> trait from the <a href="https://crates.io/crates/futures"><code>futures</code></a> crate, and in order to access its streaming functionality you need to import at least one of the <a href="https://docs.rs/futures/latest/futures/stream/trait.StreamExt.html"><code>StreamExt</code></a> or <a href="https://docs.rs/futures/latest/futures/stream/trait.TryStreamExt.html"><code>TryStreamExt</code></a> traits.</p>
+<pre><code class="language-toml"># In Cargo.toml, add the following dependency.
+futures = &quot;0.3&quot;
+</code></pre>
+<pre><pre class="playground"><code class="language-rust no_run edition2021">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">extern crate mongodb;
+</span><span class="boring">extern crate serde;
+</span><span class="boring">extern crate futures;
+</span><span class="boring">use serde::Deserialize;
+</span><span class="boring">#[derive(Deserialize)]
+</span><span class="boring">struct Book { title: String }
+</span><span class="boring">async fn foo() -&gt; mongodb::error::Result&lt;()&gt; {
+</span><span class="boring">let typed_collection = mongodb::Client::with_uri_str(&quot;&quot;).await?.database(&quot;&quot;).collection::&lt;Book&gt;(&quot;&quot;);
+</span>// This trait is required to use `try_next()` on the cursor
+use futures::stream::TryStreamExt;
+use mongodb::{bson::doc, options::FindOptions};
+
+// Query the books in the collection with a filter and an option.
+let filter = doc! { &quot;author&quot;: &quot;George Orwell&quot; };
+let find_options = FindOptions::builder().sort(doc! { &quot;title&quot;: 1 }).build();
+let mut cursor = typed_collection.find(filter, find_options).await?;
+
+// Iterate over the results of the cursor.
+while let Some(book) = cursor.try_next().await? {
+    println!(&quot;title: {}&quot;, book.title);
+}
+<span class="boring">Ok(()) }
+</span><span class="boring">}
+</span></code></pre></pre>
 
                     </main>
 

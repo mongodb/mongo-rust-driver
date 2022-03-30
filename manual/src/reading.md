@@ -2,4 +2,103 @@
 
 ## Database and Collection Handles
 
-Once you have a `Client`, you can 
+Once you have a `Client`, you can call [`Client::database`](https://docs.rs/mongodb/latest/mongodb/struct.Client.html#method.database) to create a handle to a particular databse on the server, and [`Database::collection`](https://docs.rs/mongodb/latest/mongodb/struct.Database.html#method.collection) to create a handle to a particular collection in that database.  [`Database`](https://docs.rs/mongodb/latest/mongodb/struct.Database.html) and [`Collection`](https://docs.rs/mongodb/latest/mongodb/struct.Collection.html) handles are lightweight - creating them requires no IO, `clone`ing them is cheap, and they can be safely shared across threads or async tasks.  For example:
+```rust,no_run
+# extern crate mongodb;
+# extern crate tokio;
+# use mongodb::{bson::Document, Client, error::Result};
+# use tokio::task;
+#
+# async fn start_workers() -> Result<()> {
+# let client = Client::with_uri_str("mongodb://example.com").await?;
+let db = client.database("items");
+
+for i in 0..5 {
+    let db_ref = db.clone();
+
+    task::spawn(async move {
+        let collection = db_ref.collection::<Document>(&format!("coll{}", i));
+
+        // Do something with the collection
+    });
+}
+#
+# Ok(())
+# }
+```
+
+A `Collection` can be parameterized with any type that implements the `Serialize` and `Deserialize` traits from the [`serde`](https://serde.rs/) crate. This includes but is not limited to just `Document`. The various methods that accept or return instances of the documents in the collection will accept/return instances of the generic parameter (e.g. [`Collection::insert_one`](https://docs.rs/mongodb/latest/mongodb/struct.Collection.html#method.insert_one) accepts it as an argument, [`Collection::find_one`](https://docs.rs/mongodb/latest/mongodb/struct.Collection.html#method.find_one) returns an `Option` of it). It is recommended to define types that model your data which you can parameterize your `Collection`s with instead of `Document`, since doing so eliminates a lot of boilerplate deserialization code and is often more performant.
+
+```rust,no_run
+# extern crate mongodb;
+# extern crate tokio;
+# extern crate serde;
+# use mongodb::{
+#     bson::doc,
+#     error::Result,
+# };
+# use tokio::task;
+#
+# async fn start_workers() -> Result<()> {
+# use mongodb::Client;
+#
+# let client = Client::with_uri_str("mongodb://example.com").await?;
+use serde::{Deserialize, Serialize};
+
+// Define a type that models our data.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct Item {
+    id: u32,
+}
+
+// Parameterize our collection with the model.
+let coll = client.database("items").collection::<Item>("in_stock");
+
+for i in 0..5 {
+    let coll_ref = coll.clone();
+
+    // Spawn several tasks that operate on the same collection concurrently.
+    task::spawn(async move {
+        // Perform operations with `coll_ref` that work with directly our model.
+        coll_ref.insert_one(Item { id: i }, None).await;
+    });
+}
+#
+# Ok(())
+# }
+```
+
+For more information, see the [Serde Integration](serde_integration.md) section.
+
+## Cursors
+
+Results from queries are generally returned via [`Cursor`](https://docs.rs/mongodb/latest/mongodb/struct.Cursor.html), a struct which streams the results back from the server as requested. The `Cursor` type implements the [`Stream`](https://docs.rs/futures/latest/futures/stream/trait.Stream.html) trait from the [`futures`](https://crates.io/crates/futures) crate, and in order to access its streaming functionality you need to import at least one of the [`StreamExt`](https://docs.rs/futures/latest/futures/stream/trait.StreamExt.html) or [`TryStreamExt`](https://docs.rs/futures/latest/futures/stream/trait.TryStreamExt.html) traits.
+
+```toml
+# In Cargo.toml, add the following dependency.
+futures = "0.3"
+```
+```rust,no_run
+# extern crate mongodb;
+# extern crate serde;
+# extern crate futures;
+# use serde::Deserialize;
+# #[derive(Deserialize)]
+# struct Book { title: String }
+# async fn foo() -> mongodb::error::Result<()> {
+# let typed_collection = mongodb::Client::with_uri_str("").await?.database("").collection::<Book>("");
+// This trait is required to use `try_next()` on the cursor
+use futures::stream::TryStreamExt;
+use mongodb::{bson::doc, options::FindOptions};
+
+// Query the books in the collection with a filter and an option.
+let filter = doc! { "author": "George Orwell" };
+let find_options = FindOptions::builder().sort(doc! { "title": 1 }).build();
+let mut cursor = typed_collection.find(filter, find_options).await?;
+
+// Iterate over the results of the cursor.
+while let Some(book) = cursor.try_next().await? {
+    println!("title: {}", book.title);
+}
+# Ok(()) }
+```
