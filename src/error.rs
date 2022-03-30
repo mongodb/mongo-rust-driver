@@ -13,7 +13,7 @@ use thiserror::Error;
 use crate::{bson::Document, options::ServerAddress};
 
 const RECOVERING_CODES: [i32; 5] = [11600, 11602, 13436, 189, 91];
-const NOTMASTER_CODES: [i32; 3] = [10107, 13435, 10058];
+const NOTWRITABLEPRIMARY_CODES: [i32; 3] = [10107, 13435, 10058];
 const SHUTTING_DOWN_CODES: [i32; 2] = [11600, 91];
 const RETRYABLE_READ_CODES: [i32; 11] =
     [11600, 11602, 10107, 13435, 13436, 189, 91, 7, 6, 89, 9001];
@@ -111,7 +111,7 @@ impl Error {
     }
 
     pub(crate) fn is_state_change_error(&self) -> bool {
-        self.is_recovering() || self.is_not_master()
+        self.is_recovering() || self.is_notwritableprimary()
     }
 
     pub(crate) fn is_auth_error(&self) -> bool {
@@ -297,10 +297,10 @@ impl Error {
         }
     }
 
-    /// If this error corresponds to a "not master" error as per the SDAM spec.
-    pub(crate) fn is_not_master(&self) -> bool {
+    /// If this error corresponds to a "not writable primary" error as per the SDAM spec.
+    pub(crate) fn is_notwritableprimary(&self) -> bool {
         self.code()
-            .map(|code| NOTMASTER_CODES.contains(&code))
+            .map(|code| NOTWRITABLEPRIMARY_CODES.contains(&code))
             .unwrap_or(false)
     }
 

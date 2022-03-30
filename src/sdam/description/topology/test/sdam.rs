@@ -701,7 +701,7 @@ async fn direct_connection() {
         .insert_one(doc! {}, None)
         .await
         .expect_err("write should fail with directConnection=true on secondary");
-    assert!(error.is_not_master());
+    assert!(error.is_notwritableprimary());
 
     let client =
         Client::with_options(secondary_options).expect("client construction should succeed");

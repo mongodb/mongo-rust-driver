@@ -122,15 +122,15 @@ async fn get_more() {
 #[function_name::named]
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn not_master_keep_pool() {
-    async fn not_master_keep_pool_test(
+async fn notwritableprimary_keep_pool() {
+    async fn notwritableprimary_keep_pool_test(
         client: EventClient,
         _db: Database,
         coll: Collection<Document>,
     ) {
         // This test requires server version 4.2 or higher.
         if client.server_version_lt(4, 2) {
-            log_uncaptured("skipping not_master_keep_pool due to server version < 4.2");
+            log_uncaptured("skipping notwritableprimary_keep_pool due to server version < 4.2");
             return;
         }
 
@@ -167,21 +167,22 @@ async fn not_master_keep_pool() {
         assert_eq!(client.count_pool_cleared_events(), 0);
     }
 
-    run_test(function_name!(), not_master_keep_pool_test).await;
+    run_test(function_name!(), notwritableprimary_keep_pool_test).await;
 }
 
-#[function_name::named]
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
-async fn not_master_reset_pool() {
-    async fn not_master_reset_pool_test(
+async fn notwritableprimary_reset_pool() {
+    async fn notwritableprimary_reset_pool_test(
         client: EventClient,
         _db: Database,
         coll: Collection<Document>,
     ) {
         // This test must only run on 4.0 servers.
         if !client.server_version_eq(4, 0) {
-            log_uncaptured("skipping not_master_reset_pool due to unsupported server version");
+            log_uncaptured(
+                "skipping notwritableprimary_reset_pool due to unsupported server version",
+            );
             return;
         }
 
@@ -218,7 +219,11 @@ async fn not_master_reset_pool() {
             .expect("insert should have succeeded");
     }
 
-    run_test(function_name!(), not_master_reset_pool_test).await;
+    run_test(
+        "notwritableprimary_reset_pool",
+        notwritableprimary_reset_pool_test,
+    )
+    .await;
 }
 
 #[function_name::named]

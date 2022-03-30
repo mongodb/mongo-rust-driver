@@ -258,7 +258,7 @@ impl Handshaker {
                 .map(|server_first| client_first.into_first_round(server_first))
         });
 
-        // Check that master reply has a compressor list and unpack it
+        // Check that the hello reply has a compressor list and unpack it
         if let (Some(server_compressors), Some(client_compressors)) = (
             hello_reply.command_response.compressors.as_ref(),
             self.compressors.as_ref(),
