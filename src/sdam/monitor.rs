@@ -193,6 +193,7 @@ impl HeartbeatMonitor {
             Some(ref mut conn) => {
                 let command = hello_command(
                     self.client_options.server_api.as_ref(),
+                    self.client_options.load_balanced,
                     Some(conn.stream_description()?.hello_ok),
                 );
                 run_hello(
