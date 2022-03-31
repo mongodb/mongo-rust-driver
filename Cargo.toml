@@ -53,7 +53,7 @@ snappy-compression = ["snap"]
 async-trait = "0.1.42"
 base64 = "0.13.0"
 bitflags = "1.1.0"
-bson = { git = "https://github.com/mongodb/bson-rust" }
+bson = { git = "https://github.com/mongodb/bson-rust", branch = "main" }
 chrono = "0.4.7"
 derivative = "2.1.1"
 flate2 = { version = "1.0", optional = true }

@@ -354,7 +354,7 @@ bash .evergreen/check-all.sh
 ```
 
 ## Continuous Integration
-Commits to master are run automatically on [evergreen](https://evergreen.mongodb.com/waterfall/mongo-rust-driver-stable).
+Commits to main are run automatically on [evergreen](https://evergreen.mongodb.com/waterfall/mongo-rust-driver).
 
 ## Minimum supported Rust version (MSRV)
 
@@ -363,4 +363,4 @@ it will only happen in a minor or major version release.
 
 ## License
 
-This project is licensed under the [Apache License 2.0](https://github.com/10gen/mongo-rust-driver/blob/master/LICENSE).
+This project is licensed under the [Apache License 2.0](https://github.com/10gen/mongo-rust-driver/blob/main/LICENSE).
