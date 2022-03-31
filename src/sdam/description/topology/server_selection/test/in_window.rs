@@ -225,24 +225,6 @@ async fn load_balancing_test() {
     options.min_pool_size = Some(max_pool_size);
     let client = TestClient::with_handler(Some(Arc::new(handler.clone())), options).await;
 
-    // wait for both servers to be discovered.
-    subscriber
-        .wait_for_event(Duration::from_secs(30), |event| {
-            if let Event::Sdam(SdamEvent::TopologyDescriptionChanged(event)) = event {
-                event
-                    .new_description
-                    .servers()
-                    .into_iter()
-                    .filter(|s| matches!(s.1.server_type(), ServerType::Mongos))
-                    .count()
-                    == 2
-            } else {
-                false
-            }
-        })
-        .await
-        .expect("timed out waiting for both mongoses to be discovered");
-
     // wait for both servers pools to be saturated.
     for address in hosts {
         let selector = Arc::new(move |sd: &ServerInfo| sd.address() == &address);
@@ -271,7 +253,6 @@ async fn load_balancing_test() {
             .await
             .expect("timed out waiting for both pools to be saturated");
         conns += 1;
-        println!("conns: {}", conns);
     }
     drop(subscriber);
 
@@ -282,7 +263,6 @@ async fn load_balancing_test() {
     let failpoint = FailPoint::fail_command(&["find"], FailPointMode::AlwaysOn, options);
 
     let slow_host = CLIENT_OPTIONS.hosts[0].clone();
-    println!("slow host: {}", slow_host);
     let criteria = SelectionCriteria::Predicate(Arc::new(move |si| si.address() == &slow_host));
     let fp_guard = setup_client
         .enable_failpoint(failpoint, criteria)
