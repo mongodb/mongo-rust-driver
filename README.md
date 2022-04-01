@@ -18,7 +18,7 @@ This repository contains the officially supported MongoDB Rust driver, a client 
         - [Finding documents in a collection](#finding-documents-in-a-collection)
     - [Using the sync API](#using-the-sync-api)
 - [Platforms](#platforms)
-- [Atlas note](#atlas-note)
+- [Note on connecting to Atlas deployments](#note-on-connecting-to-atlas-deployments)
 - [Windows DNS note](#windows-dns-note)
 - [Warning about timeouts / cancellation](#warning-about-timeouts--cancellation)
 - [Bug Reporting / Feature Requests](#bug-reporting--feature-requests)
@@ -237,9 +237,9 @@ for result in cursor {
 
 The driver tests against Linux, MacOS, and Windows in CI.
 
-## Atlas note
+## Note on connecting to Atlas deployments
 
-Currently, the driver has issues connecting to Atlas tiers above M2 unless the server version is at least 4.2. We're working on fixing this, but in the meantime, a workaround is to upgrade your cluster to 4.2. The driver has no known issues with either M0 or M2 instances.
+In order to connect to a pre-4.2 Atlas instance that's M2 or bigger, the `openssl-tls` feature flag must be enabled. The flag is not required for clusters smaller than M2 or running server versions 4.2 or newer.
 
 ## Windows DNS note
 
