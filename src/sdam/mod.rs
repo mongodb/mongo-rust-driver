@@ -3,6 +3,7 @@ mod description;
 mod message_manager;
 mod monitor;
 pub mod public;
+mod topology;
 mod srv_polling;
 mod state;
 #[cfg(test)]
