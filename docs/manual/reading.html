@@ -144,7 +144,7 @@
                     <main>
                         <h1 id="reading-from-the-database"><a class="header" href="#reading-from-the-database">Reading From the Database</a></h1>
 <h2 id="database-and-collection-handles"><a class="header" href="#database-and-collection-handles">Database and Collection Handles</a></h2>
-<p>Once you have a <code>Client</code>, you can call <a href="https://docs.rs/mongodb/latest/mongodb/struct.Client.html#method.database"><code>Client::database</code></a> to create a handle to a particular databse on the server, and <a href="https://docs.rs/mongodb/latest/mongodb/struct.Database.html#method.collection"><code>Database::collection</code></a> to create a handle to a particular collection in that database.  <a href="https://docs.rs/mongodb/latest/mongodb/struct.Database.html"><code>Database</code></a> and <a href="https://docs.rs/mongodb/latest/mongodb/struct.Collection.html"><code>Collection</code></a> handles are lightweight - creating them requires no IO, <code>clone</code>ing them is cheap, and they can be safely shared across threads or async tasks.  For example:</p>
+<p>Once you have a <code>Client</code>, you can call <a href="https://docs.rs/mongodb/latest/mongodb/struct.Client.html#method.database"><code>Client::database</code></a> to create a handle to a particular database on the server, and <a href="https://docs.rs/mongodb/latest/mongodb/struct.Database.html#method.collection"><code>Database::collection</code></a> to create a handle to a particular collection in that database.  <a href="https://docs.rs/mongodb/latest/mongodb/struct.Database.html"><code>Database</code></a> and <a href="https://docs.rs/mongodb/latest/mongodb/struct.Collection.html"><code>Collection</code></a> handles are lightweight - creating them requires no IO, <code>clone</code>ing them is cheap, and they can be safely shared across threads or async tasks.  For example:</p>
 <pre><pre class="playground"><code class="language-rust no_run edition2021">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -171,7 +171,8 @@ for i in 0..5 {
 </span><span class="boring">}
 </span><span class="boring">}
 </span></code></pre></pre>
-<p>A <code>Collection</code> can be parameterized with any type that implements the <code>Serialize</code> and <code>Deserialize</code> traits from the <a href="https://serde.rs/"><code>serde</code></a> crate. This includes but is not limited to just <code>Document</code>. The various methods that accept or return instances of the documents in the collection will accept/return instances of the generic parameter (e.g. <a href="https://docs.rs/mongodb/latest/mongodb/struct.Collection.html#method.insert_one"><code>Collection::insert_one</code></a> accepts it as an argument, <a href="https://docs.rs/mongodb/latest/mongodb/struct.Collection.html#method.find_one"><code>Collection::find_one</code></a> returns an <code>Option</code> of it). It is recommended to define types that model your data which you can parameterize your <code>Collection</code>s with instead of <code>Document</code>, since doing so eliminates a lot of boilerplate deserialization code and is often more performant.</p>
+<p>A <code>Collection</code> can be parameterized with a type for the documents in the collection; this includes but is not limited to just <code>Document</code>.  The various methods that accept instances of the documents (e.g. <a href="https://docs.rs/mongodb/latest/mongodb/struct.Collection.html#method.insert_one"><code>Collection::insert_one</code></a>) require that it implement the <code>Serialize</code> trait from the <a href="http://serde.rs/"><code>serde</code></a> crate.  Similarly, the methods that return instances (e.g. <a href="https://docs.rs/mongodb/latest/mongodb/struct.Collection.html#method.find_one"><code>Collection::find_one</code></a>) require that it implement <code>Deserialize</code>.</p>
+<p><code>Document</code> implements both and can always be used as the type parameter.  However, it is recommended to define types that model your data which you can parameterize your <code>Collection</code>s with instead, since doing so eliminates a lot of boilerplate deserialization code and is often more performant.</p>
 <pre><pre class="playground"><code class="language-rust no_run edition2021">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -200,13 +201,8 @@ struct Item {
 let coll = client.database(&quot;items&quot;).collection::&lt;Item&gt;(&quot;in_stock&quot;);
 
 for i in 0..5 {
-    let coll_ref = coll.clone();
-
-    // Spawn several tasks that operate on the same collection concurrently.
-    task::spawn(async move {
-        // Perform operations with `coll_ref` that work with directly our model.
-        coll_ref.insert_one(Item { id: i }, None).await;
-    });
+    // Perform operations that work with directly our model.
+    coll.insert_one(Item { id: i }, None).await;
 }
 <span class="boring">
 </span><span class="boring">Ok(())
@@ -270,20 +266,6 @@ while let Some(book) = cursor.try_next().await? {
 
         </div>
 
-        <!-- Livereload script (if served using the cli tool) -->
-        <script type="text/javascript">
-            var socket = new WebSocket("ws://localhost:3000/__livereload");
-            socket.onmessage = function (event) {
-                if (event.data === "reload") {
-                    socket.close();
-                    location.reload();
-                }
-            };
-
-            window.onbeforeunload = function() {
-                socket.close();
-            }
-        </script>
 
 
 

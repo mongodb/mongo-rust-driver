@@ -146,7 +146,7 @@
 <p><a href="https://crates.io/crates/mongodb"><img src="https://img.shields.io/crates/v/mongodb.svg" alt="Crates.io" /></a> <a href="https://docs.rs/mongodb"><img src="https://docs.rs/mongodb/badge.svg" alt="docs.rs" /></a> <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License" /></a></p>
 <p>This is the manual for the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the <a href="https://docs.rs/bson/latest"><code>bson</code></a> crate for BSON support. The driver contains a fully async API that supports either <a href="https://crates.io/crates/tokio"><code>tokio</code></a> (default) or <a href="https://crates.io/crates/async-std"><code>async-std</code></a>, depending on the feature flags set. The driver also has a sync API that may be enabled via feature flag.</p>
 <h2 id="warning-about-timeouts--cancellation"><a class="header" href="#warning-about-timeouts--cancellation">Warning about timeouts / cancellation</a></h2>
-<p>In async Rust, it is common to implement cancellation and timeouts by dropping a future after a certain period of time instead of polling it to completion. This is how <a href="https://docs.rs/tokio/1.10.1/tokio/time/fn.timeout.html"><code>tokio::time::timeout</code></a> works, for example. However, doing this with futures returned by the driver can leave the driver's internals in an inconsistent state, which may lead to unpredictable or incorrect behavior (see RUST-937 for more details). As such, it is <strong><em>highly</em></strong> recommended to poll all futures returned from the driver to completion. In order to still use timeout mechanisms like <code>tokio::time::timeout</code> with the driver, one option is to spawn tasks and time out on their <a href="https://docs.rs/tokio/1.10.1/tokio/task/struct.JoinHandle.html"><code>JoinHandle</code></a> futures instead of on the driver's futures directly. This will ensure the driver's futures will always be completely polled while also allowing the application to continue in the event of a timeout.</p>
+<p>In async Rust, it is common to implement cancellation and timeouts by dropping a future after a certain period of time instead of polling it to completion. This is how <a href="https://docs.rs/tokio/latest/tokio/time/fn.timeout.html"><code>tokio::time::timeout</code></a> works, for example. However, doing this with futures returned by the driver can leave the driver's internals in an inconsistent state, which may lead to unpredictable or incorrect behavior (see <a href="https://jira.mongodb.org/browse/RUST-937">RUST-937</a> for more details). As such, it is <strong><em>highly</em></strong> recommended to poll all futures returned from the driver to completion. In order to still use timeout mechanisms like <code>tokio::time::timeout</code> with the driver, one option is to spawn tasks and time out on their <a href="https://docs.rs/tokio/latest/tokio/task/struct.JoinHandle.html"><code>JoinHandle</code></a> futures instead of on the driver's futures directly. This will ensure the driver's futures will always be completely polled while also allowing the application to continue in the event of a timeout.</p>
 <p>e.g.</p>
 <pre><pre class="playground"><code class="language-rust no_run edition2021">
 <span class="boring">#![allow(unused)]
@@ -199,20 +199,6 @@ it will only happen in a minor or major version release.</p>
 
         </div>
 
-        <!-- Livereload script (if served using the cli tool) -->
-        <script type="text/javascript">
-            var socket = new WebSocket("ws://localhost:3000/__livereload");
-            socket.onmessage = function (event) {
-                if (event.data === "reload") {
-                    socket.close();
-                    location.reload();
-                }
-            };
-
-            window.onbeforeunload = function() {
-                socket.close();
-            }
-        </script>
 
 
 

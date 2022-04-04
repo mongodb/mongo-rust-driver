@@ -63,4 +63,7 @@ for i in 0..5 {
 # Ok(())
 # }
 ```
-For more information on the client and parallel operation, see the [Performance](performance.md) chapter.
+
+## Client Performance
+
+While cloning a `Client` is very lightweight, creating a new one is an expensive operation.  For most use cases, it is highly recommended to create a single `Client` and persist it for the lifetime of your application.  For more information, see the [Performance](performance.md) chapter.

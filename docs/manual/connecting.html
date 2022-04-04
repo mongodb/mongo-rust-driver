@@ -215,7 +215,8 @@ for i in 0..5 {
 </span><span class="boring">}
 </span><span class="boring">}
 </span></code></pre></pre>
-<p>For more information on the client and parallel operation, see the <a href="performance.html">Performance</a> chapter.</p>
+<h2 id="client-performance"><a class="header" href="#client-performance">Client Performance</a></h2>
+<p>While cloning a <code>Client</code> is very lightweight, creating a new one is an expensive operation.  For most use cases, it is highly recommended to create a single <code>Client</code> and persist it for the lifetime of your application.  For more information, see the <a href="performance.html">Performance</a> chapter.</p>
 
                     </main>
 
@@ -246,20 +247,6 @@ for i in 0..5 {
 
         </div>
 
-        <!-- Livereload script (if served using the cli tool) -->
-        <script type="text/javascript">
-            var socket = new WebSocket("ws://localhost:3000/__livereload");
-            socket.onmessage = function (event) {
-                if (event.data === "reload") {
-                    socket.close();
-                    location.reload();
-                }
-            };
-
-            window.onbeforeunload = function() {
-                socket.close();
-            }
-        </script>
 
 
 

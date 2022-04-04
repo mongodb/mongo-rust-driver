@@ -2,7 +2,7 @@
 
 ## Database and Collection Handles
 
-Once you have a `Client`, you can call [`Client::database`](https://docs.rs/mongodb/latest/mongodb/struct.Client.html#method.database) to create a handle to a particular databse on the server, and [`Database::collection`](https://docs.rs/mongodb/latest/mongodb/struct.Database.html#method.collection) to create a handle to a particular collection in that database.  [`Database`](https://docs.rs/mongodb/latest/mongodb/struct.Database.html) and [`Collection`](https://docs.rs/mongodb/latest/mongodb/struct.Collection.html) handles are lightweight - creating them requires no IO, `clone`ing them is cheap, and they can be safely shared across threads or async tasks.  For example:
+Once you have a `Client`, you can call [`Client::database`](https://docs.rs/mongodb/latest/mongodb/struct.Client.html#method.database) to create a handle to a particular database on the server, and [`Database::collection`](https://docs.rs/mongodb/latest/mongodb/struct.Database.html#method.collection) to create a handle to a particular collection in that database.  [`Database`](https://docs.rs/mongodb/latest/mongodb/struct.Database.html) and [`Collection`](https://docs.rs/mongodb/latest/mongodb/struct.Collection.html) handles are lightweight - creating them requires no IO, `clone`ing them is cheap, and they can be safely shared across threads or async tasks.  For example:
 ```rust,no_run
 # extern crate mongodb;
 # extern crate tokio;
@@ -27,7 +27,9 @@ for i in 0..5 {
 # }
 ```
 
-A `Collection` can be parameterized with any type that implements the `Serialize` and `Deserialize` traits from the [`serde`](https://serde.rs/) crate. This includes but is not limited to just `Document`. The various methods that accept or return instances of the documents in the collection will accept/return instances of the generic parameter (e.g. [`Collection::insert_one`](https://docs.rs/mongodb/latest/mongodb/struct.Collection.html#method.insert_one) accepts it as an argument, [`Collection::find_one`](https://docs.rs/mongodb/latest/mongodb/struct.Collection.html#method.find_one) returns an `Option` of it). It is recommended to define types that model your data which you can parameterize your `Collection`s with instead of `Document`, since doing so eliminates a lot of boilerplate deserialization code and is often more performant.
+A `Collection` can be parameterized with a type for the documents in the collection; this includes but is not limited to just `Document`.  The various methods that accept instances of the documents (e.g. [`Collection::insert_one`](https://docs.rs/mongodb/latest/mongodb/struct.Collection.html#method.insert_one)) require that it implement the `Serialize` trait from the [`serde`](http://serde.rs/) crate.  Similarly, the methods that return instances (e.g. [`Collection::find_one`](https://docs.rs/mongodb/latest/mongodb/struct.Collection.html#method.find_one)) require that it implement `Deserialize`.
+
+`Document` implements both and can always be used as the type parameter.  However, it is recommended to define types that model your data which you can parameterize your `Collection`s with instead, since doing so eliminates a lot of boilerplate deserialization code and is often more performant.
 
 ```rust,no_run
 # extern crate mongodb;
@@ -55,13 +57,8 @@ struct Item {
 let coll = client.database("items").collection::<Item>("in_stock");
 
 for i in 0..5 {
-    let coll_ref = coll.clone();
-
-    // Spawn several tasks that operate on the same collection concurrently.
-    task::spawn(async move {
-        // Perform operations with `coll_ref` that work with directly our model.
-        coll_ref.insert_one(Item { id: i }, None).await;
-    });
+    // Perform operations that work with directly our model.
+    coll.insert_one(Item { id: i }, None).await;
 }
 #
 # Ok(())
