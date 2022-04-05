@@ -8,6 +8,8 @@ use super::{
     state::{server::Server, Topology, WeakTopology},
     ServerUpdate,
     ServerUpdateReceiver,
+    TopologyUpdater,
+    TopologyWatcher,
 };
 use crate::{
     cmap::{Connection, Handshaker},
@@ -74,6 +76,143 @@ impl Monitor {
         runtime::execute(async move {
             update_monitor.execute().await;
         });
+    }
+}
+
+pub(crate) struct HMonitor {
+    address: ServerAddress,
+    connection: Option<Connection>,
+    handshaker: Handshaker,
+    topology_updater: TopologyUpdater,
+    topology_watcher: TopologyWatcher,
+    client_options: ClientOptions,
+}
+
+impl HMonitor {
+    pub(crate) fn new(
+        address: ServerAddress,
+        topology_updater: TopologyUpdater,
+        topology_watcher: TopologyWatcher,
+        client_options: ClientOptions,
+    ) -> Self {
+        let handshaker = Handshaker::new(Some(client_options.clone().into()));
+        Self {
+            address,
+            client_options,
+            handshaker,
+            topology_updater,
+            topology_watcher,
+            connection: None,
+        }
+    }
+
+    pub(crate) async fn execute(&mut self) {
+        let heartbeat_frequency = self
+            .client_options
+            .heartbeat_freq
+            .unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY);
+
+        while self.topology_watcher.is_alive() {
+            self.check_server().await;
+
+            #[cfg(test)]
+            let min_frequency = self
+                .client_options
+                .test_options
+                .as_ref()
+                .and_then(|to| to.heartbeat_freq)
+                .unwrap_or(MIN_HEARTBEAT_FREQUENCY);
+
+            #[cfg(not(test))]
+            let min_frequency = MIN_HEARTBEAT_FREQUENCY;
+
+            runtime::delay_for(min_frequency).await;
+            self.topology_updater
+                .wait_for_update_request(heartbeat_frequency - min_frequency)
+                .await;
+        }
+    }
+
+    /// Checks the the server by running a hello command. If an I/O error occurs, the
+    /// connection will replaced with a new one.
+    ///
+    /// Returns true if the topology has changed and false otherwise.
+    async fn check_server(&mut self) -> bool {
+        self.topology_updater.clear_update_requests();
+        let mut retried = false;
+        let check_result = match self.perform_hello().await {
+            Ok(reply) => Ok(reply),
+            Err(e) => {
+                let previous_description = self.topology_watcher.server_description(&self.address);
+                if e.is_network_error()
+                    && previous_description
+                        .map(|sd| sd.is_available())
+                        .unwrap_or(false)
+                {
+                    self.handle_error(e);
+                    retried = true;
+                    self.perform_hello().await
+                } else {
+                    Err(e)
+                }
+            }
+        };
+
+        match check_result {
+            Ok(reply) => {
+                let server_description =
+                    ServerDescription::new(self.address.clone(), Some(Ok(reply)));
+                self.topology_updater.update(server_description);
+                true
+            }
+            Err(e) => self.handle_error(e) || retried,
+        }
+    }
+
+    async fn perform_hello(&mut self) -> Result<HelloReply> {
+        let result = match self.connection {
+            Some(ref mut conn) => {
+                let command = hello_command(
+                    self.client_options.server_api.as_ref(),
+                    self.client_options.load_balanced,
+                    Some(conn.stream_description()?.hello_ok),
+                );
+                run_hello(conn, command, None, &self.client_options.sdam_event_handler).await
+            }
+            None => {
+                let mut connection = Connection::connect_monitoring(
+                    self.address.clone(),
+                    self.client_options.connect_timeout,
+                    self.client_options.tls_options(),
+                )
+                .await?;
+
+                let res = self
+                    .handshaker
+                    .handshake(
+                        &mut connection,
+                        None,
+                        &self.client_options.sdam_event_handler,
+                    )
+                    .await
+                    .map(|r| r.hello_reply);
+                self.connection = Some(connection);
+                res
+            }
+        };
+
+        if result.is_err() {
+            self.connection.take();
+        }
+
+        result
+    }
+
+    fn handle_error(&mut self, error: Error) -> bool {
+        // topology.handle_monitor_error(error, server).await
+        self.topology_updater
+            .handle_monitor_error(self.address.clone(), error);
+        true
     }
 }
 

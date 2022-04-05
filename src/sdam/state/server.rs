@@ -57,6 +57,14 @@ impl Server {
         (server, monitor)
     }
 
+    pub(crate) fn new(
+        address: ServerAddress,
+        options: ClientOptions,
+        http_client: HttpClient,
+    ) -> Arc<Server> {
+        todo!()
+    }
+
     pub(crate) fn increment_operation_count(&self) {
         self.operation_count.fetch_add(1, Ordering::SeqCst);
     }
